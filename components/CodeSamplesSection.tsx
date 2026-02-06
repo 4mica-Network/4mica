@@ -2,215 +2,118 @@
 
 import { useState } from 'react';
 
-type LanguageId = 'typescript' | 'python' | 'rust' | 'api';
+type LanguageId = 'typescript' | 'python' | 'rust';
 type KeyAction = 'payer' | 'recipient';
 
 const languageTabs: { id: LanguageId; label: string }[] = [
   { id: 'typescript', label: 'TypeScript' },
   { id: 'python', label: 'Python' },
   { id: 'rust', label: 'Rust' },
-  { id: 'api', label: 'API' },
 ];
 
 const keyActions: { id: KeyAction; label: string }[] = [
-  { id: 'payer', label: 'Payer (agent)' },
-  { id: 'recipient', label: 'Recipient (payee)' },
+  { id: 'payer', label: 'Client' },
+  { id: 'recipient', label: 'Server' },
 ];
 
 const codeSamples: Record<LanguageId, Record<KeyAction, string>> = {
   typescript: {
-    payer: `import { Client, ConfigBuilder, PaymentGuaranteeRequestClaims, SigningScheme } from "sdk-4mica";
+    payer: `import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
 
-async function run() {
-  const cfg = new ConfigBuilder()
-    .fromEnv()
-    .walletPrivateKey(process.env.PAYER_KEY!)
-    .build();
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
 
-  const client = await Client.new(cfg);
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [
+    {
+      network: "eip155:11155111", // Ethereum Sepolia
+      client: scheme,
+    },
+  ],
+});
 
-  const claims = PaymentGuaranteeRequestClaims.new(
-    userAddress,
-    recipientAddress,
-    tabId,
-    amountWei,
-    Math.floor(Date.now() / 1000),
-    assetAddress,
-    reqId
-  );
+const response = await fetchWithPayment("https://api.example.com/premium-content");
+const data = await response.json();
+console.log(data);`,
+    recipient: `import express from "express";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 
-  const signed = await client.user.signPayment(claims, SigningScheme.EIP712);
-  console.log(signed.signature);
-}
+const app = express();
+app.use(express.json());
 
-run();`,
-    recipient: `import { Client, ConfigBuilder, PaymentGuaranteeRequestClaims, SigningScheme } from "sdk-4mica";
-
-async function run() {
-  const cfg = new ConfigBuilder()
-    .fromEnv()
-    .walletPrivateKey(process.env.RECIPIENT_KEY!)
-    .build();
-
-  const client = await Client.new(cfg);
-
-  const tabId = await client.recipient.createTab(
-    userAddress,
-    recipientAddress,
-    assetAddress,
-    3600
-  );
-  const latest = await client.recipient.getLatestGuarantee(tabId);
-  const reqId = latest ? latest.reqId + 1n : 0n;
-
-  const claims = PaymentGuaranteeRequestClaims.new(
-    userAddress,
-    recipientAddress,
-    tabId,
-    amountWei,
-    Math.floor(Date.now() / 1000),
-    assetAddress,
-    reqId
-  );
-
-  const cert = await client.recipient.issuePaymentGuarantee(
-    claims,
-    payerSignature,
-    SigningScheme.EIP712
-  );
-  console.log(cert.signature);
-}
-
-run();`,
-  },
-  python: {
-    payer: `import asyncio
-import time
-from fourmica_sdk import Client, ConfigBuilder, PaymentGuaranteeRequestClaims, SigningScheme
-
-async def main() -> None:
-    cfg = ConfigBuilder().from_env().wallet_private_key(PAYER_KEY).build()
-    client = await Client.new(cfg)
-
-    claims = PaymentGuaranteeRequestClaims.new(
-        user_address=user_address,
-        recipient_address=recipient_address,
-        tab_id=tab_id,
-        req_id=req_id,
-        amount=amount_wei,
-        timestamp=int(time.time()),
-        erc20_token=asset_address,
-    )
-
-    signature = await client.user.sign_payment(claims, SigningScheme.EIP712)
-    print(signature.signature)
-
-asyncio.run(main())`,
-    recipient: `import asyncio
-import time
-from fourmica_sdk import Client, ConfigBuilder, PaymentGuaranteeRequestClaims, SigningScheme
-
-async def main() -> None:
-    cfg = ConfigBuilder().from_env().wallet_private_key(RECIPIENT_KEY).build()
-    client = await Client.new(cfg)
-
-    tab_id = await client.recipient.create_tab(
-        user_address=user_address,
-        recipient_address=recipient_address,
-        erc20_token=asset_address,
-        ttl=3600,
-    )
-    latest = await client.recipient.get_latest_guarantee(tab_id)
-    req_id = latest.req_id + 1 if latest else 0
-
-    claims = PaymentGuaranteeRequestClaims.new(
-        user_address=user_address,
-        recipient_address=recipient_address,
-        tab_id=tab_id,
-        req_id=req_id,
-        amount=amount_wei,
-        timestamp=int(time.time()),
-        erc20_token=asset_address,
-    )
-
-    cert = await client.recipient.issue_payment_guarantee(
-        claims, payer_signature, SigningScheme.EIP712
-    )
-    print(cert.signature)
-
-asyncio.run(main())`,
-  },
-  rust: {
-    payer: `use rust_sdk_4mica::{Client, ConfigBuilder, PaymentGuaranteeRequestClaims, SigningScheme, U256};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-let cfg = ConfigBuilder::default()
-  .wallet_private_key(std::env::var("PAYER_KEY")?)
-  .build()?;
-let client = Client::new(cfg).await?;
-
-let claims = PaymentGuaranteeRequestClaims::new(
-  user_address.clone(),
-  recipient_address.clone(),
-  tab_id,
-  req_id,
-  U256::from(amount_wei),
-  SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-  Some(asset_address.clone()),
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:11155111", // Ethereum Sepolia
+          payTo: "0xYourAddress",
+        },
+        description: "Access to premium content",
+      },
+    },
+    {
+      advertisedEndpoint: "https://api.example.com/tabs/open",
+    }
+  )
 );
 
-let signed = client.user.sign_payment(claims.clone(), SigningScheme::Eip712).await?;
-println!("{}", signed.signature);`,
-    recipient: `use rust_sdk_4mica::{Client, ConfigBuilder, U256};
+app.get("/premium-content", (req, res) => {
+  res.json({ message: "This is premium content behind a paywall" });
+});
 
-let cfg = ConfigBuilder::default()
-  .wallet_private_key(std::env::var("RECIPIENT_KEY")?)
-  .build()?;
-let client = Client::new(cfg).await?;
-
-let tab_id = client
-  .recipient
-  .create_tab(user_address.clone(), recipient_address.clone(), None, Some(3600))
-  .await?;
-
-let latest = client.recipient.get_latest_guarantee(tab_id).await?;
-let req_id = latest
-  .map(|g| g.req_id + U256::from(1u64))
-  .unwrap_or(U256::ZERO);
-
-println!("TAB_ID={tab_id}");
-println!("REQ_ID={req_id}");
-
-let cert = payer_certificate;
-client.recipient.remunerate(cert).await?;`,
+app.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});`,
   },
-  api: {
-    payer: `curl -X POST "$CORE_URL/core/guarantees" \\
-  -H "Authorization: Bearer $ACCESS_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "claims": {
-      "version": "v1",
-      "user_address": "0xUSER",
-      "recipient_address": "0xRECIPIENT",
-      "tab_id": "0x1",
-      "req_id": "0x0",
-      "amount": "0x16345785d8a0000",
-      "asset_address": "0x0000000000000000000000000000000000000000",
-      "timestamp": 1716500000
+  python: {
+    payer: `from x402 import x402ClientSync
+from x402.http.clients import x402_requests
+from fourmica_x402.client_scheme import FourMicaEvmScheme
+
+client = x402ClientSync()
+client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+
+session = x402_requests(client)
+response = session.get("https://api.example.com/premium-content")
+print(response.status_code, response.text)`,
+    recipient: `from fastapi import FastAPI
+from fourmica_x402.http import fastapi_payment_middleware_from_config
+
+app = FastAPI()
+
+routes = {
+    "GET /premium-content": {
+        "accepts": {
+            "scheme": "4mica-credit",
+            "price": "$0.10",
+            "network": "eip155:11155111",  # Ethereum Sepolia
+            "payTo": "0xYourAddress",
+        },
+        "description": "Access to premium content",
     },
-    "signature": "0x...",
-    "scheme": "eip712"
-  }'`,
-    recipient: `curl -X POST "$CORE_URL/core/payment-tabs" \\
-  -H "Authorization: Bearer $ACCESS_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "user_address": "0xUSER",
-    "recipient_address": "0xRECIPIENT",
-    "erc20_token": null,
-    "ttl": 3600
-  }'`,
+}
+
+middleware = fastapi_payment_middleware_from_config(
+    routes,
+    tab_endpoint="https://api.example.com/tabs/open",
+)
+
+@app.middleware("http")
+async def x402_mw(request, call_next):
+    return await middleware(request, call_next)
+
+@app.get("/premium-content")
+async def premium_content():
+    return {"message": "This is premium content behind a paywall"}`,
+  },
+  rust: {
+    payer: `Will be ready soon!`,
+    recipient: `Will be ready soon!`,
   },
 };
 
@@ -234,11 +137,6 @@ const tokenPatterns: Record<LanguageId, TokenPattern> = {
     regex:
       /(\/\/.*$)|(b?"[^"\\]*(?:\\.[^"\\]*)*"|b?'[^'\\]*(?:\\.[^'\\]*)*')|(\b0x[0-9a-fA-F_]+\b|\b\d+(?:_\d+)*(?:\.\d+)?\b)|(\b(?:use|let|mut|async|await|fn|pub|struct|impl|match|if|else|for|while|loop|return|crate|mod|enum|trait|Result|Ok|Err|Some|None)\b)|(\b\w+!)/g,
     classes: ['comment', 'string', 'number', 'keyword', 'macro'],
-  },
-  api: {
-    regex:
-      /(#.*$)|('[^'\\]*(?:\\.[^'\\]*)*'|"[^"\\]*(?:\\.[^"\\]*)*")|(\b\d+(?:\.\d+)?\b)|(\b(?:curl|POST|GET|PUT|PATCH|DELETE)\b)|(--?[A-Za-z-]+)|(\$[A-Z0-9_]+)\b/g,
-    classes: ['comment', 'string', 'number', 'keyword', 'flag', 'variable'],
   },
 };
 
@@ -291,7 +189,7 @@ export default function CodeSamplesSection() {
           <div className="glass-panel rounded-2xl p-5 sm:p-6">
             <div className="flex items-center justify-between text-[10px] sm:text-xs uppercase tracking-[0.24em] text-ink-muted">
               <span>Quick Start</span>
-              <span>Payer + Recipient Flow</span>
+              <span>Client + Server Integration</span>
             </div>
             <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-surface-solid">
               <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-surface-solid px-3 py-2">
@@ -353,7 +251,7 @@ export default function CodeSamplesSection() {
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between text-xs text-ink-muted">
-              <span>Payer and recipient flow examples</span>
+              <span>Client and server integration examples</span>
               <span className="text-brand-teal">SDK + API ready</span>
             </div>
           </div>
