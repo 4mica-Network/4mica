@@ -51,10 +51,13 @@ export default function HeroSection() {
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
               <button
                 onClick={handleGetStarted}
-                className="btn btn-primary btn-lg whitespace-nowrap"
+                className="btn btn-outline btn-lg whitespace-nowrap"
               >
                 Start Building
               </button>
+              <Link href="/demo" className="btn btn-outline btn-lg whitespace-nowrap">
+                Live Demo
+              </Link>
               <button
                 onClick={handleJoinCommunity}
                 className="btn btn-outline btn-lg whitespace-nowrap"

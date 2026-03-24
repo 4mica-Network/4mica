@@ -5,9 +5,7 @@ import Link from 'next/link';
 
 export default function PartnersSection() {
   const partners = [
-    { name: 'Eigen', logo: '/assets/eigen.svg', href: 'https://www.eigencloud.xyz/' },
     { name: 'Aligned Layer', logo: '/assets/aligned_layer_logo.png', href: 'https://alignedlayer.com/' },
-    { name: 'Vistara', logo: '/assets/Vistaara.jpeg', href: 'https://www.vistara.dev/' },
     { name: 'ChaosChain', logo: '/assets/chaos_chain_logo.svg', href: 'https://chaoscha.in/' }
   ];
   const proofPoints = [
