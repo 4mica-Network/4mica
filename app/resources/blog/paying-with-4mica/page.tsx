@@ -5,7 +5,7 @@ import CodeTabs from '../CodeTabs';
 export const metadata: Metadata = {
   title: 'Paying with 4Mica',
   description:
-    'A payer-first guide to funding collateral, signing X-PAYMENT, and settling tabs on-chain.',
+    'A payer-first guide to funding collateral, signing 4Mica payment headers, and settling tabs on-chain with v2 validation-gated guarantees.',
 };
 
 export default function PayingWith4MicaPage() {
@@ -14,7 +14,17 @@ export default function PayingWith4MicaPage() {
       heading: 'Executive Summary',
       paragraphs: [
         'This guide is for payers and agents who want to consume paid resources using 4Mica credit.',
-        'You fund collateral once, receive 402 requirements, sign an X-PAYMENT header, and later settle the tab on-chain. Recipients get a certificate immediately, so work can be delivered without waiting on chain.',
+        'You fund collateral once, receive 402 requirements, sign a payment header (`X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2), and later settle the tab on-chain. Recipients get a certificate immediately, so work can be delivered without waiting on chain.',
+        'When a route uses V2 guarantees, default-time remuneration is allowed only after the linked ERC-8004 validation request passes (for example using wachai-validation-sdk status checks).',
+      ],
+    },
+    {
+      heading: 'V1 vs V2: What Changes for Payers',
+      bullets: [
+        'V1: sign standard guarantee claims and settle tab on-chain as usual.',
+        'V2: sign claims that include validation policy commitments generated from `paymentRequirements.extra`.',
+        'Settlement request/response remains the same (`/verify`, `/settle`), but V2 certificates are validation-gated only when default remuneration is attempted.',
+        'Both versions stay available; payers do not lose V1 compatibility.',
       ],
     },
     {
@@ -24,9 +34,10 @@ export default function PayingWith4MicaPage() {
       ],
       steps: [
         'Expect `paymentRequirements.scheme = "4mica-credit"` (or another scheme containing "4mica") plus `extra.tabEndpoint` in the 402 response.',
+        'If the endpoint enforces V2, expect validation fields in `paymentRequirements.extra`: `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, and `validationChainId` (optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
         'Deposit collateral before your first credit request; the facilitator refuses tabs for empty balances.',
-        'Use the 4Mica SDK X402Flow to sign the guarantee and produce the `X-PAYMENT` header.',
-        'Retry the request with `X-PAYMENT`, then pay the tab later using the `req_id` from the certificate.',
+        'Use the 4Mica SDK X402Flow to sign the guarantee and produce the payment header (`X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2).',
+        'Retry the request with the payment header, then pay the tab later using the `req_id` from the certificate.',
         'Keep your old debit path as a fallback if the scheme is not 4mica.',
       ],
     },
@@ -128,6 +139,7 @@ async fn main() -> anyhow::Result<()> {
       heading: 'Step 2: Parse 402 Requirements & Select 4Mica Credit',
       paragraphs: [
         'Make the request without payment to receive a 402 response. Then parse the requirements and ensure the scheme is 4mica credit.',
+        'For V2 accepted payloads, verify the required validation fields are present in `requirements.extra` before signing.',
       ],
       codeBlocks: [
         {
@@ -162,14 +174,15 @@ if !requirements.scheme.contains("4mica") {
       ],
     },
     {
-      heading: 'Step 3: Sign X-PAYMENT (Payer SDK)',
+      heading: 'Step 3: Sign the Payment Header (Payer SDK)',
       paragraphs: [
-        'Use the SDK to build and sign the payment guarantee. The SDK automatically calls the tabEndpoint to refresh the tab and returns the base64 X-PAYMENT header.',
+        'Use the SDK to build and sign the payment guarantee. The SDK automatically calls the tabEndpoint to refresh the tab and returns a base64 payment header.',
+        'If the V2 validation fields are present, SDKs sign V2 claims and compute canonical `validationSubjectHash` + `validationRequestHash`; otherwise they sign V1.',
       ],
       codeBlocks: [
         {
           language: 'ts',
-          caption: 'Sign X-PAYMENT (TypeScript SDK)',
+          caption: 'Sign payment header (TypeScript SDK)',
           code: String.raw`import { Client, ConfigBuilder, X402Flow } from "sdk-4mica";
 
 const cfg = new ConfigBuilder()
@@ -188,7 +201,7 @@ await client.aclose();`,
         },
         {
           language: 'python',
-          caption: 'Sign X-PAYMENT (Python SDK)',
+          caption: 'Sign payment header (Python SDK)',
           code: String.raw`import asyncio
 from fourmica_sdk import Client, ConfigBuilder, X402Flow
 
@@ -215,7 +228,7 @@ asyncio.run(main())`,
         },
         {
           language: 'rust',
-          caption: 'Sign X-PAYMENT (Rust SDK)',
+          caption: 'Sign payment header (Rust SDK)',
           code: String.raw`use rust_sdk_4mica::{Client, ConfigBuilder, X402Flow};
 
 #[tokio::main]
@@ -233,16 +246,17 @@ async fn main() -> anyhow::Result<()> {
         .sign_payment(requirements, std::env::var("USER_ADDRESS")?)
         .await?;
 
-    let x_payment_header = signed.header; // send as X-PAYMENT
+    let x_payment_header = signed.header; // send as X-PAYMENT (v1) or PAYMENT-SIGNATURE (v2)
     Ok(())
 }`,
         },
       ],
     },
     {
-      heading: 'Step 4: Retry the Request with X-PAYMENT',
+      heading: 'Step 4: Retry the Request with the Payment Header',
       paragraphs: [
-        'Retry the same request with the X-PAYMENT header. The recipient will call /verify and /settle and then serve the response.',
+        'Retry the same request with the payment header. The recipient will call /verify and /settle and then serve the response.',
+        'For V2 flows, `/settle` returns a certificate that carries validation policy fields; it does not by itself prove the job result.',
       ],
     },
     {
@@ -331,8 +345,8 @@ let certificate = settled.settlement;`,
       steps: [
         'Call the resource and check for HTTP 402.',
         'Parse paymentRequirements and confirm the scheme is 4mica credit (fallback to debit if not).',
-        'Sign X-PAYMENT with the SDK (it calls tabEndpoint internally).',
-        'Retry the request with X-PAYMENT.',
+        'Sign the payment header with the SDK (it calls tabEndpoint internally).',
+        'Retry the request with that header.',
         'If 402 returns again, surface the error and refresh the tab.',
       ],
     },
@@ -340,7 +354,7 @@ let certificate = settled.settlement;`,
       heading: 'Operational Tips',
       bullets: [
         'Track tab TTL and settle before expiry (default 21 days) to avoid remuneration.',
-        'If unpaid, recipients can remunerate after the grace period (default 14 days).',
+        'If unpaid, recipients can remunerate after the grace period (default 14 days). For V2, this only succeeds after matching ERC-8004 validation status exists on-chain.',
         'Always use the req_id from the certificate, not a cached value.',
         'Reuse collateral across tabs, but monitor balances if you issue many guarantees.',
         'If you rotate keys, create fresh tabs to avoid mismatched user addresses.',
@@ -349,7 +363,7 @@ let certificate = settled.settlement;`,
     {
       heading: 'Why This Works',
       paragraphs: [
-        'Credit lets you access services instantly while keeping settlement on-chain and enforceable. The certificate is the cryptographic bridge between off-chain delivery and on-chain repayment.',
+        'Credit lets you access services instantly while keeping settlement on-chain and enforceable. The certificate is the cryptographic bridge between off-chain delivery and on-chain repayment, and V2 adds validation-gated remuneration for “pay only if validated” integrations.',
       ],
     },
   ];

@@ -5,7 +5,7 @@ import CodeTabs from '../CodeTabs';
 export const metadata: Metadata = {
   title: 'Getting paid using 4Mica',
   description:
-    'A deep dive into the 4Mica credit flow, x402 integration, and settlement paths',
+    'A deep dive into the 4Mica credit flow, x402 integration, and v2 validation-gated remuneration paths',
 };
 
 export default function How4MicaWorksPage() {
@@ -43,7 +43,16 @@ export default function How4MicaWorksPage() {
       heading: 'Executive Summary',
       paragraphs: [
         '4Mica is a cryptographic credit system for web3. It lets a payer consume a service immediately while settlement happens later. Recipients get a guarantee that is enforceable on-chain if the payer defaults. Payers keep collateral productive in the vault, earning yield and giving credit to the payers; recipients get payout protection.',
-        'This post explains how to accept payments using 4Mica, and how each possible scenario is handled (happy path, default path, and optional exact/debit fallback).',
+        'This post explains how to accept payments using 4Mica, including V2 guarantees where remuneration is gated by ERC-8004 validation status (for example via 8004 ValidationRegistry and wachai-validation-sdk).',
+      ],
+    },
+    {
+      heading: 'V1 vs V2: Quick Difference',
+      bullets: [
+        'V1: standard credit guarantee. If payer defaults, recipient can remunerate after grace period and before tab expiry.',
+        'V2: same credit flow plus signed validation policy fields (registry, validator, agent, score threshold, optional tag).',
+        'V2 enables 8004 verification: remunerate only succeeds when ERC-8004 validation status matches the signed policy.',
+        'Both versions are supported; version is derived from the signed claims payload.',
       ],
     },
     {
@@ -73,11 +82,12 @@ export default function How4MicaWorksPage() {
       heading: 'x402 Primer: HTTP 402 + Payment Requirements',
       paragraphs: [
         'x402 is an open, HTTP-native payment standard. It activates HTTP 402 Payment Required so a resource can advertise how it wants to be paid, then lets the client retry the same request with a payment header.',
-        'In the 4Mica credit flow, the x402 scheme string is `4mica-credit` and the client sends an `X-PAYMENT` header (a base64 JSON envelope with `x402Version: 1`). The resource server delegates verification and settlement to the x402-4mica facilitator.',
+        'In the 4Mica credit flow, the x402 scheme string is `4mica-credit` and the client sends a versioned payment header: `X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2 (both are base64 JSON envelopes). The resource server delegates verification and settlement to the x402-4mica facilitator.',
       ],
       bullets: [
-        '402 responses advertise `scheme`, `network`, `payTo`, `asset`, `maxAmountRequired`, and `extra.tabEndpoint`.',
-        'Clients retry with `X-PAYMENT`; resources call `/verify` for structural checks and `/settle` to obtain a certificate.',
+        '402 responses advertise `scheme`, `network`, `payTo`, `asset`, `maxAmountRequired` (v1) or `amount` (v2), and `extra.tabEndpoint`.',
+        'For v2, `paymentRequirements.extra` should include `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, and `validationChainId` (plus optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
+        'Clients retry with the payment header (`X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2); resources call `/verify` for structural checks and `/settle` to obtain a certificate.',
         'If the header is missing or invalid, return 402 again with the same requirements and an actionable error.',
       ],
     },
@@ -109,11 +119,13 @@ export default function How4MicaWorksPage() {
           <code className={inlineCodeClass}>recipient</code>,{' '}
           <code className={inlineCodeClass}>asset</code>,{' '}
           <code className={inlineCodeClass}>amount</code>,{' '}
-          <code className={inlineCodeClass}>timestamp</code>).
+          <code className={inlineCodeClass}>timestamp</code>). V2 extends this with a validation policy.
         </>,
         <>
-          <strong>X-PAYMENT:</strong> the base64 header wrapping the signed claims. Recipients pass
-          it to <code className={inlineCodeClass}>/verify</code> and{' '}
+          <strong>Payment header:</strong> the base64 header wrapping the signed claims (
+          <code className={inlineCodeClass}>X-PAYMENT</code> for v1,{' '}
+          <code className={inlineCodeClass}>PAYMENT-SIGNATURE</code> for v2). Recipients pass it to{' '}
+          <code className={inlineCodeClass}>/verify</code> and{' '}
           <code className={inlineCodeClass}>/settle</code>.
         </>,
         <>
@@ -126,7 +138,18 @@ export default function How4MicaWorksPage() {
         <>
           <strong>Certificate:</strong> the signature over{' '}
           <code className={inlineCodeClass}>PaymentGuaranteeClaims</code> returned by{' '}
-          <code className={inlineCodeClass}>/settle</code>. This is the cryptographic proof of the credit. If the user defaults, the recipient can remunerate after the grace period (default 14 days) and before the tab expires (default 21 days).
+          <code className={inlineCodeClass}>/settle</code>. This is the cryptographic proof of the credit. If the user defaults, the recipient can remunerate after the grace period (default 14 days) and before the tab expires (default 21 days). For V2, remuneration additionally requires passing ERC-8004 validation checks on-chain.
+        </>,
+        <>
+          <strong>Validation policy (V2):</strong> signed fields include{' '}
+          <code className={inlineCodeClass}>validation_registry_address</code>,{' '}
+          <code className={inlineCodeClass}>validation_request_hash</code>,{' '}
+          <code className={inlineCodeClass}>validation_chain_id</code>,{' '}
+          <code className={inlineCodeClass}>validator_address</code>,{' '}
+          <code className={inlineCodeClass}>validator_agent_id</code>,{' '}
+          <code className={inlineCodeClass}>min_validation_score</code>,{' '}
+          <code className={inlineCodeClass}>validation_subject_hash</code>, and{' '}
+          <code className={inlineCodeClass}>required_validation_tag</code>.
         </>,
         <>
           <strong>Grace periods:</strong> By default, tabs expire after 21 days and the remuneration grace period is 14 days, leaving a 7-day window to remunerate after default. Withdrawal requests finalize after a 22-day grace period.
@@ -162,7 +185,7 @@ rust-sdk-4mica = "0.4.0"`,
     {
       heading: 'Return 402 Payment Required',
       paragraphs: [
-        'When a request arrives without a valid `X-PAYMENT` header, respond with HTTP 402 and include `paymentRequirements` so the client can request a tab and retry.',
+        'When a request arrives without a valid payment header, respond with HTTP 402 and include `paymentRequirements` so the client can request a tab and retry.',
         'The requirements must match what you will later verify: the amount must equal `maxAmountRequired`, and `scheme`, `network`, `payTo`, and `asset` must match the tab you issue.',
       ],
       codeBlocks: [
@@ -175,7 +198,7 @@ Content-Type: application/json
 {
   "paymentRequirements": {
     "scheme": "4mica-credit",
-    "network": "polygon-amoy",
+    "network": "eip155:80002",
     "maxAmountRequired": "100",
     "resource": "/v1/report",
     "description": "Generate report",
@@ -195,14 +218,15 @@ Content-Type: application/json
     {
       heading: 'Handle User Requests (Recipient Logic)',
       steps: [
-        'If `X-PAYMENT` is missing, return 402 with `paymentRequirements` and `extra.tabEndpoint`.',
-        'If present, call `/verify` with `{ x402Version, paymentHeader, paymentRequirements }`.',
+        'If the payment header is missing, return 402 with `paymentRequirements` and `extra.tabEndpoint`.',
+        'If present, call `/verify` with `{ x402Version, paymentPayload, paymentRequirements }` (where `paymentPayload` is the decoded payment header).',
         'If `/verify` returns invalid, return 402 again (optionally with the invalidReason).',
         'If valid, call `/settle` to mint a certificate once you are ready to accept credit.',
         'Persist the certificate, then serve the protected response immediately. You can also fetch all your certificates later if needed.',
       ],
       paragraphsAfter: [
         'Only `/settle` touches the 4Mica operator to issue a BLS certificate. `/verify` is purely structural and is safe to use as a preflight check before doing any expensive work.',
+        'For V2, `/settle` does not prove the job outcome; it only issues a certificate with the signed validation policy. The ERC-8004 validation check is enforced later during on-chain remuneration.',
       ],
     },
     {
@@ -295,14 +319,15 @@ async fn main() -> anyhow::Result<()> {
       ],
     },
     {
-      heading: 'Step 2: Sign X-PAYMENT (Payer SDK)',
+      heading: 'Step 2: Sign the Payment Header (Payer SDK)',
       paragraphs: [
-        'The payer consumes the `paymentRequirements` from the 402 response, refreshes the tab if needed, and signs the guarantee to produce the base64 `X-PAYMENT` header.',
+        'The payer consumes the `paymentRequirements` from the 402 response, refreshes the tab if needed, and signs the guarantee to produce the base64 payment header (`X-PAYMENT` for v1 or `PAYMENT-SIGNATURE` for v2).',
+        'SDK behavior is automatic: if V2 validation fields are present in `paymentRequirements.extra`, claims are built as V2 with canonical `validation_subject_hash` and `validation_request_hash`; otherwise V1 is used.',
       ],
       codeBlocks: [
         {
           language: 'ts',
-          caption: 'Sign X-PAYMENT (TypeScript SDK)',
+          caption: 'Sign payment header (TypeScript SDK)',
           code: String.raw`import { Client, ConfigBuilder, PaymentRequirements, X402Flow } from "sdk-4mica";
 
 const cfg = new ConfigBuilder()
@@ -321,7 +346,7 @@ await client.aclose();`,
         },
         {
           language: 'python',
-          caption: 'Sign X-PAYMENT (Python SDK)',
+          caption: 'Sign payment header (Python SDK)',
           code: String.raw`import asyncio
 from fourmica_sdk import Client, ConfigBuilder, PaymentRequirements, X402Flow
 
@@ -343,7 +368,7 @@ asyncio.run(main())`,
         },
         {
           language: 'rust',
-          caption: 'Sign X-PAYMENT (Rust SDK)',
+          caption: 'Sign payment header (Rust SDK)',
           code: String.raw`use rust_sdk_4mica::{Client, ConfigBuilder, X402Flow};
 use rust_sdk_4mica::x402::PaymentRequirements;
 
@@ -459,12 +484,12 @@ let receipt = client
       steps: [
         'Recipient returns 402 Payment Required with paymentRequirements and extra.tabEndpoint.',
         'Payer SDK calls the tabEndpoint, which forwards to POST /tabs to open or reuse a tab.',
-        'Payer signs a guarantee and retries with the X-PAYMENT header.',
+        'Payer signs a guarantee and retries with the payment header.',
         'Recipient optionally calls /verify (structural checks) and then /settle (issues the certificate).',
         'Recipient delivers the protected response immediately; payer settles on-chain later (payTab or payTabInERC20Token).',
       ],
       paragraphsAfter: [
-        'This is the “agent pays with credit” experience: the recipient opens the tab, the agent gets a guarantee via /settle, and the agent settles later on-chain before the tab expires (default 21 days). If unpaid, recipients can remunerate after the grace period (default 14 days).',
+        'This is the “agent pays with credit” experience: the recipient opens the tab, the agent gets a guarantee via /settle, and the agent settles later on-chain before the tab expires (default 21 days). If unpaid, recipients can remunerate after the grace period (default 14 days). V2 claims add a mandatory ERC-8004 validation gate before remuneration succeeds.',
       ],
     },
     {
@@ -479,7 +504,7 @@ let receipt = client
         'Recipient → Facilitator: POST /tabs',
         'Facilitator → Core: create/reuse tab',
         'Facilitator → Recipient: tabId + metadata',
-        'Payer → Recipient: retry with X-PAYMENT header',
+        'Payer → Recipient: retry with payment header',
         'Recipient → Facilitator: POST /verify',
         'Recipient → Facilitator: POST /settle',
         'Facilitator → Core: issue guarantee',
@@ -491,13 +516,14 @@ let receipt = client
     {
       heading: 'What /verify vs /settle Actually Do',
       paragraphs: [
-        '/verify is purely structural: it decodes X-PAYMENT and ensures the claims match the recipient’s advertised requirements. It does not talk to core and does not issue a certificate.',
+        '/verify is purely structural: it decodes the payment header and ensures the claims match the recipient’s advertised requirements. It does not talk to core and does not issue a certificate.',
         '/settle repeats the same checks and then calls core to request a BLS guarantee. The facilitator verifies the certificate locally and returns it to the recipient.',
       ],
       bullets: [
         '/verify returns { isValid, invalidReason?, certificate: null }.',
         '/settle returns { success, networkId, txHash, certificate }.',
         'Both enforce scheme/network, payTo, asset, and exact amount matching.',
+        'For V2, neither endpoint confirms job validity; they only carry and enforce claim structure. Job validity is checked later through ERC-8004 validation status during `remunerate`.',
       ],
     },
     {
@@ -515,11 +541,12 @@ let receipt = client
       heading: 'Default Path: Recipient Remunerates',
       steps: [
         'If the payer does not settle before the grace period, the recipient (or a daemon) lists pending remunerations.',
+        'For V2, ensure the linked ERC-8004 validation request has a passing status (for example by calling `getValidationStatus` from `wachai-validation-sdk`).',
         'The recipient verifies the certificate and calls Core4Mica.remunerate with the certificate bytes and BLS signature.',
-        'The contract validates domain, timestamp + grace window, tab status, and collateral; it then transfers funds to the recipient.',
+        'The contract validates domain, timestamp + grace window, tab status, and collateral; for V2 it additionally validates ERC-8004 response constraints from the signed policy before transfer.',
       ],
       paragraphsAfter: [
-        'This path is deterministic: the same certificate that enabled instant delivery becomes the claim that makes the recipient whole.',
+        'This path is deterministic: the same certificate that enabled instant delivery becomes the claim that makes the recipient whole, but V2 only pays out after validated job evidence exists on-chain.',
       ],
     },
     {
@@ -536,7 +563,7 @@ let receipt = client
     {
       heading: 'Two Ways to Integrate',
       bullets: [
-        'x402 flow: recipients expose a tabEndpoint and call /verify + /settle. Payers use the SDK to sign X-PAYMENT.',
+        'x402 flow: recipients expose a tabEndpoint and call /verify + /settle. Payers use the SDK to sign the versioned payment header.',
         'Direct core flow: recipients create tabs and request guarantees via the SDK, then remunerate directly. This is useful for closed systems or internal pipelines.',
       ],
     },
@@ -549,7 +576,7 @@ let receipt = client
     {
       heading: 'Why This Design Holds',
       paragraphs: [
-        '4Mica keeps the happy path off-chain but preserves enforceability on-chain. Recipients never need to trust a coordinator; they only need a certificate that the contract will accept. Payers keep capital efficient, and the system has a clear and auditable failure mode: either the payer pays, or the recipient remunerates.',
+        '4Mica keeps the happy path off-chain but preserves enforceability on-chain. Recipients never need to trust a coordinator; they only need a certificate that the contract will accept. Payers keep capital efficient, and the system has a clear and auditable failure mode: either the payer pays, or the recipient remunerates (for V2, only after ERC-8004 validation passes).',
       ],
     },
   ];

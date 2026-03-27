@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import CodeBlock from '../../../components/CodeBlock';
 import MermaidDiagram from '../../../components/MermaidDiagram';
 import CodeTabs from '../blog/CodeTabs';
@@ -9,6 +10,7 @@ import CodeTabs from '../blog/CodeTabs';
 const navigationItems = [
   { id: 'overview', title: 'Overview', icon: 'ri-eye-line' },
   { id: 'installation', title: 'Installation', icon: 'ri-download-cloud-2-line' },
+  { id: 'guarantee-modes', title: 'Guarantee Modes', icon: 'ri-git-branch-line' },
   { id: 'server-integration', title: 'Server Integration', icon: 'ri-server-line' },
   { id: 'client-integration', title: 'Client Integration', icon: 'ri-user-line' },
   { id: 'examples', title: 'Code Examples', icon: 'ri-file-code-line' },
@@ -31,8 +33,9 @@ function TechnicalDocsContentInner() {
 
   useEffect(() => {
     const requestedSection = searchParams.get('section');
-    if (requestedSection && navigationItems.some((item) => item.id === requestedSection)) {
-      setActiveSection(requestedSection);
+    const normalizedSection = requestedSection === 'guarantee-versions' ? 'guarantee-modes' : requestedSection;
+    if (normalizedSection && navigationItems.some((item) => item.id === normalizedSection)) {
+      setActiveSection(normalizedSection);
     }
   }, [searchParams]);
 
@@ -46,7 +49,7 @@ function TechnicalDocsContentInner() {
           <div className="accent-bar mx-auto mb-8"></div>
           <p className="section-lead max-w-3xl mx-auto text-xl">
             Express middleware and client integration for the x402 Payment Protocol with 4mica credit flow support,
-            including automatic facilitator and scheme registration.
+            including V1 and V2 guarantees (V2 adds ERC-8004 validation-gated remuneration) and automatic facilitator/scheme registration.
           </p>
         </div>
 
@@ -88,7 +91,7 @@ function TechnicalDocsContentInner() {
                     </p>
                     <p className="text-ink-body leading-relaxed">
                       Use this page to get paid as a resource server, configure deeper server integrations, or pay as an agent
-                      with fetch/axios wrappers that automatically open tabs, sign guarantees, and retry requests.
+                      with fetch/axios wrappers that automatically open tabs, sign guarantees (V1 or V2), and retry requests.
                     </p>
                     <div>
                       <h3 className="text-xl font-semibold text-ink-strong mb-4">Key Capabilities</h3>
@@ -111,6 +114,10 @@ function TechnicalDocsContentInner() {
                             desc: 'Fetch and Axios wrappers handle 402, open tabs, sign guarantees, and retry requests.'
                           },
                           {
+                            title: 'ERC-8004 Validation Gating',
+                            desc: 'V2 guarantees bind validation policy fields; remuneration is allowed only after on-chain validation passes.'
+                          },
+                          {
                             title: 'Multi-Network Support',
                             desc: 'Built-in support for Ethereum Sepolia and Polygon Amoy networks.'
                           },
@@ -126,6 +133,111 @@ function TechnicalDocsContentInner() {
                         ))}
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'guarantee-modes' && (
+                <div>
+                  <h2 className="text-3xl font-bold text-ink-strong mb-6">Guarantee Modes (V1 vs V2)</h2>
+                  <div className="space-y-6">
+                    <p className="text-ink-body leading-relaxed">
+                      A <strong>guarantee</strong> is the signed credit commitment used as the payment instrument in the 4Mica x402
+                      flow. After a 402 challenge, the payer signs guarantee claims and sends them as the payment header
+                      (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
+                      The recipient settles that guarantee into a certificate and can later enforce repayment on-chain if needed.
+                    </p>
+                    <p className="text-ink-body leading-relaxed">
+                      Choose the mode based on whether payout should depend on external validation evidence: use V1 for standard
+                      credit payments, and V2 when payout must be gated by ERC-8004 validation outcomes (for example “pay only if job validated”).
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V1</h3>
+                        <p className="text-sm text-ink-body">
+                          Use for normal credit-backed API/service payments when no external job-validation attestation is required for payout.
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V2</h3>
+                        <p className="text-sm text-ink-body">
+                          Use for integrations such as ERC-8004 where remuneration must succeed only after a matching on-chain validation status passes policy checks.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-white/10">
+                      <table className="w-full text-sm">
+                        <thead className="bg-white/5 text-ink-strong">
+                          <tr>
+                            <th className="text-left p-3">Capability</th>
+                            <th className="text-left p-3">V1</th>
+                            <th className="text-left p-3">V2</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-ink-body">
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">Signed claim fields</td>
+                            <td className="p-3">tab/payment fields only</td>
+                            <td className="p-3">V1 fields + validation policy fields</td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">x402 requirements</td>
+                            <td className="p-3">standard 4mica-credit requirements</td>
+                            <td className="p-3">adds validation inputs in <code className="font-mono">extra</code></td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">/verify and /settle</td>
+                            <td className="p-3">structural check + certificate issuance</td>
+                            <td className="p-3">same behavior, but certificate carries validation policy</td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">remunerate preconditions</td>
+                            <td className="p-3">grace window + unpaid tab + valid cert</td>
+                            <td className="p-3">V1 checks + passing ERC-8004 validation status</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <CodeTabs
+                      blocks={[
+                        {
+                          label: 'V1 claims',
+                          language: 'json',
+                          code: `{
+  "version": "v1",
+  "user_address": "0xUser",
+  "recipient_address": "0xRecipient",
+  "tab_id": "0x1",
+  "req_id": "0x0",
+  "amount": "0x64",
+  "asset_address": "0xAsset",
+  "timestamp": 1716500000
+}`,
+                        },
+                        {
+                          label: 'V2 claims',
+                          language: 'json',
+                          code: `{
+  "version": "v2",
+  "user_address": "0xUser",
+  "recipient_address": "0xRecipient",
+  "tab_id": "0x1",
+  "req_id": "0x0",
+  "amount": "0x64",
+  "asset_address": "0xAsset",
+  "timestamp": 1716500000,
+  "validation_registry_address": "0xRegistry",
+  "validation_request_hash": "0xRequestHash",
+  "validation_chain_id": 80002,
+  "validator_address": "0xValidator",
+  "validator_agent_id": "0x7",
+  "min_validation_score": 80,
+  "validation_subject_hash": "0xSubjectHash",
+  "required_validation_tag": "hard-finality"
+}`,
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -303,7 +415,7 @@ async def premium_content():
                       <ol className="list-decimal list-inside space-y-1">
                         <li>The client requests your protected route without payment.</li>
                         <li>The server returns HTTP 402 with <code className="font-mono">paymentRequirements</code> and a tab endpoint.</li>
-                        <li>The client opens a tab (using the <code className="font-mono">advertisedEndpoint</code>), signs a payment guarantee, and retries with <code className="font-mono">PAYMENT-SIGNATURE</code>.</li>
+                        <li>The client opens a tab (using the <code className="font-mono">advertisedEndpoint</code>), signs a payment guarantee, and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
                         <li>The server verifies and settles the payment, then serves the protected response.</li>
                       </ol>
                     </div>
@@ -810,7 +922,7 @@ session = x402_requests(client)`,
                       <ol className="list-decimal list-inside space-y-1">
                         <li>Call the protected resource and receive HTTP 402 with payment requirements.</li>
                         <li>The wrapper opens a tab and signs the guarantee using your key.</li>
-                        <li>The request is retried automatically with <code className="font-mono">PAYMENT-SIGNATURE</code>.</li>
+                        <li>The request is retried automatically with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
                         <li>Handle the successful response or surface any 402 retry errors.</li>
                       </ol>
                     </div>
@@ -958,15 +1070,16 @@ session = x402_requests(client)`,
                       <div className="border border-white/10 rounded-lg p-5 space-y-2 bg-white/5">
                         <h3 className="text-lg font-semibold text-ink-strong">POST /verify</h3>
                         <p className="text-sm text-ink-body">
-                          <span className="font-semibold">What it does:</span> Validates the structure of the X-PAYMENT
-                          header against the original payment requirements. No on-chain work is done here.
+                          <span className="font-semibold">What it does:</span> Validates the structure of the decoded
+                          payment envelope against the original payment requirements. No on-chain work is done here.
                         </p>
                         <p className="text-sm text-ink-body">
                           <span className="font-semibold">Gets:</span>{' '}
                           <code className="font-mono">
                             {'{ x402Version?: 1|2, paymentPayload: { ... }, paymentRequirements }'}
                           </code>
-                          . <code className="font-mono">paymentPayload</code> is the decoded X-PAYMENT header.
+                          . <code className="font-mono">paymentPayload</code> is the decoded payment header
+                          (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
                         </p>
                         <p className="text-sm text-ink-body">
                           <span className="font-semibold">Returns:</span>{' '}
@@ -1027,8 +1140,9 @@ session = x402_requests(client)`,
                       <div className="border border-white/10 rounded-lg p-5 space-y-2 bg-white/5">
                         <h3 className="text-lg font-semibold text-ink-strong">POST /settle</h3>
                         <p className="text-sm text-ink-body">
-                          <span className="font-semibold">What it does:</span> Re-validates the X-PAYMENT header and
-                          issues a BLS certificate for 4mica-credit (or proxies exact/debit settlements).
+                          <span className="font-semibold">What it does:</span> Re-validates the decoded payment header and
+                          issues a BLS certificate for 4mica-credit (or proxies exact/debit settlements). This step does
+                          not execute ERC-8004 validation; it only returns the certificate used later on-chain.
                         </p>
                         <p className="text-sm text-ink-body">
                           <span className="font-semibold">Gets:</span>{' '}
@@ -1114,13 +1228,31 @@ session = x402_requests(client)`,
                           <code className="font-mono">maxTimeoutSeconds</code>, and <code className="font-mono">extra</code>.
                         </p>
                         <p>
-                          <span className="font-semibold">paymentPayload</span> is the decoded X-PAYMENT header and supports
-                          <code className="font-mono">x402Version</code> 1 or 2.
+                          <span className="font-semibold">V2 validation fields:</span> when using x402 v2 claims, include
+                          <code className="font-mono"> validationRegistryAddress</code>, <code className="font-mono">validatorAddress</code>,{' '}
+                          <code className="font-mono">validatorAgentId</code>, and <code className="font-mono">minValidationScore</code> in{' '}
+                          <code className="font-mono">paymentRequirements.extra</code>.{' '}
+                          <code className="font-mono">requiredValidationTag</code> is optional. For V2 signing with the
+                          TypeScript SDK / <code className="font-mono">@4mica/x402</code> packages, include{' '}
+                          <code className="font-mono">validationChainId</code> and make it match{' '}
+                          <code className="font-mono">network</code> (<code className="font-mono">eip155:&lt;chainId&gt;</code>).
+                          Some SDKs can derive it from <code className="font-mono">network</code> when omitted.
+                        </p>
+                        <p>
+                          <span className="font-semibold">paymentPayload</span> is the decoded payment header
+                          (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2)
+                          and supports <code className="font-mono">x402Version</code> 1 or 2.
                         </p>
                         <p>
                           <span className="font-semibold">certificate</span> is returned as{' '}
                           <code className="font-mono">{'{ claims, signature }'}</code>, both hex strings suitable for
                           on-chain remuneration.
+                        </p>
+                        <p>
+                          <span className="font-semibold">V2 remuneration rule:</span> a V2 certificate can be remunerated only
+                          if the configured ERC-8004 Validation Registry has a response for the signed
+                          <code className="font-mono"> validation_request_hash</code> and policy checks pass
+                          (score threshold, validator/agent, optional tag, canonical hashes, trusted registry).
                         </p>
                         <p>
                           <span className="font-semibold">Versioning:</span> the facilitator only accepts{' '}
@@ -1370,9 +1502,9 @@ session = x402_requests(client)`,
                         {
                           method: 'POST',
                           path: '/core/guarantees',
-                          desc: 'Issue a BLS guarantee for a signed request.',
+                          desc: 'Issue a BLS guarantee for a signed request (V1 or V2).',
                           expects:
-                            '{ claims: { version: "v1", user_address, recipient_address, tab_id, req_id, amount, asset_address, timestamp }, signature, scheme: "eip712" | "eip191" }',
+                            '{ claims: { version: "v1"| "v2", ... }, signature, scheme: "eip712" | "eip191" }',
                           returns: '{ claims, signature } (BLSCert)',
                           examples: [
                             {
@@ -1732,6 +1864,12 @@ session = x402_requests(client)`,
                       This flow summarizes the internal protocol sequence for credit guarantees, from collateral to settlement and
                       remuneration. It mirrors the internal sequence diagrams in <code className="font-mono">Sequence Diagrams</code>.
                     </p>
+                    <p className="text-ink-body leading-relaxed">
+                      If you want to see the interactive protocol design, click{' '}
+                      <Link href="/interactive-protocol" className="text-brand-teal hover:text-brand-teal/80 underline">
+                        here
+                      </Link>.
+                    </p>
                     <div className="bg-white/10 border border-white/10 rounded-lg p-6">
                       <ol className="list-decimal list-inside space-y-3 text-ink-body">
                         <li>
@@ -1748,8 +1886,9 @@ session = x402_requests(client)`,
                         </li>
                         <li>
                           <span className="font-semibold text-ink-body">Header composition.</span> The payer (or SDK helper) signs
-                          <code className="font-mono"> PaymentGuaranteeRequestClaimsV1</code> and wraps it into a base64
-                          <code className="font-mono"> X-PAYMENT</code> header.
+                          V1 claims by default, or V2 claims when validation policy fields are present in
+                          <code className="font-mono"> paymentRequirements.extra</code>, then wraps them into a base64
+                          payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
                         </li>
                         <li>
                           <span className="font-semibold text-ink-body">Verification.</span> The resource calls
@@ -1758,6 +1897,11 @@ session = x402_requests(client)`,
                         <li>
                           <span className="font-semibold text-ink-body">Settlement.</span> The resource calls
                           <code className="font-mono"> /settle</code>, the facilitator requests a BLS certificate from core, verifies it, and returns it.
+                        </li>
+                        <li>
+                          <span className="font-semibold text-ink-body">Validation (V2 only).</span> If the guarantee is V2 and the payer defaults,
+                          the recipient (or validator workflow) must have an ERC-8004 validation response that satisfies the signed
+                          policy before calling <code className="font-mono">remunerate</code>.
                         </li>
                         <li>
                           <span className="font-semibold text-ink-body">Tab closure.</span> Happy path: the payer settles on-chain using the
@@ -1780,6 +1924,7 @@ session = x402_requests(client)`,
     participant Facilitator as x402-4Mica Facilitator
     participant CoreService as 4Mica Core
     participant Contract as Vault
+    participant Validation as ERC-8004 ValidationRegistry
 
     Client->>Contract: Deposit collateral
     Contract-->>CoreService: Collateral event
@@ -1794,7 +1939,7 @@ session = x402_requests(client)`,
     Facilitator-->>Resource: Tab info
     Resource-->>Client: paymentRequirements + tabId (bound to wallet)
 
-    Client->>Resource: Retry with X-PAYMENT header
+    Client->>Resource: Retry with payment header (X-PAYMENT/PAYMENT-SIGNATURE)
     Resource->>Facilitator: POST /verify
     Facilitator-->>Resource: Valid / invalid decision
 
@@ -1810,6 +1955,9 @@ session = x402_requests(client)`,
         CoreService->>CoreService: Record payment & unlock collateral
         CoreService-->>Resource: Tab marked settled
     else User defaults and Recipient redeems guarantee
+        Note over Resource,Validation: V2 only: validation response must satisfy policy
+        Resource->>Validation: getValidationStatus(validation_request_hash)
+        Validation-->>Resource: score/tag/validator/agent/lastUpdate
         Resource->>Contract: remunerate(guarantee, signature)
         Contract-->>CoreService: RecipientRemunerated event
         CoreService->>CoreService: Update repo, reduce collateral
@@ -1839,6 +1987,7 @@ session = x402_requests(client)`,
                           <li>/settle upgrades claims with monotonic <code className="font-mono">req_id</code> and running totals.</li>
                           <li>Certificates are verified against operator public parameters and domain.</li>
                           <li>Remuneration only succeeds after grace period and if the tab is unpaid.</li>
+                          <li>V2 additionally requires passing ERC-8004 validation status that matches the signed policy.</li>
                         </ul>
                       </div>
                     </div>
@@ -1959,7 +2108,7 @@ Payment required: $0.05 (4mica credit on Sepolia)`}
                             </li>
                             <li>
                               The client makes a request, receives <code className="font-mono">402 Payment Required</code>, opens a tab,
-                              signs a guarantee, and retries with <code className="font-mono">PAYMENT-SIGNATURE</code>.
+                              signs a guarantee, and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
                             </li>
                             <li>The server verifies and settles the payment, then returns the protected response.</li>
                           </ol>

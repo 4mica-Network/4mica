@@ -10,12 +10,22 @@ export default function FaqSection() {
     {
       question: 'What is a payment guarantee?',
       answer:
-        'A guarantee is a BLS-signed claim with tab_id, req_id, client, recipient, asset, amount, total_amount, timestamp, and a domain separator.',
+        'A guarantee is a BLS-signed claim with tab_id, req_id, client, recipient, asset, amount, total_amount, timestamp, and a domain separator. V2 also embeds ERC-8004 validation policy fields.',
+    },
+    {
+      question: 'Do you support both V1 and V2?',
+      answer:
+        'Yes. Both are supported. V1 is the baseline credit guarantee flow; V2 adds ERC-8004 validation-gated remuneration checks.',
     },
     {
       question: 'When can recipients claim collateral?',
       answer:
-        'After the remuneration grace period (default 14 days) and before tab expiration (default 21 days). Claims outside that window revert.',
+        'After the remuneration grace period (default 14 days) and before tab expiration (default 21 days). For V2, claim/remuneration also requires a passing ERC-8004 validation status that matches the signed policy.',
+    },
+    {
+      question: 'How does V2 validation work?',
+      answer:
+        'V2 claims commit a validation request hash, validator, agent id, and score threshold. During remuneration, core checks ValidationRegistry status on-chain and reverts unless the policy constraints pass.',
     },
     {
       question: 'When do users settle?',

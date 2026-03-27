@@ -1,8 +1,6 @@
 
 'use client';
 
-import Link from 'next/link';
-
 export default function HeroSection() {
   const handleGetStarted = () => {
     const docsSection = document.querySelector('#docs');
@@ -43,7 +41,7 @@ export default function HeroSection() {
         <div className="grid items-center gap-12 lg:grid-cols-1">
           <div className="flex flex-col items-center text-center">
             <h1 className="mt-6 section-title-lg leading-tight">
-              Instant credit tabs on any chain
+              Instant payments on any chain
             </h1>
             <p className="mt-6 text-lg md:text-xl text-ink-body/80 max-w-2xl leading-relaxed">
               Open a tab, let users spend now, then settle after 7 days with non-custodial, collateral-backed guarantees.
@@ -55,9 +53,6 @@ export default function HeroSection() {
               >
                 Start Building
               </button>
-              <Link href="/demo" className="btn btn-outline btn-lg whitespace-nowrap">
-                Live Demo
-              </Link>
               <button
                 onClick={handleJoinCommunity}
                 className="btn btn-outline btn-lg whitespace-nowrap"

@@ -14,7 +14,7 @@ export default function DocsCalloutSection() {
                 Start with tabs, ship in a day
               </h2>
               <p className="section-lead">
-                Quickstart, SDKs, and API endpoints for /tabs, /verify, and /settle
+                Quickstart, SDKs, and API endpoints for /tabs, /verify, /settle, and V2 validation-gated remuneration
               </p>
               <div className="mt-6 flex flex-col sm:flex-row gap-4">
                 <Link
@@ -43,6 +43,10 @@ export default function DocsCalloutSection() {
                 <div className="flex items-center justify-between">
                   <span>Agent: POST /settle</span>
                   <span className="text-brand-teal">credit guarantee</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>V2: ERC-8004 status</span>
+                  <span className="text-brand-teal">job validated</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Agent: payTabInERC20Token</span>
