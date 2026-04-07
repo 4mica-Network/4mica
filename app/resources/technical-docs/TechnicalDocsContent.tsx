@@ -10,10 +10,10 @@ import CodeTabs from '../blog/CodeTabs';
 const navigationItems = [
   { id: 'overview', title: 'Overview', icon: 'ri-eye-line' },
   { id: 'installation', title: 'Installation', icon: 'ri-download-cloud-2-line' },
-  { id: 'guarantee-modes', title: 'Guarantee Modes', icon: 'ri-git-branch-line' },
   { id: 'server-integration', title: 'Server Integration', icon: 'ri-server-line' },
   { id: 'client-integration', title: 'Client Integration', icon: 'ri-user-line' },
   { id: 'examples', title: 'Code Examples', icon: 'ri-file-code-line' },
+  { id: 'guarantee-modes', title: 'Guarantee Modes', icon: 'ri-git-branch-line' },
   { id: 'facilitator-api', title: 'Facilitator API', icon: 'ri-cloud-line' },
   { id: 'operator-api', title: 'Operator API', icon: 'ri-database-2-line' },
   { id: 'payment-flow', title: 'Protocol Flow', icon: 'ri-route-line' },
@@ -119,7 +119,7 @@ function TechnicalDocsContentInner() {
                           },
                           {
                             title: 'Multi-Network Support',
-                            desc: 'Built-in support for Ethereum Sepolia and Polygon Amoy networks.'
+                            desc: 'Built-in support for Ethereum Sepolia (eip155:11155111) and Base Sepolia (eip155:84532) networks.'
                           },
                           {
                             title: 'Extensible Paywalls',
@@ -133,111 +133,6 @@ function TechnicalDocsContentInner() {
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {activeSection === 'guarantee-modes' && (
-                <div>
-                  <h2 className="text-3xl font-bold text-ink-strong mb-6">Guarantee Modes (V1 vs V2)</h2>
-                  <div className="space-y-6">
-                    <p className="text-ink-body leading-relaxed">
-                      A <strong>guarantee</strong> is the signed credit commitment used as the payment instrument in the 4Mica x402
-                      flow. After a 402 challenge, the payer signs guarantee claims and sends them as the payment header
-                      (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
-                      The recipient settles that guarantee into a certificate and can later enforce repayment on-chain if needed.
-                    </p>
-                    <p className="text-ink-body leading-relaxed">
-                      Choose the mode based on whether payout should depend on external validation evidence: use V1 for standard
-                      credit payments, and V2 when payout must be gated by ERC-8004 validation outcomes (for example “pay only if job validated”).
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V1</h3>
-                        <p className="text-sm text-ink-body">
-                          Use for normal credit-backed API/service payments when no external job-validation attestation is required for payout.
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V2</h3>
-                        <p className="text-sm text-ink-body">
-                          Use for integrations such as ERC-8004 where remuneration must succeed only after a matching on-chain validation status passes policy checks.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto rounded-lg border border-white/10">
-                      <table className="w-full text-sm">
-                        <thead className="bg-white/5 text-ink-strong">
-                          <tr>
-                            <th className="text-left p-3">Capability</th>
-                            <th className="text-left p-3">V1</th>
-                            <th className="text-left p-3">V2</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-ink-body">
-                          <tr className="border-t border-white/10">
-                            <td className="p-3">Signed claim fields</td>
-                            <td className="p-3">tab/payment fields only</td>
-                            <td className="p-3">V1 fields + validation policy fields</td>
-                          </tr>
-                          <tr className="border-t border-white/10">
-                            <td className="p-3">x402 requirements</td>
-                            <td className="p-3">standard 4mica-credit requirements</td>
-                            <td className="p-3">adds validation inputs in <code className="font-mono">extra</code></td>
-                          </tr>
-                          <tr className="border-t border-white/10">
-                            <td className="p-3">/verify and /settle</td>
-                            <td className="p-3">structural check + certificate issuance</td>
-                            <td className="p-3">same behavior, but certificate carries validation policy</td>
-                          </tr>
-                          <tr className="border-t border-white/10">
-                            <td className="p-3">remunerate preconditions</td>
-                            <td className="p-3">grace window + unpaid tab + valid cert</td>
-                            <td className="p-3">V1 checks + passing ERC-8004 validation status</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <CodeTabs
-                      blocks={[
-                        {
-                          label: 'V1 claims',
-                          language: 'json',
-                          code: `{
-  "version": "v1",
-  "user_address": "0xUser",
-  "recipient_address": "0xRecipient",
-  "tab_id": "0x1",
-  "req_id": "0x0",
-  "amount": "0x64",
-  "asset_address": "0xAsset",
-  "timestamp": 1716500000
-}`,
-                        },
-                        {
-                          label: 'V2 claims',
-                          language: 'json',
-                          code: `{
-  "version": "v2",
-  "user_address": "0xUser",
-  "recipient_address": "0xRecipient",
-  "tab_id": "0x1",
-  "req_id": "0x0",
-  "amount": "0x64",
-  "asset_address": "0xAsset",
-  "timestamp": 1716500000,
-  "validation_registry_address": "0xRegistry",
-  "validation_request_hash": "0xRequestHash",
-  "validation_chain_id": 80002,
-  "validator_address": "0xValidator",
-  "validator_agent_id": "0x7",
-  "min_validation_score": 80,
-  "validation_subject_hash": "0xSubjectHash",
-  "required_validation_tag": "hard-finality"
-}`,
-                        },
-                      ]}
-                    />
                   </div>
                 </div>
               )}
@@ -439,7 +334,7 @@ async def premium_content():
         accepts: {
           scheme: "4mica-credit",
           price: "$0.10",
-          network: "eip155:11155111", // or "eip155:80002" for Polygon Amoy
+          network: "eip155:11155111", // or "eip155:84532" for Base Sepolia (see Networks)
           payTo: "0xRecipientAddress",
         },
         description: "What the user is paying for",
@@ -465,7 +360,7 @@ routes = {
         "accepts": {
             "scheme": "4mica-credit",
             "price": "$0.10",
-            "network": "eip155:11155111",  # or "eip155:80002" for Polygon Amoy
+            "network": "eip155:11155111",  # or "eip155:84532" for Base Sepolia
             "payTo": "0xRecipientAddress",
         },
         "description": "What the user is paying for",
@@ -520,10 +415,10 @@ async def x402_mw(request, call_next):
                       <h3 className="text-lg font-semibold text-ink-strong">Supported Networks</h3>
                       <ul className="list-disc list-inside space-y-1">
                         <li>
-                          <code className="font-mono">eip155:11155111</code> — Ethereum Sepolia
+                          <code className="font-mono">eip155:11155111</code> — Ethereum Sepolia (<code className="font-mono">https://ethereum.sepolia.4mica.xyz/</code>)
                         </li>
                         <li>
-                          <code className="font-mono">eip155:80002</code> — Polygon Amoy
+                          <code className="font-mono">eip155:84532</code> — Base Sepolia (<code className="font-mono">https://base.sepolia.4mica.xyz/</code>)
                         </li>
                       </ul>
                     </div>
@@ -841,18 +736,18 @@ print(response.json())`,
                             code: `import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 
-const sepoliaScheme = await FourMicaEvmScheme.create(sepoliaAccount);
-const amoyScheme = await FourMicaEvmScheme.create(amoyAccount);
+const ethSepoliaScheme = await FourMicaEvmScheme.create(ethSepoliaAccount);
+const baseSepoliaScheme = await FourMicaEvmScheme.create(baseSepoliaAccount);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
       network: "eip155:11155111", // Ethereum Sepolia
-      client: sepoliaScheme,
+      client: ethSepoliaScheme,
     },
     {
-      network: "eip155:80002", // Polygon Amoy
-      client: amoyScheme,
+      network: "eip155:84532", // Base Sepolia
+      client: baseSepoliaScheme,
     },
   ],
 });`,
@@ -865,8 +760,8 @@ from x402.http.clients import x402_requests
 from fourmica_x402.client_scheme import FourMicaEvmScheme
 
 client = x402ClientSync()
-client.register("eip155:11155111", FourMicaEvmScheme("0xSepoliaPrivateKey"))
-client.register("eip155:80002", FourMicaEvmScheme("0xAmoyPrivateKey"))
+client.register("eip155:11155111", FourMicaEvmScheme("0xEthSepoliaPrivateKey"))
+client.register("eip155:84532", FourMicaEvmScheme("0xBaseSepoliaPrivateKey"))
 
 session = x402_requests(client)`,
                           },
@@ -960,8 +855,10 @@ session = x402_requests(client)`,
                           code={`{
   "message": "Welcome to the 4mica credit facilitator...",
   "supported": [
-    { "scheme": "4mica-credit", "network": "eip155:80002", "x402Version": 1 },
-    { "scheme": "4mica-credit", "network": "eip155:80002", "x402Version": 2 }
+    { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 2 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 2 }
   ],
   "health": "/health",
   "docs": "See README.md for a full flow walkthrough."
@@ -1003,8 +900,10 @@ session = x402_requests(client)`,
                         <CodeBlock
                           code={`{
   "kinds": [
-    { "scheme": "4mica-credit", "network": "eip155:80002", "x402Version": 1 },
-    { "scheme": "4mica-credit", "network": "eip155:80002", "x402Version": 2 }
+    { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 2 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 2 }
   ],
   "extensions": [],
   "signers": {}
@@ -1024,7 +923,7 @@ session = x402_requests(client)`,
                           <code className="font-mono">
                             {'{ userAddress, recipientAddress, network?, erc20Token?, ttlSeconds? }'}
                           </code>
-                          . Networks use CAIP-2 identifiers (e.g. <code className="font-mono">eip155:80002</code>).
+                          . Networks use CAIP-2 identifiers (e.g. <code className="font-mono">eip155:11155111</code> for Ethereum Sepolia, <code className="font-mono">eip155:84532</code> for Base Sepolia).
                           Use <code className="font-mono">erc20Token</code> = null or omit for ETH. Aliases:{' '}
                           <code className="font-mono">assetAddress</code> and <code className="font-mono">networkId</code> are accepted.
                           If <code className="font-mono">network</code> is omitted, the facilitator defaults to the first configured network.
@@ -1043,7 +942,7 @@ session = x402_requests(client)`,
                               label: 'Request',
                               language: 'json',
                               code: `{
-  "network": "eip155:80002",
+  "network": "eip155:84532",
   "userAddress": "0xUser",
   "recipientAddress": "0xRecipient",
   "erc20Token": null,
@@ -1098,7 +997,7 @@ session = x402_requests(client)`,
   "paymentPayload": {
     "x402Version": 1,
     "scheme": "4mica-credit",
-    "network": "eip155:80002",
+    "network": "eip155:84532",
     "payload": {
       "claims": {
         "user_address": "0xUser",
@@ -1116,7 +1015,7 @@ session = x402_requests(client)`,
   },
   "paymentRequirements": {
     "scheme": "4mica-credit",
-    "network": "eip155:80002",
+    "network": "eip155:84532",
     "maxAmountRequired": "10000000000000000",
     "payTo": "0xRecipient",
     "asset": "0xAsset",
@@ -1170,7 +1069,7 @@ session = x402_requests(client)`,
   "paymentPayload": {
     "x402Version": 1,
     "scheme": "4mica-credit",
-    "network": "eip155:80002",
+    "network": "eip155:84532",
     "payload": {
       "claims": {
         "user_address": "0xUser",
@@ -1188,7 +1087,7 @@ session = x402_requests(client)`,
   },
   "paymentRequirements": {
     "scheme": "4mica-credit",
-    "network": "eip155:80002",
+    "network": "eip155:84532",
     "maxAmountRequired": "10000000000000000",
     "payTo": "0xRecipient",
     "asset": "0xAsset",
@@ -1203,7 +1102,7 @@ session = x402_requests(client)`,
   "success": true,
   "error": null,
   "txHash": null,
-  "networkId": "eip155:80002",
+  "networkId": "eip155:84532",
   "certificate": {
     "claims": "0x...",
     "signature": "0x..."
@@ -2323,6 +2222,111 @@ print("Result:", compute_response.json())`,
                         ]}
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'guarantee-modes' && (
+                <div>
+                  <h2 className="text-3xl font-bold text-ink-strong mb-6">Guarantee Modes (V1 vs V2)</h2>
+                  <div className="space-y-6">
+                    <p className="text-ink-body leading-relaxed">
+                      A <strong>guarantee</strong> is the signed credit commitment used as the payment instrument in the 4Mica x402
+                      flow. After a 402 challenge, the payer signs guarantee claims and sends them as the payment header
+                      (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
+                      The recipient settles that guarantee into a certificate and can later enforce repayment on-chain if needed.
+                    </p>
+                    <p className="text-ink-body leading-relaxed">
+                      Choose the mode based on whether payout should depend on external validation evidence: use V1 for standard
+                      credit payments, and V2 when payout must be gated by ERC-8004 validation outcomes (for example “pay only if job validated”).
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V1</h3>
+                        <p className="text-sm text-ink-body">
+                          Use for normal credit-backed API/service payments when no external job-validation attestation is required for payout.
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <h3 className="text-lg font-semibold text-ink-strong mb-2">V2</h3>
+                        <p className="text-sm text-ink-body">
+                          Use for integrations such as ERC-8004 where remuneration must succeed only after a matching on-chain validation status passes policy checks.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-white/10">
+                      <table className="w-full text-sm">
+                        <thead className="bg-white/5 text-ink-strong">
+                          <tr>
+                            <th className="text-left p-3">Capability</th>
+                            <th className="text-left p-3">V1</th>
+                            <th className="text-left p-3">V2</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-ink-body">
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">Signed claim fields</td>
+                            <td className="p-3">tab/payment fields only</td>
+                            <td className="p-3">V1 fields + validation policy fields</td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">x402 requirements</td>
+                            <td className="p-3">standard 4mica-credit requirements</td>
+                            <td className="p-3">adds validation inputs in <code className="font-mono">extra</code></td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">/verify and /settle</td>
+                            <td className="p-3">structural check + certificate issuance</td>
+                            <td className="p-3">same behavior, but certificate carries validation policy</td>
+                          </tr>
+                          <tr className="border-t border-white/10">
+                            <td className="p-3">remunerate preconditions</td>
+                            <td className="p-3">grace window + unpaid tab + valid cert</td>
+                            <td className="p-3">V1 checks + passing ERC-8004 validation status</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <CodeTabs
+                      blocks={[
+                        {
+                          label: 'V1 claims',
+                          language: 'json',
+                          code: `{
+  "version": "v1",
+  "user_address": "0xUser",
+  "recipient_address": "0xRecipient",
+  "tab_id": "0x1",
+  "req_id": "0x0",
+  "amount": "0x64",
+  "asset_address": "0xAsset",
+  "timestamp": 1716500000
+}`,
+                        },
+                        {
+                          label: 'V2 claims',
+                          language: 'json',
+                          code: `{
+  "version": "v2",
+  "user_address": "0xUser",
+  "recipient_address": "0xRecipient",
+  "tab_id": "0x1",
+  "req_id": "0x0",
+  "amount": "0x64",
+  "asset_address": "0xAsset",
+  "timestamp": 1716500000,
+  "validation_registry_address": "0xRegistry",
+  "validation_request_hash": "0xRequestHash",
+  "validation_chain_id": 80002,
+  "validator_address": "0xValidator",
+  "validator_agent_id": "0x7",
+  "min_validation_score": 80,
+  "validation_subject_hash": "0xSubjectHash",
+  "required_validation_tag": "hard-finality"
+}`,
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
               )}

@@ -1,7 +1,7 @@
 import type { Chain } from 'viem/chains';
-import { polygonAmoy, sepolia } from 'viem/chains';
+import { baseSepolia, sepolia } from 'viem/chains';
 
-export type RegistrationChainKey = 'sepolia' | 'polygonAmoy';
+export type RegistrationChainKey = 'ethereumSepolia' | 'baseSepolia';
 export type RegistrationAssetKey = 'native' | 'usdc' | 'usdt';
 
 export type RegistrationAsset = {
@@ -35,15 +35,15 @@ const chainIdToHex = (chainId: number): `0x${string}` => `0x${chainId.toString(1
 
 export const REGISTRATION_CONFIG: { chains: Record<RegistrationChainKey, RegistrationChain> } = {
   chains: {
-    sepolia: {
-      key: 'sepolia',
+    ethereumSepolia: {
+      key: 'ethereumSepolia',
       id: 11155111,
       label: 'Ethereum Sepolia',
-      shortLabel: 'Sepolia',
+      shortLabel: 'Eth Sepolia',
       viemChain: sepolia,
       explorerUrl: 'https://sepolia.etherscan.io',
       coreContractAddress:
-        (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA as `0x${string}` | undefined) ?? '',
+        (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA as `0x${string}` | undefined) ?? '',
       assets: {
         native: {
           key: 'native',
@@ -77,20 +77,20 @@ export const REGISTRATION_CONFIG: { chains: Record<RegistrationChainKey, Registr
         blockExplorerUrls: ['https://sepolia.etherscan.io'],
       },
     },
-    polygonAmoy: {
-      key: 'polygonAmoy',
-      id: 80002,
-      label: 'Polygon Amoy',
-      shortLabel: 'Amoy',
-      viemChain: polygonAmoy,
-      explorerUrl: 'https://amoy.polygonscan.com',
+    baseSepolia: {
+      key: 'baseSepolia',
+      id: 84532,
+      label: 'Base Sepolia',
+      shortLabel: 'Base Sepolia',
+      viemChain: baseSepolia,
+      explorerUrl: 'https://sepolia.basescan.org',
       coreContractAddress:
-        (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY as `0x${string}` | undefined) ?? '',
+        (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA as `0x${string}` | undefined) ?? '',
       assets: {
         native: {
           key: 'native',
-          label: 'POL',
-          symbol: 'POL',
+          label: 'Base Sepolia ETH',
+          symbol: 'ETH',
           decimals: 18,
           type: 'native',
         },
@@ -100,7 +100,7 @@ export const REGISTRATION_CONFIG: { chains: Record<RegistrationChainKey, Registr
           symbol: 'USDC',
           decimals: 6,
           type: 'erc20',
-          address: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+          address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
         },
         usdt: {
           key: 'usdt',
@@ -108,15 +108,15 @@ export const REGISTRATION_CONFIG: { chains: Record<RegistrationChainKey, Registr
           symbol: 'USDT',
           decimals: 6,
           type: 'erc20',
-          address: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+          address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
         },
       },
       addChainParams: {
-        chainId: chainIdToHex(80002),
-        chainName: 'Polygon Amoy',
-        nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-        rpcUrls: ['https://rpc-amoy.polygon.technology'],
-        blockExplorerUrls: ['https://amoy.polygonscan.com'],
+        chainId: chainIdToHex(84532),
+        chainName: 'Base Sepolia',
+        nativeCurrency: { name: 'Base Sepolia ETH', symbol: 'ETH', decimals: 18 },
+        rpcUrls: ['https://sepolia.base.org'],
+        blockExplorerUrls: ['https://sepolia.basescan.org'],
       },
     },
   },

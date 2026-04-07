@@ -111,7 +111,7 @@ const parseError = (err: unknown) => {
 };
 
 export default function AgentRegistrationPage() {
-  const [selectedChainKey, setSelectedChainKey] = useState<RegistrationChainKey>('sepolia');
+  const [selectedChainKey, setSelectedChainKey] = useState<RegistrationChainKey>('ethereumSepolia');
   const [selectedAssetKey, setSelectedAssetKey] = useState<RegistrationAssetKey>('usdc');
   const [amount, setAmount] = useState('');
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -131,9 +131,9 @@ export default function AgentRegistrationPage() {
   const asset = chain.assets[selectedAssetKey];
   const coreContractAddress = chain.coreContractAddress || null;
   const contractEnvVar =
-    chain.key === 'sepolia'
-      ? 'NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA'
-      : 'NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY';
+    chain.key === 'ethereumSepolia'
+      ? 'NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA'
+      : 'NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA';
   const account = (eip155Account.address as Address | undefined) ?? null;
   const isConnected = Boolean(eip155Account.isConnected && account);
   const activeChainId = typeof chainId === 'string' ? Number(chainId) : chainId;
