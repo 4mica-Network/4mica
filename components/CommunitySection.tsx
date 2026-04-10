@@ -2,16 +2,10 @@
 
 import Link from 'next/link';
 
-const discordUrl = 'https://discord.gg/6r3VGq6crq';
 const githubUrl = 'https://github.com/4mica-Network/4mica-core/';
-const communityUrl = 'https://discord.gg/6r3VGq6crq';
 
 export default function CommunitySection() {
   const hooks = [
-    {
-      label: 'Join the Discord',
-      href: discordUrl,
-    },
     {
       label: 'Star on GitHub',
       href: githubUrl,
@@ -41,7 +35,7 @@ export default function CommunitySection() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               <Link
-                href={communityUrl}
+                href={githubUrl}
                 className="btn btn-primary btn-md text-center"
               >
                 Join Community

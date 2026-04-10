@@ -20,12 +20,6 @@ export default function FinalCtaSection() {
             >
               Start Building
             </Link>
-            <Link
-              href="https://discord.gg/6r3VGq6crq"
-              className="btn btn-outline btn-lg text-center"
-            >
-              Join Community
-            </Link>
           </div>
         </div>
       </div>
