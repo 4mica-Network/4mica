@@ -90,7 +90,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: 'Multi-Network Support',
-      desc: 'Point the SDK at Ethereum Sepolia (https://ethereum.sepolia.4mica.xyz/) or Base Sepolia (https://base.sepolia.4mica.xyz/).',
+      desc: 'Point the SDK at Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/) or Base Sepolia (https://base.sepolia.api.4mica.xyz/).',
     },
     {
       title: 'Server & Client Middleware (coming soon)',

@@ -104,7 +104,7 @@ function RustInstallation() {
         />
         <p className="text-sm text-ink-body mt-3">
           Requires Tokio for the async runtime. The SDK points directly at the network RPC URL
-          (e.g. <code className="font-mono">https://base.sepolia.4mica.xyz/</code>) — no separate
+          (e.g. <code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>) — no separate
           facilitator package is needed.
         </p>
       </div>

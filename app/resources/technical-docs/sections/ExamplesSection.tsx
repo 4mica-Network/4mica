@@ -10,11 +10,11 @@ export default function ExamplesSection() {
           Grab the full demo repo and run it locally:{' '}
           <a
             className="text-brand-deep"
-            href="https://github.com/4mica-Network/x402-4mica/blob/feat/x402-ts-utils/packages/typescript/x402/demo"
+            href="https://github.com/4mica-Network/x402-4mica/tree/main/packages/typescript/x402/demo"
             target="_blank"
             rel="noreferrer"
           >
-            github.com/4mica-Network/x402-4mica/blob/feat/x402-ts-utils/packages/typescript/x402/demo
+            github.com/4mica-Network/x402-4mica/tree/main/packages/typescript/x402/demo
           </a>
         </div>
         <div>

@@ -46,7 +46,7 @@ export default function PayingWith4MicaPage() {
       bullets: [
         'A wallet private key with collateral available (ETH or ERC20).',
         'The recipient endpoint you want to call.',
-        'Access to a 4Mica network: Ethereum Sepolia (https://ethereum.sepolia.4mica.xyz/) or Base Sepolia (https://base.sepolia.4mica.xyz/).',
+        'Access to a 4Mica network: Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/) or Base Sepolia (https://base.sepolia.api.4mica.xyz/).',
         'A 402 response that advertises `scheme: "4mica-credit"` and `extra.tabEndpoint`.',
       ],
     },
@@ -120,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::new(
         ConfigBuilder::default()
-            .rpc_url("https://base.sepolia.4mica.xyz/".to_string())
+            .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
             .signer(signer)
             .build()?,
     )
@@ -242,7 +242,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::new(
         ConfigBuilder::default()
-            .rpc_url("https://base.sepolia.4mica.xyz/".to_string())
+            .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
             .signer(signer)
             .build()?,
     )

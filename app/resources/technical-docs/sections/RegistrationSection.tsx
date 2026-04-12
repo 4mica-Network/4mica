@@ -9,8 +9,8 @@ const NETWORKS = (
   <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-sm text-ink-body space-y-1">
     <p className="font-semibold text-ink-strong">Supported networks</p>
     <ul className="list-disc list-inside space-y-1 mt-2">
-      <li><code className="font-mono">eip155:11155111</code> — Ethereum Sepolia (<code className="font-mono">https://ethereum.sepolia.4mica.xyz/</code>)</li>
-      <li><code className="font-mono">eip155:84532</code> — Base Sepolia (<code className="font-mono">https://base.sepolia.4mica.xyz/</code>)</li>
+      <li><code className="font-mono">eip155:11155111</code> — Ethereum Sepolia (<code className="font-mono">https://ethereum.sepolia.api.4mica.xyz/</code>)</li>
+      <li><code className="font-mono">eip155:84532</code> — Base Sepolia (<code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>)</li>
     </ul>
   </div>
 );
@@ -206,8 +206,8 @@ function RustRegistration() {
           language="bash"
         />
         <p className="text-sm text-ink-body mt-2">
-          Pass the RPC URL directly — e.g. <code className="font-mono">https://base.sepolia.4mica.xyz/</code> for
-          Base Sepolia or <code className="font-mono">https://ethereum.sepolia.4mica.xyz/</code> for Ethereum Sepolia.
+          Pass the RPC URL directly — e.g. <code className="font-mono">https://base.sepolia.api.4mica.xyz/</code> for
+          Base Sepolia or <code className="font-mono">https://ethereum.sepolia.api.4mica.xyz/</code> for Ethereum Sepolia.
         </p>
       </div>
       <div className="space-y-4">
@@ -231,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer: PrivateKeySigner = "0xYourPrivateKey".parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.4mica.xyz/".to_string())
+        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
         .signer(signer)
         .build()?;
 

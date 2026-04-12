@@ -300,7 +300,7 @@ async fn main() -> anyhow::Result<()> {
     let signer: PrivateKeySigner = std::env::var("RECIPIENT_KEY")?.parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.4mica.xyz/".to_string())
+        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
         .signer(signer)
         .build()?;
     let client = Client::new(cfg).await?;
@@ -380,7 +380,7 @@ async fn main() -> anyhow::Result<()> {
     let signer: PrivateKeySigner = std::env::var("PAYER_KEY")?.parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.4mica.xyz/".to_string())
+        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
         .signer(signer)
         .build()?;
     let client = Client::new(cfg).await?;
