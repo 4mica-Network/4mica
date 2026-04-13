@@ -56,7 +56,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: 'httpx & requests Client Wrappers',
-      desc: 'x402_httpx (async) and x402_requests (sync) handle 402 responses, open tabs, sign guarantees, and retry requests transparently.',
+      desc: 'x402_httpx_transport (async) and x402_requests (sync) handle 402 responses, open tabs, sign guarantees, and retry requests transparently.',
     },
     {
       title: 'ERC-8004 Validation Gating',
@@ -106,7 +106,7 @@ const intros: Record<Language, { p1: string; p2: string }> = {
   },
   python: {
     p1: 'The 4mica-x402 package ships FastAPI and Flask server middleware and httpx/requests client helpers for the x402 Payment Protocol with 4Mica credit flow support. It protects API routes with HTTP 402 responses and wires the 4Mica facilitator automatically.',
-    p2: 'Use this page to get paid as a resource server with FastAPI or Flask, or pay as an agent with x402_httpx (async) or x402_requests (sync) wrappers that automatically open tabs, sign guarantees (V1 or V2), and retry requests.',
+    p2: 'Use this page to get paid as a resource server with FastAPI or Flask, or pay as an agent with x402_httpx_transport (async) or x402_requests (sync) wrappers that automatically open tabs, sign guarantees (V1 or V2), and retry requests.',
   },
   rust: {
     p1: 'The sdk-4mica crate provides collateral management and wallet operations for the x402 Payment Protocol with 4Mica credit flow support. It communicates directly with the 4Mica network RPC URL and handles deposit, withdrawal, and balance queries.',

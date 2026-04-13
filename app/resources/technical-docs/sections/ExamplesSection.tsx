@@ -30,7 +30,12 @@ export default function ExamplesSection() {
                 Build the parent package first, then install the demo dependencies from the demo directory.
               </p>
               <CodeBlock
-                code={`cd demo\nyarn install`}
+                code={`cd ..
+yarn install
+yarn build
+
+cd demo
+yarn install`}
                 language="bash"
               />
             </div>
@@ -49,6 +54,12 @@ export default function ExamplesSection() {
                 </li>
                 <li>
                   <code className="font-mono">PAY_TO_ADDRESS</code>: address that receives payments.
+                </li>
+                <li>
+                  <code className="font-mono">ADVERTISED_ENDPOINT</code>: optional resource-server tab endpoint URL.
+                </li>
+                <li>
+                  <code className="font-mono">API_URL</code>: optional client base URL (defaults to <code className="font-mono">http://localhost:3000</code>).
                 </li>
               </ul>
             </div>
@@ -73,7 +84,12 @@ export default function ExamplesSection() {
               />
               <p className="text-sm text-ink-body">You should see output similar to:</p>
               <CodeBlock
-                code={`x402 Demo Server running on http://localhost:3000\nProtected endpoint: http://localhost:3000/api/premium-data\nPayment required: $0.01 (4mica credit on Sepolia)`}
+                code={`x402 Demo Server running on http://localhost:3000
+Protected endpoint: http://localhost:3000/api/premium-data
+Payment required: $0.01 (4mica credit on Sepolia)
+Tab endpoint hosted by this server: POST http://localhost:3000/payment/tab
+Who calls it: payer clients after a 402 Payment Required response
+What it does: opens or reuses a tab via the 4Mica facilitator and returns tab JSON`}
                 language="bash"
               />
             </div>

@@ -149,7 +149,7 @@ function PythonClientIntegration() {
   return (
     <div className="space-y-8">
       <p className="text-ink-body leading-relaxed">
-        Use <code className="font-mono">x402_requests</code> (synchronous) or <code className="font-mono">x402_httpx</code> (async)
+        Use <code className="font-mono">x402_requests</code> (synchronous) or <code className="font-mono">x402_httpx_transport</code> (async)
         to wrap your Python HTTP client with automatic 402 handling. Register
         <code className="font-mono"> FourMicaEvmScheme</code> for your network and the wrapper handles tab opening,
         guarantee signing, and request retrying transparently.
@@ -188,23 +188,26 @@ print(response.status_code, response.json())`}
         />
       </div>
       <div className="space-y-3">
-        <h3 className="text-xl font-semibold text-ink-strong">Using x402_httpx (async)</h3>
+        <h3 className="text-xl font-semibold text-ink-strong">Using x402_httpx_transport (async)</h3>
         <p className="text-sm text-ink-body">
-          Wraps an <code className="font-mono">httpx</code> async client. Use this in FastAPI clients or
+          Wraps an <code className="font-mono">httpx.AsyncClient</code> transport. Use this in FastAPI clients or
           any <code className="font-mono">asyncio</code>-based code.
         </p>
         <CodeBlock
           language="python"
           code={`import asyncio
-from x402 import x402ClientAsync
-from x402.http.clients import x402_httpx
+import httpx
+from x402 import x402Client
+from x402.http.clients import x402_httpx_transport
 from fourmica_x402.client_scheme import FourMicaEvmScheme
 
 async def main():
-    client = x402ClientAsync()
+    client = x402Client()
     client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
 
-    async with x402_httpx(client) as session:
+    async with httpx.AsyncClient(
+        transport=x402_httpx_transport(client)
+    ) as session:
         response = await session.get("https://api.example.com/premium-content")
         print(response.status_code, response.json())
 
@@ -234,7 +237,7 @@ session = x402_requests(client)`}
         <h3 className="text-lg font-semibold text-ink-strong">Flow Summary</h3>
         <ol className="list-decimal list-inside space-y-1">
           <li>Call the protected resource — receive HTTP 402 with payment requirements.</li>
-          <li>The wrapper opens a tab using the <code className="font-mono">tabEndpoint</code> in the 402 response.</li>
+          <li>The wrapper reads <code className="font-mono">paymentRequirements.extra.tabEndpoint</code> from the 402 response and opens a tab on the resource server.</li>
           <li>Signs a guarantee with your key and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
           <li>Returns the successful response or raises an exception for unresolvable 402s.</li>
         </ol>
