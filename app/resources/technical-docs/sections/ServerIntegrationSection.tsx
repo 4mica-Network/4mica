@@ -12,7 +12,7 @@ function TypeScriptServerIntegration() {
       <p className="text-ink-body leading-relaxed">
         Use <code className="font-mono">paymentMiddlewareFromConfig</code> to add payment-protected routes to your
         Express app. It configures the 4Mica facilitator, registers <code className="font-mono">FourMicaEvmScheme</code>,
-        and injects the tab endpoint into <code className="font-mono">paymentRequirements.extra.tabEndpoint</code> automatically.
+        and injects your server&apos;s advertised tab endpoint into <code className="font-mono">paymentRequirements.extra.tabEndpoint</code> automatically.
       </p>
       <p className="text-sm text-ink-body">
         Already using Coinbase x402? The only change is: use scheme <code className="font-mono">4mica-credit</code>,
@@ -28,9 +28,23 @@ function TypeScriptServerIntegration() {
           language="ts"
           code={`import express from "express";
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+import { FourMicaEvmScheme } from "@4mica/x402/server";
 
 const app = express();
 app.use(express.json());
+
+// This is the tab endpoint advertised by this resource server.
+//
+// When a client hits a protected route and receives a 402, this URL is embedded
+// in the response as \`paymentRequirements.extra.tabEndpoint\`. The client then
+// POSTs to this URL on this server with { userAddress, paymentRequirements }.
+// The x402 middleware handles that route, calls the 4Mica facilitator's
+// \`POST /tabs\` endpoint on the server's behalf, and returns the facilitator's
+// tab JSON to the client. The client uses \`tabId\` and \`nextReqId\` from that
+// response to sign the X-PAYMENT header and retry the original request.
+//
+// In production this should be your API URL, not the facilitator URL.
+const TAB_ENDPOINT = "http://localhost:3000/payment/tab";
 
 app.use(
   paymentMiddlewareFromConfig(
@@ -39,15 +53,26 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.10",
-          network: "eip155:11155111", // Ethereum Sepolia
+          network: "eip155:84532", // Base Sepolia
           payTo: "0xYourAddress",
         },
         description: "Access to premium content",
       },
     },
     {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-    }
+      // Injected into every 402 response as extra.tabEndpoint. This server
+      // hosts the route and the middleware forwards tab-open requests to 4Mica.
+      advertisedEndpoint: TAB_ENDPOINT,
+    },
+    undefined, // facilitatorClients — defaults to x402.4mica.xyz
+    [
+      {
+        // Registers the 4mica-credit scheme for Base Sepolia so the middleware
+        // can build payment requirements and inject extra.tabEndpoint.
+        network: "eip155:84532",
+        server: new FourMicaEvmScheme(TAB_ENDPOINT),
+      },
+    ]
   )
 );
 
@@ -64,36 +89,49 @@ app.listen(3000, () => {
         <h3 className="text-lg font-semibold text-ink-strong">What Happens on Each Request</h3>
         <ol className="list-decimal list-inside space-y-1">
           <li>The client requests your protected route without payment.</li>
-          <li>The server returns HTTP 402 with <code className="font-mono">paymentRequirements</code> and a tab endpoint.</li>
-          <li>The client opens a tab, signs a payment guarantee, and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
+          <li>The server returns HTTP 402 with <code className="font-mono">paymentRequirements</code> and your advertised tab endpoint.</li>
+          <li>The client opens a tab through that server endpoint, signs a payment guarantee, and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
           <li>The server verifies and settles the payment, then serves the protected response.</li>
         </ol>
       </div>
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-ink-strong">paymentMiddlewareFromConfig(routes, tabConfig, ...options)</h3>
         <p className="text-sm text-ink-body">
-          Provide protected routes and the tab configuration. The middleware wires 402 responses,
+          Provide protected routes and the advertised tab configuration. The middleware wires 402 responses,
           tab openings, and verify/settle calls automatically.
         </p>
         <CodeBlock
           language="ts"
-          code={`app.use(
+          code={`import { FourMicaEvmScheme } from "@4mica/x402/server";
+
+const TAB_ENDPOINT = "http://localhost:3000/payment/tab";
+
+app.use(
   paymentMiddlewareFromConfig(
     {
       "GET /path": {
         accepts: {
           scheme: "4mica-credit",
           price: "$0.10",
-          network: "eip155:11155111", // or "eip155:84532" for Base Sepolia
+          network: "eip155:84532", // or "eip155:11155111"
           payTo: "0xRecipientAddress",
         },
         description: "What the user is paying for",
       },
     },
     {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
+      advertisedEndpoint: TAB_ENDPOINT,
       ttlSeconds: 3600,
-    }
+    },
+    undefined, // facilitatorClients
+    [
+      {
+        // The scheme uses your server's advertised endpoint; the middleware
+        // proxies tab creation to the facilitator under the hood.
+        network: "eip155:84532",
+        server: new FourMicaEvmScheme(TAB_ENDPOINT),
+      },
+    ]
   )
 );`}
         />
@@ -113,8 +151,14 @@ app.listen(3000, () => {
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-ink-strong">Advanced: Custom Resource Server</h3>
         <p className="text-sm text-ink-body">
-          For custom facilitators or additional schemes, use <code className="font-mono">paymentMiddleware</code> directly
-          and build your own <code className="font-mono">x402ResourceServer</code>.
+          For custom facilitator clients used during verify/settle or for additional schemes, use{' '}
+          <code className="font-mono">paymentMiddleware</code> directly and build your own{' '}
+          <code className="font-mono">x402ResourceServer</code>.
+        </p>
+        <p className="text-sm text-ink-body">
+          The advertised tab endpoint is still handled by the 4Mica middleware path in{' '}
+          <code className="font-mono">@4mica/x402/server/express</code>, which proxies tab opening to the 4Mica
+          facilitator.
         </p>
         <CodeBlock
           language="ts"
@@ -131,6 +175,8 @@ const otherFacilitator = new HTTPFacilitatorClient({
   url: "https://other-facilitator.example.com",
 });
 
+// Custom facilitator clients on the resource server affect verify/settle flows.
+// The advertised tab endpoint below is still proxied through the 4Mica middleware.
 const resourceServer = new x402ResourceServer([
   fourMicaFacilitator,
   otherFacilitator,

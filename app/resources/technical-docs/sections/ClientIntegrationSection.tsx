@@ -20,7 +20,7 @@ function TypeScriptClientIntegration() {
       </p>
       <div className="space-y-2">
         <h3 className="text-lg font-semibold text-ink-strong">Install</h3>
-        <CodeBlock code={`pnpm install @x402/fetch @x402/axios`} language="bash" />
+        <CodeBlock code={`pnpm install @x402/fetch @x402/axios @4mica/x402 viem`} language="bash" />
       </div>
       <div className="space-y-3">
         <h3 className="text-xl font-semibold text-ink-strong">Using wrapFetchWithPaymentFromConfig</h3>
@@ -31,24 +31,28 @@ function TypeScriptClientIntegration() {
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { Client, ConfigBuilder } from "@4mica/sdk";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
 
-const cfg = new ConfigBuilder()
-  .network("base-sepolia") // or "ethereum-sepolia"
-  .walletPrivateKey("0xYourPrivateKey")
-  .build();
-const client = await Client.new(cfg);
+const account = privateKeyToAccount("0xYourPrivateKey");
+
+// This scheme client handles the 4Mica x402 flow for fetch:
+// 1. request the protected resource
+// 2. receive a 402 with paymentRequirements.extra.tabEndpoint
+// 3. POST to that tab endpoint on the resource server
+// 4. receive tab JSON, sign the payment, and retry the request
+const scheme = await FourMicaEvmScheme.create(account);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
       network: "eip155:84532", // Base Sepolia
-      client: client,
+      client: scheme,
     },
   ],
 });
 
-const response = await fetchWithPayment("https://api.example.com/premium-content");
+const response = await fetchWithPayment("http://localhost:3000/premium-content");
 const data = await response.json();
 console.log(data);`}
         />
@@ -63,24 +67,22 @@ console.log(data);`}
           language="ts"
           code={`import axios from "axios";
 import { wrapAxiosWithPaymentFromConfig } from "@x402/axios";
-import { Client, ConfigBuilder } from "@4mica/sdk";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
 
-const cfg = new ConfigBuilder()
-  .network("base-sepolia") // or "ethereum-sepolia"
-  .walletPrivateKey("0xYourPrivateKey")
-  .build();
-const client = await Client.new(cfg);
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
 
 const api = wrapAxiosWithPaymentFromConfig(axios.create(), {
   schemes: [
     {
       network: "eip155:84532", // Base Sepolia
-      client: client,
+      client: scheme,
     },
   ],
 });
 
-const response = await api.get("https://api.example.com/premium-content");
+const response = await api.get("http://localhost:3000/premium-content");
 console.log(response.data);`}
         />
       </div>
@@ -93,19 +95,20 @@ console.log(response.data);`}
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { Client, ConfigBuilder } from "@4mica/sdk";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
 
-const ethSepoliaClient = await Client.new(
-  new ConfigBuilder().network("ethereum-sepolia").walletPrivateKey("0xEthSepoliaPrivateKey").build()
+const ethSepoliaScheme = await FourMicaEvmScheme.create(
+  privateKeyToAccount("0xEthSepoliaPrivateKey")
 );
-const baseSepoliaClient = await Client.new(
-  new ConfigBuilder().network("base-sepolia").walletPrivateKey("0xBaseSepoliaPrivateKey").build()
+const baseSepoliaScheme = await FourMicaEvmScheme.create(
+  privateKeyToAccount("0xBaseSepoliaPrivateKey")
 );
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
-    { network: "eip155:11155111", client: ethSepoliaClient }, // Ethereum Sepolia
-    { network: "eip155:84532",    client: baseSepoliaClient }, // Base Sepolia
+    { network: "eip155:11155111", client: ethSepoliaScheme }, // Ethereum Sepolia
+    { network: "eip155:84532", client: baseSepoliaScheme }, // Base Sepolia
   ],
 });`}
         />
@@ -119,13 +122,11 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
-import { Client, ConfigBuilder } from "@4mica/sdk";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
 
-const cfg = new ConfigBuilder()
-  .network("base-sepolia") // or "ethereum-sepolia"
-  .walletPrivateKey("0xYourPrivateKey")
-  .build();
-const scheme = await Client.new(cfg);
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
 const client = new x402Client().register("eip155:84532", scheme);
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);`}
@@ -135,7 +136,7 @@ const fetchWithPayment = wrapFetchWithPayment(fetch, client);`}
         <h3 className="text-lg font-semibold text-ink-strong">Flow Summary</h3>
         <ol className="list-decimal list-inside space-y-1">
           <li>Call the protected resource — receive HTTP 402 with payment requirements.</li>
-          <li>The wrapper opens a tab using the <code className="font-mono">tabEndpoint</code> in the 402 response.</li>
+          <li>The wrapper reads <code className="font-mono">paymentRequirements.extra.tabEndpoint</code> from the 402 response and opens a tab on the resource server.</li>
           <li>Signs a guarantee with your key and retries with a payment header (<code className="font-mono">X-PAYMENT</code> for v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).</li>
           <li>Returns the successful response or surfaces any retry errors.</li>
         </ol>
