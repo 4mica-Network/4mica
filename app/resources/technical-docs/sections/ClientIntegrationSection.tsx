@@ -31,17 +31,19 @@ function TypeScriptClientIntegration() {
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { FourMicaEvmScheme } from "@4mica/x402/client";
-import { privateKeyToAccount } from "viem/accounts";
+import { Client, ConfigBuilder } from "@4mica/sdk";
 
-const account = privateKeyToAccount("0xYourPrivateKey");
-const scheme = await FourMicaEvmScheme.create(account);
+const cfg = new ConfigBuilder()
+  .network("base-sepolia") // or "ethereum-sepolia"
+  .walletPrivateKey("0xYourPrivateKey")
+  .build();
+const client = await Client.new(cfg);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
-      client: scheme,
+      network: "eip155:84532", // Base Sepolia
+      client: client,
     },
   ],
 });
@@ -61,17 +63,19 @@ console.log(data);`}
           language="ts"
           code={`import axios from "axios";
 import { wrapAxiosWithPaymentFromConfig } from "@x402/axios";
-import { FourMicaEvmScheme } from "@4mica/x402/client";
-import { privateKeyToAccount } from "viem/accounts";
+import { Client, ConfigBuilder } from "@4mica/sdk";
 
-const account = privateKeyToAccount("0xYourPrivateKey");
-const scheme = await FourMicaEvmScheme.create(account);
+const cfg = new ConfigBuilder()
+  .network("base-sepolia") // or "ethereum-sepolia"
+  .walletPrivateKey("0xYourPrivateKey")
+  .build();
+const client = await Client.new(cfg);
 
 const api = wrapAxiosWithPaymentFromConfig(axios.create(), {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
-      client: scheme,
+      network: "eip155:84532", // Base Sepolia
+      client: client,
     },
   ],
 });
@@ -89,15 +93,19 @@ console.log(response.data);`}
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { Client, ConfigBuilder } from "@4mica/sdk";
 
-const ethSepoliaScheme = await FourMicaEvmScheme.create(ethSepoliaAccount);
-const baseSepoliaScheme = await FourMicaEvmScheme.create(baseSepoliaAccount);
+const ethSepoliaClient = await Client.new(
+  new ConfigBuilder().network("ethereum-sepolia").walletPrivateKey("0xEthSepoliaPrivateKey").build()
+);
+const baseSepoliaClient = await Client.new(
+  new ConfigBuilder().network("base-sepolia").walletPrivateKey("0xBaseSepoliaPrivateKey").build()
+);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
-    { network: "eip155:11155111", client: ethSepoliaScheme }, // Ethereum Sepolia
-    { network: "eip155:84532",    client: baseSepoliaScheme }, // Base Sepolia
+    { network: "eip155:11155111", client: ethSepoliaClient }, // Ethereum Sepolia
+    { network: "eip155:84532",    client: baseSepoliaClient }, // Base Sepolia
   ],
 });`}
         />
@@ -111,10 +119,14 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
         <CodeBlock
           language="ts"
           code={`import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
-import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { Client, ConfigBuilder } from "@4mica/sdk";
 
-const scheme = await FourMicaEvmScheme.create(account);
-const client = new x402Client().register("eip155:11155111", scheme);
+const cfg = new ConfigBuilder()
+  .network("base-sepolia") // or "ethereum-sepolia"
+  .walletPrivateKey("0xYourPrivateKey")
+  .build();
+const scheme = await Client.new(cfg);
+const client = new x402Client().register("eip155:84532", scheme);
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);`}
         />

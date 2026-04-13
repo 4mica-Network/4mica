@@ -34,16 +34,15 @@ function TypeScriptRegistration() {
       <div className="space-y-4">
         <h3 className="text-xl font-semibold text-ink-strong">Deposit USDC on Base Sepolia</h3>
         <p className="text-sm text-ink-body">
-          For ERC-20 tokens (e.g. USDC), first approve the Core4Mica contract to spend the token, then call
-          <code className="font-mono"> deposit</code>. The SDK fetches the contract address automatically from
+          For ERC-20 tokens (e.g. USDC), use <code className="font-mono">getSupportedTokens</code> to resolve
+          the token address from the network, then approve the Core4Mica contract and call{' '}
+          <code className="font-mono">deposit</code>. The SDK fetches the contract address automatically from
           the network URL — you do not need to supply it manually.
         </p>
         <CodeBlock
           language="ts"
           code={`import { Client, ConfigBuilder } from "@4mica/sdk";
 
-// USDC on Base Sepolia
-const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 // 1 USDC = 1_000_000 (6 decimals)
 const AMOUNT = 1_000_000n;
 
@@ -55,12 +54,21 @@ const cfg = new ConfigBuilder()
 const client = await Client.new(cfg);
 
 try {
-  // Step 1 — approve the Core4Mica contract to spend USDC
-  await client.user.approveErc20(USDC, AMOUNT);
-  console.log("Approved");
+  // Resolve a token supported by the 4Mica core on this network
+  const { tokens } = await client.rpc.getSupportedTokens();
+  const usdc =
+    tokens.find((t) => t.symbol.toUpperCase() === "USDC" && t.address) ??
+    tokens.find((t) => t.address);
+  if (!usdc?.address) {
+    throw new Error("No supported ERC20 token found for deposit");
+  }
+
+  // Step 1 — approve the Core4Mica contract to spend the token
+  await client.user.approveErc20(usdc.address, AMOUNT);
+  console.log(\`Approved \${usdc.symbol} (\${usdc.address})\`);
 
   // Step 2 — deposit into the vault (this is your registration)
-  const receipt = await client.user.deposit(AMOUNT, USDC);
+  const receipt = await client.user.deposit(AMOUNT, usdc.address);
   console.log("Deposited. tx:", receipt.transactionHash);
 } finally {
   await client.aclose();
