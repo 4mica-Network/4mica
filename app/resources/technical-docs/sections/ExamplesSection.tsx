@@ -48,7 +48,7 @@ export default function ExamplesSection() {
                   <code className="font-mono">PRIVATE_KEY</code>: Ethereum private key (0x-prefixed) on Sepolia.
                 </li>
                 <li>
-                  <code className="font-mono">PAY_TO_ADDRESS</code>: address that receives payments (optional).
+                  <code className="font-mono">PAY_TO_ADDRESS</code>: address that receives payments.
                 </li>
               </ul>
             </div>
@@ -73,7 +73,7 @@ export default function ExamplesSection() {
               />
               <p className="text-sm text-ink-body">You should see output similar to:</p>
               <CodeBlock
-                code={`x402 Demo Server running on http://localhost:3000\nProtected endpoint: http://localhost:3000/api/premium-data\nPayment required: $0.05 (4mica credit on Sepolia)`}
+                code={`x402 Demo Server running on http://localhost:3000\nProtected endpoint: http://localhost:3000/api/premium-data\nPayment required: $0.01 (4mica credit on Sepolia)`}
                 language="bash"
               />
             </div>

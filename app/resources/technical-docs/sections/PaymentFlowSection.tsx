@@ -59,7 +59,7 @@ export default function PaymentFlowSection() {
       <div className="space-y-6">
         <p className="text-ink-body leading-relaxed">
           This flow summarizes the internal protocol sequence for credit guarantees, from collateral to settlement and
-          remuneration. It mirrors the internal sequence diagrams in <code className="font-mono">Sequence Diagrams</code>.
+          remuneration.
         </p>
         <p className="text-ink-body leading-relaxed">
           If you want to see the interactive protocol design, click{' '}
