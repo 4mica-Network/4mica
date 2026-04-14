@@ -142,12 +142,6 @@ export default function Header() {
                 Contact Us
               </button>
             </div>
-            <Link
-              href="/register"
-              className="btn btn-outline btn-sm whitespace-nowrap"
-            >
-              Register to 4Mica
-            </Link>
           </div>
 
           <div className="md:hidden">
@@ -203,13 +197,6 @@ export default function Header() {
                   {item.label}
                 </Link>
               ))}
-              <Link
-                href="/register"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="btn btn-outline btn-md mt-4 w-full"
-              >
-                Register to 4Mica
-              </Link>
               <button
                 type="button"
                 onClick={openContactModal}

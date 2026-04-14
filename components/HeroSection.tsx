@@ -18,53 +18,54 @@ export default function HeroSection() {
 
   const highlights = [
     {
-      title: 'Non-custodial collateral',
-      description: 'Funds stay on-chain with the user until settlement',
+      title: 'Earn while agents spend',
+      description: 'Deposits generate yield that offsets costs',
     },
     {
-      title: 'BLS-backed guarantees',
-      description: 'Cryptographic proofs for each spend request',
+      title: 'One pool, infinite endpoints',
+      description: 'No per-channel collateral or prefunding',
     },
     {
-      title: 'Settle after 7 days',
-      description: 'Users pay later without prefunding balances',
+      title: 'Spend now, settle later',
+      description: 'Built-in credit with cryptographic guarantees',
     },
     {
-      title: 'ETH, USDC, USDT',
-      description: 'Default assets with versioned guarantees',
+      title: 'Gasless, cross-chain', // CHANGED: "and" → ","
+      description: 'Works across x402, MPP, and more',
     },
   ];
 
   const heroContent = (
     <div className="relative z-10 w-full">
-      <div className="container mx-auto px-6 pt-24 pb-24 lg:pt-28 lg:pb-28">
+      <div className="container mx-auto px-6 pt-16 pb-24 lg:pt-20 lg:pb-28"> {/* CHANGED: pt-24→pt-16, lg:pt-28→lg:pt-20 — move content block upward */}
         <div className="grid items-center gap-12 lg:grid-cols-1">
           <div className="flex flex-col items-center text-center">
-            <h1 className="mt-6 section-title-lg leading-tight">
-              Instant payments on any chain
-            </h1>
-            <p className="mt-6 text-lg md:text-xl text-ink-body/80 max-w-2xl leading-relaxed">
-              Open a tab, let users spend now, then settle after 7 days with non-custodial, collateral-backed guarantees.
+            <h1 className="section-title-lg leading-tight w-full">Scale your agentic revenue</h1>
+            <p className="mt-3 text-lg md:text-xl text-ink-body/80 whitespace-nowrap leading-relaxed">
+              AI agents work non-stop. Monetize every interaction without payment friction. {/* CHANGED */}
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+            <p className="mt-1 text-sm text-ink-muted/60 max-w-lg leading-relaxed">
+              Fund once, earn continuously, and let your agents transact across any chain. {/* CHANGED */}
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <button
                 onClick={handleGetStarted}
-                className="btn btn-outline btn-lg whitespace-nowrap"
+                className="btn btn-primary btn-lg whitespace-nowrap font-bold" // CHANGED: btn-outline→btn-primary, font-semibold→font-bold — dominant CTA
               >
                 Start Building
               </button>
               <button
                 onClick={handleJoinCommunity}
-                className="btn btn-outline btn-lg whitespace-nowrap"
+                className="btn btn-outline btn-lg whitespace-nowrap font-normal"
               >
-                Join Community
+                Read Docs
               </button>
             </div>
-            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+            <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl"> {/* CHANGED: mt-10→mt-14 — more breathing room between buttons and cards */}
               {highlights.map((highlight) => (
-                <div key={highlight.title} className="glass-panel rounded-xl p-4">
-                  <p className="text-sm font-semibold text-ink-strong">{highlight.title}</p>
-                  <p className="mt-2 text-xs text-ink-muted leading-relaxed">{highlight.description}</p>
+                <div key={highlight.title} className="glass-panel rounded-xl p-4 border border-white/10 bg-white/5"> {/* CHANGED: removed opacity-90, added border-white/10 + bg-white/5 for more visibility against dark bg */}
+                  <p className="text-sm font-semibold text-ink-strong/90">{highlight.title}</p> {/* CHANGED: text-ink-strong→text-ink-strong/90 keeps contrast visible */}
+                  <p className="mt-2 text-xs text-ink-muted/80 leading-relaxed">{highlight.description}</p> {/* CHANGED: text-ink-muted→text-ink-muted/80 — slightly higher contrast */}
                 </div>
               ))}
             </div>
