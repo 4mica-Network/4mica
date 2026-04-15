@@ -19,7 +19,7 @@ const highlights = [
       description: 'No per-channel collateral or prefunding',
     },
     {
-      title: 'Spend now, settle later',
+      title: 'Settle Less, Clear More',
       description: 'Built-in credit with cryptographic guarantees',
     },
     {

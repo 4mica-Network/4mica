@@ -2,7 +2,7 @@
 
 export default function SecuritySection() {
   const items = [
-    'Non-custodial collateral stays in Aave until settlement or claim',
+    'Non-custodial collateral stays in Aave until withdrawal or on-chain claim',
     'Guarantees are BLS-signed with domain separation and versioned configs',
     'AccessManaged roles, Pausable, and ReentrancyGuard protect critical flows',
   ];
@@ -17,7 +17,7 @@ export default function SecuritySection() {
               Plain UX, hard guarantees
             </h2>
             <p className="section-lead">
-              Keep funds on-chain and verify every claim before collateral moves
+              Credit lines are secured by BLS-signed certificates. Because collateral stays in Aave, users can withdraw at any time and recipients can claim on-chain if a payer defaults — no intermediary required.
             </p>
           </div>
           <div className="glass-panel rounded-2xl p-6 sm:p-8">

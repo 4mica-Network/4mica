@@ -19,7 +19,7 @@ export default function PartnersSection() {
     },
     {
       title: 'Non-custodial',
-      description: 'Collateral stays in Aave until settlement or on-chain claim',
+      description: 'Collateral stays in Aave until withdrawal or on-chain claim',
     },
   ];
 

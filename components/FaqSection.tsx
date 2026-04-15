@@ -13,9 +13,9 @@ export default function FaqSection() {
         'A guarantee is a signed claim the payer attaches to their request as an X-PAYMENT header. It carries tabId, reqId, userAddress, recipientAddress, amount, totalAmount, asset, and a timestamp. Payers sign with EIP-712 (default) or EIP-191. The facilitator verifies the signature and issues a BLS-signed certificate on-chain.',
     },
     {
-      question: 'Do you support both V1 and V2?',
+      question: 'How does 4Mica integrate with ERC-8004?',
       answer:
-        'Yes. V1 is the baseline EIP-712 signed guarantee flow. V2 extends it with a full on-chain validation policy — validationRegistryAddress, validationRequestHash, validationChainId, validationSubjectHash, and a jobHash — which gates remuneration on a passing ValidationRegistry status.',
+        'ERC-8004 defines the ValidationRegistry — an on-chain registry where validators post scored responses (0–100) to validation requests. In V2 guarantees, the payer signs a guarantee that commits to a validationRequestHash binding a specific validator, agentId, minValidationScore, requiredValidationTag, and jobHash to the payment claims. When the recipient calls remunerate(), the ValidationRegistryGuaranteeDecoder reads the ValidationRegistry: if no response exists, the score is below the minimum, or the validator or tag do not match, the call reverts. Validators — stakers re-running the job, zkML verifiers, or TEE oracles — call validationResponse() on the registry with a score and tag, and can update it for progressive finality. V1 guarantees use plain EIP-712 signatures with no on-chain validation policy.',
     },
     {
       question: 'When can recipients claim collateral?',
