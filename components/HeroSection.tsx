@@ -33,12 +33,9 @@ const highlights = [
       <div className="container mx-auto px-6 pt-16 pb-24 lg:pt-20 lg:pb-28"> {/* CHANGED: pt-24→pt-16, lg:pt-28→lg:pt-20 — move content block upward */}
         <div className="grid items-center gap-12 lg:grid-cols-1">
           <div className="flex flex-col items-center text-center">
-            <h1 className="section-title-lg leading-tight w-full">Scale your agentic revenue</h1>
+            <h1 className="section-title-lg leading-tight w-full">The Clearing Layer for<br />the Agentic Economy</h1>
             <p className="mt-3 text-lg md:text-xl text-ink-body/80 leading-relaxed max-w-lg">
-              AI agents work non-stop. Monetize every interaction without payment friction. {/* CHANGED */}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted/60 max-w-lg leading-relaxed">
-              Fund once, earn continuously, and let your agents transact across any chain. {/* CHANGED */}
+              Instant credit, net settlement, and yield-generating collateral for AI agents.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <button
