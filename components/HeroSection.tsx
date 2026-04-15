@@ -38,18 +38,18 @@ const highlights = [
               Instant credit, net settlement, and yield-generating collateral for AI agents.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-              <button
-                onClick={handleGetStarted}
-                className="btn btn-primary btn-lg whitespace-nowrap font-bold" // CHANGED: btn-outline→btn-primary, font-semibold→font-bold — dominant CTA
-              >
-                Start Building
-              </button>
               <a
                 href="/resources/technical-docs"
+                className="btn btn-primary btn-lg whitespace-nowrap font-bold"
+              >
+                Documentation
+              </a>
+              <button
+                onClick={handleGetStarted}
                 className="btn btn-outline btn-lg whitespace-nowrap font-normal"
               >
-                Read Docs
-              </a>
+                See How It Works
+              </button>
             </div>
             <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl"> {/* CHANGED: mt-10→mt-14 — more breathing room between buttons and cards */}
               {highlights.map((highlight) => (
