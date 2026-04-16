@@ -35,7 +35,7 @@ const highlights = [
           <div className="flex flex-col items-center text-center">
             <h1 className="section-title-lg leading-tight w-full">The Clearing Layer for<br />the Agentic Economy</h1>
             <p className="mt-3 text-lg md:text-xl text-ink-body/80 leading-relaxed max-w-lg">
-              Instant credit, net settlement, and yield-generating collateral for AI agents.
+              Power AI agents with credit via x402—while your capital continuously earns yield.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
               <a
