@@ -6,7 +6,8 @@ import Link from 'next/link';
 export default function PartnersSection() {
   const partners = [
     { name: 'Aligned Layer', logo: '/assets/aligned_layer_logo.png', href: 'https://alignedlayer.com/' },
-    { name: 'ChaosChain', logo: '/assets/chaos_chain_logo.svg', href: 'https://chaoscha.in/' }
+    { name: 'ChaosChain', logo: '/assets/chaos_chain_logo.svg', href: 'https://chaoscha.in/' }, 
+    { name: 'Wachai', logo: '/assets/wachai.png', href: 'https://wach.ai/' }
   ];
   const proofPoints = [
     {
@@ -15,7 +16,7 @@ export default function PartnersSection() {
     },
     {
       title: 'Testnet live',
-      description: '4Mica is live on testnet — deposit, spend, and settle today',
+      description: '4Mica is live on testnet — deposit, spend, and earn today',
     },
     {
       title: 'Non-custodial',
@@ -32,7 +33,7 @@ export default function PartnersSection() {
             Partners that trust 4Mica
           </h2>
           <p className="section-lead max-w-2xl mx-auto">
-            Teams running AVS compute, API monetization, and agentic commerce on 4Mica's credit layer
+            Teams building agentic commerce on 4Mica's credit layer
           </p>
         </div>
 
