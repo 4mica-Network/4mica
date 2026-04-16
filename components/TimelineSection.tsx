@@ -28,7 +28,7 @@ export default function TimelineSection({ showHeader = true }: TimelineSectionPr
       quarter: 'Q1 2026',
       title: 'Beta Release',
       description: 'Beta release to Ethereum and Solana and support for retail payments',
-      done: false
+      done: true
     },
     {
       quarter: 'Q2 2026',
