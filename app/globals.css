@@ -42,6 +42,10 @@
     --brand-violet: 92 124 250;
     --surface-solid: 5 11 29;
     --surface-deep: 6 9 15;
+    /* Semantic colors */
+    --color-success: 74 222 128;
+    --color-warning: 251 146 60;
+    --color-danger: 248 113 113;
   }
 
   .dark {

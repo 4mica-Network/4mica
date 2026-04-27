@@ -2,7 +2,9 @@
 
 import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
+import WhatYoureMissingSection from '../components/WhatYoureMissingSection';
 import DocsCalloutSection from '../components/DocsCalloutSection';
+import UseCasesSection from '../components/UseCasesSection';
 import PartnersSection from '../components/PartnersSection';
 import CodeSamplesSection from '../components/CodeSamplesSection';
 import SecuritySection from '../components/SecuritySection';
@@ -15,7 +17,9 @@ export default function Home() {
     <div className="min-h-screen">
       <Header />
       <HeroSection />
+      <WhatYoureMissingSection />
       <DocsCalloutSection />
+      <UseCasesSection />
       <PartnersSection />
       <CodeSamplesSection />
       <SecuritySection />

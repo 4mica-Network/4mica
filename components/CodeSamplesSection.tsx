@@ -1,250 +1,240 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
-type LanguageId = 'typescript' | 'python';
-type KeyAction = 'payer' | 'recipient';
+type LangId = 'typescript' | 'python';
 
-const languageTabs: { id: LanguageId; label: string }[] = [
-  { id: 'typescript', label: 'TypeScript' },
-  { id: 'python', label: 'Python' },
-];
-
-const keyActions: { id: KeyAction; label: string }[] = [
-  { id: 'payer', label: 'Client' },
-  { id: 'recipient', label: 'Server' },
-];
-
-const codeSamples: Record<LanguageId, Record<KeyAction, string>> = {
-  typescript: {
-    payer: `import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+const CLIENT_SNIPPET: Record<LangId, string> = {
+  typescript: `import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { privateKeyToAccount } from "viem/accounts";
 
+// 1. Create your account
 const account = privateKeyToAccount("0xYourPrivateKey");
+// 2. Register the 4Mica credit scheme
 const scheme = await FourMicaEvmScheme.create(account);
-
+// 3. Wrap your existing fetch — that's it
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
-  schemes: [
-    {
-      network: "eip155:84532", // Base Sepolia
-      client: scheme,
-    },
-  ],
+  schemes: [{ network: "eip155:84532", client: scheme }],
 });
 
-const response = await fetchWithPayment("https://api.example.com/resource");
-const data = await response.json();`,
-    recipient: `import express from "express";
+// Now every request is credit-based — no gas, no chain
+const response = await fetchWithPayment("https://api.example.com/data");`,
+
+  python: `from x402 import x402ClientSync
+from x402.http.clients import x402_requests
+from fourmica_x402.client_scheme import FourMicaEvmScheme
+
+# 1. Create client
+client = x402ClientSync()
+# 2. Register the 4Mica scheme
+client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+# 3. Wrap requests — that's it
+session = x402_requests(client)
+
+# Credit-based, off-chain, instant
+response = session.get("https://api.example.com/data")`,
+};
+
+const SERVER_SNIPPET: Record<LangId, string> = {
+  typescript: `import express from "express";
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 import { FourMicaEvmScheme } from "@4mica/x402/server";
 
 const app = express();
-app.use(express.json());
 
-const TAB_ENDPOINT = "http://localhost:3000/payment/tab";
-
+// Add 4Mica middleware — one line
 app.use(
   paymentMiddlewareFromConfig(
-    {
-      "GET /resource": {
-        accepts: {
-          scheme: "4mica-credit",
-          price: "$0.10",
-          network: "eip155:84532", // Base Sepolia
-          payTo: "0xYourAddress",
-        },
-        description: "Access to premium resource",
-      },
-    },
-    { advertisedEndpoint: TAB_ENDPOINT },
+    { "GET /data": { accepts: { scheme: "4mica-credit", price: "$0.01",
+        network: "eip155:84532", payTo: "0xYourAddress" } } },
+    { advertisedEndpoint: "https://api.example.com/tabs" },
     undefined,
-    [{ network: "eip155:84532", server: new FourMicaEvmScheme(TAB_ENDPOINT) }]
+    [{ network: "eip155:84532", server: new FourMicaEvmScheme("https://api.example.com/tabs") }]
   )
 );
 
-app.get("/resource", (req, res) => {
-  res.json({ message: "Premium content" });
-});
-
+app.get("/data", (req, res) => res.json({ data: "premium content" }));
 app.listen(3000);`,
-  },
-  python: {
-    payer: `from x402 import x402ClientSync
-from x402.http.clients import x402_requests
-from fourmica_x402.client_scheme import FourMicaEvmScheme
 
-client = x402ClientSync()
-client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
-
-session = x402_requests(client)
-response = session.get("https://api.example.com/resource")
-print(response.status_code, response.json())`,
-    recipient: `from fastapi import FastAPI
+  python: `from fastapi import FastAPI
 from fourmica_x402.http import fastapi_payment_middleware_from_config
 
 app = FastAPI()
 
-routes = {
-    "GET /resource": {
-        "accepts": {
-            "scheme": "4mica-credit",
-            "price": "$0.10",
-            "network": "eip155:11155111",  # Ethereum Sepolia
-            "payTo": "0xYourAddress",
-        },
-        "description": "Access to premium resource",
-    },
-}
-
+# Add 4Mica middleware — one line
 middleware = fastapi_payment_middleware_from_config(
-    routes,
-    tab_endpoint="https://api.example.com/tabs/open",
+  { "GET /data": { "accepts": { "scheme": "4mica-credit",
+      "price": "$0.01", "network": "eip155:11155111",
+      "payTo": "0xYourAddress" } } },
+  tab_endpoint="https://api.example.com/tabs",
 )
 
 @app.middleware("http")
 async def x402_mw(request, call_next):
     return await middleware(request, call_next)
 
-@app.get("/resource")
-async def resource():
-    return {"message": "Premium content"}`,
-  },
+@app.get("/data")
+async def data():
+    return {"data": "premium content"}`,
 };
 
-type TokenPattern = {
-  regex: RegExp;
-  classes: string[];
+const KEYWORDS = {
+  typescript: ['import', 'from', 'const', 'await', 'async', 'return', 'new'],
+  python: ['import', 'from', 'async', 'def', 'await', 'return', 'class'],
 };
 
-const tokenPatterns: Record<LanguageId, TokenPattern> = {
-  typescript: {
-    regex:
-      /(\/\/.*$)|(`[^`]*`|'[^'\\]*(?:\\.[^'\\]*)*'|"[^"\\]*(?:\\.[^"\\]*)*")|(\b0x[0-9a-fA-F]+\b|\b\d+(?:_\d+)*(?:\.\d+)?\b)|(\b(?:import|from|async|function|const|let|await|return|new|class|export|default|try|catch|throw|if|else|for|while)\b)|(\b(?:console|Math|Date|BigInt|Number|String|Boolean|Object|process|Promise)\b)/g,
-    classes: ['comment', 'string', 'number', 'keyword', 'builtin'],
-  },
-  python: {
-    regex:
-      /(#.*$)|('''[^']*'''|"""[^"]*"""|'[^'\\]*(?:\\.[^'\\]*)*'|"[^"\\]*(?:\\.[^"\\]*)*")|(\b0x[0-9a-fA-F]+\b|\b\d+(?:_\d+)*(?:\.\d+)?\b)|(\b(?:import|from|async|def|await|return|class|try|except|raise|if|elif|else|for|while|with|as|in|None|True|False)\b)/g,
-    classes: ['comment', 'string', 'number', 'keyword'],
-  },
-};
+const STRINGS_RE = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g;
+const COMMENT_RE = /(\/\/.*$|#.*$)/;
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-
-const highlightLine = (line: string, language: LanguageId) => {
-  const pattern = tokenPatterns[language];
-  if (!pattern) return escapeHtml(line);
-  let result = '';
-  let lastIndex = 0;
-  pattern.regex.lastIndex = 0;
-  let match = pattern.regex.exec(line);
-  while (match) {
-    const index = match.index ?? 0;
-    if (index > lastIndex) result += escapeHtml(line.slice(lastIndex, index));
-    const groupIndex = match.slice(1).findIndex((group) => group !== undefined);
-    const className = groupIndex >= 0 ? pattern.classes[groupIndex] : '';
-    const tokenValue = escapeHtml(match[0]);
-    result += className ? `<span class="code-token ${className}">${tokenValue}</span>` : tokenValue;
-    lastIndex = index + match[0].length;
-    match = pattern.regex.exec(line);
+function highlightLine(line: string, lang: LangId): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const commentMatch = line.match(COMMENT_RE);
+  if (commentMatch && line.trimStart().startsWith(commentMatch[1].trim().slice(0, 2))) {
+    const idx = line.indexOf(commentMatch[1]);
+    const before = line.slice(0, idx);
+    return (
+      processTokens(before, lang) +
+      `<span style="color:rgba(148,163,184,0.4);font-style:italic">${esc(commentMatch[1])}</span>`
+    );
   }
-  if (lastIndex < line.length) result += escapeHtml(line.slice(lastIndex));
+  return processTokens(line, lang);
+}
+
+function processTokens(line: string, lang: LangId): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const kws = KEYWORDS[lang];
+  let result = '';
+  const strParts = line.split(STRINGS_RE);
+  for (let i = 0; i < strParts.length; i++) {
+    const part = strParts[i];
+    if ((part.startsWith('"') || part.startsWith("'") || part.startsWith('`')) && i % 2 === 1) {
+      result += `<span style="color:#86efac">${esc(part)}</span>`;
+    } else {
+      let p = esc(part);
+      kws.forEach((kw) => {
+        p = p.replace(
+          new RegExp(`\\b(${kw})\\b`, 'g'),
+          `<span style="color:#7dd3fc">$1</span>`
+        );
+      });
+      result += p;
+    }
+  }
   return result;
-};
+}
 
 export default function CodeSamplesSection() {
-  const [activeLanguage, setActiveLanguage] = useState<LanguageId>('typescript');
-  const [activeAction, setActiveAction] = useState<KeyAction>('payer');
-  const activeCode = codeSamples[activeLanguage][activeAction];
-  const codeLines = activeCode.trimEnd().split('\n');
-  const highlightedLines = codeLines.map((line) => highlightLine(line, activeLanguage));
+  const [lang, setLang] = useState<LangId>('typescript');
+  const [side, setSide] = useState<'client' | 'server'>('client');
+
+  const code = side === 'client' ? CLIENT_SNIPPET[lang] : SERVER_SNIPPET[lang];
+  const lines = code.trimEnd().split('\n');
 
   return (
-    <section className="py-20 section-gloss">
+    <section id="integration" className="py-24 section-gloss">
       <div className="container mx-auto px-6">
-        <div className="mx-auto max-w-5xl">
+        <div className="max-w-5xl mx-auto">
 
           {/* Header */}
-          <div className="mb-8">
-            <p className="section-kicker">Quick start</p>
-            <h2 className="mt-2 section-title-sm">Integrate in seconds</h2>
-            <p className="section-lead mt-1">
-              Drop the middleware into your server and wrap your HTTP client. That&apos;s it.
+          <div className="mb-10">
+            <p className="section-kicker">Integration</p>
+            <h2 className="mt-2 section-title-sm">3 lines to enable credit-based payments</h2>
+            <p className="section-lead mt-1 max-w-xl">
+              Works with your existing HTTP client. No contract changes. No new wallet. Fully x402-compatible.
             </p>
           </div>
 
-          <div className="glass-panel rounded-2xl p-5 sm:p-6">
-            <div className="overflow-hidden rounded-xl border border-white/10 bg-surface-solid">
-              <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-surface-solid px-3 py-2">
-                {languageTabs.map((tab) => {
-                  const isActive = activeLanguage === tab.id;
-                  return (
+          {/* Value props */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            {[
+              { icon: 'ri-plug-line', label: 'Works with existing HTTP clients', color: 'rgb(var(--brand))' },
+              { icon: 'ri-file-code-line', label: 'No contract changes required', color: 'rgb(var(--color-success))' },
+              { icon: 'ri-exchange-2-line', label: 'x402-compatible by default', color: '#c084fc' },
+            ].map((p) => (
+              <div key={p.label} className="flex items-center gap-3 glass-panel rounded-xl px-4 py-3">
+                <i className={`${p.icon} text-base shrink-0`} style={{ color: p.color }} />
+                <span className="text-xs font-medium text-ink-body">{p.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Code panel */}
+          <div className="glass-panel rounded-2xl overflow-hidden">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 bg-surface-solid px-4 py-2.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/40" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/40" />
+                <span className="ml-2 text-[10px] text-ink-subtle uppercase tracking-wider">
+                  {side === 'client' ? 'agent / client' : 'api / server'} · {lang}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg overflow-hidden border border-white/10">
+                  {(['client', 'server'] as const).map((s) => (
                     <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActiveLanguage(tab.id)}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                        isActive
-                          ? 'bg-white/15 text-ink-strong shadow-sm'
-                          : 'text-ink-muted hover:text-ink-strong'
+                      key={s}
+                      onClick={() => setSide(s)}
+                      className={`px-3 py-1 text-xs font-semibold transition capitalize ${
+                        side === s
+                          ? 'bg-white/15 text-ink-strong'
+                          : 'text-ink-muted hover:text-ink-body'
                       }`}
                     >
-                      {tab.label}
+                      {s}
                     </button>
-                  );
-                })}
-              </div>
-              <div className="grid md:grid-cols-[170px_1fr]">
-                <div className="border-b border-white/10 bg-surface-solid p-3 md:border-b-0 md:border-r">
-                  <div className="flex gap-2 md:flex-col">
-                    {keyActions.map((action) => {
-                      const isActive = activeAction === action.id;
-                      return (
-                        <button
-                          key={action.id}
-                          type="button"
-                          onClick={() => setActiveAction(action.id)}
-                          className={`rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
-                            isActive
-                              ? 'bg-white/15 text-ink-strong'
-                              : 'text-ink-muted hover:text-ink-strong'
-                          }`}
-                        >
-                          {action.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  ))}
                 </div>
-                <div className="bg-surface-solid p-4 sm:p-5 overflow-x-auto">
-                  <div className="space-y-1 font-mono text-xs sm:text-sm leading-relaxed text-ink-strong min-w-max">
-                    {codeLines.map((line, index) => (
-                      <div key={`${activeLanguage}-${activeAction}-${index}`} className="grid grid-cols-[2.2rem_1fr] gap-3">
-                        <span className="select-none text-right text-[10px] text-ink-subtle sm:text-xs">
-                          {index + 1}
-                        </span>
-                        <span
-                          className="whitespace-pre"
-                          dangerouslySetInnerHTML={{ __html: highlightedLines[index] || ' ' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex rounded-lg overflow-hidden border border-white/10">
+                  {(['typescript', 'python'] as const).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => setLang(l)}
+                      className={`px-3 py-1 text-xs font-semibold transition capitalize ${
+                        lang === l
+                          ? 'bg-white/15 text-ink-strong'
+                          : 'text-ink-muted hover:text-ink-body'
+                      }`}
+                    >
+                      {l === 'typescript' ? 'TS' : 'PY'}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between text-xs text-ink-muted">
-              <span>Full docs at <span className="text-brand-teal">/resources/technical-docs</span></span>
-              <span className="text-brand-teal">SDKs: TypeScript · Python · Rust soon</span>
+
+            {/* Code body */}
+            <div className="bg-[#050b1d] p-5 sm:p-6 overflow-x-auto">
+              <div className="font-mono text-xs leading-6 min-w-max">
+                {lines.map((line, i) => (
+                  <div key={i} className="flex gap-4">
+                    <span className="select-none w-6 text-right text-[10px] text-ink-subtle/40 shrink-0 pt-px">
+                      {i + 1}
+                    </span>
+                    <span
+                      className="whitespace-pre text-ink-body/80"
+                      dangerouslySetInnerHTML={{ __html: highlightLine(line, lang) || ' ' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-white/5 bg-surface-solid px-5 py-3 flex items-center justify-between text-xs text-ink-subtle">
+              <span>
+                Full docs at{' '}
+                <Link href="/resources/technical-docs" className="text-brand-teal hover:text-brand-soft transition">
+                  /resources/technical-docs
+                </Link>
+              </span>
+              <span>SDKs: TypeScript · Python · Rust soon</span>
             </div>
           </div>
+
         </div>
       </div>
     </section>
