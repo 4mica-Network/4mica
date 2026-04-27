@@ -2,42 +2,46 @@
 
 import Link from 'next/link';
 
+const BLUE = '#7bcbff';
+
+const STATS = [
+  { value: '1 tx', label: 'per settlement' },
+  { value: '~0', label: 'gas per call' },
+  { value: 'APY', label: 'on collateral' },
+];
+
 export default function FinalCtaSection() {
   return (
     <section className="py-24 section-gloss">
       <div className="container mx-auto px-6">
-        <div
-          className="glass-panel rounded-3xl p-10 sm:p-14 text-center max-w-3xl mx-auto"
-          style={{ borderColor: 'rgb(var(--brand) / 0.15)' }}
-        >
-          {/* Kicker */}
-          <p className="section-kicker mb-4">Start building</p>
+        <div className="max-w-2xl mx-auto text-center">
 
-          {/* Headline */}
+          <p className="section-kicker">Start building</p>
           <h2 className="section-title">Stop paying per transaction.</h2>
-
-          {/* Sub */}
-          <p className="section-lead max-w-md mx-auto">
+          <p className="mt-4 text-base text-ink-muted leading-relaxed max-w-md mx-auto">
             Add a credit layer. Batch thousands of payments. Settle once.
             Your collateral earns yield while your agents scale.
           </p>
 
-          {/* Stat trio */}
-          <div className="mt-8 grid grid-cols-3 gap-3 max-w-sm mx-auto">
-            {[
-              { value: '1 tx', label: 'settlement', color: 'rgb(var(--color-success))' },
-              { value: '~0', label: 'gas per call', color: 'rgb(var(--brand))' },
-              { value: 'APY', label: 'on collateral', color: '#c084fc' },
-            ].map((s) => (
-              <div key={s.label} className="rounded-xl px-3 py-3" style={{ background: s.color + '10', border: `1px solid ${s.color}25` }}>
-                <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
-                <p className="text-[10px] text-ink-subtle mt-0.5">{s.label}</p>
+          {/* Stats */}
+          <div className="mt-10 flex justify-center items-center gap-6">
+            {STATS.map((s, i) => (
+              <div key={s.label} className="contents">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-2xl font-bold tabular-nums" style={{ color: BLUE }}>
+                    {s.value}
+                  </span>
+                  <span className="text-xs text-ink-subtle">{s.label}</span>
+                </div>
+                {i < STATS.length - 1 && (
+                  <div className="w-px h-8 bg-white/10" />
+                )}
               </div>
             ))}
           </div>
 
-          {/* CTAs */}
-          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+          {/* Divider between stats */}
+          <div className="mt-10 border-t border-white/8 pt-10 flex flex-col sm:flex-row justify-center gap-3">
             <Link href="/resources/technical-docs" className="btn btn-primary btn-lg text-center font-bold">
               Start Building
             </Link>
@@ -51,6 +55,7 @@ export default function FinalCtaSection() {
               View Source
             </Link>
           </div>
+
         </div>
       </div>
     </section>

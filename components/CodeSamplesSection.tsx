@@ -14,12 +14,12 @@ import { privateKeyToAccount } from "viem/accounts";
 const account = privateKeyToAccount("0xYourPrivateKey");
 // 2. Register the 4Mica credit scheme
 const scheme = await FourMicaEvmScheme.create(account);
-// 3. Wrap your existing fetch — that's it
+// 3. Wrap your existing fetch. That's it.
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [{ network: "eip155:84532", client: scheme }],
 });
 
-// Now every request is credit-based — no gas, no chain
+// Now every request is credit-based. No gas, no chain.
 const response = await fetchWithPayment("https://api.example.com/data");`,
 
   python: `from x402 import x402ClientSync
@@ -30,7 +30,7 @@ from fourmica_x402.client_scheme import FourMicaEvmScheme
 client = x402ClientSync()
 # 2. Register the 4Mica scheme
 client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
-# 3. Wrap requests — that's it
+# 3. Wrap requests. That's it.
 session = x402_requests(client)
 
 # Credit-based, off-chain, instant
@@ -44,7 +44,7 @@ import { FourMicaEvmScheme } from "@4mica/x402/server";
 
 const app = express();
 
-// Add 4Mica middleware — one line
+// Add 4Mica middleware. One line.
 app.use(
   paymentMiddlewareFromConfig(
     { "GET /data": { accepts: { scheme: "4mica-credit", price: "$0.01",
@@ -63,7 +63,7 @@ from fourmica_x402.http import fastapi_payment_middleware_from_config
 
 app = FastAPI()
 
-# Add 4Mica middleware — one line
+# Add 4Mica middleware. One line.
 middleware = fastapi_payment_middleware_from_config(
   { "GET /data": { "accepts": { "scheme": "4mica-credit",
       "price": "$0.01", "network": "eip155:11155111",
@@ -96,7 +96,7 @@ function highlightLine(line: string, lang: LangId): string {
     const before = line.slice(0, idx);
     return (
       processTokens(before, lang) +
-      `<span style="color:rgba(148,163,184,0.4);font-style:italic">${esc(commentMatch[1])}</span>`
+      `<span style="color:rgba(148,163,184,0.62);font-style:italic">${esc(commentMatch[1])}</span>`
     );
   }
   return processTokens(line, lang);
@@ -144,20 +144,6 @@ export default function CodeSamplesSection() {
             <p className="section-lead mt-1 max-w-xl">
               Works with your existing HTTP client. No contract changes. No new wallet. Fully x402-compatible.
             </p>
-          </div>
-
-          {/* Value props */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            {[
-              { icon: 'ri-plug-line', label: 'Works with existing HTTP clients', color: 'rgb(var(--brand))' },
-              { icon: 'ri-file-code-line', label: 'No contract changes required', color: 'rgb(var(--color-success))' },
-              { icon: 'ri-exchange-2-line', label: 'x402-compatible by default', color: '#c084fc' },
-            ].map((p) => (
-              <div key={p.label} className="flex items-center gap-3 glass-panel rounded-xl px-4 py-3">
-                <i className={`${p.icon} text-base shrink-0`} style={{ color: p.color }} />
-                <span className="text-xs font-medium text-ink-body">{p.label}</span>
-              </div>
-            ))}
           </div>
 
           {/* Code panel */}
@@ -211,11 +197,11 @@ export default function CodeSamplesSection() {
               <div className="font-mono text-xs leading-6 min-w-max">
                 {lines.map((line, i) => (
                   <div key={i} className="flex gap-4">
-                    <span className="select-none w-6 text-right text-[10px] text-ink-subtle/40 shrink-0 pt-px">
+                    <span className="select-none w-6 text-right text-[10px] text-ink-subtle/60 shrink-0 pt-px">
                       {i + 1}
                     </span>
                     <span
-                      className="whitespace-pre text-ink-body/80"
+                      className="whitespace-pre text-ink-body/95"
                       dangerouslySetInnerHTML={{ __html: highlightLine(line, lang) || ' ' }}
                     />
                   </div>
@@ -224,7 +210,7 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-white/5 bg-surface-solid px-5 py-3 flex items-center justify-between text-xs text-ink-subtle">
+            <div className="border-t border-white/10 bg-surface-solid px-5 py-3 flex items-center justify-between text-xs text-ink-subtle">
               <span>
                 Full docs at{' '}
                 <Link href="/resources/technical-docs" className="text-brand-teal hover:text-brand-soft transition">

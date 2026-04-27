@@ -1,37 +1,35 @@
 'use client';
 
+const BLUE = '#7bcbff';
+
 const USE_CASES = [
   {
     icon: 'ri-robot-line',
     kicker: 'AI Agents',
-    title: 'Autonomous agent subscriptions',
-    desc: 'An AI agent calls dozens of APIs per task — data feeds, inference endpoints, storage. 4Mica lets it pay on credit from one pool and settle net exposure once per epoch.',
-    tags: ['Off-chain execution', 'Per-request payment', 'Auto-settlement'],
-    color: '#7bcbff',
+    title: 'Agents pay APIs on credit, settle once',
+    desc: 'An AI agent calls dozens of endpoints per task: data feeds, inference, storage. No account setup, no API keys. It pays on credit from one pool and settles net exposure once per epoch.',
+    tags: ['No account setup', 'Instant onboarding', 'Auto-settlement'],
   },
   {
     icon: 'ri-exchange-line',
     kicker: 'Agentic Commerce',
-    title: 'Agent-to-agent micropayments',
+    title: 'Agent-to-agent micropayments at scale',
     desc: 'When agents transact with each other at high frequency, on-chain settlement per call is unworkable. 4Mica natively nets bilateral flows and collapses them into one settlement.',
     tags: ['Agent-to-agent', 'Bilateral netting', 'High-frequency'],
-    color: '#c084fc',
   },
   {
     icon: 'ri-code-box-line',
-    kicker: 'APIs / Pay-per-request',
-    title: 'HTTP API monetization at scale',
-    desc: 'Charge per API call using standard x402 headers — no SDK required on the client side. Works with existing HTTP clients. Add 4Mica middleware to enable credit and batch settlement.',
-    tags: ['x402-compatible', 'Any HTTP client', 'Instant verification'],
-    color: '#4ade80',
+    kicker: 'API Monetization',
+    title: 'Accept payments with one line of code',
+    desc: 'Add 4Mica middleware and charge per HTTP request. Works with any x402-compatible client. No SDK on the client side, no KYC, no credits to manage. Money moves at the speed of the internet.',
+    tags: ['x402-compatible', 'Any HTTP client', 'Zero friction'],
   },
   {
     icon: 'ri-bank-line',
     kicker: 'Financial Infrastructure',
     title: 'Clearinghouse for on-chain apps',
-    desc: 'Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive banks use — but permissionless.',
+    desc: 'Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive banks use, but permissionless.',
     tags: ['Yield on float', 'Programmable disputes', 'Non-custodial'],
-    color: '#f59e0b',
   },
 ];
 
@@ -43,7 +41,7 @@ export default function UseCasesSection() {
           <p className="section-kicker">Use cases</p>
           <h2 className="section-title">Built for the scale you need</h2>
           <p className="section-lead max-w-xl mx-auto">
-            From autonomous agents to financial infrastructure — 4Mica handles the payment layer so you don&apos;t have to.
+            API monetization, agentic commerce, paywalled content. 4Mica handles the payment layer so you don&apos;t have to.
           </p>
         </div>
 
@@ -52,18 +50,18 @@ export default function UseCasesSection() {
             <div
               key={uc.title}
               className="glass-panel rounded-2xl p-6 sm:p-7 flex flex-col gap-4"
-              style={{ borderColor: uc.color + '18' }}
+              style={{ borderColor: BLUE + '28' }}
             >
               <div className="flex items-start justify-between">
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: uc.color + '15' }}
+                  style={{ background: BLUE + '1a' }}
                 >
-                  <i className={`${uc.icon} text-lg`} style={{ color: uc.color }} />
+                  <i className={`${uc.icon} text-lg`} style={{ color: BLUE }} />
                 </div>
                 <span
                   className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: uc.color + 'aa' }}
+                  style={{ color: BLUE + 'bb' }}
                 >
                   {uc.kicker}
                 </span>
@@ -80,9 +78,9 @@ export default function UseCasesSection() {
                     key={tag}
                     className="text-[11px] font-medium px-2 py-0.5 rounded-full"
                     style={{
-                      background: uc.color + '12',
-                      color: uc.color + 'cc',
-                      border: `1px solid ${uc.color}25`,
+                      background: BLUE + '14',
+                      color: BLUE + 'cc',
+                      border: `1px solid ${BLUE}30`,
                     }}
                   >
                     {tag}

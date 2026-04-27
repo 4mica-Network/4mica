@@ -4,7 +4,7 @@ const FAQS = [
   {
     question: 'What exactly is a credit layer for x402?',
     answer:
-      'Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window — orders of magnitude fewer transactions.',
+      'Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window, orders of magnitude fewer transactions.',
   },
   {
     question: 'What is a payment tab?',
@@ -44,7 +44,7 @@ const FAQS = [
   {
     question: 'Does it work with existing x402 clients?',
     answer:
-      'Yes. 4Mica is x402-compatible. Wrap your existing fetch or requests client with the 4Mica scheme adapter — one line of code. No changes to your server or HTTP logic.',
+      'Yes. 4Mica is x402-compatible. Wrap your existing fetch or requests client with the 4Mica scheme adapter. One line of code. No changes to your server or HTTP logic.',
   },
 ];
 

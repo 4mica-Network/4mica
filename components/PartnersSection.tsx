@@ -3,26 +3,25 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
+const BLUE = '#7bcbff';
+
 const PRIMITIVES = [
   {
     name: 'x402',
     role: 'Payment protocol',
     desc: 'The HTTP payment standard 4Mica extends with a credit layer. Any x402-compatible client works out of the box.',
-    color: '#7bcbff',
     icon: 'ri-global-line',
   },
   {
     name: 'Aave',
     role: 'Yield layer',
-    desc: 'All collateral routes directly to Aave. Deposits earn APY continuously — your payment infrastructure generates return.',
-    color: '#4ade80',
+    desc: 'All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates return.',
     icon: 'ri-plant-line',
   },
   {
     name: 'Ethereum / Base',
     role: 'Settlement layer',
     desc: 'Net positions settle on-chain via EVM-compatible contracts. One transaction per settlement window, cryptographically enforced.',
-    color: '#c084fc',
     icon: 'ri-links-line',
   },
 ];
@@ -58,18 +57,18 @@ export default function PartnersSection() {
             <div
               key={p.name}
               className="glass-panel rounded-2xl p-6 flex flex-col gap-3"
-              style={{ borderColor: p.color + '20' }}
+              style={{ borderColor: BLUE + '28' }}
             >
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: p.color + '15' }}
+                style={{ background: BLUE + '1a' }}
               >
-                <i className={`${p.icon} text-lg`} style={{ color: p.color }} />
+                <i className={`${p.icon} text-lg`} style={{ color: BLUE }} />
               </div>
               <div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-sm font-bold text-ink-strong">{p.name}</span>
-                  <span className="text-[10px] uppercase tracking-wider" style={{ color: p.color + 'aa' }}>
+                  <span className="text-[10px] uppercase tracking-wider" style={{ color: BLUE + 'bb' }}>
                     {p.role}
                   </span>
                 </div>
@@ -80,14 +79,14 @@ export default function PartnersSection() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-white/5 mb-16" />
+        <div className="border-t border-white/10 mb-16" />
 
         {/* Trust points */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-16">
           {TRUST_POINTS.map((t) => (
             <div key={t.label} className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                style={{ background: 'rgb(var(--brand) / 0.1)' }}>
+                style={{ background: 'rgb(var(--brand) / 0.16)' }}>
                 <i className={`${t.icon} text-sm`} style={{ color: 'rgb(var(--brand))' }} />
               </div>
               <div>

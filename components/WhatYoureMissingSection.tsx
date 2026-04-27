@@ -45,8 +45,8 @@ export default function WhatYoureMissingSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-4xl mx-auto items-stretch">
 
           {/* x402 */}
-          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ border: `1px solid ${RED}25` }}>
-            <div className="px-6 py-4 flex items-center justify-between" style={{ background: `${RED}0d` }}>
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ border: `1px solid ${RED}38` }}>
+            <div className="px-6 py-4 flex items-center justify-between" style={{ background: `${RED}12` }}>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: RED }}>x402</p>
                 <p className="text-xs text-ink-subtle mt-0.5">per-transaction settlement</p>
@@ -65,7 +65,7 @@ export default function WhatYoureMissingSection() {
                   </div>
                 ))}
               </div>
-              <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
                 <span className="text-sm font-semibold text-ink-strong">Total cost</span>
                 <span className="text-lg font-bold" style={{ color: RED }}>${x402Total.toLocaleString()} USDC</span>
               </div>
@@ -73,8 +73,8 @@ export default function WhatYoureMissingSection() {
           </div>
 
           {/* 4Mica */}
-          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ border: `1px solid ${GREEN}25` }}>
-            <div className="px-6 py-4 flex items-center justify-between" style={{ background: `${GREEN}0d` }}>
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{ border: `1px solid ${GREEN}38` }}>
+            <div className="px-6 py-4 flex items-center justify-between" style={{ background: `${GREEN}12` }}>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: GREEN }}>With 4Mica</p>
                 <p className="text-xs text-ink-subtle mt-0.5">credit layer + batch settlement</p>
@@ -93,7 +93,7 @@ export default function WhatYoureMissingSection() {
                   </div>
                 ))}
               </div>
-              <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
                 <span className="text-sm font-semibold text-ink-strong">Net cost</span>
                 <span className="text-lg font-bold" style={{ color: GREEN }}>${micaNet.toLocaleString()} USDC</span>
               </div>

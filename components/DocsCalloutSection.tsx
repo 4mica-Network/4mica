@@ -1,6 +1,6 @@
 'use client';
 
-// Single accent color for all steps — visual consistency over per-step differentiation
+// Single accent color for all steps
 const ACCENT = '#7bcbff';
 
 const STEPS = [
@@ -49,7 +49,7 @@ Bob → Alice:  300 USDC  (15 guarantees)
     code: `// Debtor pays net position to ClearingHouse
 await clearingHouse.payNetDebit(
   cycleId,
-  netDebit,       // 500 USDC — not 800
+  netDebit,       // 500 USDC (not 800)
   merkleProof,
 );
 
@@ -85,7 +85,7 @@ export default function DocsCalloutSection() {
             >
               <div className="grid lg:grid-cols-[1fr_1.2fr] gap-0">
 
-                {/* Left — step info */}
+                {/* Left */}
                 <div className="p-6 sm:p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
@@ -115,7 +115,7 @@ export default function DocsCalloutSection() {
                   )}
                 </div>
 
-                {/* Right — code */}
+                {/* Right */}
                 <div className="bg-[#050b1d] p-5 sm:p-6">
                   <div className="flex items-center gap-1.5 mb-4">
                     <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
