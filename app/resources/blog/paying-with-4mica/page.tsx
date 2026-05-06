@@ -34,7 +34,7 @@ export default function PayingWith4MicaPage() {
       ],
       steps: [
         'Expect `paymentRequirements.scheme = "4mica-credit"` (or another scheme containing "4mica") plus `extra.tabEndpoint` in the 402 response.',
-        'If the endpoint enforces V2, expect validation fields in `paymentRequirements.extra`: `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, and `validationChainId` (optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
+        'If the endpoint enforces V2, expect validation fields in `paymentRequirements.extra`: `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, `validationChainId`, and `jobHash` (optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
         'Deposit collateral before your first credit request; the facilitator refuses tabs for empty balances.',
         'Use the 4Mica SDK X402Flow to sign the guarantee and produce the payment header (`X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2).',
         'Retry the request with the payment header, then pay the tab later using the `req_id` from the certificate.',

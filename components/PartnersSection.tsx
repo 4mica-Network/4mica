@@ -15,7 +15,7 @@ const PRIMITIVES = [
   {
     name: 'Aave',
     role: 'Yield layer',
-    desc: 'All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates return.',
+    desc: 'All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates returns.',
     icon: 'ri-plant-line',
   },
   {

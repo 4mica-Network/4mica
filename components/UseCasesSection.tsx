@@ -28,7 +28,7 @@ const USE_CASES = [
     icon: 'ri-bank-line',
     kicker: 'Financial Infrastructure',
     title: 'Clearinghouse for on-chain apps',
-    desc: 'Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive banks use, but permissionless.',
+    desc: 'Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive that banks use, but permissionless.',
     tags: ['Yield on float', 'Programmable disputes', 'Non-custodial'],
   },
 ];

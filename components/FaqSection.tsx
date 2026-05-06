@@ -4,7 +4,7 @@ const FAQS = [
   {
     question: 'What exactly is a credit layer for x402?',
     answer:
-      'Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window, orders of magnitude fewer transactions.',
+      'Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window, resulting in orders of magnitude fewer transactions.',
   },
   {
     question: 'What is a payment tab?',
@@ -14,7 +14,7 @@ const FAQS = [
   {
     question: 'What is a payment guarantee?',
     answer:
-      'An EIP-712 signed claim the payer attaches as an X-PAYMENT header. It commits to tabId, reqId, amounts, addresses, and timestamp. The facilitator verifies the signature and issues a BLS-signed certificate for on-chain settlement.',
+      'A payment guarantee is an EIP-712 signed claim that the payer attaches as an X-PAYMENT header. It commits to tabId, reqId, amounts, addresses, and timestamp. The facilitator verifies the signature and issues a BLS-signed certificate for on-chain settlement.',
   },
   {
     question: 'How does yield work?',

@@ -22,9 +22,9 @@ const LANGUAGES: { id: Language; label: string; icon: string }[] = [
 
 const subtitles: Record<Language, string> = {
   typescript:
-    '@4mica/x402 ships Express middleware and client helpers for the x402 Payment Protocol with 4Mica credit flow support, including V1 and V2 guarantees (V2 adds ERC-8004 validation-gated remuneration) and automatic facilitator/scheme registration.',
+    '@4mica/x402 ships Express middleware and client helpers for the x402 Payment Protocol with 4Mica credit flow support, including standard (V1) and verified (V2) payment guarantees — V2 gates remuneration on ERC-8004 job-validation outcomes — plus automatic facilitator/scheme registration.',
   python:
-    '4mica-x402 ships FastAPI and Flask server middleware and httpx/requests client helpers for the x402 Payment Protocol with 4Mica credit flow support, including V1 and V2 guarantees (V2 adds ERC-8004 validation-gated remuneration) and automatic facilitator/scheme registration.',
+    '4mica-x402 ships FastAPI and Flask server middleware and httpx/requests client helpers for the x402 Payment Protocol with 4Mica credit flow support, including standard (V1) and verified (V2) payment guarantees — V2 gates remuneration on ERC-8004 job-validation outcomes — plus automatic facilitator/scheme registration.',
   rust:
     'The 4Mica Rust SDK provides collateral management and wallet operations for the x402 Payment Protocol. Server middleware and HTTP client wrappers for Rust are on the roadmap.',
 };

@@ -28,7 +28,6 @@ function TypeScriptServerIntegration() {
           language="ts"
           code={`import express from "express";
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
-import { FourMicaEvmScheme } from "@4mica/x402/server";
 
 const app = express();
 app.use(express.json());
@@ -44,7 +43,7 @@ app.use(express.json());
 // response to sign the X-PAYMENT header and retry the original request.
 //
 // In production this should be your API URL, not the facilitator URL.
-const TAB_ENDPOINT = "http://localhost:3000/payment/tab";
+const TAB_ENDPOINT = "http://localhost:3030/payment/tab";
 
 app.use(
   paymentMiddlewareFromConfig(
@@ -64,15 +63,6 @@ app.use(
       // hosts the route and the middleware forwards tab-open requests to 4Mica.
       advertisedEndpoint: TAB_ENDPOINT,
     },
-    undefined, // facilitatorClients — defaults to x402.4mica.xyz
-    [
-      {
-        // Registers the 4mica-credit scheme for Base Sepolia so the middleware
-        // can build payment requirements and inject extra.tabEndpoint.
-        network: "eip155:84532",
-        server: new FourMicaEvmScheme(TAB_ENDPOINT),
-      },
-    ]
   )
 );
 
@@ -80,8 +70,8 @@ app.get("/premium-content", (req, res) => {
   res.json({ message: "This is premium content behind a paywall" });
 });
 
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+app.listen(3030, () => {
+  console.log("Server running on http://localhost:3030");
 });`}
         />
       </div>
@@ -102,9 +92,7 @@ app.listen(3000, () => {
         </p>
         <CodeBlock
           language="ts"
-          code={`import { FourMicaEvmScheme } from "@4mica/x402/server";
-
-const TAB_ENDPOINT = "http://localhost:3000/payment/tab";
+          code={`const TAB_ENDPOINT = "http://localhost:3030/payment/tab";
 
 app.use(
   paymentMiddlewareFromConfig(
@@ -123,15 +111,6 @@ app.use(
       advertisedEndpoint: TAB_ENDPOINT,
       ttlSeconds: 3600,
     },
-    undefined, // facilitatorClients
-    [
-      {
-        // The scheme uses your server's advertised endpoint; the middleware
-        // proxies tab creation to the facilitator under the hood.
-        network: "eip155:84532",
-        server: new FourMicaEvmScheme(TAB_ENDPOINT),
-      },
-    ]
   )
 );`}
         />

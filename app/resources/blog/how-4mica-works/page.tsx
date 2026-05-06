@@ -86,7 +86,7 @@ export default function How4MicaWorksPage() {
       ],
       bullets: [
         '402 responses advertise `scheme`, `network`, `payTo`, `asset`, `maxAmountRequired` (v1) or `amount` (v2), and `extra.tabEndpoint`.',
-        'For v2, `paymentRequirements.extra` should include `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, and `validationChainId` (plus optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
+        'For v2, `paymentRequirements.extra` should include `validationRegistryAddress`, `validatorAddress`, `validatorAgentId`, `minValidationScore`, `validationChainId`, and `jobHash` (plus optional `requiredValidationTag`). `validationChainId` must match `network` (`eip155:<chainId>`).',
         'Clients retry with the payment header (`X-PAYMENT` for v1, `PAYMENT-SIGNATURE` for v2); resources call `/verify` for structural checks and `/settle` to obtain a certificate.',
         'If the header is missing or invalid, return 402 again with the same requirements and an actionable error.',
       ],

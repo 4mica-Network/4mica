@@ -8,7 +8,7 @@ const STEPS = [
     num: '01',
     badge: 'Deposit',
     title: 'Deposit collateral once',
-    desc: 'Funds go into Aave and earn yield. One collateral covers all credit.',
+    desc: 'Funds go into Aave and earn yield. A single collateral deposit covers all credit.',
     code: `await client.user.approveErc20(usdc.address, AMOUNT);
 await client.user.deposit(AMOUNT, usdc.address);`,
   },
@@ -16,7 +16,7 @@ await client.user.deposit(AMOUNT, usdc.address);`,
     num: '02',
     badge: 'Spend',
     title: 'Spend on credit: instant, off-chain',
-    desc: 'Agent authorizes an EIP-712 guarantee claim, gets a BLS signature credit. No gas, no chain transaction. Verified in milliseconds.',
+    desc: 'The agent signs an EIP-712 guarantee claim and receives BLS-signed credit. No gas, no chain transaction. Verified in milliseconds.',
     code: `const payment = await signGuarantee({
   cycleId:   "0xabc",  
   reqId:     "0x0",

@@ -309,12 +309,12 @@ export default function FacilitatorApiSection() {
             <p>
               <span className="font-semibold">V2 validation fields:</span> when using x402 v2 claims, include
               <code className="font-mono"> validationRegistryAddress</code>, <code className="font-mono">validatorAddress</code>,{' '}
-              <code className="font-mono">validatorAgentId</code>, and <code className="font-mono">minValidationScore</code> in{' '}
+              <code className="font-mono">validatorAgentId</code>, <code className="font-mono">minValidationScore</code>,{' '}
+              <code className="font-mono">validationChainId</code>, and <code className="font-mono">jobHash</code> in{' '}
               <code className="font-mono">paymentRequirements.extra</code>.{' '}
-              <code className="font-mono">jobHash</code> is also required and <code className="font-mono">requiredValidationTag</code> is optional.
-              The facilitator does not require <code className="font-mono">validationChainId</code> in{' '}
-              <code className="font-mono">paymentRequirements.extra</code>; it derives the expected chain id from the CAIP-2
-              <code className="font-mono"> network</code>, while the signed V2 claim still carries
+              <code className="font-mono">requiredValidationTag</code> is optional.{' '}
+              <code className="font-mono">validationChainId</code> must match the CAIP-2{' '}
+              <code className="font-mono"> network</code> chain id and is carried in the signed V2 claim as{' '}
               <code className="font-mono"> validation_chain_id</code>.
             </p>
             <p>
