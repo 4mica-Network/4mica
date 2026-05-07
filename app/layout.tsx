@@ -28,12 +28,17 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL ?? "https://4mica.xyz";
+const metadataBase = new URL(siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`);
+
 export const metadata: Metadata = {
+  metadataBase,
   title: "4Mica",
-  description: "4Mica - Sub-second transactions across any blockchain",
+  description: "The clearinghouse for the agentic economy",
+  authors: [{ name: "Mairon Mahzoun" }],
   openGraph: {
     title: "4Mica",
-    description: "4Mica - Sub-second transactions across any blockchain",
+    description: "The clearinghouse for the agentic economy",
     images: [
       {
         url: "/assets/logo_transparent.png",
@@ -42,12 +47,13 @@ export const metadata: Metadata = {
         alt: "4Mica Logo",
       },
     ],
-    type: "website",
+    type: "article",
+    publishedTime: "2026-05-07T00:00:00Z",
   },
   twitter: {
     card: "summary_large_image",
     title: "4Mica",
-    description: "4Mica - Sub-second transactions across any blockchain",
+    description: "The clearinghouse for the agentic economy",
     images: ["/assets/logo_transparent.png"],
   },
 };
