@@ -31,6 +31,25 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "4Mica",
   description: "4Mica - Sub-second transactions across any blockchain",
+  openGraph: {
+    title: "4Mica",
+    description: "4Mica - Sub-second transactions across any blockchain",
+    images: [
+      {
+        url: "/assets/logo.jpg",
+        width: 2048,
+        height: 2048,
+        alt: "4Mica Logo",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "4Mica",
+    description: "4Mica - Sub-second transactions across any blockchain",
+    images: ["/assets/logo.jpg"],
+  },
 };
 
 export default function RootLayout({
