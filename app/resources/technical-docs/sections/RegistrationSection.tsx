@@ -9,6 +9,7 @@ const NETWORKS = (
   <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-sm text-ink-body space-y-1">
     <p className="font-semibold text-ink-strong">Supported networks</p>
     <ul className="list-disc list-inside space-y-1 mt-2">
+      <li><code className="font-mono">eip155:8453</code> — Base (<code className="font-mono">https://base.api.4mica.xyz/</code>)</li>
       <li><code className="font-mono">eip155:11155111</code> — Ethereum Sepolia (<code className="font-mono">https://ethereum.sepolia.api.4mica.xyz/</code>)</li>
       <li><code className="font-mono">eip155:84532</code> — Base Sepolia (<code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>)</li>
     </ul>

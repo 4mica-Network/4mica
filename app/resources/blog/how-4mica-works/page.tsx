@@ -159,7 +159,7 @@ export default function How4MicaWorksPage() {
     {
       heading: 'SDK Installation',
       paragraphs: [
-        'Pick the SDK that matches your stack. Source repos: `~/4mica-core/sdk`, `~/py-sdk-4mica`, `~/ts-sdk-4mica`.',
+        'Pick the SDK that matches your stack.',
       ],
       codeBlocks: [
         {

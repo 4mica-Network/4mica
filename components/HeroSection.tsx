@@ -9,7 +9,7 @@ export default function HeroSection() {
 
             {/* Headline */}
             <h1 className="section-title-lg leading-tight max-w-4xl">
-              The clearinghouse for<br />the agentic economy
+              The clearing house for<br />the agentic economy
             </h1>
 
             {/* Subheadline */}

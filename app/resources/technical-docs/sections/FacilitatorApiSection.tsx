@@ -32,6 +32,8 @@ export default function FacilitatorApiSection() {
               code={`{
   "message": "Welcome to the 4mica credit facilitator...",
   "supported": [
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 2 },
     { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 1 },
     { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 2 },
     { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 1 },
@@ -77,6 +79,8 @@ export default function FacilitatorApiSection() {
             <CodeBlock
               code={`{
   "kinds": [
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 2 },
     { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 1 },
     { "scheme": "4mica-credit", "network": "eip155:11155111", "x402Version": 2 },
     { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 1 },
@@ -100,7 +104,7 @@ export default function FacilitatorApiSection() {
               <code className="font-mono">
                 {'{ userAddress, recipientAddress, x402Version?, guaranteeVersion?, network?, erc20Token?, ttlSeconds? }'}
               </code>
-              . Networks use CAIP-2 identifiers (e.g. <code className="font-mono">eip155:11155111</code> for Ethereum Sepolia, <code className="font-mono">eip155:84532</code> for Base Sepolia).
+              . Networks use CAIP-2 identifiers (e.g. <code className="font-mono">eip155:8453</code> for Base, <code className="font-mono">eip155:11155111</code> for Ethereum Sepolia, <code className="font-mono">eip155:84532</code> for Base Sepolia).
               Use <code className="font-mono">erc20Token</code> = null or omit for ETH. Aliases:{' '}
               <code className="font-mono">assetAddress</code> and <code className="font-mono">networkId</code> are accepted.
               If <code className="font-mono">network</code> is omitted, the facilitator defaults to the first configured network.

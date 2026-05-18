@@ -149,9 +149,9 @@ async fn main() -> anyhow::Result<()> {
         {
           language: 'ts',
           caption: 'Parse requirements (TypeScript SDK)',
-          code: String.raw`import { PaymentRequirements } from "@4mica/sdk";
+          code: String.raw`import type { PaymentRequirementsV1 } from "@4mica/sdk";
 
-const requirements = PaymentRequirements.fromRaw(reqRaw); // from 402 response
+const requirements = reqRaw as PaymentRequirementsV1; // from 402 response
 if (!requirements.scheme.includes("4mica")) {
   throw new Error("Unsupported scheme; expected 4mica credit.");
 }`,

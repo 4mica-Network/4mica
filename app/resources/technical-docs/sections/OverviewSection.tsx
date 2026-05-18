@@ -34,7 +34,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: 'Multi-Network Support',
-      desc: 'Built-in support for Ethereum Sepolia (eip155:11155111) and Base Sepolia (eip155:84532) networks.',
+      desc: 'Built-in support for Base (eip155:8453), Ethereum Sepolia (eip155:11155111), and Base Sepolia (eip155:84532) networks.',
     },
     {
       title: 'Extensible Paywalls',
@@ -64,7 +64,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: 'Multi-Network Support',
-      desc: 'Built-in support for Ethereum Sepolia (eip155:11155111) and Base Sepolia (eip155:84532) networks.',
+      desc: 'Built-in support for Base (eip155:8453), Ethereum Sepolia (eip155:11155111), and Base Sepolia (eip155:84532) networks.',
     },
     {
       title: 'Async & Sync Support',
@@ -90,7 +90,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: 'Multi-Network Support',
-      desc: 'Point the SDK at Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/) or Base Sepolia (https://base.sepolia.api.4mica.xyz/).',
+      desc: 'Point the SDK at Base (https://base.api.4mica.xyz/), Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/), or Base Sepolia (https://base.sepolia.api.4mica.xyz/).',
     },
     {
       title: 'Server & Client Middleware (coming soon)',
