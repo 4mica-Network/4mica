@@ -122,7 +122,7 @@ const endpoints = [
   "accepted_guarantee_versions": [1, 2],
   "active_guarantee_domain_separator": "0xDomainSeparator",
   "trusted_validation_registries": ["0xRegistry"],
-  "validation_hash_canonicalization_version": "erc8004-v1"
+  "validation_hash_canonicalization_version": "4MICA_VALIDATION_REQUEST_V2"
 }`,
       },
     ],
@@ -565,8 +565,8 @@ export default function OperatorApiSection() {
         <div className="border border-white/10 rounded-lg p-5 text-sm text-ink-body space-y-2">
           <h3 className="text-lg font-semibold text-ink-strong">Response shape notes</h3>
           <ul className="list-disc list-inside space-y-1">
-            <li><code className="font-mono">TabInfo</code>: tab_id, user_address, recipient_address, asset_address, start_timestamp, ttl_seconds, status, settlement_status, created_at, updated_at.</li>
-            <li><code className="font-mono">GuaranteeInfo</code>: tab_id, req_id, from_address, to_address, asset_address, amount, start_timestamp, certificate?.</li>
+            <li><code className="font-mono">TabInfo</code>: tab_id, user_address, recipient_address, asset_address, accepted_guarantee_version, start_timestamp, ttl_seconds, status, settlement_status, created_at, updated_at.</li>
+            <li><code className="font-mono">GuaranteeInfo</code>: tab_id, req_id, version, from_address, to_address, asset_address, amount, start_timestamp, certificate?.</li>
             <li><code className="font-mono">PendingRemunerationInfo</code>: tab, latest_guarantee?.</li>
             <li><code className="font-mono">CollateralEventInfo</code>: id, user_address, asset_address, amount, event_type, tab_id?, req_id?, tx_id?, created_at.</li>
             <li><code className="font-mono">UserTransactionInfo</code>: user_address, recipient_address, tx_hash, amount, verified, finalized, failed, created_at.</li>
