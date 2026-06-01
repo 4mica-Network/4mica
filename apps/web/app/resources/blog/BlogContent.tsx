@@ -101,7 +101,7 @@ export default function BlogContent() {
               {filteredPosts.map((post) => (
                 <article
                   key={post.id}
-                  className="glass-panel overflow-hidden rounded-lg transition-all hover:translate-y-[-2px]"
+                  className="glass-panel overflow-hidden rounded-lg transition-all hover:-translate-y-0.5"
                 >
                   <div className="p-6">
                     <div className="mb-3 flex items-center justify-between">

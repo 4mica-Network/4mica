@@ -662,7 +662,7 @@ let receipt = client
                 <div className="space-y-2 rounded-xl border border-white/10 bg-surface-solid p-5 text-ink-body text-sm">
                   {section.sequence.map((line) => (
                     <div key={line} className="flex items-start gap-3">
-                      <span className="mt-[3px] h-2 w-2 flex-shrink-0 rounded-full bg-brand-teal"></span>
+                      <span className="mt-0.75 h-2 w-2 shrink-0 rounded-full bg-brand-teal"></span>
                       <span className="font-mono">{line}</span>
                     </div>
                   ))}

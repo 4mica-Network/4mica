@@ -45,7 +45,7 @@ export default function TeamSection() {
               key={member.name}
               className="glass-panel group overflow-hidden rounded-xl transition-shadow duration-300"
             >
-              <div className="relative aspect-[4/5] overflow-hidden bg-surface-solid/35">
+              <div className="relative aspect-4/5 overflow-hidden bg-surface-solid/35">
                 <Image
                   src={member.image}
                   alt={member.name}
@@ -54,7 +54,7 @@ export default function TeamSection() {
                   style={{ objectPosition: member.imagePosition ?? "50% 20%" }}
                   quality={100}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-surface-deep/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                <div className="absolute inset-0 bg-linear-to-t from-surface-deep/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
               </div>
 
               <div className="p-6">

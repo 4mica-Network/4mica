@@ -43,7 +43,7 @@ export default function AboutSection() {
             <Link
               key={card.title}
               href={card.href}
-              className="glass-panel rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-2px]"
+              className="glass-panel rounded-2xl p-6 transition-all duration-300 hover:-translate-y-0.5"
             >
               <h3 className="font-semibold text-ink-strong text-xl">
                 {card.title}

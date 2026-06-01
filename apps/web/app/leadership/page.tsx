@@ -49,7 +49,7 @@ export default function LeadershipPage() {
                 key={member.name}
                 className="glass-panel overflow-hidden rounded-xl"
               >
-                <div className="relative aspect-[4/5] bg-surface-solid/35">
+                <div className="relative aspect-4/5 bg-surface-solid/35">
                   <Image
                     src={member.image}
                     alt={member.name}
