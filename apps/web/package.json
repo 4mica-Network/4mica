@@ -1,5 +1,5 @@
 {
-  "name": "@repo/web",
+  "name": "@4mica/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,10 @@
     "fmt": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
+    "test": "TEST=1 vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
     "knip": "knip",
     "knip:prod": "knip --production --exclude types",
     "refresh": "taze",
@@ -41,15 +45,21 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitest/ui": "^4.1.8",
     "autoprefixer": "^10.4.22",
     "cross-env": "10.1.0",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.5",
     "tailwindcss": "^4.1.17",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }
