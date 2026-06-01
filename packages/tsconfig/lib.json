@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "maxNodeModuleJsDepth": 2,
+    "skipLibCheck": true,
+    "noErrorTruncation": false,
+    "disableSizeLimit": true
+  },
+  "extends": ["./base.json"]
+}

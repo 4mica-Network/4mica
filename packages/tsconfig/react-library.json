@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "React Library",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "ESNext",
+    "target": "ES5",
+    "jsx": "react-jsx",
+    "maxNodeModuleJsDepth": 2,
+    "skipLibCheck": true,
+    "noErrorTruncation": false,
+    "disableSizeLimit": true
+  },
+  "include": [".", "../types/next-auth.d.ts"],
+  "exclude": ["dist", "build", "node_modules"]
+}
