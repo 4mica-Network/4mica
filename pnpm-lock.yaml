@@ -4,215 +4,412 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@biomejs/biome':
+      specifier: ^2.4.16
+      version: 2.4.16
+    '@biomejs/cli-darwin-x64':
+      specifier: ^2.4.16
+      version: 2.4.16
+    '@radix-ui/react-scroll-area':
+      specifier: ^1.2.10
+      version: 1.2.10
+    '@radix-ui/react-slot':
+      specifier: ^1.2.4
+      version: 1.2.4
+    '@react-google-maps/api':
+      specifier: ^2.20.8
+      version: 2.20.8
+    '@reown/appkit':
+      specifier: ^1.8.20
+      version: 1.8.20
+    '@reown/appkit-adapter-wagmi':
+      specifier: ^1.8.20
+      version: 1.8.20
+    '@tailwindcss/postcss':
+      specifier: ^4.3.0
+      version: 4.3.0
+    '@tanstack/react-query':
+      specifier: ^5.100.14
+      version: 5.100.14
+    '@testing-library/jest-dom':
+      specifier: ^6.9.1
+      version: 6.9.1
+    '@testing-library/react':
+      specifier: ^16.3.2
+      version: 16.3.2
+    '@testing-library/user-event':
+      specifier: ^14.6.1
+      version: 14.6.1
+    '@types/node':
+      specifier: ^25.9.1
+      version: 25.9.1
+    '@types/npm-registry-fetch':
+      specifier: ^8.0.9
+      version: 8.0.9
+    '@types/react':
+      specifier: ^19.2.16
+      version: 19.2.16
+    '@types/react-dom':
+      specifier: ^19.2.3
+      version: 19.2.3
+    '@types/react-syntax-highlighter':
+      specifier: ^15.5.13
+      version: 15.5.13
+    '@vitest/coverage-v8':
+      specifier: ^4.1.8
+      version: 4.1.8
+    '@vitest/ui':
+      specifier: ^4.1.8
+      version: 4.1.8
+    '@wagmi/connectors':
+      specifier: ^8.0.15
+      version: 8.0.15
+    '@wagmi/core':
+      specifier: ^3.5.0
+      version: 3.5.0
+    '@walletconnect/ethereum-provider':
+      specifier: 2.23.4
+      version: 2.23.4
+    accounts:
+      specifier: ^0.14.6
+      version: 0.14.6
+    autoprefixer:
+      specifier: ^10.5.0
+      version: 10.5.0
+    changelogen:
+      specifier: ^0.6.2
+      version: 0.6.2
+    class-variance-authority:
+      specifier: ^0.7.1
+      version: 0.7.1
+    clsx:
+      specifier: ^2.1.1
+      version: 2.1.1
+    cross-env:
+      specifier: 10.1.0
+      version: 10.1.0
+    esbuild:
+      specifier: ^0.28.0
+      version: 0.28.0
+    execa:
+      specifier: ^9.6.1
+      version: 9.6.1
+    find-up:
+      specifier: ^8.0.0
+      version: 8.0.0
+    framer-motion:
+      specifier: ^12.40.0
+      version: 12.40.0
+    husky:
+      specifier: ^9.1.7
+      version: 9.1.7
+    jsdom:
+      specifier: ^29.1.1
+      version: 29.1.1
+    knip:
+      specifier: ^6.15.0
+      version: 6.15.0
+    ky:
+      specifier: ^2.0.2
+      version: 2.0.2
+    lint-staged:
+      specifier: ^17.0.7
+      version: 17.0.7
+    lucide-react:
+      specifier: ^1.17.0
+      version: 1.17.0
+    next:
+      specifier: ^16.2.7
+      version: 16.2.7
+    npm-registry-fetch:
+      specifier: ^20.0.0
+      version: 20.0.0
+    ora:
+      specifier: ^9.4.0
+      version: 9.4.0
+    picocolors:
+      specifier: ^1.1.1
+      version: 1.1.1
+    postcss:
+      specifier: ^8.5.15
+      version: 8.5.15
+    react:
+      specifier: ^19.2.7
+      version: 19.2.7
+    react-dom:
+      specifier: ^19.2.7
+      version: 19.2.7
+    react-syntax-highlighter:
+      specifier: ^16.1.1
+      version: 16.1.1
+    read-pkg:
+      specifier: ^10.1.0
+      version: 10.1.0
+    recharts:
+      specifier: ^3.8.1
+      version: 3.8.1
+    rimraf:
+      specifier: ^6.1.3
+      version: 6.1.3
+    tailwind-merge:
+      specifier: ^3.6.0
+      version: 3.6.0
+    tailwindcss:
+      specifier: ^4.3.0
+      version: 4.3.0
+    tailwindcss-animate:
+      specifier: ^1.0.7
+      version: 1.0.7
+    taze:
+      specifier: ^19.14.1
+      version: 19.14.1
+    terminal-link:
+      specifier: ^5.0.0
+      version: 5.0.0
+    tsup:
+      specifier: ^8.5.1
+      version: 8.5.1
+    tsx:
+      specifier: ^4.22.4
+      version: 4.22.4
+    turbo:
+      specifier: latest
+      version: 2.9.16
+    typescript:
+      specifier: ^6.0.3
+      version: 6.0.3
+    viem:
+      specifier: 2.x
+      version: 2.52.0
+    vitest:
+      specifier: ^4.1.8
+      version: 4.1.8
+    wagmi:
+      specifier: ^3.6.16
+      version: 3.6.16
+    yargs:
+      specifier: ^18.0.0
+      version: 18.0.0
+  node24:
+    '@types/node':
+      specifier: ^24.10.1
+      version: 24.12.4
+  typescript-latest:
+    typescript:
+      specifier: latest
+      version: 6.0.3
+
 importers:
 
   .:
     dependencies:
       '@biomejs/cli-darwin-x64':
-        specifier: ^2.4.16
+        specifier: 'catalog:'
         version: 2.4.16
       execa:
-        specifier: ^9.6.1
+        specifier: 'catalog:'
         version: 9.6.1
       find-up:
-        specifier: ^8.0.0
+        specifier: 'catalog:'
         version: 8.0.0
       npm-registry-fetch:
-        specifier: ^20.0.0
+        specifier: 'catalog:'
         version: 20.0.0
       read-pkg:
-        specifier: ^10.1.0
+        specifier: 'catalog:'
         version: 10.1.0
       terminal-link:
-        specifier: ^5.0.0
+        specifier: 'catalog:'
         version: 5.0.0
     devDependencies:
       '@4mica/tsconfig':
         specifier: workspace:*
         version: link:packages/tsconfig
       '@biomejs/biome':
-        specifier: ^2.4.16
+        specifier: 'catalog:'
         version: 2.4.16
       '@types/node':
-        specifier: ^24.10.1
+        specifier: catalog:node24
         version: 24.12.4
       '@types/npm-registry-fetch':
-        specifier: ^8.0.9
+        specifier: 'catalog:'
         version: 8.0.9
       '@vitest/coverage-v8':
-        specifier: ^4.1.8
+        specifier: 'catalog:'
         version: 4.1.8(vitest@4.1.8)
       changelogen:
-        specifier: ^0.6.2
+        specifier: 'catalog:'
         version: 0.6.2(magicast@0.5.3)
       esbuild:
-        specifier: ^0.28.0
+        specifier: 'catalog:'
         version: 0.28.0
       husky:
-        specifier: ^9.1.7
+        specifier: 'catalog:'
         version: 9.1.7
       knip:
-        specifier: ^6.15.0
+        specifier: 'catalog:'
         version: 6.15.0
       ky:
-        specifier: ^2.0.2
+        specifier: 'catalog:'
         version: 2.0.2
       lint-staged:
-        specifier: ^17.0.7
+        specifier: 'catalog:'
         version: 17.0.7
       ora:
-        specifier: ^9.4.0
+        specifier: 'catalog:'
         version: 9.4.0
       picocolors:
-        specifier: ^1.1.1
+        specifier: 'catalog:'
         version: 1.1.1
       rimraf:
-        specifier: ^6.1.3
+        specifier: 'catalog:'
         version: 6.1.3
       taze:
-        specifier: ^19.14.1
+        specifier: 'catalog:'
         version: 19.14.1
       tsup:
-        specifier: ^8.5.1
+        specifier: 'catalog:'
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
       tsx:
-        specifier: ^4.22.4
+        specifier: 'catalog:'
         version: 4.22.4
       turbo:
-        specifier: latest
+        specifier: 'catalog:'
         version: 2.9.16
       typescript:
-        specifier: latest
+        specifier: catalog:typescript-latest
         version: 6.0.3
       vitest:
-        specifier: ^4.1.8
+        specifier: 'catalog:'
         version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
       yargs:
-        specifier: ^18.0.0
+        specifier: 'catalog:'
         version: 18.0.0
 
   apps/web:
     dependencies:
       '@radix-ui/react-scroll-area':
-        specifier: ^1.2.10
+        specifier: 'catalog:'
         version: 1.2.10(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-slot':
-        specifier: ^1.2.4
+        specifier: 'catalog:'
         version: 1.2.4(@types/react@19.2.16)(react@19.2.7)
       '@react-google-maps/api':
-        specifier: ^2.20.8
+        specifier: 'catalog:'
         version: 2.20.8(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@reown/appkit':
-        specifier: ^1.8.20
+        specifier: 'catalog:'
         version: 1.8.20(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3)
       '@reown/appkit-adapter-wagmi':
-        specifier: ^1.8.20
+        specifier: 'catalog:'
         version: 1.8.20(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@types/react@19.2.16)(@wagmi/core@3.5.0)(@walletconnect/ethereum-provider@2.23.4(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(accounts@0.14.6)(bufferutil@4.1.0)(immer@11.1.8)(porto@0.2.35)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(viem@2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(wagmi@3.6.16)(zod@4.4.3)
       '@tanstack/react-query':
-        specifier: ^5.100.14
+        specifier: 'catalog:'
         version: 5.100.14(react@19.2.7)
       '@wagmi/connectors':
-        specifier: ^8.0.15
+        specifier: 'catalog:'
         version: 8.0.15(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@wagmi/core@3.5.0)(@walletconnect/ethereum-provider@2.23.4(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(accounts@0.14.6)(porto@0.2.35)(typescript@6.0.3)(viem@2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       '@wagmi/core':
-        specifier: ^3.5.0
+        specifier: 'catalog:'
         version: 3.5.0(@tanstack/query-core@5.100.14)(@types/react@19.2.16)(accounts@0.14.6)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       '@walletconnect/ethereum-provider':
-        specifier: 2.23.4
+        specifier: 'catalog:'
         version: 2.23.4(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3)
       accounts:
-        specifier: ^0.14.6
+        specifier: 'catalog:'
         version: 0.14.6(@types/react@19.2.16)(@wagmi/core@3.5.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(viem@2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(wagmi@3.6.16)
       class-variance-authority:
-        specifier: ^0.7.1
+        specifier: 'catalog:'
         version: 0.7.1
       clsx:
-        specifier: ^2.1.1
+        specifier: 'catalog:'
         version: 2.1.1
       framer-motion:
-        specifier: ^12.40.0
+        specifier: 'catalog:'
         version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       lucide-react:
-        specifier: ^1.17.0
+        specifier: 'catalog:'
         version: 1.17.0(react@19.2.7)
       next:
-        specifier: ^16.2.7
+        specifier: 'catalog:'
         version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
-        specifier: ^19.2.7
+        specifier: 'catalog:'
         version: 19.2.7
       react-dom:
-        specifier: ^19.2.7
+        specifier: 'catalog:'
         version: 19.2.7(react@19.2.7)
       react-syntax-highlighter:
-        specifier: ^16.1.1
+        specifier: 'catalog:'
         version: 16.1.1(react@19.2.7)
       recharts:
-        specifier: ^3.8.1
+        specifier: 'catalog:'
         version: 3.8.1(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react-is@17.0.2)(react@19.2.7)(redux@5.0.1)
       tailwind-merge:
-        specifier: ^3.6.0
+        specifier: 'catalog:'
         version: 3.6.0
       tailwindcss-animate:
-        specifier: ^1.0.7
+        specifier: 'catalog:'
         version: 1.0.7(tailwindcss@4.3.0)
       viem:
-        specifier: 2.x
+        specifier: 'catalog:'
         version: 2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3)
       wagmi:
-        specifier: ^3.6.16
+        specifier: 'catalog:'
         version: 3.6.16(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))(@tanstack/query-core@5.100.14)(@tanstack/react-query@5.100.14(react@19.2.7))(@types/react@19.2.16)(@walletconnect/ethereum-provider@2.23.4(@types/react@19.2.16)(bufferutil@4.1.0)(immer@11.1.8)(react@19.2.7)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(accounts@0.14.6)(immer@11.1.8)(porto@0.2.35)(react@19.2.7)(typescript@6.0.3)(viem@2.52.0(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@5.0.10)(zod@4.4.3))
     devDependencies:
       '@tailwindcss/postcss':
-        specifier: ^4.3.0
+        specifier: 'catalog:'
         version: 4.3.0
       '@testing-library/jest-dom':
-        specifier: ^6.9.1
+        specifier: 'catalog:'
         version: 6.9.1
       '@testing-library/react':
-        specifier: ^16.3.2
+        specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@testing-library/user-event':
-        specifier: ^14.6.1
+        specifier: 'catalog:'
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/node':
-        specifier: ^25.9.1
+        specifier: 'catalog:'
         version: 25.9.1
       '@types/react':
-        specifier: ^19.2.16
+        specifier: 'catalog:'
         version: 19.2.16
       '@types/react-dom':
-        specifier: ^19.2.3
+        specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.16)
       '@types/react-syntax-highlighter':
-        specifier: ^15.5.13
+        specifier: 'catalog:'
         version: 15.5.13
       '@vitest/ui':
-        specifier: ^4.1.8
+        specifier: 'catalog:'
         version: 4.1.8(vitest@4.1.8)
       autoprefixer:
-        specifier: ^10.5.0
+        specifier: 'catalog:'
         version: 10.5.0(postcss@8.5.15)
       cross-env:
-        specifier: 10.1.0
+        specifier: 'catalog:'
         version: 10.1.0
       jsdom:
-        specifier: ^29.1.1
+        specifier: 'catalog:'
         version: 29.1.1(@noble/hashes@1.8.0)
       postcss:
-        specifier: ^8.5.15
+        specifier: 'catalog:'
         version: 8.5.15
       tailwindcss:
-        specifier: ^4.3.0
+        specifier: 'catalog:'
         version: 4.3.0
       tsx:
-        specifier: ^4.22.4
+        specifier: 'catalog:'
         version: 4.22.4
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       vitest:
-        specifier: ^4.1.8
+        specifier: 'catalog:'
         version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/tsconfig: {}
@@ -6675,7 +6872,7 @@ snapshots:
 
   '@scure/bip32@1.7.0':
     dependencies:
-      '@noble/curves': 1.9.1
+      '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
 
@@ -7347,7 +7544,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 24.12.4
+      '@types/node': 25.9.1
       form-data: 4.0.5
 
   '@types/node@24.12.4':
@@ -7364,7 +7561,7 @@ snapshots:
 
   '@types/npm-registry-fetch@8.0.9':
     dependencies:
-      '@types/node': 24.12.4
+      '@types/node': 25.9.1
       '@types/node-fetch': 2.6.13
       '@types/npm-package-arg': 6.1.4
       '@types/npmlog': 7.0.0
@@ -7372,7 +7569,7 @@ snapshots:
 
   '@types/npmlog@7.0.0':
     dependencies:
-      '@types/node': 24.12.4
+      '@types/node': 25.9.1
 
   '@types/prismjs@1.26.6': {}
 
@@ -7390,7 +7587,7 @@ snapshots:
 
   '@types/ssri@7.1.5':
     dependencies:
-      '@types/node': 24.12.4
+      '@types/node': 25.9.1
 
   '@types/trusted-types@2.0.7': {}
 
@@ -8283,6 +8480,17 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
       zod: 4.4.3
+
+  abitype@1.2.4(typescript@6.0.3)(zod@3.22.4):
+    optionalDependencies:
+      typescript: 6.0.3
+      zod: 3.22.4
+
+  abitype@1.2.4(typescript@6.0.3)(zod@3.25.76):
+    optionalDependencies:
+      typescript: 6.0.3
+      zod: 3.25.76
+    optional: true
 
   abitype@1.2.4(typescript@6.0.3)(zod@4.4.3):
     optionalDependencies:
@@ -9593,7 +9801,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)(zod@3.22.4)
+      abitype: 1.2.4(typescript@6.0.3)(zod@3.22.4)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 6.0.3
@@ -9608,7 +9816,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)(zod@3.25.76)
+      abitype: 1.2.4(typescript@6.0.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 6.0.3
@@ -9624,7 +9832,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)(zod@4.4.3)
+      abitype: 1.2.4(typescript@6.0.3)(zod@4.4.3)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 6.0.3

@@ -31,27 +31,27 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "catalog:",
     "@4mica/tsconfig": "workspace:*",
-    "@types/node": "^24.10.1",
-    "@types/npm-registry-fetch": "^8.0.9",
-    "@vitest/coverage-v8": "^4.1.8",
-    "changelogen": "^0.6.2",
-    "esbuild": "^0.28.0",
-    "husky": "^9.1.7",
-    "knip": "^6.15.0",
-    "ky": "^2.0.2",
-    "lint-staged": "^17.0.7",
-    "ora": "^9.4.0",
-    "picocolors": "^1.1.1",
-    "rimraf": "^6.1.3",
-    "taze": "^19.14.1",
-    "tsup": "^8.5.1",
-    "tsx": "^4.22.4",
-    "turbo": "latest",
-    "typescript": "latest",
-    "vitest": "^4.1.8",
-    "yargs": "^18.0.0"
+    "@types/node": "catalog:node24",
+    "@types/npm-registry-fetch": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "changelogen": "catalog:",
+    "esbuild": "catalog:",
+    "husky": "catalog:",
+    "knip": "catalog:",
+    "ky": "catalog:",
+    "lint-staged": "catalog:",
+    "ora": "catalog:",
+    "picocolors": "catalog:",
+    "rimraf": "catalog:",
+    "taze": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:",
+    "yargs": "catalog:"
   },
   "engines": {
     "node": "^14.18.0 || >=16.10.0"
@@ -64,11 +64,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@biomejs/cli-darwin-x64": "^2.4.16",
-    "execa": "^9.6.1",
-    "find-up": "^8.0.0",
-    "npm-registry-fetch": "^20.0.0",
-    "read-pkg": "^10.1.0",
-    "terminal-link": "^5.0.0"
+    "@biomejs/cli-darwin-x64": "catalog:",
+    "execa": "catalog:",
+    "find-up": "catalog:",
+    "npm-registry-fetch": "catalog:",
+    "read-pkg": "catalog:",
+    "terminal-link": "catalog:"
   }
 }
