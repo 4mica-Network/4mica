@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "presentation": {
+    "echo": false,
+    "reveal": "always",
+    "focus": false,
+    "panel": "dedicated",
+    "showReuseMessage": true
+  },
+  "tasks": [
+    {
+      "label": "Launch 4mica Development terminals",
+      "dependsOn": ["Web App(3000)"],
+      // Mark as the default build task so cmd/ctrl+shift+b launches local dev.
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      // Next.js app at http://localhost:3000.
+      "label": "Web App(3000)",
+      "type": "shell",
+      "command": "pnpm --filter @4mica/web dev",
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Build",
+      "type": "shell",
+      "command": "pnpm build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Lint",
+      "type": "shell",
+      "command": "pnpm lint",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Typecheck",
+      "type": "shell",
+      "command": "pnpm typecheck",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Workspace Tests",
+      "type": "shell",
+      "command": "pnpm test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Web Tests Watch",
+      "type": "shell",
+      "command": "pnpm --filter @4mica/web test:watch",
+      "isBackground": false,
+      "problemMatcher": []
+    }
+  ]
+}

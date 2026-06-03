@@ -1,0 +1,4 @@
+Contact: mairon@4mica.io
+Preferred-Languages: en
+Canonical: https://4mica.io/.well-known/security.txt
+Policy: https://github.com/4mica-Network/.well-known/4mica/security/policy

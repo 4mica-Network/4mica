@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "maxNodeModuleJsDepth": 2,
+    "skipLibCheck": true,
+    "noErrorTruncation": false,
+    "disableSizeLimit": true
+  },
+  "extends": ["./base.json"]
+}

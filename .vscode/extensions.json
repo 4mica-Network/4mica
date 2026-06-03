@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "bradlc.vscode-tailwindcss",
+    "DavidAnson.vscode-markdownlint",
+    "yzhang.markdown-all-in-one",
+    "unifiedjs.vscode-mdx",
+    "Prisma.prisma",
+    "github.vscode-github-actions",
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+    "vscode-icons-team.vscode-icons"
+  ]
+}

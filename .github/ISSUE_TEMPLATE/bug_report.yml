@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a bug or unexpected behavior in 4mica
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve 4mica. Please include enough detail for us to reproduce the issue.
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug description
+      description: Clear and concise description of what went wrong.
+      placeholder: Tell us what happened and what part of 4mica is affected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps needed to reproduce the bug.
+      placeholder: |
+        1. Go to ...
+        2. Run ...
+        3. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: Clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: Clear and concise description of what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Share the versions, runtime, browser, operating system, or deployment context where the bug occurs.
+      placeholder: |
+        - 4mica version or commit:
+        - Node.js version:
+        - Package manager:
+        - Browser and version:
+        - Operating system:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Add any relevant logs, stack traces, screenshots, or screen recordings.
+      render: shell
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Validations
+      description: Before submitting the issue, please make sure you do the following
+      options:
+        - label: Follow our [Code of Conduct](https://github.com/4mica-Network/4mica/blob/main/CODE_OF_CONDUCT.md).
+          required: true
+        - label: Read the [Contributing Guidelines](https://github.com/4mica-Network/4mica/blob/main/CONTRIBUTING.md).
+          required: true
+        - label: Read the 4mica documentation.
+          required: true
+        - label: Check that there isn't [already an issue](https://github.com/4mica-Network/4mica/issues) reporting the same bug to avoid creating a duplicate.
+          required: true
+        - label: Check that this is a concrete bug. For Q&A, open a [GitHub Discussion](https://github.com/4mica-Network/4mica/discussions).
+          required: true

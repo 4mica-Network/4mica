@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "types": ["node"],
+    "maxNodeModuleJsDepth": 2,
+    "skipLibCheck": true,
+    "noErrorTruncation": false,
+    "disableSizeLimit": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "root": true,
+  "files": {
+    "includes": [
+      "**",
+      "!**/__testfixtures__",
+      "!**/*.mdx",
+      "!**/logs",
+      "!**/generated",
+      "!**/*.d.ts",
+      "!**/input.js",
+      "!**/output.js",
+      "!**/dist",
+      "!**/build",
+      "!**/pnpm-lock.yaml",
+      "!**/node_modules",
+      "!**/build-ncc",
+      "!**/.next",
+      "!**/.vscode",
+      "!**/playwright-report",
+      "!**/dev-dist",
+      "!**/.all-contributorsrc",
+      "!**/.turbo",
+      "!apps/**/coverage",
+      "!apps/**/cypress",
+      "!apps/**/test-results",
+      "!apps/**/dev-dist",
+      "!apps/web/out"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "nursery": {
+        "useSortedClasses": {
+          "level": "error",
+          "fix": "safe",
+          "options": {
+            "attributes": ["className"],
+            "functions": ["cn"]
+          }
+        }
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "useHookAtTopLevel": "error",
+        "useExhaustiveDependencies": "off",
+        "useJsxKeyInIterable": "warn"
+      },
+      "suspicious": {
+        "noDuplicateJsxProps": "warn",
+        "noExplicitAny": "warn",
+        "noUnknownAtRules": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "noRestrictedGlobals": "error"
+      },
+      "a11y": {
+        "recommended": true,
+        "useKeyWithClickEvents": "off",
+        "noNoninteractiveTabindex": "warn",
+        "noStaticElementInteractions": "warn",
+        "useSemanticElements": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
+      }
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "assist": {
+    "includes": [
+      "**",
+      "!**/node_modules/**",
+      "!**/dist/**",
+      "!**/build/**",
+      "!**/.next/**",
+      "!**/.vscode/**",
+      "!**/build-ncc/**",
+      "!**/generated/**",
+      "!apps/**/coverage/**",
+      "!apps/**/cypress/**",
+      "!apps/**/dev-dist/**"
+    ],
+    "actions": {
+      "recommended": true,
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "formatter": {
+    "formatWithErrors": true,
+    "indentStyle": "space",
+    "lineWidth": 80
+  }
+}

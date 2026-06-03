@@ -11,13 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - run: npm ci
-      - run: npm run build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
         env:
           NEXT_PUBLIC_PROJECT_ID: ${{ vars.NEXT_PUBLIC_PROJECT_ID }}
           NEXT_PUBLIC_REOWN_PROJECT_ID: ${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
@@ -34,13 +39,13 @@ jobs:
 
       - name: Upload hashed assets with immutable cache
         run: |
-          aws s3 sync out/_next/static s3://${{ secrets.S3_BUCKET }}/_next/static \
+          aws s3 sync apps/web/out/_next/static s3://${{ secrets.S3_BUCKET }}/_next/static \
             --cache-control "public,max-age=31536000,immutable" \
             --delete
 
       - name: Upload HTML with no-cache
         run: |
-          aws s3 sync out/ s3://${{ secrets.S3_BUCKET }} \
+          aws s3 sync apps/web/out/ s3://${{ secrets.S3_BUCKET }} \
             --exclude "*" \
             --include "*.html" \
             --cache-control "public,max-age=0,must-revalidate" \
@@ -48,7 +53,7 @@ jobs:
 
       - name: Upload remaining assets with standard cache
         run: |
-          aws s3 sync out/ s3://${{ secrets.S3_BUCKET }} \
+          aws s3 sync apps/web/out/ s3://${{ secrets.S3_BUCKET }} \
             --exclude "_next/static/*" \
             --exclude "*.html" \
             --cache-control "public,max-age=86400" \

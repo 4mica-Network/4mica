@@ -1,53 +1,73 @@
 {
-  "name": "homepage",
-  "version": "0.1.0",
+  "name": "4mica",
   "private": true,
+  "imports": {
+    "#*": "./src/*"
+  },
+  "keywords": [],
+  "type": "module",
+  "exports": null,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "*.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/homepage.git"
+  },
   "scripts": {
-    "dev": "cross-env NODE_ENV=development next dev -H 0.0.0.0 -p 3000",
-    "build": "next build",
-    "lint": "next lint",
-    "fmt": "next lint --fix",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@radix-ui/react-scroll-area": "^1.2.10",
-    "@radix-ui/react-slot": "^1.2.4",
-    "@react-google-maps/api": "^2.19.3",
-    "@reown/appkit": "^1.8.17",
-    "@reown/appkit-adapter-wagmi": "^1.8.17",
-    "@tanstack/react-query": "^5.86.0",
-    "@walletconnect/ethereum-provider": "2.23.4",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "framer-motion": "^12.23.25",
-    "lucide-react": "^0.556.0",
-    "next": "^16.1.6",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "react-syntax-highlighter": "^16.1.0",
-    "recharts": "^3.5.1",
-    "tailwind-merge": "^3.4.0",
-    "tailwindcss-animate": "^1.0.7",
-    "viem": "^2.45.1",
-    "wagmi": "^2.19.5"
-  },
-  "overrides": {
-    "valtio": {
-      "use-sync-external-store": "1.6.0"
-    }
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "biome check .",
+    "test": "turbo run test",
+    "lint:write": "biome check --write --diagnostic-level=error .",
+    "lint:linter": "biome lint --write --diagnostic-level=error .",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean && rm -rf node_modules",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.17",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@types/react-syntax-highlighter": "^15.5.13",
-    "autoprefixer": "^10.4.22",
-    "cross-env": "10.1.0",
-    "eslint": "9.39.1",
-    "eslint-config-next": "^16.0.7",
-    "postcss": "^8.5.5",
-    "tailwindcss": "^4.1.17",
-    "typescript": "^5"
+    "@biomejs/biome": "catalog:",
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "@types/npm-registry-fetch": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "changelogen": "catalog:",
+    "esbuild": "catalog:",
+    "husky": "catalog:",
+    "knip": "catalog:",
+    "ky": "catalog:",
+    "lint-staged": "catalog:",
+    "ora": "catalog:",
+    "picocolors": "catalog:",
+    "rimraf": "catalog:",
+    "taze": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:",
+    "yargs": "catalog:"
+  },
+  "engines": {
+    "node": "^14.18.0 || >=16.10.0"
+  },
+  "pkg": {
+    "outputPath": "./package/"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "execa": "catalog:",
+    "find-up": "catalog:",
+    "npm-registry-fetch": "catalog:",
+    "read-pkg": "catalog:",
+    "terminal-link": "catalog:"
   }
 }
