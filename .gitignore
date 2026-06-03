@@ -7,7 +7,6 @@ yarn-error.log*
 lerna-debug.log*
 .DS_Store
 .idea/
-.vscode/
 .fleet/
 .vercel
 .turbo
