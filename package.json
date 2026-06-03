@@ -54,7 +54,18 @@
     "yargs": "catalog:"
   },
   "engines": {
-    "node": "^14.18.0 || >=16.10.0"
+    "node": ">=22.0.0"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@wagmi/core>accounts": "*",
+        "@wagmi/connectors>accounts": "*"
+      },
+      "allowAny": [
+        "typescript"
+      ]
+    }
   },
   "pkg": {
     "outputPath": "./package/"
