@@ -268,8 +268,9 @@ accessibility improvements, test coverage, and small UI polish.
 
 Thanks to everyone who helps build 4Mica.
 
-See the full contributor graph on GitHub:
-[github.com/4mica-Network/homepage/graphs/contributors](https://github.com/4mica-Network/homepage/graphs/contributors)
+<a href="https://github.com/4mica-Network/4mica/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=4mica-Network/4mica" />
+</a>
 
 ## Acknowledgements
 
