@@ -9,9 +9,6 @@ catalogs:
     '@biomejs/biome':
       specifier: ^2.4.16
       version: 2.4.16
-    '@biomejs/cli-darwin-x64':
-      specifier: ^2.4.16
-      version: 2.4.16
     '@radix-ui/react-scroll-area':
       specifier: ^1.2.10
       version: 1.2.10
@@ -205,9 +202,6 @@ importers:
 
   .:
     dependencies:
-      '@biomejs/cli-darwin-x64':
-        specifier: 'catalog:'
-        version: 2.4.16
       execa:
         specifier: 'catalog:'
         version: 9.6.1
@@ -5349,7 +5343,8 @@ snapshots:
   '@biomejs/cli-darwin-arm64@2.4.16':
     optional: true
 
-  '@biomejs/cli-darwin-x64@2.4.16': {}
+  '@biomejs/cli-darwin-x64@2.4.16':
+    optional: true
 
   '@biomejs/cli-linux-arm64-musl@2.4.16':
     optional: true
@@ -7609,7 +7604,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/expect@4.1.8':
     dependencies:
@@ -7663,7 +7658,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vitest: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+      vitest: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   '@vitest/utils@4.1.8':
     dependencies:

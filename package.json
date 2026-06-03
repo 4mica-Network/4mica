@@ -64,7 +64,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@biomejs/cli-darwin-x64": "catalog:",
     "execa": "catalog:",
     "find-up": "catalog:",
     "npm-registry-fetch": "catalog:",

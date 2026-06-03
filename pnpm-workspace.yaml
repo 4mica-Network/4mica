@@ -7,7 +7,6 @@ allowBuilds:
   utf-8-validate: false
 catalog:
   '@biomejs/biome': ^2.4.16
-  '@biomejs/cli-darwin-x64': ^2.4.16
   '@radix-ui/react-scroll-area': ^1.2.10
   '@radix-ui/react-slot': ^1.2.4
   '@react-google-maps/api': ^2.20.8
