@@ -14,7 +14,7 @@ export default function AboutSection() {
       title: "Team",
       description:
         "Meet the founders building the payment layer for instant commerce",
-      href: "/leadership",
+      href: "/team",
     },
     {
       title: "Roadmap",

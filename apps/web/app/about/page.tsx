@@ -86,7 +86,7 @@ export default function AboutPage() {
               </div>
               <div className="mt-6">
                 <Link
-                  href="/leadership"
+                  href="/team"
                   className="link-accent inline-flex items-center font-semibold text-sm"
                 >
                   Meet the team

@@ -10,7 +10,7 @@ export default function Header() {
 
   const companyLinks = [
     { href: "/about", label: "4Mica Mission" },
-    { href: "/leadership", label: "Team" },
+    { href: "/team", label: "Team" },
     { href: "/roadmap", label: "Roadmap" },
   ];
 

@@ -29,7 +29,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/leadership" className="link-muted cursor-pointer">
+                <Link href="/team" className="link-muted cursor-pointer">
                   Team
                 </Link>
               </li>
