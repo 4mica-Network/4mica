@@ -1,0 +1,259 @@
+---
+title: "Server Integration"
+description: "Protect your API endpoints with 4Mica payment middleware"
+---
+
+## Overview
+
+Server integration adds HTTP 402 Payment Required protection to your API endpoints. When a client accesses a protected endpoint without providing valid payment credentials, the server returns a 402 response with payment requirements.
+
+## TypeScript/Express
+
+### Basic Middleware Setup
+
+<Steps>
+  <Step title="Import the middleware">
+    ```typescript
+    import { 
+      paymentMiddlewareFromConfig, 
+      FourMicaEvmScheme 
+    } from '@4mica/x402';
+    import express from 'express';
+
+    const app = express();
+    ```
+  </Step>
+
+  <Step title="Initialize middleware">
+    ```typescript
+    const paymentMiddleware = await paymentMiddlewareFromConfig({
+      operatorUrl: process.env.NEXT_PUBLIC_4MICA_OPERATOR_URL,
+      facilitatorSecret: process.env.4MICA_FACILITATOR_SECRET,
+      schemeClass: FourMicaEvmScheme,
+      tabOpeningEndpoint: 'https://your-domain.com/api/tab',
+    });
+    ```
+  </Step>
+
+  <Step title="Protect routes">
+    ```typescript
+    // Protect specific routes
+    app.get('/api/protected', 
+      paymentMiddleware, 
+      (req, res) => {
+        res.json({ message: 'Payment verified!' });
+      }
+    );
+
+    // Protect entire router
+    const apiRouter = express.Router();
+    apiRouter.use(paymentMiddleware);
+    app.use('/api', apiRouter);
+    ```
+  </Step>
+
+  <Step title="Handle tab requests">
+    ```typescript
+    app.post('/api/tab', paymentMiddleware.tabHandler, (req, res) => {
+      // Middleware handles tab opening
+      res.json({ tabId: req.payment.tabId });
+    });
+    ```
+  </Step>
+</Steps>
+
+### Advanced Configuration
+
+```typescript
+const paymentMiddleware = await paymentMiddlewareFromConfig({
+  operatorUrl: process.env.NEXT_PUBLIC_4MICA_OPERATOR_URL,
+  facilitatorSecret: process.env.4MICA_FACILITATOR_SECRET,
+  schemeClass: FourMicaEvmScheme,
+  
+  // Optional: Custom paywall UI
+  paywallTemplate: (req) => ({
+    message: 'Payment required to access this resource',
+    price: '0.01 ETH',
+  }),
+
+  // Optional: Lifecycle hooks
+  onPaymentRequired: async (req, res, paymentReq) => {
+    console.log('Payment required for:', req.path);
+  },
+
+  onPaymentVerified: async (req, res, guarantee) => {
+    console.log('Payment verified:', guarantee.id);
+    // Update your database, send confirmation, etc.
+  },
+
+  onPaymentFailed: async (req, res, error) => {
+    console.error('Payment failed:', error.message);
+  },
+});
+```
+
+## Python/FastAPI
+
+### Basic Middleware Setup
+
+<Steps>
+  <Step title="Import middleware and dependencies">
+    ```python
+    from mica_x402 import (
+        fastapi_payment_middleware_from_config,
+        FourMicaEvmScheme,
+    )
+    from fastapi import FastAPI, Depends
+    import os
+
+    app = FastAPI()
+    ```
+  </Step>
+
+  <Step title="Initialize middleware">
+    ```python
+    payment_middleware = await fastapi_payment_middleware_from_config(
+        operator_url=os.getenv('NEXT_PUBLIC_4MICA_OPERATOR_URL'),
+        facilitator_secret=os.getenv('4MICA_FACILITATOR_SECRET'),
+        scheme_class=FourMicaEvmScheme,
+        tab_opening_endpoint='https://your-domain.com/api/tab',
+    )
+    ```
+  </Step>
+
+  <Step title="Protect routes">
+    ```python
+    @app.get('/api/protected')
+    async def protected_route(payment=Depends(payment_middleware)):
+        return {'message': 'Payment verified!'}
+
+    # Or protect entire router
+    from fastapi import APIRouter
+    protected_router = APIRouter()
+    protected_router.dependencies = [Depends(payment_middleware)]
+    ```
+  </Step>
+
+  <Step title="Handle tab requests">
+    ```python
+    @app.post('/api/tab')
+    async def tab_endpoint(payment=Depends(payment_middleware.tab_handler)):
+        return {'tabId': payment.tab_id}
+    ```
+  </Step>
+</Steps>
+
+### Flask Alternative
+
+```python
+from mica_x402 import (
+    flask_payment_middleware_from_config,
+    FourMicaEvmScheme,
+)
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+payment_middleware = flask_payment_middleware_from_config(
+    operator_url=os.getenv('NEXT_PUBLIC_4MICA_OPERATOR_URL'),
+    facilitator_secret=os.getenv('4MICA_FACILITATOR_SECRET'),
+    scheme_class=FourMicaEvmScheme,
+)
+
+@app.route('/api/protected')
+@payment_middleware
+def protected_route():
+    return jsonify({'message': 'Payment verified!'})
+```
+
+## Response Format
+
+When payment is required, the server responds with HTTP 402 and payment details:
+
+```json
+{
+  "status": 402,
+  "headers": {
+    "WWW-Authenticate": "x402 realm=\"Protected Resource\""
+  },
+  "body": {
+    "paymentRequired": {
+      "tabUrl": "https://app.4mica.com/tab/tab_xxx",
+      "guaranteeRequired": {
+        "amount": "0.01",
+        "currency": "ETH",
+        "validationPolicy": {
+          "address": "0x...",
+          "method": "erc8004"
+        }
+      }
+    }
+  }
+}
+```
+
+## Error Handling
+
+Handle different payment scenarios:
+
+<CodeGroup>
+  ```typescript
+  app.use((err, req, res, next) => {
+    if (err.code === 'PAYMENT_REQUIRED') {
+      return res.status(402).json(err.payment);
+    }
+    if (err.code === 'INVALID_GUARANTEE') {
+      return res.status(403).json({ error: 'Invalid payment proof' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  });
+  ```
+
+  ```python
+  @app.exception_handler(PaymentRequiredException)
+  async def payment_required_handler(request, exc):
+      return JSONResponse(status_code=402, content=exc.payment)
+
+  @app.exception_handler(InvalidGuaranteeException)
+  async def invalid_guarantee_handler(request, exc):
+      return JSONResponse(status_code=403, content={'error': 'Invalid payment proof'})
+  ```
+</CodeGroup>
+
+## Payment Verification
+
+Access payment details in your route handlers:
+
+<CodeGroup>
+  ```typescript
+  app.get('/api/protected', paymentMiddleware, (req, res) => {
+    console.log(req.payment.guaranteeId);
+    console.log(req.payment.amount);
+    console.log(req.payment.currency);
+    console.log(req.payment.validatedAt);
+  });
+  ```
+
+  ```python
+  @app.get('/api/protected')
+  async def protected_route(payment: Payment = Depends(payment_middleware)):
+      print(payment.guarantee_id)
+      print(payment.amount)
+      print(payment.currency)
+  ```
+</CodeGroup>
+
+## Best Practices
+
+<Tip>
+  - Always validate payment guarantees before processing sensitive operations
+  - Store payment receipts for audit trails and disputes
+  - Implement rate limiting based on payment tier
+  - Use HTTPS for all payment endpoints
+</Tip>
+
+## Next Steps
+
+- [Client integration →](/client-integration)
+- [Verified payments →](/verified-payments)
+- [Code examples →](/code-examples)

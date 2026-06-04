@@ -1,0 +1,212 @@
+---
+title: "Registration"
+description: "Register as a Facilitator or Operator in the 4Mica network"
+---
+
+## What is a Facilitator?
+
+A Facilitator is a service that connects clients to the 4Mica payment network. As a Facilitator, you:
+
+- Accept HTTP 402 payment requests from clients
+- Manage payment tabs on behalf of your users
+- Register a payment scheme for your service
+- Receive callbacks for payment validation
+
+## Registration Process
+
+### Step 1: Create Your Facilitator Account
+
+The SDK automatically registers your facilitator on first use, but you can manually register for more control:
+
+<CodeGroup>
+  ```typescript
+  import { facilitatorClient } from '@4mica/x402';
+
+  const facilitator = await facilitatorClient.register({
+    name: 'My Service',
+    domain: 'https://api.myservice.com',
+    webhookUrl: 'https://api.myservice.com/webhooks/4mica',
+    supportEmail: 'support@myservice.com',
+  });
+
+  // Save these credentials securely
+  console.log(facilitator.id);
+  console.log(facilitator.secret);
+  ```
+
+  ```python
+  from mica_x402 import facilitator_client
+
+  facilitator = await facilitator_client.register(
+      name='My Service',
+      domain='https://api.myservice.com',
+      webhook_url='https://api.myservice.com/webhooks/4mica',
+      support_email='support@myservice.com',
+  )
+
+  print(facilitator.id)
+  print(facilitator.secret)
+  ```
+
+  ```bash curl
+  curl -X POST https://facilitator.4mica.xyz/register \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "My Service",
+      "domain": "https://api.myservice.com",
+      "webhookUrl": "https://api.myservice.com/webhooks/4mica",
+      "supportEmail": "support@myservice.com"
+    }'
+  ```
+</CodeGroup>
+
+### Step 2: Create a Payment Scheme
+
+A Payment Scheme defines how your service will handle payments:
+
+<CodeGroup>
+  ```typescript
+  import { schemeClient } from '@4mica/x402';
+
+  const scheme = await schemeClient.create({
+    facilitatorId: facilitator.id,
+    name: 'Standard v1',
+    guaranteeMode: 'v1', // or 'v2' for verified payments
+    networks: ['eip155:8453', 'eip155:11155111'], // Base, Ethereum
+  });
+
+  console.log(`Scheme registered: ${scheme.address}`);
+  ```
+
+  ```python
+  from mica_x402 import scheme_client
+
+  scheme = await scheme_client.create(
+      facilitator_id=facilitator.id,
+      name='Standard v1',
+      guarantee_mode='v1',  # or 'v2' for verified payments
+      networks=['eip155:8453', 'eip155:11155111'],
+  )
+
+  print(f'Scheme registered: {scheme.address}')
+  ```
+</CodeGroup>
+
+### Step 3: Configure Webhook Handling
+
+Your service must accept and validate webhook callbacks from 4Mica:
+
+<CodeGroup>
+  ```typescript
+  import { verifyWebhook } from '@4mica/x402';
+  import express from 'express';
+
+  app.post('/webhooks/4mica', async (req, res) => {
+    try {
+      const event = verifyWebhook(
+        req.body,
+        req.headers['x-4mica-signature'] as string,
+        process.env.4MICA_WEBHOOK_SECRET!
+      );
+
+      // Handle webhook events
+      switch (event.type) {
+        case 'payment.verified':
+          // Payment was validated
+          break;
+        case 'payment.failed':
+          // Payment validation failed
+          break;
+        case 'tab.opened':
+          // User opened payment tab
+          break;
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(401).json({ error: 'Invalid signature' });
+    }
+  });
+  ```
+
+  ```python
+  from mica_x402 import verify_webhook
+  from fastapi import FastAPI, Request
+
+  app = FastAPI()
+
+  @app.post('/webhooks/4mica')
+  async def webhook(request: Request):
+      body = await request.json()
+      signature = request.headers.get('x-4mica-signature')
+
+      try:
+          event = verify_webhook(
+              body,
+              signature,
+              os.getenv('4MICA_WEBHOOK_SECRET'),
+          )
+
+          # Handle webhook events
+          if event.type == 'payment.verified':
+              # Payment was validated
+              pass
+
+          return {'success': True}
+      except Exception:
+          return {'error': 'Invalid signature'}, 401
+  ```
+</CodeGroup>
+
+## Network Configuration
+
+Choose which networks your Facilitator will support:
+
+| Network | Chain ID | RPC URL | Status |
+|---------|----------|---------|--------|
+| Base | `eip155:8453` | `https://base.api.4mica.xyz` | Production |
+| Ethereum Sepolia | `eip155:11155111` | `https://ethereum.sepolia.api.4mica.xyz` | Testnet |
+| Base Sepolia | `eip155:84532` | `https://base.sepolia.api.4mica.xyz` | Testnet |
+
+## Environment Setup
+
+Store your registration credentials securely:
+
+```bash
+# .env.local
+4MICA_FACILITATOR_ID=fac_xxx
+4MICA_FACILITATOR_SECRET=secret_xxx
+4MICA_SCHEME_ADDRESS=0x...
+4MICA_WEBHOOK_SECRET=webhook_secret_xxx
+4MICA_OPERATOR_URL=https://api.4mica.xyz
+```
+
+<Warning>
+  Never commit secrets to version control. Use environment variables or a secrets manager.
+</Warning>
+
+## Verification
+
+Verify your registration is complete:
+
+<CodeGroup>
+  ```typescript
+  const facilitator = await facilitatorClient.get(facilitatorId);
+  console.log(facilitator.status); // Should be 'active'
+  ```
+
+  ```python
+  facilitator = await facilitator_client.get(facilitator_id)
+  print(facilitator.status)  # Should be 'active'
+  ```
+</CodeGroup>
+
+## Next Steps
+
+- [Set up server middleware →](/server-integration)
+- [Configure client handling →](/client-integration)
+- [Review the payment flow →](/payment-flow)
+
+<Tip>
+  Need a test Facilitator? Create a free account at [app.4mica.com](https://app.4mica.com).
+</Tip>

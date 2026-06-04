@@ -1,0 +1,355 @@
+---
+title: "Core API Reference"
+description: "Complete reference for the 4Mica Core API"
+---
+
+## Overview
+
+The Core API is the primary interface for interacting with the 4Mica network. It handles:
+
+- Network state queries
+- Collateral management
+- On-chain validations
+- Settlement operations
+
+## Base URL
+
+```
+https://api.4mica.xyz
+```
+
+## Authentication
+
+Include your API key in the Authorization header:
+
+```bash
+Authorization: Bearer {api_key}
+```
+
+## Core Endpoints
+
+### Get Network Status
+
+```http
+GET /network/status
+```
+
+**Response:**
+```json
+{
+  "status": "operational",
+  "chains": {
+    "eip155:8453": {
+      "name": "Base",
+      "status": "operational",
+      "blockHeight": 15234567,
+      "gasPrice": "2.5"
+    },
+    "eip155:11155111": {
+      "name": "Ethereum Sepolia",
+      "status": "operational",
+      "blockHeight": 5678901,
+      "gasPrice": "25.5"
+    }
+  },
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+### Get User Collateral
+
+Retrieve a user's collateral position across the network.
+
+```http
+GET /users/{userAddress}/collateral
+```
+
+**Response:**
+```json
+{
+  "address": "0x...",
+  "deposits": [
+    {
+      "chain": "eip155:8453",
+      "token": "0x...",
+      "symbol": "ETH",
+      "amount": "10.5",
+      "value": "$25000"
+    }
+  ],
+  "totalValue": "$25000",
+  "creditLimit": "$50000",
+  "available": "$24500"
+}
+```
+
+### Deposit Collateral
+
+```http
+POST /users/{userAddress}/deposit
+```
+
+**Request:**
+```json
+{
+  "chain": "eip155:8453",
+  "token": "0x...",
+  "amount": "1.0",
+  "metadata": {
+    "source": "wallet_sweep"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "transactionHash": "0x...",
+  "status": "confirmed",
+  "amount": "1.0",
+  "token": "ETH",
+  "chain": "eip155:8453",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+### Withdraw Collateral
+
+```http
+POST /users/{userAddress}/withdraw
+```
+
+**Request:**
+```json
+{
+  "chain": "eip155:8453",
+  "token": "0x...",
+  "amount": "0.5",
+  "recipientAddress": "0x...",
+  "metadata": {
+    "reason": "emergency_withdrawal"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "withdrawalId": "wth_xxx",
+  "transactionHash": "0x...",
+  "status": "pending",
+  "amount": "0.5",
+  "estimatedCompletion": "2024-01-01T00:30:00Z"
+}
+```
+
+### Get Scheme Information
+
+```http
+GET /schemes/{schemeAddress}
+```
+
+**Response:**
+```json
+{
+  "address": "0x...",
+  "facilitatorId": "fac_xxx",
+  "name": "Standard v1",
+  "guaranteeMode": "v1",
+  "chains": ["eip155:8453", "eip155:11155111"],
+  "totalVolume": "1000.50",
+  "totalTransactions": 2543,
+  "status": "active",
+  "createdAt": "2024-01-01T00:00:00Z"
+}
+```
+
+### Get Guarantee Details
+
+```http
+GET /guarantees/{guaranteeId}
+```
+
+**Response:**
+```json
+{
+  "id": "gua_xxx",
+  "schemeAddress": "0x...",
+  "guaranteeMode": "v2",
+  "amount": "0.01",
+  "currency": "ETH",
+  "status": "verified",
+  "userAddress": "0x...",
+  "signature": "0x...",
+  "validationPolicy": {
+    "validatorAddress": "0x...",
+    "method": "erc8004",
+    "minimumScore": 80
+  },
+  "metadata": {
+    "jobId": "job_xxx",
+    "requestHash": "0x..."
+  },
+  "createdAt": "2024-01-01T00:00:00Z",
+  "verifiedAt": "2024-01-01T00:05:00Z"
+}
+```
+
+### Verify Guarantee On-Chain
+
+Validate a guarantee against the scheme contract.
+
+```http
+POST /guarantees/{guaranteeId}/verify
+```
+
+**Request:**
+```json
+{
+  "jobId": "job_xxx",
+  "validationScore": 95,
+  "metadata": {
+    "completedAt": "2024-01-01T00:10:00Z"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "guaranteeId": "gua_xxx",
+  "valid": true,
+  "validationHash": "0x...",
+  "transactionHash": "0x...",
+  "verified": true,
+  "timestamp": "2024-01-01T00:10:30Z"
+}
+```
+
+### Get Settlement Information
+
+```http
+GET /settlements/{settlementId}
+```
+
+**Response:**
+```json
+{
+  "id": "set_xxx",
+  "facilitatorId": "fac_xxx",
+  "guarantees": ["gua_xxx", "gua_yyy"],
+  "totalAmount": "0.02",
+  "currency": "ETH",
+  "status": "completed",
+  "chains": ["eip155:8453"],
+  "transactionHash": "0x...",
+  "gasUsed": "125000",
+  "completedAt": "2024-01-01T00:15:00Z"
+}
+```
+
+### List Validators
+
+```http
+GET /validators
+```
+
+**Query Parameters:**
+- `chain` - Filter by chain ID
+- `status` - Filter by status: `active`, `paused`, `deprecated`
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "address": "0x...",
+      "name": "ERC-8004 Job Validator",
+      "method": "erc8004",
+      "chains": ["eip155:8453", "eip155:11155111"],
+      "status": "active",
+      "fee": "0.001",
+      "minimumScore": 50,
+      "description": "Validates job completeness on-chain"
+    }
+  ]
+}
+```
+
+## Batch Operations
+
+### Batch Deposit
+
+Process multiple deposits in a single request:
+
+```http
+POST /batch/deposit
+```
+
+**Request:**
+```json
+{
+  "deposits": [
+    {
+      "chain": "eip155:8453",
+      "token": "0x...",
+      "amount": "1.0"
+    },
+    {
+      "chain": "eip155:11155111",
+      "token": "0x...",
+      "amount": "2.0"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "batchId": "batch_xxx",
+  "status": "processing",
+  "deposits": [
+    { "transactionHash": "0x...", "status": "pending" },
+    { "transactionHash": "0x...", "status": "pending" }
+  ]
+}
+```
+
+### Check Batch Status
+
+```http
+GET /batch/{batchId}
+```
+
+## WebSocket Connections
+
+Subscribe to real-time updates:
+
+```javascript
+const ws = new WebSocket('wss://api.4mica.xyz/ws');
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    channel: 'guarantees',
+    filter: { scheme: 'sch_xxx' }
+  }));
+};
+
+ws.onmessage = (event) => {
+  const update = JSON.parse(event.data);
+  console.log('Guarantee updated:', update);
+};
+```
+
+## Rate Limiting
+
+- **Standard**: 1000 requests per minute
+- **Enterprise**: Custom limits available
+
+## Next Steps
+
+- [Facilitator API →](/facilitator-api)
+- [Payment flow →](/payment-flow)
+- [Code examples →](/code-examples)

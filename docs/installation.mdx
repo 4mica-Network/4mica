@@ -1,0 +1,158 @@
+---
+title: "Installation"
+description: "Install the 4Mica SDK for your platform"
+---
+
+## Choose Your SDK
+
+4Mica provides production-ready SDKs for TypeScript, Python, and Rust. Select your language below to get started.
+
+<CodeGroup>
+  ```bash npm
+  npm install @4mica/x402
+  ```
+  ```bash pip
+  pip install 4mica-x402
+  ```
+  ```bash cargo
+  cargo add sdk-4mica
+  ```
+</CodeGroup>
+
+## Installation by Language
+
+### TypeScript/Node.js
+
+The TypeScript SDK provides Express middleware, automatic facilitator setup, and client-side helpers.
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    npm install @4mica/x402
+    ```
+  </Step>
+  <Step title="Set up environment variables">
+    Create a `.env.local` file with your 4Mica credentials:
+    ```
+    NEXT_PUBLIC_4MICA_OPERATOR_URL=https://api.4mica.xyz
+    4MICA_FACILITATOR_SECRET=your_facilitator_secret
+    4MICA_WEBHOOK_SECRET=your_webhook_secret
+    ```
+  </Step>
+  <Step title="Import and initialize">
+    ```typescript
+    import { initializeFourMica } from '@4mica/x402';
+
+    const fourmica = initializeFourMica({
+      operatorUrl: process.env.NEXT_PUBLIC_4MICA_OPERATOR_URL,
+      facilitatorSecret: process.env.4MICA_FACILITATOR_SECRET,
+    });
+    ```
+  </Step>
+</Steps>
+
+**What's included:**
+- Express middleware for HTTP 402 payment handling
+- Automatic facilitator and scheme registration
+- Client helpers for Fetch and Axios
+- Built-in support for Base, Ethereum, and testnets
+
+### Python
+
+The Python SDK supports both FastAPI and Flask, with async and sync client transports.
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    pip install 4mica-x402
+    ```
+  </Step>
+  <Step title="Set up environment variables">
+    Create a `.env` file:
+    ```
+    4MICA_OPERATOR_URL=https://api.4mica.xyz
+    4MICA_FACILITATOR_SECRET=your_facilitator_secret
+    4MICA_WEBHOOK_SECRET=your_webhook_secret
+    ```
+  </Step>
+  <Step title="Import and initialize">
+    ```python
+    from mica_x402 import FourMicaClient
+
+    client = FourMicaClient(
+        operator_url=os.getenv('4MICA_OPERATOR_URL'),
+        facilitator_secret=os.getenv('4MICA_FACILITATOR_SECRET'),
+    )
+    ```
+  </Step>
+</Steps>
+
+**What's included:**
+- FastAPI middleware with async support
+- Flask middleware for traditional Python web apps
+- Async (httpx) and sync (requests) client transports
+- Automatic facilitator registration
+
+### Rust
+
+The Rust SDK focuses on collateral management and wallet operations via the Core4Mica contract.
+
+<Steps>
+  <Step title="Add to Cargo.toml">
+    ```toml
+    [dependencies]
+    sdk-4mica = "0.1"
+    tokio = { version = "1", features = ["full"] }
+    ```
+  </Step>
+  <Step title="Set up environment variables">
+    ```
+    4MICA_RPC_URL=https://rpc.4mica.xyz
+    4MICA_WALLET_PRIVATE_KEY=0x...
+    ```
+  </Step>
+  <Step title="Initialize the client">
+    ```rust
+    use sdk_4mica::Client;
+
+    #[tokio::main]
+    async fn main() {
+        let client = Client::new(
+            std::env::var("4MICA_RPC_URL").unwrap(),
+        );
+    }
+    ```
+  </Step>
+</Steps>
+
+**What's included:**
+- Direct RPC integration for on-chain operations
+- Collateral deposit and withdrawal
+- Balance and position queries
+- ERC-8004 validation support
+
+## Verify Installation
+
+Test your installation by verifying the SDK is properly imported:
+
+<CodeGroup>
+  ```bash node
+  npm list @4mica/x402
+  ```
+  ```bash python
+  pip show 4mica-x402
+  ```
+  ```bash cargo
+  cargo tree | grep sdk-4mica
+  ```
+</CodeGroup>
+
+## Next Steps
+
+- [Configure your facilitator →](/registration)
+- [Set up server middleware →](/server-integration)
+- [View code examples →](/code-examples)
+
+<Tip>
+  Having installation issues? Check our [GitHub Discussions](https://github.com/4Mica/sdk) or email [support@4mica.com](mailto:support@4mica.com).
+</Tip>
