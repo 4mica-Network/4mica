@@ -26,6 +26,20 @@ export default function LeadershipPage() {
       imagePosition: "50% 15%",
       bio: "Cryptography expert leading the instant transaction layer for next-gen commerce.",
     },
+    {
+      name: "Mohammad Ghanbari",
+      role: "Founding Engineer - Core",
+      image: "/assets/mohammad.png",
+      imagePosition: "50% 20%",
+      bio: "Spent years building scalable backend systems, distributed infrastructure, and AI-powered products across multiple industries.",
+    },
+    {
+      name: "Mo Shafiei",
+      role: "Founding Engineer - Integrations",
+      image: "/assets/mo.jpeg",
+      imagePosition: "50% 20%",
+      bio: "Built platform-level products, developer tools, and large-scale web systems.",
+    },
   ];
 
   return (
