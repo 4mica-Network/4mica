@@ -1,29 +1,88 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "4Mica",
+  "name": "4Mica docs",
   "description": "The clearinghouse for the agentic economy",
+  "topbarLinks": [
+    {
+      "name": "Feedback",
+      "url": "mailto:feedback@zyme.sh"
+    },
+    {
+      "name": "Support",
+      "url": "mailto:support@zyme.sh"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Open app",
+    "url": "https://app.zyme.sh"
+  },
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#000",
+    "light": "#ffffff",
+    "dark": "#151515"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "pages": [
       {
         "group": "Getting Started",
-        "pages": ["index", "quickstart"]
+        "pages": ["index", "quickstart", "all-products", "usecases"]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "agentic-economy/core-concepts/agentic-economy",
+          "agentic-economy/core-concepts/agentic-payments",
+          "agentic-economy/core-concepts/agent-identity",
+          "agentic-economy/core-concepts/transaction-lifecycle",
+          "agentic-economy/core-concepts/security",
+          "agentic-economy/core-concepts/how-x402-works",
+          "agentic-economy/core-concepts/http-402",
+          "agentic-economy/core-concepts/client-server-roles",
+          "agentic-economy/core-concepts/facilitator",
+          "agentic-economy/core-concepts/wallet"
+        ]
+      },
+      {
+        "group": "Buyer",
+        "pages": [
+          "agentic-economy/integration-guides/quick-start",
+          "agentic-economy/integration-guides/facilitator-urls",
+          "agentic-economy/integration-guides/make-paid-requests-automatically",
+          "agentic-economy/integration-guides/error-handling",
+          "agentic-economy/integration-guides/examples",
+          "agentic-economy/integration-guides/test-in-sandbox",
+          "agentic-economy/integration-guides/go-live"
+        ]
+      },
+      {
+        "group": "Seller",
+        "pages": [
+          "agentic-economy/integration-guides/quick-start",
+          "agentic-economy/integration-guides/facilitator-urls",
+          "agentic-economy/integration-guides/payment-middleware",
+          "agentic-economy/integration-guides/test-in-sandbox",
+          "agentic-economy/integration-guides/go-live"
+        ]
       },
       {
         "group": "Integration",
         "pages": [
+          "agentic-economy/integration-guides/accept-agent-payments",
+          "agentic-economy/integration-guides/connect-your-agent",
+          "agentic-economy/integration-guides/configure-permissions",
+
           "installation",
           "registration",
           "server-integration",
           "client-integration",
           "verified-payments"
         ]
+      },
+      {
+        "group": "Reference SDK Support",
+        "pages": ["agentic-economy/integration-guides/accept-agent-payments"]
       },
       {
         "group": "API Reference",
