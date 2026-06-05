@@ -3,20 +3,6 @@
   "theme": "almond",
   "name": "4Mica docs",
   "description": "The clearinghouse for the agentic economy",
-  "topbarLinks": [
-    {
-      "name": "Feedback",
-      "url": "mailto:feedback@zyme.sh"
-    },
-    {
-      "name": "Support",
-      "url": "mailto:support@zyme.sh"
-    }
-  ],
-  "topbarCtaButton": {
-    "name": "Open app",
-    "url": "https://app.zyme.sh"
-  },
   "colors": {
     "primary": "#000",
     "light": "#ffffff",
@@ -27,66 +13,81 @@
     "pages": [
       {
         "group": "Getting Started",
-        "pages": ["index", "quickstart", "all-products", "usecases"]
+        "pages": [
+          "index",
+          "quickstart",
+          "all-products",
+          "why-we-exist",
+          "usecases"
+        ]
       },
       {
         "group": "Core Concepts",
         "pages": [
-          "agentic-economy/core-concepts/agentic-economy",
-          "agentic-economy/core-concepts/agentic-payments",
-          "agentic-economy/core-concepts/agent-identity",
-          "agentic-economy/core-concepts/transaction-lifecycle",
-          "agentic-economy/core-concepts/security",
-          "agentic-economy/core-concepts/how-x402-works",
-          "agentic-economy/core-concepts/http-402",
-          "agentic-economy/core-concepts/client-server-roles",
-          "agentic-economy/core-concepts/facilitator",
-          "agentic-economy/core-concepts/wallet"
+          "agentic-economy",
+          "agentic-payments",
+          "agent-identity",
+          "transaction-lifecycle",
+          "security",
+          "deposits-and-withdrawals",
+          "earning-yield",
+          "no-account-setup",
+          "no-custodial-risk",
+          "bilateral-netting-cycles",
+          "settlements",
+          "how-x402-works",
+          "http-402",
+          "client-server-roles",
+          "facilitator",
+          "wallet",
+          "risk-management",
+          "micro-payments-at-scale",
+          "collateral-ratios",
+          "configurable-SLAs",
+          "cross-chain-credit"
         ]
       },
       {
         "group": "Buyer",
         "pages": [
-          "agentic-economy/integration-guides/quick-start",
-          "agentic-economy/integration-guides/facilitator-urls",
-          "agentic-economy/integration-guides/make-paid-requests-automatically",
-          "agentic-economy/integration-guides/error-handling",
-          "agentic-economy/integration-guides/examples",
-          "agentic-economy/integration-guides/test-in-sandbox",
-          "agentic-economy/integration-guides/go-live"
+          "quick-start",
+          "facilitator-urls",
+          "make-paid-requests-automatically",
+          "error-handling",
+          "examples",
+          "test-in-sandbox",
+          "go-live"
         ]
       },
       {
         "group": "Seller",
         "pages": [
-          "agentic-economy/integration-guides/quick-start",
-          "agentic-economy/integration-guides/facilitator-urls",
-          "agentic-economy/integration-guides/payment-middleware",
-          "agentic-economy/integration-guides/test-in-sandbox",
-          "agentic-economy/integration-guides/go-live"
+          "quick-start",
+          "facilitator-urls",
+          "payment-middleware",
+          "test-in-sandbox",
+          "go-live"
         ]
       },
       {
         "group": "Integration",
         "pages": [
-          "agentic-economy/integration-guides/accept-agent-payments",
-          "agentic-economy/integration-guides/connect-your-agent",
-          "agentic-economy/integration-guides/configure-permissions",
-
-          "installation",
-          "registration",
-          "server-integration",
-          "client-integration",
-          "verified-payments"
+          "accept-agent-payments",
+          "connect-your-agent",
+          "configure-permissions"
         ]
       },
       {
-        "group": "Reference SDK Support",
-        "pages": ["agentic-economy/integration-guides/accept-agent-payments"]
+        "group": "SDKs",
+        "pages": ["backend", "frontend"]
       },
       {
         "group": "API Reference",
         "pages": ["facilitator-api", "operator-api", "payment-flow"]
+      },
+      {
+        "group": "Changelogs",
+        "pages": ["facilitator-api"]
       },
       {
         "group": "Examples",
@@ -116,13 +117,17 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@4mica.com"
+        "href": "mailto:support@4mica.io"
+      },
+      {
+        "label": "Feedback",
+        "href": "mailto:feedback@4mica.io"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Launch App",
-      "href": "https://app.4mica.com"
+      "href": "https://app.4mica.io"
     }
   },
   "contextual": {
