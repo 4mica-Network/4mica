@@ -1,0 +1,35 @@
+---
+title: "NodeJS"
+description: "Integrate 4Mica with a NodeJS application."
+---
+
+# NodeJS
+
+Use NodeJS when you want a direct path into 4Mica without reading the full protocol first. Start by registering collateral, then wire either the buyer client or seller middleware depending on your role.
+
+## Install
+
+```bash
+pnpm install @4mica/x402 @x402/fetch viem
+```
+
+## Basic Setup
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY);
+const scheme = await FourMicaEvmScheme.create(account);
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+```
+
+## What To Build Next
+
+- If you are a buyer, wrap your HTTP client so 402 responses become automatic paid retries.
+- If you are a seller, protect one route first and choose a small test price.
+- Use Base Sepolia until tab creation, verification, and settlement are working end to end.
+- Move shared values like network, private key, payTo address, and tab endpoint into environment variables before production.

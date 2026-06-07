@@ -1,0 +1,24 @@
+---
+title: "HTTP 402"
+description: "How HTTP 402 advertises prices, assets, networks, and tab endpoints."
+---
+
+# HTTP 402
+
+HTTP 402 is the discovery moment. It tells a client what the resource costs, who should be paid, which network and scheme are accepted, and where to open a 4Mica tab.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- scheme: 4mica-credit
+- network: CAIP-2 chain identifier
+- payTo: seller address
+- maxAmountRequired or price: request cost
+- extra.tabEndpoint: seller-hosted tab route
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

@@ -1,0 +1,32 @@
+---
+title: "Introduction"
+description: "Start here to understand what 4Mica does and how to begin building."
+---
+
+# Introduction
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+Instead of forcing every request to become an on-chain transaction, 4Mica lets a payer deposit collateral once, sign off-chain payment guarantees per request, and settle later. Resource servers keep the familiar HTTP 402 flow while gaining programmable credit, non-custodial enforcement, and batched settlement.
+
+## Who 4Mica Is For
+
+- API providers that want to charge per request without accounts, invoices, or prepaid balances.
+- AI agents that need to pay many services during a task and settle once later.
+- Applications that want x402-compatible payments with credit, collateral, and net settlement.
+- Protocol teams building financial infrastructure for high-frequency agent-to-agent commerce.
+
+## The Basic Story
+
+1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
+2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
+3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
+4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
+5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+
+## Where To Go Next
+
+- Read Quickstart to make your first paid request.
+- Read Buyer if you are building an agent or client that pays APIs.
+- Read Seller if you are protecting an API, model, dataset, or workflow.
+- Read Core Concepts when you want the protocol details behind tabs, guarantees, settlement, and risk.

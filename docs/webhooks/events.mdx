@@ -1,0 +1,25 @@
+---
+title: "Events"
+description: "Event types for collateral, tabs, settlement, and withdrawals."
+---
+
+# Events
+
+Webhook events should mirror meaningful state transitions in the 4Mica lifecycle.
+
+## Relevant Events
+
+- collateral.deposited
+- tab.opened
+- guarantee.settled
+- tab.paid
+- tab.remunerated
+- withdrawal.requested
+- withdrawal.finalized
+
+## Handler Guidance
+
+- Verify the webhook signature before processing.
+- Store event IDs and ignore duplicates.
+- Fetch current state from the API if the event arrives out of order.
+- Keep user-facing state clear: pending, settled, claimable, paid, or failed.

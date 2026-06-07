@@ -1,0 +1,26 @@
+---
+title: "How to Integrate 4Mica with Your Application"
+description: "Add 4Mica payments to an existing buyer or seller application."
+---
+
+# How to Integrate 4Mica with Your Application
+
+A good 4Mica integration starts small. Pick one paid workflow, decide whether your application is paying, receiving, or both, and wire that path end to end before expanding.
+
+## Integration Map
+
+- Buyer apps need a signer, collateral, network registration, and an x402-capable HTTP client.
+- Seller apps need protected routes, prices, a payTo address, an advertised tab endpoint, and settlement handling.
+- Full marketplaces often need both roles: agents pay for upstream work while the app charges downstream consumers.
+
+## Recommended Rollout
+
+1. Register one test wallet and deposit collateral on Base Sepolia.
+2. Protect one low-risk route or wrap one outbound client.
+3. Log every 402 response, tab open, guarantee, verify result, and settle result.
+4. Add policy controls such as seller allowlists, max price per request, and budget per task.
+5. Move to production networks only after settlement monitoring is routine.
+
+## Product Story
+
+Use 4Mica where account setup, prepaid balances, or per-request chain transactions would slow down the user. The application should tell a simple story: connect collateral once, let agents transact instantly, and settle with clear guarantees later.

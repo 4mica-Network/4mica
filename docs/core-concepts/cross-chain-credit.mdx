@@ -1,0 +1,23 @@
+---
+title: "Cross Chain Credit"
+description: "How 4Mica uses network-aware collateral and settlement flows."
+---
+
+# Cross Chain Credit
+
+Cross-chain credit means agents can use a shared payment pattern across networks while applications choose the chain, asset, and settlement environment that fit their needs.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Use CAIP-2 network identifiers everywhere.
+- Register client schemes per accepted network.
+- Keep collateral and settlement rules network-specific.
+- Design apps so adding a network is a configuration change, not a product rewrite.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

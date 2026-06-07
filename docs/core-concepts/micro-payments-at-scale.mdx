@@ -1,0 +1,23 @@
+---
+title: "Micro Payments at Scale"
+description: "How 4Mica makes high-volume small payments practical."
+---
+
+# Micro Payments at Scale
+
+Micropayments only work when the payment system does not spend more effort than the payment is worth. 4Mica keeps each request off-chain while preserving a claimable settlement path.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Use off-chain signatures per request.
+- Aggregate repeated obligations in tabs.
+- Avoid per-call gas and chain latency.
+- Settle net exposure later.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

@@ -1,0 +1,26 @@
+---
+title: "All Products"
+description: "Understand the product surface across protocol, facilitator, SDKs, and app."
+---
+
+# All Products
+
+4Mica is not a single checkout widget. It is a stack for credit-based machine payments: protocol contracts, a facilitator, SDKs, middleware, and hosted tools that make the flow usable for builders.
+
+## Protocol Layer
+
+The Core4Mica contracts hold collateral, enforce settlement rules, and allow recipients to claim from collateral when guarantees mature and remain unpaid. Deposits are non-custodial by design; 4Mica coordinates state and guarantees but does not hold user funds directly.
+
+## Facilitator
+
+The facilitator is the bridge between x402 HTTP flows and 4Mica credit. Resource servers use it to open tabs, verify payment payloads, and settle guarantees. Buyers usually interact with it indirectly through the seller tab endpoint and x402 client wrapper.
+
+## SDKs And Middleware
+
+- TypeScript: Express middleware, x402 client schemes, and wallet operations.
+- Python: FastAPI and Flask middleware plus requests and httpx client wrappers.
+- Rust: collateral management and direct wallet operations, with HTTP middleware planned.
+
+## Hosted App
+
+The hosted app gives teams a guided path for registering agents, connecting wallets, choosing networks, and depositing collateral before moving into code. Use it when you want a visual flow before automating the same actions in an SDK.

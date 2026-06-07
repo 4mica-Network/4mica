@@ -1,0 +1,25 @@
+---
+title: "Quick Start"
+description: "Set up 4Mica webhooks quickly."
+---
+
+# Quick Start
+
+Start by subscribing a development endpoint to the small set of events your product actually needs.
+
+## Relevant Events
+
+- collateral.deposited
+- tab.opened
+- guarantee.settled
+- tab.paid
+- tab.remunerated
+- withdrawal.requested
+- withdrawal.finalized
+
+## Handler Guidance
+
+- Verify the webhook signature before processing.
+- Store event IDs and ignore duplicates.
+- Fetch current state from the API if the event arrives out of order.
+- Keep user-facing state clear: pending, settled, claimable, paid, or failed.

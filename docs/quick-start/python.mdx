@@ -1,0 +1,33 @@
+---
+title: "Python"
+description: "Integrate 4Mica with a Python application."
+---
+
+# Python
+
+Use Python when you want a direct path into 4Mica without reading the full protocol first. Start by registering collateral, then wire either the buyer client or seller middleware depending on your role.
+
+## Install
+
+```bash
+pip install "4mica-x402[requests]" sdk-4mica
+```
+
+## Basic Setup
+
+```python
+from x402 import x402ClientSync
+from x402.http.clients import x402_requests
+from fourmica_x402.client_scheme import FourMicaEvmScheme
+
+client = x402ClientSync()
+client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+session = x402_requests(client)
+```
+
+## What To Build Next
+
+- If you are a buyer, wrap your HTTP client so 402 responses become automatic paid retries.
+- If you are a seller, protect one route first and choose a small test price.
+- Use Base Sepolia until tab creation, verification, and settlement are working end to end.
+- Move shared values like network, private key, payTo address, and tab endpoint into environment variables before production.

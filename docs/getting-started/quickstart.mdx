@@ -1,0 +1,48 @@
+---
+title: "Quickstart"
+description: "Make your first 4Mica-powered x402 request."
+---
+
+# Quickstart
+
+This page gets you from zero to a credit-based paid request. You need a wallet, collateral on a supported network, and either a buyer client that can pay or a seller route that can return HTTP 402 payment requirements.
+
+## Prerequisites
+
+- A wallet private key or supported signer for your agent or service.
+- Testnet ETH for gas if you are using Base Sepolia or Ethereum Sepolia.
+- Collateral in ETH, USDC, or USDT depending on the network and route.
+- NodeJS or Python if you want the shortest integration path today.
+
+## Buyer Path
+
+1. Deposit collateral into 4Mica. This is the registration step.
+2. Wrap your HTTP client with the 4Mica x402 scheme.
+3. Call a protected route normally.
+4. Let the wrapper open a tab, sign the guarantee, retry, and return the paid response.
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("https://api.example.com/data");
+```
+
+## Seller Path
+
+1. Install the 4Mica x402 server package.
+2. Protect a route with scheme 4mica-credit, price, network, and payTo address.
+3. Advertise a tab endpoint hosted by your server.
+4. Let the middleware handle 402 responses, tab creation, verification, and settlement.
+
+## Success Criteria
+
+A working quickstart ends with the buyer receiving a successful HTTP response and the seller receiving a settled guarantee. The on-chain tab can be paid later by the buyer, or claimed by the seller if the buyer defaults during the claim window.

@@ -1,0 +1,23 @@
+---
+title: "Bilateral Netting Cycles"
+description: "How many small obligations collapse into fewer settlements."
+---
+
+# Bilateral Netting Cycles
+
+Netting turns many small obligations between two counterparties into a smaller number of settlements. This is essential when agents transact at machine speed.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Track obligations inside tabs.
+- Aggregate repeated requests during the credit window.
+- Settle the net exposure instead of every individual call.
+- Use claim windows to protect sellers if the payer does not pay.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

@@ -1,0 +1,38 @@
+---
+title: "Payment Middleware"
+description: "Protect API routes with 4Mica x402 payment middleware."
+---
+
+# Payment Middleware
+
+Payment middleware is the fastest way to turn an ordinary route into a 4Mica-protected resource.
+
+## Seller Responsibilities
+
+- Define protected routes and prices clearly.
+- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
+- Set scheme to 4mica-credit and choose supported networks.
+- Verify and settle every accepted payment before serving paid work.
+- Monitor unpaid tabs and claim windows for defaulted payers.
+
+## Express Sketch
+
+```ts
+app.use(paymentMiddlewareFromConfig({
+  "GET /premium-content": {
+    accepts: {
+      scheme: "4mica-credit",
+      price: "$0.10",
+      network: "eip155:84532",
+      payTo: "0xYourAddress",
+    },
+  },
+}, { advertisedEndpoint: "https://api.example.com/payment/tab" }));
+```
+
+## Production Checklist
+
+- Use HTTPS for protected routes and tab endpoints.
+- Log tab IDs, request IDs, payer addresses, and settle responses.
+- Keep prices and accepted assets explicit in route configuration.
+- Create alerts for repeated verification failures and missed claim windows.
