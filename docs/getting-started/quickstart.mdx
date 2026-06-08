@@ -16,15 +16,27 @@ You need:
 - A wallet private key or supported signer for your agent or service.
 - Testnet ETH for gas if you are using Base Sepolia or Ethereum Sepolia.
 - Collateral in ETH, USDC, or USDT, depending on the network and route.
-- Node.js if you want to follow the example below.
+- [Node.js](https://nodejs.org/) if you want to follow the example below.
 
 Use Base Sepolia (`eip155:84532`) for development. Move to Base (`eip155:8453`) when you are ready for production traffic.
+
+If you do not have these yet, start with a test wallet. Create a new wallet in [MetaMask](https://metamask.io/), [Coinbase Wallet](https://www.coinbase.com/wallet/downloads), [Rabby](https://rabby.io/), or another EVM wallet, then export the private key for that wallet only. Use this key for development and keep your main wallet separate.
+
+Add testnet gas from a [Base Sepolia faucet](https://docs.base.org/base-chain/network-information/network-faucets) or an [Ethereum Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia), then [deposit a small amount of supported collateral](/core-concepts/deposits-and-withdrawals) into 4Mica. For stablecoin testing, use the token and network supported by the route you plan to call.
+
+Keep private keys in environment variables instead of committing them to your code:
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+```
+
+For production, use a dedicated service wallet, hardware-backed signer, MPC wallet, or hosted key management system. Rotate keys regularly and limit how much collateral any one wallet can control.
 
 ## Register collateral
 
 Deposit collateral into 4Mica before your first paid request. This registers the wallet and gives 4Mica a balance to secure future payment guarantees.
 
-During registration, choose the same network you plan to use in your x402 client. Wait for the deposit to finalize before continuing.
+During registration, choose the same network you plan to use in your x402 client. Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals) for the collateral flow, then wait for the deposit to finalize before continuing.
 
 ## Install the packages
 
@@ -54,7 +66,7 @@ const response = await fetchWithPayment("https://api.example.com/data");
 const data = await response.json();
 ```
 
-If the request succeeds, your client received the protected response and the seller received a settled payment guarantee.
+If the request succeeds, your client received the protected response and the seller received a settled payment guarantee. For the full setup, see the [Buyer Quick Start](/buyer/quick-start).
 
 ## Protect a route
 
@@ -73,7 +85,7 @@ app.use(paymentMiddlewareFromConfig({
 }, { advertisedEndpoint: "https://api.example.com/payment/tab" }));
 ```
 
-The middleware returns HTTP 402 responses, advertises the tab endpoint, verifies payment payloads, settles guarantees, and serves the protected route after payment succeeds.
+The middleware returns HTTP 402 responses, advertises the tab endpoint, verifies payment payloads, settles guarantees, and serves the protected route after payment succeeds. For the full setup, see the [Seller Quick Start](/seller/quick-start).
 
 ## Confirm it worked
 
@@ -83,16 +95,15 @@ A successful first run should end with:
 - The seller receiving a settled guarantee for the request amount.
 - A tab that can be paid later by the buyer or claimed by the seller if the buyer defaults during the claim window.
 
-## Next steps
+## See it in action
 
-<Columns cols={3}>
-  <Card title="Node.js" icon="code" href="/quick-start/nodejs">
-    Build the full Node.js buyer or seller integration.
+Use a demo app or the REPL to see the full payment loop before wiring 4Mica into your own product. Start with testnet collateral, a small protected route, and a buyer client that can handle HTTP 402 retries.
+
+<Columns cols={2}>
+  <Card title="Demo apps" icon="play" href="/recipes/demo-apps">
+    Explore example product flows that show buyers, sellers, tabs, and settlement together.
   </Card>
-  <Card title="Buyer" icon="wallet" href="/buyer/quick-start">
-    Make paid requests automatically from an agent or app.
-  </Card>
-  <Card title="Seller" icon="server" href="/seller/quick-start">
-    Protect an API route and settle payments through 4Mica.
+  <Card title="REPL" icon="terminal" href="/recipes/repl">
+    Run the full 4Mica payment flow in an interactive environment.
   </Card>
 </Columns>
