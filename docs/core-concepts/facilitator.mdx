@@ -1,0 +1,23 @@
+---
+title: "Facilitator"
+description: "The service that connects x402 HTTP flows to 4Mica credit operations."
+---
+
+# Facilitator
+
+The facilitator translates between HTTP payment flows and 4Mica core credit operations. It is used by resource servers, not as a replacement for the seller API.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- GET /supported lists accepted scheme and network pairs.
+- POST /tabs opens or reuses a payment tab.
+- POST /verify validates payment payload structure.
+- POST /settle requests a BLS certificate and returns settlement result.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

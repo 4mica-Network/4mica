@@ -1,0 +1,23 @@
+---
+title: "No Custodial Risk"
+description: "Why 4Mica relies on collateral, signatures, and contracts instead of custodial balances."
+---
+
+# No Custodial Risk
+
+4Mica coordinates credit and settlement; it is not meant to custody user funds as a centralized balance provider.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Deposits go into protocol-controlled flows rather than a 4Mica operating wallet.
+- Sellers rely on enforceable guarantees and collateral claims.
+- Payers retain a clear withdrawal path after obligations clear.
+- The trust boundary is explicit: signatures, contracts, and validators enforce the important parts.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

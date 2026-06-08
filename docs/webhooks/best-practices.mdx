@@ -1,0 +1,25 @@
+---
+title: "Best Practices"
+description: "Apply webhook implementation best practices."
+---
+
+# Best Practices
+
+Treat webhook handlers as eventually consistent workers. They should be idempotent, observable, and safe to retry.
+
+## Relevant Events
+
+- collateral.deposited
+- tab.opened
+- guarantee.settled
+- tab.paid
+- tab.remunerated
+- withdrawal.requested
+- withdrawal.finalized
+
+## Handler Guidance
+
+- Verify the webhook signature before processing.
+- Store event IDs and ignore duplicates.
+- Fetch current state from the API if the event arrives out of order.
+- Keep user-facing state clear: pending, settled, claimable, paid, or failed.

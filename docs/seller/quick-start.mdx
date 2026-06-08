@@ -1,0 +1,31 @@
+---
+title: "Quick Start"
+description: "Help sellers start accepting paid requests with 4Mica."
+---
+
+# Quick Start
+
+Start here if you operate an API, model endpoint, dataset, tool, or content route that should be paid per request.
+
+## Seller Responsibilities
+
+- Define protected routes and prices clearly.
+- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
+- Set scheme to 4mica-credit and choose supported networks.
+- Verify and settle every accepted payment before serving paid work.
+- Monitor unpaid tabs and claim windows for defaulted payers.
+
+## Request Flow
+
+1. Return HTTP 402 when an unpaid client asks for protected content.
+2. Let the client open a tab through your advertised endpoint.
+3. Receive the retried request with a payment header.
+4. Verify and settle through the facilitator.
+5. Serve the protected response only after payment validation succeeds.
+
+## Production Checklist
+
+- Use HTTPS for protected routes and tab endpoints.
+- Log tab IDs, request IDs, payer addresses, and settle responses.
+- Keep prices and accepted assets explicit in route configuration.
+- Create alerts for repeated verification failures and missed claim windows.

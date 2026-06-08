@@ -1,0 +1,23 @@
+---
+title: "Agent Identity"
+description: "Wallets, signers, policy, and validation identity for agents."
+---
+
+# Agent Identity
+
+An agent identity starts with a wallet address that can sign guarantees and control collateral. Product teams may layer richer identity, permissions, and policy on top of that address.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Wallet address identifies the payer.
+- Signer controls guarantee authorization.
+- Policy defines what the agent may buy.
+- Validation metadata can bind work quality to payment in V2 flows.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

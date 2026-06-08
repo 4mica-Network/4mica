@@ -1,0 +1,25 @@
+---
+title: "Overview"
+description: "Understand 4Mica webhook capabilities."
+---
+
+# Overview
+
+Webhooks should notify your systems when payment and collateral state changes need product action. They are most useful for dashboards, entitlement updates, and settlement monitoring.
+
+## Relevant Events
+
+- collateral.deposited
+- tab.opened
+- guarantee.settled
+- tab.paid
+- tab.remunerated
+- withdrawal.requested
+- withdrawal.finalized
+
+## Handler Guidance
+
+- Verify the webhook signature before processing.
+- Store event IDs and ignore duplicates.
+- Fetch current state from the API if the event arrives out of order.
+- Keep user-facing state clear: pending, settled, claimable, paid, or failed.

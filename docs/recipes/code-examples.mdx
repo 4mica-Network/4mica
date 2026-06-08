@@ -1,0 +1,31 @@
+---
+title: "Code Examples"
+description: "Small copy-ready examples for common 4Mica integration tasks."
+---
+
+# Code Examples
+
+These examples show the smallest useful pieces of a 4Mica integration. Use them to assemble a buyer, seller, or collateral-management flow.
+
+## Buyer Fetch Wrapper
+
+```ts
+const response = await fetchWithPayment("https://api.example.com/data");
+const data = await response.json();
+```
+
+## Seller Route Shape
+
+```ts
+app.use(paymentMiddlewareFromConfig(routes, {
+  advertisedEndpoint: "https://api.example.com/payment/tab",
+}));
+```
+
+## What To Log
+
+- network and asset
+- payer and recipient address
+- tab ID and request ID
+- verify and settle result
+- response status served to the buyer

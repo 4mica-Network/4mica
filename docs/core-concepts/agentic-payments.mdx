@@ -1,0 +1,23 @@
+---
+title: "Agentic Payments"
+description: "How agents pay and get paid through collateral-backed guarantees."
+---
+
+# Agentic Payments
+
+Agentic payments are payments initiated by software agents as part of a task. In 4Mica, the agent signs a guarantee instead of sending an on-chain transaction for every request.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- A route advertises price through HTTP 402.
+- The payer opens or reuses a tab.
+- The payer signs a guarantee for the request amount.
+- The seller verifies, settles, and serves the response.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

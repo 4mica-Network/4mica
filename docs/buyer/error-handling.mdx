@@ -1,0 +1,27 @@
+---
+title: "Error Handling"
+description: "Handle buyer-side payment, collateral, and retry failures."
+---
+
+# Error Handling
+
+Buyer errors usually fall into four buckets: unsupported network, missing collateral, invalid signature, or seller-side verification failure.
+
+## Buyer Responsibilities
+
+- Maintain a funded collateral position on the networks you want to use.
+- Register a 4Mica client scheme for every network your target sellers accept.
+- Sign only payment requirements that match your agent policy.
+- Track open tabs and settlement obligations before withdrawing collateral.
+
+## Recommended Flow
+
+1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
+2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
+3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
+4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
+5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+
+## Operational Notes
+
+Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.

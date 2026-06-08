@@ -1,0 +1,23 @@
+---
+title: "How x402 Works"
+description: "How x402 turns an HTTP request into a machine-readable payment flow."
+---
+
+# How x402 Works
+
+x402 uses HTTP 402 Payment Required as a machine-readable payment negotiation. 4Mica keeps that developer experience and changes the payment mechanism underneath to credit-backed guarantees.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Server returns payment requirements.
+- Client chooses a supported scheme and network.
+- Client submits a payment payload in the retry request.
+- Server verifies the payload before serving protected content.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

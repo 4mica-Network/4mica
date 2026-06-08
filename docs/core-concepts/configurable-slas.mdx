@@ -1,0 +1,23 @@
+---
+title: "Configurable SLAs"
+description: "Payment guarantees that can depend on validation and quality policy."
+---
+
+# Configurable SLAs
+
+SLAs let a payment guarantee represent not just amount and recipient, but the quality or validation threshold required before a claim should succeed.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Bind validation policy to V2 guarantees.
+- Specify validator, agent, score threshold, and job hash.
+- Let validation determine whether remuneration should proceed.
+- Use SLAs for tasks where quality matters as much as delivery.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

@@ -1,0 +1,23 @@
+---
+title: "Wallet"
+description: "Wallet requirements for collateral, signing, settlement, and withdrawal."
+---
+
+# Wallet
+
+A wallet is the economic identity for a 4Mica payer. It signs guarantees, owns collateral, and eventually pays or withdraws.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Use a private key, managed signer, or MPC wallet supported by your SDK.
+- Deposit collateral before paying.
+- Sign only payment requirements your policy allows.
+- Monitor open tabs before withdrawal.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

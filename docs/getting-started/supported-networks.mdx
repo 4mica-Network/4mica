@@ -1,0 +1,26 @@
+---
+title: "Supported Networks"
+description: "List the networks and identifiers supported by 4Mica."
+---
+
+# Supported Networks
+
+4Mica identifies networks with CAIP-2 IDs so x402 clients, resource servers, and facilitator calls agree on the same chain context.
+
+## Networks
+
+- Base (eip155:8453)
+- Base Sepolia (eip155:84532)
+- Ethereum Sepolia (eip155:11155111)
+
+## Assets
+
+ETH is supported as a native asset. USDC and USDT are the default stablecoin targets where configured by the active deployment. Additional ERC-20 assets can be enabled by the operator for a network.
+
+## Choosing A Network
+
+Use Base Sepolia for development, examples, and integration testing. Use Base when you are ready for production traffic. Ethereum Sepolia is useful when you want Ethereum testnet compatibility or are validating cross-network flows.
+
+## Where The Network Appears
+
+The network ID appears in payment requirements, client scheme registration, facilitator supported-kind responses, and SDK configuration. A buyer can only pay if its client has a registered 4Mica scheme for a network the seller accepts.
