@@ -3,24 +3,31 @@ title: "Supported Networks"
 description: "List the networks and identifiers supported by 4Mica."
 ---
 
-# Supported Networks
+4Mica uses CAIP-2 network IDs so buyers, sellers, SDKs, and facilitator calls all refer to the same chain.
 
-4Mica identifies networks with CAIP-2 IDs so x402 clients, resource servers, and facilitator calls agree on the same chain context.
+Use the network ID in payment requirements, SDK configuration, and scheme registration. Use the API URL when your server talks to the 4Mica facilitator for that network.
 
-## Networks
+## Values
 
-- Base (eip155:8453)
-- Base Sepolia (eip155:84532)
-- Ethereum Sepolia (eip155:11155111)
+```txt
+Base
+Network ID: eip155:8453
+API URL: https://base.api.4mica.xyz/
+Use for: Production
 
-## Assets
+Base Sepolia
+Network ID: eip155:84532
+API URL: https://base.sepolia.api.4mica.xyz/
+Use for: Development, examples, demos, and integration testing
 
-ETH is supported as a native asset. USDC and USDT are the default stablecoin targets where configured by the active deployment. Additional ERC-20 assets can be enabled by the operator for a network.
+Ethereum Sepolia
+Network ID: eip155:11155111
+API URL: https://ethereum.sepolia.api.4mica.xyz/
+Use for: Ethereum testnet compatibility and cross-network testing
+```
 
-## Choosing A Network
+## Choosing a network
 
-Use Base Sepolia for development, examples, and integration testing. Use Base when you are ready for production traffic. Ethereum Sepolia is useful when you want Ethereum testnet compatibility or are validating cross-network flows.
-
-## Where The Network Appears
-
-The network ID appears in payment requirements, client scheme registration, facilitator supported-kind responses, and SDK configuration. A buyer can only pay if its client has a registered 4Mica scheme for a network the seller accepts.
+- Start with **Base Sepolia** for most development work.
+- Use **Ethereum Sepolia** only when your test flow needs Ethereum Sepolia.
+- Use **Base** when you are ready for production traffic.
