@@ -1,24 +1,79 @@
 ---
 title: "Use Cases"
-description: "Explore practical ways to use 4Mica."
+description: "Explore where 4Mica fits for high-volume agent payments."
 ---
 
-# Use Cases
+Use 4Mica when payments are too small, too frequent, or too automated for checkout, invoices, subscriptions, or per-request chain transactions.
 
-4Mica is designed for moments where payments are too frequent, too small, or too automated for traditional checkout flows. The common pattern is simple: protect the resource, let the agent pay on credit, and settle later.
+## When 4Mica fits
 
-## AI Agents Paying APIs
+4Mica works best when you need one or more of these:
 
-An agent may call data feeds, model endpoints, vector search, storage, and execution services during one task. 4Mica lets it pay each service through x402 while drawing from one collateral-backed credit position.
+- **Micropayments:** Agents pay cents or fractions of a cent per request.
+- **High volume:** A workflow may create thousands or millions of payment events.
+- **Agent collaboration:** Multiple agents contribute to one result and need to get paid.
+- **Fee splitting:** A product needs to pay the referrer, planner, tool, data source, validator, or executor behind one user-facing action.
+- **No account setup:** Buyers should not open a separate account with every provider.
+- **Clear settlement:** Sellers need a claim path if the buyer does not settle.
 
-## API Monetization
+### Agents buying APIs and data
 
-API providers can charge per request with middleware instead of issuing API keys, subscriptions, or prepaid credits. Any compatible x402 client can discover the price, open a tab, sign, and retry automatically.
+Use 4Mica when an agent needs paid resources during a task.
 
-## Agent-To-Agent Commerce
+- **AI agents paying APIs:** An agent calls data feeds, model endpoints, vector search, storage, and execution services from one collateral-backed position.
+- **Data and research agents:** Research agents buy small pieces of market data, web data, embeddings, reports, or search results as they work.
+- **Model and inference routing:** A routing agent tests many model providers, pays only for the calls it uses, and settles later.
 
-When agents trade results, data, tasks, or compute at high frequency, bilateral netting collapses many small obligations into fewer settlements. This keeps the user experience instant without making the chain process every interaction.
+### APIs, tools, compute, and storage
 
-## Financial Infrastructure
+Use 4Mica when providers want to charge per unit of usage.
 
-Protocols can use 4Mica as a clearing primitive: collateral, guarantees, settlement windows, and claim paths are separated from application logic so product teams can build on top of a predictable payment layer.
+- **Pay-per-request APIs:** API providers charge per request without accounts, subscriptions, invoices, or prepaid balances.
+- **Tool marketplaces:** Developers expose tools that agents call on demand, with a price and guarantee per call.
+- **Compute and storage:** Agents rent small units of compute, memory, storage, or bandwidth without making every usage event an on-chain transaction.
+
+### Agent collaboration and fee splits
+
+Use 4Mica when one result depends on several contributors.
+
+- **Agent-to-agent collaboration:** Planner, researcher, coder, reviewer, and validator agents each receive payment for their part of a workflow.
+- **Agent recommendations:** A recommendation agent earns a small fee when it sends another agent to the right API, tool, dataset, or model.
+- **Revenue and fee splits:** A product splits one paid workflow across referrers, tools, data sources, validators, and executors.
+
+### Verified and conditional work
+
+Use 4Mica when payment should depend on a clear result.
+
+- **Validation-gated work:** A seller attaches payment to a score, completion check, job hash, or validation result.
+- **Dispute-aware workflows:** Sellers keep a claim path if the payer does not settle.
+- **Buyer limits:** Buyers cap exposure with collateral, tabs, and settlement windows.
+
+### Autonomous marketplaces
+
+Use 4Mica when a marketplace needs both buyer and seller flows.
+
+- Agents buy upstream services while the application charges downstream users or other agents.
+- Sellers publish paid routes that compatible x402 clients can discover and pay.
+- The marketplace tracks many obligations and settles them later.
+
+### Protocol infrastructure
+
+Use 4Mica as a payment primitive for machine-speed commerce.
+
+- Use collateral to back agent spending.
+- Use guarantees to authorize paid work before settlement.
+- Use tabs, settlement windows, and claim windows to keep high-volume flows manageable.
+
+## Fee splits in practice
+
+Agent workflows often produce value through several contributors, not one seller.
+
+For example, a travel agent might pay:
+
+- A recommendation agent for finding the right flight API.
+- A data provider for live availability.
+- A pricing model for ranking options.
+- A booking tool for the final action.
+- A validator for checking that the result matches the user request.
+
+4Mica lets each participant receive a payment guarantee for its part of the workflow. The system can track many small obligations and settle net exposure later.
