@@ -1,23 +1,55 @@
 ---
-title: "Agentic Economy"
-description: "Understand the market 4Mica is built for."
+title: "Agentic economy"
+description: "Why autonomous agents need open payment, identity, trust, and settlement rails."
 ---
 
-# Agentic Economy
+The agentic economy is a market where autonomous software actors discover services, make decisions, and pay for work without a human clicking checkout every time. Agents call APIs, buy inference, fetch data, rent compute, place orders, and coordinate with other agents as part of a larger task.
 
-The agentic economy is a network of autonomous software actors that discover services, negotiate work, and pay each other without a human clicking checkout every time.
+This changes the shape of commerce. The buyer is no longer always a person in a browser session, and the seller is no longer always a merchant with a storefront. Many transactions become API-native, high-frequency, small-value, and machine-initiated. Work also starts to look less like software usage and more like service execution. A human or organization states an outcome. Agents assemble the steps, tools, and counterparties needed to complete it.
 
-## Why It Matters
+## Why it matters
 
-4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+Most payment systems were built around people, accounts, cards, invoices, fraud teams, and manual reconciliation. Agents need different rails:
 
-## How It Works
+- **Portable identity:** a service needs to know which agent is acting, who controls it, and what permissions it has.
+- **Programmable payment:** an agent must be able to pay inside the workflow, not after a human opens an account or approves an invoice.
+- **Trust before work:** sellers need confidence before serving paid work, especially when requests are small and frequent.
+- **Efficient settlement:** the system cannot afford an on-chain transaction, card authorization, or manual invoice cycle for every API call.
+- **Open access:** new services should be reachable by protocol, not only through closed platform integrations.
 
-- Agents need instant access to services.
-- Services need payment guarantees before doing work.
-- The system must support tiny, frequent obligations.
-- Settlement must be batched, netted, and enforceable.
+Agents are being deployed as economic participants before the surrounding payment, identity, and settlement systems are ready for them. Stablecoins and open protocols make money programmable. They don't yet give agents a way to turn many small machine requests into enforceable obligations that can settle later.
 
-## Builder Guidance
+## What agents buy and sell
 
-Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.
+The agentic economy is not just agents buying finished products. It includes the full lifecycle of agent capabilities:
+
+- **Production:** developers, companies, and teams create specialized agents, tools, datasets, and services.
+- **Distribution:** agents and services become available through marketplaces, APIs, app stores, registries, and direct integrations.
+- **Consumption:** people, businesses, and other agents invoke those capabilities to complete work.
+
+That shift changes how software is valued. In a traditional SaaS model, the buyer pays to use a tool and a human operates it. In an agentic model, the buyer increasingly pays for completed work, delegated execution, or measurable outcomes. The economic unit moves from the seat, dashboard, or subscription toward the task, workflow, request, or result.
+
+## How agents become economic actors
+
+The change is easier to see in three stages:
+
+1. **Tools:** software helps a person do work, but the person drives the workflow.
+2. **Assistants:** AI drafts, summarizes, searches, or recommends, but still waits for repeated human prompts.
+3. **Agents:** software receives a goal, plans the steps, calls other systems, spends within policy, and reports back when the work is done.
+
+The third stage turns agents into economic actors. They need credentials, budgets, limits, audit trails, and payment methods because they are no longer just producing text inside a chat window. They are initiating actions in the world.
+
+## How agentic commerce changes each role
+
+For sellers, agentic commerce makes APIs monetizable as first-class products. A seller can expose a paid endpoint and serve machine customers without forcing every buyer through a human-oriented signup, dashboard, subscription, or sales process.
+
+For buyers, the payment relationship becomes more portable. An agent should move across services using consistent identity, spending policies, and payment credentials. It shouldn't need a separate account and prepaid balance on every service.
+
+For the market, open payment rails reduce the advantage of closed distribution. If agents can discover and pay for services directly, the best endpoint can win through price, reliability, latency, data quality, and policy compatibility.
+
+For operators, trust and governance become product requirements. Agents need scoped authority, observability, revocation, and clear liability boundaries. A system that can act quickly also needs a way to prove what it did, why it did it, and who authorized it.
+
+## Next steps
+
+- [Agentic payments](./agentic-payments) — how agents pay and get paid through collateral-backed guarantees.
+- [Agent identity](./agent-identity) — wallets, signers, policy, and validation identity for agents.
