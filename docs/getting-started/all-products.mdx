@@ -3,24 +3,106 @@ title: "All Products"
 description: "Understand the product surface across protocol, facilitator, SDKs, and app."
 ---
 
-# All Products
+4Mica is more than a protocol. It gives you the tools to add x402 microtransactions across apps, agents, APIs, and services.
 
-4Mica is not a single checkout widget. It is a stack for credit-based machine payments: protocol contracts, a facilitator, SDKs, middleware, and hosted tools that make the flow usable for builders.
+Use this page as a map to the protocol, facilitator, SDKs, middleware, and hosted tools that make up 4Mica.
 
-## Protocol Layer
+### Protocol
 
-The Core4Mica contracts hold collateral, enforce settlement rules, and allow recipients to claim from collateral when guarantees mature and remain unpaid. Deposits are non-custodial by design; 4Mica coordinates state and guarantees but does not hold user funds directly.
+The foundation for collateral, credit, and settlement.
 
-## Facilitator
+<Columns cols={2}>
+  <Card
+    title="Core4Mica contracts"
+    icon="landmark"
+    href="/core-concepts/deposits-and-withdrawals"
+    arrow="true"
+    cta="View deposits"
+  >
+    Learn how collateral is deposited, withdrawn, and used to secure future payment guarantees.
+  </Card>
+  <Card
+    title="Settlement"
+    icon="receipt"
+    href="/core-concepts/settlements"
+    arrow="true"
+    cta="View settlements"
+  >
+    Understand how tabs are settled, when claims can happen, and how 4Mica reduces on-chain transactions.
+  </Card>
+</Columns>
 
-The facilitator is the bridge between x402 HTTP flows and 4Mica credit. Resource servers use it to open tabs, verify payment payloads, and settle guarantees. Buyers usually interact with it indirectly through the seller tab endpoint and x402 client wrapper.
+### Payments
 
-## SDKs And Middleware
+The services that make 4Mica usable inside x402 payment flows.
 
-- TypeScript: Express middleware, x402 client schemes, and wallet operations.
-- Python: FastAPI and Flask middleware plus requests and httpx client wrappers.
-- Rust: collateral management and direct wallet operations, with HTTP middleware planned.
+<Columns cols={2}>
+  <Card
+    title="Facilitator"
+    icon="route"
+    href="/core-concepts/facilitator"
+    arrow="true"
+    cta="View concept"
+  >
+    See the role the facilitator plays between buyer clients, seller routes, and protocol settlement.
+  </Card>
+  <Card
+    title="Payment flow"
+    icon="diagram-project"
+    href="/api-reference/payment-flow"
+    arrow="true"
+    cta="View flow"
+  >
+    Follow the request lifecycle from HTTP 402 response to signed guarantee and protected content.
+  </Card>
+</Columns>
 
-## Hosted App
+### SDKs and middleware
 
-The hosted app gives teams a guided path for registering agents, connecting wallets, choosing networks, and depositing collateral before moving into code. Use it when you want a visual flow before automating the same actions in an SDK.
+Developer tools for adding 4Mica to your own app, API, agent, or backend service.
+
+<Columns cols={3}>
+  <Tile
+    href="/quick-start/nodejs"
+    title="NodeJS"
+  >
+    <Icon icon="node-js" iconType="brands" size={40} />
+  </Tile>
+  <Tile
+    href="/quick-start/python"
+    title="Python"
+  >
+    <Icon icon="python" iconType="brands" size={40} />
+  </Tile>
+  <Tile
+    href="/quick-start/rust"
+    title="Rust"
+  >
+    <Icon icon="rust" iconType="brands" size={40} />
+  </Tile>
+</Columns>
+
+### Hosted tools
+
+Hosted tools for getting configured, testing flows, and moving toward production.
+
+<Columns cols={2}>
+  <Card
+    title="4Mica app"
+    icon="window-maximize"
+    href="https://app.4mica.io"
+    arrow="true"
+    cta="Launch app"
+  >
+    Set up a wallet and collateral visually before moving the flow into an SDK.
+  </Card>
+  <Card
+    title="Supported networks"
+    icon="globe"
+    href="/getting-started/supported-networks"
+    arrow="true"
+    cta="View networks"
+  >
+    Choose the right testnet or production network for your buyer, seller, or route.
+  </Card>
+</Columns>
