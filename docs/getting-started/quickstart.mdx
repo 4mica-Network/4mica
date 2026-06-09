@@ -3,15 +3,11 @@ title: "Quickstart"
 description: "Make your first 4Mica-powered x402 request in minutes."
 ---
 
-Get started with 4Mica by registering collateral, wiring a buyer client, and making your first credit-backed x402 request.
-
 After you complete this guide, you will have a wallet ready to pay with 4Mica credit and a client that can handle HTTP 402 responses automatically.
 
 ## Before you begin
 
-4Mica adds a credit layer to x402. Instead of sending an on-chain transaction for every paid request, a payer deposits collateral once, signs payment guarantees as requests happen, and settles the tab later.
-
-You need:
+4Mica's approach is to deposit collateral once, sign payment guarantees as requests happen, and settle the tab later instead of sending an on-chain transaction for every paid request. To start, you need:
 
 - A wallet private key or supported signer for your agent or service.
 - Testnet ETH for gas if you are using Base Sepolia or Ethereum Sepolia.
@@ -24,13 +20,14 @@ If you do not have these yet, start with a test wallet. Create a new wallet in [
 
 Add testnet gas from a [Base Sepolia faucet](https://docs.base.org/base-chain/network-information/network-faucets) or an [Ethereum Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia), then [deposit a small amount of supported collateral](/core-concepts/deposits-and-withdrawals) into 4Mica. For stablecoin testing, use the token and network supported by the route you plan to call.
 
-Keep private keys in environment variables instead of committing them to your code:
 
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 ```
 
-For production, use a dedicated service wallet, hardware-backed signer, MPC wallet, or hosted key management system. Rotate keys regularly and limit how much collateral any one wallet can control.
+<Warning>Keep private keys in environment variables instead of committing them to your code.</Warning>
+
+<Tip>For production, use a dedicated service wallet, hardware-backed signer, MPC wallet, or hosted key management system. Rotate keys regularly and limit how much collateral any one wallet can control.</Tip>
 
 ## Register collateral
 
