@@ -48,6 +48,8 @@ Use the buyer private key only in trusted server-side code.
 
 Deposit collateral for the buyer wallet before it calls your Hono service. Use the same network in the buyer scheme and route payment requirements.
 
+Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+
 ## Protect A Route
 
 Run your paid API route through the 4Mica middleware and keep the rest of your service in Hono.
