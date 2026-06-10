@@ -5,18 +5,16 @@ description: "Start here to understand what 4Mica does and how to begin building
 ---
 
 <Frame>
-<img 
-  src="/assets/img/logo.png" 
-  alt="Workspace"
-  class="inline-block rounded-lg"
-/>
+  <img
+    src="/assets/img/logo.png"
+    alt="Workspace"
+    class="inline-block rounded-lg"
+  />
 </Frame>
 
 [4Mica](https://4mica.io) is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
 
 Instead of forcing every request to become an on-chain transaction, 4Mica lets a payer deposit collateral once, sign off-chain payment guarantees per request, and settle later. Resource servers keep the familiar HTTP 402 flow while gaining programmable credit, non-custodial enforcement, and batched settlement.
-
-
 
 ## Who 4Mica Is For
 
@@ -25,26 +23,29 @@ Instead of forcing every request to become an on-chain transaction, 4Mica lets a
 - **Applications** that want x402-compatible payments with credit, collateral, and net settlement.
 - **Protocol teams** building financial infrastructure for high-frequency agent-to-agent commerce.
 
-## The Basic Story
+## The basic story
 
 <Steps>
   <Step title="Deposit Collateral">
     A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
   </Step>
   <Step title="Protect a Route">
-    A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
+    A seller protects an HTTP route with x402 payment requirements and
+    advertises a tab endpoint.
   </Step>
   <Step title="Sign a Guarantee">
-    The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
+    The buyer receives HTTP 402, opens or reuses a payment tab, signs a
+    guarantee, and retries the request.
   </Step>
   <Step title="Settle the Payment">
-    The seller verifies and settles the payment through the facilitator, then serves the protected response.
+    The seller verifies and settles the payment through the facilitator, then
+    serves the protected response.
   </Step>
   <Step title="Close the Tab">
-    The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+    The payer settles the tab after the credit window, or the seller claims from
+    collateral during the on-chain claim window if the payer defaults.
   </Step>
 </Steps>
-
 
 ## Related Topics
 
