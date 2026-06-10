@@ -1,34 +1,17 @@
 ---
 title: "Rust"
-description: "Integrate 4Mica wallet operations with Rust."
+description: "Rust support for 4Mica is in progress."
 ---
 
 # Rust
 
-Use Rust when you want a direct path into 4Mica without reading the full protocol first. Start by registering collateral, then wire either the buyer client or seller middleware depending on your role.
+We are building Rust support for 4Mica based on the client integration roadmap shared here.
 
-## Install
+HTTP client wrappers for Rust are coming soon. A `reqwest`-based wrapper with automatic 402 handling is on the roadmap. In the meantime, you can call the facilitator API directly or use the Rust SDK for collateral and wallet operations.
 
-```bash
-cargo add sdk-4mica alloy
-cargo add tokio --features macros,rt-multi-thread
-```
+## What Is Planned
 
-## Basic Setup
-
-```rust
-use sdk_4mica::{Client, ConfigBuilder};
-
-let cfg = ConfigBuilder::new()
-    .network("base-sepolia")
-    .wallet_private_key("0xYourPrivateKey")
-    .build()?;
-let client = Client::new(cfg).await?;
-```
-
-## What To Build Next
-
-- If you are a buyer, wrap your HTTP client so 402 responses become automatic paid retries.
-- If you are a seller, protect one route first and choose a small test price.
-- Use Base Sepolia until tab creation, verification, and settlement are working end to end.
-- Rust currently focuses on wallet and collateral operations; use TypeScript or Python for HTTP middleware today.
+- `reqwest` middleware layer with automatic 402 retry.
+- `FourMicaEvmScheme` Rust implementation for EIP-712 guarantee signing.
+- Tab opening and `X-PAYMENT` / `PAYMENT-SIGNATURE` header construction.
+- Multi-network client registry.

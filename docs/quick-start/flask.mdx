@@ -1,0 +1,97 @@
+---
+title: "Flask"
+description: "Protect Flask routes with 4Mica x402 payment middleware."
+---
+
+# Flask
+
+Use Flask when you want synchronous Python route handlers with 4Mica payment protection. The `4mica-x402` Flask middleware handles HTTP 402 responses, tab creation, verification, and settlement for protected routes.
+
+## Prerequisites
+
+- Python 3.10 or later.
+- A Flask app.
+- A seller wallet address for `payTo`.
+- A buyer wallet with deposited 4Mica collateral for paid requests.
+- A server-hosted tab endpoint URL.
+
+## Install
+
+```bash
+pip install "4mica-x402[flask]" "4mica-x402[requests]"
+```
+
+## Create Wallet
+
+Create a dedicated EVM wallet for the buyer client and use a seller address for `payTo`.
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:5000/tabs/open
+```
+
+## Deposit Collateral
+
+Deposit collateral for the buyer wallet before it calls the protected route. Use the same network in the buyer scheme and route configuration.
+
+## Protect A Route
+
+```python
+from flask import Flask, jsonify
+from fourmica_x402.http import flask_payment_middleware_from_config
+
+app = Flask(__name__)
+
+routes = {
+    "GET /premium-content": {
+        "accepts": {
+            "scheme": "4mica-credit",
+            "price": "$0.10",
+            "network": "eip155:11155111",
+            "payTo": "0xYourAddress",
+        },
+        "description": "Access to premium Flask content",
+    },
+}
+
+flask_payment_middleware_from_config(
+    app,
+    routes,
+    tab_endpoint="http://localhost:5000/tabs/open",
+    ttl_seconds=3600,
+)
+
+@app.route("/premium-content")
+def premium_content():
+    return jsonify({"message": "This is premium content behind a paywall"})
+
+if __name__ == "__main__":
+    app.run(port=5000)
+```
+
+In production, set `tab_endpoint` to your API URL, not the facilitator URL. The client posts to that route, the middleware opens the tab with 4Mica, and the client uses the returned tab data to sign the payment retry.
+
+## Support Payment
+
+Use the synchronous `requests` wrapper in Flask clients, scripts, workers, or any blocking Python code.
+
+```python
+from x402 import x402ClientSync
+from x402.http.clients import x402_requests
+from fourmica_x402.client_scheme import FourMicaEvmScheme
+
+client = x402ClientSync()
+client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+
+session = x402_requests(client)
+response = session.get("http://localhost:5000/premium-content")
+print(response.status_code, response.json())
+```
+
+## What Happens
+
+1. The buyer requests `/premium-content` without payment.
+2. Flask returns HTTP 402 with payment requirements and `extra.tabEndpoint`.
+3. The `requests` wrapper opens a tab, signs a guarantee, and retries with a payment header.
+4. The middleware verifies and settles the payment before your handler serves the response.

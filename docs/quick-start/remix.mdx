@@ -1,0 +1,105 @@
+---
+title: "Remix"
+description: "Use 4Mica with a Remix Express server."
+---
+
+Use Remix with 4Mica by mounting the payment middleware in your Express server before the Remix request handler. This gives paid routes the full 4Mica server flow while Remix handles the rest of your app.
+
+## Prerequisites
+
+- Remix running on an Express server.
+- A seller wallet address for `payTo`.
+- A buyer wallet with deposited collateral.
+- A server-hosted tab endpoint.
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install @remix-run/express express @4mica/x402 @x402/fetch viem
+```
+
+```bash pnpm
+pnpm install @remix-run/express express @4mica/x402 @x402/fetch viem
+```
+
+```bash yarn
+yarn add @remix-run/express express @4mica/x402 @x402/fetch viem
+```
+
+```bash bun
+bun add @remix-run/express express @4mica/x402 @x402/fetch viem
+```
+
+</CodeGroup>
+
+## Create Wallet
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:3000/payment/tab
+```
+
+## Deposit Collateral
+
+Deposit collateral for the buyer wallet before it calls protected Remix-backed APIs. Use Base Sepolia until the flow works end to end.
+
+## Protect A Route
+
+```ts
+import express from "express";
+import { createRequestHandler } from "@remix-run/express";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+import * as build from "./build/server/index.js";
+
+const server = express();
+server.use(express.json());
+
+server.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /api/premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:84532",
+          payTo: process.env.PAY_TO ?? "0xYourAddress",
+        },
+        description: "Access to premium Remix content",
+      },
+    },
+    {
+      advertisedEndpoint:
+        process.env.TAB_ENDPOINT ?? "http://localhost:3000/payment/tab",
+    },
+  ),
+);
+
+server.get("/api/premium-content", (req, res) => {
+  res.json({ message: "Paid content from Remix" });
+});
+
+server.all("*", createRequestHandler({ build }));
+
+server.listen(3000);
+```
+
+## Support Payment
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("http://localhost:3000/api/premium-content");
+const data = await response.json();
+```
