@@ -36,6 +36,8 @@ bun add nuxt express @4mica/x402 @x402/fetch viem
 
 ## Create Wallet
 
+For wallet setup, see [Wallet](/core-concepts/wallet).
+
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
@@ -46,7 +48,7 @@ TAB_ENDPOINT=http://localhost:3030/payment/tab
 
 Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
 
-Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect A Route
 

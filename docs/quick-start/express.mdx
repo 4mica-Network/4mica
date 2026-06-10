@@ -37,7 +37,9 @@ bun add express @4mica/x402 @x402/fetch viem
 
 ## Create Wallet
 
-Create one wallet for the buyer client and one seller address for `payTo`. Keep the buyer private key in an environment variable:
+Create one wallet for the buyer client and one seller address for `payTo`. For wallet setup, see [Wallet](/core-concepts/wallet).
+
+Keep the buyer private key in an environment variable:
 
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
@@ -48,7 +50,7 @@ PAY_TO=0xYourSellerAddress
 
 Deposit collateral for the buyer wallet before it calls the protected route. Use Base Sepolia (`eip155:84532`) while you test, then wait for the deposit to finalize.
 
-Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect A Route
 
