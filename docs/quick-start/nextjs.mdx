@@ -34,7 +34,7 @@ bun add next react react-dom express @4mica/x402 @x402/fetch viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -46,13 +46,13 @@ TAB_ENDPOINT=http://localhost:3000/payment/tab
 
 Use the private key only for buyer-side signing. Use `PAY_TO` as the seller address advertised by protected routes.
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet on the same network your NextJS server advertises. Start with Base Sepolia (`eip155:84532`) and a small test price.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 Create a Node server entry and mount the payment middleware before `nextRequestHandler`.
 
@@ -101,7 +101,7 @@ server.listen(3000, () => {
 });
 ```
 
-## Support Payment
+## Support payment
 
 Use the wrapped client anywhere you run trusted server-side code, such as a route handler, server action, or background job.
 

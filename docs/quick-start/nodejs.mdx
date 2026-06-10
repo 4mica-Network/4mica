@@ -50,7 +50,7 @@ bun add @4mica/x402 @x402/fetch @x402/axios viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 Create a dedicated EVM wallet for the buyer, seller, or agent. For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -64,13 +64,13 @@ const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 
 Use a separate service wallet in production. Keep your main wallet away from automated signing flows.
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral before the buyer signs 4Mica payment guarantees. Collateral secures the tab, lets the seller settle quickly, and gives the seller a claim path if the buyer defaults later.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 For server-side protection, use `paymentMiddlewareFromConfig` from `@4mica/x402/server/express`. The middleware returns HTTP 402 responses, advertises your tab endpoint in `paymentRequirements.extra.tabEndpoint`, verifies retried payment headers, settles the guarantee, and serves the protected route after payment succeeds.
 
@@ -111,7 +111,7 @@ app.listen(3030, () => {
 });
 ```
 
-## Support Payment
+## Support payment
 
 Use `@x402/fetch` or `@x402/axios` to wrap your HTTP client with automatic 402 handling. The wrappers open tabs, sign payment guarantees using `FourMicaEvmScheme`, and retry requests without any additional code.
 
@@ -175,7 +175,7 @@ const response = await api.get("http://localhost:3000/premium-content");
 console.log(response.data);
 ```
 
-### Multi-Network Setup
+### Multi-Network setup
 
 Register multiple networks to route payments to the right scheme based on what the server advertises in its 402 response.
 
@@ -199,7 +199,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 });
 ```
 
-### Builder Pattern
+### Builder pattern
 
 Build a reusable `x402Client` registry when you need to share the client across multiple wrappers or want explicit control over scheme registration.
 
@@ -215,14 +215,14 @@ const client = new x402Client().register("eip155:84532", scheme);
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 ```
 
-## Flow Summary
+## Flow summary
 
 1. Call the protected resource and receive HTTP 402 with payment requirements.
 2. The wrapper reads `paymentRequirements.extra.tabEndpoint` and opens a tab on the resource server.
 3. The wrapper signs a guarantee with your key and retries with a payment header.
 4. The server verifies and settles the payment, then returns the protected response.
 
-## Framework Guides
+## Framework guides
 
 <Columns cols={2}>
   <Card title="NextJS" icon="box" href="/quick-start/nextjs">

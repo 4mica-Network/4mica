@@ -34,7 +34,7 @@ bun add express @4mica/x402 @x402/fetch @x402/axios viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -44,13 +44,13 @@ PAY_TO=0xYourSellerAddress
 TAB_ENDPOINT=http://localhost:3030/payment/tab
 ```
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet before calling protected routes. Match the route network, such as `eip155:84532` for Base Sepolia.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 ```ts
 import express from "express";
@@ -94,7 +94,7 @@ Run it with Bun:
 bun run server.ts
 ```
 
-## Support Payment
+## Support payment
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
