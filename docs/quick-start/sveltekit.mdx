@@ -1,0 +1,110 @@
+---
+title: "SvelteKit"
+description: "Use 4Mica with SvelteKit on Node."
+---
+
+Use SvelteKit with 4Mica by running the Node adapter behind an Express server. Mount the 4Mica middleware before the SvelteKit handler for paid API routes.
+
+## Prerequisites
+
+- SvelteKit configured with `@sveltejs/adapter-node`.
+- A seller wallet address for `payTo`.
+- A buyer wallet with deposited 4Mica collateral.
+- A tab endpoint URL hosted by your API.
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install @sveltejs/adapter-node express @4mica/x402 @x402/fetch viem
+```
+
+```bash pnpm
+pnpm install @sveltejs/adapter-node express @4mica/x402 @x402/fetch viem
+```
+
+```bash yarn
+yarn add @sveltejs/adapter-node express @4mica/x402 @x402/fetch viem
+```
+
+```bash bun
+bun add @sveltejs/adapter-node express @4mica/x402 @x402/fetch viem
+```
+
+</CodeGroup>
+
+## Create Wallet
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:3000/payment/tab
+```
+
+## Deposit Collateral
+
+Deposit collateral for the buyer wallet before making paid requests. Match the network in the client scheme and the protected route.
+
+## Protect A Route
+
+After building SvelteKit with the Node adapter, create an Express server entry that mounts paid routes first and then passes everything else to SvelteKit.
+
+```ts
+import express from "express";
+import { handler } from "./build/handler.js";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+const server = express();
+server.use(express.json());
+
+server.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /api/premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:84532",
+          payTo: process.env.PAY_TO ?? "0xYourAddress",
+        },
+        description: "Access to premium SvelteKit content",
+      },
+    },
+    {
+      advertisedEndpoint:
+        process.env.TAB_ENDPOINT ?? "http://localhost:3000/payment/tab",
+    },
+  ),
+);
+
+server.get("/api/premium-content", (req, res) => {
+  res.json({ message: "Paid content from SvelteKit" });
+});
+
+server.use(handler);
+
+server.listen(3000);
+```
+
+## Support Payment
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+export const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+```
+
+Use it from server-only SvelteKit code:
+
+```ts
+const response = await fetchWithPayment("http://localhost:3000/api/premium-content");
+const data = await response.json();
+```

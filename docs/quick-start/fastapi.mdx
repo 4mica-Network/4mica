@@ -1,0 +1,100 @@
+---
+title: "FastAPI"
+description: "Protect FastAPI routes with 4Mica x402 payment middleware."
+---
+
+# FastAPI
+
+Use FastAPI when you want async Python route handlers with 4Mica payment protection. The `4mica-x402` FastAPI middleware returns HTTP 402 responses, advertises your tab endpoint, verifies retried payment headers, settles guarantees, and serves the protected response after payment succeeds.
+
+## Prerequisites
+
+- Python 3.10 or later.
+- A FastAPI app.
+- A seller wallet address for `payTo`.
+- A buyer wallet with deposited 4Mica collateral for paid requests.
+- A server-hosted tab endpoint URL.
+
+## Install
+
+```bash
+pip install "4mica-x402[fastapi]" "4mica-x402[httpx]"
+```
+
+## Create Wallet
+
+Create a dedicated EVM wallet for the buyer client and use a seller address for `payTo`.
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:8000/tabs/open
+```
+
+## Deposit Collateral
+
+Deposit collateral for the buyer wallet before it calls the protected route. Use the same network in the buyer scheme and route configuration.
+
+## Protect A Route
+
+```python
+from fastapi import FastAPI
+from fourmica_x402.http import fastapi_payment_middleware_from_config
+
+app = FastAPI()
+
+routes = {
+    "GET /premium-content": {
+        "accepts": {
+            "scheme": "4mica-credit",
+            "price": "$0.10",
+            "network": "eip155:11155111",
+            "payTo": "0xYourAddress",
+        },
+        "description": "Access to premium FastAPI content",
+    },
+}
+
+middleware = fastapi_payment_middleware_from_config(
+    routes,
+    tab_endpoint="http://localhost:8000/tabs/open",
+    ttl_seconds=3600,
+)
+
+@app.middleware("http")
+async def x402_middleware(request, call_next):
+    return await middleware(request, call_next)
+
+@app.get("/premium-content")
+async def premium_content():
+    return {"message": "This is premium content behind a paywall"}
+```
+
+In production, set `tab_endpoint` to your API URL, not the facilitator URL. The client posts to that route, the middleware opens the tab with 4Mica, and the client uses the returned tab data to sign the payment retry.
+
+## Support Payment
+
+Use the async `httpx` wrapper in FastAPI clients, background tasks, or other `asyncio` code.
+
+```python
+import httpx
+from x402 import x402Client
+from x402.http.clients import x402_httpx_transport
+from fourmica_x402.client_scheme import FourMicaEvmScheme
+
+client = x402Client()
+client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+
+async with httpx.AsyncClient(
+    transport=x402_httpx_transport(client)
+) as session:
+    response = await session.get("http://localhost:8000/premium-content")
+    print(response.status_code, response.json())
+```
+
+## What Happens
+
+1. The buyer requests `/premium-content` without payment.
+2. FastAPI returns HTTP 402 with payment requirements and `extra.tabEndpoint`.
+3. The `httpx` wrapper opens a tab, signs a guarantee, and retries with a payment header.
+4. The middleware verifies and settles the payment before your handler serves the response.
