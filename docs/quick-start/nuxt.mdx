@@ -46,6 +46,8 @@ TAB_ENDPOINT=http://localhost:3030/payment/tab
 
 Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
 
+Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+
 ## Protect A Route
 
 Create a small Node API service for the paid route. Nuxt can call this service from server routes, server plugins, or background jobs.
