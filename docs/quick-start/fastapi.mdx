@@ -21,7 +21,7 @@ Use FastAPI when you want async Python route handlers with 4Mica payment protect
 pip install "4mica-x402[fastapi]" "4mica-x402[httpx]"
 ```
 
-## Create Wallet
+## Create wallet
 
 Create a dedicated EVM wallet for the buyer client and use a seller address for `payTo`. For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -31,13 +31,13 @@ PAY_TO=0xYourSellerAddress
 TAB_ENDPOINT=http://localhost:8000/tabs/open
 ```
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet before it calls the protected route. Use the same network in the buyer scheme and route configuration.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 ```python
 from fastapi import FastAPI
@@ -74,7 +74,7 @@ async def premium_content():
 
 In production, set `tab_endpoint` to your API URL, not the facilitator URL. The client posts to that route, the middleware opens the tab with 4Mica, and the client uses the returned tab data to sign the payment retry.
 
-## Support Payment
+## Support payment
 
 Use the async `httpx` wrapper in FastAPI clients, background tasks, or other `asyncio` code.
 
@@ -94,7 +94,7 @@ async with httpx.AsyncClient(
     print(response.status_code, response.json())
 ```
 
-## What Happens
+## What happens
 
 1. The buyer requests `/premium-content` without payment.
 2. FastAPI returns HTTP 402 with payment requirements and `extra.tabEndpoint`.

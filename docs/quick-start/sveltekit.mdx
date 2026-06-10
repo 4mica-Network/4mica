@@ -34,7 +34,7 @@ bun add @sveltejs/adapter-node express @4mica/x402 @x402/fetch viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -44,13 +44,13 @@ PAY_TO=0xYourSellerAddress
 TAB_ENDPOINT=http://localhost:3000/payment/tab
 ```
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet before making paid requests. Match the network in the client scheme and the protected route.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 After building SvelteKit with the Node adapter, create an Express server entry that mounts paid routes first and then passes everything else to SvelteKit.
 
@@ -91,7 +91,7 @@ server.use(handler);
 server.listen(3000);
 ```
 
-## Support Payment
+## Support payment
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";

@@ -34,7 +34,7 @@ bun add hono @hono/node-server express @4mica/x402 @x402/fetch viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -46,13 +46,13 @@ TAB_ENDPOINT=http://localhost:3030/payment/tab
 
 Use the buyer private key only in trusted server-side code.
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet before it calls your Hono service. Use the same network in the buyer scheme and route payment requirements.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 Run your paid API route through the 4Mica middleware and keep the rest of your service in Hono.
 
@@ -97,7 +97,7 @@ app.get("/", (c) => c.text("Hono app"));
 serve({ fetch: app.fetch, port: 3000 });
 ```
 
-## Support Payment
+## Support payment
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";

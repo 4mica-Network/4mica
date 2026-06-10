@@ -34,7 +34,7 @@ bun add nuxt express @4mica/x402 @x402/fetch viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -44,13 +44,13 @@ PAY_TO=0xYourSellerAddress
 TAB_ENDPOINT=http://localhost:3030/payment/tab
 ```
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 Create a small Node API service for the paid route. Nuxt can call this service from server routes, server plugins, or background jobs.
 
@@ -90,7 +90,7 @@ api.listen(3030, () => {
 });
 ```
 
-## Support Payment
+## Support payment
 
 Create a Nuxt server utility for paid requests.
 

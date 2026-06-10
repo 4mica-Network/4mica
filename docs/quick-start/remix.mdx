@@ -34,7 +34,7 @@ bun add @remix-run/express express @4mica/x402 @x402/fetch viem
 
 </CodeGroup>
 
-## Create Wallet
+## Create wallet
 
 For wallet setup, see [Wallet](/core-concepts/wallet).
 
@@ -44,13 +44,13 @@ PAY_TO=0xYourSellerAddress
 TAB_ENDPOINT=http://localhost:3000/payment/tab
 ```
 
-## Deposit Collateral
+## Deposit collateral
 
 Deposit collateral for the buyer wallet before it calls protected Remix-backed APIs. Use Base Sepolia until the flow works end to end.
 
 For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
-## Protect A Route
+## Protect a route
 
 ```ts
 import express from "express";
@@ -90,7 +90,7 @@ server.all("*", createRequestHandler({ build }));
 server.listen(3000);
 ```
 
-## Support Payment
+## Support payment
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
