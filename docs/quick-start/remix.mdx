@@ -36,6 +36,8 @@ bun add @remix-run/express express @4mica/x402 @x402/fetch viem
 
 ## Create Wallet
 
+For wallet setup, see [Wallet](/core-concepts/wallet).
+
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
@@ -46,7 +48,7 @@ TAB_ENDPOINT=http://localhost:3000/payment/tab
 
 Deposit collateral for the buyer wallet before it calls protected Remix-backed APIs. Use Base Sepolia until the flow works end to end.
 
-Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect A Route
 

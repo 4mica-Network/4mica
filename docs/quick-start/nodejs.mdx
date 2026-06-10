@@ -52,7 +52,9 @@ bun add @4mica/x402 @x402/fetch @x402/axios viem
 
 ## Create Wallet
 
-Create a dedicated EVM wallet for the buyer, seller, or agent. For local development, convert the private key into a viem account:
+Create a dedicated EVM wallet for the buyer, seller, or agent. For wallet setup, see [Wallet](/core-concepts/wallet).
+
+For local development, convert the private key into a viem account:
 
 ```ts
 import { privateKeyToAccount } from "viem/accounts";
@@ -66,7 +68,7 @@ Use a separate service wallet in production. Keep your main wallet away from aut
 
 Deposit collateral before the buyer signs 4Mica payment guarantees. Collateral secures the tab, lets the seller settle quickly, and gives the seller a claim path if the buyer defaults later.
 
-Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals), then wait for the deposit to finalize before calling paid routes. Use the same network in your client registration and seller route configuration.
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect A Route
 
