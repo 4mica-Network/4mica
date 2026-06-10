@@ -1,23 +1,127 @@
 ---
-title: "Agentic Payments"
-description: "How agents pay and get paid through collateral-backed guarantees."
+title: "Agentic payments"
+description: "What agents pay with, why stablecoins fit, and how a machine-readable payment flow works."
 ---
 
-# Agentic Payments
+Agentic payments are payments initiated by software agents as part of a task. Instead of routing a person through checkout, an agent discovers a price, checks it against policy, pays or guarantees payment, and continues working. No human approves each transaction.
 
-Agentic payments are payments initiated by software agents as part of a task. In 4Mica, the agent signs a guarantee instead of sending an on-chain transaction for every request.
+This requires payment infrastructure that operates at machine speed, without browser sessions, card terminals, or manual reconciliation cycles.
 
-## Why It Matters
+## What is a stablecoin
 
-4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+A stablecoin is a digital token designed to hold a stable value, usually one US dollar.
 
-## How It Works
+Unlike cryptocurrencies such as Bitcoin, stablecoins are not primarily speculative assets. They are settlement assets: digital dollars that move over internet-native payment networks instantly and at very low cost.
 
-- A route advertises price through HTTP 402.
-- The payer opens or reuses a tab.
-- The payer signs a guarantee for the request amount.
-- The seller verifies, settles, and serves the response.
+In practical terms, a stablecoin behaves less like an investment and more like programmable cash. You can send it to any address with an internet connection, in any amount, at any time, without a bank acting as intermediary. Software can hold it, transfer it, and apply conditions to it the same way it handles any other data.
 
-## Builder Guidance
+That combination of stability, programmability, and global reach makes stablecoins a natural fit for agent payments.
 
-Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.
+## Why a new payment layer exists
+
+The HTTP specification reserved status code 402, "Payment Required," in 1997. No one implemented it. The internet carries information. Commerce grew on top of card networks and banking systems built on infrastructure that predates the web itself.
+
+The internet separated communication from physical mail. Before email, sending a message required a physical object, a postal system, and days of transit. The internet made communication programmable and instant.
+
+Stablecoins do the same thing for value transfer. Before internet-native money, sending payment required a bank, a card network, or a wire system built on decades-old infrastructure. Stablecoins make value programmable and instant, without changing what money represents.
+
+This is not just a speed improvement. It is a structural shift. When value can move the same way information moves, new kinds of economic actors become possible. Agents are one of them.
+
+## How agent traffic changes the internet economy
+
+The current internet economy runs on a straightforward model: content attracts human visitors, visitors see advertisements, and advertisers pay for that attention. Subscriptions, paywalls, and affiliate commissions follow the same logic. Revenue flows to whoever controls the page a human lands on.
+
+Agents don't land on pages. They call APIs, parse data, and continue the task. No ad impression registers. No affiliate link gets clicked. No subscription triggers. The transaction that would have funded the content creator, the publisher, or the data provider never happens.
+
+That creates a structural problem at scale. A meaningful and growing share of internet traffic comes from automated systems: scrapers, crawlers, and agents. Most of that traffic consumes server bandwidth and data without contributing to the revenue model that funds the service. Websites pay to serve content. When the visitor is software rather than a person, the economics of that arrangement deteriorate.
+
+Content sites are already responding. A large and growing share of the largest websites now block or restrict AI-oriented crawlers. Operators realize they are subsidizing data collection for AI systems rather than their own audiences.
+
+The affiliate model breaks too. When an agent makes a purchasing decision on behalf of a user, it acts on context from many sources rather than clicking a referral link. The creator whose content informed that decision may receive nothing. The relationship between content creators and the platforms that distribute their work is under structural pressure.
+
+Agentic payments address part of this. If agents pay for what they consume, the economics of the open web become more sustainable. A crawler that pays for data access compensates the site it reads. An agent that queries an API pays the service that built it. Revenue shifts from ad impressions and affiliate clicks toward direct payment for access, information, and compute.
+
+This is a renegotiation of how value flows across the internet when the entity making requests is software rather than a person.
+
+## Why existing payment rails fall short
+
+Agents expose four failure modes in traditional payment infrastructure:
+
+- **No browser session.** Card processors interrupt the payment flow to verify a human is present. Agents call APIs without a session and have nowhere to handle that interrupt.
+- **High frequency, small value.** One agent task may trigger hundreds of micro-requests. Per-request card authorization or on-chain settlement adds latency and cost that make small payments economically impractical.
+- **No credit history.** Fraud detection builds behavioral models over time. A new agent has no history. Traditional systems either reject it or demand pre-funding that ties up capital.
+- **No fixed merchant relationship.** An agent may call many different services in one task. Opening a separate account and funding a balance on every service doesn't scale.
+
+## Why not just upgrade the card networks
+
+You might ask whether card networks could add agent support. The architecture works against it.
+
+Card systems center on consumer fraud protection. They assume a cardholder who can dispute a charge, a merchant who accepts chargebacks, and an issuer who covers losses during the reversal window. That model depends on reversibility. Stablecoin transfers are generally final.
+
+Card authorization also carries a fixed cost floor. A 30-cent minimum per transaction makes sub-dollar payments unprofitable and sub-cent payments impossible. Agents routinely pay for work priced below that threshold: a single API call, one second of compute, a small data lookup. No card-based model can price those correctly without losing money on each transaction.
+
+Finally, card infrastructure requires identity verification at the point of sale: a cardholder presents credentials, a terminal captures them, a processor validates them. Agents have no terminal, no cardholder to present, and no fraud team to call when something goes wrong. Adapting that system for software-initiated payments would require rebuilding the assumptions underneath it, not just adding an API.
+
+## Cards vs stablecoins
+
+|                         | Card payment                 | Stablecoin payment          |
+| ----------------------- | ---------------------------- | --------------------------- |
+| **Network required**    | Card network and processor   | Blockchain network          |
+| **Minimum transaction** | ~$0.30 per authorization     | Fractions of a cent         |
+| **Settlement timing**   | Days after authorization     | Seconds                     |
+| **Reversibility**       | Chargebacks supported        | Generally final             |
+| **Orientation**         | Built for human cardholders  | Built for software and APIs |
+| **Geographic reach**    | National or regional systems | Global by default           |
+
+The [Agentic economy](./agentic-economy) page maps the full seven-layer protocol stack for agentic commerce, including identity, trust, mandate collection, and clearing. The sections below focus on the payment-specific mechanics: what agents pay with, how flows are coordinated, and how obligations settle.
+
+## Three categories of agentic payment
+
+Not all agentic payments are the same. The protocols, methods, and infrastructure differ depending on what is being purchased.
+
+**Commerce payments** cover buying goods or services on behalf of a human. The agent handles discovery, selection, and checkout. ACP and UCP are the main protocols at this layer. They let merchants appear in agent-driven shopping flows and let agents complete structured checkout without a human clicking through each step.
+
+**B2B payments** cover invoice settlement, supplier payments, and high-value business transactions. These are larger, less frequent, and require audit trails and approval workflows. Stablecoins offer programmable settlement here. Traditional rails like ACH and wire remain relevant for established vendor relationships.
+
+**Micropayments** cover software paying for anything at machine speed and machine scale. The seller can be another agent, a third-party API, a compute provider, or any gated resource. No human initiates or approves the transaction.
+
+## What agents pay with
+
+Each payment method trades off capital efficiency, throughput, programmability, and relationship maturity. At low volume, any of these can work. At agent scale, only one model holds structurally.
+
+- **Direct stablecoin transfer.** The agent holds a balance and sends payment when a service is rendered. Settlement is immediate and final. This works for one-off calls where no pre-existing relationship exists. At high frequency, signing and broadcasting every individual request adds latency and fragments liquidity across hundreds of in-flight transactions.
+
+- **Prepaid escrow.** The agent deposits funds before work starts. The service draws from that balance as requests complete. This removes per-call signing overhead and gives sellers confidence without requiring settlement on every request. The tradeoff is capital efficiency: an agent working across dozens of services pre-funds dozens of separate balances, most sitting idle at any moment.
+
+- **Streaming payment.** The agent pays per second, per token, or per unit of compute as work is consumed. This is the right model for compute-heavy or time-based services where billing by outcome is impractical. It handles a specific category well and is not a general solution.
+
+- **B2B credit and invoicing.** At scale, agents behave like businesses, not individual buyers. They negotiate pre-approved terms, volume pricing, and deferred invoices with key vendors. Settlement flows over stablecoins or wires, but the payment relationship is ongoing. This is where agent commerce matures: less like a tourist making one-off purchases, more like a local business with established supplier arrangements. It requires an existing relationship and credit underwriting before it is available.
+
+- **Cryptographic guarantee with deferred settlement.** The agent provides a signed commitment proving it can pay. The service accepts that commitment and serves the request. Funds move later, in a batch, on a trigger, or within a defined settlement window. This is the strongest general model for agent payments.
+  The insight behind cryptographic guarantee is the separation of authorization from settlement. Authorization happens at machine speed: a cryptographic operation that is fast, cheap, and composable. Settlement happens at finance speed, batched across many calls and triggered by condition rather than by each request. Credit lines, conditional release, automatic refund on failure, and netting across many services can all layer on top of the commitment without changing how the agent makes requests.
+
+## Why stablecoins
+
+Card systems break for agent payments. Stablecoins remove those constraints:
+
+- **No authorization loop.** A stablecoin transfer is a software operation. The agent signs and broadcasts. No third party needs to approve the session or verify the cardholder.
+- **No cost floor.** The same infrastructure that settles a `$50,000` invoice can settle a `$0.001` micropayment. The fee is a fraction of a cent regardless of amount.
+- **Fast finality.** Settlement completes in seconds, not days.
+- **Programmable.** Logic can be layered on top: conditional release, escrow, streaming, netting, automatic refund on failure.
+- **Global by default.** A stablecoin transfer crosses borders without a correspondent bank, a currency conversion fee, or a compliance hold. Agents calling services in multiple jurisdictions don't need a separate payment relationship in each one. And the initial market for a new product is not the domestic market anymore.
+- **API-native.** Stablecoins are software objects. An agent integrates payment the same way it integrates any other API call. No physical terminal, payment page, or human-facing UI is required.
+
+There are gaps stablecoins don't close on their own:
+
+- **Policy.** identity, spending limits, authorization, audit, and dispute handling.
+- **Scalability.** stablecoins are on blockchains. Writing data on blockchain is slow, costs money, and is very limited. No blockchain can handle 10k rps, which is far less load than what agentic economy will have.
+
+## Builder guidance
+
+Start with the simplest paid flow that makes the price, accepted assets, and responsibilities explicit on both sides. Add stronger controls as volume grows:
+
+- choose a payment type that matches your transaction frequency and size: direct transfer for low-volume, escrow or guarantee for high-frequency;
+- define accepted stablecoins, networks, and settlement windows before launch;
+- set per-agent spending limits and per-route caps;
+- log every payment authorization with agent address, policy version, and timestamp;
+- monitor settlement status, retry rates, and failed requests from the start because problems compound at scale.
