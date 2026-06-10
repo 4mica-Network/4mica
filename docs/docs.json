@@ -12,6 +12,14 @@
   "navigation": {
     "pages": [
       {
+        "group": "Background",
+        "pages": [
+          "core-concepts/agentic-economy",
+          "core-concepts/agentic-payments",
+          "core-concepts/agent-identity"
+        ]
+      },
+      {
         "group": "Getting Started",
         "pages": [
           "getting-started/introduction",
@@ -48,9 +56,6 @@
       {
         "group": "Core Concepts",
         "pages": [
-          "core-concepts/agentic-economy",
-          "core-concepts/agentic-payments",
-          "core-concepts/agent-identity",
           "core-concepts/transaction-lifecycle",
           "core-concepts/security",
           "core-concepts/deposits-and-withdrawals",
