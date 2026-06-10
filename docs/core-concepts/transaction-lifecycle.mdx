@@ -213,7 +213,7 @@ If the registry result does not match the policy, `remunerate` reverts and no fu
 
 Both V1 and V2 guarantees flow into a settlement cycle once they reach `FINALIZED_PAYABLE`.
 The cycle batches those guarantees, computes net positions across all participants, and commits a Merkle clearing batch on chain.
-Only the net amounts move — individual guarantees are not settled one by one.
+Only the net amounts move. Individual guarantees are not settled one by one.
 
 Each cycle runs through six phases:
 

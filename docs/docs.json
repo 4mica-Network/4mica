@@ -56,7 +56,6 @@
       {
         "group": "Core Concepts",
         "pages": [
-          "core-concepts/http-402",
           "core-concepts/how-x402-works",
           "core-concepts/client-server-roles",
           "core-concepts/transaction-lifecycle",
