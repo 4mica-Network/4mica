@@ -25,8 +25,23 @@
       {
         "group": "Quick Start",
         "pages": [
-          "quick-start/nodejs",
-          "quick-start/python",
+          {
+            "group": "NodeJS",
+            "pages": [
+              "quick-start/nodejs",
+              "quick-start/nextjs",
+              "quick-start/express",
+              "quick-start/hono",
+              "quick-start/nuxt",
+              "quick-start/sveltekit",
+              "quick-start/remix",
+              "quick-start/bun"
+            ]
+          },
+          {
+            "group": "Python",
+            "pages": ["quick-start/fastapi", "quick-start/flask"]
+          },
           "quick-start/rust"
         ]
       },

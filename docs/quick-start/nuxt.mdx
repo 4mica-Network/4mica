@@ -1,0 +1,117 @@
+---
+title: "Nuxt"
+description: "Use 4Mica with a Nuxt app and a Node API route."
+---
+
+Use Nuxt with 4Mica by keeping paid API protection in a Node service and calling it from Nuxt server code. This keeps the 4Mica tab endpoint, verify, and settle flow on the server while your Nuxt app remains focused on UI and server routes.
+
+## Prerequisites
+
+- Nuxt running on Node.
+- A Node API service for paid routes.
+- A seller wallet address for `payTo`.
+- A buyer wallet with 4Mica collateral for paid requests.
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install nuxt express @4mica/x402 @x402/fetch viem
+```
+
+```bash pnpm
+pnpm install nuxt express @4mica/x402 @x402/fetch viem
+```
+
+```bash yarn
+yarn add nuxt express @4mica/x402 @x402/fetch viem
+```
+
+```bash bun
+bun add nuxt express @4mica/x402 @x402/fetch viem
+```
+
+</CodeGroup>
+
+## Create wallet
+
+For wallet setup, see [Wallet](/core-concepts/wallet).
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:3030/payment/tab
+```
+
+## Deposit collateral
+
+Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
+
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+
+## Protect a route
+
+Create a small Node API service for the paid route. Nuxt can call this service from server routes, server plugins, or background jobs.
+
+```ts
+import express from "express";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+const api = express();
+api.use(express.json());
+
+api.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:84532",
+          payTo: process.env.PAY_TO ?? "0xYourAddress",
+        },
+        description: "Access to premium Nuxt content",
+      },
+    },
+    {
+      advertisedEndpoint:
+        process.env.TAB_ENDPOINT ?? "http://localhost:3030/payment/tab",
+    },
+  ),
+);
+
+api.get("/premium-content", (req, res) => {
+  res.json({ message: "Paid content for Nuxt" });
+});
+
+api.listen(3030, () => {
+  console.log("Paid API running on http://localhost:3030");
+});
+```
+
+## Support payment
+
+Create a Nuxt server utility for paid requests.
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+export const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+```
+
+Call it from a Nuxt server route:
+
+```ts
+export default defineEventHandler(async () => {
+  const response = await fetchWithPayment("http://localhost:3030/premium-content");
+  return response.json();
+});
+```
