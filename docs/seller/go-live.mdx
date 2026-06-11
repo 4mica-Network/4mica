@@ -1,31 +1,74 @@
 ---
 title: "Go Live"
-description: "Prepare seller integrations for production."
+description: "Prepare seller agent integrations for production."
 ---
 
-# Go Live
+Going live means your payment rules, monitoring, pricing, and claim process are ready for real buyers, real agents, and real collateral.
 
-Going live means your payment rules, monitoring, pricing, and claim process are ready for real users and real collateral.
+Do not treat a protected route as production-ready just because the happy path works. Agent traffic is automated, fast, and sometimes adversarial. The production surface needs clear pricing, strong logs, and controls for suspicious usage.
 
-## Seller Responsibilities
+## Production requirements
 
-- Define protected routes and prices clearly.
-- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
-- Set scheme to 4mica-credit and choose supported networks.
-- Verify and settle every accepted payment before serving paid work.
-- Monitor unpaid tabs and claim windows for defaulted payers.
+- Use HTTPS for all protected routes and tab endpoints.
+- Use a production seller wallet for `payTo`.
+- Publish stable route prices or a clear quote-before-pay flow.
+- Verify and settle before serving paid work.
+- Log request IDs, tab IDs, payer addresses, route, price, and settlement result.
+- Monitor unpaid tabs, claim windows, failed settlements, and invalid payment attempts.
+- Rate limit unpaid requests and failed payment retries.
+- Keep a support path for disputes, refunds, and delivery questions.
 
-## Request Flow
+## Seller launch checklist
 
-1. Return HTTP 402 when an unpaid client asks for protected content.
-2. Let the client open a tab through your advertised endpoint.
-3. Receive the retried request with a payment header.
-4. Verify and settle through the facilitator.
-5. Serve the protected response only after payment validation succeeds.
+### Trust and legitimacy
 
-## Production Checklist
+- Show your seller `payTo` address anywhere buyers should verify payment destination.
+- Keep your public API domain, tab endpoint, and payment requirements consistent.
+- Document what the route does, what it costs, and what counts as delivery.
+- If you use a marketplace, registry, verified seller profile, or ratings system, bind that identity to your payment address and domain.
+- Monitor for impersonation: copied agent names, wrong domains, wrong `payTo` addresses, and fake payment requirements.
 
-- Use HTTPS for protected routes and tab endpoints.
-- Log tab IDs, request IDs, payer addresses, and settle responses.
-- Keep prices and accepted assets explicit in route configuration.
-- Create alerts for repeated verification failures and missed claim windows.
+### Pricing and monetization
+
+- Decide whether each route is fixed-price, metered, tiered, subscription-gated, or quote-based.
+- Set minimum payment amounts that still make sense after infrastructure costs.
+- Publish accepted networks and assets.
+- Keep dynamic pricing explainable before the buyer signs.
+- Use separate routes, policies, or metadata if humans and agents should see different prices.
+
+### Microtransactions
+
+- Batch settlement through tabs instead of trying to settle every tiny request on-chain.
+- Keep high-frequency traffic on signed guarantees and deferred settlement.
+- Require payment or a valid guarantee before expensive work starts.
+- Test sub-cent and small-dollar prices in sandbox with realistic traffic volume.
+
+### Agent-to-agent controls
+
+- Treat other agents as normal x402 buyers unless your product needs extra identity checks.
+- Accept, reject, or price requests based on route, payer, metadata, policy, reputation, or your own allowlist.
+- Let your agent decline work that would cost more to fulfill than the payment covers.
+- Log downstream paid calls if your agent buys from another agent and resells the result.
+
+### Risk and abuse
+
+- Limit unpaid pre-work.
+- Cap spend or request volume per buyer, agent, tab, API key, or wallet.
+- Block suspicious payers and repeated invalid payment attempts.
+- Keep refund rules explicit.
+- Store delivery evidence for disputes.
+- Alert on missed claim windows.
+
+## Production flow
+
+1. Buyer or buyer agent calls your protected route.
+2. Your API returns HTTP 402 with payment requirements.
+3. Buyer opens or reuses a tab through your advertised endpoint.
+4. Buyer retries with a signed payment guarantee.
+5. Your middleware verifies and settles through the facilitator.
+6. Your paid handler runs and returns the result.
+7. You monitor settlement and claim from collateral if the payer defaults within the claim window.
+
+## Go-live decision
+
+Launch when you can operate the route without guessing. For every paid request, your team should know who paid, what they paid for, which result was delivered, whether settlement succeeded, and what recovery path exists if the payer does not settle.

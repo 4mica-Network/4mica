@@ -1,27 +1,39 @@
 ---
 title: "Facilitator URLs"
-description: "List buyer-facing facilitator URL guidance."
+description: "Understand which endpoints buyer agents call during a 4Mica payment flow."
 ---
 
-# Facilitator URLs
+Most buyers do not call the hosted facilitator directly. They call the seller API, receive payment requirements, and use the seller advertised tab endpoint. The seller middleware talks to the facilitator from the server side.
 
-Most buyers do not call the hosted facilitator directly. They call the seller API, receive a 402 response, and use the seller advertised tab endpoint.
+For buyers, the safest mental model is: pay the seller you intended to call, through the endpoint that seller advertised.
 
-## Buyer Responsibilities
+## Buyer-facing endpoints
 
-- Maintain a funded collateral position on the networks you want to use.
-- Register a 4Mica client scheme for every network your target sellers accept.
-- Sign only payment requirements that match your agent policy.
-- Track open tabs and settlement obligations before withdrawing collateral.
+| Endpoint | Who owns it | Buyer use |
+| --- | --- | --- |
+| Protected route | Seller | The API, agent, model, or dataset your agent wants to use. |
+| Seller tab endpoint | Seller | Opens or reuses a payment tab for that seller route. |
+| Facilitator API | 4Mica or self-hosted operator | Usually called by seller middleware, not directly by buyer agents. |
+| Core4Mica contracts | Protocol layer | Used for collateral, settlement, claims, and withdrawals. |
 
-## Recommended Flow
+## What buyers should verify
 
-1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
-2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
-3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
-4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
-5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+Before signing, check:
 
-## Operational Notes
+- the tab endpoint belongs to the seller domain you called;
+- the seller `payTo` address matches the agent or service you intended to buy from;
+- the network and asset are allowed by your policy;
+- the amount fits the task budget;
+- the route and price match the task.
 
-Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.
+If any value looks wrong, do not sign. A buyer agent should treat mismatched payment requirements the same way a human treats a suspicious checkout page.
+
+## Hosted facilitator
+
+Hosted deployments commonly use:
+
+```txt
+https://x402.4mica.xyz/
+```
+
+Buyer applications normally see this only indirectly. Keep your integration pointed at seller APIs and use the tab endpoint they advertise.

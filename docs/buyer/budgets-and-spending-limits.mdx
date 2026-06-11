@@ -1,0 +1,86 @@
+---
+title: "Budgets and Spending Limits"
+description: "Control how much an AI agent can spend, when it needs approval, and when it must stop."
+---
+
+The buyer story is simple: give your AI agent money, but not unlimited trust.
+
+4Mica lets an agent pay for useful services. Your buyer policy decides how much the agent can spend and under what conditions.
+
+## Core limits
+
+Start with hard limits:
+
+| Limit | What it prevents |
+| --- | --- |
+| Per-request limit | One expensive call draining the budget. |
+| Per-task limit | A task becoming more expensive than expected. |
+| Time-window limit | Slow leaks over hours or days. |
+| Seller limit | One seller receiving too much spend. |
+| Category limit | Spending on blocked or risky service types. |
+| Network or asset limit | Payments moving through unsupported routes. |
+
+Use small limits in sandbox and raise them only after the workflow is predictable.
+
+## Fixed and usage-based prices
+
+Before paying, the agent should know whether the seller price is:
+
+- fixed per request;
+- per API call;
+- per task;
+- per token;
+- per second of compute;
+- per data unit;
+- per result;
+- quote-based.
+
+Usage-based work needs extra guardrails. If the final cost can grow, use a cap, staged payment, or human approval threshold.
+
+## Approval gates
+
+Require approval when:
+
+- the payment exceeds a per-request threshold;
+- the task budget is almost exhausted;
+- the seller is new;
+- the route is high risk;
+- the agent wants to call another paid agent;
+- the price changed from the estimate;
+- the agent wants to continue after a failure.
+
+Approval should happen before signing the payment, not after the agent has already spent.
+
+## Stopping mid-task
+
+A buyer agent should stop when:
+
+- the budget is exhausted;
+- the next payment requires approval and approval is denied;
+- the seller fails repeatedly;
+- the agent detects a suspicious payment requirement;
+- the task can no longer be completed within budget;
+- the user cancels the task.
+
+Stopping is a feature. It prevents a useful agent from becoming an uncontrolled spender.
+
+## Hidden costs
+
+Agents may pay other services while completing one task. Track:
+
+- API calls;
+- model inference;
+- data access;
+- compute;
+- storage;
+- downstream agents;
+- retries;
+- premium latency or SLA charges.
+
+Show estimated cost before the task starts and actual cost after it ends. If the task changes, update the estimate before spending more.
+
+## Refunds
+
+Refunds are seller policy. 4Mica provides payment evidence that helps both sides see what was paid. Your application should connect that evidence to task logs, seller terms, and support decisions.
+
+For buyer safety, prefer sellers with clear refund rules and strong delivery evidence.

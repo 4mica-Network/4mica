@@ -1,0 +1,77 @@
+---
+title: "Trust and Verification"
+description: "Help buyer agents decide which sellers, agents, routes, and payment requirements are safe to pay."
+---
+
+Before a buyer agent spends money, it should know who it is paying and why that seller is allowed.
+
+4Mica verifies payment mechanics. Your buyer application should verify the commercial context: seller identity, domain, route, price, reputation, and permissions.
+
+## What buyers should verify
+
+Before signing a payment, check:
+
+- seller domain;
+- seller `payTo` address;
+- advertised tab endpoint;
+- route and method;
+- price and accepted asset;
+- network;
+- seller profile or registry entry if available;
+- agent or service reputation if available;
+- task match.
+
+If the seller address, tab endpoint, or price does not match the service the agent intended to call, do not sign.
+
+## Seller verification
+
+A verified seller profile is usually provided by a marketplace, registry, or application. Bind that profile to the values the buyer sees in payment requirements:
+
+- agent name;
+- operator;
+- domain;
+- `payTo` address;
+- supported routes;
+- version;
+- refund or support policy.
+
+4Mica can give you a payment record. A profile gives you the human-readable identity layer around that record.
+
+## Reputation and history
+
+Buyers may want to see:
+
+- number of successful paid requests;
+- repeat buyers;
+- latency;
+- refund rate;
+- dispute rate;
+- ratings and reviews;
+- examples of outputs;
+- version history.
+
+Treat reputation as a decision input, not a replacement for policy. A reputable seller can still be too expensive for the current task.
+
+## Fake or malicious agents
+
+A fake seller may copy an agent name or description while using a different domain or payment address. Buyer agents should compare the payment requirement against a trusted source.
+
+Block or require approval when:
+
+- the `payTo` address is new for a known seller;
+- the tab endpoint is not on the seller domain;
+- the price changed unexpectedly;
+- the seller asks for a network or asset you do not normally use;
+- the route does not match the task.
+
+## Revocation
+
+Buyers should be able to stop future spending by:
+
+- disabling the agent;
+- changing policy;
+- removing allowed sellers;
+- revoking or rotating signing keys;
+- withdrawing available collateral after checking open tabs and obligations.
+
+Revocation should be planned before production. It is much easier to stop one scoped agent key than to recover from a shared key with broad authority.

@@ -1,0 +1,70 @@
+---
+title: "Safety and Permissions"
+description: "Limit what data, services, purchases, and payments an AI agent can access."
+---
+
+An agent with money also needs boundaries. Payment policy should sit beside data policy, tool policy, and revocation.
+
+## Data access
+
+Before using a paid agent, decide:
+
+- what data the agent can read;
+- whether it can store data;
+- whether it can share data with sellers or other agents;
+- whether sensitive fields should be redacted;
+- how long logs and payloads are retained;
+- whether outputs can be used for training or resale.
+
+4Mica handles payment evidence. Your application controls data permissions.
+
+## External APIs and tools
+
+Agents often need to call external services to finish a task. Put limits around:
+
+- allowed domains;
+- allowed sellers;
+- allowed tool categories;
+- allowed data sources;
+- maximum downstream spend;
+- maximum number of external calls;
+- whether the agent can call other paid agents.
+
+If a downstream call changes the cost or risk of the task, require approval before continuing.
+
+## Purchases on behalf of a user
+
+Paying for API access is not the same as buying goods, booking services, or making real-world commitments. If an agent can make purchases on behalf of a user, add stronger controls:
+
+- explicit approval before purchase;
+- maximum purchase amount;
+- merchant allowlist;
+- cancellation policy checks;
+- receipt storage;
+- user confirmation for irreversible actions.
+
+## Manual approval
+
+Some buyers want to approve every payment. Others want only large or unusual payments to pause. Both are valid.
+
+Common modes:
+
+- approve every payment;
+- auto-approve under a small amount;
+- auto-approve trusted sellers only;
+- require approval for new sellers;
+- require approval for categories like compute, data resale, or purchases;
+- pause when behavior is unexpected.
+
+## Revocation and emergency stop
+
+Build a fast stop path:
+
+- pause agent execution;
+- disable signing;
+- remove allowed sellers;
+- rotate the signer;
+- revoke agent credentials where supported;
+- withdraw available collateral after checking open obligations.
+
+The buyer should never have to let a misbehaving agent keep spending because the key is hard to isolate.

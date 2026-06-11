@@ -1,38 +1,90 @@
 ---
 title: "Payment Middleware"
-description: "Protect API routes with 4Mica x402 payment middleware."
+description: "Protect seller routes with 4Mica x402 payment middleware."
 ---
 
-# Payment Middleware
+Payment middleware turns an ordinary HTTP route into a paid resource. It is the seller-side bridge between your application and 4Mica's x402 credit flow.
 
-Payment middleware is the fastest way to turn an ordinary route into a 4Mica-protected resource.
+Use it for APIs, model endpoints, agent workflows, paid datasets, or any route where the server should verify payment before serving the response.
 
-## Seller Responsibilities
+## What the middleware does
 
-- Define protected routes and prices clearly.
-- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
-- Set scheme to 4mica-credit and choose supported networks.
-- Verify and settle every accepted payment before serving paid work.
-- Monitor unpaid tabs and claim windows for defaulted payers.
+For a protected route, the middleware:
 
-## Express Sketch
+- returns HTTP 402 when a request is unpaid;
+- includes machine-readable payment requirements in the response;
+- advertises your seller-hosted tab endpoint;
+- accepts a retried request with an x402 payment header;
+- verifies the signed guarantee;
+- settles through the facilitator;
+- lets your handler run only after payment validation succeeds.
+
+This keeps your paid product API-native. Buyers and agents can discover the price from the HTTP response and pay without opening an account on your service.
+
+## Route configuration
 
 ```ts
-app.use(paymentMiddlewareFromConfig({
-  "GET /premium-content": {
-    accepts: {
-      scheme: "4mica-credit",
-      price: "$0.10",
-      network: "eip155:84532",
-      payTo: "0xYourAddress",
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "POST /agent/summarize": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.02",
+          network: "eip155:84532",
+          payTo: "0xYourSellerAddress",
+        },
+      },
     },
-  },
-}, { advertisedEndpoint: "https://api.example.com/payment/tab" }));
+    {
+      advertisedEndpoint: "https://api.example.com/payment/tab",
+    }
+  )
+);
 ```
 
-## Production Checklist
+## Fields sellers should make explicit
 
-- Use HTTPS for protected routes and tab endpoints.
-- Log tab IDs, request IDs, payer addresses, and settle responses.
-- Keep prices and accepted assets explicit in route configuration.
-- Create alerts for repeated verification failures and missed claim windows.
+| Field | Seller decision |
+| --- | --- |
+| `scheme` | Use `4mica-credit` for collateral-backed off-chain guarantees. |
+| `price` | Set the amount for this unit of work. Start small in sandbox. |
+| `network` | Use Base Sepolia (`eip155:84532`) for testing and Base (`eip155:8453`) for production when supported by your route. |
+| `payTo` | Use the seller wallet address that should receive payment. |
+| `advertisedEndpoint` | Use a route hosted by your API, not a raw facilitator URL. |
+
+## Pricing dynamic work
+
+If the final cost depends on tokens, compute, data, or task complexity, use your application logic to quote before work begins. The buyer should see the price before paying. Common patterns are:
+
+- fixed price per route, such as `$0.02` per summary;
+- tiered routes, such as `/basic`, `/pro`, and `/enterprise`;
+- quoted tasks, where the agent estimates cost and returns payment requirements for the accepted quote;
+- metered work, where the seller requires prepayment or a credit cap before streaming or long-running execution.
+
+Keep the payment requirement honest. If the buyer paid for one request, do not silently perform more work that requires a larger charge.
+
+## Delivery and logging
+
+Log enough information to connect payment, request, and result:
+
+- route and method;
+- request ID;
+- tab ID;
+- payer address;
+- seller `payTo` address;
+- quoted price;
+- payment header version;
+- verification and settle result;
+- response status;
+- response hash or delivery marker.
+
+These records are how you answer "which request was paid for?" and "what response did the agent deliver?"
+
+## Failure behavior
+
+If verification or settlement fails, do not run the paid handler. Return a clear payment failure response and include a stable error code that your support team can map back to logs.
+
+If a buyer retries repeatedly with invalid payment headers, rate limit the payer, tab, IP, or agent identity depending on what your application can observe.

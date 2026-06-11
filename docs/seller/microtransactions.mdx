@@ -1,0 +1,74 @@
+---
+title: "Microtransactions"
+description: "Keep tiny agent payments profitable with guarantees, tabs, batching, and deferred settlement."
+---
+
+Agents create high-frequency, low-value commerce. A single task may trigger hundreds of small calls across data providers, model endpoints, and other agents.
+
+4Mica is built for this pattern by separating authorization from settlement. The buyer signs payment guarantees as requests happen. Settlement can happen later through tabs, claims, and netting instead of forcing every small request to become an on-chain transaction.
+
+## Why tiny payments need a different flow
+
+Traditional payment systems have a cost floor. Card authorizations, on-chain transactions, and manual invoices are too expensive or too slow for sub-dollar and sub-cent work.
+
+With 4Mica:
+
+- the buyer deposits collateral once;
+- the buyer signs off-chain guarantees per paid request;
+- the seller verifies and settles the guarantee before serving work;
+- obligations accumulate in tabs;
+- settlement and claims happen later according to protocol rules.
+
+This makes tiny paid requests practical because the expensive part does not happen on every call.
+
+## Can sellers charge fractions of a cent?
+
+Yes, the model supports very small payments. Whether a fraction-of-a-cent price is profitable depends on your own cost structure. Include model cost, data cost, compute, bandwidth, observability, failed requests, support, and any downstream paid calls.
+
+If the unit is too small to price alone, bundle it:
+
+- charge per 100 records instead of per record;
+- charge per task stage instead of per internal operation;
+- charge per time slice for streaming or compute;
+- require a minimum tab amount before expensive work begins.
+
+## What happens if the buyer lacks balance?
+
+If the buyer cannot produce a valid collateral-backed guarantee, your server should not serve paid work. The buyer client should treat the 402 flow as unpaid or insufficient funds and either stop, add collateral, choose a cheaper route, or ask the supervising user for a new budget.
+
+## Prepayment, locks, and completion
+
+For cheap deterministic work, verifying payment before the handler runs is usually enough.
+
+For expensive or long-running work, use one of these patterns:
+
+- require a valid guarantee before starting;
+- require a larger prepayment or cap before streaming begins;
+- split work into paid stages;
+- hold delivery until final payment validation succeeds;
+- refund or credit according to your published refund rules if the task fails.
+
+4Mica gives you the payment and claim path. Your product defines when work is considered complete.
+
+## Avoiding gas and network fee loss
+
+Do not settle every tiny call as its own on-chain transfer. Use 4Mica credit, tabs, and deferred settlement so high-frequency traffic becomes a set of enforceable obligations rather than a flood of transactions.
+
+Monitor:
+
+- average payment amount;
+- requests per tab;
+- settlement success rate;
+- claimable amount;
+- expired claims;
+- cost per fulfilled request;
+- downstream paid spend.
+
+## Microtransaction checklist
+
+- Keep tiny prices visible and machine-readable.
+- Require payment validation before expensive work.
+- Batch obligations through tabs.
+- Set minimums where your cost structure requires it.
+- Alert on invalid payment spikes and missed claim windows.
+- Reprice when usage patterns change.

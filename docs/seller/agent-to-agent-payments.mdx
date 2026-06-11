@@ -1,0 +1,92 @@
+---
+title: "Agent-to-Agent Payments"
+description: "Let other AI agents pay your agent directly through x402 and 4Mica credit."
+---
+
+Other agents can pay your agent the same way any x402 buyer pays a protected resource. They call your route, receive HTTP 402, evaluate the price against their policy, open or reuse a tab, sign a guarantee, and retry the request.
+
+Your server verifies and settles the guarantee before running the paid operation.
+
+## What changes when the buyer is an agent
+
+The payment flow stays the same. The operating model changes:
+
+- the buyer may make decisions without a human approval step;
+- the buyer may call many sellers in one task;
+- the buyer may be newly created or have little reputation;
+- the buyer may resell your result inside a larger workflow;
+- the buyer may need machine-readable pricing and limits.
+
+Design your seller API for that reality. Make the price explicit, reject requests that exceed policy, and log enough context to support automated workflows.
+
+## Receiving payment without human approval
+
+As a seller, you do not need a human to approve every inbound payment. Your protected route defines the price and requirements. If the buyer produces a valid guarantee, your server can accept it automatically.
+
+The buyer controls whether its own agent can sign without human approval. That authority comes from the buyer's wallet, signer, collateral, and policy.
+
+## Resale and downstream paid calls
+
+Your agent can call another paid agent, combine the result, and sell the final output. Treat this as a workflow with input cost:
+
+- quote high enough to cover downstream calls;
+- cap downstream spend per request;
+- log each paid sub-call;
+- reject requests that cannot be fulfilled profitably;
+- disclose resale or data-use limits if your product requires them.
+
+If you split revenue with other agents or tools, track each participant's contribution and payment obligation in your application. 4Mica can handle the paid requests and guarantees, while your workflow defines the revenue allocation.
+
+## Allowing or blocking buyers
+
+You can define who is allowed to buy from your agent. Common controls include:
+
+- allowlists for trusted wallets, agents, domains, or customers;
+- blocklists for suspicious payers;
+- per-buyer request limits;
+- higher prices for unknown buyers;
+- required deposits, collateral, or minimum guarantee amounts;
+- identity or metadata checks before accepting a task.
+
+4Mica verifies payment capacity. Your application decides access policy.
+
+## Negotiating price
+
+Agents can negotiate price before payment if your API exposes a quote or planning endpoint. A simple flow is:
+
+1. Buyer describes the task.
+2. Seller estimates cost, time, and constraints.
+3. Seller returns a quoted price and expiration.
+4. Buyer signs only if the quote fits policy.
+5. Seller executes after payment validation.
+
+For deterministic products, skip negotiation and publish fixed route prices.
+
+## Exposing payment requirements through an API
+
+HTTP 402 is the API-native way to expose payment requirements. An agent can discover:
+
+- required scheme;
+- amount;
+- accepted network and asset;
+- seller `payTo` address;
+- tab endpoint;
+- expiration or metadata.
+
+This lets agents decide automatically whether to pay, choose another provider, or ask their operator for more budget.
+
+## Multi-agent workflows
+
+A single workflow may involve multiple paid agents. Each seller should receive a payment guarantee for its own work. Do not rely on another seller's payment record as proof that your route was paid.
+
+For every agent-to-agent step, log:
+
+- upstream request ID;
+- downstream request ID;
+- payer;
+- seller;
+- amount;
+- settlement result;
+- delivered output or hash.
+
+That audit trail is how a workflow proves which agent did what and which obligation paid for it.

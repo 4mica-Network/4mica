@@ -3,25 +3,53 @@ title: "Error Handling"
 description: "Handle buyer-side payment, collateral, and retry failures."
 ---
 
-# Error Handling
+Buyer errors should fail closed. If the agent cannot verify a seller, fit a payment inside policy, sign a guarantee, or connect the payment to the task, it should stop or ask for approval instead of spending blindly.
 
-Buyer errors usually fall into four buckets: unsupported network, missing collateral, invalid signature, or seller-side verification failure.
+## Common error categories
 
-## Buyer Responsibilities
+| Error | Meaning | Buyer response |
+| --- | --- | --- |
+| Unsupported network | Seller requires a network your client has not registered. | Skip, choose another seller, or add the network intentionally. |
+| Missing collateral | Wallet cannot back the payment guarantee. | Add collateral or lower the task budget. |
+| Price over limit | Seller price exceeds policy. | Ask for approval, choose another seller, or stop. |
+| Seller mismatch | Domain, tab endpoint, or `payTo` address does not match expectations. | Do not sign. Treat as suspicious. |
+| Invalid signature | Payment signing failed or produced an invalid payload. | Retry only after checking signer and network configuration. |
+| Seller verification failure | Seller rejected the payment retry. | Log the failure and avoid repeated automatic retries. |
+| Task budget exhausted | The agent has spent its allowed budget. | Stop or ask for a higher budget. |
 
-- Maintain a funded collateral position on the networks you want to use.
-- Register a 4Mica client scheme for every network your target sellers accept.
-- Sign only payment requirements that match your agent policy.
-- Track open tabs and settlement obligations before withdrawing collateral.
+## Retry rules
 
-## Recommended Flow
+Do not retry forever. Automated retries can turn a small issue into unexpected spend or noisy traffic.
 
-1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
-2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
-3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
-4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
-5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+Use strict retry rules:
 
-## Operational Notes
+- retry network timeouts with backoff;
+- do not retry policy failures automatically;
+- do not retry payments over budget;
+- do not retry mismatched seller addresses;
+- cap attempts per seller and per task;
+- record the final failure reason in the task log.
 
-Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.
+## User-facing status
+
+Keep payment state understandable:
+
+- `needs_approval`: the agent found a payment that exceeds policy;
+- `insufficient_collateral`: the wallet cannot back the payment;
+- `blocked_seller`: policy does not allow this seller;
+- `payment_failed`: signing, tab opening, or seller verification failed;
+- `budget_exhausted`: the task limit has been reached;
+- `paid`: the request was paid and a response was received.
+
+## What to log
+
+Log enough to debug without guessing:
+
+- task ID and request ID;
+- seller domain and `payTo` address;
+- amount, network, and asset;
+- policy version;
+- failure reason;
+- retry count;
+- whether human approval was requested;
+- final task outcome.

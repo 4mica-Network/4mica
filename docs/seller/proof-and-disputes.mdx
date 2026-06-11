@@ -1,0 +1,91 @@
+---
+title: "Proof and Disputes"
+description: "Connect payment guarantees to delivered agent work, logs, support, refunds, and reputation."
+---
+
+4Mica can prove that a buyer signed a payment guarantee for a request and that your server settled it. Your application should also prove what work was delivered.
+
+For agent sellers, this matters because the product may be probabilistic, generated, long-running, or assembled from other services.
+
+## What payment proves
+
+A valid 4Mica payment flow can show:
+
+- which payer authorized payment;
+- which seller address was paid;
+- which tab and request were used;
+- what amount, network, and asset were accepted;
+- whether verification and settlement succeeded;
+- whether the seller has a claim path if the payer later defaults.
+
+That answers the payment question. It does not automatically answer whether the generated result was good, useful, or compliant with the buyer's expectations.
+
+## What delivery evidence proves
+
+Delivery evidence connects the paid request to the result. Store:
+
+- request ID;
+- tab ID;
+- route and method;
+- payer address;
+- seller `payTo` address;
+- request payload or hash;
+- quoted price and expiration;
+- model, tool, dataset, or agent version;
+- response payload or hash;
+- response status and timestamp;
+- settlement result;
+- refund or support decision if one occurs.
+
+For privacy-sensitive payloads, store hashes and metadata instead of full content.
+
+## Proving completion
+
+Define completion before launch. Examples:
+
+- API route returned HTTP 200 with the paid data.
+- Model endpoint returned a response under the advertised latency target.
+- Agent completed the requested workflow stage.
+- Dataset endpoint delivered the requested records.
+- Streaming job delivered a paid time or token interval.
+
+If a task can fail after payment validation, define whether the buyer receives retry, refund, credit, partial result, or no refund.
+
+## Disputes for AI-generated work
+
+AI output can be subjective. Reduce ambiguity by making the contract concrete:
+
+- describe what the route does and does not promise;
+- separate payment for effort from payment for a guaranteed outcome;
+- return structured result statuses;
+- log tool calls and model versions;
+- define refund rules for technical failure, timeout, duplicate charge, or seller-side error;
+- avoid promising correctness where the agent only provides generated assistance.
+
+4Mica supplies enforceable payment records. Your support policy decides how to handle quality complaints and refunds.
+
+## Refunds and tiny payments
+
+For small payments, manual refunds can cost more than the payment itself. Prefer automated rules:
+
+- no charge if verification fails;
+- retry or credit if your handler errors before delivery;
+- automatic credit for duplicate paid requests;
+- minimum refund threshold where appropriate;
+- batch refunds or credits for tiny amounts.
+
+Publish the rule. Agents can reason about clear policies.
+
+## Reputation and ratings
+
+Reputation can be built around your agent by linking identity, payment records, and delivery outcomes. A marketplace, registry, or application can track:
+
+- successful paid requests;
+- failure rate;
+- latency;
+- refund rate;
+- dispute rate;
+- repeat buyers;
+- verified seller address and domain.
+
+4Mica gives the payment evidence. Reputation systems can use that evidence as one input.

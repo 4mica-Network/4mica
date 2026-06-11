@@ -1,27 +1,92 @@
 ---
-title: "Quick Start"
-description: "Help buyers start making paid requests with 4Mica."
+title: "Quick start"
+description: "Give an AI agent spending power with limits, visibility, and payment proof."
 ---
 
-# Quick Start
+4Mica lets buyers give an AI agent money without giving it unlimited trust. You fund a wallet, define what the agent is allowed to pay for, and keep a record of every paid request so spending stays visible, bounded, and auditable.
 
-Start here if you are building an agent, script, wallet, or application that pays 4Mica-protected resources.
+## What buyers control
 
-## Buyer Responsibilities
+When an agent can spend, the important question is not just "can it pay?" It is "can it pay within the rules I set?"
 
-- Maintain a funded collateral position on the networks you want to use.
-- Register a 4Mica client scheme for every network your target sellers accept.
-- Sign only payment requirements that match your agent policy.
-- Track open tabs and settlement obligations before withdrawing collateral.
+As a buyer, you should control:
 
-## Recommended Flow
+- which wallet funds the agent;
+- which networks and assets it can use;
+- which sellers, agents, or domains it can pay;
+- how much it can spend per request, task, route, or time window;
+- whether larger payments require approval;
+- when the agent should stop, ask for help, or choose a cheaper option;
+- how payments connect to task logs and delivered results.
 
-1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
-2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
-3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
-4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
-5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+4Mica provides the payment path. Your agent policy decides when a payment is allowed.
 
-## Operational Notes
+## Buyer setup
 
-Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.
+<Steps>
+  <Step title="Create a dedicated wallet">
+    Use a wallet for the agent or application, not your main wallet. Keep automated signing separate from personal funds.
+  </Step>
+  <Step title="Deposit collateral">
+    Deposit ETH or a supported ERC-20 into 4Mica on the network your target sellers accept.
+  </Step>
+  <Step title="Register the client scheme">
+    Configure the 4Mica client for each network the agent may use.
+  </Step>
+  <Step title="Define spending policy">
+    Set limits for amount, seller, route, network, task, time window, and approval requirements.
+  </Step>
+  <Step title="Make paid requests">
+    Use a wrapped HTTP client so the agent can handle paid resources while your policy decides which payments to sign.
+  </Step>
+  <Step title="Audit the task">
+    Record each payment with the seller, route, amount, reason, tab, request ID, and task result.
+  </Step>
+</Steps>
+
+## Minimal TypeScript example
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("https://api.example.com/data");
+const data = await response.json();
+```
+
+Start on Base Sepolia (`eip155:84532`) with small amounts. Move to production only after limits, logs, and withdrawal checks are routine.
+
+## Before the agent pays
+
+Your agent should inspect the seller's payment requirements and decide:
+
+- is this seller or domain allowed?
+- is the price within budget?
+- is the network and asset allowed?
+- does the payment match the task?
+- does the agent need human approval first?
+- should the agent continue, stop, or choose another seller?
+
+For cost controls, see [Budgets and Spending Limits](/buyer/budgets-and-spending-limits).
+
+## After the agent pays
+
+Every paid request should produce a record that explains what happened:
+
+- which agent paid;
+- which seller received the payment;
+- how much was authorized;
+- why the payment happened;
+- which task or request it belongs to;
+- what result came back;
+- whether the tab or settlement obligation is still open.
+
+For audit trails, see [Payment Proof and Audit](/buyer/payment-proof-and-audit).

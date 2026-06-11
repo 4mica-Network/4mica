@@ -1,31 +1,109 @@
 ---
 title: "Quick Start"
-description: "Help sellers start accepting paid requests with 4Mica."
+description: "Turn an agent, API, model, dataset, or workflow into a paid 4Mica resource."
 ---
 
-# Quick Start
+4Mica lets sellers turn an AI agent, API, model endpoint, dataset, tool, or content route into a paid service that earns money per request, per task, or per unit of usage without building accounts, invoices, prepaid balances, or manual checkout.
 
-Start here if you operate an API, model endpoint, dataset, tool, or content route that should be paid per request.
+## What you are selling
 
-## Seller Responsibilities
+For agent sellers, the product is usually not a static file. It is work:
 
-- Define protected routes and prices clearly.
-- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
-- Set scheme to 4mica-credit and choose supported networks.
-- Verify and settle every accepted payment before serving paid work.
-- Monitor unpaid tabs and claim windows for defaulted payers.
+- one model inference;
+- one API call;
+- one completed task;
+- one workflow step;
+- one data lookup;
+- one second of compute;
+- one agent-to-agent request.
 
-## Request Flow
+4Mica is built for that shape. The buyer does not need a subscription, an account balance on your service, or a human checkout session. They need a funded 4Mica position, an x402-capable client, and a policy that allows the payment.
 
-1. Return HTTP 402 when an unpaid client asks for protected content.
-2. Let the client open a tab through your advertised endpoint.
-3. Receive the retried request with a payment header.
-4. Verify and settle through the facilitator.
-5. Serve the protected response only after payment validation succeeds.
+## Seller setup
 
-## Production Checklist
+<Steps>
+  <Step title="Choose the paid surface">
+    Pick the route that represents a paid unit of work. Start with one route, one price, one network, and one settlement asset.
+  </Step>
+  <Step title="Publish payment requirements">
+    Configure x402 payment requirements for that route: scheme, price, network, accepted asset, and your `payTo` address.
+  </Step>
+  <Step title="Host a tab endpoint">
+    Advertise a tab endpoint on your own API, such as `https://api.example.com/payment/tab`. Buyers should call your endpoint, not a raw facilitator URL.
+  </Step>
+  <Step title="Verify before work">
+    When the buyer retries with a payment header, verify and settle the guarantee through the facilitator before running the paid operation.
+  </Step>
+  <Step title="Record what happened">
+    Log the request ID, tab ID, payer address, seller address, price, route, settlement result, and response hash or delivery marker.
+  </Step>
+</Steps>
 
-- Use HTTPS for protected routes and tab endpoints.
-- Log tab IDs, request IDs, payer addresses, and settle responses.
-- Keep prices and accepted assets explicit in route configuration.
-- Create alerts for repeated verification failures and missed claim windows.
+## Minimal Express example
+
+```ts
+import express from "express";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+const app = express();
+
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "POST /agent/research": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:84532",
+          payTo: "0xYourSellerAddress",
+        },
+      },
+    },
+    {
+      advertisedEndpoint: "https://api.example.com/payment/tab",
+    }
+  )
+);
+
+app.post("/agent/research", async (req, res) => {
+  const result = await runPaidAgentTask(req.body);
+  res.json(result);
+});
+```
+
+The middleware handles the payment loop. Your handler should only run after the payment has been validated for the protected route.
+
+## How sellers earn money
+
+Sellers earn by attaching prices to protected work. You can charge per request, task, API call, model invocation, usage unit, or tiered route. The pricing model belongs in your route configuration and application logic. 4Mica supplies the payment guarantee, tab, verification, settlement, and claim path.
+
+For pricing patterns, see [Pricing and Monetization](/seller/pricing-and-monetization).
+
+## How another agent pays you
+
+An agent pays you the same way a human-operated client does: it calls your route, receives HTTP 402, checks the price against its policy, opens or reuses a tab, signs a guarantee, and retries. Your server does not need to know whether the payer is a person, a script, or another agent unless you choose to price or allowlist them differently.
+
+For agent-to-agent flows, see [Agent-to-Agent Payments](/seller/agent-to-agent-payments).
+
+## How you prove value was delivered
+
+A payment guarantee proves that a specific payer authorized a specific amount for a specific request. Your application still needs delivery evidence for the work itself. Store the request payload or hash, response payload or hash, timestamps, model or agent version, logs, and settlement result. This gives you a record for support, disputes, reputation, and analytics.
+
+For delivery evidence, see [Proof and Disputes](/seller/proof-and-disputes).
+
+## How you protect your agent
+
+Do not run expensive work before payment validation succeeds. Add rate limits, free-trial limits, per-buyer caps, allowlists or blocklists, cost ceilings, and monitoring around failed verifications. 4Mica gives you the payment enforcement path; your application controls abuse policy.
+
+For abuse controls, see [Risk and Abuse Prevention](/seller/risk-and-abuse-prevention).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Payment Middleware" icon="server" href="/seller/payment-middleware">
+    Protect routes and settle signed guarantees.
+  </Card>
+  <Card title="Test in Sandbox" icon="flask-conical" href="/seller/test-in-sandbox">
+    Prove the full 402, tab, retry, settle, and claim flow before production.
+  </Card>
+</Columns>

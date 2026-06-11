@@ -1,29 +1,82 @@
 ---
 title: "Examples"
-description: "Show buyer implementation examples."
+description: "Buyer implementation patterns for paid agent requests with policy and logs."
 ---
 
-# Examples
+Use these patterns as a starting point for agents that need to pay services during a task while staying inside budget and policy.
 
-Use these patterns as a starting point for agents that need to pay many services during a task.
-
-## Buyer Responsibilities
-
-- Maintain a funded collateral position on the networks you want to use.
-- Register a 4Mica client scheme for every network your target sellers accept.
-- Sign only payment requirements that match your agent policy.
-- Track open tabs and settlement obligations before withdrawing collateral.
-
-## TypeScript Example
+## Basic paid request
 
 ```ts
 const response = await fetchWithPayment("https://api.example.com/data");
+
 if (!response.ok) {
   throw new Error(`Paid request failed: ${response.status}`);
 }
+
 const data = await response.json();
 ```
 
-## Operational Notes
+## Task budget guard
 
-Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.
+```ts
+type BuyerPolicy = {
+  maxPerRequestUsd: number;
+  maxPerTaskUsd: number;
+  allowedDomains: string[];
+};
+
+function canPay(requirement: {
+  amountUsd: number;
+  sellerDomain: string;
+  taskSpendUsd: number;
+}, policy: BuyerPolicy) {
+  if (!policy.allowedDomains.includes(requirement.sellerDomain)) return false;
+  if (requirement.amountUsd > policy.maxPerRequestUsd) return false;
+  if (requirement.taskSpendUsd + requirement.amountUsd > policy.maxPerTaskUsd) {
+    return false;
+  }
+  return true;
+}
+```
+
+## Approval threshold
+
+```ts
+async function requireApprovalIfNeeded(amountUsd: number) {
+  if (amountUsd <= 1) return true;
+
+  return await requestHumanApproval({
+    title: "Approve agent payment",
+    amountUsd,
+    reason: "The agent needs a paid data source to finish the task.",
+  });
+}
+```
+
+## Payment log shape
+
+```ts
+type PaidRequestLog = {
+  taskId: string;
+  requestId: string;
+  sellerDomain: string;
+  payTo: `0x${string}`;
+  amountUsd: number;
+  network: string;
+  asset: string;
+  tabId: string;
+  policyVersion: string;
+  reason: string;
+  resultStatus: "paid" | "failed" | "blocked" | "needs_approval";
+};
+```
+
+## Workflow pattern
+
+1. Agent plans the task.
+2. Agent estimates which paid services may be needed.
+3. Policy sets max spend for the task.
+4. Each payment is checked against seller, amount, network, and reason.
+5. The task log links paid requests to outputs.
+6. The user can audit spend after completion.

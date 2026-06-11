@@ -1,0 +1,164 @@
+---
+title: "FAQs"
+description: "Answers to common questions from sellers of AI agents, paid APIs, models, datasets, and workflows."
+---
+
+## Trust and legitimacy
+
+**Why should I trust this payment platform for my AI agent?**  
+4Mica is built for x402 agent payments: buyers sign collateral-backed guarantees, sellers verify and settle before serving paid work, and settlement can happen later through tabs and claims.
+
+**How do buyers know my agent is legitimate?**  
+Publish a consistent domain, seller `payTo` address, agent name, route list, and support policy. Marketplaces or registries can add verified profiles on top.
+
+**How do buyers verify that my agent is the real one and not a fake copy?**  
+They compare the API domain, tab endpoint, seller address, and profile metadata against your canonical listing.
+
+**Can my agent have a verified seller profile?**  
+Yes, if the marketplace, registry, or application provides profiles. Bind the profile to your domain and seller payment address.
+
+**Can I show my agent's payment address publicly?**  
+Yes. Showing the seller address helps buyers detect fake payment requirements.
+
+**Can buyers see my agent's pricing before paying?**  
+Yes. Fixed prices appear in payment requirements. Dynamic work should use a quote-before-pay flow.
+
+**Can buyers see what they are paying for?**  
+Yes, if your route or quote describes the task, price, expiration, and completion rule clearly.
+
+**Can I prove that my agent delivered the requested result?**  
+Yes, by logging request IDs, tab IDs, payment results, payload hashes, response hashes, timestamps, and agent versions.
+
+**Can I build reputation or ratings around my agent?**  
+Yes. Use payment records plus delivery outcomes such as success rate, latency, refunds, disputes, and repeat buyers.
+
+**What happens if another agent impersonates my agent?**  
+Buyers should reject mismatched domains or seller addresses. You should publish canonical identity information and report fake listings to the marketplace or registry.
+
+## Pricing and monetization
+
+**Can I charge per request?**  
+Yes. Protect a route with a fixed price.
+
+**Can I charge per API call?**  
+Yes. Price each endpoint according to value and cost.
+
+**Can I charge per task completed?**  
+Yes. Quote the task, require payment or a guarantee, then execute and record delivery.
+
+**Can I charge based on usage, like tokens, compute, data, or time?**  
+Yes. Meter usage in your app and use prepayment, caps, staged payments, or quote updates.
+
+**Can I offer subscriptions?**  
+Yes, but subscriptions are usually enforced by your application. 4Mica is most useful for usage, overages, and agent-initiated paid calls.
+
+**Can I offer free trials or free credits?**  
+Yes. Keep them capped by wallet, identity, account, IP, or API key to prevent abuse.
+
+**Can I create different pricing tiers?**  
+Yes. Use different routes, metadata, policies, or application checks.
+
+**Can I change pricing dynamically based on demand or cost?**  
+Yes, as long as the buyer sees the quoted price before signing.
+
+**Can I charge different prices for humans and agents?**  
+Yes, if your application can distinguish the context and publishes the terms clearly.
+
+**Can I set minimum payment amounts?**  
+Yes. Set minimums that cover your costs and support burden.
+
+## Microtransactions
+
+**Does the platform support very small payments?**  
+Yes. 4Mica separates fast authorization from later settlement so small payments can be practical.
+
+**Can I charge fractions of a cent?**  
+Yes, if that price makes sense for your product economics.
+
+**Are fees low enough for microtransactions to make sense?**  
+The model avoids settling every request on-chain. You should still measure your own compute, data, and support costs.
+
+**Can multiple small payments be batched?**  
+Yes. Tabs and deferred settlement let many small obligations accumulate before settlement.
+
+**How often are microtransactions settled?**  
+Settlement depends on the tab, credit window, claim window, and your operational policy.
+
+**What happens if the buyer does not have enough balance?**  
+They cannot produce a valid collateral-backed guarantee, and your server should not serve paid work.
+
+**Can I require prepayment before my agent starts working?**  
+Yes. Require a valid guarantee, prepayment, or staged payment before expensive execution.
+
+**Can I lock payment until the task is completed?**  
+You can design completion and release rules in your application. 4Mica provides guarantees, settlement, and claim paths.
+
+**Can I refund tiny payments easily?**  
+Use automated credit or refund rules for seller-side failures, duplicates, or timeouts. Tiny manual refunds can cost more than they are worth.
+
+**Can I avoid losing money on gas fees or network fees?**  
+Use 4Mica credit, tabs, and deferred settlement instead of sending an on-chain transaction for every small call.
+
+## Agent-to-agent payments
+
+**Can other AI agents pay my agent directly?**  
+Yes. Any compatible x402 buyer agent can pay your protected route.
+
+**Can my agent receive payments without human approval every time?**  
+Yes. Your server can accept valid guarantees automatically. The buyer decides how much authority its agent has.
+
+**Can my agent call another paid agent and resell the result?**  
+Yes. Track downstream cost, permissions, and delivery evidence in your workflow.
+
+**Can my agent split revenue with other agents?**  
+Yes at the application layer. Track each participant and pay each obligation through the appropriate paid route or settlement process.
+
+**Can I define who is allowed to buy from my agent?**  
+Yes. Use allowlists, blocklists, identity checks, route policy, and rate limits.
+
+**Can I block suspicious agents or buyers?**  
+Yes. Block by wallet, identity, account, domain, API key, IP, or behavior depending on your integration.
+
+**Can my agent reject requests that are too expensive to fulfill?**  
+Yes. Reject or requote when estimated cost exceeds the authorized payment.
+
+**Can my agent negotiate price before accepting a task?**  
+Yes. Add a quote endpoint or negotiation step before returning final payment requirements.
+
+**Can my agent expose payment requirements through an API?**  
+Yes. HTTP 402 is the machine-readable API flow for payment requirements.
+
+**Can my agent receive payment from multiple agents in the same workflow?**  
+Yes. Treat each paid request as its own obligation with its own payer, seller, amount, and delivery record.
+
+## Risk, control, and abuse prevention
+
+**How do I prevent spam requests to my agent?**  
+Keep unpaid requests cheap, return 402 before expensive work, and rate limit unpaid traffic.
+
+**How do I prevent buyers from abusing free trials?**  
+Cap trials by wallet, account, IP, identity, or API key and monitor repeated new identities.
+
+**What happens if a buyer claims my agent failed?**  
+Use payment logs, delivery logs, and your published completion rule to decide refund, retry, credit, or denial.
+
+**How are disputes handled for AI-generated work?**  
+4Mica provides payment evidence. Your product policy handles subjective quality, technical failure, refunds, and support.
+
+**Can I define refund rules?**  
+Yes. Define them before launch and make them visible.
+
+**Can I limit how much one buyer or agent can spend?**  
+Yes. Enforce per-buyer caps, concurrency limits, route limits, and downstream spend limits in your application.
+
+**Can I pause payments if something looks suspicious?**  
+Yes. Reject tab opens, block buyers, disable routes, or pause paid execution according to your incident process.
+
+**Can I require collateral or deposits from buyers?**  
+Yes. 4Mica guarantees are backed by payer collateral, and your application can require stronger prepayment for expensive tasks.
+
+**Can I see logs for paid requests?**  
+Yes, if you log them. Store request IDs, tab IDs, payer, route, amount, settlement result, and delivery marker.
+
+**Can I prove which request was paid for and what response was delivered?**  
+Yes. Link the payment record to request and response hashes or stored artifacts.

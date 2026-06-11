@@ -1,0 +1,82 @@
+---
+title: "Payment Proof and Audit"
+description: "See what your agent paid for, why it paid, and how payments connect to task results."
+---
+
+The buyer should be able to audit the full workflow after a task is done.
+
+4Mica gives the payment layer a record of signed guarantees, tabs, settlement, and claim paths. Your application should connect those records to task logs, reasons, outputs, receipts, and support workflows.
+
+## What to record
+
+For every paid request, log:
+
+- task ID;
+- request ID;
+- agent ID or wallet;
+- seller domain;
+- seller `payTo` address;
+- route;
+- amount;
+- network and asset;
+- tab ID;
+- policy version;
+- reason for payment;
+- approval record if one was required;
+- response status;
+- output hash or delivery marker;
+- settlement or obligation status.
+
+## Why each payment happened
+
+A payment without a reason is hard to trust. Buyer agents should attach a short reason:
+
+- "weather API needed for travel plan";
+- "model reranker needed to compare search results";
+- "translation agent needed to process seller page";
+- "paid dataset required for final answer";
+- "compute service needed for image generation."
+
+Reason codes make support, auditing, and user trust much easier.
+
+## Receipts and invoices
+
+4Mica provides the payment mechanics and records. Your application can expose receipts or invoices using those records:
+
+- task summary;
+- seller;
+- amount;
+- date;
+- network and asset;
+- request ID;
+- tab ID;
+- result status;
+- refund or dispute status.
+
+For business users, export these records in the format their accounting or compliance process needs.
+
+## Disputes
+
+If a buyer disputes a payment, review:
+
+1. Did the agent sign under policy?
+2. Did the seller receive a valid payment guarantee?
+3. Did the seller return the promised response?
+4. Did the output meet the seller's published completion rule?
+5. Does the seller refund policy apply?
+
+4Mica helps establish payment facts. Quality disputes, refunds, and support decisions depend on seller terms and application policy.
+
+## Notifications
+
+Notify users when:
+
+- a payment needs approval;
+- a task budget is nearly exhausted;
+- a payment fails;
+- a seller is blocked;
+- a large payment is made;
+- a task finishes with a spend summary;
+- a dispute or refund status changes.
+
+Notifications turn invisible agent spending into visible delegated work.

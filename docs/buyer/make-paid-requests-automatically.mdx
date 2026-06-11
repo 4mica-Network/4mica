@@ -3,25 +3,73 @@ title: "Make Paid Requests Automatically"
 description: "Use client wrappers to turn HTTP 402 responses into automatic paid retries."
 ---
 
-# Make Paid Requests Automatically
+The best buyer experience is simple for the agent and controlled for the operator. Your code calls a protected resource normally, the wrapper handles the paid retry, and your policy decides whether the payment should be signed.
 
-The best buyer experience is invisible: call fetch, requests, httpx, or Axios normally and let the wrapper handle the 402 payment dance.
+Automatic payment does not mean unlimited payment. Treat the wrapper as the transport layer and your policy as the guardrail.
 
-## Buyer Responsibilities
+## What the wrapper handles
 
-- Maintain a funded collateral position on the networks you want to use.
-- Register a 4Mica client scheme for every network your target sellers accept.
-- Sign only payment requirements that match your agent policy.
-- Track open tabs and settlement obligations before withdrawing collateral.
+- receives payment requirements from a protected route;
+- opens or reuses a tab through the seller endpoint;
+- signs a payment guarantee with your configured account;
+- retries the request with the payment header;
+- returns the paid response to your agent.
 
-## Recommended Flow
+## What your policy should handle
 
-1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
-2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
-3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
-4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
-5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+- maximum price per request;
+- maximum spend per task;
+- allowed sellers, domains, networks, and assets;
+- approval thresholds;
+- blocked categories or routes;
+- reason codes for every payment;
+- logging and alerting.
 
-## Operational Notes
+## TypeScript fetch wrapper
 
-Use small prices and testnet collateral first. Once the flow is stable, add spend limits per task, allowlists for seller domains, alerts for failed settlements, and a withdrawal process that checks open tabs before moving funds.
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("https://api.example.com/research");
+```
+
+## Signing rules
+
+Before signing, validate the payment against your buyer policy:
+
+- amount is at or below the allowed limit;
+- seller address matches the expected service;
+- route matches the current task;
+- network and asset are approved;
+- tab endpoint belongs to the seller domain you called;
+- task budget has remaining room;
+- approval has been collected if the amount crosses a threshold.
+
+If a requirement fails policy, do not sign. Return a controlled error to the agent so it can pick another service, ask for approval, or stop.
+
+## Logging rules
+
+Automatic payment should still be explainable. Log:
+
+- task ID;
+- request ID;
+- seller domain;
+- seller `payTo` address;
+- route;
+- amount;
+- network and asset;
+- tab ID;
+- policy version;
+- reason for payment;
+- result or error.
+
+These logs answer "why did the agent pay?" after the task is done.
