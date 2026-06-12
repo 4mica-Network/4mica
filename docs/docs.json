@@ -79,22 +79,34 @@
         "group": "Buyer",
         "pages": [
           "buyer/quick-start",
+          "buyer/trust-and-verification",
+          "buyer/budgets-and-spending-limits",
+          "buyer/quality-and-outcomes",
+          "buyer/safety-and-permissions",
+          "buyer/payment-proof-and-audit",
           "buyer/facilitator-urls",
           "buyer/make-paid-requests-automatically",
           "buyer/error-handling",
-          "buyer/examples",
           "buyer/test-in-sandbox",
-          "buyer/go-live"
+          "buyer/go-live",
+          "buyer/faqs"
         ]
       },
       {
         "group": "Seller",
         "pages": [
           "seller/quick-start",
+          "seller/trust-and-legitimacy",
+          "seller/pricing-and-monetization",
+          "seller/microtransactions",
+          "seller/agent-to-agent-payments",
+          "seller/proof-and-disputes",
+          "seller/risk-and-abuse-prevention",
           "seller/facilitator-urls",
           "seller/payment-middleware",
           "seller/test-in-sandbox",
-          "seller/go-live"
+          "seller/go-live",
+          "seller/faqs"
         ]
       },
       {

@@ -1,31 +1,52 @@
 ---
 title: "Facilitator URLs"
-description: "List seller-facing facilitator URL guidance."
+description: "Understand when you use the facilitator and why buyers should use your tab endpoint."
 ---
 
-# Facilitator URLs
+You use the facilitator from server-side middleware. Buyers usually should not call a hosted facilitator URL directly. They call your API, receive HTTP 402, and use the tab endpoint you advertised in the payment requirements.
 
-Sellers use the facilitator from their server middleware. Buyers should use the seller tab endpoint advertised in the HTTP 402 response.
+That distinction matters because you own the commercial context: route, price, accepted networks, accepted assets, `payTo` address, logging, and abuse policy.
 
-## Seller Responsibilities
+## URLs your service uses
 
-- Define protected routes and prices clearly.
-- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
-- Set scheme to 4mica-credit and choose supported networks.
-- Verify and settle every accepted payment before serving paid work.
-- Monitor unpaid tabs and claim windows for defaulted payers.
+| URL type | Who calls it | Purpose |
+| --- | --- | --- |
+| Protected route | Buyer or buyer agent | Requests the paid resource. |
+| Your tab endpoint | Buyer or buyer agent | Opens or reuses a tab for your route. |
+| Facilitator API | Your middleware | Verifies and settles signed payment guarantees. |
+| Core4Mica contracts | Payer or seller through protocol operations | Collateral, settlement, claim, and withdrawal enforcement. |
 
-## Request Flow
+## Why advertise your own tab endpoint
 
-1. Return HTTP 402 when an unpaid client asks for protected content.
-2. Let the client open a tab through your advertised endpoint.
-3. Receive the retried request with a payment header.
-4. Verify and settle through the facilitator.
-5. Serve the protected response only after payment validation succeeds.
+Your tab endpoint lets you keep your policy at the edge of your own API. It gives you a place to:
 
-## Production Checklist
+- bind the tab to the route and price the buyer saw;
+- apply allowlists, blocklists, and rate limits;
+- attach request metadata for support and audit;
+- hide infrastructure details from buyers;
+- migrate facilitator deployments without changing your public payment surface.
 
-- Use HTTPS for protected routes and tab endpoints.
-- Log tab IDs, request IDs, payer addresses, and settle responses.
-- Keep prices and accepted assets explicit in route configuration.
-- Create alerts for repeated verification failures and missed claim windows.
+In production, the advertised endpoint should be an HTTPS URL on your domain, such as:
+
+```txt
+https://api.example.com/payment/tab
+```
+
+If buyers are seeing a facilitator URL instead of your tab endpoint, review seller endpoint configuration in [4mica dashboard](https://app.4mica.io).
+
+## Hosted facilitator
+
+Hosted deployments commonly use:
+
+```txt
+https://x402.4mica.xyz/
+```
+
+Use hosted or self-hosted facilitator URLs from your server configuration. Do not make buyers depend on those URLs directly unless you are intentionally exposing a lower-level integration.
+
+## Operational guidance
+
+- Keep the tab endpoint stable even if the facilitator URL changes.
+- Log every tab open request with route, buyer, network, price, and response.
+- Reject tab opens for routes, prices, assets, or networks you no longer accept.
+- Treat unexpected direct facilitator usage as an integration smell unless you explicitly documented it.

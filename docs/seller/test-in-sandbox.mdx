@@ -1,31 +1,79 @@
 ---
 title: "Test in Sandbox"
-description: "Test seller payment flows safely before production."
+description: "Test your agent payment flows safely before production."
 ---
 
-# Test in Sandbox
+Sandbox testing proves that your route can issue 402 requirements, open tabs, verify guarantees, settle, serve paid work, and produce useful logs.
 
-Sandbox testing proves that your route can issue 402 requirements, open tabs, verify guarantees, settle, and serve content.
+Use Base Sepolia (`eip155:84532`) and small prices while you are validating behavior.
 
-## Seller Responsibilities
+<Warning>
+Keep sandbox wallets, keys, and prices separate from production. A test route should never rely on a production seller key or real production pricing.
+</Warning>
 
-- Define protected routes and prices clearly.
-- Advertise a tab endpoint hosted by your API, not a raw facilitator URL.
-- Set scheme to 4mica-credit and choose supported networks.
-- Verify and settle every accepted payment before serving paid work.
-- Monitor unpaid tabs and claim windows for defaulted payers.
+## What to test first
 
-## Request Flow
+<Steps>
+  <Step title="Unpaid request">
+    Call the protected route without a payment header. Confirm your API returns HTTP 402 with the expected scheme, price, network, asset, `payTo`, and tab endpoint.
+  </Step>
+  <Step title="Paid retry">
+    Use a 4Mica-capable buyer client to open a tab, sign a guarantee, retry the request, and receive the protected response.
+  </Step>
+  <Step title="Invalid payment">
+    Retry with a missing, expired, malformed, or mismatched payment header. Confirm the paid handler does not run.
+  </Step>
+  <Step title="Delivery evidence">
+    Confirm logs connect request ID, tab ID, payer, route, price, settlement result, and response hash or delivery marker.
+  </Step>
+  <Step title="Claim path">
+    Exercise the default path in a controlled environment so your team understands when a seller can claim from collateral and when a claim expires.
+  </Step>
+</Steps>
 
-1. Return HTTP 402 when an unpaid client asks for protected content.
-2. Let the client open a tab through your advertised endpoint.
-3. Receive the retried request with a payment header.
-4. Verify and settle through the facilitator.
-5. Serve the protected response only after payment validation succeeds.
+Watch the sandbox run in [4mica dashboard](https://app.4mica.io) so tab creation, settlement, and delivery evidence are visible together.
 
-## Production Checklist
+## Sandbox checklist
 
-- Use HTTPS for protected routes and tab endpoints.
-- Log tab IDs, request IDs, payer addresses, and settle responses.
-- Keep prices and accepted assets explicit in route configuration.
-- Create alerts for repeated verification failures and missed claim windows.
+Before adding tiers, metering, or complex workflows, prove the smallest paid route end to end.
+
+| Check | What to confirm |
+| --- | --- |
+| Test wallets | You use separate seller and buyer wallets for sandbox. |
+| Small price | The first route uses a low amount, such as `$0.01`. |
+| One protected route | A simple route works before you add pricing complexity. |
+| Tab endpoint | The buyer client can reach your advertised tab endpoint. |
+| Server-side facilitator call | Your server, not browser code, talks to the facilitator. |
+| Invalid attempts | Repeated bad payments trigger rate limits or alerts. |
+| Support lookup | You can find a paid request from a tab ID or request ID. |
+
+## Abuse scenarios to simulate
+
+- A buyer without enough collateral tries to pay.
+- A buyer pays for a cheap route and reuses the header on an expensive route.
+- A buyer changes request parameters after receiving a quote.
+- A buyer sends many unpaid requests to force expensive pre-work.
+- A buyer claims the agent failed after receiving a response.
+- Another client tries to impersonate a known payer or agent.
+
+The expected result is simple: unpaid or invalid requests do not trigger paid work, and every accepted request has a payment record tied to the delivered result.
+
+<Warning>
+If an unpaid, expired, malformed, or mismatched payment reaches paid execution, stop the rollout. Fix that path before testing more pricing models.
+</Warning>
+
+If an invalid or suspicious request still reaches paid execution, send the reproduction steps to [support](mailto:support@4mica.io).
+
+## When sandbox is done
+
+Move toward production only after the payment flow is boring. You should be able to answer the same questions from logs, dashboard records, and application behavior.
+
+| Question | Where the answer should appear |
+| --- | --- |
+| What did the buyer pay for? | Route configuration, quote metadata, and request logs. |
+| Which wallet paid? | Payment record and request logs. |
+| Which seller address received the obligation? | Payment requirements and settlement records. |
+| Which route and price were used? | HTTP 402 response, logs, and dashboard activity. |
+| Did verification and settlement succeed? | Middleware result and facilitator records. |
+| What did the agent return? | Response hash, delivery marker, or stored result metadata. |
+| What happens if the payer does not settle later? | Claim-path test notes and protocol records. |

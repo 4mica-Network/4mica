@@ -1,0 +1,93 @@
+---
+title: "Microtransactions"
+description: "Keep tiny agent payments profitable with guarantees, tabs, batching, and deferred settlement."
+---
+
+Agents create high-frequency, low-value commerce. A single task may trigger hundreds of small calls across data providers, model endpoints, and other agents.
+
+4Mica is built for this pattern by separating authorization from settlement. The buyer signs payment guarantees as requests happen. Settlement can happen later through tabs, claims, and netting instead of forcing every small request to become an on-chain transaction.
+
+## Why tiny payments need a different flow
+
+Traditional payment systems have a cost floor. Card authorizations, on-chain transactions, and manual invoices are too expensive or too slow for sub-dollar and sub-cent work.
+
+With 4Mica, the expensive part does not need to happen on every call:
+
+<Steps>
+  <Step title="Buyer adds collateral">
+    The buyer funds the account or wallet that can back payment guarantees.
+  </Step>
+  <Step title="Buyer signs per request">
+    Each paid request carries an off-chain guarantee instead of forcing immediate settlement.
+  </Step>
+  <Step title="You verify before work">
+    Your server checks the guarantee before serving the paid response.
+  </Step>
+  <Step title="Tabs accumulate obligations">
+    Small payments collect into tabs so settlement can happen later according to protocol rules.
+  </Step>
+</Steps>
+
+This makes tiny paid requests practical because the expensive part does not happen on every call.
+
+## Can you charge fractions of a cent?
+
+Yes, the model supports very small payments. Whether a fraction-of-a-cent price is profitable depends on your own cost structure. Include model cost, data cost, compute, bandwidth, observability, failed requests, support, and any downstream paid calls.
+
+If the unit is too small to price alone, bundle it into a unit buyers can still understand:
+
+- charge per 100 records instead of per record;
+- charge per task stage instead of per internal operation;
+- charge per time slice for streaming or compute;
+- require a minimum tab amount before expensive work begins.
+
+## Handle insufficient buyer balance
+
+If the buyer cannot produce a valid collateral-backed guarantee, your server should not serve paid work. The buyer client should treat the 402 flow as unpaid or insufficient funds and either stop, add collateral, choose a cheaper route, or ask the supervising user for a new budget.
+
+<Warning>
+Do not let an insufficient guarantee become a free retry path. If the buyer cannot back the payment, fail closed and make the next step explicit.
+</Warning>
+
+## Prepayment, locks, and completion
+
+For cheap deterministic work, verifying payment before the handler runs is usually enough.
+
+For expensive or long-running work, choose a payment pattern that matches the risk. You can require a valid guarantee before starting, ask for a larger prepayment or cap before streaming begins, split the task into paid stages, or hold final delivery until payment validation succeeds.
+
+If the task fails, refund or credit according to your published refund rules. Buyers should know the completion rule before they authorize the work.
+
+4Mica gives you the payment and claim path. Your product defines when work is considered complete.
+
+## Avoiding gas and network fee loss
+
+Do not settle every tiny call as its own on-chain transfer. Use 4Mica credit, tabs, and deferred settlement so high-frequency traffic becomes a set of enforceable obligations rather than a flood of transactions.
+
+<Warning>
+If every tiny call settles separately, fees can erase the revenue you just earned. Use tabs and deferred settlement for high-frequency routes.
+</Warning>
+
+Monitor the signals that show whether microtransactions are still profitable:
+
+- average payment amount;
+- requests per tab;
+- settlement success rate;
+- claimable amount;
+- expired claims;
+- cost per fulfilled request;
+- downstream paid spend.
+
+Use dashboard settlement history to confirm tiny obligations are batching as expected.
+
+## Microtransaction checklist
+
+Before launch, check the parts that decide whether small payments stay profitable.
+
+| Check | What to confirm |
+| --- | --- |
+| Price visibility | Tiny prices are visible before the buyer signs. |
+| Payment validation | Expensive work does not start until payment is valid. |
+| Batching | Obligations accumulate through tabs instead of settling one by one. |
+| Minimums | Your minimum price covers cost, support, and downstream paid calls. |
+| Alerts | You watch invalid payment spikes and missed claim windows. |
+| Repricing | You revisit prices when usage patterns change. |
