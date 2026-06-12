@@ -3,13 +3,13 @@ title: "Budgets and Spending Limits"
 description: "Control how much an AI agent can spend, when it needs approval, and when it must stop."
 ---
 
-The buyer story is simple: give your AI agent money, but not unlimited trust.
+The story is simple: give your AI agent money, but not unlimited trust.
 
-4Mica lets an agent pay for useful services. Your buyer policy decides how much the agent can spend and under what conditions.
+4Mica lets an agent pay for useful services. Your policy decides how much the agent can spend and under what conditions.
 
 ## Core limits
 
-Start with hard limits:
+Start with hard limits. Your policy should define the largest amount an agent can spend in one request, across one task, and over a time window. It should also constrain where that money can go: which sellers, categories, networks, and assets are allowed.
 
 | Limit | What it prevents |
 | --- | --- |
@@ -20,67 +20,38 @@ Start with hard limits:
 | Category limit | Spending on blocked or risky service types. |
 | Network or asset limit | Payments moving through unsupported routes. |
 
-Use small limits in sandbox and raise them only after the workflow is predictable.
+Set the first budget caps from [dashboard](https://app.4mica.io), then raise them only after the agent behaves predictably.
 
 ## Fixed and usage-based prices
 
-Before paying, the agent should know whether the seller price is:
+Before paying, your agent should know what kind of price it is accepting. Some sellers charge a fixed amount for each request or task. Others charge by usage, such as API call, token, second of compute, data unit, or completed result. Some work starts with a quote that expires if you do not accept it.
 
-- fixed per request;
-- per API call;
-- per task;
-- per token;
-- per second of compute;
-- per data unit;
-- per result;
-- quote-based.
-
-Usage-based work needs extra guardrails. If the final cost can grow, use a cap, staged payment, or human approval threshold.
+Fixed prices are easier to approve automatically because the final cost is known before signing. Usage-based work needs stronger guardrails. If the final cost can grow, use a cap, staged payment, or human approval threshold.
 
 ## Approval gates
 
-Require approval when:
+Approval gates decide when your agent can keep going by itself and when it must pause for a person or higher-level policy. The most common triggers are payments above a per-request threshold, tasks nearing their budget, new sellers, high-risk routes, downstream paid agents, changed estimates, and attempts to continue after failure.
 
-- the payment exceeds a per-request threshold;
-- the task budget is almost exhausted;
-- the seller is new;
-- the route is high risk;
-- the agent wants to call another paid agent;
-- the price changed from the estimate;
-- the agent wants to continue after a failure.
+Approve before signing the payment, not after the agent has already spent.
 
-Approval should happen before signing the payment, not after the agent has already spent.
+If your approval flow needs custom thresholds or multiple reviewers, contact [4Mica support](mailto:support@4mica.io) before production.
 
 ## Stopping mid-task
 
-A buyer agent should stop when:
+Your agent should stop when continuing would break policy or waste money. That includes an exhausted budget, denied approval, repeated seller failures, suspicious payment requirements, user cancellation, or a task that can no longer be completed within budget.
 
-- the budget is exhausted;
-- the next payment requires approval and approval is denied;
-- the seller fails repeatedly;
-- the agent detects a suspicious payment requirement;
-- the task can no longer be completed within budget;
-- the user cancels the task.
-
-Stopping is a feature. It prevents a useful agent from becoming an uncontrolled spender.
+Stopping is a feature. It prevents a useful agent from becoming an uncontrolled spender, and it gives the user a clean point to approve more budget, change sellers, or abandon the task.
 
 ## Hidden costs
 
-Agents may pay other services while completing one task. Track:
-
-- API calls;
-- model inference;
-- data access;
-- compute;
-- storage;
-- downstream agents;
-- retries;
-- premium latency or SLA charges.
+Your agent may pay other services while completing one task. The visible seller price may not be the whole cost if the agent also buys model inference, data access, compute, storage, downstream agent work, retries, or premium latency.
 
 Show estimated cost before the task starts and actual cost after it ends. If the task changes, update the estimate before spending more.
 
+Use your dashboard history to compare estimated spend with actual downstream payments.
+
 ## Refunds
 
-Refunds are seller policy. 4Mica provides payment evidence that helps both sides see what was paid. Your application should connect that evidence to task logs, seller terms, and support decisions.
+Refunds are your policy. 4Mica provides payment evidence that helps both sides see what was paid. Your application should connect that evidence to task logs, seller terms, and support decisions.
 
-For buyer safety, prefer sellers with clear refund rules and strong delivery evidence.
+For your safety, prefer sellers with clear refund rules and strong delivery evidence.

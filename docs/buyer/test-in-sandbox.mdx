@@ -1,6 +1,6 @@
 ---
 title: "Test in Sandbox"
-description: "Test buyer payment flows safely before production."
+description: "Test payment flows safely before production."
 ---
 
 Use Base Sepolia (`eip155:84532`) or Ethereum Sepolia until your agent can deposit collateral, open tabs, sign guarantees, retry paid requests, enforce limits, and produce useful logs.
@@ -27,15 +27,17 @@ Sandbox is where you prove the guardrails, not only the happy path.
   </Step>
 </Steps>
 
+Run the sandbox flow while watching activity in [app.4mica.io](https://app.4mica.io), so each tab and payment attempt is visible.
+
 ## Sandbox scenarios
 
-- Seller is allowed and price is within budget.
-- Seller is unknown and should be blocked.
+- The seller is allowed and price is within budget.
+- The seller is unknown and should be blocked.
 - Price is higher than the per-request limit.
 - Task spend exceeds the task budget.
 - Network or asset is unsupported.
 - Wallet has insufficient collateral.
-- Seller tab endpoint does not match the expected domain.
+- The seller tab endpoint does not match the expected domain.
 - Paid response fails after payment.
 - User stops the agent mid-task.
 
@@ -51,3 +53,4 @@ Move beyond sandbox when you can answer:
 - Can you see every payment and why it happened?
 - Can you link payments to task logs and results?
 - Do withdrawals check open tabs and settlement obligations first?
+

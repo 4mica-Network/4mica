@@ -1,22 +1,22 @@
 ---
 title: "Facilitator URLs"
-description: "Understand which endpoints buyer agents call during a 4Mica payment flow."
+description: "Understand which endpoints your agent calls during a 4Mica payment flow."
 ---
 
-Most buyers do not call the hosted facilitator directly. They call the seller API, receive payment requirements, and use the seller advertised tab endpoint. The seller middleware talks to the facilitator from the server side.
+Most integrations do not call the hosted facilitator directly. Your agent calls the seller's API, receives payment requirements, and uses the tab endpoint the seller advertised. The seller's middleware talks to the facilitator from the server side.
 
-For buyers, the safest mental model is: pay the seller you intended to call, through the endpoint that seller advertised.
+The safest mental model is: pay the seller you intended to call, through the endpoint that seller advertised.
 
-## Buyer-facing endpoints
+## Endpoints your agent uses
 
-| Endpoint | Who owns it | Buyer use |
+| Endpoint | Who owns it | Your agent uses it to |
 | --- | --- | --- |
 | Protected route | Seller | The API, agent, model, or dataset your agent wants to use. |
-| Seller tab endpoint | Seller | Opens or reuses a payment tab for that seller route. |
-| Facilitator API | 4Mica or self-hosted operator | Usually called by seller middleware, not directly by buyer agents. |
+| The seller tab endpoint | Seller | Opens or reuses a payment tab for that seller route. |
+| Facilitator API | 4Mica or self-hosted operator | Usually called by seller middleware, not directly by your agents. |
 | Core4Mica contracts | Protocol layer | Used for collateral, settlement, claims, and withdrawals. |
 
-## What buyers should verify
+## What you should verify
 
 Before signing, check:
 
@@ -26,7 +26,9 @@ Before signing, check:
 - the amount fits the task budget;
 - the route and price match the task.
 
-If any value looks wrong, do not sign. A buyer agent should treat mismatched payment requirements the same way a human treats a suspicious checkout page.
+If any value looks wrong, do not sign. Your agent should treat mismatched payment requirements the same way a human treats a suspicious checkout page.
+
+If the seller address or tab endpoint does not match what your buyer expected, do not sign; escalate the mismatch through [support](mailto:support@4mica.io).
 
 ## Hosted facilitator
 
@@ -36,4 +38,4 @@ Hosted deployments commonly use:
 https://x402.4mica.xyz/
 ```
 
-Buyer applications normally see this only indirectly. Keep your integration pointed at seller APIs and use the tab endpoint they advertise.
+Your applications normally see this only indirectly. Keep your integration pointed at seller APIs and use the tab endpoint they advertise.

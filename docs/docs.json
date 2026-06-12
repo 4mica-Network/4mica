@@ -87,7 +87,6 @@
           "buyer/facilitator-urls",
           "buyer/make-paid-requests-automatically",
           "buyer/error-handling",
-          "buyer/examples",
           "buyer/test-in-sandbox",
           "buyer/go-live",
           "buyer/faqs"

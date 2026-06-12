@@ -1,15 +1,15 @@
 ---
-title: "Quick start"
+title: "Quick Start"
 description: "Give an AI agent spending power with limits, visibility, and payment proof."
 ---
 
-4Mica lets buyers give an AI agent money without giving it unlimited trust. You fund a wallet, define what the agent is allowed to pay for, and keep a record of every paid request so spending stays visible, bounded, and auditable.
+4Mica lets you give an AI agent money without giving it unlimited trust. You fund a wallet, define what the agent is allowed to pay for, and keep a record of every paid request so spending stays visible, bounded, and auditable.
 
-## What buyers control
+## What you control
 
 When an agent can spend, the important question is not just "can it pay?" It is "can it pay within the rules I set?"
 
-As a buyer, you should control:
+You should control:
 
 - which wallet funds the agent;
 - which networks and assets it can use;
@@ -21,7 +21,7 @@ As a buyer, you should control:
 
 4Mica provides the payment path. Your agent policy decides when a payment is allowed.
 
-## Buyer setup
+## Set up your agent
 
 <Steps>
   <Step title="Create a dedicated wallet">
@@ -37,14 +37,16 @@ As a buyer, you should control:
     Set limits for amount, seller, route, network, task, time window, and approval requirements.
   </Step>
   <Step title="Make paid requests">
-    Use a wrapped HTTP client so the agent can handle paid resources while your policy decides which payments to sign.
+    Use a wrapped HTTP client so the agent can handle paid resources while Your policy decides which payments to sign.
   </Step>
   <Step title="Audit the task">
     Record each payment with the seller, route, amount, reason, tab, request ID, and task result.
   </Step>
 </Steps>
 
-## Minimal TypeScript example
+When you are ready to create the wallet and policy, continue in the [dashboard](https://app.4mica.io).
+
+## Make a Paid Request
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
@@ -62,7 +64,9 @@ const response = await fetchWithPayment("https://api.example.com/data");
 const data = await response.json();
 ```
 
+<Warning>
 Start on Base Sepolia (`eip155:84532`) with small amounts. Move to production only after limits, logs, and withdrawal checks are routine.
+</Warning>
 
 ## Before the agent pays
 
@@ -77,6 +81,8 @@ Your agent should inspect the seller's payment requirements and decide:
 
 For cost controls, see [Budgets and Spending Limits](/buyer/budgets-and-spending-limits).
 
+If a payment requirement looks suspicious or hard to classify, send the details to [support](mailto:support@4mica.io) before allowing the agent to sign.
+
 ## After the agent pays
 
 Every paid request should produce a record that explains what happened:
@@ -90,3 +96,5 @@ Every paid request should produce a record that explains what happened:
 - whether the tab or settlement obligation is still open.
 
 For audit trails, see [Payment Proof and Audit](/buyer/payment-proof-and-audit).
+
+Use the activity view in [4mica app](https://app.4mica.io) to compare the payment trail with your task logs.

@@ -5,76 +5,39 @@ description: "Evaluate whether a paid AI agent is likely to deliver useful work 
 
 Payment proves that money moved or was guaranteed. It does not prove that an AI result was useful.
 
-Buyers should evaluate agent quality before spending and measure outcomes after the task is done.
+You should evaluate agent quality before spending and measure outcomes after the task is done.
 
 ## Before paying
 
-Look for:
+Before paying, you should have enough evidence to decide whether the agent is likely to produce useful work. Some evidence comes from the seller, such as examples, demos, version information, known limitations, and refund terms. Some comes from the market, such as ratings, reviews, repeat usage, latency, and failure history.
 
-- clear description of what the agent does;
-- examples of previous outputs;
-- sandbox or demo access;
-- ratings, reviews, or marketplace history;
-- success rate or failure rate;
-- latency expectations;
-- refund and support policy;
-- version or model information;
-- known limitations.
+| Signal | What it helps answer |
+| --- | --- |
+| Output examples | Does the agent produce work in the format and quality you expect? |
+| Demo or sandbox | Can you test the agent before giving it a larger task? |
+| Ratings and reviews | Have other buyers had a good experience with this agent? |
+| Success and failure history | How often does the agent complete the kind of task being requested? |
+| Refund and support policy | What happens if the result is unusable or incomplete? |
 
 For a new or unknown agent, start with a small paid test before giving it a larger task.
 
 ## During the task
 
-Your buyer app should track:
+During execution, quality is partly about visibility. You should be able to see what the agent is trying to do, which paid services it calls, why each payment is needed, what intermediate outputs are produced, and whether the remaining budget still makes sense for the task.
 
-- what the agent is trying to do;
-- which paid services it calls;
-- why each payment is needed;
-- intermediate outputs;
-- retries and failures;
-- remaining budget;
-- whether the task is still worth continuing.
-
-This is how buyers keep autonomy from becoming opacity.
+This is how you keep autonomy from becoming opacity.
 
 ## If the agent is wrong
 
 AI agents can return bad or incomplete results. Decide what should happen before the task starts:
 
-- retry automatically;
-- ask the user;
-- call another agent for comparison;
-- stop and preserve logs;
-- request a refund or credit under seller policy;
-- report or rate the agent.
+- retry automatically
+- ask the user
+- call another agent for comparison
+- stop and preserve logs
+- request a refund or credit under seller policy
+- report or rate the agent
 
 If the seller promised effort, a wrong answer may not qualify for a refund. If the seller promised a concrete outcome and failed to deliver it, the support path should be different.
 
-## Comparing agents
-
-Buyers can compare agents by:
-
-- price;
-- task fit;
-- success rate;
-- latency;
-- output examples;
-- refund rate;
-- reputation;
-- supported networks and assets;
-- data and permission requirements.
-
-The cheapest agent is not always the best value. Track outcome quality alongside spend.
-
-## Rating and reporting
-
-After using a paid agent, buyer applications can collect:
-
-- rating;
-- completion status;
-- output usefulness;
-- dispute or refund request;
-- reason for failure;
-- whether the buyer would use the agent again.
-
-These signals can feed marketplaces, registries, or internal allowlists.
+Keep the payment record and output together; support can only review a quality issue if the request trail is intact.

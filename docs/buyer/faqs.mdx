@@ -1,6 +1,6 @@
 ---
 title: "FAQs"
-description: "Answers to common questions from buyers of AI agents and paid agent services."
+description: "Answers to common questions about buying AI agents and paid agent services."
 ---
 
 ## Trust and verification
@@ -30,7 +30,7 @@ Compare the domain, tab endpoint, `payTo` address, and profile metadata against 
 Yes. Your client can inspect payment requirements and compare them with seller identity records before signing.
 
 **Can I see what permissions the agent requires?**  
-Your buyer application should show requested data, tools, sellers, networks, assets, and spending limits before the task starts.
+Your application should show requested data, tools, sellers, networks, assets, and spending limits before the task starts.
 
 **Can I revoke access later?**  
 Yes. Disable the agent, change policy, remove allowed sellers, rotate keys, and withdraw available collateral after checking open obligations.
@@ -50,7 +50,7 @@ The route, quote, or task description should define the paid unit of work.
 That depends on the seller. Your policy should handle each pricing model explicitly.
 
 **Can I see the estimated cost before the agent starts?**  
-Yes, your application should estimate cost and update the estimate if the task changes.
+Yes, Your application should estimate cost and update the estimate if the task changes.
 
 **Can I set a spending limit?**  
 Yes. Set limits per request, task, seller, category, time window, network, or asset.
@@ -65,7 +65,9 @@ Yes. Stop execution when budget is exhausted, approval is denied, or the task is
 There can be. Track downstream services, retries, data, compute, and other paid agents in the task log.
 
 **Can I get a refund if the result is bad?**  
-Refunds depend on seller policy. Payment and delivery logs help support the request.
+Refunds depend on your policy. Payment and delivery logs help support the request.
+
+For live budgets, approvals, and spend review, use [app.4mica.io](https://app.4mica.io).
 
 ## Quality and outcome
 
@@ -79,7 +81,7 @@ Some sellers offer demos, sandbox routes, trials, or tiny paid tests.
 That depends on the seller or marketplace. Use sandbox before giving a new agent larger budgets.
 
 **Can I see examples of previous outputs?**  
-Sellers should provide examples where possible. Marketplaces can also show past public outputs or case studies.
+Ask sellers to provide examples where possible. Marketplaces can also show past public outputs or case studies.
 
 **What success rate does this agent have?**  
 Success rate should come from seller reporting, marketplace history, or your own usage logs.
@@ -91,7 +93,7 @@ Follow your workflow policy: retry, ask the user, compare with another agent, re
 Stop spending, preserve logs, and use the seller support or refund process if payment was made.
 
 **Does the agent explain how it reached the result?**  
-That depends on the agent. Your buyer app can prefer agents that return citations, tool traces, or reasoning summaries.
+That depends on the agent. your app can prefer agents that return citations, tool traces, or reasoning summaries.
 
 **Can I compare this agent with other agents?**  
 Yes. Compare price, quality, latency, reputation, permissions, and refund history.
@@ -105,7 +107,7 @@ Yes, if your marketplace or application supports ratings and reports.
 Your application should show the data scope before the task starts.
 
 **Will the agent store my data?**  
-That depends on seller policy. Prefer sellers that publish retention and privacy terms.
+That depends on your policy. Prefer sellers that publish retention and privacy terms.
 
 **Can the agent share my data with other agents?**  
 Only if your permissions allow it. Block or require approval for downstream sharing.
@@ -137,7 +139,7 @@ Pause execution, disable signing, preserve logs, rotate keys if needed, and revi
 Your agent pays protected seller routes with a 4Mica-capable wallet and client.
 
 **Do I need a wallet or account?**  
-For 4Mica payments, the buyer needs a wallet or signer with collateral. Your application may abstract that for end users.
+For 4Mica payments, you need a wallet or signer with collateral. Your application may abstract that for end users.
 
 **Can I pay with card, wallet, stablecoin, or balance?**  
 4Mica's payment flow uses wallet-based collateral and supported assets. Cards or internal balances can be added by an application layer if offered.
@@ -162,3 +164,4 @@ Yes. Notify before approval-required payments and after important payment events
 
 **Can I audit the full workflow after the task is done?**  
 Yes. Keep a full workflow log that connects prompts, tool calls, payments, outputs, and policy decisions.
+
