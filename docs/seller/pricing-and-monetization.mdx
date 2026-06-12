@@ -3,13 +3,13 @@ title: "Pricing and Monetization"
 description: "Choose how an AI agent, API, model, dataset, or workflow earns money with 4Mica."
 ---
 
-Agent sellers are not limited to one checkout model. You can charge for work in the unit that matches your product: request, API call, completed task, usage unit, tier, subscription entitlement, or negotiated quote.
+You are not limited to one checkout model. You can charge for work in the unit that matches your product: request, API call, completed task, usage unit, tier, subscription entitlement, or negotiated quote.
 
 4Mica handles the payment guarantee and settlement path. Your application decides what the paid unit means.
 
 ## Common pricing models
 
-| Model | Good fit | Seller implementation |
+| Model | Good fit | Your implementation |
 | --- | --- | --- |
 | Per request | Simple APIs, data lookup, content access | One protected route with one price. |
 | Per API call | Tool APIs, model routing, enrichment services | Price each endpoint by value and cost. |
@@ -18,17 +18,20 @@ Agent sellers are not limited to one checkout model. You can charge for work in 
 | Tiered pricing | Basic/pro/enterprise agent capabilities | Use separate routes, metadata, or policy checks for each tier. |
 | Subscription entitlement | Ongoing access with periodic billing elsewhere | Use 4Mica for overages, one-off agent calls, or machine-initiated usage. |
 
-## Let buyers see the price before paying
+Model the first version of your pricing in [4mica dashboard](https://app.4mica.io) before exposing it to buyers.
 
-Agents need machine-readable prices because they make decisions without a human checkout screen. A buyer should be able to inspect:
+## Show the price before payment
 
-- the route being purchased;
-- the price;
-- the accepted scheme;
-- the network and asset;
-- the seller `payTo` address;
-- the tab endpoint;
-- any limits or expiration rules attached to the quote.
+Agents need clear prices because they make decisions without a human checkout screen. Before the buyer signs, expose the facts it needs to evaluate the payment:
+
+- route being purchased
+- price
+- accepted scheme, network, and asset
+- your `payTo` address
+- tab endpoint
+- quote limits or expiration rules
+
+That information lets a buyer agent compare the payment requirement with its own policy before it commits. It also gives both sides a clean record if the request later needs support, refund review, or dispute handling.
 
 If the price is dynamic, return a quote before the buyer signs. Do not make the buyer discover a higher price after work has already begun.
 
@@ -36,15 +39,17 @@ If the price is dynamic, return a quote before the buyer signs. Do not make the 
 
 Dynamic pricing works when the terms are visible before payment. Use it when cost changes with model load, demand, token count, data source, latency target, or downstream agent cost.
 
-Good dynamic pricing patterns:
-
-- quote based on estimated tokens or compute;
-- quote based on task complexity;
-- quote based on priority or SLA;
-- quote based on downstream provider cost plus margin;
-- reject requests that cannot be fulfilled profitably.
+| Pricing pattern | When to use it |
+| --- | --- |
+| Estimated tokens or compute | Your cost depends on model usage or processing time. |
+| Task complexity | Some requests need more planning, tools, or review than others. |
+| Priority or SLA | Buyers pay more for faster or more reliable execution. |
+| Downstream cost plus margin | Your agent calls paid tools, APIs, datasets, or other agents. |
+| Profitability rejection | A request cannot be fulfilled inside the buyer's authorized price. |
 
 If the final cost can exceed the estimate, cap the work, ask for another signed payment, or require a higher prepayment limit before continuing.
+
+If dynamic quotes depend on downstream costs or demand, ask [support](mailto:support@4mica.io) to review the flow before launch.
 
 ## Human and agent pricing
 
@@ -54,27 +59,36 @@ At the payment layer, both are x402 buyers. The pricing difference belongs in yo
 
 ## Free trials and credits
 
-Free trials are useful, but agents can abuse them quickly. Keep trials scoped:
+Free trials are useful, but agents can abuse them quickly. Keep each trial scoped by the signals you actually control, such as wallet, agent identity, account, IP, or API key. Add short expiration windows and cap both request count and total value.
 
-- limit by wallet, agent identity, account, IP, or API key where available;
-- set short expiration windows;
-- cap request count and total value;
-- require payment after the free credit is exhausted;
-- monitor repeated new identities that behave like the same buyer.
+Once the free credit is exhausted, require payment before more work continues. Watch for repeated new identities that behave like the same buyer, especially around expensive routes.
+
+Good trial limits usually include:
+
+- a short expiration window
+- a maximum number of requests
+- a maximum total value
+- a clear paid path after credits run out
 
 For valuable or expensive work, prefer tiny paid trials over unlimited free access.
 
 ## Minimum payment amounts
 
-4Mica is designed for very small payments, but your seller economics still matter. Set a minimum that covers model cost, infrastructure, logging, support, fraud risk, and downstream paid calls.
+4Mica is designed for very small payments, but your economics still matter. Set a minimum that covers model cost, infrastructure, logging, support, fraud risk, and downstream paid calls.
 
 For extremely small units, batch work at the application level or use a tab to accumulate many small obligations before settlement.
 
-## Seller pricing checklist
+## Pricing checklist
 
-- Price the smallest unit of work you can explain.
-- Make the price visible before payment.
-- Keep route, amount, network, asset, and seller address stable in logs.
-- Reject work that may cost more than the buyer authorized.
-- Use tiers or quotes instead of hidden surcharges.
-- Revisit pricing once you have real traffic, failure rates, and support data.
+Before production, review the choices that affect both revenue and buyer trust.
+
+| Check | What good looks like |
+| --- | --- |
+| Unit of work | You price the smallest unit you can explain clearly. |
+| Price visibility | Buyers can see the price before they sign. |
+| Payment record | Route, amount, network, asset, and `payTo` address stay stable in logs. |
+| Cost control | You reject work that may cost more than the buyer authorized. |
+| Pricing structure | You use tiers or quotes instead of hidden surcharges. |
+| Review cycle | You revisit pricing once you have real traffic, failure rates, and support data. |
+
+Before launch, compare these decisions with your configuration in the dashboard.

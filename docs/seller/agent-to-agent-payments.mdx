@@ -7,71 +7,66 @@ Other agents can pay your agent the same way any x402 buyer pays a protected res
 
 Your server verifies and settles the guarantee before running the paid operation.
 
-## What changes when the buyer is an agent
+## What changes when the payer is an agent
 
-The payment flow stays the same. The operating model changes:
+The payment flow stays the same. The operating model changes because the buyer may decide without a human approval step, call many sellers in one task, arrive with little reputation, resell your result inside a larger workflow, or require machine-readable pricing and limits.
 
-- the buyer may make decisions without a human approval step;
-- the buyer may call many sellers in one task;
-- the buyer may be newly created or have little reputation;
-- the buyer may resell your result inside a larger workflow;
-- the buyer may need machine-readable pricing and limits.
+Design your API for that reality. Make the price explicit, reject requests that exceed policy, and log enough context to support automated workflows.
 
-Design your seller API for that reality. Make the price explicit, reject requests that exceed policy, and log enough context to support automated workflows.
+<Tip>
+Assume another agent will read your payment requirements before a person does. Clear amounts, limits, expiration rules, and task metadata help autonomous buyers make safer decisions.
+</Tip>
 
 ## Receiving payment without human approval
 
-As a seller, you do not need a human to approve every inbound payment. Your protected route defines the price and requirements. If the buyer produces a valid guarantee, your server can accept it automatically.
+You do not need a human to approve every inbound payment. Your protected route defines the price and requirements. If the buyer produces a valid guarantee, your server can accept it automatically.
 
 The buyer controls whether its own agent can sign without human approval. That authority comes from the buyer's wallet, signer, collateral, and policy.
 
 ## Resale and downstream paid calls
 
-Your agent can call another paid agent, combine the result, and sell the final output. Treat this as a workflow with input cost:
+Your agent can call another paid agent, combine the result, and sell the final output. Treat this as a workflow with input cost, not a single free operation.
 
-- quote high enough to cover downstream calls;
-- cap downstream spend per request;
-- log each paid sub-call;
-- reject requests that cannot be fulfilled profitably;
-- disclose resale or data-use limits if your product requires them.
+For resale workflows, quote high enough to cover downstream calls, cap downstream spend per request, log each paid sub-call, and reject requests that cannot be fulfilled profitably. If your product has resale or data-use limits, disclose them before the buyer pays.
 
 If you split revenue with other agents or tools, track each participant's contribution and payment obligation in your application. 4Mica can handle the paid requests and guarantees, while your workflow defines the revenue allocation.
 
-## Allowing or blocking buyers
+<Warning>
+Do not resell downstream work unless your price, permissions, and logs can support it. A profitable top-level request can still fail if one sub-call costs more than expected or forbids reuse.
+</Warning>
 
-You can define who is allowed to buy from your agent. Common controls include:
+## Allow or block buyers
 
-- allowlists for trusted wallets, agents, domains, or customers;
-- blocklists for suspicious payers;
-- per-buyer request limits;
-- higher prices for unknown buyers;
-- required deposits, collateral, or minimum guarantee amounts;
-- identity or metadata checks before accepting a task.
+You can define who is allowed to buy from your agent. Access policy usually combines trust, economics, and abuse prevention.
+
+| Control | When to use it |
+| --- | --- |
+| Allowlists | You only want trusted wallets, agents, domains, or customers to buy. |
+| Blocklists | You need to stop suspicious payers from returning. |
+| Per-buyer limits | You want to cap request volume or spend from one buyer. |
+| Higher unknown-buyer prices | You want the price to reflect extra risk or support cost. |
+| Deposits or minimum guarantees | You need confidence before expensive work starts. |
+| Identity or metadata checks | You need more context before accepting a task. |
 
 4Mica verifies payment capacity. Your application decides access policy.
+
+Manage buyer allowlists and blocks from [4mica dashboard](https://app.4mica.io) when the controls are available.
 
 ## Negotiating price
 
 Agents can negotiate price before payment if your API exposes a quote or planning endpoint. A simple flow is:
 
-1. Buyer describes the task.
-2. Seller estimates cost, time, and constraints.
-3. Seller returns a quoted price and expiration.
-4. Buyer signs only if the quote fits policy.
-5. Seller executes after payment validation.
+1. The buyer describes the task.
+2. You estimate cost, time, and constraints.
+3. You return a quoted price and expiration.
+4. The buyer signs only if the quote fits policy.
+5. You execute after payment validation.
 
 For deterministic products, skip negotiation and publish fixed route prices.
 
 ## Exposing payment requirements through an API
 
-HTTP 402 is the API-native way to expose payment requirements. An agent can discover:
-
-- required scheme;
-- amount;
-- accepted network and asset;
-- seller `payTo` address;
-- tab endpoint;
-- expiration or metadata.
+HTTP 402 is the API-native way to expose payment requirements. An agent can discover the required scheme, amount, accepted network and asset, `payTo` address, tab endpoint, expiration, and metadata directly from your route.
 
 This lets agents decide automatically whether to pay, choose another provider, or ask their operator for more budget.
 
@@ -79,14 +74,13 @@ This lets agents decide automatically whether to pay, choose another provider, o
 
 A single workflow may involve multiple paid agents. Each seller should receive a payment guarantee for its own work. Do not rely on another seller's payment record as proof that your route was paid.
 
-For every agent-to-agent step, log:
+For every agent-to-agent step, log enough to explain the chain of work.
 
-- upstream request ID;
-- downstream request ID;
-- payer;
-- seller;
-- amount;
-- settlement result;
-- delivered output or hash.
+| Log field | Why it matters |
+| --- | --- |
+| Upstream and downstream request IDs | Connects your request to the larger workflow. |
+| Payer and seller | Shows who paid whom at each step. |
+| Amount and settlement result | Shows the obligation and whether it completed. |
+| Delivered output or hash | Connects the payment to the result provided. |
 
 That audit trail is how a workflow proves which agent did what and which obligation paid for it.

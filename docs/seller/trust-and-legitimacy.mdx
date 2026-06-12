@@ -3,53 +3,46 @@ title: "Trust and Legitimacy"
 description: "Help buyers verify your agent, payment address, pricing, and delivery record."
 ---
 
-Agent sellers need to prove two things: the buyer is paying the real seller, and the seller delivered the paid work.
+You need to prove two things: the buyer is paying the real service, and you delivered the paid work.
 
-4Mica helps with the payment side by binding payment requirements to a seller address, route, amount, network, and signed guarantee. Your product, marketplace, or registry should add the public identity layer around that payment record.
+4Mica helps with the payment side by binding payment requirements to your `payTo` address, route, amount, network, and signed guarantee. Your product, marketplace, or registry should add the public identity layer around that payment record.
 
-## What buyers can verify
+## Make verification easy
 
-Before paying, a buyer or buyer agent can inspect:
-
-- your API domain;
-- the protected route;
-- the price;
-- the accepted scheme;
-- the network and asset;
-- the seller `payTo` address;
-- the advertised tab endpoint;
-- any quote metadata or expiration.
+Before paying, a buyer or buyer agent should be able to inspect the API domain, protected route, price, accepted scheme, network, asset, `payTo` address, advertised tab endpoint, and any quote metadata or expiration. Those values should all point to the same service and the same commercial promise.
 
 After paying, both sides can connect the payment record to the request, tab, settlement result, and delivered response.
 
-## Public seller address
+<Tip>
+Treat verification as part of your product experience. The easier your domain, route, price, and `payTo` address are to compare, the easier it is for cautious buyer agents to pay you.
+</Tip>
+
+## Publish your payment address
 
 You can show your agent's payment address publicly. In fact, public consistency helps buyers detect fake copies.
 
-Use the same seller address in:
-
-- docs;
-- marketplace profile;
-- agent card or registry listing;
-- payment requirements;
-- support material;
-- status page or changelog.
+Use the same seller address everywhere buyers learn about your agent: docs, marketplace profile, agent card, registry listing, payment requirements, support material, status page, and changelog. If those surfaces disagree, cautious buyer agents should stop before signing.
 
 If you rotate the address, publish the change clearly and keep old logs accessible.
 
-## Verified seller profiles
+<Warning>
+Do not rotate your public seller address silently. A surprise `payTo` change looks the same as impersonation to a careful buyer agent.
+</Warning>
 
-4Mica provides verifiable payment mechanics. A verified seller profile is usually created by the marketplace, registry, or application that lists your agent.
+Keep the public seller address aligned with what buyers see in [4mica app](https://app.4mica.io).
 
-Bind a verified profile to:
+## Verified profiles
 
-- domain;
-- seller `payTo` address;
-- agent name;
-- operator;
-- version;
-- supported routes;
-- refund and support policy.
+4Mica provides verifiable payment mechanics. A verified profile is usually created by the marketplace, registry, or application that lists your agent.
+
+Bind the profile to the facts buyers need at payment time.
+
+| Profile field | Why it matters |
+| --- | --- |
+| Domain and `payTo` address | Lets buyers compare the listing with the payment requirement. |
+| Agent name and operator | Shows who runs the service. |
+| Version and supported routes | Helps buyers confirm they are paying for the expected capability. |
+| Refund and support policy | Sets expectations before a paid task starts. |
 
 That profile can then point buyers to the payment address they should expect in x402 requirements.
 
@@ -57,34 +50,30 @@ That profile can then point buyers to the payment address they should expect in 
 
 Impersonation usually shows up as a copied name, copied docs, fake domain, or different payment address.
 
-Protect buyers by making the legitimate payment surface easy to check:
+Protect buyers by making the legitimate payment surface easy to check. Publish canonical API domains and seller addresses, keep tab endpoints on your domain, warn buyers not to pay mismatched `payTo` addresses, and use identity registries or verified profiles when available.
 
-- publish canonical API domains;
-- publish canonical seller addresses;
-- keep tab endpoints on your domain;
-- warn buyers not to pay mismatched `payTo` addresses;
-- monitor marketplaces and registries for copied listings;
-- use identity registries or verified profiles when available.
+You should also monitor marketplaces and registries for copied listings. A fake agent is easier to report when your real domain, address, and profile have been public and consistent.
 
-If another agent impersonates your agent, 4Mica cannot remove that copy by itself. But buyers can compare the fake payment requirements against your canonical address, domain, and profile.
+If another agent impersonates your agent, 4Mica cannot remove that copy by itself. Make your canonical address, domain, and profile easy to compare against fake payment requirements.
 
-## Showing what buyers pay for
+<Tip>
+Keep one canonical page that lists your official API domain, `payTo` address, tab endpoint, and support contact. It gives buyers and marketplaces a single source to compare against suspicious copies.
+</Tip>
 
-Buyers should see pricing before they sign. For fixed-price routes, the 402 response provides the price. For dynamic tasks, use a quote step that returns amount, expiration, task scope, and completion criteria.
+Report copied agent names, fake domains, or wrong `payTo` addresses to [support](mailto:support@4mica.io).
+
+## Show what buyers pay for
+
+Show pricing before buyers sign. For fixed-price routes, the 402 response provides the price. For dynamic tasks, use a quote step that returns amount, expiration, task scope, and completion criteria.
 
 Good payment requirements make the commercial promise concrete: "pay this seller this amount for this route or task under these terms."
 
+<Warning>
+Do not start expensive work before the buyer has seen and authorized the price. For dynamic work, use a quote or staged payment instead of surprising the buyer after execution starts.
+</Warning>
+
 ## Reputation
 
-Reputation can be built from a mix of payment records and product outcomes:
-
-- settled request count;
-- successful delivery rate;
-- latency;
-- refund rate;
-- dispute rate;
-- repeat buyers;
-- buyer ratings;
-- verified domain and address history.
+Reputation works best when it combines payment records with product outcomes. Buyers care about settled request count, successful delivery rate, latency, refund rate, dispute rate, repeat buyers, ratings, and verified domain or address history.
 
 Keep payment evidence and delivery evidence linked. That is what makes reputation credible instead of just decorative.

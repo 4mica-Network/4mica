@@ -3,11 +3,11 @@ title: "Quick Start"
 description: "Turn an agent, API, model, dataset, or workflow into a paid 4Mica resource."
 ---
 
-4Mica lets sellers turn an AI agent, API, model endpoint, dataset, tool, or content route into a paid service that earns money per request, per task, or per unit of usage without building accounts, invoices, prepaid balances, or manual checkout.
+4Mica lets you turn an AI agent, API, model endpoint, dataset, tool, or content route into a paid service. You can earn money per request, per task, or per unit of usage without building accounts, invoices, prepaid balances, or manual checkout.
 
 ## What you are selling
 
-For agent sellers, the product is usually not a static file. It is work:
+For your agent service, the product is usually not a static file. It is work:
 
 - one model inference;
 - one API call;
@@ -19,7 +19,7 @@ For agent sellers, the product is usually not a static file. It is work:
 
 4Mica is built for that shape. The buyer does not need a subscription, an account balance on your service, or a human checkout session. They need a funded 4Mica position, an x402-capable client, and a policy that allows the payment.
 
-## Seller setup
+## Set up your service
 
 <Steps>
   <Step title="Choose the paid surface">
@@ -29,15 +29,17 @@ For agent sellers, the product is usually not a static file. It is work:
     Configure x402 payment requirements for that route: scheme, price, network, accepted asset, and your `payTo` address.
   </Step>
   <Step title="Host a tab endpoint">
-    Advertise a tab endpoint on your own API, such as `https://api.example.com/payment/tab`. Buyers should call your endpoint, not a raw facilitator URL.
+    Advertise a tab endpoint on your own API, such as `https://api.example.com/payment/tab`. You should call your endpoint, not a raw facilitator URL.
   </Step>
   <Step title="Verify before work">
     When the buyer retries with a payment header, verify and settle the guarantee through the facilitator before running the paid operation.
   </Step>
   <Step title="Record what happened">
-    Log the request ID, tab ID, payer address, seller address, price, route, settlement result, and response hash or delivery marker.
+    Log the request ID, tab ID, payer address, your `payTo` address, price, route, settlement result, and response hash or delivery marker.
   </Step>
 </Steps>
+
+When the route and `payTo` address are ready, finish setup from [4mica dashboard](https://app.4mica.io).
 
 ## Minimal Express example
 
@@ -73,9 +75,9 @@ app.post("/agent/research", async (req, res) => {
 
 The middleware handles the payment loop. Your handler should only run after the payment has been validated for the protected route.
 
-## How sellers earn money
+## How you earn money
 
-Sellers earn by attaching prices to protected work. You can charge per request, task, API call, model invocation, usage unit, or tiered route. The pricing model belongs in your route configuration and application logic. 4Mica supplies the payment guarantee, tab, verification, settlement, and claim path.
+You earn by attaching prices to protected work. You can charge per request, task, API call, model invocation, usage unit, or tiered route. The pricing model belongs in your route configuration and application logic. 4Mica supplies the payment guarantee, tab, verification, settlement, and claim path.
 
 For pricing patterns, see [Pricing and Monetization](/seller/pricing-and-monetization).
 
@@ -91,19 +93,16 @@ A payment guarantee proves that a specific payer authorized a specific amount fo
 
 For delivery evidence, see [Proof and Disputes](/seller/proof-and-disputes).
 
+If a buyer asks for proof, start from the payment activity and attach the matching request and response logs.
+
 ## How you protect your agent
 
 Do not run expensive work before payment validation succeeds. Add rate limits, free-trial limits, per-buyer caps, allowlists or blocklists, cost ceilings, and monitoring around failed verifications. 4Mica gives you the payment enforcement path; your application controls abuse policy.
 
 For abuse controls, see [Risk and Abuse Prevention](/seller/risk-and-abuse-prevention).
 
+For suspicious traffic or repeated invalid payments, gather the tab and request IDs before contacting [support](mailto:support@4mica.io).
+
 ## Next steps
 
-<Columns cols={2}>
-  <Card title="Payment Middleware" icon="server" href="/seller/payment-middleware">
-    Protect routes and settle signed guarantees.
-  </Card>
-  <Card title="Test in Sandbox" icon="flask-conical" href="/seller/test-in-sandbox">
-    Prove the full 402, tab, retry, settle, and claim flow before production.
-  </Card>
-</Columns>
+Protect routes with [Payment Middleware](/seller/payment-middleware), then prove the flow in [Test in Sandbox](/seller/test-in-sandbox) before production.

@@ -5,87 +5,86 @@ description: "Connect payment guarantees to delivered agent work, logs, support,
 
 4Mica can prove that a buyer signed a payment guarantee for a request and that your server settled it. Your application should also prove what work was delivered.
 
-For agent sellers, this matters because the product may be probabilistic, generated, long-running, or assembled from other services.
+For your agent service, this matters because the product may be probabilistic, generated, long-running, or assembled from other services.
 
 ## What payment proves
 
-A valid 4Mica payment flow can show:
-
-- which payer authorized payment;
-- which seller address was paid;
-- which tab and request were used;
-- what amount, network, and asset were accepted;
-- whether verification and settlement succeeded;
-- whether the seller has a claim path if the payer later defaults.
+A valid 4Mica payment flow can show who authorized payment, which seller address was paid, which tab and request were used, what amount, network, and asset were accepted, whether verification and settlement succeeded, and whether you have a claim path if the payer later defaults.
 
 That answers the payment question. It does not automatically answer whether the generated result was good, useful, or compliant with the buyer's expectations.
 
 ## What delivery evidence proves
 
-Delivery evidence connects the paid request to the result. Store:
+Delivery evidence connects the paid request to the result. Store enough information to reconstruct what happened without guessing.
 
-- request ID;
-- tab ID;
-- route and method;
-- payer address;
-- seller `payTo` address;
-- request payload or hash;
-- quoted price and expiration;
-- model, tool, dataset, or agent version;
-- response payload or hash;
-- response status and timestamp;
-- settlement result;
-- refund or support decision if one occurs.
+| Evidence | What it proves |
+| --- | --- |
+| Request ID and tab ID | Connects the task to the payment flow. |
+| Route, method, payer, and `payTo` address | Shows who requested work and which seller route handled it. |
+| Request payload or hash | Shows what the buyer asked for. |
+| Quoted price and expiration | Shows what the buyer agreed to before signing. |
+| Model, tool, dataset, or agent version | Shows which system produced the result. |
+| Response payload or hash | Shows what you delivered. |
+| Response status and timestamp | Shows whether delivery completed and when. |
+| Settlement result | Shows whether the payment obligation completed. |
+| Refund or support decision | Shows how you handled follow-up if something went wrong. |
 
 For privacy-sensitive payloads, store hashes and metadata instead of full content.
 
+<Tip>
+Hashes are useful when you need proof without retaining sensitive content. Keep enough metadata to explain the request, but avoid storing data you do not need for support, audit, or compliance.
+</Tip>
+
+Attach delivery evidence to the payment activity visible in [4mica dashboard](https://app.4mica.io).
+
 ## Proving completion
 
-Define completion before launch. Examples:
+Define completion before launch. The right rule depends on what your product sells.
 
-- API route returned HTTP 200 with the paid data.
-- Model endpoint returned a response under the advertised latency target.
-- Agent completed the requested workflow stage.
-- Dataset endpoint delivered the requested records.
-- Streaming job delivered a paid time or token interval.
+| Product type | Example completion rule |
+| --- | --- |
+| API route | Returned HTTP 200 with the paid data. |
+| Model endpoint | Returned a response under the advertised latency target. |
+| Workflow agent | Completed the requested workflow stage. |
+| Dataset endpoint | Delivered the requested records. |
+| Streaming job | Delivered a paid time or token interval. |
 
 If a task can fail after payment validation, define whether the buyer receives retry, refund, credit, partial result, or no refund.
 
+<Warning>
+Do not wait for the first dispute to decide what "complete" means. If completion is unclear, payment facts and delivery facts will not settle the disagreement by themselves.
+</Warning>
+
 ## Disputes for AI-generated work
 
-AI output can be subjective. Reduce ambiguity by making the contract concrete:
+AI output can be subjective. Reduce ambiguity by making the contract concrete before the buyer pays. Describe what the route does and does not promise, separate payment for effort from payment for a guaranteed outcome, return structured result statuses, and log tool calls and model versions.
 
-- describe what the route does and does not promise;
-- separate payment for effort from payment for a guaranteed outcome;
-- return structured result statuses;
-- log tool calls and model versions;
-- define refund rules for technical failure, timeout, duplicate charge, or seller-side error;
-- avoid promising correctness where the agent only provides generated assistance.
+Your refund rules should cover technical failure, timeout, duplicate charge, and errors on your side. Avoid promising correctness where the agent only provides generated assistance.
 
 4Mica supplies enforceable payment records. Your support policy decides how to handle quality complaints and refunds.
 
+When a dispute turns on output quality, share the payment record, delivery evidence, and your policy with [support](mailto:support@4mica.io).
+
 ## Refunds and tiny payments
 
-For small payments, manual refunds can cost more than the payment itself. Prefer automated rules:
+For small payments, manual refunds can cost more than the payment itself. Prefer automated rules that a buyer agent can understand.
 
-- no charge if verification fails;
-- retry or credit if your handler errors before delivery;
-- automatic credit for duplicate paid requests;
-- minimum refund threshold where appropriate;
-- batch refunds or credits for tiny amounts.
+- no charge if verification fails
+- retry or credit if your handler errors before delivery
+- automatic credit for duplicate paid requests
+- minimum refund threshold where appropriate
+- batch refunds or credits for tiny amounts
 
 Publish the rule. Agents can reason about clear policies.
 
+Use payment history to decide whether refunds should be direct, credited, or batched.
+
+<Tip>
+For very small amounts, crediting the buyer can be more practical than sending a standalone refund. The important part is that the rule is visible before payment.
+</Tip>
+
 ## Reputation and ratings
 
-Reputation can be built around your agent by linking identity, payment records, and delivery outcomes. A marketplace, registry, or application can track:
-
-- successful paid requests;
-- failure rate;
-- latency;
-- refund rate;
-- dispute rate;
-- repeat buyers;
-- verified seller address and domain.
+Reputation can be built around your agent by linking identity, payment records, and delivery outcomes. A marketplace, registry, or application can track successful paid requests, failure rate, latency, refund rate, dispute rate, repeat buyers, and verified seller address or domain.
 
 4Mica gives the payment evidence. Reputation systems can use that evidence as one input.

@@ -5,23 +5,31 @@ description: "Protect paid agent routes from spam, free-trial abuse, failed paym
 
 Agent traffic is fast. A small mistake in pricing, pre-work, or free trials can become expensive quickly.
 
-The seller rule is simple: do not spend meaningful resources until payment validation or another explicit trust decision has happened.
+The rule is simple: do not spend meaningful resources until payment validation or another explicit trust decision has happened.
 
 ## Spam requests
 
 Unpaid requests should be cheap. Your API can return HTTP 402 without running the expensive model, tool call, search, or workflow.
 
-Add controls around the unpaid edge:
+Add controls around the unpaid edge so discovery does not become free compute.
 
-- rate limit unpaid requests;
-- cache payment requirements for common routes;
-- reject oversized request bodies before quote generation;
-- require a quote step for expensive work;
-- monitor repeated 402s without paid retries.
+| Control | Why it helps |
+| --- | --- |
+| Rate limit unpaid requests | Prevents repeated 402 discovery from becoming noisy traffic. |
+| Cache payment requirements | Keeps common route pricing cheap to return. |
+| Reject oversized bodies early | Stops attackers from making quote generation expensive. |
+| Require a quote step | Keeps expensive work behind an explicit pricing decision. |
+| Watch repeated 402s without paid retries | Helps you spot probing or unpaid automation. |
+
+Monitor unpaid traffic and failed retries from [4mica dashboard](https://app.4mica.io) where available.
+
+<Warning>
+Never run the expensive part of the task just to decide whether payment is required. The unpaid edge should stay cheap.
+</Warning>
 
 ## Free-trial abuse
 
-Free trials are not payment guarantees. Treat them as marketing spend with strict limits:
+Free trials are not payment guarantees. Treat them as marketing spend with strict limits.
 
 - cap trial value per wallet, account, IP, agent identity, or API key;
 - expire credits quickly;
@@ -29,7 +37,7 @@ Free trials are not payment guarantees. Treat them as marketing spend with stric
 - block repeated trial farming patterns;
 - convert unknown agents to small paid trials when abuse appears.
 
-## Buyer failure claims
+## Handle failure claims
 
 When a buyer claims your agent failed, check three records:
 
@@ -37,54 +45,49 @@ When a buyer claims your agent failed, check three records:
 2. delivery record: did your system return the promised response?
 3. product rule: did the result meet your published completion criteria?
 
-If the issue is a seller-side technical failure, refund or credit according to policy. If the issue is subjective output quality, use the terms you published for that route.
+If the issue is a technical failure on your side, refund or credit according to policy. If the issue is subjective output quality, use the terms you published for that route.
+
+<Tip>
+Write completion criteria before launch, not during the support conversation. It makes failure claims faster and fairer to resolve.
+</Tip>
 
 ## Spend and request limits
 
-Limit exposure per buyer or agent:
-
-- maximum requests per minute;
-- maximum paid value per hour;
-- maximum concurrent tasks;
-- maximum downstream spend;
-- maximum task duration;
-- maximum unpaid quote attempts.
+Limit exposure per buyer or agent before traffic grows. Useful limits include maximum requests per minute, paid value per hour, concurrent tasks, downstream spend, task duration, and unpaid quote attempts.
 
 You can enforce limits by payer address, agent identity, account, domain, API key, tab, or IP depending on what your integration captures.
 
 ## Suspicious activity
 
-Pause or reject payment flows when you see:
-
-- repeated invalid signatures;
-- payment headers reused across routes or prices;
-- mismatched `payTo`, amount, network, or asset;
-- sudden traffic spikes from a new payer;
-- repeated failures after delivery;
-- patterns that farm trials or refunds;
-- requests that would cost more to fulfill than the payment covers.
+Pause or reject payment flows when behavior no longer matches a normal buyer. Repeated invalid signatures, payment headers reused across routes or prices, mismatched `payTo`, amount, network, or asset, sudden spikes from a new payer, repeated failures after delivery, trial farming, refund farming, or unprofitable requests all deserve review.
 
 Payment validation is necessary, but not the whole abuse system. Keep application-level policy close to the paid route.
 
-## Deposits, collateral, and buyer confidence
+For abuse patterns, send wallet, tab, route, and timestamp details to [support](mailto:support@4mica.io).
 
-4Mica's credit model is backed by payer collateral. Sellers should still choose when extra deposits or prepayment are appropriate:
+## Build confidence with collateral
 
-- expensive long-running jobs;
-- custom work with subjective acceptance;
-- workflows with high downstream cost;
-- unknown buyers with no reputation;
-- tasks that cannot be cheaply interrupted.
+4Mica's credit model is backed by payer collateral. You should still choose when extra deposits or prepayment are appropriate.
+
+| Situation | Safer approach |
+| --- | --- |
+| Expensive long-running job | Require more collateral or staged payment before starting. |
+| Custom work with subjective acceptance | Publish completion and refund rules before payment. |
+| Workflow with high downstream cost | Cap downstream spend and quote before execution. |
+| Unknown buyer with no reputation | Start with lower limits or higher prepayment. |
+| Task that cannot be cheaply interrupted | Require enough coverage before work begins. |
 
 For small deterministic requests, a valid payment guarantee may be enough.
 
 ## Risk checklist
 
-- Verify and settle before paid work.
-- Rate limit unpaid and invalid requests.
-- Cap buyer spend and concurrency.
-- Keep free trials narrow.
-- Log every paid request and response.
-- Define refund rules before launch.
-- Monitor claim windows.
-- Block suspicious payers quickly.
+Before launch, make sure your risk controls match the cost of your routes.
+
+- verify and settle before paid work
+- rate limit unpaid and invalid requests
+- cap buyer spend and concurrency
+- keep free trials narrow
+- log every paid request and response
+- define refund rules before launch
+- monitor claim windows
+- block suspicious payers quickly

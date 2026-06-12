@@ -1,24 +1,24 @@
 ---
 title: "FAQs"
-description: "Answers to common questions from sellers of AI agents, paid APIs, models, datasets, and workflows."
+description: "Answers to common questions about selling AI agents, paid APIs, models, datasets, and workflows."
 ---
 
 ## Trust and legitimacy
 
 **Why should I trust this payment platform for my AI agent?**  
-4Mica is built for x402 agent payments: buyers sign collateral-backed guarantees, sellers verify and settle before serving paid work, and settlement can happen later through tabs and claims.
+4Mica is built for x402 agent payments: buyers sign collateral-backed guarantees, you verify and settle before serving paid work, and settlement can happen later through tabs and claims.
 
 **How do buyers know my agent is legitimate?**  
-Publish a consistent domain, seller `payTo` address, agent name, route list, and support policy. Marketplaces or registries can add verified profiles on top.
+Publish a consistent domain, your `payTo` address, agent name, route list, and support policy. Marketplaces or registries can add verified profiles on top.
 
 **How do buyers verify that my agent is the real one and not a fake copy?**  
-They compare the API domain, tab endpoint, seller address, and profile metadata against your canonical listing.
+They compare the API domain, tab endpoint, your `payTo` address, and profile metadata against your canonical listing.
 
-**Can my agent have a verified seller profile?**  
-Yes, if the marketplace, registry, or application provides profiles. Bind the profile to your domain and seller payment address.
+**Can my agent have a verified profile?**  
+Yes, if the marketplace, registry, or application provides profiles. Bind the profile to your domain and your payment address.
 
 **Can I show my agent's payment address publicly?**  
-Yes. Showing the seller address helps buyers detect fake payment requirements.
+Yes. Showing your `payTo` address helps buyers detect fake payment requirements.
 
 **Can buyers see my agent's pricing before paying?**  
 Yes. Fixed prices appear in payment requirements. Dynamic work should use a quote-before-pay flow.
@@ -33,7 +33,9 @@ Yes, by logging request IDs, tab IDs, payment results, payload hashes, response 
 Yes. Use payment records plus delivery outcomes such as success rate, latency, refunds, disputes, and repeat buyers.
 
 **What happens if another agent impersonates my agent?**  
-Buyers should reject mismatched domains or seller addresses. You should publish canonical identity information and report fake listings to the marketplace or registry.
+You should reject mismatched domains or seller addresses. You should publish canonical identity information and report fake listings to the marketplace or registry.
+
+For profile, address, or impersonation questions, use the dashboard first, then contact [support](mailto:support@4mica.io) if anything does not match.
 
 ## Pricing and monetization
 
@@ -67,6 +69,8 @@ Yes, if your application can distinguish the context and publishes the terms cle
 **Can I set minimum payment amounts?**  
 Yes. Set minimums that cover your costs and support burden.
 
+Use [4mica dashboard](https://app.4mica.io) to review the seller pricing state buyers will see.
+
 ## Microtransactions
 
 **Does the platform support very small payments?**  
@@ -94,7 +98,7 @@ Yes. Require a valid guarantee, prepayment, or staged payment before expensive e
 You can design completion and release rules in your application. 4Mica provides guarantees, settlement, and claim paths.
 
 **Can I refund tiny payments easily?**  
-Use automated credit or refund rules for seller-side failures, duplicates, or timeouts. Tiny manual refunds can cost more than they are worth.
+Use automated credit or refund rules for failures on your side, duplicates, or timeouts. Tiny manual refunds can cost more than they are worth.
 
 **Can I avoid losing money on gas fees or network fees?**  
 Use 4Mica credit, tabs, and deferred settlement instead of sending an on-chain transaction for every small call.

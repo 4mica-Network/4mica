@@ -1,24 +1,24 @@
 ---
 title: "Facilitator URLs"
-description: "Understand when sellers use the facilitator and why buyers should use your tab endpoint."
+description: "Understand when you use the facilitator and why buyers should use your tab endpoint."
 ---
 
-Sellers use the facilitator from server-side middleware. Buyers usually should not call a hosted facilitator URL directly. They call your API, receive HTTP 402, and use the tab endpoint you advertised in the payment requirements.
+You use the facilitator from server-side middleware. Buyers usually should not call a hosted facilitator URL directly. They call your API, receive HTTP 402, and use the tab endpoint you advertised in the payment requirements.
 
-That distinction matters because the seller owns the commercial context: route, price, accepted networks, accepted assets, `payTo` address, logging, and abuse policy.
+That distinction matters because you own the commercial context: route, price, accepted networks, accepted assets, `payTo` address, logging, and abuse policy.
 
-## Seller-facing URLs
+## URLs your service uses
 
 | URL type | Who calls it | Purpose |
 | --- | --- | --- |
 | Protected route | Buyer or buyer agent | Requests the paid resource. |
-| Seller tab endpoint | Buyer or buyer agent | Opens or reuses a tab for your route. |
-| Facilitator API | Seller middleware | Verifies and settles signed payment guarantees. |
+| Your tab endpoint | Buyer or buyer agent | Opens or reuses a tab for your route. |
+| Facilitator API | Your middleware | Verifies and settles signed payment guarantees. |
 | Core4Mica contracts | Payer or seller through protocol operations | Collateral, settlement, claim, and withdrawal enforcement. |
 
 ## Why advertise your own tab endpoint
 
-Your tab endpoint lets you keep seller policy at the edge of your own API. It gives you a place to:
+Your tab endpoint lets you keep your policy at the edge of your own API. It gives you a place to:
 
 - bind the tab to the route and price the buyer saw;
 - apply allowlists, blocklists, and rate limits;
@@ -31,6 +31,8 @@ In production, the advertised endpoint should be an HTTPS URL on your domain, su
 ```txt
 https://api.example.com/payment/tab
 ```
+
+If buyers are seeing a facilitator URL instead of your tab endpoint, review seller endpoint configuration in [4mica dashboard](https://app.4mica.io).
 
 ## Hosted facilitator
 
