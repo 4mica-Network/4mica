@@ -1,0 +1,79 @@
+---
+title: "HTTP 402"
+description: "How a server advertises its price, accepted assets, and payment terms to a client."
+---
+
+HTTP 402, "Payment Required," was reserved in the original HTTP specification in 1991. No one implemented it. Internet commerce grew on top of card networks and banking infrastructure that predates the web, and payment never became part of HTTP itself.
+
+x402 implements it. When a server protects a resource behind payment, it responds with a 402 status and a machine-readable payload describing the price, accepted assets, and which network to pay on. The client reads those terms, signs a payment, and retries the request. No human clicks through a checkout page. No pre-existing account is required between client and server.
+
+## The 402 response
+
+A 402 response carries a `PaymentRequirements` payload. In x402 version 1, the server returns it as a JSON body. In version 2, it arrives as a base64-encoded `payment-required` response header.
+
+The payload contains an `accepts` array with one or more payment options. The client selects the option that matches its configured scheme and network, then constructs a signed payment from those terms.
+
+```json
+{
+  "x402Version": 1,
+  "error": "Payment required to access this resource",
+  "accepts": [
+    {
+      "scheme": "4mica-credit",
+      "network": "eip155:8453",
+      "maxAmountRequired": "1000000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0xRecipientAddress",
+      "resource": "https://api.example.com/data",
+      "description": "Access to premium market data",
+      "mimeType": "application/json",
+      "maxTimeoutSeconds": 300,
+      "extra": {
+        "tabEndpoint": "https://api.example.com/x402/tab"
+      }
+    }
+  ]
+}
+```
+
+## Payment requirements fields
+
+| Field               | Type   | Description                                                                         |
+| ------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `scheme`            | string | Payment scheme. `4mica-credit` for 4Mica guarantee flow; `exact` for direct transfer. |
+| `network`           | string | CAIP-2 chain identifier. `eip155:8453` for Base mainnet.                            |
+| `maxAmountRequired` | string | Maximum amount the server charges, in token base units.                             |
+| `asset`             | string | ERC-20 token contract address for the settlement asset.                             |
+| `payTo`             | string | Recipient wallet address.                                                           |
+| `resource`          | string | URL of the protected resource.                                                      |
+| `description`       | string | Human-readable description of what the resource provides.                           |
+| `mimeType`          | string | MIME type of the response the client receives after paying.                         |
+| `maxTimeoutSeconds` | number | Maximum seconds the server allows between the client signing and settlement.        |
+| `extra`             | object | Scheme-specific data. For `4mica-credit`, must include `tabEndpoint`.               |
+
+## The tab endpoint
+
+When the scheme is `4mica-credit`, the client needs one additional piece of data before it can sign a payment: a tab.
+
+The `extra.tabEndpoint` field points to an endpoint on the resource server, not on the facilitator. The client calls it with its wallet address and the full payment requirements. The resource server proxies that call to the 4Mica facilitator, which contacts 4Mica Core and returns a `tabId` and `nextReqId`. The client uses those values to sign the guarantee that becomes the payment payload.
+
+The tab endpoint is hosted on the resource server so that server operators retain full control over which clients can open tabs and under what conditions. The facilitator never speaks directly to the client.
+
+## Why the scheme is the server's choice
+
+The resource server decides which payment schemes it accepts, at what price, and on which networks. It publishes those terms in the 402 response. The client decides which of the offered options it can fulfill. Neither side is forced into a specific payment method. The `accepts` array lists options; the client picks what it can fulfill.
+
+A server can list multiple entries in `accepts` to support different schemes or networks simultaneously. A client that supports both `4mica-credit` and `exact` selects whichever it prefers.
+
+## Builder guidance
+
+When you configure your 402 response:
+
+- Set `scheme` to `4mica-credit` for 4Mica guarantee-backed payments.
+- Use the CAIP-2 format for `network`: `eip155:8453` for Base, `eip155:1` for Ethereum mainnet.
+- Set `maxAmountRequired` in token base units. For USDC (6 decimals), $1.00 is `"1000000"`.
+- Set `payTo` to the wallet address that should receive payment after netting and settlement.
+- Expose a tab endpoint on your server (for example `POST /x402/tab`) and put its full URL in `extra.tabEndpoint`. Keep the facilitator URL in your server-side configuration, not in the 402 response.
+- Set `maxTimeoutSeconds` to the time you are willing to wait between the client signing and your call to `/settle`. 300 seconds is a reasonable default for most API flows.
+
+See [How x402 works](./how-x402-works) for the full request, retry, and settlement sequence.

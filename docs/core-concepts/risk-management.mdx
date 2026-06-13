@@ -1,0 +1,23 @@
+---
+title: "Risk Management"
+description: "How 4Mica bounds exposure between instant access and delayed settlement."
+---
+
+# Risk Management
+
+Risk management in 4Mica is about bounding exposure between the instant user experience and delayed settlement.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Collateral limits how much credit a wallet can extend.
+- Tabs scope obligations by payer, recipient, asset, version, and time.
+- SLAs and validation policies can gate payment quality.
+- Claim windows give recipients a path if payers default.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

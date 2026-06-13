@@ -1,0 +1,56 @@
+---
+title: "Test in Sandbox"
+description: "Test payment flows safely before production."
+---
+
+Use Base Sepolia (`eip155:84532`) or Ethereum Sepolia until your agent can deposit collateral, open tabs, sign guarantees, retry paid requests, enforce limits, and produce useful logs.
+
+Sandbox is where you prove the guardrails, not only the happy path.
+
+## What to test first
+
+<Steps>
+  <Step title="Fund a test wallet">
+    Use a dedicated wallet with testnet gas and test collateral. Do not use a main wallet for automated signing.
+  </Step>
+  <Step title="Pay a known route">
+    Call one test seller route and confirm the agent can receive a paid response.
+  </Step>
+  <Step title="Reject over-budget work">
+    Configure a low per-request or per-task limit and confirm the agent refuses payments above it.
+  </Step>
+  <Step title="Require approval">
+    Add an approval threshold and confirm the agent pauses before signing larger payments.
+  </Step>
+  <Step title="Audit the task">
+    Confirm you can connect each payment to a task, reason, request, seller, and result.
+  </Step>
+</Steps>
+
+Run the sandbox flow while watching activity in [4mica dashboard](https://app.4mica.io), so each tab and payment attempt is visible.
+
+## Sandbox scenarios
+
+- The seller is allowed and price is within budget.
+- The seller is unknown and should be blocked.
+- Price is higher than the per-request limit.
+- Task spend exceeds the task budget.
+- Network or asset is unsupported.
+- Wallet has insufficient collateral.
+- The seller tab endpoint does not match the expected domain.
+- Paid response fails after payment.
+- User stops the agent mid-task.
+
+## Ready for production
+
+Move beyond sandbox when you can answer:
+
+- What is the maximum this agent can spend?
+- Which sellers can it pay?
+- Which categories are blocked?
+- When does it ask for human approval?
+- Can it stop mid-task?
+- Can you see every payment and why it happened?
+- Can you link payments to task logs and results?
+- Do withdrawals check open tabs and settlement obligations first?
+

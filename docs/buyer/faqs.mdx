@@ -1,0 +1,167 @@
+---
+title: "FAQs"
+description: "Answers to common questions about buying AI agents and paid agent services."
+---
+
+## Trust and verification
+
+**How do I know this AI agent is legitimate?**  
+Check the seller domain, payment address, profile, reputation, and route metadata before paying.
+
+**Who built this agent?**  
+That information should come from the seller profile, marketplace, registry, or application listing.
+
+**Is the seller verified?**  
+Verification is usually provided by a marketplace, registry, or application. Bind it to the seller domain and `payTo` address.
+
+**Has this agent been reviewed or approved?**  
+Use marketplace reviews, registry status, internal approvals, or your own allowlist where available.
+
+**Can I see the agent's history or reputation?**  
+Yes, if the marketplace or application tracks it. Useful signals include successful paid requests, repeat buyers, latency, refunds, disputes, and ratings.
+
+**Can I see ratings, reviews, or past usage?**  
+Yes when the seller platform exposes them. Treat them as inputs to policy, not automatic approval.
+
+**How do I know the agent is not fake or malicious?**  
+Compare the domain, tab endpoint, `payTo` address, and profile metadata against a trusted source.
+
+**Can I verify the agent's identity before paying?**  
+Yes. Your client can inspect payment requirements and compare them with seller identity records before signing.
+
+**Can I see what permissions the agent requires?**  
+Your application should show requested data, tools, sellers, networks, assets, and spending limits before the task starts.
+
+**Can I revoke access later?**  
+Yes. Disable the agent, change policy, remove allowed sellers, rotate keys, and withdraw available collateral after checking open obligations.
+
+## Pricing and cost control
+
+**How much does this agent cost?**  
+The seller should expose the price or quote before your agent pays.
+
+**Is the price fixed or usage-based?**  
+It can be either. Your agent should inspect the payment requirement or quote and apply the right limit.
+
+**What exactly am I paying for?**  
+The route, quote, or task description should define the paid unit of work.
+
+**Will I be charged per request, per task, per token, or per result?**  
+That depends on the seller. Your policy should handle each pricing model explicitly.
+
+**Can I see the estimated cost before the agent starts?**  
+Yes, Your application should estimate cost and update the estimate if the task changes.
+
+**Can I set a spending limit?**  
+Yes. Set limits per request, task, seller, category, time window, network, or asset.
+
+**Can I require approval before the agent spends more?**  
+Yes. Add approval gates for larger payments, new sellers, budget increases, or risky categories.
+
+**Can I stop the agent mid-task if it becomes too expensive?**  
+Yes. Stop execution when budget is exhausted, approval is denied, or the task is no longer worth the cost.
+
+**Are there hidden costs, like API calls, compute, or third-party tools?**  
+There can be. Track downstream services, retries, data, compute, and other paid agents in the task log.
+
+**Can I get a refund if the result is bad?**  
+Refunds depend on your policy. Payment and delivery logs help support the request.
+
+For live budgets, approvals, and spend review, use [4mica dashboard](https://app.4mica.io).
+
+## Quality and outcome
+
+**How do I know the agent can actually do what it claims?**  
+Use demos, examples, reputation, reviews, success metrics, and small paid tests.
+
+**Can I test the agent before paying?**  
+Some sellers offer demos, sandbox routes, trials, or tiny paid tests.
+
+**Is there a demo or sandbox?**  
+That depends on the seller or marketplace. Use sandbox before giving a new agent larger budgets.
+
+**Can I see examples of previous outputs?**  
+Ask sellers to provide examples where possible. Marketplaces can also show past public outputs or case studies.
+
+**What success rate does this agent have?**  
+Success rate should come from seller reporting, marketplace history, or your own usage logs.
+
+**What happens if the agent gives a wrong answer?**  
+Follow your workflow policy: retry, ask the user, compare with another agent, report it, or request a refund under seller terms.
+
+**What happens if the agent fails to complete the task?**  
+Stop spending, preserve logs, and use the seller support or refund process if payment was made.
+
+**Does the agent explain how it reached the result?**  
+That depends on the agent. your app can prefer agents that return citations, tool traces, or reasoning summaries.
+
+**Can I compare this agent with other agents?**  
+Yes. Compare price, quality, latency, reputation, permissions, and refund history.
+
+**Can I rate or report the agent after using it?**  
+Yes, if your marketplace or application supports ratings and reports.
+
+## Safety and permissions
+
+**What data will the agent access?**  
+Your application should show the data scope before the task starts.
+
+**Will the agent store my data?**  
+That depends on your policy. Prefer sellers that publish retention and privacy terms.
+
+**Can the agent share my data with other agents?**  
+Only if your permissions allow it. Block or require approval for downstream sharing.
+
+**Can the agent call external APIs on my behalf?**  
+Yes, if your tool policy allows it.
+
+**Can the agent make purchases on my behalf?**  
+Only if you grant that authority. Purchases should require stronger approval than API micropayments.
+
+**Can the agent spend money without asking me?**  
+Yes, if you allow automatic payments under policy. You can also require approval for every payment.
+
+**Can I approve each payment manually?**  
+Yes. Manual approval is a valid policy mode.
+
+**Can I limit which agents or services it can call?**  
+Yes. Use allowlists, blocklists, categories, seller limits, and network limits.
+
+**Can I block certain categories of spending?**  
+Yes. Block categories such as unknown sellers, high-cost compute, data resale, purchases, or external agents.
+
+**What happens if the agent behaves unexpectedly?**  
+Pause execution, disable signing, preserve logs, rotate keys if needed, and review open obligations before withdrawing collateral.
+
+## Payments and transaction proof
+
+**How do I pay the agent?**  
+Your agent pays protected seller routes with a 4Mica-capable wallet and client.
+
+**Do I need a wallet or account?**  
+For 4Mica payments, you need a wallet or signer with collateral. Your application may abstract that for end users.
+
+**Can I pay with card, wallet, stablecoin, or balance?**  
+4Mica's payment flow uses wallet-based collateral and supported assets. Cards or internal balances can be added by an application layer if offered.
+
+**Can I see every payment the agent makes?**  
+Yes, if your application logs every paid request.
+
+**Can I see why each payment happened?**  
+Yes. Attach reason codes and task IDs to payment logs.
+
+**Can I download receipts or invoices?**  
+Your application can generate receipts or invoices from payment records and task logs.
+
+**Can I connect payments to task logs?**  
+Yes. Store task ID, request ID, tab ID, seller, amount, reason, and result together.
+
+**Can I dispute a payment?**  
+You can dispute through the seller or application support process. 4Mica records help establish payment facts.
+
+**Can I get notified before or after each payment?**  
+Yes. Notify before approval-required payments and after important payment events.
+
+**Can I audit the full workflow after the task is done?**  
+Yes. Keep a full workflow log that connects prompts, tool calls, payments, outputs, and policy decisions.
+

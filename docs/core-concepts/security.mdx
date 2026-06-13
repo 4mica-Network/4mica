@@ -1,0 +1,23 @@
+---
+title: "Security"
+description: "Cover the security model and trust boundaries for 4Mica."
+---
+
+# Security
+
+4Mica is designed so critical guarantees are enforced by signatures, contracts, and collateral rather than by trusting a hosted service.
+
+## Why It Matters
+
+4Mica is the clearing house for the agentic economy: a credit layer for x402 that lets agents and applications transact instantly, earn yield on collateral, and settle net positions later.
+
+## How It Works
+
+- Collateral remains controlled by protocol contracts.
+- Every spend is backed by an EIP-712 signed guarantee.
+- BLS certificates support settlement and on-chain claims.
+- Access controls, pausing, and reentrancy guards protect critical contract flows.
+
+## Builder Guidance
+
+Start with the simplest x402 flow that works, then add stronger policies, limits, validation, and monitoring as your payment surface grows. Keep buyer and seller responsibilities explicit so failures are easy to debug.

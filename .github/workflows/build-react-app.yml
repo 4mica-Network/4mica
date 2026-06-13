@@ -59,6 +59,21 @@ jobs:
             --cache-control "public,max-age=86400" \
             --delete
 
+      - name: Upload extensionless HTML route aliases with no-cache
+        run: |
+          while IFS= read -r -d '' file; do
+            key="${file#apps/web/out/}"
+            key="${key%.html}"
+
+            if [[ "$key" == "index" || "$key" == "404" || "$key" == "_not-found" ]]; then
+              continue
+            fi
+
+            aws s3 cp "$file" "s3://${{ secrets.S3_BUCKET }}/$key" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "public,max-age=0,must-revalidate"
+          done < <(find apps/web/out -type f -name "*.html" -print0)
+
       - name: Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \

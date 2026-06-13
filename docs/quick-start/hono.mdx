@@ -1,0 +1,116 @@
+---
+title: "Hono"
+description: "Use 4Mica with a Hono service."
+---
+
+Use Hono for lightweight services and keep 4Mica payment handling in the Node layer that owns your paid route. The stable 4Mica server integration is Express middleware, so mount it beside your Hono app when the paid route needs automatic verify and settle behavior.
+
+## Prerequisites
+
+- Node.js 18 or later.
+- A Hono service running on Node.
+- A seller wallet address for `payTo`.
+- A buyer wallet with deposited collateral for testing paid calls.
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install hono @hono/node-server express @4mica/x402 @x402/fetch viem
+```
+
+```bash pnpm
+pnpm install hono @hono/node-server express @4mica/x402 @x402/fetch viem
+```
+
+```bash yarn
+yarn add hono @hono/node-server express @4mica/x402 @x402/fetch viem
+```
+
+```bash bun
+bun add hono @hono/node-server express @4mica/x402 @x402/fetch viem
+```
+
+</CodeGroup>
+
+## Create wallet
+
+For wallet setup, see [Wallet](/core-concepts/wallet).
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey
+PAY_TO=0xYourSellerAddress
+TAB_ENDPOINT=http://localhost:3030/payment/tab
+```
+
+Use the buyer private key only in trusted server-side code.
+
+## Deposit collateral
+
+Deposit collateral for the buyer wallet before it calls your Hono service. Use the same network in the buyer scheme and route payment requirements.
+
+For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+
+## Protect a route
+
+Run your paid API route through the 4Mica middleware and keep the rest of your service in Hono.
+
+```ts
+import express from "express";
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+const paid = express();
+paid.use(express.json());
+
+paid.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network: "eip155:84532",
+          payTo: process.env.PAY_TO ?? "0xYourAddress",
+        },
+        description: "Access to premium Hono content",
+      },
+    },
+    {
+      advertisedEndpoint:
+        process.env.TAB_ENDPOINT ?? "http://localhost:3030/payment/tab",
+    },
+  ),
+);
+
+paid.get("/premium-content", (req, res) => {
+  res.json({ message: "Paid content from Hono's Node service" });
+});
+
+paid.listen(3030);
+
+const app = new Hono();
+app.get("/", (c) => c.text("Hono app"));
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+## Support payment
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("http://localhost:3030/premium-content");
+const data = await response.json();
+```

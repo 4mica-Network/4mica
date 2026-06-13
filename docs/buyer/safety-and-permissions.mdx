@@ -1,0 +1,51 @@
+---
+title: "Safety and Permissions"
+description: "Limit what data, services, purchases, and payments an AI agent can access."
+---
+
+An agent with money also needs boundaries. Payment policy should sit beside data policy, tool policy, and revocation.
+
+## Data access
+
+Before using a paid agent, decide what data it can read, store, and share. Sensitive fields may need redaction before the agent sees them. Logs and payloads should have a retention policy, and the seller should be clear about whether outputs can be used for training or resale.
+
+4Mica handles payment evidence. Your application controls data permissions.
+
+## External APIs and tools
+
+Agents often need to call external services to finish a task. Tool permissions should define where the agent can go, how much it can spend downstream, and when it must stop for approval.
+
+| Permission | What it controls |
+| --- | --- |
+| Domains and sellers | Which services the agent may call. |
+| Tool categories | Whether the agent can use compute, data, search, models, or other paid agents. |
+| Data sources | Which internal or external data the agent may send to a tool. |
+| Downstream spend | How much the agent can spend through tools during one task. |
+| Call count | How many external calls the agent may make before it stops or asks. |
+
+If a downstream call changes the cost or risk of the task, require approval before continuing.
+
+## Purchases on behalf of a user
+
+Paying for API access is not the same as buying goods, booking services, or making real-world commitments. If an agent can make purchases on your behalf, require explicit approval before purchase, set a maximum purchase amount, restrict merchants, check cancellation policies, store receipts, and confirm irreversible actions before they happen.
+
+## Manual approval
+
+You may want to approve every payment. Others may want only large or unusual payments to pause. Both are valid.
+
+Common modes:
+
+- approve every payment;
+- auto-approve under a small amount;
+- auto-approve trusted sellers only;
+- require approval for new sellers;
+- require approval for categories like compute, data resale, or purchases;
+- pause when behavior is unexpected.
+
+Configure approval behavior from your controls in [4mica app](https://app.4mica.io) when available.
+
+## Revocation and emergency stop
+
+Build a fast stop path before production. In an emergency, you should be able to pause agent execution, disable signing, remove allowed sellers, rotate the signer, revoke agent credentials where supported, and withdraw available collateral after checking open obligations.
+
+You should never have to let a misbehaving agent keep spending because the key is hard to isolate.

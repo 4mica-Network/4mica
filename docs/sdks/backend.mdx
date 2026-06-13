@@ -1,0 +1,20 @@
+---
+title: "Backend"
+description: "Use 4Mica backend SDKs and middleware."
+---
+
+# Backend
+
+Backend integrations protect resources and coordinate settlement. Use backend middleware when you are the seller, and direct SDK operations when you need wallet, collateral, or operator-facing actions.
+
+## TypeScript
+
+Use <code>@4mica/x402</code> for Express middleware and server-side 4Mica x402 support. It wires protected routes, tab handling, facilitator calls, and scheme registration.
+
+## Python
+
+Use <code>4mica-x402</code> for FastAPI or Flask middleware. Use <code>sdk-4mica</code> for collateral management, balances, and on-chain operations.
+
+## Rust
+
+Use <code>sdk-4mica</code> for collateral and wallet operations. HTTP server middleware is planned, so use TypeScript or Python when you need production x402 middleware today.

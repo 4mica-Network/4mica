@@ -1,0 +1,75 @@
+---
+title: "Make Paid Requests Automatically"
+description: "Use client wrappers to turn HTTP 402 responses into automatic paid retries."
+---
+
+The best experience is simple for the agent and controlled for the operator. Your code calls a protected resource normally, the wrapper handles the paid retry, and your policy decides whether the payment should be signed.
+
+Automatic payment does not mean unlimited payment. Treat the wrapper as the transport layer and your policy as the guardrail.
+
+## What the wrapper handles
+
+The wrapper handles the payment mechanics around a normal HTTP request.
+
+<Steps>
+  <Step title="Read payment requirements">
+    The wrapper receives the seller's payment requirements from the protected route.
+  </Step>
+  <Step title="Open or reuse a tab">
+    It uses the seller endpoint to open a new tab or continue with an existing one.
+  </Step>
+  <Step title="Sign the guarantee">
+    It signs a payment guarantee with your configured account.
+  </Step>
+  <Step title="Retry the request">
+    It sends the request again with the payment header attached.
+  </Step>
+  <Step title="Return the response">
+    Your agent receives the paid response like a normal HTTP result.
+  </Step>
+</Steps>
+
+## What your policy should handle
+
+Your policy handles judgment. It decides whether the seller, route, amount, network, asset, and task context are allowed before the wrapper signs.
+
+| Policy area | Decision |
+| --- | --- |
+| Spend limits | Maximum price per request and maximum spend per task. |
+| Seller access | Allowed sellers, domains, networks, and assets. |
+| Approval | Thresholds that require a person or higher-level policy. |
+| Blocking | Categories, routes, or sellers the agent should never pay. |
+| Audit | Reason codes, logging, and alerting for every paid request. |
+
+## TypeScript fetch wrapper
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("https://api.example.com/research");
+```
+
+After the first paid retry succeeds, check the corresponding wallet activity in [4mica dashboard](https://app.4mica.io).
+
+## Signing rules
+
+Before signing, validate the payment against your policy. The amount should fit the budget, the seller address should match the expected service, the route should match the task, the network and asset should be approved, and the tab endpoint should belong to the seller domain your agent called.
+
+If the payment crosses an approval threshold, collect approval before signing. If the task budget has no room left, return a controlled error so the agent can pick another service, ask for approval, or stop.
+
+When a seller requirement does not clearly match policy, pause signing and [ask for help](mailto:support@4mica.io).
+
+## Logging rules
+
+Automatic payment should still be explainable. Each paid request should connect task ID, request ID, seller domain, seller `payTo` address, route, amount, network, asset, tab ID, policy version, reason for payment, and final result or error.
+
+These logs answer "why did the agent pay?" after the task is done.

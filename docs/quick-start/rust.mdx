@@ -1,0 +1,17 @@
+---
+title: "Rust"
+description: "Rust support for 4Mica is in progress."
+---
+
+# Rust
+
+We are building Rust support for 4Mica based on the client integration roadmap shared here.
+
+HTTP client wrappers for Rust are coming soon. A `reqwest`-based wrapper with automatic 402 handling is on the roadmap. In the meantime, you can call the facilitator API directly or use the Rust SDK for collateral and wallet operations.
+
+## What Is Planned
+
+- `reqwest` middleware layer with automatic 402 retry.
+- `FourMicaEvmScheme` Rust implementation for EIP-712 guarantee signing.
+- Tab opening and `X-PAYMENT` / `PAYMENT-SIGNATURE` header construction.
+- Multi-network client registry.

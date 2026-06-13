@@ -1,0 +1,59 @@
+---
+title: "Go Live"
+description: "Prepare your integration for production."
+---
+
+Before production, turn a working payment demo into a controlled agent spending system with limits, monitoring, approval flows, and key management.
+
+The goal is not to let the agent spend as freely as possible. The goal is to let it spend only when the payment is useful, allowed, and explainable.
+
+## Production requirements
+
+- Use a dedicated service wallet, hardware-backed signer, MPC wallet, or hosted key management system.
+- Keep automated signing separate from personal or treasury wallets.
+- Set per-request, per-task, and time-window spend limits.
+- Allowlist trusted sellers or domains before enabling broader discovery.
+- Require approval above defined thresholds.
+- Log every paid request with reason, seller, route, amount, and task ID.
+- Alert on failed payments, blocked sellers, budget exhaustion, and unusual spend.
+- Check open tabs and settlement obligations before withdrawing collateral.
+
+Use [4mica dashboard](https://app.4mica.io) as the final check for collateral, open obligations, and spend controls.
+
+## Launch checklist
+
+### Trust and verification
+
+- Verify seller domain, `payTo` address, route, and tab endpoint before signing.
+- Prefer verified marketplaces, registries, or known seller lists when available.
+- Store seller metadata and reputation inputs separately from payment records.
+- Block sellers that mismatch identity, price, or domain expectations.
+
+### Cost control
+
+- Set hard spend ceilings.
+- Use approval gates for larger or unusual payments.
+- Stop the agent when a task becomes too expensive.
+- Track hidden downstream costs such as tools, APIs, data, compute, and other agents.
+- Show estimated and actual spend in the task view.
+
+### Safety and permissions
+
+- Limit which services the agent may call.
+- Limit which categories of spending are allowed.
+- Revoke or rotate signing keys quickly.
+- Keep policy versions in logs so old behavior can be audited.
+- Pause spending if the agent behaves unexpectedly.
+
+### Payment proof
+
+- Log every payment.
+- Link payments to task logs and outputs.
+- Keep tab IDs and request IDs searchable.
+- Track open obligations before withdrawal.
+- Export receipts or invoices from your application if your users need them.
+
+## Go-live decision
+
+Launch when the agent can spend autonomously without becoming opaque. In production, you should always be able to see what the agent paid for, why it paid, which policy allowed it, and what value came back.
+

@@ -1,0 +1,28 @@
+---
+title: "FAQs"
+description: "Answer common questions about 4Mica."
+---
+
+# FAQs
+
+These answers should help builders understand the mental model before they choose a deeper guide.
+
+## What Is 4Mica?
+
+4Mica is a credit layer for x402. It lets agents and applications pay per request with signed guarantees backed by collateral, then settle later instead of sending an on-chain transaction for every call.
+
+## What Is A Payment Tab?
+
+A tab is a credit session between a payer and recipient for a specific asset and network. Individual requests increment a request ID and attach signed guarantees to that tab.
+
+## Do Buyers Need To Prefund Every API?
+
+No. Buyers deposit collateral once and can use it across compatible 4Mica payment flows subject to limits, policy, and network support.
+
+## Is 4Mica Custodial?
+
+4Mica is designed around collateral, signatures, and contract enforcement rather than a centralized prepaid balance. The important trust boundaries should be enforced by the protocol, not by a manual promise.
+
+## Which Assets Are Supported?
+
+ETH is supported natively. USDC and USDT are the default stablecoin assets where configured by the active deployment. Operators can enable additional ERC-20 assets.

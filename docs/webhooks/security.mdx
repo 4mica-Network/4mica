@@ -1,0 +1,25 @@
+---
+title: "Security"
+description: "Secure and verify 4Mica webhooks."
+---
+
+# Security
+
+Webhook security is about proving the message came from 4Mica and that it has not been replayed or modified.
+
+## Relevant Events
+
+- collateral.deposited
+- tab.opened
+- guarantee.settled
+- tab.paid
+- tab.remunerated
+- withdrawal.requested
+- withdrawal.finalized
+
+## Handler Guidance
+
+- Verify the webhook signature before processing.
+- Store event IDs and ignore duplicates.
+- Fetch current state from the API if the event arrives out of order.
+- Keep user-facing state clear: pending, settled, claimable, paid, or failed.

@@ -1,0 +1,70 @@
+---
+title: "Error Handling"
+description: "Handle payment, collateral, and retry failures."
+---
+
+Your payment errors should fail closed. If the agent cannot verify a seller, fit a payment inside policy, sign a guarantee, or connect the payment to the task, it should stop or ask for approval instead of spending blindly.
+
+## Common error categories
+
+| Error | Meaning | Your response |
+| --- | --- | --- |
+| Unsupported network | Seller requires a network your client has not registered. | Skip, choose another seller, or add the network intentionally. |
+| Missing collateral | Wallet cannot back the payment guarantee. | Add collateral or lower the task budget. |
+| Price over limit | Seller price exceeds policy. | Ask for approval, choose another seller, or stop. |
+| Seller mismatch | Domain, tab endpoint, or `payTo` address does not match expectations. | Do not sign. Treat as suspicious. |
+| Invalid signature | Payment signing failed or produced an invalid payload. | Retry only after checking signer and network configuration. |
+| Seller verification failure | Seller rejected the payment retry. | Log the failure and avoid repeated automatic retries. |
+| Task budget exhausted | The agent has spent its allowed budget. | Stop or ask for a higher budget. |
+
+For collateral, network, or wallet issues, inspect your account in [4mica dashboard](https://app.4mica.io) before retrying.
+
+## Retry rules
+
+Do not retry forever. Automated retries can turn a small issue into unexpected spend or noisy traffic.
+
+Use strict retry rules that separate temporary transport failures from payment or policy decisions.
+
+| Situation | Retry behavior |
+| --- | --- |
+| Network timeout | Retry with backoff and a small attempt limit. |
+| Policy failure | Do not retry automatically. Choose a different seller, get a lower price, or ask for approval. |
+| Over-budget payment | Stop before signing and ask for more budget. |
+| Seller mismatch | Do not retry. Treat the mismatch as suspicious until you verify it. |
+| Seller verification failure | Retry only after checking signer, network, tab, and seller configuration. |
+
+Always record the final failure reason in the task log.
+
+If retries create duplicate-looking activity, stop the agent and share the request IDs with [support](mailto:support@4mica.io).
+
+<Warning>
+Never let retries bypass policy. A retry should repeat a valid attempt, not turn a blocked payment into an approved one.
+</Warning>
+
+## User-facing status
+
+Keep payment state understandable. You should be able to tell whether the agent needs approval, lacks collateral, hit a blocked seller, failed during signing or verification, exhausted its budget, or successfully received a paid response.
+
+Use stable status names so your UI, logs, and support process speak the same language.
+
+| Status | When to show it |
+| --- | --- |
+| `needs_approval` | The agent found a payment that exceeds policy. |
+| `insufficient_collateral` | The wallet cannot back the payment guarantee. |
+| `blocked_seller` | Your policy does not allow this seller. |
+| `payment_failed` | Signing, tab opening, or seller verification failed. |
+| `budget_exhausted` | The task reached its spending limit. |
+| `paid` | The request was paid and a response was received. |
+
+## What you should log
+
+Log enough to debug without guessing. The payment record should connect the task, request, seller, amount, policy, failure reason, retry count, approval state, and final outcome.
+
+| Log field | Purpose |
+| --- | --- |
+| Task ID and request ID | Connects the payment failure to the workflow. |
+| Seller domain and `payTo` address | Shows who the agent tried to pay. |
+| Amount, network, and asset | Shows what the agent tried to authorize. |
+| Policy version | Explains which rules allowed or blocked the attempt. |
+| Failure reason and retry count | Shows why the request stopped and whether retries were controlled. |
+| Approval state and final outcome | Shows whether a person was asked and what happened next. |

@@ -1,0 +1,210 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "almond",
+  "name": "4Mica docs",
+  "description": "The clearinghouse for the agentic economy",
+  "colors": {
+    "primary": "#000",
+    "light": "#ffffff",
+    "dark": "#151515"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "pages": [
+      {
+        "group": "Background",
+        "pages": [
+          "core-concepts/agentic-economy",
+          "core-concepts/agentic-payments",
+          "core-concepts/agent-identity"
+        ]
+      },
+      {
+        "group": "Getting Started",
+        "pages": [
+          "getting-started/introduction",
+          "getting-started/quickstart",
+          "getting-started/all-products",
+          "getting-started/why-we-exist",
+          "getting-started/usecases",
+          "getting-started/supported-networks"
+        ]
+      },
+      {
+        "group": "Quick Start",
+        "pages": [
+          {
+            "group": "NodeJS",
+            "pages": [
+              "quick-start/nodejs",
+              "quick-start/nextjs",
+              "quick-start/express",
+              "quick-start/hono",
+              "quick-start/nuxt",
+              "quick-start/sveltekit",
+              "quick-start/remix",
+              "quick-start/bun"
+            ]
+          },
+          {
+            "group": "Python",
+            "pages": ["quick-start/fastapi", "quick-start/flask"]
+          },
+          "quick-start/rust"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "core-concepts/how-x402-works",
+          "core-concepts/client-server-roles",
+          "core-concepts/transaction-lifecycle",
+          "core-concepts/deposits-and-withdrawals",
+          "core-concepts/wallet",
+          "core-concepts/no-custodial-risk",
+          "core-concepts/no-account-setup",
+          "core-concepts/collateral-ratios",
+          "core-concepts/bilateral-netting-cycles",
+          "core-concepts/settlements",
+          "core-concepts/micro-payments-at-scale",
+          "core-concepts/security",
+          "core-concepts/risk-management",
+          "core-concepts/configurable-slas",
+          "core-concepts/facilitator",
+          "core-concepts/earning-yield",
+          "core-concepts/cross-chain-credit"
+        ]
+      },
+      {
+        "group": "Buyer",
+        "pages": [
+          "buyer/quick-start",
+          "buyer/trust-and-verification",
+          "buyer/budgets-and-spending-limits",
+          "buyer/quality-and-outcomes",
+          "buyer/safety-and-permissions",
+          "buyer/payment-proof-and-audit",
+          "buyer/facilitator-urls",
+          "buyer/make-paid-requests-automatically",
+          "buyer/error-handling",
+          "buyer/test-in-sandbox",
+          "buyer/go-live",
+          "buyer/faqs"
+        ]
+      },
+      {
+        "group": "Seller",
+        "pages": [
+          "seller/quick-start",
+          "seller/trust-and-legitimacy",
+          "seller/pricing-and-monetization",
+          "seller/microtransactions",
+          "seller/agent-to-agent-payments",
+          "seller/proof-and-disputes",
+          "seller/risk-and-abuse-prevention",
+          "seller/facilitator-urls",
+          "seller/payment-middleware",
+          "seller/test-in-sandbox",
+          "seller/go-live",
+          "seller/faqs"
+        ]
+      },
+      {
+        "group": "Tutorials",
+        "pages": [
+          "tutorials/building-a-pay-per-use-api-with-4mica",
+          "tutorials/how-to-integrate-4mica-with-your-application",
+          "tutorials/migrate-from-stripe-to-4mica",
+          "tutorials/best-practices-for-using-4mica-in-your-application"
+        ]
+      },
+      {
+        "group": "SDKs",
+        "pages": ["sdks/backend", "sdks/frontend"]
+      },
+      {
+        "group": "Webhooks",
+        "pages": [
+          "webhooks/overview",
+          "webhooks/quick-start",
+          "webhooks/events",
+          "webhooks/security",
+          "webhooks/best-practices"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/facilitator-api",
+          "api-reference/operator-api",
+          "api-reference/payment-flow"
+        ]
+      },
+      "updates/changelogs",
+      "support/faqs",
+      {
+        "group": "Recipes",
+        "pages": [
+          "recipes/code-examples",
+          "recipes/learn-by-doing",
+          "recipes/demo-apps",
+          "recipes/4mica-youtube"
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Website",
+          "href": "https://4mica.io",
+          "icon": "globe"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/4Mica-Network",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@4mica.io"
+      },
+      {
+        "label": "Feedback",
+        "href": "mailto:feedback@4mica.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Launch App",
+      "href": "https://app.4mica.io"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/0x4Mica",
+      "github": "https://github.com/4Mica-Network",
+      "linkedin": "https://linkedin.com/company/4mica"
+    }
+  }
+}
