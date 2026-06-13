@@ -69,7 +69,17 @@ jobs:
               continue
             fi
 
-            aws s3 cp "$file" "s3://${{ secrets.S3_BUCKET }}/$key" \
+            aws s3api put-object \
+              --bucket "${{ secrets.S3_BUCKET }}" \
+              --key "$key" \
+              --body "$file" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "public,max-age=0,must-revalidate"
+
+            aws s3api put-object \
+              --bucket "${{ secrets.S3_BUCKET }}" \
+              --key "$key/" \
+              --body "$file" \
               --content-type "text/html; charset=utf-8" \
               --cache-control "public,max-age=0,must-revalidate"
           done < <(find apps/web/out -type f -name "*.html" -print0)
