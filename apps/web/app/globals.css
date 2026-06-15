@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 220 20% 5%;
+    --background: 0 0% 0%;
     --foreground: 210 40% 96%;
     --card: 220 22% 9%;
     --card-foreground: 210 40% 96%;
@@ -41,7 +41,7 @@
     --brand-soft: 163 255 214;
     --brand-violet: 92 124 250;
     --surface-solid: 5 11 29;
-    --surface-deep: 6 9 15;
+    --surface-deep: 0 0 0;
     --font-display: var(--font-intervar);
     --font-sans: var(--font-intervar);
     --font-pacifico: var(--font-intervar);
@@ -87,11 +87,18 @@
     border-color: hsl(var(--border));
   }
 
+  html {
+    background: #000000;
+  }
+
   body {
-    background-color: rgb(var(--surface-deep));
+    background-color: #000000;
     color: rgb(var(--ink-body));
     min-height: 100%;
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   h1,
@@ -328,7 +335,7 @@
   }
 
   .global-bg-base {
-    background: linear-gradient(180deg, #06090f 0%, #080c12 45%, #070b12 100%);
+    background: #000000;
   }
 
   .global-bg-vignette {
