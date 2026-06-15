@@ -1,12 +1,9 @@
+import { HOW_4MICA_WORKS_META_DATA } from "@seo/how4MicaWorks";
 import type { Metadata } from "next";
 import Link from "next/link";
 import CodeTabs from "../CodeTabs";
 
-export const metadata: Metadata = {
-  title: "Getting paid using 4Mica",
-  description:
-    "A deep dive into the 4Mica credit flow, x402 integration, and v2 validation-gated remuneration paths",
-};
+export const metadata: Metadata = HOW_4MICA_WORKS_META_DATA;
 
 export default function How4MicaWorksPage() {
   const inlineCodeClass =

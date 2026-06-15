@@ -26,6 +26,7 @@
       "@context/*": ["./context/*"],
       "@hooks/*": ["./hooks/*"],
       "@lib/*": ["./lib/*"],
+      "@seo/*": ["./seo/*"],
       "@services/*": ["./services/*"]
     },
     "types": ["vitest/globals"]
