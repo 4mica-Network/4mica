@@ -22,23 +22,23 @@ const config = {
   nodeMin: 30,
   nodeMax: 30,
   linkDistanceScale: 1.5,
-  nodeRadius: { min: 6, max: 7.6 },
-  pulseMin: 15,
-  pulseMax: 15,
+  nodeRadius: { min: 3.2, max: 4.4 },
+  pulseMin: 10,
+  pulseMax: 12,
   pulseSpeed: { min: 0.0004, max: 0.0004 },
-  pulseDelayMs: { min: 140, max: 220 },
-  pulseRadius: 0.9,
-  pulseGlowRadius: 8,
-  pulseTrail: 22,
-  pulseTrailWidth: 0.9,
-  pulseTrailAlpha: 0.08,
-  flashFade: 6,
+  pulseDelayMs: { min: 240, max: 420 },
+  pulseRadius: 0.75,
+  pulseGlowRadius: 6,
+  pulseTrail: 18,
+  pulseTrailWidth: 0.7,
+  pulseTrailAlpha: 0.045,
+  flashFade: 5,
   parallaxStrength: 5,
-  lineColor: "rgba(120, 140, 160, 0.04)",
-  nodeColor: "rgba(150, 170, 190, 0.12)",
-  nodeFlash: "rgba(150, 170, 190, 0.18)",
-  pulseCore: "rgba(163, 255, 214, 0.28)",
-  pulseGlow: "rgba(72, 201, 176, 0.12)",
+  lineColor: "rgba(48, 48, 48, 0.4)",
+  nodeColor: "rgba(48, 48, 48, 0.95)",
+  nodeFlash: "rgba(109, 109, 109, 0.42)",
+  pulseCore: "rgba(161, 161, 161, 0.24)",
+  pulseGlow: "rgba(109, 109, 109, 0.08)",
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -384,10 +384,10 @@ export default function GlobalNetworkBackground() {
   }, []);
 
   return (
-    <div className="global-background" aria-hidden="true">
-      <div className="global-bg-base" />
+    <div className="bg-black" aria-hidden="true">
+      <div className="bg-black" />
       <canvas ref={canvasRef} className="global-network-canvas" />
-      <div className="global-bg-vignette" />
+      <div className="bg-black" />
     </div>
   );
 }
