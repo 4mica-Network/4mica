@@ -9,7 +9,7 @@ const BLUE = "#7bcbff";
 export default function FinalCtaSection() {
   return (
     <section className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-2xl text-center">
           <p className="section-kicker">Start building</p>
           <h2 className="section-title">Stop paying per transaction.</h2>

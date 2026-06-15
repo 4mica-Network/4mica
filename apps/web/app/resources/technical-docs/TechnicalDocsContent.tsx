@@ -70,7 +70,7 @@ function TechnicalDocsContentInner() {
 
   return (
     <div className="min-h-screen pt-20 text-ink-body">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-10 text-center">
           <h1 className="section-title mb-6">
             4Mica x402 Integration Documentation

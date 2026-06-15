@@ -11,7 +11,7 @@ export default function TimelineSection({
 }: TimelineSectionProps) {
   return (
     <section id="roadmap" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         {showHeader && (
           <div className="mb-16 text-center">
             <h2 className="section-title mb-6">Product Roadmap</h2>

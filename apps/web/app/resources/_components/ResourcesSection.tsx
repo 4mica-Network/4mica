@@ -6,7 +6,7 @@ import { resources } from "../data";
 export default function ResourcesSection() {
   return (
     <section id="resources" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-16 text-center">
           <h2 className="section-title mb-6">Resources</h2>
           <div className="mx-auto mb-8 accent-bar"></div>

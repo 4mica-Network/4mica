@@ -27,7 +27,7 @@ export default function BlogContent() {
 
   return (
     <div className="min-h-screen pt-20 text-ink-body">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         {/* Header */}
         <div className="mb-16 text-center">
           <h1 className="section-title mb-6">4Mica Blog</h1>

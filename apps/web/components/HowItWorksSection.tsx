@@ -4,7 +4,7 @@ import { steps } from "./data";
 export default function HowItWorksSection() {
   return (
     <section id="how-it-works" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-3xl text-center">
           <p className="section-kicker">How it works</p>
           <h2 className="section-title">Three steps to instant spend</h2>

@@ -15,7 +15,7 @@ const GREEN = "#4ade80";
 export default function WhatYoureMissingSection() {
   return (
     <section className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-10 text-center">
           <p className="section-kicker">The real cost</p>
           <h2 className="section-title">Agentic economy breaks at scale.</h2>

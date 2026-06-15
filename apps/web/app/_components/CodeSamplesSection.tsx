@@ -149,7 +149,7 @@ export default function CodeSamplesSection() {
 
   return (
     <section id="integration" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-5xl">
           {/* Header */}
           <div className="mb-10">

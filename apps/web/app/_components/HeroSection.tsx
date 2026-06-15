@@ -4,7 +4,7 @@ export default function HeroSection() {
   return (
     <section className="section-gloss relative">
       <div className="relative z-10 w-full">
-        <div className="container mx-auto px-6 pt-32 pb-20 lg:pt-36 lg:pb-24">
+        <div className="w-full pt-32 pb-20 lg:pt-36 lg:pb-24">
           <div className="flex flex-col items-center text-center">
             {/* Headline */}
             <h1 className="section-title-lg max-w-4xl leading-tight">

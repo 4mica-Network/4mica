@@ -4,7 +4,7 @@ import { SECURITY_POINTS } from "./data";
 export default function SecuritySection() {
   return (
     <section id="security" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-4xl">
           <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.6fr] lg:gap-16">
             {/* Left */}

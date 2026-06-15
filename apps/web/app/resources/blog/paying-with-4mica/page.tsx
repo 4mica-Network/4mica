@@ -9,7 +9,7 @@ export const metadata: Metadata = PAYING_WITH_4MICA_META_DATA;
 export default function PayingWith4MicaPage() {
   return (
     <div className="min-h-screen pt-20 pb-24 text-ink-body">
-      <div className="container mx-auto max-w-4xl px-6">
+      <div className="mx-auto w-full max-w-4xl">
         <header className="mb-12 text-center">
           <p className="section-kicker">Payer Guide</p>
           <h1 className="section-title mb-4">

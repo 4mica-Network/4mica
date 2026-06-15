@@ -14,7 +14,7 @@ const getCodeLineKey = (line: string, counts: Map<string, number>) => {
 export default function DocsCalloutSection() {
   return (
     <section id="how-it-works" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-16 text-center">
           <p className="section-kicker">How it works</p>
           <h3 className="section-title mx-auto max-w-3xl">

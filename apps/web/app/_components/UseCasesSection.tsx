@@ -7,7 +7,7 @@ const BLUE = "#7bcbff";
 export default function UseCasesSection() {
   return (
     <section id="use-cases" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-16 text-center">
           <p className="section-kicker">Use cases</p>
           <h2 className="section-title">Built for the scale you need</h2>

@@ -9,7 +9,7 @@ export default function OpenSourceSection() {
       aria-labelledby="open-source-title"
       className="section-gloss relative py-20"
     >
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="grid gap-12 lg:grid-cols-[0.95fr_1.1fr] lg:items-center">
           <div>
             <h2

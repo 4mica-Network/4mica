@@ -610,7 +610,7 @@ let receipt = client
 
   return (
     <div className="min-h-screen pt-20 pb-24 text-ink-body">
-      <div className="container mx-auto max-w-4xl px-6">
+      <div className="mx-auto w-full max-w-4xl">
         <header className="mb-12 text-center">
           <p className="section-kicker">Deep Dive</p>
           <h1 className="section-title mb-4">Getting paid using 4Mica</h1>

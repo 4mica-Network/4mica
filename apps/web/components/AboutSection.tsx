@@ -6,7 +6,7 @@ import { aboutCards } from "./data";
 export default function AboutSection() {
   return (
     <section id="about" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-3xl text-center">
           <p className="section-kicker">About Us</p>
           <h2 className="section-title">

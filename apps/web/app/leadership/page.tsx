@@ -8,8 +8,8 @@ export default function LeadershipPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="pt-24 pb-20">
-        <section className="container mx-auto px-6">
+      <div className="pt-24 pb-20">
+        <section className="w-full">
           <div className="max-w-3xl">
             <p className="section-kicker">Team</p>
             <h1 className="section-title-lg">Team</h1>
@@ -74,7 +74,7 @@ export default function LeadershipPage() {
             </div>
           </div>
         </section>
-      </main>
+      </div>
       <Footer />
     </div>
   );

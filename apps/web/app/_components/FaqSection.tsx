@@ -4,7 +4,7 @@ import { FAQS } from "../data";
 export default function FaqSection() {
   return (
     <section id="faq" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto mb-12 max-w-3xl text-center">
           <p className="section-kicker">FAQ</p>
           <h2 className="section-title">Common questions</h2>
