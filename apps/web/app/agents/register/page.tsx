@@ -1,5 +1,12 @@
 "use client";
 
+import Footer from "@components/Footer";
+import Header from "@components/Header";
+import {
+  REGISTRATION_CONFIG,
+  type RegistrationAssetKey,
+  type RegistrationChainKey,
+} from "@lib/registrationConfig";
 import {
   type Provider,
   useAppKit,
@@ -20,13 +27,6 @@ import {
   parseUnits,
 } from "viem";
 import { networks } from "@/config/appkit";
-import Footer from "../../../components/Footer";
-import Header from "../../../components/Header";
-import {
-  REGISTRATION_CONFIG,
-  type RegistrationAssetKey,
-  type RegistrationChainKey,
-} from "../../../lib/registrationConfig";
 
 const core4MicaAbi = [
   {

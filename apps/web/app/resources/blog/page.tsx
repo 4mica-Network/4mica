@@ -1,7 +1,7 @@
 "use client";
 
-import Footer from "../../../components/Footer";
-import Header from "../../../components/Header";
+import Footer from "@components/Footer";
+import Header from "@components/Header";
 import BlogContent from "./BlogContent";
 
 export default function BlogPage() {

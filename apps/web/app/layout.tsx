@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import GlobalNetworkBackground from "../components/GlobalNetworkBackground";
-import AppKitProvider from "../context/AppKitProvider";
+import GlobalNetworkBackground from "@components/GlobalNetworkBackground";
+import AppKitProvider from "@context/AppKitProvider";
 
 const pacifico = Pacifico({
   weight: "400",
