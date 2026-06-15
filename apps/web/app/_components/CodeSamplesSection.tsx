@@ -149,8 +149,8 @@ export default function CodeSamplesSection() {
 
   return (
     <section id="integration" className="section-gloss py-24">
-      <div className="w-full">
-        <div className="mx-auto max-w-5xl">
+      <div className="mx-auto w-full max-w-300">
+        <div className="w-full">
           {/* Header */}
           <div className="mb-10">
             <p className="section-kicker">Integration</p>
@@ -164,19 +164,19 @@ export default function CodeSamplesSection() {
           </div>
 
           {/* Code panel */}
-          <div className="glass-panel overflow-hidden rounded-2xl">
+          <div className="glass-panel w-full overflow-hidden rounded-2xl">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-white/8 border-b bg-surface-solid px-4 py-2.5">
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-500/40" />
                 <div className="h-2.5 w-2.5 rounded-full bg-yellow-500/40" />
                 <div className="h-2.5 w-2.5 rounded-full bg-green-500/40" />
-                <span className="ml-2 text-[10px] text-ink-subtle uppercase tracking-wider">
+                <span className="ml-2 truncate text-[10px] text-ink-subtle uppercase tracking-wider">
                   {side === "client" ? "agent / client" : "api / server"} ·{" "}
                   {lang}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex overflow-hidden rounded-lg border border-white/10">
                   {(["client", "server"] as const).map((s) => (
                     <button
@@ -213,7 +213,7 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Code body */}
-            <div className="overflow-x-auto bg-[#050b1d] p-5 sm:p-6">
+            <div className="max-w-full overflow-x-auto bg-[#050b1d] p-5 sm:p-6">
               <div className="min-w-max font-mono text-xs leading-6">
                 {lines.map((line, i) => (
                   <div
@@ -236,7 +236,7 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-white/10 border-t bg-surface-solid px-5 py-3 text-ink-subtle text-xs">
+            <div className="flex flex-col gap-2 border-white/10 border-t bg-surface-solid px-5 py-3 text-ink-subtle text-xs sm:flex-row sm:items-center sm:justify-between">
               <span>
                 Full docs at{" "}
                 <Link

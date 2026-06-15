@@ -14,7 +14,7 @@ const getCodeLineKey = (line: string, counts: Map<string, number>) => {
 export default function DocsCalloutSection() {
   return (
     <section id="how-it-works" className="section-gloss py-24">
-      <div className="w-full">
+      <div className="mx-auto w-full max-w-300">
         <div className="mb-16 text-center">
           <p className="section-kicker">How it works</p>
           <h3 className="section-title mx-auto max-w-3xl">
@@ -26,7 +26,7 @@ export default function DocsCalloutSection() {
           </p>
         </div>
 
-        <div className="mx-auto max-w-5xl space-y-4">
+        <div className="w-full space-y-4">
           {STEPS.map((step, i) => {
             const lineCounts = new Map<string, number>();
 
@@ -37,7 +37,7 @@ export default function DocsCalloutSection() {
               >
                 <div className="grid gap-0 lg:grid-cols-[1fr_1.2fr]">
                   {/* Left */}
-                  <div className="flex flex-col justify-between border-white/10 border-b p-6 sm:p-8 lg:border-r lg:border-b-0">
+                  <div className="flex min-w-0 flex-col justify-between border-white/10 border-b p-6 sm:p-8 lg:border-r lg:border-b-0">
                     <div>
                       <div className="mb-4 flex items-center gap-3">
                         <span className="font-bold text-3xl text-white/25 leading-none">
@@ -71,7 +71,7 @@ export default function DocsCalloutSection() {
                   </div>
 
                   {/* Right */}
-                  <div className="bg-[#050b1d] p-5 sm:p-6">
+                  <div className="min-w-0 bg-[#050b1d] p-5 sm:p-6">
                     <div className="mb-4 flex items-center gap-1.5">
                       <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
                       <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
@@ -80,7 +80,7 @@ export default function DocsCalloutSection() {
                         {step.badge}
                       </span>
                     </div>
-                    <pre className="overflow-x-auto whitespace-pre font-mono text-xs leading-6">
+                    <pre className="max-w-full overflow-x-auto whitespace-pre font-mono text-xs leading-6">
                       {step.code.split("\n").map((line) => {
                         const key = getCodeLineKey(line, lineCounts);
 

@@ -7,7 +7,7 @@ const BLUE = "#7bcbff";
 export default function UseCasesSection() {
   return (
     <section id="use-cases" className="section-gloss py-24">
-      <div className="w-full">
+      <div className="mx-auto w-full max-w-[1200px]">
         <div className="mb-16 text-center">
           <p className="section-kicker">Use cases</p>
           <h2 className="section-title">Built for the scale you need</h2>
@@ -17,22 +17,22 @@ export default function UseCasesSection() {
           </p>
         </div>
 
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2">
           {USE_CASES.map((uc) => (
             <div
               key={uc.title}
-              className="glass-panel flex flex-col gap-4 rounded-2xl p-6 sm:p-7"
+              className="glass-panel flex min-w-0 flex-col gap-4 rounded-2xl p-6 sm:p-7"
               style={{ borderColor: `${BLUE}28` }}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-4">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                   style={{ background: `${BLUE}1a` }}
                 >
                   <i className={`${uc.icon} text-lg`} style={{ color: BLUE }} />
                 </div>
                 <span
-                  className="font-semibold text-xs uppercase tracking-widest"
+                  className="text-right font-semibold text-xs uppercase tracking-widest"
                   style={{ color: `${BLUE}bb` }}
                 >
                   {uc.kicker}

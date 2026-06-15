@@ -23,7 +23,7 @@ export default function FaqSection() {
 
   return (
     <section id="faq" className="section-gloss py-24">
-      <div className="mx-auto w-full max-w-[1200px]">
+      <div className="mx-auto w-full max-w-300">
         <div className="mb-12 text-center">
           <p className="section-kicker">FAQ</p>
           <h2 className="section-title">Common questions</h2>
