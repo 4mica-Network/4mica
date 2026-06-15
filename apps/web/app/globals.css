@@ -42,6 +42,12 @@
     --brand-violet: 92 124 250;
     --surface-solid: 5 11 29;
     --surface-deep: 6 9 15;
+    --font-display: var(--font-intervar);
+    --font-sans: var(--font-intervar);
+    --font-pacifico: var(--font-intervar);
+    --font-mono:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
     /* Semantic colors */
     --color-success: 74 222 128;
     --color-warning: 251 146 60;
@@ -85,7 +91,7 @@
     background-color: rgb(var(--surface-deep));
     color: rgb(var(--ink-body));
     min-height: 100%;
-    font-family: var(--font-geist-sans);
+    font-family: var(--font-sans);
   }
 
   h1,
@@ -103,6 +109,10 @@
 @layer components {
   .font-display {
     font-family: var(--font-display);
+  }
+
+  .font-pacifico {
+    font-family: var(--font-pacifico);
   }
 
   .section-kicker {
