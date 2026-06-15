@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/*": ["./*"],
+      "@4mica/url": ["../../packages/url/src/index.ts"],
       "@assets/*": ["./public/assets/*"],
       "@components/*": ["./components/*"],
       "@config/*": ["./config/*"],

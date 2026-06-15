@@ -1,3 +1,5 @@
+import { links } from "@4mica/url";
+
 export const endpoints = [
   {
     method: "POST",
@@ -18,8 +20,8 @@ export const endpoints = [
         code: `{
   "nonce": "9c1c0c7e",
   "siwe": {
-    "domain": "4mica.io",
-    "uri": "https://4mica.io",
+    "domain": "${links.root}",
+    "uri": "${links.website}",
     "chain_id": 1,
     "statement": "Sign in to 4Mica",
     "expiration": "2026-02-03T00:00:00Z",

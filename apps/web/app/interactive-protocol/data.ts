@@ -1,3 +1,5 @@
+import { links } from "@4mica/url";
+
 type NodeType = "agent" | "api" | "db" | "chain" | "ext" | "brand";
 
 interface NetNode {
@@ -182,7 +184,7 @@ export const REQUEST_ROWS = [
 export const TAB_ROWS = [
   [
     { c: "#3baeef", v: "POST " },
-    { c: "#a3ffd6", v: "https://x402.4mica.xyz/tabs " },
+    { c: "#a3ffd6", v: `${links.facilitatorTabs} ` },
     { c: "rgba(200,215,242,0.45)", v: "HTTP/1.1" },
   ],
   [],
@@ -285,7 +287,7 @@ export const RESPONSE_ROWS = [
   ],
   [
     { c: "#7dd3fc", v: '      "tabEndpoint": ' },
-    { c: "#7bcbff", v: '"https://x402.4mica.xyz/tabs",' },
+    { c: "#7bcbff", v: `"${links.facilitatorTabs}",` },
   ],
   [
     { c: "#7dd3fc", v: '      "tabId": ' },
@@ -358,7 +360,7 @@ export const SIGNING_ROWS = [
 export const SETTLE_ROWS = [
   [
     { c: "#3baeef", v: "POST " },
-    { c: "#a3ffd6", v: "https://x402.4mica.xyz/settle " },
+    { c: "#a3ffd6", v: `${links.facilitatorSettle} ` },
     { c: "rgba(200,215,242,0.45)", v: "HTTP/1.1" },
   ],
   [],

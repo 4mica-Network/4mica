@@ -1,3 +1,5 @@
+import { links, routes } from "@4mica/url";
+
 export const benefits = [
   "Users spend now and settle after 7 days",
   "No prefunding or prepaid balances for customers",
@@ -7,17 +9,17 @@ export const benefits = [
 ];
 
 export const companyLinks = [
-  { href: "/about", label: "4Mica Mission" },
-  { href: "/leadership", label: "Team" },
-  { href: "/roadmap", label: "Roadmap" },
+  { href: routes.about, label: "4Mica Mission" },
+  { href: routes.leadership, label: "Team" },
+  { href: routes.roadmap, label: "Roadmap" },
 ];
 
 export const primaryLinks = [
-  { href: "/resources/technical-docs", label: "Documents" },
-  { href: "/resources", label: "Resources" },
+  { href: routes.technicalDocs, label: "Documents" },
+  { href: routes.resources, label: "Resources" },
 ];
 
-export const githubUrl = "https://github.com/4mica-Network/4mica-core/";
+export const githubUrl = links.social.githubCore;
 
 export const hooks = [
   {
@@ -30,7 +32,7 @@ export const hooks = [
   },
   {
     label: "Request early access",
-    href: "mailto:mairon@4mica.xyz?subject=Early%20Access%20Request&body=Hi%204Mica%20team,%20I%20would%20like%20early%20access.",
+    href: links.mailto.earlyAccess,
   },
 ];
 
@@ -63,19 +65,19 @@ export const aboutCards = [
     title: "4Mica Mission",
     description:
       "Mission, product focus, and how 4Mica unlocks credit-backed payments",
-    href: "/about",
+    href: routes.about,
   },
   {
     title: "Team",
     description:
       "Meet the founders building the payment layer for instant commerce",
-    href: "/leadership",
+    href: routes.leadership,
   },
   {
     title: "Roadmap",
     description:
       "Track delivery milestones for the credit layer and network rollout",
-    href: "/roadmap",
+    href: routes.roadmap,
   },
 ];
 

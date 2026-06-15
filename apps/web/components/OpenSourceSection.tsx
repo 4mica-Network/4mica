@@ -1,6 +1,7 @@
+import { links } from "@4mica/url";
 import { Star } from "lucide-react";
 
-const repoHref = "https://github.com/4mica-Network/4mica-core/";
+const repoHref = links.social.githubCore;
 
 export default function OpenSourceSection() {
   return (

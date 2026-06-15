@@ -1,4 +1,4 @@
-import { links } from "@services/links";
+import { links } from "@4mica/url";
 import { createPageMetadata } from "./shared";
 
 export const INTERACTIVE_PROTOCOL_META_DATA = createPageMetadata({

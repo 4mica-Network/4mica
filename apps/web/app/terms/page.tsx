@@ -1,5 +1,6 @@
 "use client";
 
+import { links } from "@4mica/url";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 
@@ -35,7 +36,7 @@ export default function TermsPage() {
               </p>
               <p>
                 Questions? Contact us at{" "}
-                <span className="font-mono">mairon@4mica.xyz</span>.
+                <span className="font-mono">{links.email.contact}</span>.
               </p>
             </div>
           </div>

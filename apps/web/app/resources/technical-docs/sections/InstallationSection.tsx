@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import CodeTabs from "../../blog/CodeTabs";
 import CodeBlock from "../_components/CodeBlock";
 import type { Language } from "../navigation";
@@ -143,8 +144,8 @@ function RustInstallation() {
         <p className="mt-3 text-ink-body text-sm">
           Requires Tokio for the async runtime. The SDK points directly at the
           network RPC URL (e.g.{" "}
-          <code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>
-          ) - no separate facilitator package is needed.
+          <code className="font-mono">{links.api.baseSepolia}</code>) - no
+          separate facilitator package is needed.
         </p>
       </div>
       <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-ink-body text-sm">

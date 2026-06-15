@@ -1,3 +1,5 @@
+import { links } from "@4mica/url";
+
 export const sections = [
   {
     heading: "Executive Summary",
@@ -35,7 +37,7 @@ export const sections = [
     bullets: [
       "A wallet private key with collateral available (ETH or ERC20).",
       "The recipient endpoint you want to call.",
-      "Access to a 4Mica network: Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/) or Base Sepolia (https://base.sepolia.api.4mica.xyz/).",
+      `Access to a 4Mica network: Ethereum Sepolia (${links.api.ethereumSepolia}) or Base Sepolia (${links.api.baseSepolia}).`,
       'A 402 response that advertises `scheme: "4mica-credit"` and `extra.tabEndpoint`.',
     ],
   },
@@ -109,7 +111,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::new(
         ConfigBuilder::default()
-            .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
+            .rpc_url("${links.api.baseSepolia}".to_string())
             .signer(signer)
             .build()?,
     )
@@ -231,7 +233,7 @@ async fn main() -> anyhow::Result<()> {
 
     let client = Client::new(
         ConfigBuilder::default()
-            .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
+            .rpc_url("${links.api.baseSepolia}".to_string())
             .signer(signer)
             .build()?,
     )
@@ -310,7 +312,7 @@ client
         code: `const settled = await flow.settlePayment(
   payment,
   requirements,
-  "https://x402.4mica.xyz"
+  "${links.facilitator}"
 );
 
 const certificate = settled.settlement;`,
@@ -321,7 +323,7 @@ const certificate = settled.settlement;`,
         code: `settled = await flow.settle_payment(
     payment,
     requirements,
-    facilitator_url="https://x402.4mica.xyz/"
+    facilitator_url="${links.facilitator}/"
 )
 
 certificate = settled.settlement`,
@@ -330,7 +332,7 @@ certificate = settled.settlement`,
         language: "rust",
         caption: "Settle with the facilitator (Rust SDK)",
         code: `let settled = flow
-    .settle_payment(payment, requirements, "https://x402.4mica.xyz")
+    .settle_payment(payment, requirements, "${links.facilitator}")
     .await?;
 
 let certificate = settled.settlement;`,

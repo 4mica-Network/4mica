@@ -1,4 +1,4 @@
-import { links } from "@services/links";
+import { links } from "@4mica/url";
 import { createPageMetadata } from "./shared";
 
 export const LEADERSHIP_META_DATA = createPageMetadata({

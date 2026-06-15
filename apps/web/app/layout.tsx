@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { LinkConfig } from "@4mica/url";
 import GlobalNetworkBackground from "@components/GlobalNetworkBackground";
 import AppKitProvider from "@context/AppKitProvider";
 import { HOME_META_DATA } from "@seo/home";
@@ -29,13 +30,14 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_APP_URL ??
-  process.env.NEXT_PUBLIC_VERCEL_URL ??
-  "https://4mica.xyz";
-const metadataBase = new URL(
-  siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`,
-);
+const { base } = new LinkConfig({
+  ...process.env,
+  NEXT_PUBLIC_BASE_URL:
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_VERCEL_URL,
+});
+const metadataBase = new URL(base);
 
 export const metadata: Metadata = {
   ...HOME_META_DATA,

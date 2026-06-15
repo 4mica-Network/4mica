@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 
@@ -26,7 +27,7 @@ export default function CareersPage() {
               partnership, reach out and we&apos;ll get back quickly.
             </p>
             <a
-              href="mailto:mairon@4mica.xyz"
+              href={links.mailto.contact}
               className="btn btn-primary btn-md mt-6"
             >
               Chat with us
