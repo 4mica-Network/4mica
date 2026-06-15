@@ -1,3 +1,5 @@
+import { links } from "@4mica/url";
+
 export const FAQS = [
   {
     question: "What exactly is a credit layer for x402?",
@@ -169,14 +171,14 @@ export const PARTNERS = [
   {
     name: "Aligned Layer",
     logo: "/assets/aligned_layer_logo.png",
-    href: "https://alignedlayer.com/",
+    href: links.partner.alignedLayer,
   },
   {
     name: "ChaosChain",
     logo: "/assets/chaos_chain_logo.svg",
-    href: "https://chaoscha.in/",
+    href: links.partner.chaosChain,
   },
-  { name: "Wachai", logo: "/assets/wachai.png", href: "https://wach.ai/" },
+  { name: "Wachai", logo: "/assets/wachai.png", href: links.partner.wachai },
 ];
 
 export const TRUST_POINTS = [

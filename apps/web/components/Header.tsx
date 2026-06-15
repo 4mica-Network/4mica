@@ -1,5 +1,6 @@
 "use client";
 
+import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -26,7 +27,7 @@ export default function Header() {
         }`}
       >
         <nav className="container mx-auto flex items-center justify-between px-8 py-6">
-          <Link href="/" className="flex items-center space-x-3">
+          <Link href={routes.home} className="flex items-center space-x-3">
             <Image
               src="/assets/logo_transparent.png"
               alt="4Mica logo"
@@ -74,7 +75,7 @@ export default function Header() {
                 </Link>
               ))}
               <a
-                href="mailto:mairon@4mica.xyz"
+                href={links.mailto.contact}
                 className="whitespace-nowrap text-ink transition-colors hover:text-brand-strong"
               >
                 Contact Us
@@ -139,7 +140,7 @@ export default function Header() {
                 </Link>
               ))}
               <a
-                href="mailto:mairon@4mica.xyz"
+                href={links.mailto.contact}
                 className="block text-ink text-sm transition-colors hover:text-brand-strong"
               >
                 Contact Us
@@ -147,7 +148,7 @@ export default function Header() {
             </div>
             <div className="mt-6 grid gap-3">
               <Link
-                href="/resources/technical-docs"
+                href={routes.technicalDocs}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="btn btn-primary btn-md text-center"
               >

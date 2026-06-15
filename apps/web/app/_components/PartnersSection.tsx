@@ -1,5 +1,6 @@
 "use client";
 
+import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
@@ -111,13 +112,13 @@ export default function PartnersSection() {
         {/* CTAs */}
         <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
           <Link
-            href="/resources/technical-docs"
+            href={routes.technicalDocs}
             className="btn btn-primary btn-lg text-center"
           >
             Start Building
           </Link>
           <Link
-            href="https://github.com/4mica-Network/4mica-core/"
+            href={links.social.githubCore}
             target="_blank"
             rel="noreferrer"
             className="btn btn-soft btn-lg text-center"

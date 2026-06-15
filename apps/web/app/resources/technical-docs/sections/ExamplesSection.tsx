@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import CodeTabs from "../../blog/CodeTabs";
 import CodeBlock from "../_components/CodeBlock";
 
@@ -10,7 +11,7 @@ export default function ExamplesSection() {
           Grab the full demo repo and run it locally:{" "}
           <a
             className="text-brand-deep"
-            href="https://github.com/4mica-Network/x402-4mica/tree/main/packages/typescript/x402/demo"
+            href={links.social.githubX402Demo}
             target="_blank"
             rel="noreferrer"
           >

@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import CodeTabs from "../../blog/CodeTabs";
 import CodeBlock from "../_components/CodeBlock";
 
@@ -13,7 +14,7 @@ export default function FacilitatorApiSection() {
           clients only hit your
           <code className="font-mono"> tabEndpoint</code> and protected
           resources. The hosted base URL is typically
-          <code className="font-mono"> https://x402.4mica.xyz/</code>, but any
+          <code className="font-mono"> {links.facilitator}/</code>, but any
           compatible deployment exposes the same endpoints.
         </p>
         <div className="grid grid-cols-1 gap-4">

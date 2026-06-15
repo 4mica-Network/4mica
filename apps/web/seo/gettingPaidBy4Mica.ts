@@ -1,4 +1,4 @@
-import { links } from "@services/links";
+import { links } from "@4mica/url";
 import { createPageMetadata } from "./shared";
 
 export const GETTING_PAID_BY_4MICA_META_DATA = createPageMetadata({

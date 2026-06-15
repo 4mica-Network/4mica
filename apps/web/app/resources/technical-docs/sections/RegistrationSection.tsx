@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import CodeBlock from "../_components/CodeBlock";
 import type { Language } from "../navigation";
 
@@ -11,18 +12,15 @@ const NETWORKS = (
     <ul className="mt-2 list-inside list-disc space-y-1">
       <li>
         <code className="font-mono">eip155:8453</code> - Base (
-        <code className="font-mono">https://base.api.4mica.xyz/</code>)
+        <code className="font-mono">{links.api.base}</code>)
       </li>
       <li>
         <code className="font-mono">eip155:11155111</code> - Ethereum Sepolia (
-        <code className="font-mono">
-          https://ethereum.sepolia.api.4mica.xyz/
-        </code>
-        )
+        <code className="font-mono">{links.api.ethereumSepolia}</code>)
       </li>
       <li>
         <code className="font-mono">eip155:84532</code> - Base Sepolia (
-        <code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>)
+        <code className="font-mono">{links.api.baseSepolia}</code>)
       </li>
     </ul>
   </div>
@@ -463,12 +461,10 @@ function RustRegistration() {
         />
         <p className="mt-2 text-ink-body text-sm">
           Pass the RPC URL directly - e.g.{" "}
-          <code className="font-mono">https://base.sepolia.api.4mica.xyz/</code>{" "}
-          for Base Sepolia or{" "}
-          <code className="font-mono">
-            https://ethereum.sepolia.api.4mica.xyz/
-          </code>{" "}
-          for Ethereum Sepolia.
+          <code className="font-mono">{links.api.baseSepolia}</code> for Base
+          Sepolia or{" "}
+          <code className="font-mono">{links.api.ethereumSepolia}</code> for
+          Ethereum Sepolia.
         </p>
       </div>
       <div className="space-y-4">
@@ -495,7 +491,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer: PrivateKeySigner = "0xYourPrivateKey".parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
+        .rpc_url("${links.api.baseSepolia}".to_string())
         .signer(signer)
         .build()?;
 

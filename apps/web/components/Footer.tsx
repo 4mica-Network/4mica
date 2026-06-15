@@ -1,5 +1,6 @@
 "use client";
 
+import { links, routes } from "@4mica/url";
 import Link from "next/link";
 
 export default function Footer() {
@@ -9,7 +10,7 @@ export default function Footer() {
         <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <Link
-              href="/"
+              href={routes.home}
               className="mb-4 block font-bold font-pacifico text-3xl"
             >
               4Mica
@@ -24,27 +25,39 @@ export default function Footer() {
             <h4 className="mb-4 font-semibold text-lg">Company</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/about" className="link-muted cursor-pointer">
+                <Link href={routes.about} className="link-muted cursor-pointer">
                   4Mica Mission
                 </Link>
               </li>
               <li>
-                <Link href="/leadership" className="link-muted cursor-pointer">
+                <Link
+                  href={routes.leadership}
+                  className="link-muted cursor-pointer"
+                >
                   Team
                 </Link>
               </li>
               <li>
-                <Link href="/#resources" className="link-muted cursor-pointer">
+                <Link
+                  href={routes.resourcesAnchor}
+                  className="link-muted cursor-pointer"
+                >
                   Resources
                 </Link>
               </li>
               <li>
-                <Link href="/roadmap" className="link-muted cursor-pointer">
+                <Link
+                  href={routes.roadmap}
+                  className="link-muted cursor-pointer"
+                >
                   Roadmap
                 </Link>
               </li>
               <li>
-                <Link href="/careers" className="link-muted cursor-pointer">
+                <Link
+                  href={routes.careers}
+                  className="link-muted cursor-pointer"
+                >
                   Careers
                 </Link>
               </li>
@@ -54,16 +67,13 @@ export default function Footer() {
           <div>
             <h4 className="mb-4 font-semibold text-lg">Follow Us</h4>
             <div className="flex space-x-4">
-              <Link
-                href="https://x.com/0x4Mica"
-                className="link-muted cursor-pointer"
-              >
+              <Link href={links.social.x} className="link-muted cursor-pointer">
                 <div className="flex h-6 w-6 items-center justify-center">
                   <i className="ri-twitter-line text-xl"></i>
                 </div>
               </Link>
               <Link
-                href="https://www.linkedin.com/company/4mica"
+                href={links.social.linkedin}
                 className="link-muted cursor-pointer"
               >
                 <div className="flex h-6 w-6 items-center justify-center">
@@ -71,7 +81,7 @@ export default function Footer() {
                 </div>
               </Link>
               <Link
-                href="https://github.com/4mica-Network"
+                href={links.social.github}
                 className="link-muted cursor-pointer"
               >
                 <div className="flex h-6 w-6 items-center justify-center">
@@ -89,13 +99,13 @@ export default function Footer() {
             </p>
             <div className="flex space-x-6">
               <Link
-                href="/privacy"
+                href={routes.privacy}
                 className="link-muted cursor-pointer whitespace-nowrap"
               >
                 Privacy Policy
               </Link>
               <Link
-                href="/terms"
+                href={routes.terms}
                 className="link-muted cursor-pointer whitespace-nowrap"
               >
                 Terms of Service

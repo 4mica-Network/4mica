@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import { HOW_4MICA_WORKS_META_DATA } from "@seo/how4MicaWorks";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -320,7 +321,7 @@ async fn main() -> anyhow::Result<()> {
     let signer: PrivateKeySigner = std::env::var("RECIPIENT_KEY")?.parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
+        .rpc_url("${links.api.baseSepolia}".to_string())
         .signer(signer)
         .build()?;
     let client = Client::new(cfg).await?;
@@ -400,7 +401,7 @@ async fn main() -> anyhow::Result<()> {
     let signer: PrivateKeySigner = std::env::var("PAYER_KEY")?.parse()?;
 
     let cfg = ConfigBuilder::default()
-        .rpc_url("https://base.sepolia.api.4mica.xyz/".to_string())
+        .rpc_url("${links.api.baseSepolia}".to_string())
         .signer(signer)
         .build()?;
     let client = Client::new(cfg).await?;
@@ -430,7 +431,7 @@ async fn main() -> anyhow::Result<()> {
 const settled = await flow.settlePayment(
   payment,
   requirements,
-  "https://x402.4mica.xyz"
+  "${links.facilitator}"
 );
 
 const certificate = settled.settlement;`,
@@ -442,7 +443,7 @@ const certificate = settled.settlement;`,
 settled = await flow.settle_payment(
     payment,
     requirements,
-    facilitator_url="https://x402.4mica.xyz/"
+    facilitator_url="${links.facilitator}/"
 )
 
 certificate = settled.settlement`,
@@ -452,7 +453,7 @@ certificate = settled.settlement`,
           caption: "Settle a signed payment (Rust SDK)",
           code: `// payment + requirements from Step 2
 let settled = flow
-    .settle_payment(payment, requirements, "https://x402.4mica.xyz")
+    .settle_payment(payment, requirements, "${links.facilitator}")
     .await?;
 
 let certificate = settled.settlement;`,

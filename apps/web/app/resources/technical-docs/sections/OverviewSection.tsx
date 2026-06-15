@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import type { Language } from "../navigation";
 
 interface OverviewSectionProps {
@@ -90,7 +91,7 @@ const capabilities: Record<Language, Capability[]> = {
     },
     {
       title: "Multi-Network Support",
-      desc: "Point the SDK at Base (https://base.api.4mica.xyz/), Ethereum Sepolia (https://ethereum.sepolia.api.4mica.xyz/), or Base Sepolia (https://base.sepolia.api.4mica.xyz/).",
+      desc: `Point the SDK at Base (${links.api.base}), Ethereum Sepolia (${links.api.ethereumSepolia}), or Base Sepolia (${links.api.baseSepolia}).`,
     },
     {
       title: "Server & Client Middleware (coming soon)",
