@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Pacifico, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import GlobalNetworkBackground from "@components/GlobalNetworkBackground";
 import AppKitProvider from "@context/AppKitProvider";
+import { HOME_META_DATA } from "@seo/home";
 
 const pacifico = Pacifico({
   weight: "400",
@@ -37,30 +38,9 @@ const metadataBase = new URL(
 );
 
 export const metadata: Metadata = {
+  ...HOME_META_DATA,
   metadataBase,
-  title: "4Mica",
-  description: "The clearinghouse for the agentic economy",
   authors: [{ name: "Mairon Mahzoun" }],
-  openGraph: {
-    title: "4Mica",
-    description: "The clearinghouse for the agentic economy",
-    images: [
-      {
-        url: "/assets/logo_transparent.png",
-        width: 264,
-        height: 192,
-        alt: "4Mica Logo",
-      },
-    ],
-    type: "article",
-    publishedTime: "2026-05-07T00:00:00Z",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "4Mica",
-    description: "The clearinghouse for the agentic economy",
-    images: ["/assets/logo_transparent.png"],
-  },
 };
 
 export default function RootLayout({

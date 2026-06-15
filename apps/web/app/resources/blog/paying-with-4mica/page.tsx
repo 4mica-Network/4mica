@@ -1,13 +1,10 @@
+import { PAYING_WITH_4MICA_META_DATA } from "@seo/payingWith4Mica";
 import type { Metadata } from "next";
 import Link from "next/link";
 import CodeTabs from "../CodeTabs";
 import { sections } from "./data";
 
-export const metadata: Metadata = {
-  title: "Paying with 4Mica",
-  description:
-    "A payer-first guide to funding collateral, signing 4Mica payment headers, and settling tabs on-chain with v2 validation-gated guarantees.",
-};
+export const metadata: Metadata = PAYING_WITH_4MICA_META_DATA;
 
 export default function PayingWith4MicaPage() {
   return (
