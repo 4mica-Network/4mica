@@ -127,7 +127,7 @@ export default function OverviewSection({
       <div className="space-y-6">
         <p className="text-ink-body leading-relaxed">{p1}</p>
         <p className="text-ink-body leading-relaxed">{p2}</p>
-        <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
           <span className="font-semibold text-ink-strong">New here?</span> Payer
           wallets must deposit collateral before making payments. Start with the{" "}
           <button
@@ -147,7 +147,7 @@ export default function OverviewSection({
             {capabilities[language].map((item) => (
               <div
                 key={item.title}
-                className="rounded-lg border border-white/10 bg-white/10 p-4"
+                className="rounded-md border border-white/10 bg-white/10 p-4"
               >
                 <h4 className="mb-2 font-semibold text-ink-body">
                   {item.title}

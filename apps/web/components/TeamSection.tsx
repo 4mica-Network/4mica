@@ -20,7 +20,7 @@ export default function TeamSection() {
           {teamMembers.map((member) => (
             <div
               key={member.name}
-              className="glass-panel group overflow-hidden rounded-xl transition-shadow duration-300"
+              className="glass-panel group overflow-hidden rounded-md transition-shadow duration-300"
             >
               <div className="relative aspect-4/5 overflow-hidden bg-surface-solid/35">
                 <Image

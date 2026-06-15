@@ -24,7 +24,7 @@ export default function LeadershipPage() {
             {teamMembers.map((member) => (
               <div
                 key={member.name}
-                className="glass-panel overflow-hidden rounded-xl"
+                className="glass-panel overflow-hidden rounded-md"
               >
                 <div className="relative aspect-4/5 bg-surface-solid/35">
                   <Image
@@ -53,7 +53,7 @@ export default function LeadershipPage() {
             ))}
           </div>
 
-          <div className="glass-panel mt-12 max-w-4xl rounded-2xl p-6 sm:p-8">
+          <div className="glass-panel mt-12 max-w-4xl rounded-md p-6 sm:p-8">
             <h2 className="font-semibold text-ink-strong text-xl">
               How we work
             </h2>

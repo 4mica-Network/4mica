@@ -16,7 +16,7 @@ export default function OperatorApiSection() {
           <code className="font-mono">/auth</code>. All non-public endpoints
           require an access token.
         </p>
-        <div className="space-y-2 rounded-lg border border-white/10 bg-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 bg-white/10 p-5 text-ink-body text-sm">
           <p>
             <span className="font-semibold">Public endpoints:</span>{" "}
             <code className="font-mono">/auth/*</code>,{" "}
@@ -43,7 +43,7 @@ export default function OperatorApiSection() {
             <code className="font-mono">facilitator</code>
           </p>
         </div>
-        <div className="space-y-2 rounded-lg border border-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-sm">
           <h3 className="font-semibold text-ink-strong text-lg">
             Access rules
           </h3>
@@ -97,7 +97,7 @@ export default function OperatorApiSection() {
           {endpoints.map((endpoint) => (
             <div
               key={`${endpoint.method}-${endpoint.path}`}
-              className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5"
+              className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5"
             >
               <h3 className="font-semibold text-ink-strong text-lg">
                 {endpoint.method} {endpoint.path}
@@ -117,7 +117,7 @@ export default function OperatorApiSection() {
             </div>
           ))}
         </div>
-        <div className="space-y-2 rounded-lg border border-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-sm">
           <h3 className="font-semibold text-ink-strong text-lg">
             Response shape notes
           </h3>

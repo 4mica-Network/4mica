@@ -16,14 +16,14 @@ export default function BenefitsSection() {
               ready.
             </p>
           </div>
-          <div className="glass-panel rounded-2xl p-6 sm:p-8">
+          <div className="glass-panel rounded-md p-6 sm:p-8">
             <ul className="space-y-4">
               {benefits.map((benefit) => (
                 <li
                   key={benefit}
                   className="flex items-start gap-3 text-ink-body"
                 >
-                  <span className="mt-2 h-2 w-2 rounded-full bg-brand-teal" />
+                  <span className="mt-2 h-2 w-2 rounded-md bg-brand-teal" />
                   <span className="text-sm leading-relaxed">{benefit}</span>
                 </li>
               ))}

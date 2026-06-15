@@ -154,7 +154,7 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md font-semibold leading-none transition-all duration-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn:focus-visible {
@@ -163,15 +163,15 @@
   }
 
   .btn-sm {
-    @apply px-4 py-2 text-sm;
+    @apply px-3 py-1.5 text-sm;
   }
 
   .btn-md {
-    @apply px-6 py-3 text-sm;
+    @apply px-4 py-2 text-sm;
   }
 
   .btn-lg {
-    @apply px-8 py-4 text-base;
+    @apply px-5 py-2.5 text-sm;
   }
 
   .btn-primary {
@@ -263,7 +263,7 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold;
+    @apply inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-semibold;
     border: 1px solid rgb(var(--brand) / 0.35);
     color: rgb(var(--brand));
     background: rgb(var(--brand-deep) / 0.18);

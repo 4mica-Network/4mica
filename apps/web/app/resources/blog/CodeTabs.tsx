@@ -195,7 +195,7 @@ export default function CodeTabs({
 
   return (
     <div
-      className={`rounded-xl border border-white/10 bg-surface-solid text-ink-body text-sm ${
+      className={`rounded-md border border-white/10 bg-surface-solid text-ink-body text-sm ${
         className ?? ""
       }`}
     >
@@ -225,7 +225,7 @@ export default function CodeTabs({
                   aria-selected={isActive}
                   aria-controls={`${baseId}-panel-${idx}`}
                   onClick={() => setActiveIndex(idx)}
-                  className={`rounded-full px-3 py-1 font-semibold text-xs transition ${
+                  className={`rounded-md px-3 py-1 font-semibold text-xs transition ${
                     isActive
                       ? "bg-white/15 text-ink-strong shadow-sm"
                       : "text-ink-muted hover:text-ink-strong"
@@ -239,7 +239,7 @@ export default function CodeTabs({
           <button
             type="button"
             onClick={() => handleCopy(activeBlock?.code ?? "", activeIndex)}
-            className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
+            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
               copiedIndex === activeIndex
                 ? "text-brand"
                 : "text-ink-muted hover:text-ink-strong"
@@ -268,7 +268,7 @@ export default function CodeTabs({
           <button
             type="button"
             onClick={() => handleCopy(activeBlock?.code ?? "", activeIndex)}
-            className={`inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
+            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
               copiedIndex === activeIndex
                 ? "text-brand"
                 : "text-ink-muted hover:text-ink-strong"

@@ -10,7 +10,7 @@ export default function TermsPage() {
       <Header />
       <div className="min-h-screen pt-24 text-ink-body">
         <div className="w-full">
-          <div className="glass-panel mx-auto max-w-3xl rounded-2xl p-8 sm:p-10">
+          <div className="glass-panel mx-auto max-w-3xl rounded-md p-8 sm:p-10">
             <h1 className="font-semibold text-3xl text-ink-strong">
               Terms of Service
             </h1>

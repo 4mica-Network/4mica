@@ -164,20 +164,20 @@ export default function CodeSamplesSection() {
           </div>
 
           {/* Code panel */}
-          <div className="glass-panel w-full overflow-hidden rounded-2xl">
+          <div className="glass-panel w-full overflow-hidden rounded-md">
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-white/8 border-b bg-surface-solid px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-red-500/40" />
-                <div className="h-2.5 w-2.5 rounded-full bg-yellow-500/40" />
-                <div className="h-2.5 w-2.5 rounded-full bg-green-500/40" />
+                <div className="h-2.5 w-2.5 rounded-md bg-red-500/40" />
+                <div className="h-2.5 w-2.5 rounded-md bg-yellow-500/40" />
+                <div className="h-2.5 w-2.5 rounded-md bg-green-500/40" />
                 <span className="ml-2 truncate text-[10px] text-ink-subtle uppercase tracking-wider">
                   {side === "client" ? "agent / client" : "api / server"} ·{" "}
                   {lang}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex overflow-hidden rounded-lg border border-white/10">
+                <div className="flex overflow-hidden rounded-md border border-white/10">
                   {(["client", "server"] as const).map((s) => (
                     <button
                       key={s}
@@ -193,7 +193,7 @@ export default function CodeSamplesSection() {
                     </button>
                   ))}
                 </div>
-                <div className="flex overflow-hidden rounded-lg border border-white/10">
+                <div className="flex overflow-hidden rounded-md border border-white/10">
                   {(["typescript", "python"] as const).map((l) => (
                     <button
                       key={l}

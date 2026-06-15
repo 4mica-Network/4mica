@@ -18,7 +18,7 @@ export default function FacilitatorApiSection() {
           compatible deployment exposes the same endpoints.
         </p>
         <div className="grid grid-cols-1 gap-4">
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">GET /</h3>
             <p className="text-ink-body text-sm">
               <span className="font-semibold">What it does:</span> Returns
@@ -54,7 +54,7 @@ export default function FacilitatorApiSection() {
             />
           </div>
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">
               GET /health
             </h3>
@@ -72,7 +72,7 @@ export default function FacilitatorApiSection() {
             <CodeBlock code={`{ "status": "ok" }`} language="json" />
           </div>
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">
               GET /supported
             </h3>
@@ -109,7 +109,7 @@ export default function FacilitatorApiSection() {
             />
           </div>
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /tabs
             </h3>
@@ -183,7 +183,7 @@ export default function FacilitatorApiSection() {
             />
           </div>
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /verify
             </h3>
@@ -260,7 +260,7 @@ export default function FacilitatorApiSection() {
             />
           </div>
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /settle
             </h3>
@@ -345,7 +345,7 @@ export default function FacilitatorApiSection() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-lg border border-white/10 p-6">
+        <div className="space-y-3 rounded-md border border-white/10 p-6">
           <h3 className="font-semibold text-ink-strong text-lg">
             Shared payloads
           </h3>

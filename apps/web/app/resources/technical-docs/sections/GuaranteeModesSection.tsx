@@ -36,7 +36,7 @@ export default function GuaranteeModesSection() {
             Currently, two guarantee versions are supported:
           </p>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <div className="rounded-md border border-white/10 bg-white/5 p-4">
               <h3 className="mb-2 font-semibold text-base text-ink-strong">
                 V1: Standard
               </h3>
@@ -48,7 +48,7 @@ export default function GuaranteeModesSection() {
                 No job-validation condition is attached.
               </p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <div className="rounded-md border border-white/10 bg-white/5 p-4">
               <h3 className="mb-2 font-semibold text-base text-ink-strong">
                 V2: Verified
               </h3>
@@ -83,12 +83,12 @@ export default function GuaranteeModesSection() {
             <code className="font-mono">timestamp</code> field embedded in the
             guarantee:
           </p>
-          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-4 font-mono text-ink-body text-sm">
+          <div className="mb-4 rounded-md border border-white/10 bg-white/5 p-4 font-mono text-ink-body text-sm">
             guarantee.timestamp + 14 days &nbsp;≤&nbsp; block.timestamp
             &nbsp;&lt;&nbsp; guarantee.timestamp + 21 days
           </div>
           <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <div className="rounded-md border border-white/10 bg-white/5 p-4">
               <p className="mb-1 font-semibold text-ink-muted text-xs uppercase tracking-wide">
                 Opens
               </p>
@@ -97,7 +97,7 @@ export default function GuaranteeModesSection() {
                 voluntary settlement.
               </p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+            <div className="rounded-md border border-white/10 bg-white/5 p-4">
               <p className="mb-1 font-semibold text-ink-muted text-xs uppercase tracking-wide">
                 Closes
               </p>
@@ -106,7 +106,7 @@ export default function GuaranteeModesSection() {
                 with <code className="font-mono">TabExpired()</code>.
               </p>
             </div>
-            <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4">
+            <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
               <p className="mb-1 font-semibold text-amber-400/80 text-xs uppercase tracking-wide">
                 Window
               </p>
@@ -116,7 +116,7 @@ export default function GuaranteeModesSection() {
               </p>
             </div>
           </div>
-          <div className="mb-6 rounded-lg border border-amber-400/20 bg-amber-400/5 p-4">
+          <div className="mb-6 rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
             <p className="text-ink-body text-sm">
               <strong className="text-ink-strong">
                 Store the BLS certificate at issuance.
@@ -243,7 +243,7 @@ print("Settled in tx", receipt["transactionHash"])`,
           <h4 className="mb-3 font-semibold text-ink-strong text-sm uppercase tracking-wide">
             Base payment fields (shared with V1)
           </h4>
-          <div className="mb-6 overflow-x-auto rounded-lg border border-white/10">
+          <div className="mb-6 overflow-x-auto rounded-md border border-white/10">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-ink-strong">
                 <tr>
@@ -316,7 +316,7 @@ print("Settled in tx", receipt["transactionHash"])`,
           <h4 className="mb-3 font-semibold text-ink-strong text-sm uppercase tracking-wide">
             Validation policy fields (V2 only)
           </h4>
-          <div className="mb-6 overflow-x-auto rounded-lg border border-white/10">
+          <div className="mb-6 overflow-x-auto rounded-md border border-white/10">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-ink-strong">
                 <tr>
@@ -426,7 +426,7 @@ print("Settled in tx", receipt["transactionHash"])`,
             </table>
           </div>
 
-          <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4">
+          <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
             <p className="text-ink-body text-sm">
               <strong className="text-ink-strong">
                 Both hashes are canonical.
@@ -530,7 +530,7 @@ print("Settled in tx", receipt["transactionHash"])`,
               ] as { id: string; content: React.ReactNode }[]
             ).map((step, i) => (
               <li key={step.id} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-white/10 font-bold text-ink-muted text-xs">
+                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-white/10 font-bold text-ink-muted text-xs">
                   {i + 1}
                 </span>
                 <span>{step.content}</span>

@@ -314,7 +314,7 @@ session = x402_requests(client)`}
 function RustClientIntegration() {
   return (
     <div className="space-y-6">
-      <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-6 text-center">
+      <div className="space-y-3 rounded-md border border-white/10 bg-white/5 p-6 text-center">
         <i className="ri-time-line text-3xl text-ink-body" />
         <h3 className="font-semibold text-ink-strong text-xl">
           HTTP client wrappers for Rust are coming soon
@@ -326,7 +326,7 @@ function RustClientIntegration() {
           and wallet operations.
         </p>
       </div>
-      <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+      <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
         <p className="font-semibold text-ink-strong">
           What is planned for Rust client support
         </p>

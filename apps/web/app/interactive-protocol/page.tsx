@@ -693,7 +693,7 @@ function TerminalPanel({
       }}
     >
       <div
-        className="w-full overflow-hidden rounded-xl"
+        className="w-full overflow-hidden rounded-md"
         style={{
           background: "rgba(4,8,20,0.95)",
           border: `1px solid ${accent}33`,
@@ -709,7 +709,7 @@ function TerminalPanel({
             {TERMINAL_DOTS.map((c) => (
               <div
                 key={c}
-                className="h-2 w-2 rounded-full"
+                className="h-2 w-2 rounded-md"
                 style={{ background: c, opacity: 0.5 }}
               />
             ))}
@@ -1285,7 +1285,7 @@ export default function DemoPage() {
                 {LEGEND_ITEMS.map(({ type, label }) => (
                   <div key={type} className="flex items-center gap-2">
                     <div
-                      className="h-2 w-2 rounded-full"
+                      className="h-2 w-2 rounded-md"
                       style={{
                         background: NODE_COLOR[type],
                         boxShadow: `0 0 5px ${NODE_COLOR[type]}88`,
@@ -1314,7 +1314,7 @@ export default function DemoPage() {
                 transition={{ delay: 1.4, duration: 0.4 }}
               >
                 <div
-                  className="flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-[10px]"
+                  className="flex items-center gap-2 rounded-md px-3 py-1.5 font-mono text-[10px]"
                   style={{
                     background: "rgba(5,11,29,0.65)",
                     border: "1px solid rgba(120,180,220,0.18)",
@@ -1323,7 +1323,7 @@ export default function DemoPage() {
                   }}
                 >
                   <motion.div
-                    className="h-1.5 w-1.5 rounded-full bg-sky-400/55"
+                    className="h-1.5 w-1.5 rounded-md bg-sky-400/55"
                     animate={{ scale: [1, 1.4, 1] }}
                     transition={{ duration: 1.4, repeat: Infinity }}
                   />
@@ -1343,7 +1343,7 @@ export default function DemoPage() {
             type="button"
             onClick={goPrev}
             disabled={step === 0}
-            className="flex items-center gap-1.5 rounded-full px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
+            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
             style={{
               border: "1px solid rgba(120,180,220,0.2)",
               color: "rgb(156,183,232)",
@@ -1372,7 +1372,7 @@ export default function DemoPage() {
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center gap-1.5 rounded-full px-5 py-2 font-semibold text-xs transition-all duration-200"
+            className="flex items-center gap-1.5 rounded-md px-5 py-2 font-semibold text-xs transition-all duration-200"
             style={{
               background: playing
                 ? "rgba(59,174,239,0.13)"
@@ -1452,7 +1452,7 @@ export default function DemoPage() {
             {STEP_INDICATORS.map((stepKey, i) => (
               <motion.div
                 key={stepKey}
-                className="h-1 rounded-full"
+                className="h-1 rounded-md"
                 animate={{ width: i === step ? 24 : i < step ? 16 : 5 }}
                 transition={{ duration: 0.3 }}
                 style={{
@@ -1471,7 +1471,7 @@ export default function DemoPage() {
             type="button"
             onClick={goNext}
             disabled={step >= TOTAL_STEPS - 1}
-            className="flex items-center gap-1.5 rounded-full px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
+            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
             style={{
               border: "1px solid rgba(120,180,220,0.2)",
               color: "rgb(156,183,232)",

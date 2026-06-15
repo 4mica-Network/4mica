@@ -33,7 +33,7 @@ export default function DocsCalloutSection() {
             return (
               <div
                 key={step.num}
-                className="glass-panel overflow-hidden rounded-2xl"
+                className="glass-panel overflow-hidden rounded-md"
               >
                 <div className="grid gap-0 lg:grid-cols-[1fr_1.2fr]">
                   {/* Left */}
@@ -44,7 +44,7 @@ export default function DocsCalloutSection() {
                           {step.num}
                         </span>
                         <span
-                          className="rounded-full px-2 py-1 font-semibold text-xs uppercase tracking-widest"
+                          className="rounded-md px-2 py-1 font-semibold text-xs uppercase tracking-widest"
                           style={{
                             background: `${ACCENT}15`,
                             color: ACCENT,
@@ -73,9 +73,9 @@ export default function DocsCalloutSection() {
                   {/* Right */}
                   <div className="min-w-0 bg-[#050b1d] p-5 sm:p-6">
                     <div className="mb-4 flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                      <div className="h-2.5 w-2.5 rounded-md bg-white/20" />
+                      <div className="h-2.5 w-2.5 rounded-md bg-white/20" />
+                      <div className="h-2.5 w-2.5 rounded-md bg-white/20" />
                       <span className="ml-2 text-[10px] text-white/45 uppercase tracking-wider">
                         {step.badge}
                       </span>
@@ -144,7 +144,7 @@ export default function DocsCalloutSection() {
         </div>
 
         <div className="mx-auto mt-10 max-w-2xl text-center">
-          <div className="glass-panel rounded-2xl px-8 py-6">
+          <div className="glass-panel rounded-md px-8 py-6">
             <p className="font-semibold text-base text-ink-strong">
               Replace thousands of transactions with{" "}
               <span style={{ color: ACCENT }}>

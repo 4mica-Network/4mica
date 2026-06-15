@@ -49,7 +49,7 @@ export default function BlogContent() {
                     key={category}
                     type="button"
                     onClick={() => setSelectedCategory(category)}
-                    className={`cursor-pointer whitespace-nowrap rounded-full px-4 py-2 transition-colors ${
+                    className={`cursor-pointer whitespace-nowrap rounded-md px-4 py-2 transition-colors ${
                       selectedCategory === category
                         ? "bg-brand-deep text-ink"
                         : "bg-white/10 text-ink-body hover:bg-white/15 hover:text-ink-strong"
@@ -66,11 +66,11 @@ export default function BlogContent() {
               {filteredPosts.map((post) => (
                 <article
                   key={post.id}
-                  className="glass-panel overflow-hidden rounded-lg transition-all hover:-translate-y-0.5"
+                  className="glass-panel overflow-hidden rounded-md transition-all hover:-translate-y-0.5"
                 >
                   <div className="p-6">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="rounded-full bg-brand-deep px-3 py-1 font-medium text-ink text-sm">
+                      <span className="rounded-md bg-brand-deep px-3 py-1 font-medium text-ink text-sm">
                         {post.category}
                       </span>
                       <span className="text-ink-muted text-sm">
@@ -88,7 +88,7 @@ export default function BlogContent() {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-brand-strong">
+                        <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-brand-strong">
                           <span className="font-semibold text-sm text-white">
                             {post.author
                               .split(" ")
@@ -131,7 +131,7 @@ export default function BlogContent() {
           <div className="lg:col-span-1">
             <div className="space-y-8">
               {/* Newsletter Signup */}
-              <div className="glass-panel rounded-lg p-6">
+              <div className="glass-panel rounded-md p-6">
                 <h3 className="mb-4 font-bold text-ink-strong text-xl">
                   Stay Updated
                 </h3>
@@ -141,8 +141,8 @@ export default function BlogContent() {
                 </p>
 
                 {isSubscribed ? (
-                  <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/15 p-4 text-center">
-                    <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-400">
+                  <div className="rounded-md border border-emerald-400/30 bg-emerald-500/15 p-4 text-center">
+                    <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-md bg-emerald-400">
                       <div className="flex h-4 w-4 items-center justify-center">
                         <i className="ri-check-line text-white"></i>
                       </div>
@@ -163,7 +163,7 @@ export default function BlogContent() {
                       onChange={(e) => setSubscribedEmail(e.target.value)}
                       placeholder="Enter your email"
                       required
-                      className="form-field-dark mb-3 w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-strong/60"
+                      className="form-field-dark mb-3 w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-strong/60"
                     />
                     <button
                       type="submit"
@@ -176,7 +176,7 @@ export default function BlogContent() {
               </div>
 
               {/* Recent Posts */}
-              <div className="glass-panel rounded-lg p-6">
+              <div className="glass-panel rounded-md p-6">
                 <h3 className="mb-4 font-bold text-ink-strong text-xl">
                   Recent Posts
                 </h3>
@@ -201,7 +201,7 @@ export default function BlogContent() {
               </div>
 
               {/* Popular Tags */}
-              <div className="glass-panel rounded-lg p-6">
+              <div className="glass-panel rounded-md p-6">
                 <h3 className="mb-4 font-bold text-ink-strong text-xl">
                   Popular Tags
                 </h3>
@@ -217,7 +217,7 @@ export default function BlogContent() {
                   ].map((tag) => (
                     <span
                       key={tag}
-                      className="cursor-pointer rounded-full bg-white/10 px-3 py-1 text-ink-body text-sm transition-colors hover:bg-brand-deep hover:text-ink"
+                      className="cursor-pointer rounded-md bg-white/10 px-3 py-1 text-ink-body text-sm transition-colors hover:bg-brand-deep hover:text-ink"
                     >
                       {tag}
                     </span>
