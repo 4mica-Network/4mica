@@ -429,7 +429,7 @@ const NodeShape = memo(function NodeShape({
         textAnchor="middle"
         fontSize="1.45"
         fill="rgba(200,215,242,0.65)"
-        style={{ fontFamily: "var(--font-geist-mono)", pointerEvents: "none" }}
+        style={{ fontFamily: "var(--font-mono)", pointerEvents: "none" }}
       >
         {name}
       </text>
@@ -528,7 +528,7 @@ function NettingLedger() {
         y={Y + 5.1}
         fontSize="0.95"
         fill="rgba(100,116,139,0.75)"
-        style={{ fontFamily: "var(--font-geist-mono)" }}
+        style={{ fontFamily: "var(--font-mono)" }}
       >
         FROM → TO
       </text>
@@ -537,7 +537,7 @@ function NettingLedger() {
         y={Y + 5.1}
         fontSize="0.95"
         fill="rgba(100,116,139,0.75)"
-        style={{ fontFamily: "var(--font-geist-mono)" }}
+        style={{ fontFamily: "var(--font-mono)" }}
       >
         USDC
       </text>
@@ -546,7 +546,7 @@ function NettingLedger() {
         y={Y + 5.1}
         fontSize="0.95"
         fill="rgba(100,116,139,0.75)"
-        style={{ fontFamily: "var(--font-geist-mono)" }}
+        style={{ fontFamily: "var(--font-mono)" }}
       >
         NET STATUS
       </text>
@@ -581,7 +581,7 @@ function NettingLedger() {
             y={Y + 7.7 + i * 3.0}
             fontSize="1.05"
             fill="rgba(170,190,225,0.75)"
-            style={{ fontFamily: "var(--font-geist-mono)" }}
+            style={{ fontFamily: "var(--font-mono)" }}
           >
             {e.pair}
           </text>
@@ -590,7 +590,7 @@ function NettingLedger() {
             y={Y + 7.7 + i * 3.0}
             fontSize="1.05"
             fill={e.c}
-            style={{ fontFamily: "var(--font-geist-mono)" }}
+            style={{ fontFamily: "var(--font-mono)" }}
           >
             {e.amt}
           </text>
@@ -599,7 +599,7 @@ function NettingLedger() {
             y={Y + 7.7 + i * 3.0}
             fontSize="1.05"
             fill={e.c}
-            style={{ fontFamily: "var(--font-geist-mono)" }}
+            style={{ fontFamily: "var(--font-mono)" }}
           >
             {e.status}
           </text>
@@ -623,7 +623,7 @@ function NettingLedger() {
         fontWeight="700"
         fill="rgba(72,201,176,0.95)"
         style={{
-          fontFamily: "var(--font-geist-mono)",
+          fontFamily: "var(--font-mono)",
           opacity: 0,
           animation: "nlFade 0.4s 2.85s ease forwards",
         }}
