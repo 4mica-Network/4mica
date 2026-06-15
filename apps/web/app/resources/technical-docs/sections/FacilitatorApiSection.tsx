@@ -20,15 +20,15 @@ export default function FacilitatorApiSection() {
         <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-5">
             <h3 className="font-semibold text-ink-strong text-lg">GET /</h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Returns
               service metadata and a quick pointer to supported
               schemes/networks.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span> No body.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">
                 {
@@ -58,14 +58,14 @@ export default function FacilitatorApiSection() {
             <h3 className="font-semibold text-ink-strong text-lg">
               GET /health
             </h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Liveness
               probe for load balancers.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span> No body.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">{'{ status: "ok" }'}</code>
             </p>
@@ -76,15 +76,15 @@ export default function FacilitatorApiSection() {
             <h3 className="font-semibold text-ink-strong text-lg">
               GET /supported
             </h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Lists all
               supported (scheme, network) pairs for credit and any delegated
               exact/debit flows.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span> No body.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">
                 {
@@ -113,12 +113,12 @@ export default function FacilitatorApiSection() {
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /tabs
             </h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Opens or
               reuses a payment tab for a (user, recipient, asset) triple. Used
               by your tab endpoint.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span>{" "}
               <code className="font-mono">
                 {
@@ -141,7 +141,7 @@ export default function FacilitatorApiSection() {
               supplied they must match; if neither is supplied the facilitator
               defaults to version <code className="font-mono">1</code>.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">
                 {
@@ -187,12 +187,12 @@ export default function FacilitatorApiSection() {
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /verify
             </h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Validates the
               structure of the decoded payment envelope against the original
               payment requirements. No on-chain work is done here.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span>{" "}
               <code className="font-mono">
                 {
@@ -203,7 +203,7 @@ export default function FacilitatorApiSection() {
               payment header (<code className="font-mono">X-PAYMENT</code> for
               v1, <code className="font-mono">PAYMENT-SIGNATURE</code> for v2).
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">
                 {"{ isValid: true|false, invalidReason?, certificate? }"}
@@ -264,14 +264,14 @@ export default function FacilitatorApiSection() {
             <h3 className="font-semibold text-ink-strong text-lg">
               POST /settle
             </h3>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">What it does:</span> Re-validates
               the decoded payment header and issues a BLS certificate for
               4mica-credit (or proxies exact/debit settlements). This step does
               not execute ERC-8004 validation; it only returns the certificate
               used later on-chain.
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Gets:</span>{" "}
               <code className="font-mono">
                 {
@@ -280,7 +280,7 @@ export default function FacilitatorApiSection() {
               </code>
               .
             </p>
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <span className="font-semibold">Returns:</span>{" "}
               <code className="font-mono">
                 {"{ success, error?, txHash?, networkId?, certificate? }"}
@@ -349,7 +349,7 @@ export default function FacilitatorApiSection() {
           <h3 className="font-semibold text-ink-strong text-lg">
             Shared payloads
           </h3>
-          <div className="space-y-2 text-ink-body text-sm">
+          <div className="space-y-2 text-ink-body text-md">
             <p>
               <span className="font-semibold">paymentRequirements</span> must
               include <code className="font-mono">scheme</code>,{" "}

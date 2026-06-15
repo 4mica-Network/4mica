@@ -15,7 +15,7 @@ export default function PayingWith4MicaPage() {
           <h1 className="section-title mb-4">
             Paying with 4Mica: Credit, Tabs, and Settlement
           </h1>
-          <p className="text-ink-muted text-sm">
+          <p className="text-ink-muted text-md">
             Published January 29, 2026 · 10 min read · By Mairon
           </p>
         </header>
@@ -53,7 +53,7 @@ export default function PayingWith4MicaPage() {
           ))}
         </article>
 
-        <footer className="mt-12 flex flex-col items-center justify-between gap-4 text-ink-muted text-sm md:flex-row">
+        <footer className="mt-12 flex flex-col items-center justify-between gap-4 text-ink-muted text-md md:flex-row">
           <Link
             href="/resources/blog"
             className="link-accent cursor-pointer whitespace-nowrap"

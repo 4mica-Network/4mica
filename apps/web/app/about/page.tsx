@@ -28,10 +28,10 @@ export default function AboutPage() {
                   key={highlight.title}
                   className="glass-panel rounded-md p-5"
                 >
-                  <h3 className="font-semibold text-ink-strong text-sm">
+                  <h3 className="font-semibold text-ink-strong text-md">
                     {highlight.title}
                   </h3>
-                  <p className="mt-2 text-ink-muted text-xs leading-relaxed">
+                  <p className="mt-2 text-ink-muted text-md leading-relaxed">
                     {highlight.description}
                   </p>
                 </div>
@@ -41,7 +41,7 @@ export default function AboutPage() {
               <h2 className="font-semibold text-ink-strong text-xl">
                 Company Info
               </h2>
-              <div className="mt-6 space-y-4 text-ink-body text-sm">
+              <div className="mt-6 space-y-4 text-ink-body text-md">
                 {companyInfo.map((item) => (
                   <div
                     key={item.label}
@@ -55,10 +55,10 @@ export default function AboutPage() {
               <div className="mt-6">
                 <Link
                   href="/leadership"
-                  className="link-accent inline-flex items-center font-semibold text-sm"
+                  className="link-accent inline-flex items-center font-semibold text-md"
                 >
                   Meet the team
-                  <i className="ri-arrow-right-line ml-2 text-base"></i>
+                  <i className="ri-arrow-right-line ml-2 text-md"></i>
                 </Link>
               </div>
             </div>

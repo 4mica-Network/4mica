@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --background: 0 0% 0%;
-    --foreground: 210 40% 96%;
+    --foreground: 216 216 216;
     --card: 220 22% 9%;
     --card-foreground: 210 40% 96%;
     --popover: 220 22% 9%;
@@ -29,11 +29,11 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --ink-strong: 231 241 255;
-    --ink: 240 244 255;
-    --ink-body: 200 215 242;
-    --ink-muted: 156 183 232;
-    --ink-subtle: 106 122 163;
+    --ink-strong: 216 216 216;
+    --ink: 216 216 216;
+    --ink-body: 161 161 161;
+    --ink-muted: 161 161 161;
+    --ink-subtle: 109 109 109;
     --brand: 123 203 255;
     --brand-strong: 60 174 245;
     --brand-teal: 72 201 176;
@@ -96,6 +96,8 @@
     color: rgb(var(--ink-body));
     min-height: 100%;
     font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -123,7 +125,7 @@
   }
 
   .section-kicker {
-    @apply text-xs uppercase tracking-[0.35em] text-brand;
+    @apply text-md uppercase tracking-[0.35em] text-brand;
   }
 
   .section-title {
@@ -142,15 +144,15 @@
   }
 
   .section-lead {
-    @apply mt-4 text-base md:text-lg text-ink-body leading-relaxed;
+    @apply mt-4 text-md md:text-md text-ink-body leading-relaxed;
   }
 
   .section-lead-lg {
-    @apply mt-6 text-lg md:text-xl text-ink-body leading-relaxed;
+    @apply mt-6 text-md md:text-lg text-ink-body leading-relaxed;
   }
 
   .section-copy {
-    @apply text-sm text-ink-body leading-relaxed;
+    @apply text-md text-ink-body leading-relaxed;
   }
 
   .btn {
@@ -163,15 +165,15 @@
   }
 
   .btn-sm {
-    @apply px-3 py-1.5 text-sm;
+    @apply px-3 py-1.5 text-md;
   }
 
   .btn-md {
-    @apply px-4 py-2 text-sm;
+    @apply px-4 py-2 text-md;
   }
 
   .btn-lg {
-    @apply px-5 py-2.5 text-sm;
+    @apply px-5 py-2.5 text-md;
   }
 
   .btn-primary {
@@ -263,7 +265,7 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-semibold;
+    @apply inline-flex items-center gap-2 rounded-md px-3 py-1 text-md font-semibold;
     border: 1px solid rgb(var(--brand) / 0.35);
     color: rgb(var(--brand));
     background: rgb(var(--brand-deep) / 0.18);

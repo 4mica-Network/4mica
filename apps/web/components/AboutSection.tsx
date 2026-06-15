@@ -28,12 +28,12 @@ export default function AboutSection() {
               <h3 className="font-semibold text-ink-strong text-xl">
                 {card.title}
               </h3>
-              <p className="mt-3 text-ink-body text-sm leading-relaxed">
+              <p className="mt-3 text-ink-body text-md leading-relaxed">
                 {card.description}
               </p>
-              <span className="link-accent mt-4 inline-flex items-center font-semibold text-sm">
+              <span className="link-accent mt-4 inline-flex items-center font-semibold text-md">
                 Learn more
-                <i className="ri-arrow-right-line ml-2 text-base"></i>
+                <i className="ri-arrow-right-line ml-2 text-md"></i>
               </span>
             </Link>
           ))}

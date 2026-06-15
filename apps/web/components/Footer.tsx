@@ -3,17 +3,17 @@
 import { links, routes } from "@4mica/url";
 import Link from "next/link";
 
-const footerLinkClass = "text-[#A1A1A1] transition-colors hover:text-[#D8D8D8]";
+const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="flex w-full select-none justify-center pt-36 pb-6 text-sm">
-      <div className="flex size-full max-w-[1200px] flex-col items-center justify-center">
+    <footer className="flex w-full select-none justify-center pt-36 pb-6 text-md">
+      <div className="flex size-full max-w-300 flex-col items-center justify-center">
         <div className="grid size-full grid-cols-1 gap-10 md:grid-cols-3">
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-[#D8D8D8]">Product</div>
+            <div className="mb-2 font-medium text-ink-strong">Product</div>
             <Link href={routes.register} className={footerLinkClass}>
               Register
             </Link>
@@ -25,17 +25,17 @@ export default function Footer() {
             </Link>
             <Link
               href={links.status}
-              className="group flex items-center text-[#A1A1A1] transition-colors hover:text-[#D8D8D8]"
+              className="group flex items-center text-ink-body transition-colors hover:text-ink-strong"
               target="_blank"
               rel="noreferrer"
             >
               System status
-              <i className="ri-arrow-right-up-line ml-1 hidden text-xs transition-transform duration-200 group-hover:block" />
+              <i className="ri-arrow-right-up-line ml-1 hidden text-md transition-transform duration-200 group-hover:block" />
             </Link>
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-[#D8D8D8]">Company</div>
+            <div className="mb-2 font-medium text-ink-strong">Company</div>
             <Link href={routes.about} className={footerLinkClass}>
               About
             </Link>
@@ -57,7 +57,7 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-[#D8D8D8]">Resources</div>
+            <div className="mb-2 font-medium text-ink-strong">Resources</div>
             <Link href={routes.resources} className={footerLinkClass}>
               Resources
             </Link>
@@ -77,7 +77,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-14 flex w-full flex-col items-center gap-6 sm:flex-row sm:justify-between">
-          <div className="order-1 font-light text-[#a0a0a0] text-xs sm:order-2">
+          <div className="order-1 font-light text-ink-body text-md sm:order-2">
             4Mica © {currentYear}
           </div>
 

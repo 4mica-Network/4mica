@@ -8,7 +8,7 @@ export const metadata: Metadata = HOW_4MICA_WORKS_META_DATA;
 
 export default function How4MicaWorksPage() {
   const inlineCodeClass =
-    "rounded bg-white/10 px-1.5 py-0.5 font-mono text-sm text-amber-300";
+    "rounded bg-white/10 px-1.5 py-0.5 font-mono text-md text-amber-300";
   const getInlinePartKey = (part: string, idx: number) => `${part}-${idx % 2}`;
   const renderInlineCode = (text: string) => {
     const parts = text.split("`");
@@ -614,7 +614,7 @@ let receipt = client
         <header className="mb-12 text-center">
           <p className="section-kicker">Deep Dive</p>
           <h1 className="section-title mb-4">Getting paid using 4Mica</h1>
-          <p className="text-ink-muted text-sm">
+          <p className="text-ink-muted text-md">
             Published January 28, 2026 · Updated January 29, 2026 · 15 min read
             · By Mairon
           </p>
@@ -657,7 +657,7 @@ let receipt = client
               ))}
               {section.codeBlocks && <CodeTabs blocks={section.codeBlocks} />}
               {section.sequence && (
-                <div className="space-y-2 rounded-md border border-white/10 bg-surface-solid p-5 text-ink-body text-sm">
+                <div className="space-y-2 rounded-md border border-white/10 bg-surface-solid p-5 text-ink-body text-md">
                   {section.sequence.map((line) => (
                     <div key={line} className="flex items-start gap-3">
                       <span className="mt-0.75 h-2 w-2 shrink-0 rounded-md bg-brand-teal"></span>
@@ -670,7 +670,7 @@ let receipt = client
           ))}
         </article>
 
-        <footer className="mt-12 flex flex-col items-center justify-between gap-4 text-ink-muted text-sm md:flex-row">
+        <footer className="mt-12 flex flex-col items-center justify-between gap-4 text-ink-muted text-md md:flex-row">
           <Link
             href="/resources/blog"
             className="link-accent cursor-pointer whitespace-nowrap"

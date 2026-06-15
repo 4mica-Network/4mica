@@ -127,7 +127,7 @@ export default function OverviewSection({
       <div className="space-y-6">
         <p className="text-ink-body leading-relaxed">{p1}</p>
         <p className="text-ink-body leading-relaxed">{p2}</p>
-        <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-md">
           <span className="font-semibold text-ink-strong">New here?</span> Payer
           wallets must deposit collateral before making payments. Start with the{" "}
           <button
@@ -152,7 +152,7 @@ export default function OverviewSection({
                 <h4 className="mb-2 font-semibold text-ink-body">
                   {item.title}
                 </h4>
-                <p className="text-ink-body text-sm">{item.desc}</p>
+                <p className="text-ink-body text-md">{item.desc}</p>
               </div>
             ))}
           </div>

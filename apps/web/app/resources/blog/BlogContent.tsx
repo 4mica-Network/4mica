@@ -70,10 +70,10 @@ export default function BlogContent() {
                 >
                   <div className="p-6">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="rounded-md bg-brand-deep px-3 py-1 font-medium text-ink text-sm">
+                      <span className="rounded-md bg-brand-deep px-3 py-1 font-medium text-ink text-md">
                         {post.category}
                       </span>
-                      <span className="text-ink-muted text-sm">
+                      <span className="text-ink-muted text-md">
                         {post.readTime}
                       </span>
                     </div>
@@ -89,7 +89,7 @@ export default function BlogContent() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-brand-strong">
-                          <span className="font-semibold text-sm text-white">
+                          <span className="font-semibold text-md text-white">
                             {post.author
                               .split(" ")
                               .map((n) => n[0])
@@ -97,10 +97,10 @@ export default function BlogContent() {
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-ink-strong text-sm">
+                          <p className="font-medium text-ink-strong text-md">
                             {post.author}
                           </p>
-                          <p className="text-ink-muted text-xs">{post.date}</p>
+                          <p className="text-ink-muted text-md">{post.date}</p>
                         </div>
                       </div>
 
@@ -147,7 +147,7 @@ export default function BlogContent() {
                         <i className="ri-check-line text-white"></i>
                       </div>
                     </div>
-                    <p className="text-emerald-200 text-sm">
+                    <p className="text-emerald-200 text-md">
                       Successfully subscribed!
                     </p>
                   </div>
@@ -163,7 +163,7 @@ export default function BlogContent() {
                       onChange={(e) => setSubscribedEmail(e.target.value)}
                       placeholder="Enter your email"
                       required
-                      className="form-field-dark mb-3 w-full rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-strong/60"
+                      className="form-field-dark mb-3 w-full rounded-md px-3 py-2 text-md focus:outline-none focus:ring-2 focus:ring-brand-strong/60"
                     />
                     <button
                       type="submit"
@@ -189,10 +189,10 @@ export default function BlogContent() {
                     >
                       <div className="flex space-x-3 rounded p-2 transition-colors hover:bg-white/5">
                         <div className="min-w-0 flex-1">
-                          <h4 className="mb-1 line-clamp-2 font-semibold text-ink-strong text-sm">
+                          <h4 className="mb-1 line-clamp-2 font-semibold text-ink-strong text-md">
                             {post.title}
                           </h4>
-                          <p className="text-ink-muted text-xs">{post.date}</p>
+                          <p className="text-ink-muted text-md">{post.date}</p>
                         </div>
                       </div>
                     </Link>
@@ -217,7 +217,7 @@ export default function BlogContent() {
                   ].map((tag) => (
                     <span
                       key={tag}
-                      className="cursor-pointer rounded-md bg-white/10 px-3 py-1 text-ink-body text-sm transition-colors hover:bg-brand-deep hover:text-ink"
+                      className="cursor-pointer rounded-md bg-white/10 px-3 py-1 text-ink-body text-md transition-colors hover:bg-brand-deep hover:text-ink"
                     >
                       {tag}
                     </span>

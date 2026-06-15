@@ -35,7 +35,7 @@ export default function CommunitySection() {
               <Link
                 key={hook.label}
                 href={hook.href}
-                className="glass-panel rounded-md px-5 py-4 font-semibold text-ink-strong text-sm transition-colors hover:text-ink"
+                className="glass-panel rounded-md px-5 py-4 font-semibold text-ink-strong text-md transition-colors hover:text-ink"
               >
                 {hook.label}
               </Link>

@@ -1343,7 +1343,7 @@ export default function DemoPage() {
             type="button"
             onClick={goPrev}
             disabled={step === 0}
-            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
+            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-md transition-all duration-200 disabled:opacity-20"
             style={{
               border: "1px solid rgba(120,180,220,0.2)",
               color: "rgb(156,183,232)",
@@ -1372,7 +1372,7 @@ export default function DemoPage() {
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center gap-1.5 rounded-md px-5 py-2 font-semibold text-xs transition-all duration-200"
+            className="flex items-center gap-1.5 rounded-md px-5 py-2 font-semibold text-md transition-all duration-200"
             style={{
               background: playing
                 ? "rgba(59,174,239,0.13)"
@@ -1471,7 +1471,7 @@ export default function DemoPage() {
             type="button"
             onClick={goNext}
             disabled={step >= TOTAL_STEPS - 1}
-            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-xs transition-all duration-200 disabled:opacity-20"
+            className="flex items-center gap-1.5 rounded-md px-4 py-2 font-semibold text-md transition-all duration-200 disabled:opacity-20"
             style={{
               border: "1px solid rgba(120,180,220,0.2)",
               color: "rgb(156,183,232)",

@@ -45,7 +45,7 @@ export default function TimelineSection({
                 </div>
 
                 <div
-                  className={`absolute left-1/2 flex hidden h-12 w-12 -translate-x-1/2 transform items-center justify-center rounded-md border-4 border-white/20 font-bold text-sm shadow-lg md:flex ${
+                  className={`absolute left-1/2 flex hidden h-12 w-12 -translate-x-1/2 transform items-center justify-center rounded-md border-4 border-white/20 font-bold text-md shadow-lg md:flex ${
                     milestone.done
                       ? "bg-emerald-500 text-white"
                       : "bg-brand-violet text-white"
@@ -65,7 +65,7 @@ export default function TimelineSection({
                 </div>
 
                 <div
-                  className={`mt-4 flex h-8 w-8 items-center justify-center rounded-md font-bold text-sm md:hidden ${
+                  className={`mt-4 flex h-8 w-8 items-center justify-center rounded-md font-bold text-md md:hidden ${
                     milestone.done
                       ? "bg-emerald-500 text-white"
                       : "bg-brand-violet text-white"

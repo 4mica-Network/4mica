@@ -32,7 +32,7 @@ export default function UseCasesSection() {
                   <i className={`${uc.icon} text-lg`} style={{ color: BLUE }} />
                 </div>
                 <span
-                  className="text-right font-semibold text-xs uppercase tracking-widest"
+                  className="text-right font-semibold text-md uppercase tracking-widest"
                   style={{ color: `${BLUE}bb` }}
                 >
                   {uc.kicker}
@@ -40,10 +40,10 @@ export default function UseCasesSection() {
               </div>
 
               <div>
-                <h3 className="font-semibold text-base text-ink-strong">
+                <h3 className="font-semibold text-ink-strong text-md">
                   {uc.title}
                 </h3>
-                <p className="mt-2 text-ink-muted text-sm leading-relaxed">
+                <p className="mt-2 text-ink-muted text-md leading-relaxed">
                   {uc.desc}
                 </p>
               </div>

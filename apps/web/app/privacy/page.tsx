@@ -14,11 +14,11 @@ export default function PrivacyPage() {
             <h1 className="font-semibold text-3xl text-ink-strong">
               Privacy Policy
             </h1>
-            <p className="mt-3 text-ink-muted text-sm">
+            <p className="mt-3 text-ink-muted text-md">
               Last updated: February 6, 2026
             </p>
 
-            <div className="mt-6 space-y-4 text-sm leading-relaxed">
+            <div className="mt-6 space-y-4 text-md leading-relaxed">
               <p>
                 4Mica respects your privacy. This page explains what information
                 we collect and how we use it.

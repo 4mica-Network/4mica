@@ -80,7 +80,7 @@ export default function Header() {
             <div className="group relative">
               <button
                 type="button"
-                className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-ink-muted text-sm transition-colors hover:text-ink-strong"
+                className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-ink-muted text-md transition-colors hover:text-ink-strong"
               >
                 Company
                 <i className="ri-arrow-down-s-line text-lg"></i>
@@ -91,7 +91,7 @@ export default function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`block px-4 py-3 text-ink text-sm transition-colors hover:text-brand-strong ${
+                      className={`block px-4 py-3 text-ink text-md transition-colors hover:text-brand-strong ${
                         index > 0 ? "border-white/10 border-t" : ""
                       }`}
                     >
@@ -105,7 +105,7 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="cursor-pointer whitespace-nowrap text-ink-muted text-sm transition-colors hover:text-ink-strong"
+                className="cursor-pointer whitespace-nowrap text-ink-muted text-md transition-colors hover:text-ink-strong"
               >
                 {link.label}
               </Link>
@@ -116,14 +116,14 @@ export default function Header() {
         <div className="flex items-center gap-3">
           <a
             href={links.mailto.contact}
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-sm transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
           >
             Contact Us
           </a>
 
           <Link
             href={routes.technicalDocs}
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-sm transition-colors duration-75 ease-in hover:bg-white md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
           >
             Start Building
           </Link>
@@ -174,7 +174,7 @@ export default function Header() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-1 text-ink text-sm transition-colors hover:text-brand-strong"
+                className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
               >
                 {item.label}
               </Link>
@@ -187,7 +187,7 @@ export default function Header() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-1 text-ink text-sm transition-colors hover:text-brand-strong"
+                className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
               >
                 {item.label}
               </Link>
@@ -195,7 +195,7 @@ export default function Header() {
             <a
               href={links.mailto.contact}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="block py-1 text-ink text-sm transition-colors hover:text-brand-strong"
+              className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
             >
               Contact Us
             </a>
@@ -204,7 +204,7 @@ export default function Header() {
             <Link
               href={routes.technicalDocs}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-sm transition-colors hover:bg-white"
+              className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
             >
               Start Building
             </Link>

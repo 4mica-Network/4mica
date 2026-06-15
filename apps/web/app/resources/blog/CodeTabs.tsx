@@ -195,12 +195,12 @@ export default function CodeTabs({
 
   return (
     <div
-      className={`rounded-md border border-white/10 bg-surface-solid text-ink-body text-sm ${
+      className={`rounded-md border border-white/10 bg-surface-solid text-ink-body text-md ${
         className ?? ""
       }`}
     >
       {activeBlock?.caption && (
-        <div className="px-4 pt-4 text-brand text-xs uppercase tracking-wide">
+        <div className="px-4 pt-4 text-brand text-md uppercase tracking-wide">
           {activeBlock.caption}
         </div>
       )}
@@ -225,7 +225,7 @@ export default function CodeTabs({
                   aria-selected={isActive}
                   aria-controls={`${baseId}-panel-${idx}`}
                   onClick={() => setActiveIndex(idx)}
-                  className={`rounded-md px-3 py-1 font-semibold text-xs transition ${
+                  className={`rounded-md px-3 py-1 font-semibold text-md transition ${
                     isActive
                       ? "bg-white/15 text-ink-strong shadow-sm"
                       : "text-ink-muted hover:text-ink-strong"
@@ -239,7 +239,7 @@ export default function CodeTabs({
           <button
             type="button"
             onClick={() => handleCopy(activeBlock?.code ?? "", activeIndex)}
-            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
+            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-md transition ${
               copiedIndex === activeIndex
                 ? "text-brand"
                 : "text-ink-muted hover:text-ink-strong"
@@ -268,7 +268,7 @@ export default function CodeTabs({
           <button
             type="button"
             onClick={() => handleCopy(activeBlock?.code ?? "", activeIndex)}
-            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-xs transition ${
+            className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1 font-semibold text-md transition ${
               copiedIndex === activeIndex
                 ? "text-brand"
                 : "text-ink-muted hover:text-ink-strong"
@@ -308,13 +308,13 @@ export default function CodeTabs({
             className={!isActive ? "hidden" : undefined}
           >
             <div className={`bg-surface-solid ${contentPadding}`}>
-              <div className="space-y-1 font-mono text-ink-strong text-xs leading-relaxed sm:text-sm">
+              <div className="space-y-1 font-mono text-ink-strong text-md leading-relaxed sm:text-md">
                 {codeLines.map((line, lineIndex) => (
                   <div
                     key={`${blockKey}-${getLineKey(line, lineCounts)}`}
                     className="grid grid-cols-[2.2rem_1fr] gap-3"
                   >
-                    <span className="select-none text-right text-[10px] text-ink-subtle sm:text-xs">
+                    <span className="select-none text-right text-[10px] text-ink-subtle sm:text-md">
                       {lineIndex + 1}
                     </span>
                     <span

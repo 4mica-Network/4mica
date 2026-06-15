@@ -44,7 +44,7 @@ export default function DocsCalloutSection() {
                           {step.num}
                         </span>
                         <span
-                          className="rounded-md px-2 py-1 font-semibold text-xs uppercase tracking-widest"
+                          className="rounded-md px-2 py-1 font-semibold text-md uppercase tracking-widest"
                           style={{
                             background: `${ACCENT}15`,
                             color: ACCENT,
@@ -54,10 +54,10 @@ export default function DocsCalloutSection() {
                           {step.badge}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-base text-ink-strong">
+                      <h3 className="font-semibold text-ink-strong text-md">
                         {step.title}
                       </h3>
-                      <p className="mt-2 text-ink-muted text-sm leading-relaxed">
+                      <p className="mt-2 text-ink-muted text-md leading-relaxed">
                         {step.desc}
                       </p>
                     </div>
@@ -65,7 +65,7 @@ export default function DocsCalloutSection() {
                     {i < STEPS.length - 1 && (
                       <div className="mt-6 hidden items-center gap-2 lg:flex">
                         <div className="h-px flex-1 bg-white/10" />
-                        <i className="ri-arrow-down-line text-white/35 text-xs" />
+                        <i className="ri-arrow-down-line text-md text-white/35" />
                       </div>
                     )}
                   </div>
@@ -80,7 +80,7 @@ export default function DocsCalloutSection() {
                         {step.badge}
                       </span>
                     </div>
-                    <pre className="max-w-full overflow-x-auto whitespace-pre font-mono text-xs leading-6">
+                    <pre className="max-w-full overflow-x-auto whitespace-pre font-mono text-md leading-6">
                       {step.code.split("\n").map((line) => {
                         const key = getCodeLineKey(line, lineCounts);
 
@@ -145,13 +145,13 @@ export default function DocsCalloutSection() {
 
         <div className="mx-auto mt-10 max-w-2xl text-center">
           <div className="glass-panel rounded-md px-8 py-6">
-            <p className="font-semibold text-base text-ink-strong">
+            <p className="font-semibold text-ink-strong text-md">
               Replace thousands of transactions with{" "}
               <span style={{ color: ACCENT }}>
                 one net settlement per cycle
               </span>
             </p>
-            <p className="mt-2 text-ink-muted text-sm">
+            <p className="mt-2 text-ink-muted text-md">
               Same x402 protocol. Same HTTP clients. Add 4Mica to scale.
             </p>
           </div>

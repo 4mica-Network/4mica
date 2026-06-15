@@ -42,7 +42,7 @@ export default function FaqSection() {
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => toggleQuestion(faq.question)}
-                  className="flex w-full cursor-pointer select-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-ink-strong text-sm"
+                  className="flex w-full cursor-pointer select-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-ink-strong text-md"
                 >
                   <span>{faq.question}</span>
                   <motion.i
@@ -62,7 +62,7 @@ export default function FaqSection() {
                       className="overflow-hidden"
                     >
                       <div className="px-5 pb-4">
-                        <p className="text-ink-muted text-sm leading-relaxed">
+                        <p className="text-ink-muted text-md leading-relaxed">
                           {faq.answer}
                         </p>
                       </div>
