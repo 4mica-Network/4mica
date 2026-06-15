@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const SITE_NAME = "4Mica";
-export const DEFAULT_OG_IMAGE = "/assets/logo_transparent.png";
+export const DEFAULT_OG_IMAGE = "/og/home";
 
 type SeoConfig = {
   title: string;
@@ -19,8 +19,13 @@ export const createPageMetadata = ({
   url,
   imageAlt,
   type = "website",
-}: SeoConfig) =>
-  ({
+}: SeoConfig) => {
+  const ogImage =
+    url === "/"
+      ? DEFAULT_OG_IMAGE
+      : `/og/${url.replace(/^\/+|\/+$/g, "").replace(/\//g, "-")}`;
+
+  return {
     title,
     description,
     keywords,
@@ -35,7 +40,7 @@ export const createPageMetadata = ({
       siteName: SITE_NAME,
       images: [
         {
-          url: DEFAULT_OG_IMAGE,
+          url: ogImage,
           width: 1200,
           height: 630,
           alt: imageAlt,
@@ -47,6 +52,7 @@ export const createPageMetadata = ({
       card: "summary_large_image",
       title,
       description,
-      images: [DEFAULT_OG_IMAGE],
+      images: [ogImage],
     },
-  }) satisfies Metadata;
+  } satisfies Metadata;
+};
