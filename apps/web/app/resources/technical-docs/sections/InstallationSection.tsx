@@ -21,7 +21,7 @@ function TypeScriptInstallation() {
           Server Package
         </h3>
         <CodeBlock code={`pnpm install @4mica/x402`} language="bash" />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Installs the Express middleware, server helpers, and automatic
           facilitator and scheme registration. No additional configuration is
           required to connect to the 4Mica facilitator.
@@ -35,7 +35,7 @@ function TypeScriptInstallation() {
           code={`pnpm install @x402/fetch @x402/axios`}
           language="bash"
         />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Use <code className="font-mono">@x402/fetch</code> to wrap the native{" "}
           <code className="font-mono">fetch</code> function and{" "}
           <code className="font-mono">@x402/axios</code> for Axios-based apps.
@@ -63,7 +63,7 @@ function PythonInstallation() {
           Direct SDK (collateral, remuneration, balances)
         </h3>
         <CodeBlock code={`pip install sdk-4mica`} language="bash" />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Provides <code className="font-mono">Client</code>,{" "}
           <code className="font-mono">ConfigBuilder</code>, and all on-chain
           operations. Auth is enabled by default - no extra configuration needed
@@ -88,7 +88,7 @@ function PythonInstallation() {
             },
           ]}
         />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Both extras install the same core middleware logic. Choose the one
           that matches your framework. The middleware automatically connects to
           the 4Mica facilitator and handles tab endpoint injection.
@@ -112,7 +112,7 @@ function PythonInstallation() {
             },
           ]}
         />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Use <code className="font-mono">httpx</code> for async codebases (e.g.
           FastAPI clients) and
           <code className="font-mono"> requests</code> for synchronous scripts
@@ -141,14 +141,14 @@ function RustInstallation() {
           code={`cargo add sdk-4mica alloy\ncargo add tokio --features macros,rt-multi-thread`}
           language="bash"
         />
-        <p className="mt-3 text-ink-body text-sm">
+        <p className="mt-3 text-ink-body text-md">
           Requires Tokio for the async runtime. The SDK points directly at the
           network RPC URL (e.g.{" "}
           <code className="font-mono">{links.api.baseSepolia}</code>) - no
           separate facilitator package is needed.
         </p>
       </div>
-      <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+      <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-md">
         <p className="mb-1 font-semibold text-ink-strong">
           What is available today
         </p>

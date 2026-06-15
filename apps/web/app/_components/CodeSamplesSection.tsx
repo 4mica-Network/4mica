@@ -183,7 +183,7 @@ export default function CodeSamplesSection() {
                       key={s}
                       type="button"
                       onClick={() => setSide(s)}
-                      className={`px-3 py-1 font-semibold text-xs capitalize transition ${
+                      className={`px-3 py-1 font-semibold text-md capitalize transition ${
                         side === s
                           ? "bg-white/15 text-ink-strong"
                           : "text-ink-muted hover:text-ink-body"
@@ -199,7 +199,7 @@ export default function CodeSamplesSection() {
                       key={l}
                       type="button"
                       onClick={() => setLang(l)}
-                      className={`px-3 py-1 font-semibold text-xs capitalize transition ${
+                      className={`px-3 py-1 font-semibold text-md capitalize transition ${
                         lang === l
                           ? "bg-white/15 text-ink-strong"
                           : "text-ink-muted hover:text-ink-body"
@@ -214,7 +214,7 @@ export default function CodeSamplesSection() {
 
             {/* Code body */}
             <div className="max-w-full overflow-x-auto bg-[#050b1d] p-5 sm:p-6">
-              <div className="min-w-max font-mono text-xs leading-6">
+              <div className="min-w-max font-mono text-md leading-6">
                 {lines.map((line, i) => (
                   <div
                     key={getCodeLineKey(line, lineCounts)}
@@ -236,7 +236,7 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Footer */}
-            <div className="flex flex-col gap-2 border-white/10 border-t bg-surface-solid px-5 py-3 text-ink-subtle text-xs sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-white/10 border-t bg-surface-solid px-5 py-3 text-ink-subtle text-md sm:flex-row sm:items-center sm:justify-between">
               <span>
                 Full docs at{" "}
                 <Link

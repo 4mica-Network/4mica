@@ -13,7 +13,7 @@ export default function FinalCtaSection() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="section-kicker">Start building</p>
           <h2 className="section-title">Stop paying per transaction.</h2>
-          <p className="mx-auto mt-4 max-w-md text-base text-ink-muted leading-relaxed">
+          <p className="mx-auto mt-4 max-w-md text-ink-muted text-md leading-relaxed">
             Add a credit layer. Batch thousands of payments. Settle once. Your
             collateral earns yield while your agents scale.
           </p>
@@ -29,7 +29,7 @@ export default function FinalCtaSection() {
                   >
                     {s.value}
                   </span>
-                  <span className="text-ink-subtle text-xs">{s.label}</span>
+                  <span className="text-ink-subtle text-md">{s.label}</span>
                 </div>
                 {i < STATS.length - 1 && (
                   <div className="hidden h-8 w-px bg-white/10 sm:block" />

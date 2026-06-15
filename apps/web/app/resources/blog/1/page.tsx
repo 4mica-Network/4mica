@@ -14,7 +14,7 @@ export default function LegacyBlogRedirect() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="max-w-md text-center">
         <h1 className="font-semibold text-2xl">Redirecting...</h1>
-        <p className="mt-3 text-sm opacity-70">
+        <p className="mt-3 text-md opacity-70">
           If you are not redirected, use the link below.
         </p>
         <Link className="mt-4 inline-block underline" href={TARGET_PATH}>

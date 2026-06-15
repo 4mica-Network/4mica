@@ -14,11 +14,11 @@ export default function TermsPage() {
             <h1 className="font-semibold text-3xl text-ink-strong">
               Terms of Service
             </h1>
-            <p className="mt-3 text-ink-muted text-sm">
+            <p className="mt-3 text-ink-muted text-md">
               Last updated: February 6, 2026
             </p>
 
-            <div className="mt-6 space-y-4 text-sm leading-relaxed">
+            <div className="mt-6 space-y-4 text-md leading-relaxed">
               <p>
                 By using 4Mica, you agree to these terms. If you do not agree,
                 do not use the service.

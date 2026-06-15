@@ -19,10 +19,10 @@ export default function SecuritySection() {
                 className="glass-panel mt-6 rounded-md px-5 py-4"
                 style={{ borderColor: "rgb(74 222 128 / 0.28)" }}
               >
-                <p className="font-semibold text-ink-strong text-sm">
+                <p className="font-semibold text-ink-strong text-md">
                   Non-custodial by design
                 </p>
-                <p className="mt-1.5 text-ink-muted text-xs leading-relaxed">
+                <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
                   Your collateral is in Aave. Your guarantees are on-chain.
                   4Mica is the coordination layer. It cannot move your funds.
                 </p>
@@ -42,15 +42,15 @@ export default function SecuritySection() {
                     style={{ background: `${pt.color}22` }}
                   >
                     <i
-                      className={`${pt.icon} text-sm`}
+                      className={`${pt.icon} text-md`}
                       style={{ color: pt.color }}
                     />
                   </div>
                   <div>
-                    <p className="font-semibold text-ink-strong text-sm">
+                    <p className="font-semibold text-ink-strong text-md">
                       {pt.label}
                     </p>
-                    <p className="mt-1 text-ink-muted text-xs leading-relaxed">
+                    <p className="mt-1 text-ink-muted text-md leading-relaxed">
                       {pt.desc}
                     </p>
                   </div>

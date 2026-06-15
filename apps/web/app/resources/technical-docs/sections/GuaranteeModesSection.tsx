@@ -6,7 +6,7 @@ export default function GuaranteeModesSection() {
       <h2 className="mb-2 font-bold text-3xl text-ink-strong">
         Verified Payment
       </h2>
-      <p className="mb-6 text-ink-muted text-sm">Guarantee V1 vs V2</p>
+      <p className="mb-6 text-ink-muted text-md">Guarantee V1 vs V2</p>
 
       <div className="space-y-10">
         {/* ── What is a guarantee ── */}
@@ -37,10 +37,10 @@ export default function GuaranteeModesSection() {
           </p>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-md border border-white/10 bg-white/5 p-4">
-              <h3 className="mb-2 font-semibold text-base text-ink-strong">
+              <h3 className="mb-2 font-semibold text-ink-strong text-md">
                 V1: Standard
               </h3>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 Payment is committed at issuance. If the payer does not settle
                 voluntarily, the recipient calls{" "}
                 <code className="font-mono">remunerate</code> after the grace
@@ -49,10 +49,10 @@ export default function GuaranteeModesSection() {
               </p>
             </div>
             <div className="rounded-md border border-white/10 bg-white/5 p-4">
-              <h3 className="mb-2 font-semibold text-base text-ink-strong">
+              <h3 className="mb-2 font-semibold text-ink-strong text-md">
                 V2: Verified
               </h3>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 Same as V1, but when the recipient calls{" "}
                 <code className="font-mono">remunerate</code> the vault&apos;s
                 V2 decoder reads the ERC-8004 registry on-chain and reverts if
@@ -83,41 +83,41 @@ export default function GuaranteeModesSection() {
             <code className="font-mono">timestamp</code> field embedded in the
             guarantee:
           </p>
-          <div className="mb-4 rounded-md border border-white/10 bg-white/5 p-4 font-mono text-ink-body text-sm">
+          <div className="mb-4 rounded-md border border-white/10 bg-white/5 p-4 font-mono text-ink-body text-md">
             guarantee.timestamp + 14 days &nbsp;≤&nbsp; block.timestamp
             &nbsp;&lt;&nbsp; guarantee.timestamp + 21 days
           </div>
           <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-md border border-white/10 bg-white/5 p-4">
-              <p className="mb-1 font-semibold text-ink-muted text-xs uppercase tracking-wide">
+              <p className="mb-1 font-semibold text-ink-muted text-md uppercase tracking-wide">
                 Opens
               </p>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 14 days after guarantee timestamp - the grace period for
                 voluntary settlement.
               </p>
             </div>
             <div className="rounded-md border border-white/10 bg-white/5 p-4">
-              <p className="mb-1 font-semibold text-ink-muted text-xs uppercase tracking-wide">
+              <p className="mb-1 font-semibold text-ink-muted text-md uppercase tracking-wide">
                 Closes
               </p>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 21 days after guarantee timestamp. Calling after this reverts
                 with <code className="font-mono">TabExpired()</code>.
               </p>
             </div>
             <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
-              <p className="mb-1 font-semibold text-amber-400/80 text-xs uppercase tracking-wide">
+              <p className="mb-1 font-semibold text-amber-400/80 text-md uppercase tracking-wide">
                 Window
               </p>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 <strong>7 days</strong> to act. Missing this window means the
                 collateral is never claimable - there is no recovery path.
               </p>
             </div>
           </div>
           <div className="mb-6 rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <strong className="text-ink-strong">
                 Store the BLS certificate at issuance.
               </strong>{" "}
@@ -240,11 +240,11 @@ print("Settled in tx", receipt["transactionHash"])`,
             releasing collateral.
           </p>
 
-          <h4 className="mb-3 font-semibold text-ink-strong text-sm uppercase tracking-wide">
+          <h4 className="mb-3 font-semibold text-ink-strong text-md uppercase tracking-wide">
             Base payment fields (shared with V1)
           </h4>
           <div className="mb-6 overflow-x-auto rounded-md border border-white/10">
-            <table className="w-full text-sm">
+            <table className="w-full text-md">
               <thead className="bg-white/5 text-ink-strong">
                 <tr>
                   <th className="p-3 text-left">Field</th>
@@ -253,14 +253,14 @@ print("Settled in tx", receipt["transactionHash"])`,
               </thead>
               <tbody className="text-ink-body">
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">user_address</td>
+                  <td className="p-3 font-mono text-md">user_address</td>
                   <td className="p-3">
                     Payer, whose collateral is locked at issuance and seized on{" "}
                     <code className="font-mono">remunerate</code>.
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">recipient_address</td>
+                  <td className="p-3 font-mono text-md">recipient_address</td>
                   <td className="p-3">
                     Payee, who calls{" "}
                     <code className="font-mono">remunerate</code> to enforce
@@ -268,7 +268,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">tab_id</td>
+                  <td className="p-3 font-mono text-md">tab_id</td>
                   <td className="p-3">
                     Identifies the payment session (tab). The vault maps payment
                     status and the remuneration flag by{" "}
@@ -279,7 +279,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">req_id</td>
+                  <td className="p-3 font-mono text-md">req_id</td>
                   <td className="p-3">
                     Monotonic request counter within the tab&apos;s active
                     cycle. Makes each guarantee unique and prevents replay. Also
@@ -288,20 +288,20 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">amount</td>
+                  <td className="p-3 font-mono text-md">amount</td>
                   <td className="p-3">
                     Payment amount in token base units, locked from the
                     payer&apos;s collateral at issuance.
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">asset_address</td>
+                  <td className="p-3 font-mono text-md">asset_address</td>
                   <td className="p-3">
                     ERC-20 token address, or zero address for the native asset.
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">timestamp</td>
+                  <td className="p-3 font-mono text-md">timestamp</td>
                   <td className="p-3">
                     Unix timestamp of the payment request. The core rejects
                     future timestamps and uses it to scope the active cycle. The
@@ -313,11 +313,11 @@ print("Settled in tx", receipt["transactionHash"])`,
             </table>
           </div>
 
-          <h4 className="mb-3 font-semibold text-ink-strong text-sm uppercase tracking-wide">
+          <h4 className="mb-3 font-semibold text-ink-strong text-md uppercase tracking-wide">
             Validation policy fields (V2 only)
           </h4>
           <div className="mb-6 overflow-x-auto rounded-md border border-white/10">
-            <table className="w-full text-sm">
+            <table className="w-full text-md">
               <thead className="bg-white/5 text-ink-strong">
                 <tr>
                   <th className="p-3 text-left">Field</th>
@@ -326,7 +326,7 @@ print("Settled in tx", receipt["transactionHash"])`,
               </thead>
               <tbody className="text-ink-body">
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">
+                  <td className="p-3 font-mono text-md">
                     validation_registry_address
                   </td>
                   <td className="p-3">
@@ -337,7 +337,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">validation_chain_id</td>
+                  <td className="p-3 font-mono text-md">validation_chain_id</td>
                   <td className="p-3">
                     Chain where the registry lives. Must equal{" "}
                     <code className="font-mono">block.chainid</code> at
@@ -345,7 +345,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">validator_address</td>
+                  <td className="p-3 font-mono text-md">validator_address</td>
                   <td className="p-3">
                     On-chain address of the validator agent. The decoder checks
                     that the registry result was submitted by exactly this
@@ -353,7 +353,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">validator_agent_id</td>
+                  <td className="p-3 font-mono text-md">validator_agent_id</td>
                   <td className="p-3">
                     Numeric ID of the validator agent in the registry. The
                     decoder checks it matches the result, ensuring a specific
@@ -361,7 +361,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">
+                  <td className="p-3 font-mono text-md">
                     min_validation_score
                   </td>
                   <td className="p-3">
@@ -372,7 +372,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">
+                  <td className="p-3 font-mono text-md">
                     required_validation_tag
                   </td>
                   <td className="p-3">
@@ -383,7 +383,7 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">job_hash</td>
+                  <td className="p-3 font-mono text-md">job_hash</td>
                   <td className="p-3">
                     Keccak-256 hash of the job input. Committed into{" "}
                     <code className="font-mono">validation_request_hash</code>,
@@ -392,11 +392,11 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">
+                  <td className="p-3 font-mono text-md">
                     validation_subject_hash
                   </td>
                   <td className="p-3">
-                    <code className="font-mono text-xs">
+                    <code className="font-mono text-md">
                       keccak256(bindingDomain, tab_id, req_id, user, recipient,
                       amount, asset, timestamp)
                     </code>
@@ -407,11 +407,11 @@ print("Settled in tx", receipt["transactionHash"])`,
                   </td>
                 </tr>
                 <tr className="border-white/10 border-t">
-                  <td className="p-3 font-mono text-xs">
+                  <td className="p-3 font-mono text-md">
                     validation_request_hash
                   </td>
                   <td className="p-3">
-                    <code className="font-mono text-xs">
+                    <code className="font-mono text-md">
                       keccak256(bindingDomain, chainId, registry,
                       validatorAddress, validatorAgentId, validationSubjectHash,
                       minScore, tagHash, jobHash)
@@ -427,7 +427,7 @@ print("Settled in tx", receipt["transactionHash"])`,
           </div>
 
           <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4">
-            <p className="text-ink-body text-sm">
+            <p className="text-ink-body text-md">
               <strong className="text-ink-strong">
                 Both hashes are canonical.
               </strong>{" "}
@@ -458,7 +458,7 @@ print("Settled in tx", receipt["transactionHash"])`,
             . The decoder runs the following checks before the vault releases
             collateral:
           </p>
-          <ol className="list-none space-y-2 text-ink-body text-sm">
+          <ol className="list-none space-y-2 text-ink-body text-md">
             {(
               [
                 {
@@ -530,14 +530,14 @@ print("Settled in tx", receipt["transactionHash"])`,
               ] as { id: string; content: React.ReactNode }[]
             ).map((step, i) => (
               <li key={step.id} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-white/10 font-bold text-ink-muted text-xs">
+                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-white/10 font-bold text-ink-muted text-md">
                   {i + 1}
                 </span>
                 <span>{step.content}</span>
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-ink-body text-sm leading-relaxed">
+          <p className="mt-4 text-ink-body text-md leading-relaxed">
             All checks happen on-chain during the{" "}
             <code className="font-mono">remunerate</code> call, and no off-chain
             coordination is required for enforcement. The validator simply needs

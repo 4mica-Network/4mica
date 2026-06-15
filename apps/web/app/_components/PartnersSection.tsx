@@ -38,7 +38,7 @@ export default function PartnersSection() {
               </div>
               <div>
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="font-bold text-ink-strong text-sm">
+                  <span className="font-bold text-ink-strong text-md">
                     {p.name}
                   </span>
                   <span
@@ -48,7 +48,7 @@ export default function PartnersSection() {
                     {p.role}
                   </span>
                 </div>
-                <p className="mt-1.5 text-ink-muted text-xs leading-relaxed">
+                <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
                   {p.desc}
                 </p>
               </div>
@@ -68,15 +68,15 @@ export default function PartnersSection() {
                 style={{ background: "rgb(var(--brand) / 0.16)" }}
               >
                 <i
-                  className={`${t.icon} text-sm`}
+                  className={`${t.icon} text-md`}
                   style={{ color: "rgb(var(--brand))" }}
                 />
               </div>
               <div>
-                <p className="font-semibold text-ink-strong text-sm">
+                <p className="font-semibold text-ink-strong text-md">
                   {t.label}
                 </p>
-                <p className="mt-0.5 text-ink-muted text-xs">{t.desc}</p>
+                <p className="mt-0.5 text-ink-muted text-md">{t.desc}</p>
               </div>
             </div>
           ))}
@@ -84,7 +84,7 @@ export default function PartnersSection() {
 
         {/* Partner logos */}
         <div className="mb-8 text-center">
-          <p className="mb-6 text-ink-subtle text-xs uppercase tracking-widest">
+          <p className="mb-6 text-ink-subtle text-md uppercase tracking-widest">
             Teams building on 4Mica
           </p>
           <div className="flex w-full flex-wrap items-center justify-center gap-6">

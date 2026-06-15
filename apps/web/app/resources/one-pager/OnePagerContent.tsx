@@ -173,7 +173,7 @@ export default function OnePagerContent() {
                   <h3 className="mb-2 font-bold text-ink-strong">
                     {item.title}
                   </h3>
-                  <p className="text-ink-body text-sm">{item.description}</p>
+                  <p className="text-ink-body text-md">{item.description}</p>
                 </div>
               ))}
             </div>
@@ -199,7 +199,7 @@ export default function OnePagerContent() {
                     </div>
                   </div>
                   <h3 className="mb-2 font-bold text-ink-strong">Collateral</h3>
-                  <p className="text-ink-body text-sm">
+                  <p className="text-ink-body text-md">
                     Deposit in yield-generating vault
                   </p>
                 </div>
@@ -217,7 +217,7 @@ export default function OnePagerContent() {
                   <h3 className="mb-2 font-bold text-ink-strong">
                     Line of Credit
                   </h3>
-                  <p className="text-ink-body text-sm">
+                  <p className="text-ink-body text-md">
                     Instant access to service
                   </p>
                 </div>
@@ -235,7 +235,7 @@ export default function OnePagerContent() {
                   <h3 className="mb-2 font-bold text-ink-strong">
                     Instant Value-Exchange
                   </h3>
-                  <p className="text-ink-body text-sm">
+                  <p className="text-ink-body text-md">
                     Cryptographic payment tabs
                   </p>
                 </div>
@@ -253,7 +253,7 @@ export default function OnePagerContent() {
                   <h3 className="mb-2 font-bold text-ink-strong">
                     Settlement on L1
                   </h3>
-                  <p className="text-ink-body text-sm">
+                  <p className="text-ink-body text-md">
                     Secure and trustless by design
                   </p>
                 </div>
@@ -270,7 +270,7 @@ export default function OnePagerContent() {
                 <h4 className="mb-1 font-semibold text-ink-strong">
                   Configurable TTL{" "}
                 </h4>
-                <p className="text-ink-body text-xs">Time-to-live settings</p>
+                <p className="text-ink-body text-md">Time-to-live settings</p>
               </div>
 
               <div className="rounded-md border border-white/10 bg-white/10 p-4 text-center">
@@ -282,7 +282,7 @@ export default function OnePagerContent() {
                 <h4 className="mb-1 font-semibold text-ink-strong">
                   Collateral Ratio
                 </h4>
-                <p className="text-ink-body text-xs">Risk management</p>
+                <p className="text-ink-body text-md">Risk management</p>
               </div>
 
               <div className="rounded-md border border-white/10 bg-white/10 p-4 text-center">
@@ -294,7 +294,7 @@ export default function OnePagerContent() {
                 <h4 className="mb-1 font-semibold text-ink-strong">
                   Configurable SLA
                 </h4>
-                <p className="text-ink-body text-xs">Service agreements</p>
+                <p className="text-ink-body text-md">Service agreements</p>
               </div>
             </div>
           </div>

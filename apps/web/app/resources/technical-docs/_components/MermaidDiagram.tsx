@@ -145,8 +145,8 @@ export default function MermaidDiagram({
     >
       {error ? (
         <div className="space-y-2">
-          <p className="text-rose-300 text-sm">{error}</p>
-          <pre className="whitespace-pre-wrap break-words rounded-md border border-white/10 bg-black/20 p-3 text-ink-body text-xs">
+          <p className="text-md text-rose-300">{error}</p>
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-white/10 bg-black/20 p-3 text-ink-body text-md">
             {diagram}
           </pre>
         </div>
@@ -156,7 +156,7 @@ export default function MermaidDiagram({
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
-        <div className="text-ink-muted text-sm">Rendering diagram…</div>
+        <div className="text-ink-muted text-md">Rendering diagram…</div>
       )}
     </div>
   );

@@ -7,7 +7,7 @@ interface RegistrationSectionProps {
 }
 
 const NETWORKS = (
-  <div className="space-y-1 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+  <div className="space-y-1 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-md">
     <p className="font-semibold text-ink-strong">Supported networks</p>
     <ul className="mt-2 list-inside list-disc space-y-1">
       <li>
@@ -50,7 +50,7 @@ function TypeScriptRegistration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Deposit USDC on Base Sepolia
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           For ERC-20 tokens (e.g. USDC), use{" "}
           <code className="font-mono">getSupportedTokens</code> to resolve the
           token address from the network, then approve the Core4Mica contract
@@ -93,7 +93,7 @@ try {
   await client.aclose();
 }`}
         />
-        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-md">
           <strong className="text-ink-strong">
             Your deposit won't appear instantly.
           </strong>{" "}
@@ -110,7 +110,7 @@ try {
         <h3 className="font-semibold text-ink-strong text-xl">
           Depositing native ETH
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Omit the token address and pass the amount in wei. No approval step is
           needed for ETH.
         </p>
@@ -137,7 +137,7 @@ for (const pos of positions) {
         <h3 className="font-semibold text-ink-strong text-xl">
           Load config from environment variables
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Use <code className="font-mono">fromEnv()</code> to configure the
           client from environment variables - useful in CI, Docker, or any
           deployment where secrets are injected at runtime.
@@ -162,7 +162,7 @@ const client = await Client.new(cfg);`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Coinbase CDP wallet (no private key)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Use a Coinbase Developer Platform MPC wallet - the private key never
           leaves CDP&apos;s HSM. Install the peer dependency, then pass the
           resulting account to <code className="font-mono">.signer()</code>{" "}
@@ -212,7 +212,7 @@ try {
         <h3 className="font-semibold text-ink-strong text-xl">
           Register via the website
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Prefer a guided UI? The{" "}
           <a
             href="/agents/register"
@@ -250,7 +250,7 @@ function PythonRegistration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Deposit USDC on Base Sepolia
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           For ERC-20 tokens (e.g. USDC), use{" "}
           <code className="font-mono">get_supported_tokens()</code> to resolve
           the token address from the network, then approve the Core4Mica
@@ -294,7 +294,7 @@ async def main():
 
 asyncio.run(main())`}
         />
-        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-md">
           <strong className="text-ink-strong">
             Your deposit won't appear instantly.
           </strong>{" "}
@@ -311,7 +311,7 @@ asyncio.run(main())`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Depositing native ETH
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Omit the token address and pass the amount in wei. No approval step is
           needed for ETH.
         </p>
@@ -337,7 +337,7 @@ for pos in positions:
         <h3 className="font-semibold text-ink-strong text-xl">
           Load config from environment variables
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Use <code className="font-mono">from_env()</code> to configure the
           client from environment variables - useful in CI, Docker, or any
           deployment where secrets are injected at runtime.
@@ -369,7 +369,7 @@ asyncio.run(main())`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Coinbase CDP wallet (no private key)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Use a Coinbase Developer Platform MPC wallet - the private key never
           leaves CDP&apos;s HSM. Install the peer dependency, then pass the
           signer to <code className="font-mono">.signer()</code> instead of{" "}
@@ -423,7 +423,7 @@ asyncio.run(main())`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Register via the website
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Prefer a guided UI? The{" "}
           <a
             href="/agents/register"
@@ -459,7 +459,7 @@ function RustRegistration() {
           code={`cargo add sdk-4mica alloy\ncargo add tokio --features macros,rt-multi-thread`}
           language="bash"
         />
-        <p className="mt-2 text-ink-body text-sm">
+        <p className="mt-2 text-ink-body text-md">
           Pass the RPC URL directly - e.g.{" "}
           <code className="font-mono">{links.api.baseSepolia}</code> for Base
           Sepolia or{" "}
@@ -471,7 +471,7 @@ function RustRegistration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Deposit USDC on Base Sepolia
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           For ERC-20 tokens (e.g. USDC), approve the Core4Mica contract first,
           then deposit. The SDK resolves the contract address automatically from
           the RPC URL.
@@ -516,7 +516,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         <h3 className="font-semibold text-ink-strong text-xl">
           Depositing native ETH
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Pass <code className="font-mono">None</code> for the token address to
           deposit ETH. No approval step is needed.
         </p>
@@ -546,7 +546,7 @@ for pos in positions {
         <h3 className="font-semibold text-ink-strong text-xl">
           Register via the website
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Prefer a guided UI? The{" "}
           <a
             href="/agents/register"

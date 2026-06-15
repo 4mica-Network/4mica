@@ -17,7 +17,7 @@ function TypeScriptClientIntegration() {
         <code className="font-mono"> FourMicaEvmScheme</code>, and retry
         requests without any additional code.
       </p>
-      <p className="text-ink-body text-sm">
+      <p className="text-ink-body text-md">
         Already using Coinbase x402 clients? Keep the same wrapper and swap in
         <code className="font-mono"> FourMicaEvmScheme</code> instead of the
         exact scheme.
@@ -33,7 +33,7 @@ function TypeScriptClientIntegration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Using wrapFetchWithPaymentFromConfig
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           The convenience config wrapper is the quickest way to get started.
           Pass your scheme registrations and the wrapper handles everything
           else.
@@ -71,7 +71,7 @@ console.log(data);`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Using wrapAxiosWithPaymentFromConfig
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Drop-in replacement for Axios instances. Wraps an existing{" "}
           <code className="font-mono">axios.create()</code> instance so you can
           use it exactly as before.
@@ -103,7 +103,7 @@ console.log(response.data);`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Multi-Network Setup
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Register multiple networks to route payments to the right scheme based
           on what the server advertises in its 402 response.
         </p>
@@ -132,7 +132,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
         <h3 className="font-semibold text-ink-strong text-xl">
           Builder Pattern
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Build a reusable <code className="font-mono">x402Client</code>{" "}
           registry when you need to share the client across multiple wrappers or
           want explicit control over scheme registration.
@@ -150,7 +150,7 @@ const client = new x402Client().register("eip155:84532", scheme);
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);`}
         />
       </div>
-      <div className="space-y-2 text-ink-body text-sm">
+      <div className="space-y-2 text-ink-body text-md">
         <h3 className="font-semibold text-ink-strong text-lg">Flow Summary</h3>
         <ol className="list-inside list-decimal space-y-1">
           <li>
@@ -187,7 +187,7 @@ function PythonClientIntegration() {
         and the wrapper handles tab opening, guarantee signing, and request
         retrying transparently.
       </p>
-      <p className="text-ink-body text-sm">
+      <p className="text-ink-body text-md">
         Already using Coinbase x402 clients? Keep the same wrapper and swap in
         <code className="font-mono"> FourMicaEvmScheme</code> instead of the
         exact scheme.
@@ -213,7 +213,7 @@ function PythonClientIntegration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Using x402_requests (synchronous)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Wraps a <code className="font-mono">requests</code> session. Use this
           for synchronous scripts, Flask clients, or any blocking code.
         </p>
@@ -235,7 +235,7 @@ print(response.status_code, response.json())`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Using x402_httpx_transport (async)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Wraps an <code className="font-mono">httpx.AsyncClient</code>{" "}
           transport. Use this in FastAPI clients or any{" "}
           <code className="font-mono">asyncio</code>-based code.
@@ -265,7 +265,7 @@ asyncio.run(main())`}
         <h3 className="font-semibold text-ink-strong text-xl">
           Multi-Network Setup
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Register multiple networks to route payments to the right scheme based
           on what the server advertises in its 402 response.
         </p>
@@ -282,7 +282,7 @@ client.register("eip155:84532",    FourMicaEvmScheme("0xBaseSepoliaPrivateKey"))
 session = x402_requests(client)`}
         />
       </div>
-      <div className="space-y-2 text-ink-body text-sm">
+      <div className="space-y-2 text-ink-body text-md">
         <h3 className="font-semibold text-ink-strong text-lg">Flow Summary</h3>
         <ol className="list-inside list-decimal space-y-1">
           <li>
@@ -319,14 +319,14 @@ function RustClientIntegration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           HTTP client wrappers for Rust are coming soon
         </h3>
-        <p className="mx-auto max-w-lg text-ink-body text-sm">
+        <p className="mx-auto max-w-lg text-ink-body text-md">
           A <code className="font-mono">reqwest</code>-based wrapper with
           automatic 402 handling is on the roadmap. In the meantime, you can
           call the facilitator API directly or use the Rust SDK for collateral
           and wallet operations.
         </p>
       </div>
-      <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+      <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-md">
         <p className="font-semibold text-ink-strong">
           What is planned for Rust client support
         </p>

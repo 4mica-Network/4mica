@@ -18,7 +18,7 @@ function TypeScriptServerIntegration() {
         <code className="font-mono">paymentRequirements.extra.tabEndpoint</code>{" "}
         automatically.
       </p>
-      <p className="text-ink-body text-sm">
+      <p className="text-ink-body text-md">
         Already using Coinbase x402? The only change is: use scheme{" "}
         <code className="font-mono">4mica-credit</code>, register{" "}
         <code className="font-mono">FourMicaEvmScheme</code>, and expose a tab
@@ -81,7 +81,7 @@ app.listen(3030, () => {
 });`}
         />
       </div>
-      <div className="space-y-2 text-ink-body text-sm">
+      <div className="space-y-2 text-ink-body text-md">
         <h3 className="font-semibold text-ink-strong text-lg">
           What Happens on Each Request
         </h3>
@@ -108,7 +108,7 @@ app.listen(3030, () => {
         <h3 className="font-semibold text-ink-strong text-xl">
           paymentMiddlewareFromConfig(routes, tabConfig, ...options)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Provide protected routes and the advertised tab configuration. The
           middleware wires 402 responses, tab openings, and verify/settle calls
           automatically.
@@ -138,7 +138,7 @@ app.use(
 );`}
         />
       </div>
-      <div className="space-y-2 text-ink-body text-sm">
+      <div className="space-y-2 text-ink-body text-md">
         <h3 className="font-semibold text-ink-strong text-lg">Options</h3>
         <ul className="list-inside list-disc space-y-1">
           <li>
@@ -175,13 +175,13 @@ app.use(
         <h3 className="font-semibold text-ink-strong text-xl">
           Advanced: Custom Resource Server
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           For custom facilitator clients used during verify/settle or for
           additional schemes, use{" "}
           <code className="font-mono">paymentMiddleware</code> directly and
           build your own <code className="font-mono">x402ResourceServer</code>.
         </p>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           The advertised tab endpoint is still handled by the 4Mica middleware
           path in <code className="font-mono">@4mica/x402/server/express</code>,
           which proxies tab opening to the 4Mica facilitator.
@@ -225,7 +225,7 @@ app.use(
         <h3 className="font-semibold text-ink-strong text-xl">
           Advanced: HTTP Hooks
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Use <code className="font-mono">paymentMiddlewareFromHTTPServer</code>{" "}
           to attach lifecycle hooks to protected request events.
         </p>
@@ -274,7 +274,7 @@ function PythonServerIntegration() {
         your Python API. The middleware configures the 4Mica facilitator and
         injects the tab endpoint into payment requirements automatically.
       </p>
-      <p className="text-ink-body text-sm">
+      <p className="text-ink-body text-md">
         Already using Coinbase x402? The only change is: use scheme{" "}
         <code className="font-mono">4mica-credit</code>, register{" "}
         <code className="font-mono">FourMicaEvmScheme</code>, and expose a tab
@@ -367,7 +367,7 @@ def premium_content():
           ]}
         />
       </div>
-      <div className="space-y-2 text-ink-body text-sm">
+      <div className="space-y-2 text-ink-body text-md">
         <h3 className="font-semibold text-ink-strong text-lg">
           What Happens on Each Request
         </h3>
@@ -394,7 +394,7 @@ def premium_content():
           fastapi_payment_middleware_from_config(routes, tab_endpoint,
           ...options)
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Provide protected routes and the tab endpoint URL. Optionally pass{" "}
           <code className="font-mono">ttl_seconds</code> to control how long
           tabs stay open.
@@ -422,7 +422,7 @@ def premium_content():
         <h3 className="font-semibold text-ink-strong text-xl">
           Advanced: Custom Resource Server
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           For custom facilitators or additional schemes, build an{" "}
           <code className="font-mono">x402ResourceServer</code> directly.
         </p>
@@ -471,7 +471,7 @@ async def open_tab(body: dict):
         <h3 className="font-semibold text-ink-strong text-xl">
           Advanced: Request Hooks
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Intercept protected requests inside the middleware for logging or
           custom logic.
         </p>
@@ -505,7 +505,7 @@ function RustServerIntegration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Server middleware for Rust is coming soon
         </h3>
-        <p className="mx-auto max-w-lg text-ink-body text-sm">
+        <p className="mx-auto max-w-lg text-ink-body text-md">
           Axum and Actix-Web middleware are on the roadmap. In the meantime, you
           can use the Rust SDK for collateral management and wallet operations,
           and protect routes manually by calling the facilitator API directly.
@@ -515,7 +515,7 @@ function RustServerIntegration() {
         <h3 className="font-semibold text-ink-strong text-xl">
           Manually calling the facilitator from Rust
         </h3>
-        <p className="text-ink-body text-sm">
+        <p className="text-ink-body text-md">
           Until the middleware crate is available, you can issue HTTP requests
           to the facilitator endpoints directly from your Rust server using{" "}
           <code className="font-mono">reqwest</code> or any HTTP client. The
@@ -524,7 +524,7 @@ function RustServerIntegration() {
           section.
         </p>
       </div>
-      <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+      <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-md">
         <p className="font-semibold text-ink-strong">
           What is planned for Rust server support
         </p>

@@ -42,10 +42,10 @@ export default function LeadershipPage() {
                   <h2 className="font-semibold text-ink-strong text-lg">
                     {member.name}
                   </h2>
-                  <p className="mt-1 font-semibold text-brand text-sm">
+                  <p className="mt-1 font-semibold text-brand text-md">
                     {member.role}
                   </p>
-                  <p className="mt-3 text-ink-body text-sm leading-relaxed">
+                  <p className="mt-3 text-ink-body text-md leading-relaxed">
                     {member.bio}
                   </p>
                 </div>
@@ -57,7 +57,7 @@ export default function LeadershipPage() {
             <h2 className="font-semibold text-ink-strong text-xl">
               How we work
             </h2>
-            <p className="mt-3 text-ink-body text-sm leading-relaxed">
+            <p className="mt-3 text-ink-body text-md leading-relaxed">
               We build with a security-first mindset and keep every protocol
               component auditable. The team ships with a focus on production
               reliability, clear integration paths, and measurable outcomes for
@@ -66,10 +66,10 @@ export default function LeadershipPage() {
             <div className="mt-4">
               <Link
                 href="/about"
-                className="link-accent inline-flex items-center font-semibold text-sm"
+                className="link-accent inline-flex items-center font-semibold text-md"
               >
                 Read the 4Mica Mission
-                <i className="ri-arrow-right-line ml-2 text-base"></i>
+                <i className="ri-arrow-right-line ml-2 text-md"></i>
               </Link>
             </div>
           </div>

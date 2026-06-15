@@ -7,7 +7,7 @@ export default function ExamplesSection() {
     <div>
       <h2 className="mb-6 font-bold text-3xl text-ink-strong">Code Examples</h2>
       <div className="space-y-6">
-        <div className="text-ink-body text-sm">
+        <div className="text-ink-body text-md">
           Grab the full demo repo and run it locally:{" "}
           <a
             className="text-brand-deep"
@@ -22,7 +22,7 @@ export default function ExamplesSection() {
           <h3 className="mb-3 font-semibold text-ink-strong text-xl">
             Demo Walkthrough
           </h3>
-          <div className="space-y-5 text-ink-body text-sm">
+          <div className="space-y-5 text-ink-body text-md">
             <p>
               This demo shows how to use{" "}
               <code className="font-mono">@4mica/x402</code> to protect an API
@@ -101,7 +101,7 @@ yarn install`}
                   },
                 ]}
               />
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 You should see output similar to:
               </p>
               <CodeBlock
@@ -137,7 +137,7 @@ What it does: opens or reuses a tab via the 4Mica facilitator and returns tab JS
                   },
                 ]}
               />
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 You can also provide a key inline:
               </p>
               <CodeBlock

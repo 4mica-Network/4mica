@@ -22,7 +22,7 @@ export default function CareersPage() {
             <h2 className="font-semibold text-2xl text-ink-strong">
               Let&apos;s chat
             </h2>
-            <p className="mt-3 text-ink-body text-sm leading-relaxed">
+            <p className="mt-3 text-ink-body text-md leading-relaxed">
               If you want to contribute, share research, or explore a
               partnership, reach out and we&apos;ll get back quickly.
             </p>
@@ -31,7 +31,7 @@ export default function CareersPage() {
               className="btn btn-primary btn-md mt-6"
             >
               Chat with us
-              <i className="ri-chat-3-line text-base"></i>
+              <i className="ri-chat-3-line text-md"></i>
             </a>
           </div>
         </section>

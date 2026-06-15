@@ -54,12 +54,12 @@ export default function WhatYoureMissingSection() {
             >
               <div>
                 <p
-                  className="font-semibold text-sm uppercase tracking-widest"
+                  className="font-semibold text-md uppercase tracking-widest"
                   style={{ color: RED }}
                 >
                   x402
                 </p>
-                <p className="mt-0.5 text-ink-subtle text-xs">
+                <p className="mt-0.5 text-ink-subtle text-md">
                   per-transaction settlement
                 </p>
               </div>
@@ -84,15 +84,15 @@ export default function WhatYoureMissingSection() {
                     }}
                   >
                     <div>
-                      <p className="font-medium text-ink-body text-sm">
+                      <p className="font-medium text-ink-body text-md">
                         {line.label}
                       </p>
-                      <p className="mt-0.5 text-ink-subtle text-xs">
+                      <p className="mt-0.5 text-ink-subtle text-md">
                         {line.note}
                       </p>
                     </div>
                     <span
-                      className="shrink-0 font-bold text-base tabular-nums"
+                      className="shrink-0 font-bold text-md tabular-nums"
                       style={{ color: RED }}
                     >
                       {line.value}
@@ -101,7 +101,7 @@ export default function WhatYoureMissingSection() {
                 ))}
               </div>
               <div className="mt-6 flex items-center justify-between border-white/10 border-t pt-4">
-                <span className="font-semibold text-ink-strong text-sm">
+                <span className="font-semibold text-ink-strong text-md">
                   Total cost
                 </span>
                 <span className="font-bold text-lg" style={{ color: RED }}>
@@ -127,12 +127,12 @@ export default function WhatYoureMissingSection() {
             >
               <div>
                 <p
-                  className="font-semibold text-sm uppercase tracking-widest"
+                  className="font-semibold text-md uppercase tracking-widest"
                   style={{ color: GREEN }}
                 >
                   With 4Mica
                 </p>
-                <p className="mt-0.5 text-ink-subtle text-xs">
+                <p className="mt-0.5 text-ink-subtle text-md">
                   credit layer + batch settlement
                 </p>
               </div>
@@ -157,15 +157,15 @@ export default function WhatYoureMissingSection() {
                     }}
                   >
                     <div>
-                      <p className="font-medium text-ink-body text-sm">
+                      <p className="font-medium text-ink-body text-md">
                         {line.label}
                       </p>
-                      <p className="mt-0.5 text-ink-subtle text-xs">
+                      <p className="mt-0.5 text-ink-subtle text-md">
                         {line.note}
                       </p>
                     </div>
                     <span
-                      className="shrink-0 font-bold text-base tabular-nums"
+                      className="shrink-0 font-bold text-md tabular-nums"
                       style={{ color: GREEN }}
                     >
                       {line.value}
@@ -174,7 +174,7 @@ export default function WhatYoureMissingSection() {
                 ))}
               </div>
               <div className="mt-6 flex items-center justify-between border-white/10 border-t pt-4">
-                <span className="font-semibold text-ink-strong text-sm">
+                <span className="font-semibold text-ink-strong text-md">
                   Net cost
                 </span>
                 <span className="font-bold text-lg" style={{ color: GREEN }}>
@@ -194,7 +194,7 @@ export default function WhatYoureMissingSection() {
           variants={fadeUp}
           transition={{ duration: 0.36, delay: 0.14, ease: "easeOut" }}
         >
-          <p className="text-ink-muted text-sm">
+          <p className="text-ink-muted text-md">
             Same 1M calls. Same starting capital.
           </p>
           <p className="text-center font-bold text-ink-strong text-lg sm:text-right">

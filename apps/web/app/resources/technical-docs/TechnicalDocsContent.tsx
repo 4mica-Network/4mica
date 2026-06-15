@@ -83,13 +83,13 @@ function TechnicalDocsContentInner() {
                 key={id}
                 type="button"
                 onClick={() => setLanguage(id)}
-                className={`flex cursor-pointer items-center gap-2 rounded-md px-5 py-2.5 font-semibold text-sm transition-colors ${
+                className={`flex cursor-pointer items-center gap-2 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
                   language === id
                     ? "bg-brand-deep text-ink"
                     : "border border-white/10 text-ink-body hover:bg-white/10"
                 }`}
               >
-                <i className={`${icon} text-base`} />
+                <i className={`${icon} text-md`} />
                 {label}
               </button>
             ))}
@@ -103,8 +103,8 @@ function TechnicalDocsContentInner() {
         {LANGUAGE_AWARE_SECTIONS.has(activeSection) &&
           language === "rust" &&
           activeSection !== "registration" && (
-            <div className="mx-auto mb-6 max-w-2xl rounded-md border border-white/10 bg-white/5 px-6 py-4 text-center text-ink-body text-sm">
-              <i className="ri-time-line mr-2 text-base" />
+            <div className="mx-auto mb-6 max-w-2xl rounded-md border border-white/10 bg-white/5 px-6 py-4 text-center text-ink-body text-md">
+              <i className="ri-time-line mr-2 text-md" />
               <span className="font-semibold text-ink-strong">
                 Rust support is in progress.
               </span>{" "}

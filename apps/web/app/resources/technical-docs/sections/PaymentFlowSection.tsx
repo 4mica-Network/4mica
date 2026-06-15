@@ -161,7 +161,7 @@ export default function PaymentFlowSection() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="rounded-md border border-white/10 p-4">
             <h4 className="mb-3 font-semibold text-ink-body">Actors</h4>
-            <ul className="space-y-2 text-ink-body text-sm">
+            <ul className="space-y-2 text-ink-body text-md">
               <li>
                 Payer SDK: deposits collateral, signs guarantees, pays tabs.
               </li>
@@ -182,7 +182,7 @@ export default function PaymentFlowSection() {
             <h4 className="mb-3 font-semibold text-ink-body">
               Guards &amp; guarantees
             </h4>
-            <ul className="space-y-2 text-ink-body text-sm">
+            <ul className="space-y-2 text-ink-body text-md">
               <li>/verify is structural only; no core calls.</li>
               <li>
                 /settle upgrades claims with monotonic{" "}

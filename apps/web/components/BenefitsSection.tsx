@@ -24,7 +24,7 @@ export default function BenefitsSection() {
                   className="flex items-start gap-3 text-ink-body"
                 >
                   <span className="mt-2 h-2 w-2 rounded-md bg-brand-teal" />
-                  <span className="text-sm leading-relaxed">{benefit}</span>
+                  <span className="text-md leading-relaxed">{benefit}</span>
                 </li>
               ))}
             </ul>

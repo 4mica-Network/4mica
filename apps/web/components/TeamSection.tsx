@@ -39,7 +39,7 @@ export default function TeamSection() {
                   {member.name}
                 </h3>
                 <p className="mb-3 font-semibold text-brand">{member.role}</p>
-                <p className="text-ink-body text-sm leading-relaxed">
+                <p className="text-ink-body text-md leading-relaxed">
                   {member.bio}
                 </p>
               </div>

@@ -16,7 +16,7 @@ export default function OperatorApiSection() {
           <code className="font-mono">/auth</code>. All non-public endpoints
           require an access token.
         </p>
-        <div className="space-y-2 rounded-md border border-white/10 bg-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 bg-white/10 p-5 text-ink-body text-md">
           <p>
             <span className="font-semibold">Public endpoints:</span>{" "}
             <code className="font-mono">/auth/*</code>,{" "}
@@ -43,7 +43,7 @@ export default function OperatorApiSection() {
             <code className="font-mono">facilitator</code>
           </p>
         </div>
-        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-md">
           <h3 className="font-semibold text-ink-strong text-lg">
             Access rules
           </h3>
@@ -102,14 +102,14 @@ export default function OperatorApiSection() {
               <h3 className="font-semibold text-ink-strong text-lg">
                 {endpoint.method} {endpoint.path}
               </h3>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 <span className="font-semibold">What it does:</span>{" "}
                 {endpoint.desc}
               </p>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 <span className="font-semibold">Gets:</span> {endpoint.expects}
               </p>
-              <p className="text-ink-body text-sm">
+              <p className="text-ink-body text-md">
                 <span className="font-semibold">Returns:</span>{" "}
                 {endpoint.returns}
               </p>
@@ -117,7 +117,7 @@ export default function OperatorApiSection() {
             </div>
           ))}
         </div>
-        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-sm">
+        <div className="space-y-2 rounded-md border border-white/10 p-5 text-ink-body text-md">
           <h3 className="font-semibold text-ink-strong text-lg">
             Response shape notes
           </h3>

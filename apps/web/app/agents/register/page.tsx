@@ -453,12 +453,12 @@ export default function AgentRegistrationPage() {
                   <h2 className="font-semibold text-ink-strong text-xl">
                     Deposit Details
                   </h2>
-                  <p className="mt-1 text-ink-muted text-xs">
+                  <p className="mt-1 text-ink-muted text-md">
                     Wallet authorization required
                   </p>
                 </div>
                 <span
-                  className={`rounded-md px-3 py-1 text-xs ${
+                  className={`rounded-md px-3 py-1 text-md ${
                     txStatus === "success" || isRegistered
                       ? "bg-emerald-500/20 text-emerald-200"
                       : "bg-white/10 text-ink-muted"
@@ -471,13 +471,13 @@ export default function AgentRegistrationPage() {
               </div>
 
               {error && (
-                <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-red-200 text-sm">
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-md text-red-200">
                   {error}
                 </div>
               )}
 
               <div className="space-y-4">
-                <div className="text-ink-muted text-xs uppercase tracking-[0.3em]">
+                <div className="text-ink-muted text-md uppercase tracking-[0.3em]">
                   Allowed Chain
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -486,21 +486,21 @@ export default function AgentRegistrationPage() {
                       key={item.key}
                       type="button"
                       onClick={() => setSelectedChainKey(item.key)}
-                      className={`rounded-md border px-4 py-3 text-left text-sm transition ${
+                      className={`rounded-md border px-4 py-3 text-left text-md transition ${
                         selectedChainKey === item.key
                           ? "border-brand bg-surface-solid text-ink-strong"
                           : "border-white/10 text-ink-muted hover:border-brand/40"
                       }`}
                     >
                       <div className="font-semibold">{item.shortLabel}</div>
-                      <div className="text-xs">{item.label}</div>
+                      <div className="text-md">{item.label}</div>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-4">
-                <div className="text-ink-muted text-xs uppercase tracking-[0.3em]">
+                <div className="text-ink-muted text-md uppercase tracking-[0.3em]">
                   Asset
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -512,7 +512,7 @@ export default function AgentRegistrationPage() {
                           key={item.key}
                           type="button"
                           onClick={() => setSelectedAssetKey(item.key)}
-                          className={`rounded-md border px-3 py-3 text-center text-sm transition ${
+                          className={`rounded-md border px-3 py-3 text-center text-md transition ${
                             selectedAssetKey === item.key
                               ? "border-brand bg-surface-solid text-ink-strong"
                               : "border-white/10 text-ink-muted hover:border-brand/40"
@@ -532,7 +532,7 @@ export default function AgentRegistrationPage() {
               <div className="space-y-3">
                 <label
                   htmlFor="registration-amount"
-                  className="text-ink-muted text-xs uppercase tracking-[0.3em]"
+                  className="text-ink-muted text-md uppercase tracking-[0.3em]"
                 >
                   Amount
                 </label>
@@ -542,11 +542,11 @@ export default function AgentRegistrationPage() {
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}
                     placeholder={`0.0 ${asset.symbol}`}
-                    className="form-field-dark flex-1 rounded-md px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                    className="form-field-dark flex-1 rounded-md px-4 py-3 text-md focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                 </div>
                 {needsApproval && asset.type === "erc20" && (
-                  <div className="text-amber-200 text-xs">
+                  <div className="text-amber-200 text-md">
                     Approval required
                   </div>
                 )}
@@ -565,14 +565,14 @@ export default function AgentRegistrationPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-xs">
+                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-md">
                       <span>Connected</span>
                       <span className="text-ink-strong">
                         {account ? formatAddress(account) : "--"}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-xs">
+                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-md">
                       <span>Network</span>
                       <span className="text-ink-strong">
                         {chain.shortLabel}
@@ -580,14 +580,14 @@ export default function AgentRegistrationPage() {
                       <button
                         type="button"
                         onClick={disconnectWallet}
-                        className="text-brand text-xs hover:text-brand-soft"
+                        className="text-brand text-md hover:text-brand-soft"
                       >
                         Disconnect
                       </button>
                     </div>
 
                     {missingContract && (
-                      <div className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-amber-100 text-xs">
+                      <div className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-amber-100 text-md">
                         Core contract address is not configured for{" "}
                         {chain.shortLabel}. Set
                         <span className="ml-1 font-mono text-amber-200">
@@ -625,12 +625,12 @@ export default function AgentRegistrationPage() {
                   </div>
                 )}
                 {amountError && (
-                  <div className="text-amber-200 text-xs">{amountError}</div>
+                  <div className="text-amber-200 text-md">{amountError}</div>
                 )}
               </div>
 
               {txHash && (
-                <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-muted text-xs">
+                <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-muted text-md">
                   <div className="flex items-center justify-between">
                     <span>Transaction</span>
                     <a
@@ -646,7 +646,7 @@ export default function AgentRegistrationPage() {
               )}
 
               {txStatus === "success" && (
-                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100 text-sm">
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100 text-md">
                   Registration complete. Check the docs to see how to use 4Mica
                   and get instant credit.
                 </div>
