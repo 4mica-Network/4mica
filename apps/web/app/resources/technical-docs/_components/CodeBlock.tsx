@@ -1,6 +1,6 @@
 "use client";
 
-import CodeTabs from "../app/resources/blog/CodeTabs";
+import CodeTabs from "../../blog/CodeTabs";
 
 type CodeBlockProps = {
   code: string;

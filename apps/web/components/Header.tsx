@@ -3,21 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { companyLinks, primaryLinks } from "./data";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-
-  const companyLinks = [
-    { href: "/about", label: "4Mica Mission" },
-    { href: "/team", label: "Team" },
-    { href: "/roadmap", label: "Roadmap" },
-  ];
-
-  const primaryLinks = [
-    { href: "/resources/technical-docs", label: "Documents" },
-    { href: "/resources", label: "Resources" },
-  ];
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 0);

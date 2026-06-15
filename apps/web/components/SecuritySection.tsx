@@ -1,32 +1,6 @@
 "use client";
 
-const SECURITY_POINTS = [
-  {
-    icon: "ri-safe-line",
-    label: "Collateral stays in Aave",
-    desc: "Deposits go directly to Aave, not to 4Mica. Users can withdraw at any time. 4Mica never holds funds.",
-    color: "rgb(74 222 128)",
-  },
-  {
-    icon: "ri-fingerprint-line",
-    label: "BLS-signed guarantees",
-    desc: "Every payment is backed by an EIP-712 signed guarantee with domain separation. Cryptographic proof exists for every spend.",
-    color: "rgb(var(--brand))",
-  },
-  {
-    icon: "ri-shield-check-line",
-    label: "On-chain enforcement",
-    desc: "If a payer defaults, recipients claim collateral directly from the contract. No trusted intermediary. No custodian risk.",
-    color: "#c084fc",
-  },
-  {
-    icon: "ri-git-branch-line",
-    label: "AccessManaged + Pausable",
-    desc: "Role-based access control, emergency pause, and reentrancy guards on all critical contract flows.",
-    color: "rgb(var(--color-warning))",
-  },
-];
-
+import { SECURITY_POINTS } from "./data";
 export default function SecuritySection() {
   return (
     <section id="security" className="section-gloss py-24">

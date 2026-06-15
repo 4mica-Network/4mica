@@ -2,7 +2,7 @@
 
 import Footer from "@components/Footer";
 import Header from "@components/Header";
-import ResourcesSection from "@components/ResourcesSection";
+import ResourcesSection from "./_components/ResourcesSection";
 
 export default function ResourcesPage() {
   return (

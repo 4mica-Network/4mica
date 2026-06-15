@@ -1,5 +1,5 @@
-import MermaidDiagram from "@components/MermaidDiagram";
 import Link from "next/link";
+import MermaidDiagram from "../_components/MermaidDiagram";
 
 const sequenceDiagram = `sequenceDiagram
     autonumber
