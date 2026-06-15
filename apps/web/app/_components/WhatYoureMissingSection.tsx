@@ -40,7 +40,7 @@ export default function WhatYoureMissingSection() {
         <div className="grid w-full grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
           {/* x402 */}
           <motion.div
-            className="flex flex-col overflow-hidden rounded-2xl"
+            className="flex flex-col overflow-hidden rounded-md"
             style={{ border: `1px solid ${RED}38` }}
             initial="hidden"
             whileInView="visible"
@@ -113,7 +113,7 @@ export default function WhatYoureMissingSection() {
 
           {/* 4Mica */}
           <motion.div
-            className="flex flex-col overflow-hidden rounded-2xl"
+            className="flex flex-col overflow-hidden rounded-md"
             style={{ border: `1px solid ${GREEN}38` }}
             initial="hidden"
             whileInView="visible"
@@ -187,7 +187,7 @@ export default function WhatYoureMissingSection() {
 
         {/* Delta */}
         <motion.div
-          className="glass-panel mt-6 flex w-full flex-col items-center justify-between gap-4 rounded-2xl px-6 py-5 sm:flex-row sm:px-8"
+          className="glass-panel mt-6 flex w-full flex-col items-center justify-between gap-4 rounded-md px-6 py-5 sm:flex-row sm:px-8"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}

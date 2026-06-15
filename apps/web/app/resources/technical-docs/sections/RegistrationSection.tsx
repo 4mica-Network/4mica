@@ -7,7 +7,7 @@ interface RegistrationSectionProps {
 }
 
 const NETWORKS = (
-  <div className="space-y-1 rounded-lg border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+  <div className="space-y-1 rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
     <p className="font-semibold text-ink-strong">Supported networks</p>
     <ul className="mt-2 list-inside list-disc space-y-1">
       <li>
@@ -93,7 +93,7 @@ try {
   await client.aclose();
 }`}
         />
-        <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
           <strong className="text-ink-strong">
             Your deposit won't appear instantly.
           </strong>{" "}
@@ -294,7 +294,7 @@ async def main():
 
 asyncio.run(main())`}
         />
-        <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
+        <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-4 text-ink-body text-sm">
           <strong className="text-ink-strong">
             Your deposit won't appear instantly.
           </strong>{" "}

@@ -50,7 +50,7 @@ export default function Header() {
           onClick={() => setIsMobileMenuOpen(false)}
         >
           <span
-            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg transition-all duration-300 ease-out ${
+            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-md transition-all duration-300 ease-out ${
               isLogoCompact ? "scale-95" : "scale-100"
             }`}
           >
@@ -86,7 +86,7 @@ export default function Header() {
                 <i className="ri-arrow-down-s-line text-lg"></i>
               </button>
               <div className="pointer-events-none absolute top-full left-0 translate-y-2 pt-3 opacity-0 transition-all duration-200 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="glass-panel-strong w-52 rounded-xl border border-white/10 shadow-lg">
+                <div className="glass-panel-strong w-52 rounded-md border border-white/10 shadow-lg">
                   {companyLinks.map((item, index) => (
                     <Link
                       key={item.href}
@@ -116,14 +116,14 @@ export default function Header() {
         <div className="flex items-center gap-3">
           <a
             href={links.mailto.contact}
-            className="hidden h-8 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-3 py-2 text-ink-body text-sm transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-sm transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
           >
             Contact Us
           </a>
 
           <Link
             href={routes.technicalDocs}
-            className="hidden h-8 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-3 py-2 text-[#151515] text-sm transition-colors duration-75 ease-in hover:bg-white md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-sm transition-colors duration-75 ease-in hover:bg-white md:flex"
           >
             Start Building
           </Link>
@@ -166,7 +166,7 @@ export default function Header() {
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        <div className="mx-auto max-w-[1200px] rounded-b-2xl border-white/10 border-t pt-6">
+        <div className="mx-auto max-w-[1200px] rounded-b-md border-white/10 border-t pt-6">
           <div className="section-kicker">Company</div>
           <div className="mt-3 space-y-2">
             {companyLinks.map((item) => (
@@ -204,7 +204,7 @@ export default function Header() {
             <Link
               href={routes.technicalDocs}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="h-10 rounded-md bg-[#dedede] px-3 py-2 text-center font-semibold text-[#151515] text-sm transition-colors hover:bg-white"
+              className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-sm transition-colors hover:bg-white"
             >
               Start Building
             </Link>

@@ -71,7 +71,7 @@ export default function PaymentFlowSection() {
           </Link>
           .
         </p>
-        <div className="rounded-lg border border-white/10 bg-white/10 p-6">
+        <div className="rounded-md border border-white/10 bg-white/10 p-6">
           <ol className="list-inside list-decimal space-y-3 text-ink-body">
             <li>
               <span className="font-semibold text-ink-body">
@@ -152,14 +152,14 @@ export default function PaymentFlowSection() {
             </li>
           </ol>
         </div>
-        <div className="space-y-3 rounded-lg border border-white/10 p-6">
+        <div className="space-y-3 rounded-md border border-white/10 p-6">
           <h3 className="font-semibold text-ink-strong text-lg">
             High-level sequence
           </h3>
           <MermaidDiagram code={sequenceDiagram} />
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-white/10 p-4">
+          <div className="rounded-md border border-white/10 p-4">
             <h4 className="mb-3 font-semibold text-ink-body">Actors</h4>
             <ul className="space-y-2 text-ink-body text-sm">
               <li>
@@ -178,7 +178,7 @@ export default function PaymentFlowSection() {
               </li>
             </ul>
           </div>
-          <div className="rounded-lg border border-white/10 p-4">
+          <div className="rounded-md border border-white/10 p-4">
             <h4 className="mb-3 font-semibold text-ink-body">
               Guards &amp; guarantees
             </h4>

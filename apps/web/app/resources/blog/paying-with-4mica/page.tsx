@@ -20,7 +20,7 @@ export default function PayingWith4MicaPage() {
           </p>
         </header>
 
-        <article className="glass-panel space-y-10 rounded-2xl p-8">
+        <article className="glass-panel space-y-10 rounded-md p-8">
           {sections.map((section) => (
             <section key={section.heading} className="space-y-4">
               <h2 className="font-bold text-2xl text-ink-strong">

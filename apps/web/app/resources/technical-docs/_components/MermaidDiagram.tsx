@@ -139,14 +139,14 @@ export default function MermaidDiagram({
 
   return (
     <div
-      className={`mermaid-diagram rounded-xl border border-white/10 bg-surface-solid p-4 ${
+      className={`mermaid-diagram rounded-md border border-white/10 bg-surface-solid p-4 ${
         className ?? ""
       }`}
     >
       {error ? (
         <div className="space-y-2">
           <p className="text-rose-300 text-sm">{error}</p>
-          <pre className="whitespace-pre-wrap break-words rounded-lg border border-white/10 bg-black/20 p-3 text-ink-body text-xs">
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-white/10 bg-black/20 p-3 text-ink-body text-xs">
             {diagram}
           </pre>
         </div>

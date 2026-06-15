@@ -83,7 +83,7 @@ function TechnicalDocsContentInner() {
                 key={id}
                 type="button"
                 onClick={() => setLanguage(id)}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg px-5 py-2.5 font-semibold text-sm transition-colors ${
+                className={`flex cursor-pointer items-center gap-2 rounded-md px-5 py-2.5 font-semibold text-sm transition-colors ${
                   language === id
                     ? "bg-brand-deep text-ink"
                     : "border border-white/10 text-ink-body hover:bg-white/10"
@@ -103,7 +103,7 @@ function TechnicalDocsContentInner() {
         {LANGUAGE_AWARE_SECTIONS.has(activeSection) &&
           language === "rust" &&
           activeSection !== "registration" && (
-            <div className="mx-auto mb-6 max-w-2xl rounded-lg border border-white/10 bg-white/5 px-6 py-4 text-center text-ink-body text-sm">
+            <div className="mx-auto mb-6 max-w-2xl rounded-md border border-white/10 bg-white/5 px-6 py-4 text-center text-ink-body text-sm">
               <i className="ri-time-line mr-2 text-base" />
               <span className="font-semibold text-ink-strong">
                 Rust support is in progress.
@@ -116,7 +116,7 @@ function TechnicalDocsContentInner() {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="lg:col-span-1">
-            <div className="glass-panel sticky top-6 rounded-lg p-6">
+            <div className="glass-panel sticky top-6 rounded-md p-6">
               <h3 className="mb-4 font-semibold text-ink-strong text-lg">
                 Contents
               </h3>
@@ -126,7 +126,7 @@ function TechnicalDocsContentInner() {
                     key={item.id}
                     type="button"
                     onClick={() => setActiveSection(item.id)}
-                    className={`flex w-full cursor-pointer items-center whitespace-nowrap rounded-lg p-3 text-left transition-colors ${
+                    className={`flex w-full cursor-pointer items-center whitespace-nowrap rounded-md p-3 text-left transition-colors ${
                       activeSection === item.id
                         ? "bg-brand-deep text-ink"
                         : "border border-white/10 text-ink-body hover:bg-white/10"
@@ -143,7 +143,7 @@ function TechnicalDocsContentInner() {
           </div>
 
           <div className="lg:col-span-3">
-            <div className="glass-panel rounded-lg p-8">
+            <div className="glass-panel rounded-md p-8">
               {activeSection === "overview" && (
                 <OverviewSection
                   onNavigate={setActiveSection}

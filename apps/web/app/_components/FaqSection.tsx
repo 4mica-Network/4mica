@@ -36,7 +36,7 @@ export default function FaqSection() {
             return (
               <div
                 key={faq.question}
-                className="glass-panel overflow-hidden rounded-xl"
+                className="glass-panel overflow-hidden rounded-md"
               >
                 <button
                   type="button"

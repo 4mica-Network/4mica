@@ -21,12 +21,12 @@ export default function UseCasesSection() {
           {USE_CASES.map((uc) => (
             <div
               key={uc.title}
-              className="glass-panel flex min-w-0 flex-col gap-4 rounded-2xl p-6 sm:p-7"
+              className="glass-panel flex min-w-0 flex-col gap-4 rounded-md p-6 sm:p-7"
               style={{ borderColor: `${BLUE}28` }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
                   style={{ background: `${BLUE}1a` }}
                 >
                   <i className={`${uc.icon} text-lg`} style={{ color: BLUE }} />
@@ -52,7 +52,7 @@ export default function UseCasesSection() {
                 {uc.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full px-2 py-0.5 font-medium text-[11px]"
+                    className="rounded-md px-2 py-0.5 font-medium text-[11px]"
                     style={{
                       background: `${BLUE}14`,
                       color: `${BLUE}cc`,

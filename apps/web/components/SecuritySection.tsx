@@ -16,7 +16,7 @@ export default function SecuritySection() {
                 contracts, not by 4Mica.
               </p>
               <div
-                className="glass-panel mt-6 rounded-xl px-5 py-4"
+                className="glass-panel mt-6 rounded-md px-5 py-4"
                 style={{ borderColor: "rgb(74 222 128 / 0.28)" }}
               >
                 <p className="font-semibold text-ink-strong text-sm">
@@ -34,11 +34,11 @@ export default function SecuritySection() {
               {SECURITY_POINTS.map((pt) => (
                 <div
                   key={pt.label}
-                  className="glass-panel flex items-start gap-4 rounded-xl px-5 py-4"
+                  className="glass-panel flex items-start gap-4 rounded-md px-5 py-4"
                   style={{ borderColor: `${pt.color}32` }}
                 >
                   <div
-                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
                     style={{ background: `${pt.color}22` }}
                   >
                     <i

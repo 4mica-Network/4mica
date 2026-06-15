@@ -447,7 +447,7 @@ export default function AgentRegistrationPage() {
           <div className="mb-12"></div>
 
           <div className="flex justify-center">
-            <div className="glass-panel w-full max-w-2xl space-y-6 rounded-lg p-6 sm:p-8">
+            <div className="glass-panel w-full max-w-2xl space-y-6 rounded-md p-6 sm:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-ink-strong text-xl">
@@ -458,7 +458,7 @@ export default function AgentRegistrationPage() {
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-3 py-1 text-xs ${
+                  className={`rounded-md px-3 py-1 text-xs ${
                     txStatus === "success" || isRegistered
                       ? "bg-emerald-500/20 text-emerald-200"
                       : "bg-white/10 text-ink-muted"
@@ -471,7 +471,7 @@ export default function AgentRegistrationPage() {
               </div>
 
               {error && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-200 text-sm">
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-red-200 text-sm">
                   {error}
                 </div>
               )}
@@ -486,7 +486,7 @@ export default function AgentRegistrationPage() {
                       key={item.key}
                       type="button"
                       onClick={() => setSelectedChainKey(item.key)}
-                      className={`rounded-lg border px-4 py-3 text-left text-sm transition ${
+                      className={`rounded-md border px-4 py-3 text-left text-sm transition ${
                         selectedChainKey === item.key
                           ? "border-brand bg-surface-solid text-ink-strong"
                           : "border-white/10 text-ink-muted hover:border-brand/40"
@@ -512,7 +512,7 @@ export default function AgentRegistrationPage() {
                           key={item.key}
                           type="button"
                           onClick={() => setSelectedAssetKey(item.key)}
-                          className={`rounded-lg border px-3 py-3 text-center text-sm transition ${
+                          className={`rounded-md border px-3 py-3 text-center text-sm transition ${
                             selectedAssetKey === item.key
                               ? "border-brand bg-surface-solid text-ink-strong"
                               : "border-white/10 text-ink-muted hover:border-brand/40"
@@ -542,7 +542,7 @@ export default function AgentRegistrationPage() {
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}
                     placeholder={`0.0 ${asset.symbol}`}
-                    className="form-field-dark flex-1 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+                    className="form-field-dark flex-1 rounded-md px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                 </div>
                 {needsApproval && asset.type === "erc20" && (
@@ -565,14 +565,14 @@ export default function AgentRegistrationPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 text-ink-muted text-xs">
+                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-xs">
                       <span>Connected</span>
                       <span className="text-ink-strong">
                         {account ? formatAddress(account) : "--"}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 text-ink-muted text-xs">
+                    <div className="flex items-center justify-between rounded-md border border-white/10 px-4 py-3 text-ink-muted text-xs">
                       <span>Network</span>
                       <span className="text-ink-strong">
                         {chain.shortLabel}
@@ -587,7 +587,7 @@ export default function AgentRegistrationPage() {
                     </div>
 
                     {missingContract && (
-                      <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-amber-100 text-xs">
+                      <div className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-amber-100 text-xs">
                         Core contract address is not configured for{" "}
                         {chain.shortLabel}. Set
                         <span className="ml-1 font-mono text-amber-200">
@@ -630,7 +630,7 @@ export default function AgentRegistrationPage() {
               </div>
 
               {txHash && (
-                <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4 text-ink-muted text-xs">
+                <div className="space-y-2 rounded-md border border-white/10 bg-white/5 p-4 text-ink-muted text-xs">
                   <div className="flex items-center justify-between">
                     <span>Transaction</span>
                     <a
@@ -646,7 +646,7 @@ export default function AgentRegistrationPage() {
               )}
 
               {txStatus === "success" && (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100 text-sm">
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100 text-sm">
                   Registration complete. Check the docs to see how to use 4Mica
                   and get instant credit.
                 </div>

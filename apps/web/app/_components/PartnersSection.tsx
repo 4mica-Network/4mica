@@ -27,11 +27,11 @@ export default function PartnersSection() {
           {PRIMITIVES.map((p) => (
             <div
               key={p.name}
-              className="glass-panel flex min-w-0 flex-col gap-3 rounded-2xl p-6"
+              className="glass-panel flex min-w-0 flex-col gap-3 rounded-md p-6"
               style={{ borderColor: `${BLUE}28` }}
             >
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md"
                 style={{ background: `${BLUE}1a` }}
               >
                 <i className={`${p.icon} text-lg`} style={{ color: BLUE }} />
@@ -64,7 +64,7 @@ export default function PartnersSection() {
           {TRUST_POINTS.map((t) => (
             <div key={t.label} className="flex min-w-0 items-start gap-3">
               <div
-                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
                 style={{ background: "rgb(var(--brand) / 0.16)" }}
               >
                 <i
@@ -94,7 +94,7 @@ export default function PartnersSection() {
                 href={partner.href}
                 target="_blank"
                 rel="noreferrer"
-                className="glass-panel flex items-center justify-center rounded-xl p-3 transition-all duration-300 hover:border-brand/30"
+                className="glass-panel flex items-center justify-center rounded-md p-3 transition-all duration-300 hover:border-brand/30"
                 aria-label={`${partner.name} homepage`}
               >
                 <Image

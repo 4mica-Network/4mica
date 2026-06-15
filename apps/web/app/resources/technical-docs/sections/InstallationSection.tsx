@@ -148,7 +148,7 @@ function RustInstallation() {
           separate facilitator package is needed.
         </p>
       </div>
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
+      <div className="rounded-md border border-white/10 bg-white/5 p-4 text-ink-body text-sm">
         <p className="mb-1 font-semibold text-ink-strong">
           What is available today
         </p>

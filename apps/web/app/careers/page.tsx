@@ -18,7 +18,7 @@ export default function CareersPage() {
             </p>
           </div>
 
-          <div className="glass-panel mt-12 max-w-3xl rounded-2xl p-8">
+          <div className="glass-panel mt-12 max-w-3xl rounded-md p-8">
             <h2 className="font-semibold text-2xl text-ink-strong">
               Let&apos;s chat
             </h2>

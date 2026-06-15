@@ -26,7 +26,7 @@ export default function AboutPage() {
               {highlights.map((highlight) => (
                 <div
                   key={highlight.title}
-                  className="glass-panel rounded-xl p-5"
+                  className="glass-panel rounded-md p-5"
                 >
                   <h3 className="font-semibold text-ink-strong text-sm">
                     {highlight.title}
@@ -37,7 +37,7 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
-            <div className="glass-panel rounded-2xl p-6 sm:p-8">
+            <div className="glass-panel rounded-md p-6 sm:p-8">
               <h2 className="font-semibold text-ink-strong text-xl">
                 Company Info
               </h2>

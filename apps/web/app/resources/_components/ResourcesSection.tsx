@@ -20,9 +20,9 @@ export default function ResourcesSection() {
                 href={resource.href}
                 className="group cursor-pointer"
               >
-                <div className="glass-panel h-full rounded-2xl p-8 transition-all duration-300 group-hover:scale-105">
+                <div className="glass-panel h-full rounded-md p-8 transition-all duration-300 group-hover:scale-105">
                   <div
-                    className={`h-16 w-16 bg-gradient-to-r ${resource.gradient} mx-auto mb-6 flex items-center justify-center rounded-full`}
+                    className={`h-16 w-16 bg-gradient-to-r ${resource.gradient} mx-auto mb-6 flex items-center justify-center rounded-md`}
                   >
                     <div className="flex h-8 w-8 items-center justify-center">
                       <i className={`${resource.icon} text-2xl text-white`}></i>

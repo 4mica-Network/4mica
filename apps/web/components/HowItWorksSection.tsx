@@ -15,7 +15,7 @@ export default function HowItWorksSection() {
 
         <div className="mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
           {steps.map((step) => (
-            <div key={step.title} className="glass-panel rounded-2xl p-6">
+            <div key={step.title} className="glass-panel rounded-md p-6">
               <div className="font-semibold text-brand text-sm">
                 {step.step}
               </div>
