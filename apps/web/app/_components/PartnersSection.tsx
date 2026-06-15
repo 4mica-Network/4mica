@@ -10,7 +10,7 @@ const BLUE = "#7bcbff";
 export default function PartnersSection() {
   return (
     <section className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         {/* Ecosystem primitives */}
         <div className="mb-12 text-center">
           <p className="section-kicker">Ecosystem</p>

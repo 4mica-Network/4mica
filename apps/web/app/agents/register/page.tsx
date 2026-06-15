@@ -442,8 +442,8 @@ export default function AgentRegistrationPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="min-h-screen pt-20 text-ink-body">
-        <div className="container mx-auto px-6">
+      <div className="min-h-screen pt-20 text-ink-body">
+        <div className="w-full">
           <div className="mb-12"></div>
 
           <div className="flex justify-center">
@@ -654,7 +654,7 @@ export default function AgentRegistrationPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
       <Footer />
     </div>
   );

@@ -11,7 +11,7 @@ export default function LegacyBlogRedirect() {
   }, []);
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center">
       <div className="max-w-md text-center">
         <h1 className="font-semibold text-2xl">Redirecting...</h1>
         <p className="mt-3 text-sm opacity-70">
@@ -21,6 +21,6 @@ export default function LegacyBlogRedirect() {
           Go to the article
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

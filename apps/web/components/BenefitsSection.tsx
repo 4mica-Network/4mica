@@ -4,7 +4,7 @@ import { benefits } from "./data";
 export default function BenefitsSection() {
   return (
     <section id="benefits" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="section-kicker">Benefits</p>

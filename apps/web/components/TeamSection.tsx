@@ -6,7 +6,7 @@ import { teamMembers } from "./data";
 export default function TeamSection() {
   return (
     <section id="team" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mb-16 text-center">
           <h2 className="section-title mb-6">Meet Our Team</h2>
           <div className="mx-auto mb-8 accent-bar"></div>

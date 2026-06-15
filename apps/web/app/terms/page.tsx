@@ -8,8 +8,8 @@ export default function TermsPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="min-h-screen pt-24 text-ink-body">
-        <div className="container mx-auto px-6">
+      <div className="min-h-screen pt-24 text-ink-body">
+        <div className="w-full">
           <div className="glass-panel mx-auto max-w-3xl rounded-2xl p-8 sm:p-10">
             <h1 className="font-semibold text-3xl text-ink-strong">
               Terms of Service
@@ -41,7 +41,7 @@ export default function TermsPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
       <Footer />
     </div>
   );

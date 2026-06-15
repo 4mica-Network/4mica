@@ -14,7 +14,7 @@ export default function OnePagerContent() {
           </h1>
         </div>
 
-        <div className="container mx-auto px-6 pb-20">
+        <div className="w-full pb-20">
           {/* Problem Statement & Use Case */}
           <div className="mb-20 grid grid-cols-1 gap-12 lg:grid-cols-2">
             {/* Problem Statement - Left */}

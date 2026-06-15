@@ -6,7 +6,7 @@ import { githubUrl, hooks } from "./data";
 export default function CommunitySection() {
   return (
     <section id="community" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div>
             <p className="section-kicker">Community</p>
