@@ -10,7 +10,7 @@ const BLUE = "#7bcbff";
 export default function PartnersSection() {
   return (
     <section className="section-gloss py-24">
-      <div className="w-full">
+      <div className="mx-auto w-full max-w-300">
         {/* Ecosystem primitives */}
         <div className="mb-12 text-center">
           <p className="section-kicker">Ecosystem</p>
@@ -23,21 +23,21 @@ export default function PartnersSection() {
           </p>
         </div>
 
-        <div className="mx-auto mb-16 grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="mb-16 grid w-full grid-cols-1 gap-5 md:grid-cols-3">
           {PRIMITIVES.map((p) => (
             <div
               key={p.name}
-              className="glass-panel flex flex-col gap-3 rounded-2xl p-6"
+              className="glass-panel flex min-w-0 flex-col gap-3 rounded-2xl p-6"
               style={{ borderColor: `${BLUE}28` }}
             >
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                 style={{ background: `${BLUE}1a` }}
               >
                 <i className={`${p.icon} text-lg`} style={{ color: BLUE }} />
               </div>
               <div>
-                <div className="flex items-baseline gap-2">
+                <div className="flex flex-wrap items-baseline gap-2">
                   <span className="font-bold text-ink-strong text-sm">
                     {p.name}
                   </span>
@@ -60,9 +60,9 @@ export default function PartnersSection() {
         <div className="mb-16 border-white/10 border-t" />
 
         {/* Trust points */}
-        <div className="mx-auto mb-16 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mb-16 grid w-full grid-cols-1 gap-4 sm:grid-cols-3">
           {TRUST_POINTS.map((t) => (
-            <div key={t.label} className="flex items-start gap-3">
+            <div key={t.label} className="flex min-w-0 items-start gap-3">
               <div
                 className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                 style={{ background: "rgb(var(--brand) / 0.16)" }}
@@ -87,7 +87,7 @@ export default function PartnersSection() {
           <p className="mb-6 text-ink-subtle text-xs uppercase tracking-widest">
             Teams building on 4Mica
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex w-full flex-wrap items-center justify-center gap-6">
             {PARTNERS.map((partner) => (
               <Link
                 key={partner.name}

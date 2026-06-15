@@ -9,7 +9,7 @@ const BLUE = "#7bcbff";
 export default function FinalCtaSection() {
   return (
     <section className="section-gloss py-24">
-      <div className="w-full">
+      <div className="mx-auto w-full max-w-300">
         <div className="mx-auto max-w-2xl text-center">
           <p className="section-kicker">Start building</p>
           <h2 className="section-title">Stop paying per transaction.</h2>
@@ -19,7 +19,7 @@ export default function FinalCtaSection() {
           </p>
 
           {/* Stats */}
-          <div className="mt-10 flex items-center justify-center gap-6">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
             {STATS.map((s, i) => (
               <div key={s.label} className="contents">
                 <div className="flex flex-col items-center gap-1">
@@ -32,7 +32,7 @@ export default function FinalCtaSection() {
                   <span className="text-ink-subtle text-xs">{s.label}</span>
                 </div>
                 {i < STATS.length - 1 && (
-                  <div className="h-8 w-px bg-white/10" />
+                  <div className="hidden h-8 w-px bg-white/10 sm:block" />
                 )}
               </div>
             ))}
