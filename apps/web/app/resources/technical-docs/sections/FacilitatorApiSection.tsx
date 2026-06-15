@@ -1,5 +1,5 @@
-import CodeBlock from "@components/CodeBlock";
 import CodeTabs from "../../blog/CodeTabs";
+import CodeBlock from "../_components/CodeBlock";
 
 export default function FacilitatorApiSection() {
   return (

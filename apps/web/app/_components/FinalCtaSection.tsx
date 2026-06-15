@@ -1,14 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { STATS } from "../data";
 
 const BLUE = "#7bcbff";
-
-const STATS = [
-  { value: "1 tx", label: "per settlement" },
-  { value: "~0", label: "gas per call" },
-  { value: "APY", label: "on collateral" },
-];
 
 export default function FinalCtaSection() {
   return (

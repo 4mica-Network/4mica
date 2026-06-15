@@ -2,61 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
 
 const BLUE = "#7bcbff";
-
-const PRIMITIVES = [
-  {
-    name: "x402",
-    role: "Payment protocol",
-    desc: "The HTTP payment standard 4Mica extends with a credit layer. Any x402-compatible client works out of the box.",
-    icon: "ri-global-line",
-  },
-  {
-    name: "Aave",
-    role: "Yield layer",
-    desc: "All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates returns.",
-    icon: "ri-plant-line",
-  },
-  {
-    name: "Ethereum / Base",
-    role: "Settlement layer",
-    desc: "Net positions settle on-chain via EVM-compatible contracts. One transaction per settlement window, cryptographically enforced.",
-    icon: "ri-links-line",
-  },
-];
-
-const PARTNERS = [
-  {
-    name: "Aligned Layer",
-    logo: "/assets/aligned_layer_logo.png",
-    href: "https://alignedlayer.com/",
-  },
-  {
-    name: "ChaosChain",
-    logo: "/assets/chaos_chain_logo.svg",
-    href: "https://chaoscha.in/",
-  },
-  { name: "Wachai", logo: "/assets/wachai.png", href: "https://wach.ai/" },
-];
-
-const TRUST_POINTS = [
-  {
-    icon: "ri-lock-line",
-    label: "Non-custodial",
-    desc: "You own your collateral. 4Mica never holds funds.",
-  },
-  {
-    icon: "ri-code-s-slash-line",
-    label: "Open-source core",
-    desc: "Contracts and SDKs are public on GitHub.",
-  },
-  {
-    icon: "ri-test-tube-line",
-    label: "Testnet live",
-    desc: "Deposit, spend, and earn on Sepolia today.",
-  },
-];
 
 export default function PartnersSection() {
   return (

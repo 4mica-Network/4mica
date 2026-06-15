@@ -1,25 +1,7 @@
 "use client";
 
+import { steps } from "./data";
 export default function HowItWorksSection() {
-  const steps = [
-    {
-      step: "01",
-      title: "Recipient opens a tab",
-      description: "Create a tab_id with asset and limits for a user",
-    },
-    {
-      step: "02",
-      title: "User spends on credit",
-      description: "Users sign guarantees per request with no prefunding",
-    },
-    {
-      step: "03",
-      title: "User settles after 7 days",
-      description:
-        "Settle later, or claim collateral after the on-chain grace period",
-    },
-  ];
-
   return (
     <section id="how-it-works" className="section-gloss py-20">
       <div className="container mx-auto px-6">

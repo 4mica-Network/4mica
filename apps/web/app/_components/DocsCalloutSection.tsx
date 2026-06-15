@@ -1,68 +1,9 @@
 "use client";
 
+import { STEPS } from "../data";
+
 // Single accent color for all steps
 const ACCENT = "#7bcbff";
-
-const STEPS = [
-  {
-    num: "01",
-    badge: "Deposit",
-    title: "Deposit collateral once",
-    desc: "Funds go into Aave and earn yield. A single collateral deposit covers all credit.",
-    code: `await client.user.approveErc20(usdc.address, AMOUNT);
-await client.user.deposit(AMOUNT, usdc.address);`,
-  },
-  {
-    num: "02",
-    badge: "Spend",
-    title: "Spend on credit: instant, off-chain",
-    desc: "The agent signs an EIP-712 guarantee claim and receives BLS-signed credit. No gas, no chain transaction. Verified in milliseconds.",
-    code: `const payment = await signGuarantee({
-  cycleId:   "0xabc",  
-  reqId:     "0x0",
-  amount:    "0x64",
-  recipient: "0x72e1…ResourceHub",
-});
-
-// GET /resource
-// X-PAYMENT: <base64(payment)>
-// HTTP 200 OK`,
-  },
-  {
-    num: "03",
-    badge: "Netting",
-    title: "Netting across the cycle",
-    desc: "Every 7 days the cycle closes. Bilateral flows collapse into one net position per participant.",
-    code: `// Cycle closes every 7 days, netting begins
-// Bilateral edges this cycle:
-Alice → Bob:  800 USDC  (40 guarantees)
-Bob → Alice:  300 USDC  (15 guarantees)
-// net_debit[Alice]  = max(800 - 300, 0) = 500 USDC
-// net_credit[Bob]   = 500 USDC
-// 55 guarantees turns into 1 net position per participant`,
-  },
-  {
-    num: "04",
-    badge: "Settle",
-    title: "Settle on-chain, one net payment",
-    desc: "Net debtors pay once. Creditors claim once. Defaults are covered by vault collateral.",
-    code: `// Debtor pays net position to ClearingHouse
-await clearingHouse.payNetDebit(
-  cycleId,
-  netDebit,       // 500 USDC (not 800)
-  merkleProof,
-);
-
-// Creditor claims once debtor has paid
-await clearingHouse.claimNetCredit(
-  cycleId,
-  netCredit,
-  merkleProof,
-);
-
-// 55 off-chain payments → 1 on-chain settlement`,
-  },
-];
 
 const getCodeLineKey = (line: string, counts: Map<string, number>) => {
   const count = counts.get(line) ?? 0;

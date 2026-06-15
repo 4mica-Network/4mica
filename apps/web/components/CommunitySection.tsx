@@ -1,25 +1,9 @@
 "use client";
 
 import Link from "next/link";
-
-const githubUrl = "https://github.com/4mica-Network/4mica-core/";
+import { githubUrl, hooks } from "./data";
 
 export default function CommunitySection() {
-  const hooks = [
-    {
-      label: "Star on GitHub",
-      href: githubUrl,
-    },
-    {
-      label: "Build with us",
-      href: githubUrl,
-    },
-    {
-      label: "Request early access",
-      href: "mailto:mairon@4mica.xyz?subject=Early%20Access%20Request&body=Hi%204Mica%20team,%20I%20would%20like%20early%20access.",
-    },
-  ];
-
   return (
     <section id="community" className="section-gloss py-20">
       <div className="container mx-auto px-6">

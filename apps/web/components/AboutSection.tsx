@@ -1,29 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { aboutCards } from "./data";
 
 export default function AboutSection() {
-  const aboutCards = [
-    {
-      title: "4Mica Mission",
-      description:
-        "Mission, product focus, and how 4Mica unlocks credit-backed payments",
-      href: "/about",
-    },
-    {
-      title: "Team",
-      description:
-        "Meet the founders building the payment layer for instant commerce",
-      href: "/leadership",
-    },
-    {
-      title: "Roadmap",
-      description:
-        "Track delivery milestones for the credit layer and network rollout",
-      href: "/roadmap",
-    },
-  ];
-
   return (
     <section id="about" className="section-gloss py-24">
       <div className="container mx-auto px-6">

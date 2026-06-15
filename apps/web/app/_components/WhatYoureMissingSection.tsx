@@ -1,58 +1,13 @@
 "use client";
 
-const SCENARIO = {
-  capital: 10_000,
-  gasCostX402: 1_000,
-  x402LatencyHours: 278, // 1M txs × 1 s avg block time ÷ 3600
-  micaLatencyHours: 2.7, // 1M txs × 10 ms BLS sign + verify ÷ 3_600_000
-  yieldRate: 0.05,
-};
-
-const x402Lines = [
-  {
-    label: "Capital locked in wallet",
-    value: `$${SCENARIO.capital.toLocaleString()} USDC`,
-    note: "earns 0%, just sitting there",
-  },
-  { label: "Yield earned", value: "$0", note: "no yield mechanism" },
-  {
-    label: "Gas fees paid (1M on-chain txs)",
-    value: `+$${SCENARIO.gasCostX402.toLocaleString()} USDC`,
-    note: "~$0.001 × 1,000,000 settlements",
-  },
-  {
-    label: "Time waiting for finality",
-    value: `${SCENARIO.x402LatencyHours} hours`,
-    note: "1M txs × ~1 s avg block time",
-  },
-];
-
-const micaLines = [
-  {
-    label: "Capital deployed in Aave vault",
-    value: `$${SCENARIO.capital.toLocaleString()} USDC`,
-    note: "non-custodial · withdraw anytime",
-  },
-  {
-    label: "Yield earned over 1 year",
-    value: `+$${(SCENARIO.capital * SCENARIO.yieldRate).toLocaleString()} USDC`,
-    note: "~5% Aave USDC APY",
-  },
-  {
-    label: "Gas fees",
-    value: "< $1",
-    note: "batch + netting · sponsored · $0 for payer",
-  },
-  {
-    label: "Time waiting for finality",
-    value: `${SCENARIO.micaLatencyHours} hours`,
-    note: "10ms BLS signature + verification per request",
-  },
-];
-
-const x402Total = SCENARIO.capital + SCENARIO.gasCostX402;
-const micaNet = SCENARIO.capital - SCENARIO.capital * SCENARIO.yieldRate;
-const netDelta = x402Total - micaNet;
+import {
+  micaLines,
+  micaNet,
+  netDelta,
+  SCENARIO,
+  x402Lines,
+  x402Total,
+} from "../data";
 
 const RED = "#f87171";
 const GREEN = "#4ade80";

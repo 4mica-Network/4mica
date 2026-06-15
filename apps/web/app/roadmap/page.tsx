@@ -1,6 +1,6 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
-import TimelineSection from "@components/TimelineSection";
+import TimelineSection from "./_components/TimelineSection";
 
 export default function RoadmapPage() {
   return (

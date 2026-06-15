@@ -1,4 +1,4 @@
-import CodeBlock from "@components/CodeBlock";
+import CodeBlock from "../_components/CodeBlock";
 import type { Language } from "../navigation";
 
 interface RegistrationSectionProps {
