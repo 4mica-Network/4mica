@@ -177,7 +177,9 @@ export default function WhatYoureMissingSection() {
           transition={{ duration: 0.36, ease: "easeOut" }}
         >
           <p className="section-kicker">The real cost</p>
-          <h2 className="section-title">Agentic economy breaks at scale.</h2>
+          <h2 className="section-title font-normal">
+            Agentic economy breaks at scale.
+          </h2>
           <p className="section-lead mx-auto max-w-xl">
             1M API calls, 10k USDC volume, 1 year.
           </p>
