@@ -143,7 +143,7 @@ export default function PartnersSection() {
                       WebkitMaskComposite: "xor",
                     }}
                   />
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10 transition-colors duration-500 group-hover:bg-white/[0.06] group-hover:ring-white/15">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10 transition-colors duration-500 group-hover:bg-white/6 group-hover:ring-white/15">
                     <i className={`${p.icon} text-3xl`} />
                   </div>
                   <div>
