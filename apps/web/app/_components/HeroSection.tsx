@@ -25,16 +25,16 @@ export default function HeroSection() {
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
                 href={routes.technicalDocs}
-                className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-bold"
+                className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
               >
-                <span>Documents</span>
+                <span>Start building</span>
               </a>
               <a
                 href="#how-it-works"
                 className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-[#151515]"
               >
                 <i className="ri-play-fill relative z-10 text-lg leading-none" />
-                <span className="relative z-10">See How It Works</span>
+                <span className="relative z-10">See how it works</span>
               </a>
             </div>
 
