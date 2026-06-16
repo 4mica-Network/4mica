@@ -1,9 +1,18 @@
 "use client";
 
 import { links, routes } from "@4mica/url";
+import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
+
+const arrowNudge: Variants = {
+  rest: { x: 0 },
+  hover: {
+    x: 4,
+    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+  },
+};
 
 export default function PartnersSection() {
   return (
@@ -11,6 +20,88 @@ export default function PartnersSection() {
       <div className="mx-auto w-full max-w-300">
         {/* Ecosystem primitives */}
         <div className="mb-12 text-center">
+          <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
+            <svg
+              aria-hidden="true"
+              className="h-12 w-full overflow-visible"
+              fill="none"
+              viewBox="0 0 192 56"
+            >
+              <defs>
+                <linearGradient
+                  id="ecosystem-light-trail"
+                  x1="0"
+                  x2="1"
+                  y1="0"
+                  y2="0"
+                >
+                  <stop offset="0" stopColor="currentColor" stopOpacity="0" />
+                  <stop
+                    offset="0.7"
+                    stopColor="currentColor"
+                    stopOpacity="0.24"
+                  />
+                  <stop offset="1" stopColor="currentColor" stopOpacity="0.7" />
+                </linearGradient>
+                <filter
+                  id="ecosystem-dot-glow"
+                  x="-200%"
+                  y="-200%"
+                  width="500%"
+                  height="500%"
+                >
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path
+                id="ecosystem-orbit"
+                d="M16 46C40 6 152 6 176 46"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeOpacity="0.3"
+                strokeWidth="1"
+              />
+              <g filter="url(#ecosystem-dot-glow)">
+                <line
+                  x1="-18"
+                  x2="-3"
+                  y1="0"
+                  y2="0"
+                  stroke="url(#ecosystem-light-trail)"
+                  strokeLinecap="round"
+                  strokeWidth="1.4"
+                />
+                <circle r="7" fill="currentColor" opacity="0.08" />
+                <circle r="2.4" fill="currentColor">
+                  <animate
+                    attributeName="opacity"
+                    dur="2s"
+                    repeatCount="indefinite"
+                    values="0.55;1;0.55"
+                  />
+                  <animate
+                    attributeName="r"
+                    dur="2s"
+                    repeatCount="indefinite"
+                    values="2;2.8;2"
+                  />
+                </circle>
+                <animateMotion
+                  dur="6s"
+                  keyPoints="0;1;0"
+                  keyTimes="0;0.5;1"
+                  repeatCount="indefinite"
+                  rotate="auto"
+                >
+                  <mpath href="#ecosystem-orbit" />
+                </animateMotion>
+              </g>
+            </svg>
+          </div>
           <p className="section-kicker">Ecosystem</p>
           <h2 className="section-title">
             Built on primitives you already trust
@@ -97,9 +188,39 @@ export default function PartnersSection() {
 
           {/* Partner logos */}
           <div className="border-white/10 border-t px-6 py-8 text-left sm:px-8">
-            <p className="mb-6 font-medium text-ink-strong text-xl">
-              Teams building on 4Mica
-            </p>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-medium text-ink-strong text-xl">
+                Teams building on 4Mica
+              </p>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <motion.div initial="rest" whileHover="hover">
+                  <Link
+                    href={routes.technicalDocs}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-200 hover:bg-white"
+                  >
+                    Read documentation
+                    <motion.span
+                      aria-hidden="true"
+                      className="inline-flex"
+                      variants={arrowNudge}
+                    >
+                      <i className="ri-arrow-right-line text-lg leading-none" />
+                    </motion.span>
+                  </Link>
+                </motion.div>
+
+                <Link
+                  href={links.social.githubCore}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-soft btn-lg h-10 text-center"
+                >
+                  <i className="ri-github-fill" />
+                  View on GitHub
+                </Link>
+              </div>
+            </div>
             <div className="flex w-full flex-wrap items-center gap-4">
               {PARTNERS.map((partner) => (
                 <Link
@@ -121,25 +242,6 @@ export default function PartnersSection() {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* CTAs */}
-        <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-          <Link
-            href={routes.technicalDocs}
-            className="btn btn-primary btn-lg text-center"
-          >
-            Start Building
-          </Link>
-          <Link
-            href={links.social.githubCore}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-soft btn-lg text-center"
-          >
-            <i className="ri-github-fill" />
-            View on GitHub
-          </Link>
         </div>
       </div>
     </section>
