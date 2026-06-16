@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@4mica/url";
+
 export default function HeroSection() {
   return (
     <section className="section-gloss relative">
@@ -22,10 +24,10 @@ export default function HeroSection() {
             {/* CTAs */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                href="/resources/technical-docs"
+                href={routes.technicalDocs}
                 className="btn btn-primary btn-lg whitespace-nowrap font-bold"
               >
-                Start Building
+                Documents
               </a>
               <a
                 href="#how-it-works"

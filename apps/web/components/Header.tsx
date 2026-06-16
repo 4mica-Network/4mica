@@ -4,7 +4,6 @@ import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { companyLinks, primaryLinks } from "./data";
 
 export default function Header() {
   const [isLogoCompact, setIsLogoCompact] = useState(false);
@@ -65,7 +64,7 @@ export default function Header() {
             />
           </span>
           <span
-            className={`relative font-bold font-pacifico text-2xl transition-all duration-300 ease-out ${
+            className={`relative font-bold font-pacifico text-xl transition-all duration-300 ease-out ${
               isLogoCompact
                 ? "-translate-x-5 scale-y-50 opacity-0"
                 : "translate-x-0 scale-100 opacity-100"
@@ -75,57 +74,21 @@ export default function Header() {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
-          <div className="flex items-center space-x-8">
-            <div className="group relative">
-              <button
-                type="button"
-                className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-ink-muted text-md transition-colors hover:text-ink-strong"
-              >
-                Company
-                <i className="ri-arrow-down-s-line text-lg"></i>
-              </button>
-              <div className="pointer-events-none absolute top-full left-0 translate-y-2 pt-3 opacity-0 transition-all duration-200 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="glass-panel-strong w-52 rounded-md border border-white/10 shadow-lg">
-                  {companyLinks.map((item, index) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`block px-4 py-3 text-ink text-md transition-colors hover:text-brand-strong ${
-                        index > 0 ? "border-white/10 border-t" : ""
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {primaryLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="cursor-pointer whitespace-nowrap text-ink-muted text-md transition-colors hover:text-ink-strong"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <div className="hidden md:block" />
 
         <div className="flex items-center gap-3">
           <a
             href={links.mailto.contact}
             className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
           >
-            Contact Us
+            Talk to sales
           </a>
 
           <Link
             href={routes.technicalDocs}
             className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
           >
-            Start Building
+            Try for free
           </Link>
 
           <button
@@ -166,32 +129,9 @@ export default function Header() {
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        <div className="mx-auto max-w-[1200px] rounded-b-md border-white/10 border-t pt-6">
-          <div className="section-kicker">Company</div>
+        <div className="mx-auto max-w-[1200px] rounded-b-md pt-6">
+          <div className="section-kicker">Contact</div>
           <div className="mt-3 space-y-2">
-            {companyLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-          <div className="section-kicker mt-6">Explore</div>
-          <div className="mt-3 space-y-2">
-            {primaryLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
-              >
-                {item.label}
-              </Link>
-            ))}
             <a
               href={links.mailto.contact}
               onClick={() => setIsMobileMenuOpen(false)}
