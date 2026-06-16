@@ -103,7 +103,7 @@ export default function PartnersSection() {
             </svg>
           </div>
           <p className="section-kicker">Ecosystem</p>
-          <h2 className="section-title">
+          <h2 className="section-title font-normal">
             Built on primitives you already trust
           </h2>
           <p className="section-lead mx-auto max-w-xl">
@@ -189,17 +189,22 @@ export default function PartnersSection() {
           {/* Partner logos */}
           <div className="border-white/10 border-t px-6 py-8 text-left sm:px-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-medium text-ink-strong text-xl">
-                Teams building on 4Mica
-              </p>
+              <div>
+                <p className="font-medium text-ink-strong text-xl">
+                  Teams building on 4Mica
+                </p>
+                <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
+                  Trusted by fast-growing companies around the world.
+                </p>
+              </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <motion.div initial="rest" whileHover="hover">
+                <motion.div className="flex" initial="rest" whileHover="hover">
                   <Link
                     href={routes.technicalDocs}
                     className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-200 hover:bg-white"
                   >
-                    Read documentation
+                    View developer docs
                     <motion.span
                       aria-hidden="true"
                       className="inline-flex"
@@ -214,7 +219,7 @@ export default function PartnersSection() {
                   href={links.social.githubCore}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-soft btn-lg h-10 text-center"
+                  className="btn btn-soft btn-lg inline-flex h-10 items-center justify-center gap-1.5"
                 >
                   <i className="ri-github-fill" />
                   View on GitHub
@@ -228,7 +233,7 @@ export default function PartnersSection() {
                   href={partner.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="glass-panel flex items-center justify-center rounded-md p-3 transition-all duration-300 hover:border-brand/30"
+                  className="flex items-center justify-center rounded-md p-3 transition-all duration-300"
                   aria-label={`${partner.name} homepage`}
                 >
                   <Image
