@@ -39,7 +39,7 @@ export default function Header() {
       }`}
     >
       <nav
-        className={`flex size-full max-w-[1200px] items-center justify-between ${
+        className={`flex size-full max-w-300 items-center justify-between ${
           isMobileMenuOpen ? "overflow-hidden" : ""
         }`}
       >
@@ -129,7 +129,7 @@ export default function Header() {
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        <div className="mx-auto max-w-[1200px] rounded-b-md pt-6">
+        <div className="mx-auto max-w-300 rounded-b-md pt-6">
           <div className="section-kicker">Contact</div>
           <div className="mt-3 space-y-2">
             <a

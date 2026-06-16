@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@4mica/url";
+import { links, routes } from "@4mica/url";
 
 export default function HeroSection() {
   return (
@@ -9,7 +9,7 @@ export default function HeroSection() {
         <div className="w-full pt-32 pb-20 lg:pt-36 lg:pb-24">
           <div className="flex flex-col items-center text-center">
             {/* Headline */}
-            <h1 className="section-title-lg max-w-4xl leading-tight">
+            <h1 className="mt-4 max-w-5xl font-normal text-5xl text-ink-strong leading-tight tracking-[0.01em] md:text-7xl lg:text-[5.5rem]">
               The clearing house for
               <br />
               the agentic economy
@@ -17,25 +17,50 @@ export default function HeroSection() {
 
             {/* Subheadline */}
             <p className="mt-5 max-w-xl text-ink-body/80 text-lg leading-relaxed md:text-xl">
-              Infrastructure for your agent to transact on instant programmable
-              credit, earn yield, and settle at once.
+              4Mica gives agents one place to pay on credit, earn yield, and
+              settle transactions without clearing every request on-chain.
             </p>
 
             {/* CTAs */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
                 href={routes.technicalDocs}
-                className="btn btn-primary btn-lg whitespace-nowrap font-bold"
+                className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-bold"
               >
-                Documents
+                <span>Documents</span>
               </a>
               <a
                 href="#how-it-works"
-                className="btn btn-outline btn-lg whitespace-nowrap"
+                className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-[#151515]"
               >
-                See How It Works
+                <i className="ri-play-fill relative z-10 text-lg leading-none" />
+                <span className="relative z-10">See How It Works</span>
               </a>
             </div>
+
+            <p className="mt-12 font-light text-ink-muted text-md">
+              Supported on{" "}
+              <a
+                href={links.api.base}
+                className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+              >
+                Base
+              </a>
+              ,{" "}
+              <a
+                href={links.api.ethereumSepolia}
+                className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+              >
+                Ethereum Sepolia
+              </a>
+              , and{" "}
+              <a
+                href={links.api.baseSepolia}
+                className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+              >
+                Base Sepolia
+              </a>
+            </p>
           </div>
         </div>
       </div>
