@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 type LangId = "typescript" | "python";
@@ -100,7 +99,7 @@ function highlightLine(line: string, lang: LangId): string {
     const before = line.slice(0, idx);
     return (
       processTokens(before, lang) +
-      `<span style="color:rgba(148,163,184,0.62);font-style:italic">${esc(commentMatch[1])}</span>`
+      `<span style="color:#6272a4;font-style:italic">${esc(commentMatch[1])}</span>`
     );
   }
   return processTokens(line, lang);
@@ -118,13 +117,13 @@ function processTokens(line: string, lang: LangId): string {
       (part.startsWith('"') || part.startsWith("'") || part.startsWith("`")) &&
       i % 2 === 1
     ) {
-      result += `<span style="color:#86efac">${esc(part)}</span>`;
+      result += `<span style="color:#f1fa8c">${esc(part)}</span>`;
     } else {
       let p = esc(part);
       kws.forEach((kw) => {
         p = p.replace(
           new RegExp(`\\b(${kw})\\b`, "g"),
-          `<span style="color:#7dd3fc">$1</span>`,
+          `<span style="color:#ff79c6">$1</span>`,
         );
       });
       result += p;
@@ -154,7 +153,7 @@ export default function CodeSamplesSection() {
           {/* Header */}
           <div className="mb-10">
             <p className="section-kicker">Integration</p>
-            <h2 className="section-title-sm mt-2">
+            <h2 className="section-title mt-2 font-normal">
               3 lines to enable credit-based payments
             </h2>
             <p className="section-lead mt-1 max-w-xl">
@@ -164,14 +163,28 @@ export default function CodeSamplesSection() {
           </div>
 
           {/* Code panel */}
-          <div className="glass-panel w-full overflow-hidden rounded-md">
+          <div className="group relative w-full overflow-hidden rounded-md border border-white/10 bg-black/25">
+            <div className="pointer-events-none absolute inset-0 z-20 rounded-md border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <div
+              className="pointer-events-none absolute inset-0 z-20 rounded-md opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+              style={{
+                padding: "1px",
+                background:
+                  "linear-gradient(115deg, rgba(255,255,255,0), rgba(255,255,255,0.36), rgba(255,255,255,0.04), rgba(255,255,255,0))",
+                mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                maskComposite: "exclude",
+                WebkitMask:
+                  "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                WebkitMaskComposite: "xor",
+              }}
+            />
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-white/8 border-b bg-surface-solid px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-white/10 border-b bg-black/40 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
-                <div className="h-2.5 w-2.5 rounded-md bg-red-500/40" />
-                <div className="h-2.5 w-2.5 rounded-md bg-yellow-500/40" />
-                <div className="h-2.5 w-2.5 rounded-md bg-green-500/40" />
-                <span className="ml-2 truncate text-[10px] text-ink-subtle uppercase tracking-wider">
+                <div className="h-2.5 w-2.5 rounded-md bg-red-500/80" />
+                <div className="h-2.5 w-2.5 rounded-md bg-yellow-500/80" />
+                <div className="h-2.5 w-2.5 rounded-md bg-green-500/80" />
+                <span className="ml-2 truncate text-[10px] text-white uppercase tracking-wider">
                   {side === "client" ? "agent / client" : "api / server"} ·{" "}
                   {lang}
                 </span>
@@ -213,7 +226,7 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Code body */}
-            <div className="max-w-full overflow-x-auto bg-[#050b1d] p-5 sm:p-6">
+            <div className="max-w-full overflow-x-auto bg-black p-5 transition-colors duration-500 group-hover:bg-[#050505] sm:p-6">
               <div className="min-w-max font-mono text-md leading-6">
                 {lines.map((line, i) => (
                   <div
@@ -224,7 +237,7 @@ export default function CodeSamplesSection() {
                       {i + 1}
                     </span>
                     <span
-                      className="whitespace-pre text-ink-body/95"
+                      className="whitespace-pre text-white"
                       // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightLine escapes source text before adding syntax spans.
                       dangerouslySetInnerHTML={{
                         __html: highlightLine(line, lang) || " ",
@@ -236,17 +249,22 @@ export default function CodeSamplesSection() {
             </div>
 
             {/* Footer */}
-            <div className="flex flex-col gap-2 border-white/10 border-t bg-surface-solid px-5 py-3 text-ink-subtle text-md sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                Full docs at{" "}
-                <Link
-                  href="/resources/technical-docs"
-                  className="text-brand-teal transition hover:text-brand-soft"
-                >
-                  /resources/technical-docs
-                </Link>
-              </span>
-              <span>SDKs: TypeScript · Python · Rust soon</span>
+            <div className="flex items-center gap-3 border-white/10 border-t bg-black/25 px-5 py-3 text-ink-subtle text-md">
+              <i className="ri-code-box-line shrink-0 text-2xl text-ink-strong" />
+              <div className="flex flex-col">
+                <span className="font-medium text-ink-strong">
+                  SDKs are available
+                </span>
+                <span className="font-light text-ink-muted">
+                  Available now in{" "}
+                  <span className="font-semibold text-ink-body">
+                    TypeScript
+                  </span>{" "}
+                  & <span className="font-semibold text-ink-body">Python</span>{" "}
+                  · <span className="font-semibold text-ink-body">Rust</span>{" "}
+                  coming soon
+                </span>
+              </div>
             </div>
           </div>
         </div>
