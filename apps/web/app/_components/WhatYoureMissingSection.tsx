@@ -108,9 +108,9 @@ function ComparisonCard({
         }}
       />
 
-      <div className="relative z-10 flex items-center justify-between px-6 py-4 transition-colors duration-500 group-hover:bg-white/[0.025]">
+      <div className="relative z-10 flex items-center justify-between px-6 py-4 transition-colors duration-500 group-hover:bg-white/2.5">
         <div>
-          <p className="font-semibold text-ink-strong text-md uppercase tracking-widest transition-colors duration-500 group-hover:[color:var(--card-accent)]">
+          <p className="font-semibold text-ink-strong text-md uppercase tracking-widest transition-colors duration-500 group-hover:text-(--card-accent)">
             {eyebrow}
           </p>
           <p className="mt-0.5 text-ink-subtle text-md transition-colors duration-500 group-hover:text-ink-body">
@@ -118,7 +118,7 @@ function ComparisonCard({
           </p>
         </div>
         <i
-          className={`${icon} text-ink-strong/80 text-xl transition-colors duration-500 group-hover:[color:var(--card-accent)]`}
+          className={`${icon} text-ink-strong/80 text-xl transition-colors duration-500 group-hover:text-(--card-accent)`}
         />
       </div>
 
@@ -145,7 +145,7 @@ function ComparisonCard({
                   {line.note}
                 </p>
               </div>
-              <span className="shrink-0 font-bold text-ink-strong text-md tabular-nums transition-colors duration-500 group-hover:[color:var(--card-accent)]">
+              <span className="shrink-0 font-bold text-ink-strong text-md tabular-nums transition-colors duration-500 group-hover:text-(--card-accent)">
                 {line.value}
               </span>
             </motion.div>
@@ -155,7 +155,7 @@ function ComparisonCard({
           <span className="font-semibold text-ink-strong text-md">
             {totalLabel}
           </span>
-          <span className="font-bold text-ink-strong text-lg transition-colors duration-500 group-hover:[color:var(--card-accent)]">
+          <span className="font-bold text-ink-strong text-lg transition-colors duration-500 group-hover:text-(--card-accent)">
             {totalValue}
           </span>
         </div>
