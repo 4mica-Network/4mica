@@ -192,6 +192,60 @@
     box-shadow: 0 18px 38px rgba(2, 12, 26, 0.55);
   }
 
+  .btn-no-lift:hover {
+    transform: none;
+  }
+
+  .hero-cta-primary,
+  .hero-cta-ghost {
+    position: relative;
+    overflow: hidden;
+    transition:
+      color 220ms ease,
+      border-color 220ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .hero-cta-primary > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-cta-primary::before,
+  .hero-cta-ghost::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+
+  .hero-cta-primary::before {
+    background: linear-gradient(110deg, rgb(84 147 197), rgb(89 212 187));
+  }
+
+  .hero-cta-primary:hover {
+    background: linear-gradient(
+      110deg,
+      rgb(var(--brand-strong)),
+      rgb(var(--brand-teal))
+    );
+  }
+
+  .hero-cta-primary:hover::before,
+  .hero-cta-ghost:hover::before {
+    opacity: 1;
+  }
+
+  .hero-cta-ghost::before {
+    background: #dedede;
+  }
+
+  .hero-cta-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #151515;
+  }
+
   .btn-outline {
     border: 2px solid rgb(var(--brand-teal));
     color: rgb(var(--brand-teal));
