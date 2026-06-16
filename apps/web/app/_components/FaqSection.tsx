@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { links } from "@4mica/url";
 import { useState } from "react";
 import { FAQS } from "../data";
 
@@ -24,54 +24,64 @@ export default function FaqSection() {
   return (
     <section id="faq" className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
-        <div className="mb-12 text-center">
+        <div className="mb-6">
           <p className="section-kicker">FAQ</p>
-          <h2 className="section-title">Common questions</h2>
+          <h2 className="section-title mt-2 font-normal">Common questions</h2>
         </div>
 
-        <div className="w-full space-y-3 overflow-hidden">
-          {FAQS.map((faq) => {
+        <div className="w-full">
+          {FAQS.map((faq, index) => {
             const isOpen = openQuestions.has(faq.question);
+            const isLast = index === FAQS.length - 1;
 
             return (
               <div
                 key={faq.question}
-                className="glass-panel overflow-hidden rounded-md"
+                className={isLast ? "" : "border-white/10 border-b"}
               >
                 <button
                   type="button"
                   aria-expanded={isOpen}
                   onClick={() => toggleQuestion(faq.question)}
-                  className="flex w-full cursor-pointer select-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-ink-strong text-md"
+                  className="w-full cursor-pointer select-none px-0 pt-6 pb-4 text-left transition-colors focus:outline-none"
                 >
-                  <span>{faq.question}</span>
-                  <motion.i
-                    className="ri-arrow-down-s-line shrink-0 text-ink-subtle text-xl"
-                    animate={{ rotate: isOpen ? 180 : 0 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  />
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-semibold text-ink-strong text-md">
+                      {faq.question}
+                    </span>
+                    <i
+                      className={`ri-arrow-down-s-line ml-4 shrink-0 text-ink-subtle text-xl transition-transform duration-200 ${
+                        isOpen ? "-rotate-180" : ""
+                      }`}
+                    />
+                  </div>
                 </button>
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      key="content"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.24, ease: "easeOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-5 pb-4">
-                        <p className="text-ink-muted text-md leading-relaxed">
-                          {faq.answer}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+
+                <div
+                  className={`overflow-hidden transition-all duration-200 ease-in-out ${
+                    isOpen ? "max-h-125 pb-6 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <p className="text-ink-muted text-md leading-relaxed">
+                    {faq.answer}
+                  </p>
+                </div>
               </div>
             );
           })}
+        </div>
+
+        {/* Contact Support */}
+        <div className="mt-14 flex items-center justify-start gap-1.5 text-md">
+          <span className="font-normal text-ink-muted">
+            Something else on your mind?
+          </span>
+          <a
+            href={links.mailto.contact}
+            className="text-ink-muted underline underline-offset-4 transition-colors hover:text-ink-strong"
+          >
+            Contact us
+          </a>
         </div>
       </div>
     </section>
