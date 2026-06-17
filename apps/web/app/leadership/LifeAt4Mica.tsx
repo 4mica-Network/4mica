@@ -1,0 +1,144 @@
+"use client";
+
+import { motion, useAnimationFrame, useMotionValue } from "framer-motion";
+import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+
+interface Testimonial {
+  id: string;
+  quote: string;
+  name: string;
+  role: string;
+  avatar: string;
+}
+
+const testimonials: Testimonial[] = [
+  {
+    id: "priya-protocol",
+    quote:
+      "The bar for correctness is high here — we move real money, and everyone treats it that way.",
+    name: "Priya S.",
+    role: "Protocol Engineer",
+    avatar: "PS",
+  },
+  {
+    id: "daniel-backend",
+    quote:
+      "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
+    name: "Daniel V.",
+    role: "Backend Engineer",
+    avatar: "DV",
+  },
+  {
+    id: "lena-research",
+    quote:
+      "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
+    name: "Lena K.",
+    role: "Cryptography Researcher",
+    avatar: "LK",
+  },
+  {
+    id: "marco-product",
+    quote:
+      "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
+    name: "Marco T.",
+    role: "Product",
+    avatar: "MT",
+  },
+  {
+    id: "sofia-security",
+    quote:
+      "Every line of the protocol is auditable, and so is every decision. That clarity is rare.",
+    name: "Sofia R.",
+    role: "Security Engineer",
+    avatar: "SR",
+  },
+];
+
+const TestimonialCard = forwardRef<HTMLDivElement, { data: Testimonial }>(
+  ({ data }, ref) => (
+    <div
+      ref={ref}
+      className="mr-4 min-w-[280px] max-w-[400px] rounded-xl border border-white/10 bg-black/25 p-6 sm:mr-6 sm:min-w-[360px]"
+    >
+      <div className="flex h-full flex-col justify-between gap-6">
+        <blockquote className="font-medium text-ink-body text-md leading-relaxed sm:text-lg">
+          &ldquo;{data.quote}&rdquo;
+        </blockquote>
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 font-semibold text-ink-strong text-md">
+            {data.avatar}
+          </span>
+          <div className="flex flex-col">
+            <span className="text-ink-strong text-md">{data.name}</span>
+            <span className="text-ink-muted text-md">{data.role}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  ),
+);
+TestimonialCard.displayName = "TestimonialCard";
+
+export default function LifeAt4Mica() {
+  const firstCardRef = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [cardWidth, setCardWidth] = useState(400 + 24);
+
+  const measureCard = useCallback(() => {
+    if (!firstCardRef.current) return;
+    const el = firstCardRef.current;
+    const styles = window.getComputedStyle(el);
+    const mr = Number.parseFloat(styles.marginRight || "0");
+    setCardWidth(el.offsetWidth + mr);
+  }, []);
+
+  useEffect(() => {
+    measureCard();
+    window.addEventListener("resize", measureCard);
+    return () => window.removeEventListener("resize", measureCard);
+  }, [measureCard]);
+
+  useAnimationFrame((_, delta) => {
+    if (isHovered) return;
+    const moveBy = (delta / 1000) * 60;
+    x.set(x.get() - moveBy);
+
+    const segmentWidth = cardWidth * testimonials.length;
+    if (Math.abs(x.get()) >= segmentWidth) {
+      x.set(x.get() + segmentWidth);
+    }
+  });
+
+  return (
+    <div className="mt-24">
+      <div className="mx-auto max-w-2xl text-center">
+        <p className="section-kicker">Culture</p>
+        <h2 className="section-title font-normal">Life at 4Mica</h2>
+        <p className="section-lead mx-auto max-w-2xl">
+          Notes from the team on what it&apos;s like to build here.
+        </p>
+      </div>
+
+      <div
+        onPointerEnter={() => setIsHovered(true)}
+        onPointerLeave={() => setIsHovered(false)}
+        onTouchStart={() => setIsHovered(true)}
+        onTouchEnd={() => setIsHovered(false)}
+        className="mt-12 overflow-hidden [mask-image:linear-gradient(to_right,transparent_0%,black_8%,black_92%,transparent_100%)]"
+      >
+        <motion.div className="flex" style={{ x }}>
+          {[...testimonials, ...testimonials, ...testimonials].map(
+            (testimonial, idx) => (
+              <TestimonialCard
+                key={`${testimonial.id}-${idx}`}
+                data={testimonial}
+                ref={idx === 0 ? firstCardRef : undefined}
+              />
+            ),
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
