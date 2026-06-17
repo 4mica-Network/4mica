@@ -54,8 +54,6 @@ function TeamMemberCard({ member }: { member: Member }) {
               background: `radial-gradient(circle at ${spot.x}% ${spot.y}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 55%)`,
             }}
           />
-          {/* Shiny border on hover */}
-          <div className="pointer-events-none absolute inset-0 rounded-full border border-white/25 opacity-0 transition-opacity duration-500 group-hover/card:opacity-100" />
         </div>
       </div>
 
