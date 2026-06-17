@@ -5,13 +5,47 @@ import Link from "next/link";
 
 const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
 
+function ExternalFooterLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center text-ink-body transition-colors hover:text-ink-strong"
+    >
+      {label}
+      <i className="ri-arrow-right-up-line ml-1 hidden text-md transition-transform duration-200 group-hover:block" />
+    </a>
+  );
+}
+
+// Audience/use-case segments served by 4Mica's credit-backed payment rails.
+const SOLUTIONS = [
+  "Agentic commerce",
+  "AI companies",
+  "Cryptocurrency",
+  "Marketplaces",
+  "Platforms",
+  "Enterprises",
+  "Startups",
+];
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
     <footer className="flex w-full select-none justify-center pt-36 pb-6 text-md">
       <div className="flex size-full max-w-300 flex-col items-center justify-center">
-        <div className="grid size-full grid-cols-1 gap-10 md:grid-cols-3">
+        <div className="grid size-full grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Solutions</div>
+            {SOLUTIONS.map((solution) => (
+              <Link key={solution} href="/solution" className={footerLinkClass}>
+                {solution}
+              </Link>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Product</div>
             <Link href="/solution" className={footerLinkClass}>
@@ -29,12 +63,35 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Developers</div>
+            <ExternalFooterLink href={links.docs} label="Documentation" />
+            <Link href={routes.technicalDocs} className={footerLinkClass}>
+              API reference
+            </Link>
+            <ExternalFooterLink href={links.status} label="API status" />
+            <ExternalFooterLink
+              href={links.social.githubCore}
+              label="API changelog"
+            />
+            <ExternalFooterLink
+              href={links.social.github}
+              label="Libraries and SDKs"
+            />
+            <Link href={routes.blog} className={footerLinkClass}>
+              Developer blog
+            </Link>
+          </div>
+
+          <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Company</div>
             <Link href={routes.about} className={footerLinkClass}>
               About
             </Link>
+            <Link href={routes.careers} className={footerLinkClass}>
+              Jobs
+            </Link>
             <Link href={routes.blog} className={footerLinkClass}>
-              Blog
+              Newsroom
             </Link>
             <Link href={routes.leadership} className={footerLinkClass}>
               Team
@@ -42,18 +99,39 @@ export default function Footer() {
             <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
               Roadmap
             </Link>
-            <Link href={routes.careers} className={footerLinkClass}>
-              Careers
-            </Link>
             <a href={links.mailto.contact} className={footerLinkClass}>
-              Contact us
+              Contact sales
+            </a>
+          </div>
+
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Support</div>
+            <a href={links.mailto.contact} className={footerLinkClass}>
+              Get support
+            </a>
+            <a href={links.mailto.contact} className={footerLinkClass}>
+              Managed support plans
+            </a>
+            <a
+              href={links.status}
+              target="_blank"
+              rel="noreferrer"
+              className={footerLinkClass}
+            >
+              System status
             </a>
           </div>
 
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Resources</div>
             <Link href={routes.technicalDocs} className={footerLinkClass}>
-              Documentation
+              Licences
+            </Link>
+            <Link href={routes.technicalDocs} className={footerLinkClass}>
+              Prohibited and restricted businesses
+            </Link>
+            <Link href={routes.technicalDocs} className={footerLinkClass}>
+              Sitemap
             </Link>
             <Link href={routes.privacy} className={footerLinkClass}>
               Privacy
