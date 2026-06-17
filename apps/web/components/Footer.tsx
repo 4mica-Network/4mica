@@ -45,7 +45,7 @@ export default function Footer() {
             <Link href={routes.leadership} className={footerLinkClass}>
               Team
             </Link>
-            <Link href={routes.roadmap} className={footerLinkClass}>
+            <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
               Roadmap
             </Link>
             <Link href={routes.careers} className={footerLinkClass}>

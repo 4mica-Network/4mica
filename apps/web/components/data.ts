@@ -11,7 +11,7 @@ export const benefits = [
 export const companyLinks = [
   { href: routes.about, label: "4Mica Mission" },
   { href: routes.leadership, label: "Team" },
-  { href: routes.roadmap, label: "Roadmap" },
+  { href: `${routes.about}#roadmap`, label: "Roadmap" },
 ];
 
 export const primaryLinks = [
@@ -77,7 +77,7 @@ export const aboutCards = [
     title: "Roadmap",
     description:
       "Track delivery milestones for the credit layer and network rollout",
-    href: routes.roadmap,
+    href: `${routes.about}#roadmap`,
   },
 ];
 
