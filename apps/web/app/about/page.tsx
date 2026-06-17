@@ -3,6 +3,7 @@ import Header from "@components/Header";
 import Image from "next/image";
 import Link from "next/link";
 import { teamMembers } from "../team/data";
+import TimelineSection from "./_components/TimelineSection";
 import { companyInfo, highlights } from "./data";
 import ViewOpenRolesButton from "./ViewOpenRolesButton";
 
@@ -139,6 +140,9 @@ export default function AboutPage() {
               </div>
             </div>
           </div>
+
+          {/* Roadmap */}
+          <TimelineSection />
 
           {/* Founders */}
           {ceo && cto && (
