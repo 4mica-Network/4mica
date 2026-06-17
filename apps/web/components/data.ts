@@ -16,7 +16,7 @@ export const companyLinks = [
 
 export const primaryLinks = [
   { href: routes.technicalDocs, label: "Documents" },
-  { href: routes.resources, label: "Resources" },
+  { href: "/solution", label: "Solution" },
 ];
 
 export const githubUrl = links.social.githubCore;

@@ -208,23 +208,6 @@ try {
 }`}
         />
       </div>
-      <div className="space-y-3">
-        <h3 className="font-semibold text-ink-strong text-xl">
-          Register via the website
-        </h3>
-        <p className="text-ink-body text-md">
-          Prefer a guided UI? The{" "}
-          <a
-            href="/agents/register"
-            className="text-ink-strong underline hover:opacity-80"
-          >
-            Agent Registration page
-          </a>{" "}
-          lets you connect a wallet, choose a network, select an asset, and
-          complete the approve + deposit flow in a few clicks - no code
-          required.
-        </p>
-      </div>
     </div>
   );
 }
@@ -419,23 +402,6 @@ async def main():
 asyncio.run(main())`}
         />
       </div>
-      <div className="space-y-3">
-        <h3 className="font-semibold text-ink-strong text-xl">
-          Register via the website
-        </h3>
-        <p className="text-ink-body text-md">
-          Prefer a guided UI? The{" "}
-          <a
-            href="/agents/register"
-            className="text-ink-strong underline hover:opacity-80"
-          >
-            Agent Registration page
-          </a>{" "}
-          lets you connect a wallet, choose a network, select an asset, and
-          complete the approve + deposit flow in a few clicks - no code
-          required.
-        </p>
-      </div>
     </div>
   );
 }
@@ -541,23 +507,6 @@ for pos in positions {
     println!("asset: {}, collateral: {}", pos.asset, pos.collateral);
 }`}
         />
-      </div>
-      <div className="space-y-3">
-        <h3 className="font-semibold text-ink-strong text-xl">
-          Register via the website
-        </h3>
-        <p className="text-ink-body text-md">
-          Prefer a guided UI? The{" "}
-          <a
-            href="/agents/register"
-            className="text-ink-strong underline hover:opacity-80"
-          >
-            Agent Registration page
-          </a>{" "}
-          lets you connect a wallet, choose a network, select an asset, and
-          complete the approve + deposit flow in a few clicks - no code
-          required.
-        </p>
       </div>
     </div>
   );

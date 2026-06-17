@@ -1,4 +1,3 @@
-import Link from "next/link";
 import MermaidDiagram from "../_components/MermaidDiagram";
 
 const sequenceDiagram = `sequenceDiagram
@@ -60,16 +59,6 @@ export default function PaymentFlowSection() {
         <p className="text-ink-body leading-relaxed">
           This flow summarizes the internal protocol sequence for credit
           guarantees, from collateral to settlement and remuneration.
-        </p>
-        <p className="text-ink-body leading-relaxed">
-          If you want to see the interactive protocol design, click{" "}
-          <Link
-            href="/interactive-protocol"
-            className="text-brand-teal underline hover:text-brand-teal/80"
-          >
-            here
-          </Link>
-          .
         </p>
         <div className="rounded-md border border-white/10 bg-white/10 p-6">
           <ol className="list-inside list-decimal space-y-3 text-ink-body">

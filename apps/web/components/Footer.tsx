@@ -14,14 +14,8 @@ export default function Footer() {
         <div className="grid size-full grid-cols-1 gap-10 md:grid-cols-3">
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Product</div>
-            <Link href={routes.register} className={footerLinkClass}>
-              Register
-            </Link>
-            <Link href={routes.agentsRegister} className={footerLinkClass}>
-              Agent Registration
-            </Link>
-            <Link href={routes.technicalDocs} className={footerLinkClass}>
-              Documentation
+            <Link href="/solution" className={footerLinkClass}>
+              Solution
             </Link>
             <Link
               href={links.status}
@@ -58,14 +52,8 @@ export default function Footer() {
 
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Resources</div>
-            <Link href={routes.resources} className={footerLinkClass}>
-              Resources
-            </Link>
-            <Link href={routes.onePager} className={footerLinkClass}>
-              One pager
-            </Link>
-            <Link href={routes.interactiveProtocol} className={footerLinkClass}>
-              Interactive protocol
+            <Link href={routes.technicalDocs} className={footerLinkClass}>
+              Documentation
             </Link>
             <Link href={routes.privacy} className={footerLinkClass}>
               Privacy
