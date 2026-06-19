@@ -1,48 +1,13 @@
-"use client";
-
-import { links } from "@4mica/url";
-import Footer from "@/components/Footer";
-import Header from "@/components/Header";
+import LegalPage from "@components/legal/LegalPage";
+import { readToc } from "@components/legal/readToc";
+import Content from "./content.mdx";
 
 export default function TermsPage() {
-  return (
-    <div className="min-h-screen">
-      <Header />
-      <div className="min-h-screen pt-24 text-ink-body">
-        <div className="w-full">
-          <div className="glass-panel mx-auto max-w-3xl rounded-md p-8 sm:p-10">
-            <h1 className="font-semibold text-3xl text-ink-strong">
-              Terms of Service
-            </h1>
-            <p className="mt-3 text-ink-muted text-md">
-              Last updated: February 6, 2026
-            </p>
+  const toc = readToc("app/terms/content.mdx");
 
-            <div className="mt-6 space-y-4 text-md leading-relaxed">
-              <p>
-                By using 4Mica, you agree to these terms. If you do not agree,
-                do not use the service.
-              </p>
-              <p>
-                4Mica provides software and interfaces to interact with
-                blockchain networks. You are responsible for your wallet
-                security, transaction approvals, and compliance with applicable
-                laws.
-              </p>
-              <p>
-                The service is provided “as is” without warranties of any kind.
-                We are not liable for losses arising from blockchain
-                transactions or third-party services.
-              </p>
-              <p>
-                Questions? Contact us at{" "}
-                <span className="font-mono">{links.email.contact}</span>.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <Footer />
-    </div>
+  return (
+    <LegalPage title="Terms of Service" lastUpdated="June 2026" toc={toc}>
+      <Content />
+    </LegalPage>
   );
 }
