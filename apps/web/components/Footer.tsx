@@ -99,14 +99,6 @@ export default function Footer() {
             <a href={links.mailto.contact} className={footerLinkClass}>
               Managed support plans
             </a>
-            <a
-              href={links.status}
-              target="_blank"
-              rel="noreferrer"
-              className={footerLinkClass}
-            >
-              System status
-            </a>
           </div>
 
           <div className="flex flex-col gap-y-3">
