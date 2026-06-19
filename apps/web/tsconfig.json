@@ -19,7 +19,16 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@4mica/url": ["../../packages/url/src/index.ts"],
+      "@assets/*": ["./public/assets/*"],
+      "@components/*": ["./components/*"],
+      "@config/*": ["./config/*"],
+      "@context/*": ["./context/*"],
+      "@hooks/*": ["./hooks/*"],
+      "@lib/*": ["./lib/*"],
+      "@seo/*": ["./seo/*"],
+      "@services/*": ["./services/*"]
     },
     "types": ["vitest/globals"]
   },
@@ -30,5 +39,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "archived"]
 }

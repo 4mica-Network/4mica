@@ -1,3 +1,4 @@
+import { links } from "@4mica/url";
 import type { Chain } from "viem/chains";
 import { baseSepolia, sepolia } from "viem/chains";
 
@@ -44,7 +45,7 @@ export const REGISTRATION_CONFIG: {
       label: "Ethereum Sepolia",
       shortLabel: "Eth Sepolia",
       viemChain: sepolia,
-      explorerUrl: "https://sepolia.etherscan.io",
+      explorerUrl: links.explorer.ethereumSepolia,
       coreContractAddress:
         (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA as
           | `0x${string}`
@@ -78,8 +79,8 @@ export const REGISTRATION_CONFIG: {
         chainId: chainIdToHex(11155111),
         chainName: "Ethereum Sepolia",
         nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
-        rpcUrls: ["https://rpc.sepolia.org"],
-        blockExplorerUrls: ["https://sepolia.etherscan.io"],
+        rpcUrls: [links.rpc.ethereumSepolia],
+        blockExplorerUrls: [links.explorer.ethereumSepolia],
       },
     },
     baseSepolia: {
@@ -88,7 +89,7 @@ export const REGISTRATION_CONFIG: {
       label: "Base Sepolia",
       shortLabel: "Base Sepolia",
       viemChain: baseSepolia,
-      explorerUrl: "https://sepolia.basescan.org",
+      explorerUrl: links.explorer.baseSepolia,
       coreContractAddress:
         (process.env.NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA as
           | `0x${string}`
@@ -126,8 +127,8 @@ export const REGISTRATION_CONFIG: {
           symbol: "ETH",
           decimals: 18,
         },
-        rpcUrls: ["https://sepolia.base.org"],
-        blockExplorerUrls: ["https://sepolia.basescan.org"],
+        rpcUrls: [links.rpc.baseSepolia],
+        blockExplorerUrls: [links.explorer.baseSepolia],
       },
     },
   },

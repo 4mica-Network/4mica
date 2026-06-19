@@ -1,36 +1,10 @@
 "use client";
 
-const SECURITY_POINTS = [
-  {
-    icon: "ri-safe-line",
-    label: "Collateral stays in Aave",
-    desc: "Deposits go directly to Aave, not to 4Mica. Users can withdraw at any time. 4Mica never holds funds.",
-    color: "rgb(74 222 128)",
-  },
-  {
-    icon: "ri-fingerprint-line",
-    label: "BLS-signed guarantees",
-    desc: "Every payment is backed by an EIP-712 signed guarantee with domain separation. Cryptographic proof exists for every spend.",
-    color: "rgb(var(--brand))",
-  },
-  {
-    icon: "ri-shield-check-line",
-    label: "On-chain enforcement",
-    desc: "If a payer defaults, recipients claim collateral directly from the contract. No trusted intermediary. No custodian risk.",
-    color: "#c084fc",
-  },
-  {
-    icon: "ri-git-branch-line",
-    label: "AccessManaged + Pausable",
-    desc: "Role-based access control, emergency pause, and reentrancy guards on all critical contract flows.",
-    color: "rgb(var(--color-warning))",
-  },
-];
-
+import { SECURITY_POINTS } from "./data";
 export default function SecuritySection() {
   return (
     <section id="security" className="section-gloss py-24">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto max-w-4xl">
           <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.6fr] lg:gap-16">
             {/* Left */}
@@ -42,13 +16,13 @@ export default function SecuritySection() {
                 contracts, not by 4Mica.
               </p>
               <div
-                className="glass-panel mt-6 rounded-xl px-5 py-4"
+                className="glass-panel mt-6 rounded-md px-5 py-4"
                 style={{ borderColor: "rgb(74 222 128 / 0.28)" }}
               >
-                <p className="font-semibold text-ink-strong text-sm">
+                <p className="font-semibold text-ink-strong text-md">
                   Non-custodial by design
                 </p>
-                <p className="mt-1.5 text-ink-muted text-xs leading-relaxed">
+                <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
                   Your collateral is in Aave. Your guarantees are on-chain.
                   4Mica is the coordination layer. It cannot move your funds.
                 </p>
@@ -60,23 +34,23 @@ export default function SecuritySection() {
               {SECURITY_POINTS.map((pt) => (
                 <div
                   key={pt.label}
-                  className="glass-panel flex items-start gap-4 rounded-xl px-5 py-4"
+                  className="glass-panel flex items-start gap-4 rounded-md px-5 py-4"
                   style={{ borderColor: `${pt.color}32` }}
                 >
                   <div
-                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
                     style={{ background: `${pt.color}22` }}
                   >
                     <i
-                      className={`${pt.icon} text-sm`}
+                      className={`${pt.icon} text-md`}
                       style={{ color: pt.color }}
                     />
                   </div>
                   <div>
-                    <p className="font-semibold text-ink-strong text-sm">
+                    <p className="font-semibold text-ink-strong text-md">
                       {pt.label}
                     </p>
-                    <p className="mt-1 text-ink-muted text-xs leading-relaxed">
+                    <p className="mt-1 text-ink-muted text-md leading-relaxed">
                       {pt.desc}
                     </p>
                   </div>
