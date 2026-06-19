@@ -1,6 +1,6 @@
 "use client";
 
-import { links, routes } from "@4mica/url";
+import { links } from "@4mica/url";
 import Link from "next/link";
 import { STATS } from "../data";
 
@@ -36,7 +36,7 @@ export default function FinalCtaSection() {
           {/* Divider between stats */}
           <div className="mt-10 flex flex-col justify-center gap-3 border-white/10 border-t pt-10 sm:flex-row">
             <Link
-              href={routes.technicalDocs}
+              href="/pricing"
               className="btn btn-lg rounded-full bg-white text-center font-semibold text-black shadow-lg transition-colors hover:bg-white/90"
             >
               Start Building

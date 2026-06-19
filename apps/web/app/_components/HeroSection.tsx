@@ -1,6 +1,6 @@
 "use client";
 
-import { links, routes } from "@4mica/url";
+import { links } from "@4mica/url";
 
 export default function HeroSection() {
   return (
@@ -24,7 +24,7 @@ export default function HeroSection() {
             {/* CTAs */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                href={routes.technicalDocs}
+                href="/pricing"
                 className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
               >
                 <span>Start building</span>

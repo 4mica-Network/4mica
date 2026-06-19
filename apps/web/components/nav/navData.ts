@@ -1,4 +1,4 @@
-import { links, routes } from "@4mica/url";
+import { links } from "@4mica/url";
 import { solutions } from "../../app/solutions/data";
 
 export type NavLinkItem = {
@@ -44,19 +44,6 @@ export const NAV_ITEMS: NavItem[] = [
       {
         items: [
           {
-            title: "Documentation",
-            href: links.docs,
-            description: "Guides and reference",
-            icon: "ri-book-2-line",
-            external: true,
-          },
-          {
-            title: "API reference",
-            href: routes.technicalDocs,
-            description: "Endpoints and schemes",
-            icon: "ri-code-s-slash-line",
-          },
-          {
             title: "API status",
             href: links.status,
             description: "Live uptime",
@@ -77,14 +64,12 @@ export const NAV_ITEMS: NavItem[] = [
             icon: "ri-terminal-box-line",
             external: true,
           },
-          {
-            title: "Developer blog",
-            href: routes.blog,
-            description: "Engineering notes",
-            icon: "ri-article-line",
-          },
         ],
       },
     ],
+  },
+  {
+    label: "Pricing",
+    href: "/pricing",
   },
 ];

@@ -22,10 +22,7 @@ export default function CommunitySection() {
               >
                 Join Community
               </Link>
-              <Link
-                href="/resources/technical-docs"
-                className="btn btn-soft btn-md text-center"
-              >
+              <Link href="/pricing" className="btn btn-soft btn-md text-center">
                 Start Building
               </Link>
             </div>

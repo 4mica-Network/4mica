@@ -103,7 +103,7 @@ export function llms(): LlmsConfig {
     version: "1.0",
     contact: links.mailto.contact,
     policy: POLICY_URLS,
-    references: links.docs,
+    references: links.social.githubCore,
     rules: PRODUCTION_RULES,
   };
 }
