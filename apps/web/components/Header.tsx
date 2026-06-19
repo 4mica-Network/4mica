@@ -4,6 +4,8 @@ import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import DesktopNav from "./nav/DesktopNav";
+import MobileNav from "./nav/MobileNav";
 
 export default function Header() {
   const [isLogoCompact, setIsLogoCompact] = useState(false);
@@ -74,7 +76,7 @@ export default function Header() {
           </span>
         </Link>
 
-        <div className="hidden md:block" />
+        <DesktopNav />
 
         <div className="flex items-center gap-3">
           <a
@@ -123,30 +125,29 @@ export default function Header() {
 
       <div
         id="mobile-menu"
-        className={`absolute top-20 right-0 left-0 bg-black px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
+        className={`absolute top-20 right-0 left-0 max-h-[calc(100vh-5rem)] overflow-y-auto bg-black px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
           isMobileMenuOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
         }`}
       >
-        <div className="mx-auto max-w-300 rounded-b-md pt-6">
-          <div className="section-kicker">Contact</div>
-          <div className="mt-3 space-y-2">
+        <div className="mx-auto max-w-300 rounded-b-md pt-4">
+          <MobileNav onNavigate={() => setIsMobileMenuOpen(false)} />
+
+          <div className="mt-6 grid gap-3">
             <a
               href={links.mailto.contact}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="block py-1 text-ink text-md transition-colors hover:text-brand-strong"
+              className="h-9 rounded-md border border-white/15 bg-black px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong"
             >
-              Contact Us
+              Talk to sales
             </a>
-          </div>
-          <div className="mt-6 grid gap-3">
             <Link
               href={routes.technicalDocs}
               onClick={() => setIsMobileMenuOpen(false)}
               className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
             >
-              Start Building
+              Try for free
             </Link>
           </div>
         </div>

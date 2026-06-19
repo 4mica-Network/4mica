@@ -2,6 +2,7 @@
 
 import { links, routes } from "@4mica/url";
 import Link from "next/link";
+import { solutions } from "../app/solutions/data";
 
 const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
 
@@ -19,17 +20,6 @@ function ExternalFooterLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-// Audience/use-case segments served by 4Mica's credit-backed payment rails.
-const SOLUTIONS = [
-  "Agentic commerce",
-  "AI companies",
-  "Cryptocurrency",
-  "Marketplaces",
-  "Platforms",
-  "Enterprises",
-  "Startups",
-];
-
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -39,9 +29,13 @@ export default function Footer() {
         <div className="grid size-full grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Solutions</div>
-            {SOLUTIONS.map((solution) => (
-              <Link key={solution} href="/solution" className={footerLinkClass}>
-                {solution}
+            {solutions.map((solution) => (
+              <Link
+                key={solution.slug}
+                href={`/solutions/${solution.slug}`}
+                className={footerLinkClass}
+              >
+                {solution.label}
               </Link>
             ))}
           </div>
