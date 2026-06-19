@@ -20,4 +20,16 @@ export const teamMembers = [
     imagePosition: "50% 15%",
     country: "Belgium",
   },
+  {
+    name: "Mohammad Ghanbari",
+    role: "Founding Engineer - Core",
+    image: "/assets/mohammad.png",
+    imagePosition: "50% 20%",
+  },
+  {
+    name: "Mo Shafiei",
+    role: "Founding Engineer - Integrations",
+    image: "/assets/mo.jpeg",
+    imagePosition: "50% 20%",
+  },
 ];
