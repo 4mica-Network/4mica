@@ -1,48 +1,13 @@
-"use client";
-
-import { links } from "@4mica/url";
-import Footer from "@/components/Footer";
-import Header from "@/components/Header";
+import LegalPage from "@components/legal/LegalPage";
+import { readToc } from "@components/legal/readToc";
+import Content from "./content.mdx";
 
 export default function PrivacyPage() {
-  return (
-    <div className="min-h-screen">
-      <Header />
-      <div className="min-h-screen pt-24 text-ink-body">
-        <div className="w-full">
-          <div className="glass-panel mx-auto max-w-3xl rounded-md p-8 sm:p-10">
-            <h1 className="font-semibold text-3xl text-ink-strong">
-              Privacy Policy
-            </h1>
-            <p className="mt-3 text-ink-muted text-md">
-              Last updated: February 6, 2026
-            </p>
+  const toc = readToc("app/privacy/content.mdx");
 
-            <div className="mt-6 space-y-4 text-md leading-relaxed">
-              <p>
-                4Mica respects your privacy. This page explains what information
-                we collect and how we use it.
-              </p>
-              <p>
-                We collect minimal usage data to operate the site and improve
-                reliability. If you connect a wallet, we may process your public
-                wallet address and on-chain activity to provide the requested
-                service.
-              </p>
-              <p>
-                We do not sell your personal data. We share data only with
-                service providers needed to run the site and with blockchain
-                networks as required to process transactions.
-              </p>
-              <p>
-                If you have questions, contact us at{" "}
-                <span className="font-mono">{links.email.contact}</span>.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <Footer />
-    </div>
+  return (
+    <LegalPage title="Privacy Policy" lastUpdated="June 2026" toc={toc}>
+      <Content />
+    </LegalPage>
   );
 }

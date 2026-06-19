@@ -106,7 +106,10 @@ export default function Footer() {
             <Link href={routes.terms} className={footerLinkClass}>
               Licences
             </Link>
-            <Link href={routes.terms} className={footerLinkClass}>
+            <Link
+              href="/legal/restricted-businesses"
+              className={footerLinkClass}
+            >
               Prohibited and restricted businesses
             </Link>
             <Link href="/sitemap.xml" className={footerLinkClass}>
@@ -117,6 +120,9 @@ export default function Footer() {
             </Link>
             <Link href={routes.terms} className={footerLinkClass}>
               Terms
+            </Link>
+            <Link href="/dpa" className={footerLinkClass}>
+              DPA
             </Link>
           </div>
         </div>
