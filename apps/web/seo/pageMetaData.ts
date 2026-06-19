@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import { ABOUT_META_DATA } from "./about";
-import { BLOG_META_DATA } from "./blog";
 import { CAREERS_META_DATA } from "./careers";
-import { GETTING_PAID_BY_4MICA_META_DATA } from "./gettingPaidBy4Mica";
 import { HOME_META_DATA } from "./home";
-import { HOW_4MICA_WORKS_META_DATA } from "./how4MicaWorks";
 import { LEADERSHIP_META_DATA } from "./leadership";
-import { PAYING_WITH_4MICA_META_DATA } from "./payingWith4Mica";
 import { PRIVACY_META_DATA } from "./privacy";
 import { SOLUTION_META_DATA } from "./solution";
-import { TECHNICAL_DOCS_META_DATA } from "./technicalDocs";
 import { TERMS_META_DATA } from "./terms";
 
 export const KNOWN_PAGE_PATHS = [
@@ -18,12 +13,6 @@ export const KNOWN_PAGE_PATHS = [
   "/careers",
   "/leadership",
   "/privacy",
-  "/resources/blog",
-  "/resources/blog/1",
-  "/resources/blog/getting-paid-by-4mica",
-  "/resources/blog/how-4mica-works",
-  "/resources/blog/paying-with-4mica",
-  "/resources/technical-docs",
   "/solution",
   "/terms",
 ] as const;
@@ -36,12 +25,6 @@ const PAGE_METADATA_MAP: Record<PagePath, Metadata> = {
   "/careers": CAREERS_META_DATA,
   "/leadership": LEADERSHIP_META_DATA,
   "/privacy": PRIVACY_META_DATA,
-  "/resources/blog": BLOG_META_DATA,
-  "/resources/blog/1": GETTING_PAID_BY_4MICA_META_DATA,
-  "/resources/blog/getting-paid-by-4mica": GETTING_PAID_BY_4MICA_META_DATA,
-  "/resources/blog/how-4mica-works": HOW_4MICA_WORKS_META_DATA,
-  "/resources/blog/paying-with-4mica": PAYING_WITH_4MICA_META_DATA,
-  "/resources/technical-docs": TECHNICAL_DOCS_META_DATA,
   "/solution": SOLUTION_META_DATA,
   "/terms": TERMS_META_DATA,
 };

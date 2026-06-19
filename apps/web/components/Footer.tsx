@@ -45,6 +45,9 @@ export default function Footer() {
             <Link href="/solution" className={footerLinkClass}>
               Solution
             </Link>
+            <Link href="/pricing" className={footerLinkClass}>
+              Pricing
+            </Link>
             <Link
               href={links.status}
               className="group flex items-center text-ink-body transition-colors hover:text-ink-strong"
@@ -58,10 +61,6 @@ export default function Footer() {
 
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Developers</div>
-            <ExternalFooterLink href={links.docs} label="Documentation" />
-            <Link href={routes.technicalDocs} className={footerLinkClass}>
-              API reference
-            </Link>
             <ExternalFooterLink href={links.status} label="API status" />
             <ExternalFooterLink
               href={links.social.githubCore}
@@ -71,9 +70,6 @@ export default function Footer() {
               href={links.social.github}
               label="Libraries and SDKs"
             />
-            <Link href={routes.blog} className={footerLinkClass}>
-              Developer blog
-            </Link>
           </div>
 
           <div className="flex flex-col gap-y-3">
@@ -83,9 +79,6 @@ export default function Footer() {
             </Link>
             <Link href={routes.careers} className={footerLinkClass}>
               Jobs
-            </Link>
-            <Link href={routes.blog} className={footerLinkClass}>
-              Newsroom
             </Link>
             <Link href={routes.leadership} className={footerLinkClass}>
               Team
@@ -118,13 +111,13 @@ export default function Footer() {
 
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Resources</div>
-            <Link href={routes.technicalDocs} className={footerLinkClass}>
+            <Link href={routes.terms} className={footerLinkClass}>
               Licences
             </Link>
-            <Link href={routes.technicalDocs} className={footerLinkClass}>
+            <Link href={routes.terms} className={footerLinkClass}>
               Prohibited and restricted businesses
             </Link>
-            <Link href={routes.technicalDocs} className={footerLinkClass}>
+            <Link href="/sitemap.xml" className={footerLinkClass}>
               Sitemap
             </Link>
             <Link href={routes.privacy} className={footerLinkClass}>

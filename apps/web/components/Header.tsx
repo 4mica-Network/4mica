@@ -87,7 +87,7 @@ export default function Header() {
           </a>
 
           <Link
-            href={routes.technicalDocs}
+            href="/pricing"
             className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
           >
             Try for free
@@ -143,7 +143,7 @@ export default function Header() {
               Talk to sales
             </a>
             <Link
-              href={routes.technicalDocs}
+              href="/pricing"
               onClick={() => setIsMobileMenuOpen(false)}
               className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
             >

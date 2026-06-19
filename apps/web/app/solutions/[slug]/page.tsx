@@ -1,4 +1,4 @@
-import { links, routes } from "@4mica/url";
+import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import { createPageMetadata } from "@seo/shared";
@@ -116,7 +116,7 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
             </h2>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                href={routes.technicalDocs}
+                href="/pricing"
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-white px-5 py-2.5 font-semibold text-black text-md transition-colors hover:bg-white/90"
               >
                 Start building

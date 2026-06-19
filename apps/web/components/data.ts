@@ -15,7 +15,7 @@ export const companyLinks = [
 ];
 
 export const primaryLinks = [
-  { href: routes.technicalDocs, label: "Documents" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/solution", label: "Solution" },
 ];
 

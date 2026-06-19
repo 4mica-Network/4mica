@@ -1,6 +1,6 @@
 "use client";
 
-import { links, routes } from "@4mica/url";
+import { links } from "@4mica/url";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -201,10 +201,10 @@ export default function PartnersSection() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <motion.div className="flex" initial="rest" whileHover="hover">
                   <Link
-                    href={routes.technicalDocs}
+                    href="/pricing"
                     className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-200 hover:bg-white"
                   >
-                    View developer docs
+                    Get started
                     <motion.span
                       aria-hidden="true"
                       className="inline-flex"
