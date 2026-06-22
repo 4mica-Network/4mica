@@ -1,0 +1,154 @@
+---
+title: "Issue a guarantee"
+description: "Submit a signed V1 or V2 payment request for BLS certification."
+---
+
+`POST /core/guarantees`
+
+This endpoint verifies the payer signature, request identity, accepted version,
+policy, and collateral. V1 guarantees become payable after issuance. V2
+guarantees begin in `PENDING_VALIDATION`.
+
+## Authorization
+
+<ParamField path="Authorization" type="string" required post={["header"]}>
+  Bearer token with guarantee issuance authority.
+</ParamField>
+
+## Request body
+
+<ParamField path="claims" type="object" required />
+<ParamField path="claims.version" type="number" required post={["1|2"]} />
+<ParamField path="claims.user_address" type="string" required />
+<ParamField path="claims.recipient_address" type="string" required />
+<ParamField path="claims.req_id" type="string" required>
+  Unique request identifier selected before signing.
+</ParamField>
+<ParamField path="claims.amount" type="string" required>
+  Amount in token base units.
+</ParamField>
+<ParamField path="claims.asset_address" type="string" required>
+  ERC-20 address, or the zero address for ETH.
+</ParamField>
+<ParamField path="claims.timestamp" type="number" required />
+<ParamField path="claims.validation_policy" type="object" nullable>
+  Required for V2 guarantees.
+</ParamField>
+<ParamField path="signature" type="string" required />
+<ParamField path="scheme" type="string" required post={["eip712|eip191"]} />
+
+## Responses
+
+<ResponseField name="claims" type="string" required>
+  Hex-encoded BLS certificate claims.
+</ResponseField>
+<ResponseField name="signature" type="string" required>
+  Hex-encoded BLS signature.
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://base.sepolia.api.4mica.xyz/core/guarantees" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "claims": {
+      "version": 1,
+      "user_address": "0x1111111111111111111111111111111111111111",
+      "recipient_address": "0x2222222222222222222222222222222222222222",
+      "req_id": "0x1",
+      "amount": "0x186a0",
+      "asset_address": "0x3333333333333333333333333333333333333333",
+      "timestamp": 1782122400
+    },
+    "signature": "0xUserSignature",
+    "scheme": "eip712"
+  }'
+```
+```javascript title="Fetch"
+const response = await fetch(
+  "https://base.sepolia.api.4mica.xyz/core/guarantees",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ claims, signature, scheme: "eip712" }),
+  },
+);
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.post(
+  "https://base.sepolia.api.4mica.xyz/core/guarantees",
+  { claims, signature, scheme: "eip712" },
+  { headers: { Authorization: `Bearer ${process.env.ACCESS_TOKEN}` } },
+);
+console.log(data);
+```
+```python Python
+import os
+import requests
+body = {"claims": claims, "signature": signature, "scheme": "eip712"}
+headers = {"Authorization": f"Bearer {os.environ['ACCESS_TOKEN']}"}
+url = "https://base.sepolia.api.4mica.xyz/core/guarantees"
+print(requests.post(url, json=body, headers=headers).json())
+```
+```go Go
+package main
+import ("bytes"; "encoding/json"; "fmt"; "io"; "net/http"; "os")
+func main() {
+  body, _ := json.Marshal(map[string]any{
+    "claims": claims, "signature": signature, "scheme": "eip712",
+  })
+  request, _ := http.NewRequest(
+    "POST",
+    "https://base.sepolia.api.4mica.xyz/core/guarantees",
+    bytes.NewReader(body),
+  )
+  request.Header.Set("Authorization", "Bearer "+os.Getenv("ACCESS_TOKEN"))
+  request.Header.Set("Content-Type", "application/json")
+  response, _ := http.DefaultClient.Do(request)
+  defer response.Body.Close()
+  result, _ := io.ReadAll(response.Body)
+  fmt.Println(string(result))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "claims": "0xEncodedCertificateClaims",
+  "signature": "0xBlsSignature"
+}
+```
+```json 400 Bad Request
+{ "error": "Invalid signed guarantee request" }
+```
+```json 401 Unauthorized
+{ "error": "Missing or invalid access token" }
+```
+```json 403 Forbidden
+{ "error": "Token is not authorized to issue this guarantee" }
+```
+```json 409 Conflict
+{ "error": "Guarantee identity has already been used" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | Guarantee accepted and BLS certificate issued. |
+| `400` | Claims, policy, signature, or collateral checks failed. |
+| `401` | The bearer token is missing or invalid. |
+| `403` | The token lacks issuance authority. |
+| `409` | The signed guarantee identity already exists. |
+| `500` | Core could not issue the guarantee. |
+
+See [transaction lifecycle](/core-concepts/transaction-lifecycle) for V1 and V2
+states and signed fields.

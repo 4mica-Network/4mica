@@ -1,0 +1,93 @@
+---
+title: "Create SIWE nonce"
+description: "Create a nonce and SIWE message template for wallet authentication."
+---
+
+`POST /auth/nonce`
+
+## Request body
+
+<ParamField path="address" type="string" required>
+  EVM wallet address that will sign the SIWE message.
+</ParamField>
+
+## Responses
+
+<ResponseField name="nonce" type="string" required />
+<ResponseField name="siwe" type="object" required />
+<ResponseField name="siwe.domain" type="string" required />
+<ResponseField name="siwe.uri" type="string" required />
+<ResponseField name="siwe.chain_id" type="number" required />
+<ResponseField name="siwe.statement" type="string" required />
+<ResponseField name="siwe.expiration" type="string" required />
+<ResponseField name="siwe.issued_at" type="string" required />
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://base.sepolia.api.4mica.xyz/auth/nonce" \
+  -H "Content-Type: application/json" \
+  -d '{"address":"0x1111111111111111111111111111111111111111"}'
+```
+```javascript title="Fetch"
+const response = await fetch("https://base.sepolia.api.4mica.xyz/auth/nonce", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ address: "0x1111111111111111111111111111111111111111" }),
+});
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.post(
+  "https://base.sepolia.api.4mica.xyz/auth/nonce",
+  { address: "0x1111111111111111111111111111111111111111" },
+);
+console.log(data);
+```
+```python Python
+import requests
+url = "https://base.sepolia.api.4mica.xyz/auth/nonce"
+print(requests.post(url, json={"address": "0x1111111111111111111111111111111111111111"}).json())
+```
+```go Go
+package main
+import ("bytes"; "fmt"; "io"; "net/http")
+func main() {
+  body := []byte(`{"address":"0x1111111111111111111111111111111111111111"}`)
+  response, _ := http.Post("https://base.sepolia.api.4mica.xyz/auth/nonce", "application/json", bytes.NewReader(body))
+  defer response.Body.Close()
+  result, _ := io.ReadAll(response.Body)
+  fmt.Println(string(result))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "nonce": "9c1c0c7e",
+  "siwe": {
+    "domain": "4mica.io",
+    "uri": "https://4mica.io",
+    "chain_id": 84532,
+    "statement": "Sign in to 4Mica",
+    "expiration": "2026-06-22T11:00:00Z",
+    "issued_at": "2026-06-22T10:00:00Z"
+  }
+}
+```
+```json 400 Bad Request
+{ "error": "Invalid wallet address" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | Nonce and SIWE template created. |
+| `400` | The wallet address is missing or invalid. |
+| `500` | The operator could not create the nonce. |
+
+Sign the generated SIWE message, then call
+[`POST /auth/verify`](/api-reference/operator/verify-siwe).

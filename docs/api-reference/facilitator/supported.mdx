@@ -1,0 +1,74 @@
+---
+title: "List supported payment kinds"
+description: "List schemes, networks, and x402 versions accepted by the facilitator."
+---
+
+`GET /supported`
+
+Check this endpoint before advertising a payment option or enabling a network.
+
+## Responses
+
+<ResponseField name="kinds" type="array" required />
+<ResponseField name="kinds[].scheme" type="string" required />
+<ResponseField name="kinds[].network" type="string" required />
+<ResponseField name="kinds[].x402Version" type="number" />
+<ResponseField name="kinds[].extra" type="object" nullable />
+<ResponseField name="extensions" type="array" required />
+<ResponseField name="signers" type="object" required />
+
+<RequestExample>
+```bash cURL
+curl "https://x402.4mica.xyz/supported"
+```
+```javascript title="Fetch"
+const response = await fetch("https://x402.4mica.xyz/supported");
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.get("https://x402.4mica.xyz/supported");
+console.log(data);
+```
+```python Python
+import requests
+print(requests.get("https://x402.4mica.xyz/supported").json())
+```
+```go Go
+package main
+import ("fmt"; "io"; "net/http")
+func main() {
+  response, _ := http.Get("https://x402.4mica.xyz/supported")
+  defer response.Body.Close()
+  body, _ := io.ReadAll(response.Body)
+  fmt.Println(string(body))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "kinds": [
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:8453", "x402Version": 2 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 1 },
+    { "scheme": "4mica-credit", "network": "eip155:84532", "x402Version": 2 }
+  ],
+  "extensions": [],
+  "signers": {}
+}
+```
+```json 500 Internal Server Error
+{ "error": "Unable to load supported payment kinds" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | Supported payment kinds were returned. |
+| `500` | The facilitator could not load its capabilities. |
+
+Network values use [CAIP-2 identifiers](/getting-started/supported-networks).

@@ -1,0 +1,59 @@
+---
+title: "Health check"
+description: "Check whether the 4Mica facilitator is available."
+---
+
+`GET /health`
+
+Use this endpoint for liveness probes and basic service monitoring.
+
+## Responses
+
+<ResponseField name="status" type="string" required>
+  Returns `ok` when the facilitator is available.
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl "https://x402.4mica.xyz/health"
+```
+```javascript title="Fetch"
+const response = await fetch("https://x402.4mica.xyz/health");
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.get("https://x402.4mica.xyz/health");
+console.log(data);
+```
+```python Python
+import requests
+print(requests.get("https://x402.4mica.xyz/health").json())
+```
+```go Go
+package main
+import ("fmt"; "io"; "net/http")
+func main() {
+  response, _ := http.Get("https://x402.4mica.xyz/health")
+  defer response.Body.Close()
+  body, _ := io.ReadAll(response.Body)
+  fmt.Println(string(body))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{ "status": "ok" }
+```
+```json 503 Service Unavailable
+{ "error": "Facilitator is unavailable" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | The facilitator is available. |
+| `503` | The facilitator or a required dependency is unavailable. |

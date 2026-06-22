@@ -1,0 +1,57 @@
+---
+title: "Core health"
+description: "Check the operator database and chain RPC dependencies."
+---
+
+`GET /core/health`
+
+## Responses
+
+<ResponseField name="status" type="string" required post={["ok|fail"]} />
+<ResponseField name="db" type="string" required post={["ok|fail"]} />
+<ResponseField name="chain_rpc" type="string" required post={["ok|fail"]} />
+
+<RequestExample>
+```bash cURL
+curl "https://base.sepolia.api.4mica.xyz/core/health"
+```
+```javascript title="Fetch"
+const response = await fetch("https://base.sepolia.api.4mica.xyz/core/health");
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.get("https://base.sepolia.api.4mica.xyz/core/health");
+console.log(data);
+```
+```python Python
+import requests
+print(requests.get("https://base.sepolia.api.4mica.xyz/core/health").json())
+```
+```go Go
+package main
+import ("fmt"; "io"; "net/http")
+func main() {
+  response, _ := http.Get("https://base.sepolia.api.4mica.xyz/core/health")
+  defer response.Body.Close()
+  body, _ := io.ReadAll(response.Body)
+  fmt.Println(string(body))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{ "status": "ok", "db": "ok", "chain_rpc": "ok" }
+```
+```json 503 Service Unavailable
+{ "status": "fail", "db": "ok", "chain_rpc": "fail" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | Core and required dependencies are healthy. |
+| `503` | One or more required dependencies are unavailable. |
