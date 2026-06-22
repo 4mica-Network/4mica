@@ -1,0 +1,93 @@
+---
+title: "Verify SIWE signature"
+description: "Verify a signed SIWE message and issue access and refresh tokens."
+---
+
+`POST /auth/verify`
+
+## Request body
+
+<ParamField path="address" type="string" required />
+<ParamField path="message" type="string" required>
+  Complete SIWE message created from the nonce response.
+</ParamField>
+<ParamField path="signature" type="string" required>
+  Hex-encoded wallet signature.
+</ParamField>
+
+## Responses
+
+<ResponseField name="access_token" type="string" required />
+<ResponseField name="refresh_token" type="string" required />
+<ResponseField name="expires_in" type="number" required>
+  Access token lifetime in seconds.
+</ResponseField>
+
+<RequestExample dropdown>
+```bash cURL
+curl -X POST "https://base.sepolia.api.4mica.xyz/auth/verify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address":"0x1111111111111111111111111111111111111111",
+    "message":"4mica.io wants you to sign in...",
+    "signature":"0xWalletSignature"
+  }'
+```
+```javascript title="Fetch"
+const body = { address, message, signature };
+const response = await fetch("https://base.sepolia.api.4mica.xyz/auth/verify", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const { data } = await axios.post(
+  "https://base.sepolia.api.4mica.xyz/auth/verify",
+  { address, message, signature },
+);
+console.log(data);
+```
+```python Python
+import requests
+body = {"address": address, "message": message, "signature": signature}
+print(requests.post("https://base.sepolia.api.4mica.xyz/auth/verify", json=body).json())
+```
+```go Go
+package main
+import ("bytes"; "encoding/json"; "fmt"; "io"; "net/http")
+func main() {
+  body, _ := json.Marshal(map[string]string{
+    "address": address, "message": message, "signature": signature,
+  })
+  response, _ := http.Post("https://base.sepolia.api.4mica.xyz/auth/verify", "application/json", bytes.NewReader(body))
+  defer response.Body.Close()
+  result, _ := io.ReadAll(response.Body)
+  fmt.Println(string(result))
+}
+```
+</RequestExample>
+
+<ResponseExample dropdown>
+```json 200 OK
+{
+  "access_token": "eyJhbGciOi...",
+  "refresh_token": "rfr_...",
+  "expires_in": 3600
+}
+```
+```json 401 Unauthorized
+{ "error": "Invalid or expired SIWE signature" }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | Signature verified and tokens issued. |
+| `400` | The request is malformed. |
+| `401` | The nonce, message, or signature is invalid or expired. |
+| `500` | Authentication could not be completed. |

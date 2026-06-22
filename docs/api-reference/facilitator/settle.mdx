@@ -1,0 +1,139 @@
+---
+title: "Settle a payment"
+description: "Submit a signed payment guarantee and receive a BLS certificate."
+---
+
+`POST /settle`
+
+The facilitator revalidates the payment, submits the guarantee to 4Mica Core,
+and returns settlement evidence. V2 issuance includes the signed validation
+policy but does not itself prove the job outcome.
+
+## Request body
+
+<ParamField path="x402Version" type="number" post={["1|2"]} />
+<ParamField path="paymentPayload" type="object" required>
+  The decoded payment payload accepted by `/verify`.
+</ParamField>
+<ParamField path="paymentRequirements" type="object" required>
+  The original requirements advertised to the buyer.
+</ParamField>
+<ParamField path="paymentRequirements.extra" type="object" nullable>
+  V2 validation policy fields are supplied here.
+</ParamField>
+
+## Responses
+
+<ResponseField name="success" type="boolean" required />
+<ResponseField name="error" type="string" nullable />
+<ResponseField name="txHash" type="string" nullable />
+<ResponseField name="networkId" type="string" nullable />
+<ResponseField name="certificate" type="object" nullable />
+<ResponseField name="certificate.claims" type="string" />
+<ResponseField name="certificate.signature" type="string" />
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://x402.4mica.xyz/settle" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "x402Version": 1,
+    "paymentPayload": {
+      "x402Version": 1,
+      "scheme": "4mica-credit",
+      "network": "eip155:84532",
+      "payload": {
+        "claims": {
+          "user_address": "0x1111111111111111111111111111111111111111",
+          "recipient_address": "0x2222222222222222222222222222222222222222",
+          "req_id": "0x1",
+          "amount": "0x186a0",
+          "asset_address": "0x3333333333333333333333333333333333333333",
+          "timestamp": 1782122400,
+          "version": 1
+        },
+        "signature": "0xSignedPayment",
+        "scheme": "eip712"
+      }
+    },
+    "paymentRequirements": {
+      "scheme": "4mica-credit",
+      "network": "eip155:84532",
+      "maxAmountRequired": "100000",
+      "payTo": "0x2222222222222222222222222222222222222222",
+      "asset": "0x3333333333333333333333333333333333333333"
+    }
+  }'
+```
+```javascript title="Fetch"
+const body = { x402Version: 1, paymentPayload, paymentRequirements };
+const response = await fetch("https://x402.4mica.xyz/settle", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+console.log(await response.json());
+```
+```javascript title="Axios"
+import axios from "axios";
+const body = { x402Version: 1, paymentPayload, paymentRequirements };
+const { data } = await axios.post("https://x402.4mica.xyz/settle", body);
+console.log(data);
+```
+```python Python
+import requests
+body = {
+    "x402Version": 1,
+    "paymentPayload": payment_payload,
+    "paymentRequirements": payment_requirements,
+}
+print(requests.post("https://x402.4mica.xyz/settle", json=body).json())
+```
+```go Go
+package main
+import ("bytes"; "encoding/json"; "fmt"; "io"; "net/http")
+func main() {
+  body, _ := json.Marshal(map[string]any{
+    "x402Version": 1,
+    "paymentPayload": paymentPayload,
+    "paymentRequirements": paymentRequirements,
+  })
+  response, _ := http.Post("https://x402.4mica.xyz/settle", "application/json", bytes.NewReader(body))
+  defer response.Body.Close()
+  result, _ := io.ReadAll(response.Body)
+  fmt.Println(string(result))
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "success": true,
+  "error": null,
+  "txHash": null,
+  "networkId": "eip155:84532",
+  "certificate": {
+    "claims": "0xEncodedCertificateClaims",
+    "signature": "0xBlsSignature"
+  }
+}
+```
+```json 400 Bad Request
+{ "success": false, "error": "Invalid payment payload", "certificate": null }
+```
+```json 500 Internal Server Error
+{ "success": false, "error": "Unable to issue payment guarantee", "certificate": null }
+```
+</ResponseExample>
+
+## Status codes
+
+| Code | Description |
+| --- | --- |
+| `200` | The payment was accepted and settlement evidence was returned. |
+| `400` | The payload and requirements are malformed or inconsistent. |
+| `500` | The facilitator or Core could not issue the guarantee. |
+
+Persist the certificate with the request and delivery record. See
+[transaction lifecycle](/core-concepts/transaction-lifecycle).

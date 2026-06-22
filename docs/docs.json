@@ -135,8 +135,26 @@
       {
         "group": "API Reference",
         "pages": [
-          "api-reference/facilitator-api",
-          "api-reference/operator-api",
+          {
+            "group": "Facilitator",
+            "pages": [
+              "api-reference/facilitator/health",
+              "api-reference/facilitator/supported",
+              "api-reference/facilitator/verify",
+              "api-reference/facilitator/settle"
+            ]
+          },
+          {
+            "group": "Operator",
+            "pages": [
+              "api-reference/operator/create-nonce",
+              "api-reference/operator/verify-siwe",
+              "api-reference/operator/health",
+              "api-reference/operator/public-params",
+              "api-reference/operator/tokens",
+              "api-reference/operator/issue-guarantee"
+            ]
+          },
           "api-reference/payment-flow"
         ]
       },
