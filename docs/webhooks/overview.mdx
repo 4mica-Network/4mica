@@ -3,20 +3,159 @@ title: "Overview"
 description: "Understand 4Mica webhook capabilities."
 ---
 
-# Overview
+Webhooks notify your application when collateral, payment, or withdrawal state
+changes after the original request has finished.
 
-Webhooks should notify your systems when payment and collateral state changes need product action. They are most useful for dashboards, entitlement updates, and settlement monitoring.
+Unlike an API request where your application asks for current state, a webhook
+is event-driven. 4Mica sends an HTTP `POST` request to your configured endpoint
+when a subscribed event occurs.
 
-## Relevant Events
+Use them for:
 
-- collateral.deposited
-- guarantee.settled
-- withdrawal.requested
-- withdrawal.finalized
+- wallet and collateral dashboards;
+- payment reconciliation and entitlement updates;
+- withdrawal status notifications;
+- audit records and operational alerts.
 
-## Handler Guidance
+## Webhooks are asynchronous
 
-- Verify the webhook signature before processing.
-- Store event IDs and ignore duplicates.
-- Fetch current state from the API if the event arrives out of order.
-- Keep user-facing state clear: pending, settled, claimable, paid, or failed.
+Webhook delivery normally happens soon after an event, but it is not part of the
+synchronous transaction that produced the event. Delivery can be delayed,
+retried, duplicated, or arrive after another related event.
+
+Do not block a user-facing payment, deposit, or withdrawal flow while waiting
+for a webhook. Use the response from the original API or protocol operation for
+the immediate result, then use webhooks to reconcile and update your systems.
+
+<Warning>
+Never treat webhook delivery as guaranteed real-time confirmation. Your
+application must remain correct if an event is late or temporarily unavailable.
+</Warning>
+
+## When to use webhooks
+
+Webhooks work well when your application needs to:
+
+- update a database after a collateral or settlement change;
+- send a notification after a withdrawal changes state;
+- refresh a dashboard without polling continuously;
+- reconcile payment and delivery records;
+- trigger background accounting, analytics, or entitlement work.
+
+Use a synchronous API response instead when the next step cannot continue
+without an immediate answer. Use a scheduled reconciliation job when missing an
+event would leave important records permanently stale.
+
+## How delivery works
+
+1. A subscribed 4Mica lifecycle event occurs.
+2. 4Mica creates an event with a unique `id`.
+3. 4Mica sends the JSON event to your HTTPS endpoint with an HTTP `POST`.
+4. Your endpoint verifies the signature against the raw request body.
+5. Your endpoint durably records or queues the event.
+6. Your endpoint returns a `2xx` response.
+7. A worker applies the event to your application state.
+
+Return a non-`2xx` response when you cannot durably accept the delivery. The
+sender may retry unsuccessful deliveries, so every handler must be idempotent.
+
+## Event envelope
+
+Every event uses the same top-level shape:
+
+<ResponseField name="id" type="string" required>
+  Unique delivery identity used for deduplication.
+</ResponseField>
+<ResponseField name="type" type="string" required>
+  Event name that determines the `data` shape.
+</ResponseField>
+<ResponseField name="created_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="api_version" type="string" required />
+<ResponseField name="data" type="object" required>
+  Event-specific payload.
+</ResponseField>
+
+```json Example event
+{
+  "id": "evt_01JY3K8F4TQ9M5C2N7A6B1D0EP",
+  "type": "collateral.deposited",
+  "created_at": "2026-06-22T14:30:00.000Z",
+  "api_version": "2026-06-01",
+  "data": {
+    "user_address": "0x1111111111111111111111111111111111111111",
+    "asset_address": "0x3333333333333333333333333333333333333333",
+    "amount": "10000000",
+    "network": "eip155:84532",
+    "transaction_hash": "0xDepositTransaction",
+    "block_number": 28123456,
+    "status": "finalized"
+  }
+}
+```
+
+Treat every payload as untrusted until signature verification succeeds. After
+verification, still validate its type and required fields before processing.
+
+## Events
+
+<Columns cols={2}>
+  <Card title="Collateral deposited" icon="wallet" href="/webhooks/events/collateral-deposited">
+    Refresh collateral after a finalized deposit.
+  </Card>
+  <Card title="Guarantee settled" icon="receipt" href="/webhooks/events/guarantee-settled">
+    Reconcile a guarantee that completed clearing and settlement.
+  </Card>
+  <Card title="Withdrawal requested" icon="clock" href="/webhooks/events/withdrawal-requested">
+    Show pending withdrawal and timing information.
+  </Card>
+  <Card title="Withdrawal finalized" icon="circle-check" href="/webhooks/events/withdrawal-finalized">
+    Mark a withdrawal complete and refresh balances.
+  </Card>
+</Columns>
+
+## Syncing application data
+
+Use webhook data to identify what changed, then fetch authoritative state when
+your application needs a complete or current record. This prevents a partial,
+late, or out-of-order event from overwriting newer data.
+
+A reliable database synchronization pattern is:
+
+1. Deduplicate the event by `id`.
+2. Find the local record using `guarantee_id`, `withdrawal_id`, or wallet
+   address.
+3. Compare the incoming state with the local state.
+4. Fetch current API or protocol state if the transition is missing context.
+5. Apply the update in a database transaction.
+6. Record the event as processed.
+
+## Delivery failures and replay
+
+Expect temporary failures from deployments, network issues, database outages,
+and handler bugs. Failed deliveries may be retried, but your application should
+not depend on a particular retry count or schedule.
+
+Keep enough information to replay an event safely from your own queue or
+dead-letter store. Replaying the same event must not apply the business change
+twice.
+
+Run scheduled reconciliation for high-value state such as collateral,
+guarantees, and finalized withdrawals. Webhooks reduce polling; they should not
+be the only recovery mechanism for financial records.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Quick start" icon="rocket" href="/webhooks/quick-start">
+    Build and test your first handler.
+  </Card>
+  <Card title="Security" icon="shield-check" href="/webhooks/security">
+    Verify signatures and prevent replay.
+  </Card>
+  <Card title="Best practices" icon="list-check" href="/webhooks/best-practices">
+    Handle retries, ordering, and observability.
+  </Card>
+  <Card title="FAQs" icon="circle-question" href="/webhooks/faqs">
+    Find answers to common implementation questions.
+  </Card>
+</Columns>

@@ -1,0 +1,184 @@
+---
+title: "FAQs"
+description: "Answers to common developer questions about 4Mica webhooks."
+---
+
+## When should I use a webhook instead of calling an API?
+
+Use webhooks for asynchronous updates after an event occurs, such as refreshing
+collateral, reconciling settlement, or changing withdrawal status.
+
+Call an API when you need an immediate answer or the complete current state.
+For important financial records, use both: webhooks for timely updates and
+periodic API reconciliation for recovery.
+
+See the [webhooks overview](/webhooks/overview).
+
+## Can I rely on a webhook during a synchronous user flow?
+
+No. Do not wait for a webhook before returning a payment, deposit, or withdrawal
+result to a user.
+
+Use the result of the operation that initiated the change. Treat the webhook as
+an asynchronous confirmation or reconciliation signal.
+
+## Are webhooks delivered exactly once?
+
+No. Design for at-least-once delivery behavior: the same event may be delivered
+more than once.
+
+Store the top-level event `id` and return `2xx` without applying the update
+again when that ID has already been processed.
+
+Read [best practices](/webhooks/best-practices#make-processing-idempotent).
+
+## Can events arrive out of order?
+
+Yes. Network delays and retries can cause a finalized event to arrive before an
+earlier event.
+
+Use domain identifiers such as `guarantee_id` and `withdrawal_id`, model
+forward-only state transitions, and fetch authoritative state when the local
+record lacks context.
+
+## How quickly are events delivered?
+
+Webhook delivery is asynchronous and does not have a guaranteed immediate
+arrival time.
+
+Most applications should show an intermediate state, process events in a queue,
+and alert when delivery or processing delay exceeds their operational target.
+
+## What HTTP status should my endpoint return?
+
+Return a `2xx` response after the event has been verified and durably accepted,
+either in your database or a queue.
+
+Return a non-`2xx` response if signature verification fails or the event could
+not be safely recorded. Avoid returning `2xx` before durable acceptance, because
+the event could be lost if your process stops.
+
+## Should I process the event before responding?
+
+Only perform the minimum synchronous work needed to verify and durably queue the
+event.
+
+Run notifications, API lookups, analytics, and other slow work in a background
+worker. This keeps delivery endpoints fast and reduces unnecessary retries.
+
+## How do I verify a webhook?
+
+Preserve the exact raw request body and verify it using the configured webhook
+secret plus the signature and timestamp metadata supplied with the delivery.
+
+Verify before parsing JSON or trusting any field. The exact header names and
+verification helper should come from your active 4Mica webhook configuration.
+
+Follow [webhook security](/webhooks/security).
+
+## Why does signature verification fail locally?
+
+The most common cause is a framework parsing or modifying the body before
+verification.
+
+Make sure the webhook route receives raw bytes. Also check that you are using
+the correct endpoint secret, the request timestamp is within tolerance, and a
+proxy is not changing the payload.
+
+## What data should I store?
+
+At minimum, store:
+
+- event ID and type;
+- event creation and receipt times;
+- processing status and attempt count;
+- the relevant wallet, guarantee, withdrawal, or transaction identifier;
+- a payload hash or redacted payload;
+- the final handler result.
+
+Avoid storing sensitive request content when identifiers and hashes are enough.
+
+## Should the webhook payload be my source of truth?
+
+Use it as a state-change notification, not always as the complete source of
+truth.
+
+For balances, settlement state, and other important records, fetch current
+authoritative state when the event is partial, old, or inconsistent with your
+database.
+
+## How should I handle retries?
+
+Make the handler idempotent and safe to run repeatedly. Retry temporary worker
+failures with exponential backoff, and move persistent failures to a
+dead-letter queue for investigation.
+
+Do not retry validation errors forever. Preserve the event and error context so
+the underlying mapping or code can be fixed before replay.
+
+## How do I replay a failed event?
+
+Replay the original verified payload from your durable event store or
+dead-letter queue through the same idempotent worker.
+
+If the event ID was marked processed before the business transaction completed,
+fix that state first. Ideally, update the business record and processed-event
+record in one database transaction.
+
+## How do I test webhooks on localhost?
+
+Expose your local endpoint through an HTTPS tunnel, configure that public URL as
+the development webhook endpoint, and send the example payloads from the event
+pages.
+
+Test valid signatures, invalid signatures, duplicate IDs, out-of-order events,
+timeouts, worker failures, and replay. Never use production secrets or wallets
+in local tests.
+
+See [quick start](/webhooks/quick-start#test-before-production).
+
+## Why am I receiving duplicate events?
+
+Duplicates normally occur when the sender does not receive a successful
+response, the response arrives too late, or an event is manually replayed.
+
+This is expected behavior. Deduplicate by event `id`, not by event type,
+timestamp, wallet, or transaction hash alone.
+
+## What if my endpoint is temporarily down?
+
+Restore the endpoint, inspect failed deliveries or your dead-letter queue, and
+replay events safely.
+
+After recovery, reconcile important wallet, guarantee, and withdrawal state
+against authoritative APIs. This catches any event that was unavailable beyond
+the delivery retention window.
+
+## Can one endpoint receive every event type?
+
+Yes. Route on the top-level `type` field after verifying the signature.
+
+You can also use separate endpoints when teams, secrets, scaling requirements,
+or security boundaries differ. In either design, ignore unknown event types
+safely and keep handlers forward-compatible.
+
+## What should I do with an unknown event type?
+
+Verify and record the event, then ignore it or route it to an unsupported-event
+queue. Do not fail every delivery solely because a newer event type is unknown.
+
+Alert developers so the integration can be reviewed before relying on that
+event.
+
+## How can I debug a missing update?
+
+Trace the flow in this order:
+
+1. Confirm the lifecycle event actually occurred.
+2. Check whether the endpoint received the event ID.
+3. Check signature verification and HTTP response logs.
+4. Check the queue and worker attempts.
+5. Check deduplication and state-transition decisions.
+6. Fetch current authoritative state and reconcile the local record.
+
+Log identifiers and redacted errors, never webhook secrets.

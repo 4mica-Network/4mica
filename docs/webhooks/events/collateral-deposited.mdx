@@ -1,0 +1,109 @@
+---
+title: "Collateral deposited"
+description: "Handle the collateral.deposited webhook event."
+---
+
+`collateral.deposited`
+
+Sent after a collateral deposit has been observed and finalized for a payer.
+Use it to refresh available collateral, enable payment features, or update a
+wallet dashboard.
+
+## Event fields
+
+<ResponseField name="id" type="string" required>
+  Unique webhook event ID. Store it for deduplication.
+</ResponseField>
+<ResponseField name="type" type="string" required post={["collateral.deposited"]} />
+<ResponseField name="created_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="api_version" type="string" required />
+<ResponseField name="data" type="object" required />
+<ResponseField name="data.user_address" type="string" required>
+  Wallet that owns the deposited collateral.
+</ResponseField>
+<ResponseField name="data.asset_address" type="string" required>
+  Deposited token address. The zero address represents ETH.
+</ResponseField>
+<ResponseField name="data.amount" type="string" required>
+  Deposit amount in token base units.
+</ResponseField>
+<ResponseField name="data.network" type="string" required>
+  CAIP-2 network identifier.
+</ResponseField>
+<ResponseField name="data.transaction_hash" type="string" required />
+<ResponseField name="data.block_number" type="number" required />
+<ResponseField name="data.status" type="string" required post={["finalized"]} />
+
+## Event examples
+
+<RequestExample dropdown>
+```json Payload
+{
+  "id": "evt_01JY3K8F4TQ9M5C2N7A6B1D0EP",
+  "type": "collateral.deposited",
+  "created_at": "2026-06-22T14:30:00.000Z",
+  "api_version": "2026-06-01",
+  "data": {
+    "user_address": "0x1111111111111111111111111111111111111111",
+    "asset_address": "0x3333333333333333333333333333333333333333",
+    "amount": "10000000",
+    "network": "eip155:84532",
+    "transaction_hash": "0xDepositTransaction",
+    "block_number": 28123456,
+    "status": "finalized"
+  }
+}
+```
+```javascript title="JavaScript"
+app.post("/webhooks/4mica", rawBodyMiddleware, async (req, res) => {
+  verifyWebhookSignature(req);
+  const event = JSON.parse(req.body.toString("utf8"));
+
+  if (await eventStore.has(event.id)) return res.sendStatus(200);
+
+  if (event.type === "collateral.deposited") {
+    await wallets.refreshCollateral(
+      event.data.user_address,
+      event.data.asset_address,
+      event.data.network,
+    );
+  }
+
+  await eventStore.record(event.id);
+  res.sendStatus(200);
+});
+```
+```python title="Python"
+@app.post("/webhooks/4mica")
+async def handle_webhook(request: Request):
+    raw_body = await request.body()
+    verify_webhook_signature(request.headers, raw_body)
+    event = json.loads(raw_body)
+
+    if await event_store.has(event["id"]):
+        return Response(status_code=200)
+
+    if event["type"] == "collateral.deposited":
+        data = event["data"]
+        await wallets.refresh_collateral(
+            data["user_address"],
+            data["asset_address"],
+            data["network"],
+        )
+
+    await event_store.record(event["id"])
+    return Response(status_code=200)
+```
+</RequestExample>
+
+## Recommended handling
+
+- Verify the signature against the raw request body before parsing.
+- Return `2xx` only after the event is durably queued or processed.
+- Refresh collateral from the authoritative API instead of treating the event
+  as the complete wallet state.
+- Display amounts using the asset decimals returned by
+  [`GET /core/tokens`](/api-reference/operator/tokens).
+- Ignore duplicate deliveries with the same event `id`.
+
+See [deposits and withdrawals](/core-concepts/deposits-and-withdrawals).

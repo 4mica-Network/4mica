@@ -3,20 +3,56 @@ title: "Best Practices"
 description: "Apply webhook implementation best practices."
 ---
 
-# Best Practices
+Treat webhook handlers as eventually consistent workers. They must be
+idempotent, observable, and safe to retry.
 
-Treat webhook handlers as eventually consistent workers. They should be idempotent, observable, and safe to retry.
+## Acknowledge quickly
 
-## Relevant Events
+Verify and durably queue the event, then return `2xx`. Run slow API calls,
+notifications, analytics, and reconciliation in a background worker.
 
-- collateral.deposited
-- guarantee.settled
-- withdrawal.requested
-- withdrawal.finalized
+## Make processing idempotent
 
-## Handler Guidance
+Use the event `id` as the delivery deduplication key and use domain identifiers
+such as `guarantee_id` or `withdrawal_id` when updating business records.
 
-- Verify the webhook signature before processing.
-- Store event IDs and ignore duplicates.
-- Fetch current state from the API if the event arrives out of order.
-- Keep user-facing state clear: pending, settled, claimable, paid, or failed.
+An event that is delivered twice must produce the same final state as one
+delivery.
+
+## Handle ordering
+
+Do not assume requested events always arrive before finalized events. Upsert
+records by their domain ID and apply state transitions only when they move the
+record forward.
+
+When local and event state disagree, fetch the current authoritative state
+before taking irreversible action.
+
+## Retry temporary failures
+
+Return a non-`2xx` response when the event was not durably accepted. Use
+exponential backoff in your worker for temporary database, API, or network
+failures.
+
+Move repeatedly failing events to a dead-letter queue with enough context to
+replay them safely.
+
+## Observe delivery
+
+Record:
+
+- event ID and type;
+- received and processed timestamps;
+- processing attempt count;
+- final handler result;
+- related guarantee, withdrawal, wallet, or transaction ID;
+- redacted error details.
+
+Alert on signature failures, sustained retry volume, queue delay, and
+dead-letter growth.
+
+## Keep product state clear
+
+Use explicit states such as `pending`, `finalized`, `settled`, `failed`, and
+`needs_review`. Do not show a deposit or withdrawal as complete based only on
+the event name without checking the event payload and current state.
