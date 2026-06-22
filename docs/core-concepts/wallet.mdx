@@ -427,17 +427,3 @@ A useful wallet view should answer:
 
 Visibility turns the wallet from a hidden technical dependency into a
 manageable economic account.
-
-## Builder guidance
-
-- Use a dedicated wallet for each meaningful risk boundary.
-- Keep the signer behind policy rather than exposing keys to agents.
-- Separate gas, wallet token balance, collateral, and application budget in
-  your UI and logic.
-- Record the agent, task, policy, seller, amount, and result for every signed
-  payment.
-- Make network and asset identity explicit.
-- Build pause and revocation before enabling autonomous spending.
-- Test signer failure, insufficient gas, insufficient collateral, key rotation,
-  and withdrawal in sandbox.
-- Keep recipient addresses stable and publicly verifiable.
