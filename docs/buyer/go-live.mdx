@@ -16,7 +16,7 @@ The goal is not to let the agent spend as freely as possible. The goal is to let
 - Require approval above defined thresholds.
 - Log every paid request with reason, seller, route, amount, and task ID.
 - Alert on failed payments, blocked sellers, budget exhaustion, and unusual spend.
-- Check open tabs and settlement obligations before withdrawing collateral.
+- Check open guarantees and settlement obligations before withdrawing collateral.
 
 Use [4mica dashboard](https://app.4mica.io) as the final check for collateral, open obligations, and spend controls.
 
@@ -24,7 +24,7 @@ Use [4mica dashboard](https://app.4mica.io) as the final check for collateral, o
 
 ### Trust and verification
 
-- Verify seller domain, `payTo` address, route, and tab endpoint before signing.
+- Verify seller domain, `payTo` address, route, network, and asset before signing.
 - Prefer verified marketplaces, registries, or known seller lists when available.
 - Store seller metadata and reputation inputs separately from payment records.
 - Block sellers that mismatch identity, price, or domain expectations.
@@ -49,11 +49,10 @@ Use [4mica dashboard](https://app.4mica.io) as the final check for collateral, o
 
 - Log every payment.
 - Link payments to task logs and outputs.
-- Keep tab IDs and request IDs searchable.
+- Keep guarantee IDs and request IDs searchable.
 - Track open obligations before withdrawal.
 - Export receipts or invoices from your application if your users need them.
 
 ## Go-live decision
 
 Launch when the agent can spend autonomously without becoming opaque. In production, you should always be able to see what the agent paid for, why it paid, which policy allowed it, and what value came back.
-

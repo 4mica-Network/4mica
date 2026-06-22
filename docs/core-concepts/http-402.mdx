@@ -27,10 +27,7 @@ The payload contains an `accepts` array with one or more payment options. The cl
       "resource": "https://api.example.com/data",
       "description": "Access to premium market data",
       "mimeType": "application/json",
-      "maxTimeoutSeconds": 300,
-      "extra": {
-        "tabEndpoint": "https://api.example.com/x402/tab"
-      }
+      "maxTimeoutSeconds": 300
     }
   ]
 }
@@ -49,15 +46,7 @@ The payload contains an `accepts` array with one or more payment options. The cl
 | `description`       | string | Human-readable description of what the resource provides.                           |
 | `mimeType`          | string | MIME type of the response the client receives after paying.                         |
 | `maxTimeoutSeconds` | number | Maximum seconds the server allows between the client signing and settlement.        |
-| `extra`             | object | Scheme-specific data. For `4mica-credit`, must include `tabEndpoint`.               |
-
-## The tab endpoint
-
-When the scheme is `4mica-credit`, the client needs one additional piece of data before it can sign a payment: a tab.
-
-The `extra.tabEndpoint` field points to an endpoint on the resource server, not on the facilitator. The client calls it with its wallet address and the full payment requirements. The resource server proxies that call to the 4Mica facilitator, which contacts 4Mica Core and returns a `tabId` and `nextReqId`. The client uses those values to sign the guarantee that becomes the payment payload.
-
-The tab endpoint is hosted on the resource server so that server operators retain full control over which clients can open tabs and under what conditions. The facilitator never speaks directly to the client.
+| `extra`             | object | Optional scheme-specific data, including V2 validation policy fields.                |
 
 ## Why the scheme is the server's choice
 
@@ -73,7 +62,6 @@ When you configure your 402 response:
 - Use the CAIP-2 format for `network`: `eip155:8453` for Base, `eip155:1` for Ethereum mainnet.
 - Set `maxAmountRequired` in token base units. For USDC (6 decimals), $1.00 is `"1000000"`.
 - Set `payTo` to the wallet address that should receive payment after netting and settlement.
-- Expose a tab endpoint on your server (for example `POST /x402/tab`) and put its full URL in `extra.tabEndpoint`. Keep the facilitator URL in your server-side configuration, not in the 402 response.
 - Set `maxTimeoutSeconds` to the time you are willing to wait between the client signing and your call to `/settle`. 300 seconds is a reasonable default for most API flows.
 
 See [How x402 works](./how-x402-works) for the full request, retry, and settlement sequence.

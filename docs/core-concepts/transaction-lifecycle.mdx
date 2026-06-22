@@ -26,10 +26,8 @@ The recipient can use the validation path only if the trusted registry publishes
 ### Where `req_id` comes from
 
 `req_id` must exist before the payer signs because it is part of the signed request.
-In x402 flows, the SDK often gets this value from a tab helper as `nextReqId`.
-That helper may be backed by Core in older tab-based deployments.
-
-The current cycle-native Core issuance path, `/core/guarantees`, does not generate `req_id`.
+The payer or SDK generates a unique request identifier before signing.
+The cycle-native Core issuance path, `/core/guarantees`, does not generate `req_id`.
 It verifies the signed value, derives the deterministic `guarantee_id` from it, and rejects another guarantee with the same identity.
 
 ## How V1 works
@@ -70,7 +68,7 @@ Core verifies them, but it does not rewrite them.
 | ------------------- | --------- | --------------------------- | ---------------------------------- |
 | `user_address`      | `address` | Payer / SDK                 | Payer wallet.                      |
 | `recipient_address` | `address` | Recipient, then payer / SDK | Recipient wallet.                  |
-| `req_id`            | `uint256` | Payer / SDK or tab helper   | Request counter.                   |
+| `req_id`            | `uint256` | Payer / SDK                 | Unique request identifier.         |
 | `amount`            | `uint256` | Recipient, then payer / SDK | Token base units.                  |
 | `asset_address`     | `address` | Recipient, then payer / SDK | Settlement asset. `0x0` means ETH. |
 | `timestamp`         | `uint64`  | Payer / SDK                 | Request time.                      |
@@ -156,7 +154,7 @@ V2 signs all V1 request fields plus `validation_policy`.
 | ------------------- | --------- | --------------------------- | ----------------- |
 | `user_address`      | `address` | Payer / SDK                 | Payer wallet.     |
 | `recipient_address` | `address` | Recipient, then payer / SDK | Recipient wallet. |
-| `req_id`            | `uint256` | Payer / SDK or tab helper   | Request counter.  |
+| `req_id`            | `uint256` | Payer / SDK                 | Unique request identifier. |
 | `amount`            | `uint256` | Recipient, then payer / SDK | Token base units. |
 | `asset_address`     | `address` | Recipient, then payer / SDK | Settlement asset. |
 | `timestamp`         | `uint64`  | Payer / SDK                 | Request time.     |

@@ -17,15 +17,13 @@ const data = await response.json();
 ## Seller Route Shape
 
 ```ts
-app.use(paymentMiddlewareFromConfig(routes, {
-  advertisedEndpoint: "https://api.example.com/payment/tab",
-}));
+app.use(paymentMiddlewareFromConfig(routes));
 ```
 
 ## What To Log
 
 - network and asset
 - payer and recipient address
-- tab ID and request ID
+- guarantee ID and request ID
 - verify and settle result
 - response status served to the buyer

@@ -5,7 +5,7 @@ description: "See what your agent paid for, why it paid, and how payments connec
 
 You should be able to audit the full workflow after a task is done.
 
-4Mica gives the payment layer a record of signed guarantees, tabs, settlement, and claim paths. Your application should connect those records to task logs, reasons, outputs, receipts, and support workflows.
+4Mica gives the payment layer a record of signed guarantees, clearing cycles, settlement, and default coverage. Your application should connect those records to task logs, reasons, outputs, receipts, and support workflows.
 
 ## What you should record
 
@@ -16,7 +16,7 @@ For every paid request, keep enough information to connect the payment, policy d
 | Task and request IDs | Connect the payment to the workflow that caused it. |
 | Agent ID or wallet | Shows which agent or signer authorized the payment. |
 | Seller, route, network, and asset | Shows who was paid, for what, and on which payment path. |
-| Amount and tab ID | Connects the paid request to the 4Mica payment record. |
+| Amount and guarantee ID | Connects the paid request to the 4Mica payment record. |
 | Policy version and approval record | Shows why the agent was allowed to sign. |
 | Response status and output hash | Connects the payment to delivery. |
 | Settlement or obligation status | Shows whether the payment is complete, pending, claimable, or failed. |
@@ -42,7 +42,7 @@ Reason codes make support, auditing, and user trust much easier.
 
 ## Receipts and invoices
 
-4Mica provides the payment mechanics and records. Your application can turn those records into receipts or invoices by combining the task summary, seller, amount, date, network, asset, request ID, tab ID, result status, and refund or dispute status.
+4Mica provides the payment mechanics and records. Your application can turn those records into receipts or invoices by combining the task summary, seller, amount, date, network, asset, request ID, guarantee ID, result status, and refund or dispute status.
 
 For business users, export these records in the format their accounting or compliance process needs.
 
@@ -52,11 +52,11 @@ Use dashboard payment history as the source data for receipts or internal invoic
 
 If you dispute a payment, start with the facts that both sides can verify. Check whether the agent signed under policy, whether the seller received a valid payment guarantee, whether the seller returned the promised response, whether the output met the seller's completion rule, and whether the refund policy applies.
 
-Because 4Mica works through credit-backed guarantees, real money does not need to move at the moment your agent signs each paid request. That makes disputes easier to manage: the payment record, tab, request, and delivery evidence can be reviewed before final settlement or claim handling completes.
+Because 4Mica works through credit-backed guarantees, real money does not need to move at the moment your agent signs each paid request. That makes disputes easier to manage: the payment record, guarantee, request, and delivery evidence can be reviewed before clearing and final settlement complete.
 
 4Mica helps establish payment facts. Quality disputes, refunds, and support decisions depend on seller terms and application policy.
 
-If payment facts and seller claims do not line up, include tab IDs, request IDs, and task logs when contacting [support](mailto:support@4mica.io).
+If payment facts and seller claims do not line up, include guarantee IDs, request IDs, and task logs when contacting [support](mailto:support@4mica.io).
 
 <Warning>
 Preserve logs before retrying, refunding, or deleting task data. Disputes are much harder to resolve after the request trail is gone.

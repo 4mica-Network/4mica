@@ -9,9 +9,9 @@ You need to prove two things: the buyer is paying the real service, and you deli
 
 ## Make verification easy
 
-Before paying, a buyer or buyer agent should be able to inspect the API domain, protected route, price, accepted scheme, network, asset, `payTo` address, advertised tab endpoint, and any quote metadata or expiration. Those values should all point to the same service and the same commercial promise.
+Before paying, a buyer or buyer agent should be able to inspect the API domain, protected route, price, accepted scheme, network, asset, `payTo` address, and any quote metadata or expiration. Those values should all point to the same service and the same commercial promise.
 
-After paying, both sides can connect the payment record to the request, tab, settlement result, and delivered response.
+After paying, both sides can connect the payment record to the request, guarantee, settlement result, and delivered response.
 
 <Tip>
 Treat verification as part of your product experience. The easier your domain, route, price, and `payTo` address are to compare, the easier it is for cautious buyer agents to pay you.
@@ -50,14 +50,14 @@ That profile can then point buyers to the payment address they should expect in 
 
 Impersonation usually shows up as a copied name, copied docs, fake domain, or different payment address.
 
-Protect buyers by making the legitimate payment surface easy to check. Publish canonical API domains and seller addresses, keep tab endpoints on your domain, warn buyers not to pay mismatched `payTo` addresses, and use identity registries or verified profiles when available.
+Protect buyers by making the legitimate payment surface easy to check. Publish canonical API domains and seller addresses, warn buyers not to pay mismatched `payTo` addresses, and use identity registries or verified profiles when available.
 
 You should also monitor marketplaces and registries for copied listings. A fake agent is easier to report when your real domain, address, and profile have been public and consistent.
 
 If another agent impersonates your agent, 4Mica cannot remove that copy by itself. Make your canonical address, domain, and profile easy to compare against fake payment requirements.
 
 <Tip>
-Keep one canonical page that lists your official API domain, `payTo` address, tab endpoint, and support contact. It gives buyers and marketplaces a single source to compare against suspicious copies.
+Keep one canonical page that lists your official API domain, `payTo` address, protected routes, and support contact. It gives buyers and marketplaces a single source to compare against suspicious copies.
 </Tip>
 
 Report copied agent names, fake domains, or wrong `payTo` addresses to [support](mailto:support@4mica.io).

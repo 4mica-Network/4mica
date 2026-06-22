@@ -13,12 +13,12 @@ Before you expose a route to production traffic, confirm the basics that protect
 
 | Requirement | What to confirm |
 | --- | --- |
-| HTTPS | All protected routes and tab endpoints use HTTPS. |
+| HTTPS | All protected routes use HTTPS. |
 | Production wallet | `payTo` points to the seller wallet you intend to use in production. |
 | Pricing | Routes have stable prices or a clear quote-before-pay flow. |
 | Payment validation | Your server verifies and settles before serving paid work. |
-| Logs | Request IDs, tab IDs, payer addresses, route, price, and settlement result are recorded. |
-| Monitoring | Unpaid tabs, claim windows, failed settlements, and invalid payment attempts are visible. |
+| Logs | Request IDs, guarantee IDs, payer addresses, route, price, and settlement result are recorded. |
+| Monitoring | Pending guarantees, clearing cycles, failed settlements, and invalid payment attempts are visible. |
 | Rate limits | Unpaid requests and failed payment retries are controlled. |
 | Support path | Buyers have a way to raise disputes, refunds, and delivery questions. |
 
@@ -32,7 +32,7 @@ Do not move a sandbox route to production by only changing the network. Review t
 
 ### Trust and legitimacy
 
-Buyers should be able to verify that they are paying the real service. Show your `payTo` address where buyers check payment destination, keep your public API domain, tab endpoint, and payment requirements consistent, and document what the route does, what it costs, and what counts as delivery.
+Buyers should be able to verify that they are paying the real service. Show your `payTo` address where buyers check payment destination, keep your public API domain and payment requirements consistent, and document what the route does, what it costs, and what counts as delivery.
 
 If you use a marketplace, registry, verified profile, or ratings system, bind that identity to your payment address and domain. After launch, monitor for copied agent names, wrong domains, wrong `payTo` addresses, and fake payment requirements.
 
@@ -44,7 +44,7 @@ Keep dynamic pricing explainable before the buyer signs. If humans and agents sh
 
 ### Microtransactions
 
-For high-frequency traffic, batch settlement through tabs instead of trying to settle every tiny request on-chain. Signed guarantees and deferred settlement keep small payments practical, but you still need to require payment or a valid guarantee before expensive work starts.
+For high-frequency traffic, use clearing cycles instead of trying to settle every tiny request on-chain. Signed guarantees and deferred settlement keep small payments practical, but you still need to require payment or a valid guarantee before expensive work starts.
 
 Test sub-cent and small-dollar prices in sandbox with realistic traffic volume before you rely on them in production.
 
@@ -56,9 +56,9 @@ Your agent should decline work that would cost more to fulfill than the payment 
 
 ### Risk and abuse
 
-Keep abuse controls close to the route. Limit unpaid pre-work, cap spend or request volume per buyer, agent, tab, API key, or wallet, and block suspicious payers or repeated invalid payment attempts.
+Keep abuse controls close to the route. Limit unpaid pre-work, cap spend or request volume per buyer, agent, guarantee, API key, or wallet, and block suspicious payers or repeated invalid payment attempts.
 
-Refund rules should be explicit before launch. Store delivery evidence for disputes and alert on missed claim windows.
+Refund rules should be explicit before launch. Store delivery evidence for disputes and alert on missed settlement deadlines and defaults.
 
 <Tip>
 Launch one production route first if you can. A narrow first route makes pricing, logs, claims, and support much easier to validate with real traffic.
@@ -68,11 +68,11 @@ Launch one production route first if you can. A narrow first route makes pricing
 
 1. The buyer or buyer agent calls your protected route.
 2. Your API returns HTTP 402 with payment requirements.
-3. The buyer opens or reuses a tab through your advertised endpoint.
-4. The buyer retries with a signed payment guarantee.
+3. The buyer creates a unique request ID and signs a payment guarantee.
+4. The buyer retries with the signed payment guarantee.
 5. Your middleware verifies and settles through the facilitator.
 6. Your paid handler runs and returns the result.
-7. You monitor settlement and claim from collateral if the payer defaults within the claim window.
+7. You monitor the guarantee through clearing and final settlement.
 
 ## Go-live decision
 

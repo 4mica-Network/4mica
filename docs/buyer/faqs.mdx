@@ -24,7 +24,7 @@ Yes, if the marketplace or application tracks it. Useful signals include success
 Yes when the seller platform exposes them. Treat them as inputs to policy, not automatic approval.
 
 **How do I know the agent is not fake or malicious?**  
-Compare the domain, tab endpoint, `payTo` address, and profile metadata against a trusted source.
+Compare the domain, `payTo` address, route, and profile metadata against a trusted source.
 
 **Can I verify the agent's identity before paying?**  
 Yes. Your client can inspect payment requirements and compare them with seller identity records before signing.
@@ -154,7 +154,7 @@ Yes. Attach reason codes and task IDs to payment logs.
 Your application can generate receipts or invoices from payment records and task logs.
 
 **Can I connect payments to task logs?**  
-Yes. Store task ID, request ID, tab ID, seller, amount, reason, and result together.
+Yes. Store task ID, request ID, guarantee ID, seller, amount, reason, and result together.
 
 **Can I dispute a payment?**  
 You can dispute through the seller or application support process. 4Mica records help establish payment facts.
@@ -164,4 +164,3 @@ Yes. Notify before approval-required payments and after important payment events
 
 **Can I audit the full workflow after the task is done?**  
 Yes. Keep a full workflow log that connects prompts, tool calls, payments, outputs, and policy decisions.
-

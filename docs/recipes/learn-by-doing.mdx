@@ -5,7 +5,7 @@ description: "Hands-on exercises for learning 4Mica by building small flows."
 
 # Learn by Doing
 
-The fastest way to understand 4Mica is to build the payment loop yourself once: protect a route, pay it from a funded wallet, inspect the tab, and settle the result.
+The fastest way to understand 4Mica is to build the payment loop yourself once: protect a route, pay it from a funded wallet, inspect the guarantee, and follow it into clearing and settlement.
 
 ## Exercise 1: Protect A Mock Route
 
@@ -13,7 +13,7 @@ Create a route that returns premium JSON and protect it with a small Base Sepoli
 
 ## Exercise 2: Pay From A Test Wallet
 
-Deposit test collateral, wrap your HTTP client, and call the protected route. Confirm that the client opens a tab and retries automatically.
+Deposit test collateral, wrap your HTTP client, and call the protected route. Confirm that the client creates a unique request ID, signs a guarantee, and retries automatically.
 
 ## Exercise 3: Break One Thing
 

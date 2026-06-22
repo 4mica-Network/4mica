@@ -5,7 +5,7 @@ description: "Protect FastAPI routes with 4Mica x402 payment middleware."
 
 # FastAPI
 
-Use FastAPI when you want async Python route handlers with 4Mica payment protection. The `4mica-x402` FastAPI middleware returns HTTP 402 responses, advertises your tab endpoint, verifies retried payment headers, settles guarantees, and serves the protected response after payment succeeds.
+Use FastAPI when you want async Python route handlers with 4Mica payment protection. The `4mica-x402` FastAPI middleware returns HTTP 402 responses, verifies retried payment headers, settles guarantees, and serves the protected response after payment succeeds.
 
 ## Prerequisites
 
@@ -13,7 +13,6 @@ Use FastAPI when you want async Python route handlers with 4Mica payment protect
 - A FastAPI app.
 - A seller wallet address for `payTo`.
 - A buyer wallet with deposited 4Mica collateral for paid requests.
-- A server-hosted tab endpoint URL.
 
 ## Install
 
@@ -28,7 +27,6 @@ Create a dedicated EVM wallet for the buyer client and use a seller address for 
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
-TAB_ENDPOINT=http://localhost:8000/tabs/open
 ```
 
 ## Deposit collateral
@@ -59,8 +57,6 @@ routes = {
 
 middleware = fastapi_payment_middleware_from_config(
     routes,
-    tab_endpoint="http://localhost:8000/tabs/open",
-    ttl_seconds=3600,
 )
 
 @app.middleware("http")
@@ -71,8 +67,6 @@ async def x402_middleware(request, call_next):
 async def premium_content():
     return {"message": "This is premium content behind a paywall"}
 ```
-
-In production, set `tab_endpoint` to your API URL, not the facilitator URL. The client posts to that route, the middleware opens the tab with 4Mica, and the client uses the returned tab data to sign the payment retry.
 
 ## Support payment
 
@@ -97,6 +91,6 @@ async with httpx.AsyncClient(
 ## What happens
 
 1. The buyer requests `/premium-content` without payment.
-2. FastAPI returns HTTP 402 with payment requirements and `extra.tabEndpoint`.
-3. The `httpx` wrapper opens a tab, signs a guarantee, and retries with a payment header.
+2. FastAPI returns HTTP 402 with payment requirements.
+3. The `httpx` wrapper creates a unique request ID, signs a guarantee, and retries with a payment header.
 4. The middleware verifies and settles the payment before your handler serves the response.
