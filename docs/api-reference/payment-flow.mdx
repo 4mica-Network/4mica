@@ -3,8 +3,6 @@ title: "Payment Flow"
 description: "Reference the end-to-end 4Mica payment flow."
 ---
 
-# Payment Flow
-
 The 4Mica payment flow keeps HTTP simple while moving settlement complexity into signed guarantees, facilitator calls, clearing cycles, and protocol enforcement.
 
 ## Sequence
@@ -15,6 +13,90 @@ The 4Mica payment flow keeps HTTP simple while moving settlement complexity into
 4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
 5. Payable guarantees enter a clearing cycle. Net debtors pay their positions, while defaults are covered from locked collateral according to protocol rules.
 
+## Protocol flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Payer SDK
+    participant Resource as Recipient Resource
+    participant Facilitator as 4Mica Facilitator
+    participant Core as 4Mica Core
+    participant Clearing as ClearingHouse
+    participant Contract as Core4Mica Contract
+    participant Validation as ERC-8004 Validation Registry
+
+    Client->>Contract: Deposit collateral
+    Contract-->>Core: Collateral event
+    Core->>Core: Sync collateral state
+
+    Client->>Resource: Request protected content
+    Resource-->>Client: 402 Payment Required
+    Client->>Client: Check policy and create unique req_id
+    Client->>Client: Sign V1 or V2 guarantee
+    Client->>Resource: Retry with payment header
+
+    Resource->>Facilitator: POST /verify
+    Facilitator-->>Resource: Valid or invalid decision
+
+    alt Payment is invalid
+        Resource-->>Client: 402 with invalidReason
+    else Payment is valid
+        Resource->>Facilitator: POST /settle
+        Facilitator->>Core: POST /core/guarantees
+        Core->>Core: Verify signature, policy, version, and collateral
+        Core-->>Facilitator: BLS certificate
+        Facilitator-->>Resource: Success and certificate
+        Resource-->>Client: Serve protected response
+    end
+
+    alt V1 guarantee
+        Core->>Core: Mark FINALIZED_PAYABLE
+    else V2 guarantee
+        Core->>Core: Mark PENDING_VALIDATION
+        alt Payer finalizes payment
+            Core->>Core: Mark FINALIZED_PAYABLE
+        else Recipient uses validation path
+            Resource->>Validation: Request validation status
+            Validation-->>Resource: Validator, score, tag, and result
+            Resource->>Contract: remunerate(certificate)
+            Contract->>Validation: Verify signed validation policy
+            alt Validation passes
+                Contract-->>Resource: Transfer locked collateral
+                Contract-->>Core: Default remuneration event
+            else Validation fails
+                Contract-->>Resource: Revert without payment
+            end
+        else Validation fails or times out
+            Core->>Core: Mark DISPUTED or CANCELLED
+        end
+    end
+
+    Core->>Core: Add FINALIZED_PAYABLE guarantees to cycle
+    Core->>Clearing: Commit cycle and Merkle root
+    Clearing->>Clearing: Compute net debtor and creditor positions
+
+    alt Net debtor pays
+        Client->>Clearing: Pay net debit
+        Clearing-->>Core: Position settled
+        Clearing-->>Resource: Net credit claimable
+    else Net debtor misses finality
+        Clearing->>Contract: Cover default from locked collateral
+        Contract-->>Core: Default covered
+        Contract-->>Resource: Net credit paid
+    end
+
+    Client->>Contract: Request withdrawal
+    Contract-->>Core: Withdrawal requested event
+    Core->>Core: Check open guarantees and obligations
+    Client->>Contract: Finalize withdrawal after grace period
+    Contract-->>Core: Withdrawal finalized event
+```
+
+The synchronous HTTP flow ends when the resource returns the protected response.
+Validation, clearing, net settlement, default coverage, and withdrawal handling
+continue asynchronously.
+
 ## Headers
 
 - V1 payment payloads commonly travel as X-PAYMENT.
@@ -22,9 +104,37 @@ The 4Mica payment flow keeps HTTP simple while moving settlement complexity into
 - Both bind claims such as request ID, amount, recipient, asset, timestamp, and version.
 - The server should verify and settle before serving protected content.
 
+## Actors
+
+| Actor | Responsibility |
+| --- | --- |
+| Payer SDK | Applies spending policy, creates `req_id`, signs guarantees, and pays net debit positions. |
+| Recipient resource | Publishes payment requirements, verifies and settles payment, and delivers protected work. |
+| Facilitator | Validates x402 payloads and submits accepted guarantees to Core. |
+| 4Mica Core | Verifies guarantees, locks collateral, tracks lifecycle state, and builds clearing cycles. |
+| ClearingHouse | Commits cycles, computes net positions, accepts debtor payments, and handles defaults. |
+| Core4Mica contract | Holds collateral and enforces deposits, withdrawals, and default coverage. |
+| Validation registry | Publishes the outcome evidence required by a V2 validation policy. |
+
+## Guards and guarantees
+
+- `/verify` performs preflight validation without issuing a guarantee.
+- `/settle` submits the signed request to Core and returns a BLS certificate.
+- Every guarantee uses a unique `req_id`; Core rejects a duplicate identity.
+- V1 guarantees become `FINALIZED_PAYABLE` after issuance.
+- V2 guarantees remain `PENDING_VALIDATION` until finalized, disputed,
+  cancelled, or resolved through the validation path.
+- Only `FINALIZED_PAYABLE` guarantees enter clearing-cycle netting.
+- Settlement and finality timing are deployment configuration values.
+- Withdrawals remain subject to open guarantees, clearing obligations, and the
+  configured grace period.
+
 ## Settlement Outcomes
 
 - Settled: the guarantee is included in a clearing cycle and its net position is paid.
 - Default remunerated: locked collateral covers an unpaid net position.
 - Cancelled or disputed: the guarantee stays out of netting and collateral follows the applicable resolution path.
 - Invalid: verification or validation failed and the resource should not be served as paid.
+
+See [transaction lifecycle](/core-concepts/transaction-lifecycle) for the full
+V1 and V2 state model.

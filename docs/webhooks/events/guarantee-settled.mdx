@@ -1,0 +1,110 @@
+---
+title: "Guarantee settled"
+description: "Handle the guarantee.settled webhook event."
+---
+
+`guarantee.settled`
+
+Sent when an accepted guarantee reaches settled state through the clearing
+process. Use it to mark payment obligations complete and reconcile delivery
+records.
+
+## Event fields
+
+<ResponseField name="id" type="string" required />
+<ResponseField name="type" type="string" required post={["guarantee.settled"]} />
+<ResponseField name="created_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="api_version" type="string" required />
+<ResponseField name="data" type="object" required />
+<ResponseField name="data.guarantee_id" type="string" required />
+<ResponseField name="data.req_id" type="string" required />
+<ResponseField name="data.cycle_id" type="string" required />
+<ResponseField name="data.version" type="number" required post={["1|2"]} />
+<ResponseField name="data.user_address" type="string" required />
+<ResponseField name="data.recipient_address" type="string" required />
+<ResponseField name="data.asset_address" type="string" required />
+<ResponseField name="data.amount" type="string" required>
+  Amount in token base units.
+</ResponseField>
+<ResponseField name="data.network" type="string" required />
+<ResponseField name="data.status" type="string" required post={["SETTLED"]} />
+<ResponseField name="data.settled_at" type="string" required post={["ISO 8601 datetime"]} />
+
+## Event examples
+
+<RequestExample dropdown>
+```json Payload
+{
+  "id": "evt_01JY3M1X7Z4V8Q2H5B6C9N0KRP",
+  "type": "guarantee.settled",
+  "created_at": "2026-06-22T15:00:00.000Z",
+  "api_version": "2026-06-01",
+  "data": {
+    "guarantee_id": "0xGuaranteeId",
+    "req_id": "0x1",
+    "cycle_id": "42",
+    "version": 1,
+    "user_address": "0x1111111111111111111111111111111111111111",
+    "recipient_address": "0x2222222222222222222222222222222222222222",
+    "asset_address": "0x3333333333333333333333333333333333333333",
+    "amount": "100000",
+    "network": "eip155:84532",
+    "status": "SETTLED",
+    "settled_at": "2026-06-22T14:59:58.000Z"
+  }
+}
+```
+```javascript title="JavaScript"
+app.post("/webhooks/4mica", rawBodyMiddleware, async (req, res) => {
+  verifyWebhookSignature(req);
+  const event = JSON.parse(req.body.toString("utf8"));
+
+  if (await eventStore.has(event.id)) return res.sendStatus(200);
+
+  if (event.type === "guarantee.settled") {
+    await payments.markSettled({
+      guaranteeId: event.data.guarantee_id,
+      requestId: event.data.req_id,
+      cycleId: event.data.cycle_id,
+      settledAt: event.data.settled_at,
+    });
+  }
+
+  await eventStore.record(event.id);
+  res.sendStatus(200);
+});
+```
+```python title="Python"
+@app.post("/webhooks/4mica")
+async def handle_webhook(request: Request):
+    raw_body = await request.body()
+    verify_webhook_signature(request.headers, raw_body)
+    event = json.loads(raw_body)
+
+    if await event_store.has(event["id"]):
+        return Response(status_code=200)
+
+    if event["type"] == "guarantee.settled":
+        data = event["data"]
+        await payments.mark_settled(
+            guarantee_id=data["guarantee_id"],
+            request_id=data["req_id"],
+            cycle_id=data["cycle_id"],
+            settled_at=data["settled_at"],
+        )
+
+    await event_store.record(event["id"])
+    return Response(status_code=200)
+```
+</RequestExample>
+
+## Recommended handling
+
+- Match `guarantee_id` and `req_id` to the original paid request.
+- Reconcile the amount, asset, payer, recipient, and network before changing
+  entitlement or accounting state.
+- Keep the delivered response hash or artifact reference beside the payment.
+- Treat duplicate or out-of-order deliveries as normal.
+
+See [transaction lifecycle](/core-concepts/transaction-lifecycle) and
+[payment proof and audit](/buyer/payment-proof-and-audit).

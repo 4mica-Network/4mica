@@ -3,20 +3,52 @@ title: "Quick Start"
 description: "Set up 4Mica webhooks quickly."
 ---
 
-# Quick Start
+Start with one HTTPS endpoint and subscribe only to the events your product
+needs.
 
-Start by subscribing a development endpoint to the small set of events your product actually needs.
+## Create a handler
 
-## Relevant Events
+Your handler should preserve the raw request body, verify the signature, reject
+invalid deliveries, deduplicate by event ID, and return a successful response
+quickly.
 
-- collateral.deposited
-- guarantee.settled
-- withdrawal.requested
-- withdrawal.finalized
+```javascript Node.js
+app.post("/webhooks/4mica", rawBodyMiddleware, async (req, res) => {
+  try {
+    verifyWebhookSignature(req);
+    const event = JSON.parse(req.body.toString("utf8"));
 
-## Handler Guidance
+    if (await eventStore.has(event.id)) {
+      return res.sendStatus(200);
+    }
 
-- Verify the webhook signature before processing.
-- Store event IDs and ignore duplicates.
-- Fetch current state from the API if the event arrives out of order.
-- Keep user-facing state clear: pending, settled, claimable, paid, or failed.
+    await queue.publish("4mica-webhooks", event);
+    await eventStore.record(event.id);
+
+    return res.sendStatus(200);
+  } catch (error) {
+    return res.sendStatus(400);
+  }
+});
+```
+
+## Choose events
+
+- Use [`collateral.deposited`](/webhooks/events/collateral-deposited) to refresh
+  wallet collateral.
+- Use [`guarantee.settled`](/webhooks/events/guarantee-settled) to reconcile
+  payment completion.
+- Use [`withdrawal.requested`](/webhooks/events/withdrawal-requested) to show a
+  pending withdrawal.
+- Use [`withdrawal.finalized`](/webhooks/events/withdrawal-finalized) to mark
+  funds withdrawn.
+
+## Test before production
+
+1. Send a valid example payload from the event page.
+2. Send the same event ID twice and confirm the second delivery has no effect.
+3. Send events out of order and confirm your state remains correct.
+4. Send a modified body with an invalid signature and confirm it is rejected.
+5. Make the worker fail temporarily and confirm the event can be retried safely.
+
+See [webhook security](/webhooks/security) before accepting live deliveries.

@@ -23,7 +23,7 @@ description: "Verify a signed SIWE message and issue access and refresh tokens."
   Access token lifetime in seconds.
 </ResponseField>
 
-<RequestExample dropdown>
+<RequestExample>
 ```bash cURL
 curl -X POST "https://base.sepolia.api.4mica.xyz/auth/verify" \
   -H "Content-Type: application/json" \
@@ -70,7 +70,7 @@ func main() {
 ```
 </RequestExample>
 
-<ResponseExample dropdown>
+<ResponseExample>
 ```json 200 OK
 {
   "access_token": "eyJhbGciOi...",

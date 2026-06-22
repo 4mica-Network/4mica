@@ -127,9 +127,18 @@
         "pages": [
           "webhooks/overview",
           "webhooks/quick-start",
-          "webhooks/events",
+          {
+            "group": "Events",
+            "pages": [
+              "webhooks/events/collateral-deposited",
+              "webhooks/events/guarantee-settled",
+              "webhooks/events/withdrawal-requested",
+              "webhooks/events/withdrawal-finalized"
+            ]
+          },
           "webhooks/security",
-          "webhooks/best-practices"
+          "webhooks/best-practices",
+          "webhooks/faqs"
         ]
       },
       {
