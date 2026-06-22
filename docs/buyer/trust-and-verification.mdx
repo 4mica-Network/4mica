@@ -9,7 +9,7 @@ Before your agent spends money, it should know who it is paying and why that sel
 
 ## What you should verify
 
-Before signing a payment, your agent should compare the payment requirement with the seller it meant to call. The domain, advertised tab endpoint, route, price, asset, network, and `payTo` address should all describe the same seller and the same task.
+Before signing a payment, your agent should compare the payment requirement with the seller it meant to call. The domain, route, price, asset, network, and `payTo` address should all describe the same seller and the same task.
 
 | Check | Why it matters |
 | --- | --- |
@@ -19,7 +19,7 @@ Before signing a payment, your agent should compare the payment requirement with
 | Network and asset | Confirms the payment uses an allowed settlement path for this policy. |
 | Reputation context | Helps you decide whether this seller is trusted enough for the task. |
 
-If the seller address, tab endpoint, or price does not match the service the agent intended to call, do not sign.
+If the seller address, route, or price does not match the service the agent intended to call, do not sign.
 
 ## Verify the seller
 
@@ -37,12 +37,12 @@ Treat reputation as a decision input, not a replacement for policy. A reputable 
 
 A fake seller may copy an agent name or description while using a different domain or payment address. Your agents should compare the payment requirement against a trusted source.
 
-Block the payment or require approval when something changes in a way you did not expect. The most important warning signs are a new `payTo` address for a known seller, a tab endpoint outside the seller domain, an unexpected price change, an unusual network or asset, or a route that does not match the task.
+Block the payment or require approval when something changes in a way you did not expect. The most important warning signs are a new `payTo` address for a known seller, an unexpected price change, an unusual network or asset, or a route that does not match the task.
 
 Report copied listings, unexpected payment addresses, or suspicious seller metadata to [support](mailto:support@4mica.io).
 
 ## Revocation
 
-You should be able to stop future spending without shutting down everything else. In practice, that means disabling the agent, changing policy, removing allowed sellers, revoking or rotating signing keys, and withdrawing available collateral after checking open tabs and obligations.
+You should be able to stop future spending without shutting down everything else. In practice, that means disabling the agent, changing policy, removing allowed sellers, revoking or rotating signing keys, and withdrawing available collateral after checking open guarantees and obligations.
 
 Revocation should be planned before production. It is much easier to stop one scoped agent key than to recover from a shared key with broad authority.

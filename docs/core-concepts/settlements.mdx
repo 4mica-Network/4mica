@@ -1,6 +1,6 @@
 ---
 title: "Settlements"
-description: "How tabs are paid, claimed, or expired."
+description: "How guarantees are cleared, settled, or covered after default."
 ---
 
 # Settlements
@@ -13,10 +13,11 @@ Settlement is the moment a signed off-chain obligation becomes an accounted paym
 
 ## How It Works
 
-- Happy path: the payer pays the tab on-chain after the credit window.
-- Seller path: the recipient claims collateral with a valid certificate when the payer defaults.
-- Core services track events and update tab state.
-- Settlement windows make timing predictable for both sides.
+- Payable guarantees enter a clearing cycle.
+- The cycle computes net debtor and creditor positions.
+- Net debtors pay their positions during the payment window.
+- Locked collateral covers uncovered positions after the finality deadline.
+- Core services track guarantee and cycle state through settlement.
 
 ## Builder Guidance
 

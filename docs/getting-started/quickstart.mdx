@@ -7,7 +7,7 @@ After you complete this guide, you will have a wallet ready to pay with 4Mica cr
 
 ## Before you begin
 
-4Mica's approach is to deposit collateral once, sign payment guarantees as requests happen, and settle the tab later instead of sending an on-chain transaction for every paid request. To start, you need:
+4Mica's approach is to deposit collateral once, sign payment guarantees as requests happen, and settle net positions through clearing cycles instead of sending an on-chain transaction for every paid request. To start, you need:
 
 - A wallet private key or supported signer for your agent or service.
 - Testnet ETH for gas if you are using Base Sepolia or Ethereum Sepolia.
@@ -45,7 +45,7 @@ pnpm install @4mica/x402 @x402/fetch viem
 
 ## Make your first paid request
 
-Wrap your normal `fetch` client with the 4Mica scheme. When the API returns HTTP 402 payment requirements, the wrapper opens or reuses a tab, signs the guarantee, retries the request, and returns the paid response.
+Wrap your normal `fetch` client with the 4Mica scheme. When the API returns HTTP 402 payment requirements, the wrapper creates a unique request ID, signs the guarantee, retries the request, and returns the paid response.
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
@@ -67,7 +67,7 @@ If the request succeeds, your client received the protected response and the sel
 
 ## Protect a route
 
-If you are building the seller side, protect one route with the 4Mica payment middleware. Start with a small test price and a seller-hosted tab endpoint.
+If you are building the seller side, protect one route with the 4Mica payment middleware. Start with a small test price.
 
 ```ts
 app.use(paymentMiddlewareFromConfig({
@@ -79,10 +79,10 @@ app.use(paymentMiddlewareFromConfig({
       payTo: "0xYourAddress",
     },
   },
-}, { advertisedEndpoint: "https://api.example.com/payment/tab" }));
+}));
 ```
 
-The middleware returns HTTP 402 responses, advertises the tab endpoint, verifies payment payloads, settles guarantees, and serves the protected route after payment succeeds. For the full setup, see the [Seller Quick Start](/seller/quick-start).
+The middleware returns HTTP 402 responses, verifies payment payloads, settles guarantees, and serves the protected route after payment succeeds. For the full setup, see the [Seller Quick Start](/seller/quick-start).
 
 ## Confirm it worked
 
@@ -90,7 +90,7 @@ A successful first run should end with:
 
 - The buyer receiving a normal HTTP response from the protected route.
 - The seller receiving a settled guarantee for the request amount.
-- A tab that can be paid later by the buyer or claimed by the seller if the buyer defaults during the claim window.
+- A payable guarantee that can enter a clearing cycle.
 
 ## See it in action
 
@@ -98,7 +98,7 @@ Use a demo app or the REPL to see the full payment loop before wiring 4Mica into
 
 <Columns cols={2}>
   <Card title="Demo apps" icon="play" href="/recipes/demo-apps">
-    Explore example product flows that show buyers, sellers, tabs, and settlement together.
+    Explore example product flows that show buyers, sellers, guarantees, clearing, and settlement together.
   </Card>
   <Card title="REPL" icon="terminal" href="/recipes/repl">
     Run the full 4Mica payment flow in an interactive environment.

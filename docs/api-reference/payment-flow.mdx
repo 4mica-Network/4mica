@@ -5,26 +5,26 @@ description: "Reference the end-to-end 4Mica payment flow."
 
 # Payment Flow
 
-The 4Mica payment flow keeps HTTP simple while moving settlement complexity into tabs, signatures, facilitator calls, and protocol enforcement.
+The 4Mica payment flow keeps HTTP simple while moving settlement complexity into signed guarantees, facilitator calls, clearing cycles, and protocol enforcement.
 
 ## Sequence
 
 1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
-2. A seller protects an HTTP route with x402 payment requirements and advertises a tab endpoint.
-3. The buyer receives HTTP 402, opens or reuses a payment tab, signs a guarantee, and retries the request.
+2. A seller protects an HTTP route with x402 payment requirements.
+3. The buyer receives HTTP 402, signs a guarantee with a unique request ID, and retries the request.
 4. The seller verifies and settles the payment through the facilitator, then serves the protected response.
-5. The payer settles the tab after the credit window, or the seller claims from collateral during the on-chain claim window if the payer defaults.
+5. Payable guarantees enter a clearing cycle. Net debtors pay their positions, while defaults are covered from locked collateral according to protocol rules.
 
 ## Headers
 
 - V1 payment payloads commonly travel as X-PAYMENT.
 - V2 payment payloads commonly travel as PAYMENT-SIGNATURE.
-- Both bind claims such as tab ID, request ID, amount, recipient, asset, timestamp, and version.
+- Both bind claims such as request ID, amount, recipient, asset, timestamp, and version.
 - The server should verify and settle before serving protected content.
 
 ## Settlement Outcomes
 
-- Paid: payer settles the tab and collateral unlocks according to protocol rules.
-- Remunerated: seller claims collateral using a valid certificate during the claim window.
-- Expired: seller missed the claim window and can no longer claim that collateral for the tab.
+- Settled: the guarantee is included in a clearing cycle and its net position is paid.
+- Default remunerated: locked collateral covers an unpaid net position.
+- Cancelled or disputed: the guarantee stays out of netting and collateral follows the applicable resolution path.
 - Invalid: verification or validation failed and the resource should not be served as paid.

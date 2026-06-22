@@ -3,7 +3,7 @@ title: "Express"
 description: "Protect Express routes with 4Mica x402 payment middleware."
 ---
 
-Use Express when you want the shortest server-side path to 4Mica. The `@4mica/x402` package ships Express middleware that handles HTTP 402 responses, tab creation, verification, and settlement for protected routes.
+Use Express when you want the shortest server-side path to 4Mica. The `@4mica/x402` package ships Express middleware that handles HTTP 402 responses, guarantee verification, and settlement for protected routes.
 
 ## Prerequisites
 
@@ -11,7 +11,6 @@ Use Express when you want the shortest server-side path to 4Mica. The `@4mica/x4
 - An Express app.
 - A seller wallet address that receives payments.
 - A buyer wallet with 4Mica collateral if you want to test the paid client.
-- A public tab endpoint URL for production.
 
 ## Install
 
@@ -61,25 +60,18 @@ import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 const app = express();
 app.use(express.json());
 
-const TAB_ENDPOINT = "http://localhost:3030/payment/tab";
-
 app.use(
-  paymentMiddlewareFromConfig(
-    {
-      "GET /premium-content": {
-        accepts: {
-          scheme: "4mica-credit",
-          price: "$0.10",
-          network: "eip155:84532",
-          payTo: process.env.PAY_TO ?? "0xYourAddress",
-        },
-        description: "Access to premium content",
+  paymentMiddlewareFromConfig({
+    "GET /premium-content": {
+      accepts: {
+        scheme: "4mica-credit",
+        price: "$0.10",
+        network: "eip155:84532",
+        payTo: process.env.PAY_TO ?? "0xYourAddress",
       },
+      description: "Access to premium content",
     },
-    {
-      advertisedEndpoint: TAB_ENDPOINT,
-    },
-  ),
+  }),
 );
 
 app.get("/premium-content", (req, res) => {
@@ -90,8 +82,6 @@ app.listen(3030, () => {
   console.log("Server running on http://localhost:3030");
 });
 ```
-
-In production, set `advertisedEndpoint` to your API URL, not the facilitator URL. The client posts to that route, the middleware opens the tab with 4Mica, and the client uses the returned tab data to sign the payment retry.
 
 ## Support payment
 
@@ -116,6 +106,6 @@ console.log(data);
 ## What happens
 
 1. The buyer requests `/premium-content` without payment.
-2. Express returns HTTP 402 with payment requirements and `extra.tabEndpoint`.
-3. The wrapper opens a tab, signs a guarantee, and retries with a payment header.
+2. Express returns HTTP 402 with payment requirements.
+3. The wrapper creates a unique request ID, signs a guarantee, and retries with a payment header.
 4. The middleware verifies and settles the payment before your handler serves the response.

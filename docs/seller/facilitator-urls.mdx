@@ -1,9 +1,9 @@
 ---
 title: "Facilitator URLs"
-description: "Understand when you use the facilitator and why buyers should use your tab endpoint."
+description: "Understand when seller middleware uses the facilitator."
 ---
 
-You use the facilitator from server-side middleware. Buyers usually should not call a hosted facilitator URL directly. They call your API, receive HTTP 402, and use the tab endpoint you advertised in the payment requirements.
+You use the facilitator from server-side middleware. Buyers usually should not call a hosted facilitator URL directly. They call your API, receive HTTP 402, sign a guarantee, and retry your protected route.
 
 That distinction matters because you own the commercial context: route, price, accepted networks, accepted assets, `payTo` address, logging, and abuse policy.
 
@@ -12,27 +12,17 @@ That distinction matters because you own the commercial context: route, price, a
 | URL type | Who calls it | Purpose |
 | --- | --- | --- |
 | Protected route | Buyer or buyer agent | Requests the paid resource. |
-| Your tab endpoint | Buyer or buyer agent | Opens or reuses a tab for your route. |
 | Facilitator API | Your middleware | Verifies and settles signed payment guarantees. |
 | Core4Mica contracts | Payer or seller through protocol operations | Collateral, settlement, claim, and withdrawal enforcement. |
 
-## Why advertise your own tab endpoint
+## Keep facilitator calls server-side
 
-Your tab endpoint lets you keep your policy at the edge of your own API. It gives you a place to:
+Server-side facilitator calls let you:
 
-- bind the tab to the route and price the buyer saw;
 - apply allowlists, blocklists, and rate limits;
 - attach request metadata for support and audit;
 - hide infrastructure details from buyers;
-- migrate facilitator deployments without changing your public payment surface.
-
-In production, the advertised endpoint should be an HTTPS URL on your domain, such as:
-
-```txt
-https://api.example.com/payment/tab
-```
-
-If buyers are seeing a facilitator URL instead of your tab endpoint, review seller endpoint configuration in [4mica dashboard](https://app.4mica.io).
+- migrate facilitator deployments without changing your protected routes.
 
 ## Hosted facilitator
 
@@ -46,7 +36,6 @@ Use hosted or self-hosted facilitator URLs from your server configuration. Do no
 
 ## Operational guidance
 
-- Keep the tab endpoint stable even if the facilitator URL changes.
-- Log every tab open request with route, buyer, network, price, and response.
-- Reject tab opens for routes, prices, assets, or networks you no longer accept.
+- Log every verification and settlement request with route, buyer, network, price, guarantee ID, and response.
+- Reject guarantees for routes, prices, assets, or networks you no longer accept.
 - Treat unexpected direct facilitator usage as an integration smell unless you explicitly documented it.

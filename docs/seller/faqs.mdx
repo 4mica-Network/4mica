@@ -6,13 +6,13 @@ description: "Answers to common questions about selling AI agents, paid APIs, mo
 ## Trust and legitimacy
 
 **Why should I trust this payment platform for my AI agent?**  
-4Mica is built for x402 agent payments: buyers sign collateral-backed guarantees, you verify and settle before serving paid work, and settlement can happen later through tabs and claims.
+4Mica is built for x402 agent payments: buyers sign collateral-backed guarantees, you verify and settle before serving paid work, and payable guarantees are netted in clearing cycles.
 
 **How do buyers know my agent is legitimate?**  
 Publish a consistent domain, your `payTo` address, agent name, route list, and support policy. Marketplaces or registries can add verified profiles on top.
 
 **How do buyers verify that my agent is the real one and not a fake copy?**  
-They compare the API domain, tab endpoint, your `payTo` address, and profile metadata against your canonical listing.
+They compare the API domain, protected route, your `payTo` address, and profile metadata against your canonical listing.
 
 **Can my agent have a verified profile?**  
 Yes, if the marketplace, registry, or application provides profiles. Bind the profile to your domain and your payment address.
@@ -27,7 +27,7 @@ Yes. Fixed prices appear in payment requirements. Dynamic work should use a quot
 Yes, if your route or quote describes the task, price, expiration, and completion rule clearly.
 
 **Can I prove that my agent delivered the requested result?**  
-Yes, by logging request IDs, tab IDs, payment results, payload hashes, response hashes, timestamps, and agent versions.
+Yes, by logging request IDs, guarantee IDs, payment results, payload hashes, response hashes, timestamps, and agent versions.
 
 **Can I build reputation or ratings around my agent?**  
 Yes. Use payment records plus delivery outcomes such as success rate, latency, refunds, disputes, and repeat buyers.
@@ -83,10 +83,10 @@ Yes, if that price makes sense for your product economics.
 The model avoids settling every request on-chain. You should still measure your own compute, data, and support costs.
 
 **Can multiple small payments be batched?**  
-Yes. Tabs and deferred settlement let many small obligations accumulate before settlement.
+Yes. Clearing cycles and deferred settlement let many small obligations accumulate before settlement.
 
 **How often are microtransactions settled?**  
-Settlement depends on the tab, credit window, claim window, and your operational policy.
+Settlement depends on the guarantee state, clearing cycle, payment window, and active deployment configuration.
 
 **What happens if the buyer does not have enough balance?**  
 They cannot produce a valid collateral-backed guarantee, and your server should not serve paid work.
@@ -95,13 +95,13 @@ They cannot produce a valid collateral-backed guarantee, and your server should 
 Yes. Require a valid guarantee, prepayment, or staged payment before expensive execution.
 
 **Can I lock payment until the task is completed?**  
-You can design completion and release rules in your application. 4Mica provides guarantees, settlement, and claim paths.
+You can design completion and release rules in your application. 4Mica provides guarantees, clearing, settlement, and default coverage.
 
 **Can I refund tiny payments easily?**  
 Use automated credit or refund rules for failures on your side, duplicates, or timeouts. Tiny manual refunds can cost more than they are worth.
 
 **Can I avoid losing money on gas fees or network fees?**  
-Use 4Mica credit, tabs, and deferred settlement instead of sending an on-chain transaction for every small call.
+Use 4Mica credit, clearing cycles, and deferred settlement instead of sending an on-chain transaction for every small call.
 
 ## Agent-to-agent payments
 
@@ -156,13 +156,13 @@ Yes. Define them before launch and make them visible.
 Yes. Enforce per-buyer caps, concurrency limits, route limits, and downstream spend limits in your application.
 
 **Can I pause payments if something looks suspicious?**  
-Yes. Reject tab opens, block buyers, disable routes, or pause paid execution according to your incident process.
+Yes. Reject invalid guarantees, block buyers, disable routes, or pause paid execution according to your incident process.
 
 **Can I require collateral or deposits from buyers?**  
 Yes. 4Mica guarantees are backed by payer collateral, and your application can require stronger prepayment for expensive tasks.
 
 **Can I see logs for paid requests?**  
-Yes, if you log them. Store request IDs, tab IDs, payer, route, amount, settlement result, and delivery marker.
+Yes, if you log them. Store request IDs, guarantee IDs, payer, route, amount, settlement result, and delivery marker.
 
 **Can I prove which request was paid for and what response was delivered?**  
 Yes. Link the payment record to request and response hashes or stored artifacts.
