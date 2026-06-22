@@ -12,14 +12,6 @@
   "navigation": {
     "pages": [
       {
-        "group": "Background",
-        "pages": [
-          "core-concepts/agentic-economy",
-          "core-concepts/agentic-payments",
-          "core-concepts/agent-identity"
-        ]
-      },
-      {
         "group": "Getting Started",
         "pages": [
           "getting-started/introduction",
@@ -51,6 +43,14 @@
             "pages": ["quick-start/fastapi", "quick-start/flask"]
           },
           "quick-start/rust"
+        ]
+      },
+      {
+        "group": "Background",
+        "pages": [
+          "core-concepts/agentic-economy",
+          "core-concepts/agentic-payments",
+          "core-concepts/agent-identity"
         ]
       },
       {
