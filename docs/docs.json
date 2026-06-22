@@ -110,17 +110,8 @@
         ]
       },
       {
-        "group": "Tutorials",
-        "pages": [
-          "tutorials/building-a-pay-per-use-api-with-4mica",
-          "tutorials/how-to-integrate-4mica-with-your-application",
-          "tutorials/migrate-from-stripe-to-4mica",
-          "tutorials/best-practices-for-using-4mica-in-your-application"
-        ]
-      },
-      {
         "group": "SDKs",
-        "pages": ["sdks/backend", "sdks/frontend"]
+        "pages": ["sdks/backend"]
       },
       {
         "group": "Webhooks",
@@ -168,16 +159,7 @@
         ]
       },
       "updates/changelogs",
-      "support/faqs",
-      {
-        "group": "Recipes",
-        "pages": [
-          "recipes/code-examples",
-          "recipes/learn-by-doing",
-          "recipes/demo-apps",
-          "recipes/4mica-youtube"
-        ]
-      }
+      "support/faqs"
     ],
     "global": {
       "anchors": [
