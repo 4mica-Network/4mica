@@ -1,0 +1,155 @@
+---
+title: "Getting started with core concepts"
+sidebarTitle: "Getting started"
+description: "Understand what the Core Concepts section covers and choose the right reading path."
+---
+
+The Core Concepts section explains how 4Mica works beneath the SDKs and payment
+middleware.
+
+You will learn how a buyer authorizes payment, how a seller accepts it, how
+collateral backs the guarantee, and how the obligation is later cleared and
+settled.
+
+You do not need to read every page in order. Start with the payment flow, then
+follow the path that matches what you are building.
+
+## Begin with the payment flow
+
+Start with [How x402 works](./how-x402-works). It introduces the HTTP 402
+exchange between a buyer and seller:
+
+1. The buyer requests a protected resource.
+2. The seller returns its price and payment requirements.
+3. The buyer reviews the terms and signs a guarantee.
+4. The seller verifies and settles the guarantee through the facilitator.
+5. Core accepts the guarantee when its signature, policy, and collateral are
+   valid.
+
+Next, read [Transaction lifecycle](./transaction-lifecycle). This explains what
+happens after signing, including V1 and V2 guarantees, validation, clearing,
+settlement, cancellation, disputes, and default coverage.
+
+Read [Facilitator](./facilitator) to understand the service connecting the
+seller's x402 middleware to 4Mica Core.
+
+## Understand wallets and collateral
+
+Read [Wallet](./wallet) to understand the relationship between an agent, wallet,
+signer, spending policy, and collateral.
+
+Then read [Deposits and withdrawals](./deposits-and-withdrawals). It explains
+how a wallet deposits collateral, receives payment capacity, and later
+withdraws collateral after its obligations are resolved.
+
+[Collateral ratios](./collateral-ratios) explains why deposited collateral,
+available capacity, locked exposure, and withdrawable collateral are different
+amounts.
+
+[No custodial risk](./no-custodial-risk) describes how wallet authority,
+protocol contracts, Core, and Aave fit together without creating a centralized
+prepaid balance.
+
+## Understand clearing and settlement
+
+4Mica does not require an on-chain transfer for every paid request.
+
+[Micropayments at scale](./micro-payments-at-scale) explains why payment
+authorization happens immediately while final settlement happens later.
+
+[Bilateral netting cycles](./bilateral-netting-cycles) shows how many payable
+guarantees are grouped into net debtor and creditor positions.
+
+[Settlements](./settlements) explains how those positions are paid, claimed, or
+covered by collateral when a debtor defaults.
+
+Together, these pages explain the main scaling model:
+
+```text
+signed guarantees
+→ payable obligations
+→ net positions
+→ final settlement
+```
+
+## Understand security and risk
+
+Read [Security](./security) to understand signatures, replay protection,
+collateral enforcement, contracts, facilitator boundaries, and the
+responsibilities of buyers and sellers.
+
+Read [Risk management](./risk-management) for the risks that remain across
+wallets, assets, collateral, validation, settlement, APIs, operations, and
+external protocols.
+
+These pages are important before using production wallets or accepting
+real-value payments.
+
+## Explore advanced concepts
+
+After you understand the basic payment and settlement flow, continue with the
+topics relevant to your product:
+
+- [Configurable SLAs](./configurable-slas) explains how V2 guarantees can make
+  payment depend on objective validation evidence.
+- [Earning yield](./earning-yield) explains how configured stablecoin
+  collateral can earn through Aave, including its benefits and risks.
+- [Cross-chain credit](./cross-chain-credit) explains how the same payment
+  pattern works across separate network-specific deployments.
+- [No account setup](./no-account-setup) explains how buyers can pay new
+  sellers without creating a billing account with each service.
+
+## If you are building a buyer
+
+A buyer is an agent or application that requests paid resources and signs
+payment guarantees.
+
+Use this reading path:
+
+1. [How x402 works](./how-x402-works)
+2. [Wallet](./wallet)
+3. [Deposits and withdrawals](./deposits-and-withdrawals)
+4. [Transaction lifecycle](./transaction-lifecycle)
+5. [Collateral ratios](./collateral-ratios)
+6. [Security](./security)
+7. [Risk management](./risk-management)
+
+Then continue to the [Buyer quick start](/buyer/quick-start) to configure
+spending policy, make paid requests, test the flow, and prepare for production.
+
+## If you are building a seller
+
+A seller is an API, model, agent, dataset, tool, or workflow that charges for
+access or completed work.
+
+Use this reading path:
+
+1. [How x402 works](./how-x402-works)
+2. [Facilitator](./facilitator)
+3. [Transaction lifecycle](./transaction-lifecycle)
+4. [Micropayments at scale](./micro-payments-at-scale)
+5. [Bilateral netting cycles](./bilateral-netting-cycles)
+6. [Settlements](./settlements)
+7. [Security](./security)
+
+If payment depends on the quality or outcome of the work, also read
+[Configurable SLAs](./configurable-slas).
+
+Then continue to the [Seller quick start](/seller/quick-start) to protect a
+route, configure pricing, verify payments, and record delivery evidence.
+
+## If you want to understand the protocol
+
+Use this path when evaluating 4Mica's architecture, economics, or trust model:
+
+1. [Transaction lifecycle](./transaction-lifecycle)
+2. [No custodial risk](./no-custodial-risk)
+3. [Collateral ratios](./collateral-ratios)
+4. [Bilateral netting cycles](./bilateral-netting-cycles)
+5. [Settlements](./settlements)
+6. [Earning yield](./earning-yield)
+7. [Security](./security)
+8. [Risk management](./risk-management)
+
+This path explains how guarantees are backed, how obligations are reduced
+through netting, how defaults are covered, and which trust assumptions remain.
