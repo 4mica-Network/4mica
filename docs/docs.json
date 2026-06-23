@@ -48,16 +48,15 @@
       {
         "group": "Background",
         "pages": [
-          "core-concepts/agentic-economy",
-          "core-concepts/agentic-payments",
-          "core-concepts/agent-identity"
+          "background/agentic-economy",
+          "background/agentic-payments",
+          "background/agent-identity"
         ]
       },
       {
         "group": "Core Concepts",
         "pages": [
           "core-concepts/how-x402-works",
-          "core-concepts/client-server-roles",
           "core-concepts/transaction-lifecycle",
           "core-concepts/deposits-and-withdrawals",
           "core-concepts/wallet",
