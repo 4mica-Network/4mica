@@ -1,11 +1,11 @@
 ---
 title: "Microtransactions"
-description: "Keep tiny agent payments profitable with guarantees, tabs, batching, and deferred settlement."
+description: "Keep tiny agent payments profitable with guarantees, clearing cycles, and deferred settlement."
 ---
 
 Agents create high-frequency, low-value commerce. A single task may trigger hundreds of small calls across data providers, model endpoints, and other agents.
 
-4Mica is built for this pattern by separating authorization from settlement. The buyer signs payment guarantees as requests happen. Settlement can happen later through tabs, claims, and netting instead of forcing every small request to become an on-chain transaction.
+4Mica is built for this pattern by separating authorization from settlement. The buyer signs payment guarantees as requests happen. Settlement happens later through clearing cycles and netting instead of forcing every small request to become an on-chain transaction.
 
 ## Why tiny payments need a different flow
 
@@ -23,8 +23,8 @@ With 4Mica, the expensive part does not need to happen on every call:
   <Step title="You verify before work">
     Your server checks the guarantee before serving the paid response.
   </Step>
-  <Step title="Tabs accumulate obligations">
-    Small payments collect into tabs so settlement can happen later according to protocol rules.
+  <Step title="Cycles aggregate obligations">
+    Payable guarantees enter clearing cycles so settlement can happen later according to protocol rules.
   </Step>
 </Steps>
 
@@ -39,7 +39,7 @@ If the unit is too small to price alone, bundle it into a unit buyers can still 
 - charge per 100 records instead of per record;
 - charge per task stage instead of per internal operation;
 - charge per time slice for streaming or compute;
-- require a minimum tab amount before expensive work begins.
+- require a minimum payment amount before expensive work begins.
 
 ## Handle insufficient buyer balance
 
@@ -57,23 +57,23 @@ For expensive or long-running work, choose a payment pattern that matches the ri
 
 If the task fails, refund or credit according to your published refund rules. Buyers should know the completion rule before they authorize the work.
 
-4Mica gives you the payment and claim path. Your product defines when work is considered complete.
+4Mica gives you payment authorization, clearing, settlement, and default coverage. Your product defines when work is considered complete.
 
 ## Avoiding gas and network fee loss
 
-Do not settle every tiny call as its own on-chain transfer. Use 4Mica credit, tabs, and deferred settlement so high-frequency traffic becomes a set of enforceable obligations rather than a flood of transactions.
+Do not settle every tiny call as its own on-chain transfer. Use 4Mica credit, clearing cycles, and deferred settlement so high-frequency traffic becomes a set of enforceable obligations rather than a flood of transactions.
 
 <Warning>
-If every tiny call settles separately, fees can erase the revenue you just earned. Use tabs and deferred settlement for high-frequency routes.
+If every tiny call settles separately, fees can erase the revenue you just earned. Use clearing cycles and deferred settlement for high-frequency routes.
 </Warning>
 
 Monitor the signals that show whether microtransactions are still profitable:
 
 - average payment amount;
-- requests per tab;
+- guarantees per payer and cycle;
 - settlement success rate;
 - claimable amount;
-- expired claims;
+- defaulted positions;
 - cost per fulfilled request;
 - downstream paid spend.
 
@@ -87,7 +87,7 @@ Before launch, check the parts that decide whether small payments stay profitabl
 | --- | --- |
 | Price visibility | Tiny prices are visible before the buyer signs. |
 | Payment validation | Expensive work does not start until payment is valid. |
-| Batching | Obligations accumulate through tabs instead of settling one by one. |
+| Batching | Payable guarantees accumulate in clearing cycles instead of settling one by one. |
 | Minimums | Your minimum price covers cost, support, and downstream paid calls. |
-| Alerts | You watch invalid payment spikes and missed claim windows. |
+| Alerts | You watch invalid payment spikes, missed settlement deadlines, and defaults. |
 | Repricing | You revisit prices when usage patterns change. |

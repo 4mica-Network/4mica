@@ -1,0 +1,94 @@
+---
+title: "Withdrawal requested"
+description: "Handle the withdrawal.requested webhook event."
+---
+
+`withdrawal.requested`
+
+Sent when a wallet starts the withdrawal timelock. Use it to show pending
+withdrawal state and the earliest expected finalization time.
+
+## Event fields
+
+<ResponseField name="id" type="string" required />
+<ResponseField name="type" type="string" required post={["withdrawal.requested"]} />
+<ResponseField name="created_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="api_version" type="string" required />
+<ResponseField name="data" type="object" required />
+<ResponseField name="data.withdrawal_id" type="string" required />
+<ResponseField name="data.user_address" type="string" required />
+<ResponseField name="data.asset_address" type="string" required />
+<ResponseField name="data.amount" type="string" required />
+<ResponseField name="data.network" type="string" required />
+<ResponseField name="data.requested_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="data.available_at" type="string" required post={["ISO 8601 datetime"]}>
+  Earliest configured finalization time. Open obligations may still delay exit.
+</ResponseField>
+<ResponseField name="data.transaction_hash" type="string" required />
+<ResponseField name="data.status" type="string" required post={["pending"]} />
+
+## Event examples
+
+<RequestExample dropdown>
+```json Payload
+{
+  "id": "evt_01JY3N7A4Q8H2C5M6R9V0X1BKT",
+  "type": "withdrawal.requested",
+  "created_at": "2026-06-22T16:00:00.000Z",
+  "api_version": "2026-06-01",
+  "data": {
+    "withdrawal_id": "wd_01JY3N6Z",
+    "user_address": "0x1111111111111111111111111111111111111111",
+    "asset_address": "0x3333333333333333333333333333333333333333",
+    "amount": "5000000",
+    "network": "eip155:84532",
+    "requested_at": "2026-06-22T15:59:55.000Z",
+    "available_at": "2026-07-14T15:59:55.000Z",
+    "transaction_hash": "0xWithdrawalRequestTransaction",
+    "status": "pending"
+  }
+}
+```
+```javascript title="JavaScript"
+app.post("/webhooks/4mica", rawBodyMiddleware, async (req, res) => {
+  verifyWebhookSignature(req);
+  const event = JSON.parse(req.body.toString("utf8"));
+
+  if (await eventStore.has(event.id)) return res.sendStatus(200);
+
+  if (event.type === "withdrawal.requested") {
+    await withdrawals.upsertPending(event.data.withdrawal_id, event.data);
+  }
+
+  await eventStore.record(event.id);
+  res.sendStatus(200);
+});
+```
+```python title="Python"
+@app.post("/webhooks/4mica")
+async def handle_webhook(request: Request):
+    raw_body = await request.body()
+    verify_webhook_signature(request.headers, raw_body)
+    event = json.loads(raw_body)
+
+    if await event_store.has(event["id"]):
+        return Response(status_code=200)
+
+    if event["type"] == "withdrawal.requested":
+        data = event["data"]
+        await withdrawals.upsert_pending(data["withdrawal_id"], data)
+
+    await event_store.record(event["id"])
+    return Response(status_code=200)
+```
+</RequestExample>
+
+## Recommended handling
+
+- Display the withdrawal as pending, not completed.
+- Treat `available_at` as the earliest configured finalization time.
+- Check open guarantees and settlement obligations before telling a user that
+  funds are withdrawable.
+- Reconcile current state if this event arrives after a finalization event.
+
+See [deposits and withdrawals](/core-concepts/deposits-and-withdrawals).

@@ -15,8 +15,8 @@ The wrapper handles the payment mechanics around a normal HTTP request.
   <Step title="Read payment requirements">
     The wrapper receives the seller's payment requirements from the protected route.
   </Step>
-  <Step title="Open or reuse a tab">
-    It uses the seller endpoint to open a new tab or continue with an existing one.
+  <Step title="Create a unique request">
+    It generates a request ID that has not been used for another guarantee.
   </Step>
   <Step title="Sign the guarantee">
     It signs a payment guarantee with your configured account.
@@ -62,7 +62,7 @@ After the first paid retry succeeds, check the corresponding wallet activity in 
 
 ## Signing rules
 
-Before signing, validate the payment against your policy. The amount should fit the budget, the seller address should match the expected service, the route should match the task, the network and asset should be approved, and the tab endpoint should belong to the seller domain your agent called.
+Before signing, validate the payment against your policy. The amount should fit the budget, the seller address should match the expected service, the route should match the task, and the network and asset should be approved.
 
 If the payment crosses an approval threshold, collect approval before signing. If the task budget has no room left, return a controlled error so the agent can pick another service, ask for approval, or stop.
 
@@ -70,6 +70,6 @@ When a seller requirement does not clearly match policy, pause signing and [ask 
 
 ## Logging rules
 
-Automatic payment should still be explainable. Each paid request should connect task ID, request ID, seller domain, seller `payTo` address, route, amount, network, asset, tab ID, policy version, reason for payment, and final result or error.
+Automatic payment should still be explainable. Each paid request should connect task ID, request ID, guarantee ID, seller domain, seller `payTo` address, route, amount, network, asset, policy version, reason for payment, and final result or error.
 
 These logs answer "why did the agent pay?" after the task is done.

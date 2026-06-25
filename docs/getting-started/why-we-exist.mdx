@@ -1,5 +1,5 @@
 ---
-title: "Why We Exist"
+title: "Why we exist"
 description: "Why the agentic economy needs collateral-backed credit for x402."
 ---
 
@@ -16,7 +16,7 @@ Current payment systems make agent commerce hard:
 - **On-chain settlement is too slow per request.** A useful agent may make hundreds of calls during one task. Each call cannot wait for a transaction to settle.
 - **High-volume transaction flow does not scale.** Systems that manage every agent payment as a separate transaction can break down at millions of transactions per second.
 - **Prepaid accounts trap capital.** Teams should not have to lock money across many API providers before they know what an agent will use.
-- **Failure and disputes are hard to manage.** Sellers need a clear claim path when a payer does not settle. Buyers need a way to limit exposure when something goes wrong.
+- **Failure and disputes are hard to manage.** Sellers need predictable default coverage when a net debtor does not settle. Buyers need a way to limit exposure when something goes wrong.
 - **x402 needs more infrastructure around it.** x402 makes paid HTTP requests discoverable, but builders still need credit, collateral, net settlement, and default handling.
 - **Adoption still has friction.** Large teams need controls and reliability. Smaller businesses and developers need a path that does not require building billing infrastructure first.
 
@@ -31,18 +31,16 @@ Current payment systems make agent commerce hard:
   <Card title="Slow settlement" icon="timer">
     Agents spend instantly with signed guarantees. Settlement happens later, after the request succeeds.
   </Card>
-  <Card title="Massive volume" icon="activity">
+  <Card title="Massive volume" icon="chart-line">
     4Mica tracks high-frequency guarantees off-chain and settles net exposure instead of processing every payment on the same transaction path.
   </Card>
   <Card title="Locked capital" icon="lock-keyhole">
     Buyers use one collateral pool across many services instead of prefunding a separate account with each provider.
   </Card>
   <Card title="Defaults and disputes" icon="shield-check">
-    Sellers keep a claim path against collateral if the payer does not settle. Buyers can limit exposure through tabs, collateral, and settlement windows.
+    Locked collateral covers unpaid net positions according to protocol rules. Buyers can limit exposure through spending policy, collateral, and settlement windows.
   </Card>
   <Card title="x402 adoption" icon="route">
     Sellers can protect routes with x402 and 4Mica instead of building accounts, invoices, subscriptions, or prepaid ledgers.
   </Card>
 </Columns>
-
-In short: 4Mica turns many tiny agent payments into signed guarantees that can be settled together later.

@@ -3,23 +3,47 @@ title: "Security"
 description: "Secure and verify 4Mica webhooks."
 ---
 
-# Security
+Webhook security proves that a delivery came from 4Mica and that its body was not
+modified or replayed.
 
-Webhook security is about proving the message came from 4Mica and that it has not been replayed or modified.
+## Verify the raw body
 
-## Relevant Events
+Verify the configured webhook signature before parsing JSON. Framework body
+parsers can change whitespace or encoding, which breaks signature verification.
 
-- collateral.deposited
-- tab.opened
-- guarantee.settled
-- tab.paid
-- tab.remunerated
-- withdrawal.requested
-- withdrawal.finalized
+Your verification step should use:
 
-## Handler Guidance
+- the exact raw request bytes;
+- the signature and timestamp headers supplied with the delivery;
+- the webhook secret configured for your endpoint;
+- a small timestamp tolerance to reject stale replays.
 
-- Verify the webhook signature before processing.
-- Store event IDs and ignore duplicates.
-- Fetch current state from the API if the event arrives out of order.
-- Keep user-facing state clear: pending, settled, claimable, paid, or failed.
+<Warning>
+Never trust an event type, wallet address, amount, or transaction hash before
+signature verification succeeds.
+</Warning>
+
+## Prevent replay
+
+Store each top-level event `id` in durable storage. If the ID has already been
+processed, return a successful response without applying the change again.
+
+Do not use timestamps as the only deduplication key. Two legitimate events can
+share a timestamp.
+
+## Rotate secrets
+
+Support a short overlap where both the old and new webhook secrets verify
+successfully. Remove the old secret after all senders use the replacement.
+
+Keep secrets in a managed secret store and never write them to request logs.
+
+## Limit exposure
+
+- Accept HTTPS only.
+- Restrict request size.
+- Apply rate limits without blocking legitimate retries.
+- Log failed verification attempts without logging secrets or sensitive bodies.
+- Queue verified events before expensive processing.
+
+Use [best practices](/webhooks/best-practices) for delivery and retry behavior.

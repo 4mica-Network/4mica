@@ -3,7 +3,12 @@ title: "Nuxt"
 description: "Use 4Mica with a Nuxt app and a Node API route."
 ---
 
-Use Nuxt with 4Mica by keeping paid API protection in a Node service and calling it from Nuxt server code. This keeps the 4Mica tab endpoint, verify, and settle flow on the server while your Nuxt app remains focused on UI and server routes.
+Use Nuxt with 4Mica by keeping paid API protection in a Node service and calling it from Nuxt server code. This keeps guarantee verification and settlement on the server while your Nuxt app remains focused on UI and server routes.
+
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
 
 ## Prerequisites
 
@@ -41,14 +46,18 @@ For wallet setup, see [Wallet](/core-concepts/wallet).
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
-TAB_ENDPOINT=http://localhost:3030/payment/tab
 ```
+
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
 
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 
@@ -73,10 +82,6 @@ api.use(
         },
         description: "Access to premium Nuxt content",
       },
-    },
-    {
-      advertisedEndpoint:
-        process.env.TAB_ENDPOINT ?? "http://localhost:3030/payment/tab",
     },
   ),
 );

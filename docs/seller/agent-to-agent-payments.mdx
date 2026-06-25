@@ -3,7 +3,7 @@ title: "Agent-to-Agent Payments"
 description: "Let other AI agents pay your agent directly through x402 and 4Mica credit."
 ---
 
-Other agents can pay your agent the same way any x402 buyer pays a protected resource. They call your route, receive HTTP 402, evaluate the price against their policy, open or reuse a tab, sign a guarantee, and retry the request.
+Other agents can pay your agent the same way any x402 buyer pays a protected resource. They call your route, receive HTTP 402, evaluate the price against their policy, sign a guarantee with a unique request ID, and retry the request.
 
 Your server verifies and settles the guarantee before running the paid operation.
 
@@ -66,7 +66,7 @@ For deterministic products, skip negotiation and publish fixed route prices.
 
 ## Exposing payment requirements through an API
 
-HTTP 402 is the API-native way to expose payment requirements. An agent can discover the required scheme, amount, accepted network and asset, `payTo` address, tab endpoint, expiration, and metadata directly from your route.
+HTTP 402 is the API-native way to expose payment requirements. An agent can discover the required scheme, amount, accepted network and asset, `payTo` address, expiration, and metadata directly from your route.
 
 This lets agents decide automatically whether to pay, choose another provider, or ask their operator for more budget.
 

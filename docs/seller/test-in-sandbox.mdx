@@ -3,7 +3,7 @@ title: "Test in Sandbox"
 description: "Test your agent payment flows safely before production."
 ---
 
-Sandbox testing proves that your route can issue 402 requirements, open tabs, verify guarantees, settle, serve paid work, and produce useful logs.
+Sandbox testing proves that your route can issue 402 requirements, verify guarantees, settle, serve paid work, and produce useful logs.
 
 Use Base Sepolia (`eip155:84532`) and small prices while you are validating behavior.
 
@@ -15,23 +15,23 @@ Keep sandbox wallets, keys, and prices separate from production. A test route sh
 
 <Steps>
   <Step title="Unpaid request">
-    Call the protected route without a payment header. Confirm your API returns HTTP 402 with the expected scheme, price, network, asset, `payTo`, and tab endpoint.
+    Call the protected route without a payment header. Confirm your API returns HTTP 402 with the expected scheme, price, network, asset, and `payTo`.
   </Step>
   <Step title="Paid retry">
-    Use a 4Mica-capable buyer client to open a tab, sign a guarantee, retry the request, and receive the protected response.
+    Use a 4Mica-capable buyer client to sign a guarantee with a unique request ID, retry the request, and receive the protected response.
   </Step>
   <Step title="Invalid payment">
     Retry with a missing, expired, malformed, or mismatched payment header. Confirm the paid handler does not run.
   </Step>
   <Step title="Delivery evidence">
-    Confirm logs connect request ID, tab ID, payer, route, price, settlement result, and response hash or delivery marker.
+    Confirm logs connect request ID, guarantee ID, payer, route, price, settlement result, and response hash or delivery marker.
   </Step>
-  <Step title="Claim path">
-    Exercise the default path in a controlled environment so your team understands when a seller can claim from collateral and when a claim expires.
+  <Step title="Default path">
+    Exercise the default path in a controlled environment so your team understands how an unpaid net position is covered from locked collateral.
   </Step>
 </Steps>
 
-Watch the sandbox run in [4mica dashboard](https://app.4mica.io) so tab creation, settlement, and delivery evidence are visible together.
+Watch the sandbox run in [4mica dashboard](https://app.4mica.io) so guarantee issuance, settlement, and delivery evidence are visible together.
 
 ## Sandbox checklist
 
@@ -42,10 +42,9 @@ Before adding tiers, metering, or complex workflows, prove the smallest paid rou
 | Test wallets | You use separate seller and buyer wallets for sandbox. |
 | Small price | The first route uses a low amount, such as `$0.01`. |
 | One protected route | A simple route works before you add pricing complexity. |
-| Tab endpoint | The buyer client can reach your advertised tab endpoint. |
 | Server-side facilitator call | Your server, not browser code, talks to the facilitator. |
 | Invalid attempts | Repeated bad payments trigger rate limits or alerts. |
-| Support lookup | You can find a paid request from a tab ID or request ID. |
+| Support lookup | You can find a paid request from a guarantee ID or request ID. |
 
 ## Abuse scenarios to simulate
 
@@ -76,4 +75,4 @@ Move toward production only after the payment flow is boring. You should be able
 | Which route and price were used? | HTTP 402 response, logs, and dashboard activity. |
 | Did verification and settlement succeed? | Middleware result and facilitator records. |
 | What did the agent return? | Response hash, delivery marker, or stored result metadata. |
-| What happens if the payer does not settle later? | Claim-path test notes and protocol records. |
+| What happens if a net debtor does not settle? | Default-path test notes and clearing records. |

@@ -8,17 +8,12 @@
     "light": "#ffffff",
     "dark": "#151515"
   },
-  "favicon": "/favicon.svg",
+  "favicon": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
   "navigation": {
     "pages": [
-      {
-        "group": "Background",
-        "pages": [
-          "core-concepts/agentic-economy",
-          "core-concepts/agentic-payments",
-          "core-concepts/agent-identity"
-        ]
-      },
       {
         "group": "Getting Started",
         "pages": [
@@ -54,10 +49,18 @@
         ]
       },
       {
+        "group": "Background",
+        "pages": [
+          "background/agentic-economy",
+          "background/agentic-payments",
+          "background/agent-identity"
+        ]
+      },
+      {
         "group": "Core Concepts",
         "pages": [
+          "core-concepts/getting-started",
           "core-concepts/how-x402-works",
-          "core-concepts/client-server-roles",
           "core-concepts/transaction-lifecycle",
           "core-concepts/deposits-and-withdrawals",
           "core-concepts/wallet",
@@ -110,47 +113,56 @@
         ]
       },
       {
-        "group": "Tutorials",
-        "pages": [
-          "tutorials/building-a-pay-per-use-api-with-4mica",
-          "tutorials/how-to-integrate-4mica-with-your-application",
-          "tutorials/migrate-from-stripe-to-4mica",
-          "tutorials/best-practices-for-using-4mica-in-your-application"
-        ]
-      },
-      {
         "group": "SDKs",
-        "pages": ["sdks/backend", "sdks/frontend"]
+        "pages": ["sdks/backend"]
       },
       {
         "group": "Webhooks",
         "pages": [
           "webhooks/overview",
           "webhooks/quick-start",
-          "webhooks/events",
+          {
+            "group": "Events",
+            "pages": [
+              "webhooks/events/collateral-deposited",
+              "webhooks/events/guarantee-settled",
+              "webhooks/events/withdrawal-requested",
+              "webhooks/events/withdrawal-finalized"
+            ]
+          },
           "webhooks/security",
-          "webhooks/best-practices"
+          "webhooks/best-practices",
+          "webhooks/faqs"
         ]
       },
       {
         "group": "API Reference",
         "pages": [
-          "api-reference/facilitator-api",
-          "api-reference/operator-api",
+          {
+            "group": "Facilitator",
+            "pages": [
+              "api-reference/facilitator/health",
+              "api-reference/facilitator/supported",
+              "api-reference/facilitator/verify",
+              "api-reference/facilitator/settle"
+            ]
+          },
+          {
+            "group": "Operator",
+            "pages": [
+              "api-reference/operator/create-nonce",
+              "api-reference/operator/verify-siwe",
+              "api-reference/operator/health",
+              "api-reference/operator/public-params",
+              "api-reference/operator/tokens",
+              "api-reference/operator/issue-guarantee"
+            ]
+          },
           "api-reference/payment-flow"
         ]
       },
       "updates/changelogs",
-      "support/faqs",
-      {
-        "group": "Recipes",
-        "pages": [
-          "recipes/code-examples",
-          "recipes/learn-by-doing",
-          "recipes/demo-apps",
-          "recipes/4mica-youtube"
-        ]
-      }
+      "support/faqs"
     ],
     "global": {
       "anchors": [

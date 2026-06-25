@@ -1,28 +1,605 @@
 ---
 title: "FAQs"
-description: "Answer common questions about 4Mica."
+description: "Answers to common questions about 4Mica, x402 payments, collateral, buyers, sellers, settlement, and integration."
 ---
 
-# FAQs
+Use this page for quick answers about 4Mica. Each answer includes a link to the
+guide with the full technical or operational details.
 
-These answers should help builders understand the mental model before they choose a deeper guide.
+If you are ready to build, start with the [quickstart](/getting-started/quickstart).
+For role-specific questions, see the [buyer FAQs](/buyer/faqs) or
+[seller FAQs](/seller/faqs).
 
-## What Is 4Mica?
+## About 4Mica
 
-4Mica is a credit layer for x402. It lets agents and applications pay per request with signed guarantees backed by collateral, then settle later instead of sending an on-chain transaction for every call.
+### What is 4Mica?
 
-## What Is A Payment Tab?
+4Mica is a credit and clearing layer for x402 payments.
 
-A tab is a credit session between a payer and recipient for a specific asset and network. Individual requests increment a request ID and attach signed guarantees to that tab.
+Instead of sending an on-chain transaction for every paid HTTP request, a buyer
+signs a payment guarantee backed by deposited collateral. 4Mica verifies the
+guarantee quickly, groups payable obligations into clearing cycles, and settles
+net positions later. This makes frequent, low-value payments practical for
+agents, APIs, applications, and other automated services.
 
-## Do Buyers Need To Prefund Every API?
+Read [the introduction](/getting-started/introduction) for the basic model or
+[how x402 works](/core-concepts/how-x402-works) for the full request flow.
 
-No. Buyers deposit collateral once and can use it across compatible 4Mica payment flows subject to limits, policy, and network support.
+### Who is 4Mica for?
 
-## Is 4Mica Custodial?
+4Mica is for anyone building software that needs to buy or sell digital services
+programmatically.
 
-4Mica is designed around collateral, signatures, and contract enforcement rather than a centralized prepaid balance. The important trust boundaries should be enforced by the protocol, not by a manual promise.
+Common users include:
 
-## Which Assets Are Supported?
+- AI agents that pay for APIs, models, data, compute, storage, or other agents.
+- API and agent developers who want to charge per request or per task.
+- Marketplaces that need programmable payments between buyers and sellers.
+- Infrastructure teams building x402 facilitators, wallets, or payment rails.
 
-ETH is supported natively. USDC and USDT are the default stablecoin assets where configured by the active deployment. Operators can enable additional ERC-20 assets.
+Explore [common use cases](/getting-started/usecases) and the
+[complete product map](/getting-started/all-products).
+
+### What is x402?
+
+x402 is a machine-readable payment flow built around the HTTP
+`402 Payment Required` status.
+
+A protected server returns the price and payment requirements in a `402`
+response. A compatible client chooses an accepted option, signs a payment, and
+retries the same request with the payment attached. This lets software pay for a
+resource without a traditional checkout flow or a pre-existing account with
+the seller.
+
+See [how x402 works](/core-concepts/how-x402-works) for the actors, headers, and
+request sequence.
+
+### How is 4Mica different from a standard x402 payment?
+
+4Mica authorizes each request with a collateral-backed guarantee and settles
+later, rather than transferring funds on-chain for every request.
+
+The `4mica-credit` scheme separates fast payment authorization from slower
+on-chain settlement. Many obligations can be combined into a clearing cycle,
+and only each participant's net position needs to move on-chain. The standard
+`exact` scheme is still useful when you want a direct transfer for each request.
+
+Compare the flows in [how x402 works](/core-concepts/how-x402-works) and learn
+about batching in [bilateral netting cycles](/core-concepts/bilateral-netting-cycles).
+
+### Is 4Mica a bank, wallet, or marketplace?
+
+No. 4Mica is payment infrastructure.
+
+It provides protocol contracts, a facilitator, SDKs, middleware, and hosted
+tools for collateral-backed x402 payments. Your application can add wallets,
+marketplace discovery, identity, ratings, subscriptions, invoicing, and support
+workflows on top.
+
+See [all products](/getting-started/all-products) for the boundary between the
+protocol, facilitator, developer tools, and hosted app.
+
+### What does the facilitator do?
+
+The facilitator connects the seller's HTTP payment flow to 4Mica Core.
+
+It verifies payment payloads, submits guarantees to Core, and returns settlement
+results and certificates. Buyers call the seller's protected route; the
+seller's middleware communicates with the facilitator from the server side.
+
+Read [facilitator](/core-concepts/facilitator) for its responsibilities and
+[facilitator URLs](/buyer/facilitator-urls) for the safe endpoint model.
+
+### Is 4Mica custodial?
+
+4Mica is designed around protocol-controlled collateral and cryptographic
+authorization, not a centralized prepaid seller balance.
+
+Buyers deposit collateral into protocol contracts. Each payment is authorized
+by an EIP-712 signature, and settlement or default handling follows the
+protocol's rules. Hosted services help operate the flow, but critical payment
+guarantees are enforced by signatures, collateral, and contracts.
+
+Read [no custodial risk](/core-concepts/no-custodial-risk) and
+[security](/core-concepts/security) for the trust model.
+
+## Accounts, wallets, assets, and networks
+
+### Do I need a 4Mica account?
+
+You do not need a seller-specific account for every API you use.
+
+To pay with 4Mica credit, you need an EVM wallet or compatible signer and
+collateral registered on the network you plan to use. The hosted
+[4Mica app](https://app.4mica.io) can make setup easier, while SDK integrations
+can manage the flow directly.
+
+Follow the [quickstart](/getting-started/quickstart) to prepare a wallet and make
+your first request.
+
+### Do buyers need to pre-fund every seller or API?
+
+No. A buyer deposits collateral into 4Mica instead of maintaining a separate
+prepaid balance with every seller.
+
+Compatible payment flows can use that collateral to back guarantees, subject to
+the wallet's available capacity, the active network and asset, and the buyer's
+own spending policy. A seller may still require a particular asset, stronger
+prepayment, or additional application-level terms for expensive work.
+
+See [deposits and withdrawals](/core-concepts/deposits-and-withdrawals) and
+[buyer budgets](/buyer/budgets-and-spending-limits).
+
+### Do I need a wallet and gas?
+
+Yes, you need a wallet or signer. You also need gas for actions that touch the
+blockchain, such as depositing, withdrawing, or settling.
+
+Ordinary payment guarantees are signed off-chain, so each paid HTTP request
+does not require its own blockchain transaction. For production, use a
+dedicated service wallet, hardware-backed signer, MPC wallet, or managed key
+system rather than a personal wallet.
+
+See the wallet setup in the [quickstart](/getting-started/quickstart) and the
+[wallet concept guide](/core-concepts/wallet).
+
+### Which assets does 4Mica support?
+
+4Mica supports ETH and deployment-configured <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> assets.
+
+USDC and USDT are the default stablecoins where the active deployment enables
+them. A route can only accept assets advertised in its payment requirements, so
+the buyer must use the same asset, network, and token address as the seller.
+
+Check [supported networks](/getting-started/supported-networks) before
+integrating, and inspect each route's payment requirements for its accepted
+asset.
+
+### Which networks are supported?
+
+Base is the production network, while Base Sepolia and Ethereum Sepolia are
+available for development and compatibility testing.
+
+4Mica identifies networks with <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> IDs:
+
+- Base: `eip155:8453`
+- Base Sepolia: `eip155:84532`
+- Ethereum Sepolia: `eip155:11155111`
+
+Start on Base Sepolia unless your test requires another network. Use the
+current IDs and facilitator URLs in [supported networks](/getting-started/supported-networks).
+
+### Can I pay by card or bank transfer?
+
+The native 4Mica flow uses a wallet, supported on-chain assets, and deposited
+collateral.
+
+An application can offer cards, bank transfers, or an internal balance as an
+on-ramp or user-facing funding method, but that application layer is separate
+from the 4Mica guarantee and settlement protocol.
+
+Learn what agents pay with in [agentic payments](/core-concepts/agentic-payments).
+
+### What costs should I plan for?
+
+Plan for the seller's price, eventual network gas, and the operating costs of
+your own application.
+
+One task can also trigger paid model calls, data access, compute, storage,
+retries, or downstream agents. 4Mica reduces the need for per-request on-chain
+settlement, but it does not remove those product costs. Show an estimate before
+work begins, enforce a maximum budget, and report actual spend when the task
+ends.
+
+Buyers should review [hidden costs](/buyer/budgets-and-spending-limits#hidden-costs).
+Sellers should include all fulfillment costs in
+[their pricing model](/seller/pricing-and-monetization).
+
+## Paying for services
+
+### How does a buyer make a paid request?
+
+The buyer uses a 4Mica-compatible client to call a protected URL.
+
+The server returns HTTP `402` with its price and payment requirements. The
+client checks those terms against policy, creates a unique request ID, signs a
+guarantee, and retries the request. After verification, the server returns the
+protected response.
+
+Follow the [buyer quick start](/buyer/quick-start) or use the
+[automatic paid-request guide](/buyer/make-paid-requests-automatically).
+
+### What is a payment guarantee?
+
+A payment guarantee is the buyer's signed commitment to pay a specific amount
+to a specific recipient.
+
+It binds the payer, recipient, amount, asset, request ID, and timestamp. 4Mica
+Core checks the signature and collateral before issuing a BLS certificate. The
+certificate tells the seller that Core accepted the obligation and provides
+the evidence needed for settlement or a default claim.
+
+Read [transaction lifecycle](/core-concepts/transaction-lifecycle) for the
+signed fields, certificate fields, and states.
+
+### How do I know the price before paying?
+
+The server must advertise the price and accepted payment options before the
+client signs.
+
+Fixed prices appear in the HTTP `402` payment requirements. For dynamic work,
+the seller should provide a quote that identifies the task, maximum amount,
+expiration, and completion rule. The buyer should reject any option that is
+outside its budget or policy.
+
+Buyers can configure controls with
+[budgets and spending limits](/buyer/budgets-and-spending-limits). Sellers can
+design clear terms with [pricing and monetization](/seller/pricing-and-monetization).
+
+### Can I limit or approve what an agent spends?
+
+Yes. Spending policy belongs in the buyer application.
+
+You can set limits per request, task, seller, category, asset, network, or time
+window. You can also require manual approval for new sellers, high-value
+payments, purchases, or any request that exceeds an automatic-spend threshold.
+If the budget is exhausted, the agent should stop before signing.
+
+See [budgets and spending limits](/buyer/budgets-and-spending-limits) and
+[safety and permissions](/buyer/safety-and-permissions).
+
+### Can I stop an agent or revoke its payment authority?
+
+Yes. Build an emergency stop path before allowing autonomous spending.
+
+Pause execution, disable signing, remove allowed sellers, lower budgets, revoke
+agent credentials where supported, and rotate the signer if necessary. Before
+withdrawing collateral, check for guarantees or settlement obligations that are
+still open.
+
+Use the [revocation and emergency stop guide](/buyer/safety-and-permissions#revocation-and-emergency-stop)
+and review [agent identity](/core-concepts/agent-identity) for delegated
+authority.
+
+### How do I verify a seller before paying?
+
+Compare the seller's domain, `payTo` address, route metadata, and public profile
+against a trusted source.
+
+Do not sign if these values conflict. Reviews and reputation can help, but they
+should complement address and domain verification rather than replace it. For
+new sellers, start with a sandbox or a small paid test.
+
+Use the checklist in [trust and verification](/buyer/trust-and-verification).
+
+### Can I see what each payment was for?
+
+Yes, if your application records payment context with the task.
+
+Store the task ID, request ID, guarantee ID, seller, amount, asset,
+network, reason, policy decision, response status, and resulting artifact
+together. This produces an audit trail that can support receipts, invoices,
+debugging, and disputes.
+
+See [payment proof and audit](/buyer/payment-proof-and-audit) for recommended
+records and notification behavior.
+
+### Who controls the data an agent can access, store, or share?
+
+Your application controls data permissions; 4Mica handles payment evidence.
+
+Define what the agent may read, which sellers or tools may receive it, whether
+downstream sharing is allowed, and how long payloads and logs are retained.
+Redact sensitive fields before external calls. Check each seller's privacy and
+retention terms, especially if inputs or outputs may be used for training or
+resale.
+
+See [safety and permissions](/buyer/safety-and-permissions#data-access). For
+privacy-sensitive delivery evidence, follow
+[proof and disputes](/seller/proof-and-disputes#what-delivery-evidence-proves).
+
+### What happens if the result is wrong or the task fails?
+
+Stop further spending, preserve the task and payment records, and follow the
+seller's published retry, credit, or refund policy.
+
+4Mica can prove payment authorization and settlement state, but it does not
+automatically decide whether subjective AI output was good enough. For outcomes
+that can be validated objectively, a V2 guarantee can make payment conditional
+on a trusted validation policy.
+
+Read [quality and outcomes](/buyer/quality-and-outcomes) and
+[proof and disputes](/seller/proof-and-disputes).
+
+### Can I get a refund?
+
+Refund eligibility depends on the seller or application's published policy.
+
+The parties should define what counts as non-delivery, technical failure,
+duplicate payment, or unacceptable output before the transaction. Payment and
+delivery logs help establish what happened. For very small payments, automated
+credits or retries may be more practical than manual refund processing.
+
+See [buyer spending guidance](/buyer/budgets-and-spending-limits#refunds) and
+[seller refund guidance](/seller/proof-and-disputes#refunds-and-tiny-payments).
+
+## Selling APIs, agents, and digital services
+
+### What can I sell with 4Mica?
+
+You can sell any digital service that can be delivered or initiated through an
+HTTP request.
+
+Examples include API responses, AI inference, agent tasks, datasets, search,
+compute, storage, media processing, and access to specialized tools. You can
+charge per request, per unit of usage, per task, or from a quote.
+
+See [seller quick start](/seller/quick-start) and
+[use cases](/getting-started/usecases).
+
+### How do I add payments to an API?
+
+Protect a route with 4Mica-compatible x402 middleware and configure its price,
+network, asset, and recipient address.
+
+The middleware should return `402` before expensive work, verify or settle the
+payment, and only then serve the protected response. Start with one inexpensive
+route on Base Sepolia before adding dynamic pricing or production traffic.
+
+Follow the [seller quick start](/seller/quick-start) and
+[payment middleware guide](/seller/payment-middleware).
+
+### Can I charge per request, usage, or completed task?
+
+Yes. 4Mica supports several pricing patterns.
+
+Use a fixed route price for predictable calls. Meter tokens, compute, data, or
+time in your application for usage-based pricing. For uncertain work, quote the
+task first and use caps, stages, or validation rules so the buyer understands
+the maximum cost and completion condition.
+
+Compare the patterns in [pricing and monetization](/seller/pricing-and-monetization).
+
+### Can I charge fractions of a cent?
+
+Yes, if the asset precision and your product economics support it.
+
+4Mica avoids an on-chain transaction for every request, which makes tiny
+payments more practical. You should still account for compute, data, support,
+failed requests, settlement, and eventual network fees when choosing a minimum
+price.
+
+Use the checklist in [microtransactions](/seller/microtransactions).
+
+### Can other agents pay my agent automatically?
+
+Yes. A compatible buyer agent can read the `402` response, apply its spending
+policy, sign a guarantee, and retry your route without human approval for every
+request.
+
+The buyer controls its authority and budget. The seller controls pricing,
+accepted buyers, rate limits, and when paid work begins.
+
+See [agent-to-agent payments](/seller/agent-to-agent-payments).
+
+### How do buyers know my service is legitimate?
+
+Publish a consistent domain, `payTo` address, agent or service name, route
+description, pricing terms, and support policy.
+
+Use the same identity information in your documentation, marketplace profile,
+registry listing, and payment requirements. This gives buyers a canonical
+reference and makes impersonation easier to detect.
+
+Follow [trust and legitimacy](/seller/trust-and-legitimacy).
+
+### When is it safe to deliver the paid response?
+
+Deliver after the payment has passed the verification level appropriate for the
+cost and risk of the work.
+
+For inexpensive resources, you can settle directly and serve after success. For
+expensive compute, call the facilitator's verification endpoint before doing
+the work, then settle when you are ready to accept the guarantee. Persist the
+returned certificate and connect it to your delivery record.
+
+See [verify vs settle](/core-concepts/how-x402-works#verify-vs-settle) and
+[payment middleware failure behavior](/seller/payment-middleware#failure-behavior).
+
+### What if a buyer has insufficient collateral or does not settle?
+
+Do not serve paid work when the guarantee cannot be issued.
+
+Core rejects a guarantee that is not adequately backed. If an accepted payable
+obligation later reaches default, the settlement process can use locked
+collateral to cover the recipient according to the active deployment's rules
+and deadlines.
+
+Read [microtransaction failure handling](/seller/microtransactions#handle-insufficient-buyer-balance)
+and [transaction lifecycle](/core-concepts/transaction-lifecycle).
+
+### Can I block abusive or suspicious buyers?
+
+Yes. Enforce controls in both your application and payment flow.
+
+You can rate-limit unpaid traffic and block by wallet, account, API key, IP,
+identity, domain, or observed behavior. Keep pre-payment work cheap, return
+`402` before expensive execution, cap trials, and pause a route if activity
+looks unsafe.
+
+See [risk and abuse prevention](/seller/risk-and-abuse-prevention).
+
+## Settlement, validation, and yield
+
+### When does settlement happen?
+
+Payable guarantees enter a clearing cycle and settle according to that
+deployment's configured cycle phases.
+
+A cycle accepts guarantees, closes, computes net positions, commits the clearing
+result on-chain, and opens payment and finality windows. Timings are
+configuration values, so integrations should read current deployment
+parameters rather than hard-code assumptions from an example.
+
+See [settlement cycle phases](/core-concepts/transaction-lifecycle#how-settlement-cycles-affect-both-versions)
+and [settlements](/core-concepts/settlements).
+
+### What is bilateral netting?
+
+Bilateral netting offsets what two parties owe each other before funds move.
+
+If two agents repeatedly buy from one another, 4Mica can reduce the gross set
+of obligations to a smaller net position. Clearing cycles then settle net
+debits and credits instead of every individual request.
+
+Read [bilateral netting cycles](/core-concepts/bilateral-netting-cycles).
+
+### What is the difference between V1 and V2 guarantees?
+
+V1 becomes payable after Core verifies it. V2 waits for its validation
+condition to resolve.
+
+Use V1 for known-party or agreed payments that do not need external outcome
+validation. Use V2 when payment should depend on a trusted validation registry,
+validator identity, score threshold, job hash, or other signed policy fields.
+
+See the [V1 and V2 comparison](/core-concepts/transaction-lifecycle#v1-and-v2-comparison).
+
+### How are disputes handled?
+
+Payment facts and delivery quality are separate questions.
+
+4Mica records signatures, guarantees, certificates, lifecycle state, and
+settlement evidence. Your product policy handles subjective quality, retries,
+refunds, and support. For objectively verifiable jobs, V2 can enforce a signed
+validation policy before the obligation becomes payable or before the
+validation-based remuneration path succeeds.
+
+Read [proof and disputes](/seller/proof-and-disputes) and the
+[V2 lifecycle](/core-concepts/transaction-lifecycle#how-v2-works).
+
+### Does deposited collateral earn yield?
+
+Supported stablecoin deposits can earn yield when the active deployment routes
+them through its configured yield strategy.
+
+Yield behavior, rates, supported assets, and risk depend on the deployment and
+underlying protocol. Treat yield as variable rather than guaranteed, and verify
+the current configuration before depositing production funds.
+
+See [earning yield](/core-concepts/earning-yield) for the protocol model.
+
+### How do withdrawals work?
+
+Withdrawals use a request-and-finalize process rather than an immediate exit.
+
+The delay gives the protocol time to account for open guarantees, clearing
+cycles, and claims. A withdrawal can only be finalized after the configured
+grace period and when no obligation prevents it. Check current deployment
+parameters instead of assuming a fixed duration.
+
+Read [deposits and withdrawals](/core-concepts/deposits-and-withdrawals).
+
+## Integration and troubleshooting
+
+### Which languages and frameworks can I use?
+
+4Mica provides integration paths for TypeScript and Node.js, Python, and Rust.
+
+The documentation also includes framework-specific quick starts for Next.js,
+Express, Hono, Nuxt, SvelteKit, Remix, Bun, FastAPI, and Flask. Choose the
+closest example, then use the backend SDK reference for lower-level control.
+
+Browse the [quick-start guides](/quick-start/nodejs) and
+[backend SDKs](/sdks/backend).
+
+### Does 4Mica work with existing x402 clients and servers?
+
+Yes, when the integration can register or advertise the `4mica-credit` scheme.
+
+On the buyer side, add the 4Mica scheme adapter to an x402-compatible fetch or
+request wrapper. On the seller side, configure middleware that advertises the
+scheme and verifies signed guarantees. Your normal HTTP route and response body
+can remain unchanged.
+
+Start with the [client integration](/client-integration) or
+[server integration](/server-integration) guide.
+
+### Should I test on mainnet?
+
+No. Start on Base Sepolia with a dedicated test wallet and small amounts.
+
+Test successful payments, unsupported networks, insufficient collateral,
+duplicate request IDs, rejected signatures, budget limits, timeouts, retries,
+seller mismatches, and any refund or dispute workflow before using production
+funds.
+
+Use the [buyer sandbox checklist](/buyer/test-in-sandbox) or
+[seller sandbox checklist](/seller/test-in-sandbox), then review the matching
+go-live guide.
+
+### How can my application monitor payment and collateral changes?
+
+Use durable application logs for request-level context and webhooks for
+asynchronous state changes.
+
+Webhooks can update dashboards, entitlements, collateral state, and settlement
+status after the original HTTP request has finished. Verify every webhook
+signature, store event IDs, ignore duplicates, and fetch current state when
+events arrive out of order.
+
+Start with the [webhooks overview](/webhooks/overview), then follow the
+[webhook security guide](/webhooks/security).
+
+### Why did my paid request fail?
+
+Most failures come from network, collateral, price policy, seller identity,
+signature, request ID, or facilitator configuration.
+
+Do not retry blindly. Record the task and request IDs, seller domain, `payTo`
+address, amount, asset, network, failure reason, and retry count. Retry temporary
+transport errors with a small backoff limit; do not automatically retry policy,
+identity, or over-budget failures.
+
+Use [error handling](/buyer/error-handling) for diagnosis and safe retry rules.
+
+### What should I do if a payment looks suspicious?
+
+Stop before signing or serving more work.
+
+Verify the domain, `payTo` address, network, asset, amount, and request history.
+Pause the agent or route, preserve logs, disable automatic
+signing if necessary, and rotate a key if you believe it was exposed. Review
+open obligations before attempting to withdraw collateral.
+
+Buyers should follow [trust and verification](/buyer/trust-and-verification).
+Sellers should follow [risk and abuse prevention](/seller/risk-and-abuse-prevention).
+
+### What should I never put in logs or support messages?
+
+Never share a private key, seed phrase, raw signing secret, or unrestricted
+credential.
+
+Share public wallet addresses, transaction hashes, request IDs, guarantee IDs,
+timestamps, network IDs, route URLs, and redacted error messages instead.
+Remove personal data and confidential request content unless it is necessary
+and safe to disclose.
+
+Review [security](/core-concepts/security) before moving to production.
+
+### Where can I get more help?
+
+Check the role-specific guide first, then send a concise diagnostic report to
+[support@4mica.io](mailto:support@4mica.io).
+
+Include:
+
+- Whether you are a buyer, seller, or infrastructure operator.
+- The network and asset.
+- The affected route and public wallet addresses.
+- Request, guarantee, cycle, or transaction identifiers.
+- The time of the failure and the exact error message.
+- What you expected and what happened instead.
+
+Do not include private keys or seed phrases. You can also inspect wallet and
+collateral state in the [4Mica app](https://app.4mica.io).

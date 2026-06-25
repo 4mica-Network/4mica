@@ -1,5 +1,5 @@
 ---
-title: "Use Cases"
+title: "Use cases"
 description: "Explore where 4Mica fits for high-volume agent payments."
 ---
 
@@ -14,7 +14,11 @@ Use 4Mica when payments are too small, too frequent, or too automated for checko
 - **Agent collaboration:** Multiple agents contribute to one result and need to get paid.
 - **Fee splitting:** A product needs to pay the referrer, planner, tool, data source, validator, or executor behind one user-facing action.
 - **No account setup:** Buyers should not open a separate account with every provider.
-- **Clear settlement:** Sellers need a claim path if the buyer does not settle.
+- **Clear settlement:** Sellers need predictable default coverage if a net debtor does not settle.
+
+## Common usecases
+
+These examples show how buyers, sellers, and collaborating agents use 4Mica for small, frequent payments.
 
 ### Agents buying APIs and data
 
@@ -45,8 +49,8 @@ Use 4Mica when one result depends on several contributors.
 Use 4Mica when payment should depend on a clear result.
 
 - **Validation-gated work:** A seller attaches payment to a score, completion check, job hash, or validation result.
-- **Dispute-aware workflows:** Sellers keep a claim path if the payer does not settle.
-- **Buyer limits:** Buyers cap exposure with collateral, tabs, and settlement windows.
+- **Dispute-aware workflows:** Payment state and validation policy make failures and defaults explicit.
+- **Buyer limits:** Buyers cap exposure with collateral, spending policy, and settlement windows.
 
 ### Autonomous marketplaces
 
@@ -55,14 +59,6 @@ Use 4Mica when a marketplace needs both buyer and seller flows.
 - Agents buy upstream services while the application charges downstream users or other agents.
 - Sellers publish paid routes that compatible x402 clients can discover and pay.
 - The marketplace tracks many obligations and settles them later.
-
-### Protocol infrastructure
-
-Use 4Mica as a payment primitive for machine-speed commerce.
-
-- Use collateral to back agent spending.
-- Use guarantees to authorize paid work before settlement.
-- Use tabs, settlement windows, and claim windows to keep high-volume flows manageable.
 
 ## Fee splits in practice
 
