@@ -12,13 +12,13 @@ The interface is portable. The economic positions are network-specific.
 
 An agent can understand one recurring flow:
 
-1. receive x402 payment requirements;
-2. identify the requested network and asset;
-3. select the matching wallet, signer, and 4Mica scheme;
-4. sign a collateral-backed guarantee;
+1. receive x402 payment requirements
+2. identify the requested network and asset
+3. select the matching wallet, signer, and 4Mica scheme
+4. sign a collateral-backed guarantee
 5. let the seller settle it through the matching facilitator and Core
-   deployment;
-6. reconcile the resulting obligation on that network.
+   deployment
+6. reconcile the resulting obligation on that network
 
 This makes multi-network payments easier to add without pretending that every
 chain is one shared ledger.
@@ -60,12 +60,12 @@ settlement logic.
 
 4Mica and x402 reduce that fragmentation:
 
-- x402 advertises price and payment choices over HTTP;
-- CAIP-2 identifies the network unambiguously;
-- the `4mica-credit` scheme describes the guarantee model;
-- SDKs can register a scheme implementation for each enabled network;
-- facilitators expose supported scheme and network combinations;
-- each Core deployment publishes its active contract and signing parameters.
+- x402 advertises price and payment choices over HTTP
+- <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> identifies the network unambiguously
+- the `4mica-credit` scheme describes the guarantee model
+- SDKs can register a scheme implementation for each enabled network
+- facilitators expose supported scheme and network combinations
+- each Core deployment publishes its active contract and signing parameters
 
 The business flow remains recognizable even though the underlying deployment
 changes.
@@ -105,14 +105,14 @@ Examples include:
 
 The identifier does more than label the chain. It helps bind together:
 
-- the seller's payment requirements;
-- the buyer's scheme selection;
-- the wallet's collateral position;
-- the facilitator endpoint and supported capabilities;
-- the Core deployment;
-- the contract address;
-- the settlement asset;
-- V2 validation configuration.
+- the seller's payment requirements
+- the buyer's scheme selection
+- the wallet's collateral position
+- the facilitator endpoint and supported capabilities
+- the Core deployment
+- the contract address
+- the settlement asset
+- V2 validation configuration
 
 Applications should store the complete CAIP-2 value rather than only a chain
 name such as “Base.” Names can be ambiguous across test and production
@@ -154,12 +154,12 @@ whether the SDK recognizes the network.
 
 The buyer also needs:
 
-- collateral on that exact network;
-- the required asset enabled by that deployment;
-- available capacity after collateral ratios and locked exposure;
-- native gas for any on-chain actions it may need;
-- a trusted facilitator and Core configuration;
-- permission under its own network and spending policy.
+- collateral on that exact network
+- the required asset enabled by that deployment
+- available capacity after collateral ratios and locked exposure
+- native gas for any on-chain actions it may need
+- a trusted facilitator and Core configuration
+- permission under its own network and spending policy
 
 If no offered option is compatible, the buyer should not sign a guarantee with
 substituted fields. It should reject the purchase or ask the seller for another
@@ -176,15 +176,15 @@ illusion of a shared account.
 For example, `0xBuyer` on Base and `0xBuyer` on Base Sepolia may be controlled
 by the same signer. They still have separate:
 
-- native gas balances;
-- ERC-20 balances;
-- token approvals;
-- 4Mica deposits;
-- available and locked collateral;
-- guarantees;
-- clearing positions;
-- withdrawals;
-- transaction histories.
+- native gas balances
+- <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> balances
+- token approvals
+- 4Mica deposits
+- available and locked collateral
+- guarantees
+- clearing positions
+- withdrawals
+- transaction histories
 
 ```mermaid
 flowchart TD
@@ -245,11 +245,11 @@ trustworthy local or explicitly connected source of collateral state.
 
 This isolation protects sellers from:
 
-- chain reorganization assumptions leaking across networks;
-- stale remote balances;
-- bridge or message-delivery failures;
-- the same collateral being promised independently on several chains;
-- incompatible asset valuations and contract rules.
+- chain reorganization assumptions leaking across networks
+- stale remote balances
+- bridge or message-delivery failures
+- the same collateral being promised independently on several chains
+- incompatible asset valuations and contract rules
 
 Read [deposits and withdrawals](./deposits-and-withdrawals) for the collateral
 lifecycle and [collateral ratios](./collateral-ratios) for capacity calculation.
@@ -295,13 +295,13 @@ operator configuration determine whether it is valid.
 
 The network boundary appears in several places:
 
-- the seller advertises a CAIP-2 network;
-- the buyer registers a matching scheme;
-- the facilitator settles against the matching Core service;
-- Core publishes its `chain_id` and contract address;
-- the asset address is interpreted on that chain;
-- the certificate belongs to that deployment's signing context;
-- the guarantee enters that deployment's cycle and settlement state.
+- the seller advertises a CAIP-2 network
+- the buyer registers a matching scheme
+- the facilitator settles against the matching Core service
+- Core publishes its `chain_id` and contract address
+- the asset address is interpreted on that chain
+- the certificate belongs to that deployment's signing context
+- the guarantee enters that deployment's cycle and settlement state
 
 A valid guarantee for one deployment should not be assumed valid on another.
 Even if the payer, recipient, amount, and asset symbol look similar, the
@@ -343,14 +343,14 @@ accounting and safely moves or recognizes value between the deployments.
 
 This separation matters because each network can have different:
 
-- cycle timing;
-- contract state;
-- gas conditions;
-- finality assumptions;
-- supported assets;
-- collateral ratios;
-- defaults;
-- emergency controls.
+- cycle timing
+- contract state
+- gas conditions
+- finality assumptions
+- supported assets
+- collateral ratios
+- defaults
+- emergency controls
 
 Read [bilateral netting cycles](./bilateral-netting-cycles) and
 [settlements](./settlements) for the deployment-local clearing model.
@@ -468,15 +468,15 @@ operational state.
 
 For each enabled network, the seller needs to understand:
 
-- facilitator URL and supported payment kinds;
-- Core and contract configuration;
-- accepted assets and decimals;
-- seller `payTo` address;
-- guarantee versions;
-- settlement and claim procedures;
-- gas funding;
-- monitoring and incident response;
-- accounting and reconciliation.
+- facilitator URL and supported payment kinds
+- Core and contract configuration
+- accepted assets and decimals
+- seller `payTo` address
+- guarantee versions
+- settlement and claim procedures
+- gas funding
+- monitoring and incident response
+- accounting and reconciliation
 
 <Columns cols={2}>
   <Card title="Single-network seller" icon="location-dot">
@@ -502,18 +502,18 @@ Before advertising an option, call
 [`GET /supported`](/api-reference/facilitator/supported) and confirm that the
 facilitator exposes the expected:
 
-- scheme;
-- CAIP-2 network;
-- x402 version;
-- relevant extensions or capabilities.
+- scheme
+- CAIP-2 network
+- x402 version
+- relevant extensions or capabilities
 
 During settlement, verify that:
 
-- the payment payload network matches the requirements;
-- the selected facilitator is configured for that environment;
-- the returned `networkId` is expected;
-- the certificate comes from the intended Core path;
-- logs preserve the network alongside the guarantee identity.
+- the payment payload network matches the requirements
+- the selected facilitator is configured for that environment
+- the returned `networkId` is expected
+- the certificate comes from the intended Core path
+- logs preserve the network alongside the guarantee identity
 
 A facilitator can simplify routing, but the seller remains responsible for
 passing the requirements associated with the actual protected route.
@@ -563,14 +563,14 @@ inside its own network.
 
 Even across production networks, nominally equivalent tokens can differ in:
 
-- issuer and redemption path;
-- native versus bridged representation;
-- liquidity and market depth;
-- freeze or compliance controls;
-- oracle support;
-- lending-market support;
-- collateral factor;
-- bridge dependency.
+- issuer and redemption path
+- native versus bridged representation
+- liquidity and market depth
+- freeze or compliance controls
+- oracle support
+- lending-market support
+- collateral factor
+- bridge dependency
 
 Applications should not aggregate them into one spendable amount without
 showing the conversion and risk assumptions explicitly.
@@ -612,15 +612,15 @@ network
 
 For every network, track:
 
-- total, locked, and available collateral;
-- pending deposits and withdrawals;
-- payable and validation-pending guarantees;
-- cycle membership;
-- net debit and credit positions;
-- settlement and default outcomes;
-- gas expenditure;
-- yield-bearing positions where configured;
-- bridge or transfer activity used for treasury rebalancing.
+- total, locked, and available collateral
+- pending deposits and withdrawals
+- payable and validation-pending guarantees
+- cycle membership
+- net debit and credit positions
+- settlement and default outcomes
+- gas expenditure
+- yield-bearing positions where configured
+- bridge or transfer activity used for treasury rebalancing
 
 Do not add token base-unit amounts from assets with different decimals. Convert
 only for reporting, preserve the original integer amount, and record the price
@@ -887,21 +887,3 @@ collateral” without a network is not actionable in a multi-network system.
     spendable by one deployment.
   </Accordion>
 </AccordionGroup>
-
-## Practical mental model
-
-Think of cross-chain credit as a shared language spoken by separate economic
-systems:
-
-> The payment pattern travels across networks. The collateral does not travel
-> unless an explicit transfer mechanism moves it.
-
-That model keeps the important boundaries visible:
-
-- network selection happens before signing;
-- collateral and capacity belong to one deployment;
-- assets are identified by network and contract;
-- guarantees use network-specific signing and Core configuration;
-- clearing and settlement remain local to the deployment;
-- bridging and cross-network netting are separate systems;
-- multi-network convenience never removes the need for per-network operations.

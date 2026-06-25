@@ -85,13 +85,13 @@ through their lifecycle.
 
 The buffer protects against several ordinary conditions:
 
-- prices, decimals, and asset values being interpreted incorrectly;
-- guarantees that remain open until a clearing cycle closes;
-- V2 guarantees waiting on validation;
-- pending withdrawals reducing future capacity;
-- settlement windows where a debtor has not paid yet;
-- defaults that must be covered from locked collateral;
-- operational delays in event indexing or finality.
+- prices, decimals, and asset values being interpreted incorrectly
+- guarantees that remain open until a clearing cycle closes
+- V2 guarantees waiting on validation
+- pending withdrawals reducing future capacity
+- settlement windows where a debtor has not paid yet
+- defaults that must be covered from locked collateral
+- operational delays in event indexing or finality
 
 The purpose is not to make every risk disappear. It is to make exposure explicit
 and bounded.
@@ -302,7 +302,7 @@ flowchart TB
 For more detail, read [bilateral netting cycles](./bilateral-netting-cycles) and
 [settlements](./settlements).
 
-## Buyer view: capacity is not a spending budget
+## Capacity is not a spending budget
 
 Available capacity tells a buyer what the protocol may accept. It does not tell
 the agent what it should buy.
@@ -323,7 +323,7 @@ The wallet and collateral system make payment possible. Policy makes it
 intentional. See [wallet](./wallet) for the relationship between agent, signer,
 policy, and collateral.
 
-## Seller view: accepted capacity is the signal
+## Accepted capacity is the signal
 
 A seller does not need to inspect the buyer's raw deposit and calculate every
 internal policy rule itself. The seller needs a verifiable indication that the
@@ -335,11 +335,11 @@ locked the required capacity for that obligation.
 
 This still leaves normal seller decisions outside the collateral ratio:
 
-- whether the buyer is allowed to access the resource;
-- whether the requested work is legal and safe to serve;
-- whether the payment amount matches the protected route;
-- whether the seller accepts the facilitator and network;
-- whether additional application-level authentication is required.
+- whether the buyer is allowed to access the resource
+- whether the requested work is legal and safe to serve
+- whether the payment amount matches the protected route
+- whether the seller accepts the facilitator and network
+- whether additional application-level authentication is required
 
 Collateral ratios protect economic settlement. They do not replace product,
 abuse, or compliance controls.
@@ -403,30 +403,3 @@ At minimum, integrations should use:
 Where a deployment exposes additional collateral or account-state endpoints,
 use them as the source of truth for current capacity. If there is any mismatch
 between a local estimate and Core's response, Core's response wins.
-
-## Practical mental model
-
-Think of collateral ratios as the protocol's “speed limit” for deferred
-payment. Deposits put value into the system, but the ratio decides how quickly
-that value can be promised before settlement catches up.
-
-Good collateral policy balances three goals:
-
-<Columns cols={3}>
-  <Card title="Buyer efficiency" icon="gauge">
-    The wallet should get useful payment capacity from deposited collateral
-    instead of keeping excessive value idle.
-  </Card>
-  <Card title="Seller safety" icon="shield-check">
-    Accepted guarantees should remain credible until they are settled,
-    cancelled, or covered.
-  </Card>
-  <Card title="System resilience" icon="globe">
-    One wallet, asset, or delayed settlement path should not create exposure the
-    protocol cannot absorb.
-  </Card>
-</Columns>
-
-The ratio is where those goals meet. It is not just a configuration number. It
-is the economic boundary that lets agents make fast payments without pretending
-delayed settlement has no risk.

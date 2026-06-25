@@ -23,12 +23,12 @@ account with every seller.
 
 A wallet provides that identity. It lets an agent:
 
-- identify itself as a payer;
-- sign a payment guarantee;
-- connect that guarantee to collateral;
-- pay different compatible services from one economic position;
-- appear in payment and audit records;
-- receive value when acting as a seller.
+- identify itself as a payer
+- sign a payment guarantee
+- connect that guarantee to collateral
+- pay different compatible services from one economic position
+- appear in payment and audit records
+- receive value when acting as a seller
 
 The wallet makes payment possible. It does not decide whether a payment is a
 good idea. That decision still belongs to the agent's policy.
@@ -40,8 +40,8 @@ that, but it also proves authorization.
 
 Every wallet has:
 
-- a **public address** that other systems can see;
-- a **signer** that authorizes actions for that address.
+- a **public address** that other systems can see
+- a **signer** that authorizes actions for that address
 
 The address answers:
 
@@ -92,22 +92,22 @@ The same wallet technology appears on both sides of a payment.
 
 The payer wallet:
 
-- owns the collateral behind guarantees;
-- identifies the buyer in signed claims;
-- authorizes payments;
-- contributes obligations to clearing cycles;
-- pays net debit positions;
-- withdraws collateral when obligations are clear.
+- owns the collateral behind guarantees
+- identifies the buyer in signed claims
+- authorizes payments
+- contributes obligations to clearing cycles
+- pays net debit positions
+- withdraws collateral when obligations are clear
 
 ### Recipient wallet
 
 The recipient wallet is the seller's `payTo` address. It:
 
-- identifies who should receive value;
-- appears in payment requirements;
-- becomes part of the payer's signed guarantee;
-- receives settlement or default coverage;
-- connects payment records to the seller.
+- identifies who should receive value
+- appears in payment requirements
+- becomes part of the payer's signed guarantee
+- receives settlement or default coverage
+- connects payment records to the seller
 
 A single organization can operate both payer and recipient wallets. An agent
 may buy data from one service, transform it, and sell the result to another
@@ -117,23 +117,23 @@ agent.
 
 4Mica connects several records to wallet addresses:
 
-- collateral ownership;
-- signed guarantees;
-- payer and recipient relationships;
-- clearing positions;
-- settlement outcomes;
-- withdrawals.
+- collateral ownership
+- signed guarantees
+- payer and recipient relationships
+- clearing positions
+- settlement outcomes
+- withdrawals
 
 This makes the wallet address a stable reference across the payment lifecycle.
 But an address alone does not tell the full identity story.
 
 It does not automatically reveal:
 
-- which agent used it;
-- which person or organization authorized the agent;
-- what the agent was allowed to buy;
-- why the payment happened;
-- whether the seller is trustworthy.
+- which agent used it
+- which person or organization authorized the agent
+- what the agent was allowed to buy
+- why the payment happened
+- whether the seller is trustworthy
 
 Applications must attach that context through policy, metadata, task records,
 and identity systems.
@@ -170,23 +170,23 @@ recipient address.
 
 Before payment, the buyer application should:
 
-1. verify the seller and route;
-2. check the amount against budget;
-3. confirm the network and asset;
-4. decide whether approval is required;
-5. create a unique request identifier;
-6. ask the signer to authorize the guarantee.
+1. verify the seller and route
+2. check the amount against budget
+3. confirm the network and asset
+4. decide whether approval is required
+5. create a unique request identifier
+6. ask the signer to authorize the guarantee
 
 The wallet signs structured claims that bind the payment to a specific:
 
-- payer;
-- recipient;
-- request;
-- amount;
-- asset;
-- time;
-- guarantee version;
-- validation policy, for V2.
+- payer
+- recipient
+- request
+- amount
+- asset
+- time
+- guarantee version
+- validation policy, for V2
 
 Core verifies the signature and collateral before accepting the guarantee.
 
@@ -317,7 +317,7 @@ A wallet may have:
 - enough collateral but not enough native gas;
 - different guarantees and settlement obligations on each network.
 
-Every wallet view should identify the network explicitly. Use CAIP-2 network
+Every wallet view should identify the network explicitly. Use <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> network
 IDs rather than relying only on names.
 
 See [supported networks](/getting-started/supported-networks).
