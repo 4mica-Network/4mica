@@ -5,6 +5,11 @@ description: "Use 4Mica with a NextJS app running on Node."
 
 Use NextJS with 4Mica when your app needs paid API routes, paid server actions, or server-side calls to paid APIs. For route protection, run NextJS behind a Node server entry and mount the 4Mica Express middleware before the Next handler.
 
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
+
 ## Prerequisites
 
 - NextJS running in the Node runtime.
@@ -43,13 +48,16 @@ PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
 ```
 
-Use the private key only for buyer-side signing. Use `PAY_TO` as the seller address advertised by protected routes.
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
 
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet on the same network your NextJS server advertises. Start with Base Sepolia (`eip155:84532`) and a small test price.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 

@@ -5,6 +5,11 @@ description: "Use 4Mica from a Bun-powered Node service."
 
 Use Bun when you want fast local installs and a Node-compatible runtime for a 4Mica service. The server-side 4Mica integration uses Express middleware, which Bun can run through its Node compatibility layer.
 
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
+
 ## Prerequisites
 
 - Bun installed locally.
@@ -42,11 +47,16 @@ PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
 ```
 
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
+
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet before calling protected routes. Match the route network, such as `eip155:84532` for Base Sepolia.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 

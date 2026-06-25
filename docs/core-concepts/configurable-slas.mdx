@@ -10,10 +10,10 @@ guarantee so payment depends on validation evidence rather than delivery alone.
 The payer does not merely sign an amount and recipient. The payer also signs the
 validation policy that identifies:
 
-- where the validation result must be published;
-- who is allowed to validate the work;
-- which job and payment the result belongs to;
-- which score and result tag are acceptable.
+- where the validation result must be published
+- who is allowed to validate the work
+- which job and payment the result belongs to
+- which score and result tag are acceptable
 
 Core checks this policy before issuing the guarantee. The guarantee begins in
 `PENDING_VALIDATION`, and the signed conditions cannot be changed afterward
@@ -42,11 +42,11 @@ result.
 Without a validation policy, the payment system can prove authorization and
 settlement but cannot determine whether:
 
-- the requested job was completed;
-- the output belongs to the correct request;
-- a required evaluator approved it;
-- a measurable quality threshold was reached;
-- a required result category was published.
+- the requested job was completed
+- the output belongs to the correct request
+- a required evaluator approved it
+- a measurable quality threshold was reached
+- a required result category was published
 
 V2 adds that outcome layer. It connects a payment guarantee to a specific
 validation result while preserving the signed payment terms.
@@ -158,11 +158,11 @@ economic agreement, not an implementation detail.
 
 A validator may be:
 
-- an independent evaluation agent;
-- a deterministic verification service;
-- an application-specific assessor;
-- a registry-recognized reviewer;
-- a system that checks an on-chain or cryptographic outcome.
+- an independent evaluation agent
+- a deterministic verification service
+- an application-specific assessor
+- a registry-recognized reviewer
+- a system that checks an on-chain or cryptographic outcome
 
 The payer should understand the validator's methodology and trust assumptions
 before signing. An allowlisted registry proves where a result came from; it
@@ -200,12 +200,12 @@ metric.
 
 Good score policies state:
 
-- which evaluator produces the score;
-- which rubric and version are used;
-- whether the score is deterministic;
-- how invalid or missing outputs are scored;
-- whether the threshold is inclusive;
-- whether evaluation can be reproduced.
+- which evaluator produces the score
+- which rubric and version are used
+- whether the score is deterministic
+- how invalid or missing outputs are scored
+- whether the threshold is inclusive
+- whether evaluation can be reproduced
 
 If a binary pass or fail is sufficient, use a clear result tag rather than
 inventing unnecessary numerical precision.
@@ -286,13 +286,13 @@ flowchart LR
 
 The result is only as meaningful as the full chain:
 
-- the payer understood the policy before signing;
-- the registry is the intended contract on the intended network;
-- the validator controls the expected identity;
-- the evaluator measured the intended subject;
-- the job and request hashes were constructed correctly;
-- the score and tag have stable semantics;
-- the lifecycle applies the result to the correct guarantee.
+- the payer understood the policy before signing
+- the registry is the intended contract on the intended network
+- the validator controls the expected identity
+- the evaluator measured the intended subject
+- the job and request hashes were constructed correctly
+- the score and tag have stable semantics
+- the lifecycle applies the result to the correct guarantee
 
 4Mica verifies protocol conditions. It cannot determine whether a poorly
 designed metric represents genuine customer value.
@@ -400,12 +400,12 @@ were unused.
 Long or unreliable validation processes can reduce available spending capacity.
 Buyers should account for:
 
-- expected validation duration;
-- the number of concurrent pending jobs;
-- the maximum value of each job;
-- validator and registry availability;
-- cancellation or resolution procedures;
-- other guarantees and settlement obligations using the same collateral.
+- expected validation duration
+- the number of concurrent pending jobs
+- the maximum value of each job
+- validator and registry availability
+- cancellation or resolution procedures
+- other guarantees and settlement obligations using the same collateral
 
 This relationship is explained further in
 [collateral ratios](./collateral-ratios) and
@@ -423,12 +423,12 @@ to prove that a response met the deadline.
 
 Similarly:
 
-- availability needs a defined measurement window and observation source;
-- retry limits need a stable request identity and idempotent behavior;
-- partial completion needs a rubric or staged payment design;
-- timeout handling needs an explicit product and lifecycle policy;
+- availability needs a defined measurement window and observation source
+- retry limits need a stable request identity and idempotent behavior
+- partial completion needs a rubric or staged payment design
+- timeout handling needs an explicit product and lifecycle policy
 - refunds remain an application policy unless represented by an enforceable
-  payment or validation flow.
+  payment or validation flow
 
 Do not place critical meaning in prose that the validator cannot observe.
 Either make the condition machine-checkable or state clearly that it belongs to
@@ -522,12 +522,12 @@ SLA verifiable.
 
 Prefer commitments and minimal metadata:
 
-- hash the normalized job or artifact;
-- retain the original data in an access-controlled system;
-- publish only the result fields required by the policy;
-- avoid low-entropy hashes that reveal guessable private values;
-- document who can access supporting evidence;
-- keep retention periods proportional to audit and dispute needs.
+- hash the normalized job or artifact
+- retain the original data in an access-controlled system
+- publish only the result fields required by the policy
+- avoid low-entropy hashes that reveal guessable private values
+- document who can access supporting evidence
+- keep retention periods proportional to audit and dispute needs
 
 A hash proves that retained data matches a commitment. It does not by itself
 prove that the hidden data was correct or safe.

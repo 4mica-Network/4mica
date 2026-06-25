@@ -6,13 +6,13 @@ description: "How 4Mica transactions are signed, issued, validated, cleared, and
 A 4Mica transaction is a **cryptographic guarantee**: a signed payment commitment backed by payer collateral.
 The payer does not send an on-chain transfer for every request.
 They sign a guarantee, the recipient submits it to 4Mica Core, and Core returns a BLS certificate after it verifies the request and locks collateral.
-The BLS certificate is the payment authorization.
+The <Tooltip headline="BLS certificate" tip="BLS stands for Boneh–Lynn–Shacham, a digital signature scheme that produces compact, publicly verifiable signatures. 4Mica Core signs the certificate after verifying the guarantee and locking the required collateral capacity.">BLS certificate</Tooltip> is the payment authorization.
 After the recipient verifies it, they can provide the service knowing Core accepted the guarantee.
 
 There are two types of guarantees:
 
 - **V1** is payable as soon as Core issues it. Use it for agreed payments.
-- **V2** is validation-gated. A verifier, such as an ERC-8004 validation registry, must confirm the job before the recipient can use the validation path for payment.
+- **V2** is validation-gated. A verifier, such as an <Tooltip headline="ERC-8004" tip="An Ethereum standard for discovering, identifying, and evaluating autonomous agents through on-chain registries. 4Mica can use its validation registry as a trusted source of job-result evidence.">ERC-8004 validation registry</Tooltip>, must confirm the job before the recipient can use the validation path for payment.
 
 With **V1**, the payer and recipient already accept the payment terms.
 Core checks the payer signature, user status, accepted version, and collateral.

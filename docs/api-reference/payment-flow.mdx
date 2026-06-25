@@ -7,7 +7,7 @@ The 4Mica payment flow keeps HTTP simple while moving settlement complexity into
 
 ## Sequence
 
-1. A payer deposits ETH or a supported ERC-20 into the Core4Mica vault.
+1. A payer deposits ETH or a supported <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> into the Core4Mica vault.
 2. A seller protects an HTTP route with x402 payment requirements.
 3. The buyer receives HTTP 402, signs a guarantee with a unique request ID, and retries the request.
 4. The seller verifies and settles the payment through the facilitator, then serves the protected response.

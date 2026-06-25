@@ -5,6 +5,11 @@ description: "Use 4Mica with a Nuxt app and a Node API route."
 
 Use Nuxt with 4Mica by keeping paid API protection in a Node service and calling it from Nuxt server code. This keeps guarantee verification and settlement on the server while your Nuxt app remains focused on UI and server routes.
 
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
+
 ## Prerequisites
 
 - Nuxt running on Node.
@@ -43,11 +48,16 @@ PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
 ```
 
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
+
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet on Base Sepolia (`eip155:84532`) before you call the protected API.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 

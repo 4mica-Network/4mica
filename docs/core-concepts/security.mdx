@@ -88,16 +88,16 @@ requests.
 Good signer security includes:
 
 - use dedicated wallets for agents instead of reusing a personal or treasury
-  wallet;
-- separate production, staging, and test wallets;
-- place policy checks before the signing service;
-- limit who or what can request signatures;
+  wallet
+- separate production, staging, and test wallets
+- place policy checks before the signing service
+- limit who or what can request signatures
 - keep private keys in a secure wallet, HSM, managed key service, or isolated
-  signing service;
+  signing service
 - avoid exporting private keys into application logs, CI jobs, notebooks, or
-  local scripts;
-- rotate signers when access changes or compromise is suspected;
-- maintain an emergency stop path that disables signing quickly.
+  local scripts
+- rotate signers when access changes or compromise is suspected
+- maintain an emergency stop path that disables signing quickly
 
 <Warning>
 Never give a hosted facilitator or resource server unrestricted access to the
@@ -181,13 +181,13 @@ deadline, locked collateral can cover the claim according to protocol rules.
 
 Collateral security also has limits:
 
-- collateral can be locked while obligations remain unresolved;
+- collateral can be locked while obligations remain unresolved
 - withdrawal may be delayed by open guarantees, settlement, validation, or
-  default exposure;
-- supported assets and collateral ratios can vary by deployment;
+  default exposure
+- supported assets and collateral ratios can vary by deployment
 - yield integrations such as Aave introduce smart-contract, liquidity,
-  governance, and asset risks;
-- collateral capacity is not the same as a buyer's application budget.
+  governance, and asset risks
+- collateral capacity is not the same as a buyer's application budget
 
 Read [collateral ratios](./collateral-ratios), [settlements](./settlements),
 and [no custodial risk](./no-custodial-risk) for the collateral and ownership
@@ -225,18 +225,18 @@ and submits accepted guarantees to Core.
 
 A facilitator can:
 
-- check whether a payment payload is structurally valid;
-- verify that fields match the payment requirements;
-- submit a guarantee to Core for acceptance;
-- return a certificate or settlement response;
-- help the seller avoid implementing all protocol calls directly.
+- check whether a payment payload is structurally valid
+- verify that fields match the payment requirements
+- submit a guarantee to Core for acceptance
+- return a certificate or settlement response
+- help the seller avoid implementing all protocol calls directly
 
 A facilitator should not be able to:
 
-- change a signed amount or recipient without invalidating the signature;
-- create a valid payment without the payer's signer;
-- withdraw the payer's collateral to an arbitrary address;
-- decide that a V2 guarantee is payable without satisfying lifecycle rules.
+- change a signed amount or recipient without invalidating the signature
+- create a valid payment without the payer's signer
+- withdraw the payer's collateral to an arbitrary address
+- decide that a V2 guarantee is payable without satisfying lifecycle rules
 
 Sellers should configure trusted facilitator URLs and treat facilitator
 responses as payment evidence only after verification succeeds. Buyers should
@@ -281,14 +281,14 @@ payment decision.
 
 Before serving protected content, the seller should:
 
-- return payment requirements before doing expensive work;
+- return payment requirements before doing expensive work
 - verify that the payment payload matches the route, amount, asset, network,
-  and `payTo`;
-- call the facilitator verify or settle path according to the route's risk;
-- persist the certificate or receipt;
-- make delivery idempotent so retries do not produce unintended duplicate work;
-- rate limit unpaid and invalid requests;
-- log payment and delivery records without leaking secrets.
+  and `payTo`
+- call the facilitator verify or settle path according to the route's risk
+- persist the certificate or receipt
+- make delivery idempotent so retries do not produce unintended duplicate work
+- rate limit unpaid and invalid requests
+- log payment and delivery records without leaking secrets
 
 <Warning>
 Do not run the expensive part of the task just to decide whether payment is
@@ -326,14 +326,14 @@ every risk around autonomous software.
 
 It does not automatically decide:
 
-- whether a seller is legitimate;
-- whether an agent should buy a resource;
-- whether a price is reasonable;
-- whether a model output or data result is correct;
-- whether a user gave the agent enough authority;
-- whether private application data should be sent to a seller;
-- whether a smart contract or external protocol has zero risk;
-- whether a production key was stored safely by your organization.
+- whether a seller is legitimate
+- whether an agent should buy a resource
+- whether a price is reasonable
+- whether a model output or data result is correct
+- whether a user gave the agent enough authority
+- whether private application data should be sent to a seller
+- whether a smart contract or external protocol has zero risk
+- whether a production key was stored safely by your organization
 
 That separation is healthy. Payment infrastructure should enforce payment
 rules. Application policy should decide intent, access, data sharing, and

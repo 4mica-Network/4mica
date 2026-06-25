@@ -5,6 +5,11 @@ description: "Use 4Mica with SvelteKit on Node."
 
 Use SvelteKit with 4Mica by running the Node adapter behind an Express server. Mount the 4Mica middleware before the SvelteKit handler for paid API routes.
 
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
+
 ## Prerequisites
 
 - SvelteKit configured with `@sveltejs/adapter-node`.
@@ -42,11 +47,16 @@ PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
 ```
 
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
+
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet before making paid requests. Match the network in the client scheme and the protected route.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 

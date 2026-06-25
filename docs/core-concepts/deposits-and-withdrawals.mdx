@@ -86,7 +86,7 @@ URLs and network guidance.
 
 ## Choose a supported asset
 
-4Mica can accept native ETH and deployment-configured ERC-20 assets.
+4Mica can accept native ETH and deployment-configured <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> assets.
 
 The asset must be supported by the active Core deployment and match the asset
 advertised by the seller's payment requirements. Common stablecoin deployments
@@ -454,7 +454,7 @@ Before relying on collateral in production, confirm:
 | Area | What to verify |
 | --- | --- |
 | Wallet | A dedicated wallet and secure signer are configured. |
-| Network | Deposits and payment requirements use the same CAIP-2 network. |
+| Network | Deposits and payment requirements use the same <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> network. |
 | Asset | Token address and decimals come from trusted deployment data. |
 | Gas | The wallet can submit approvals, deposits, and withdrawals. |
 | Approval | ERC-20 allowance is limited and points to the correct contract. |
@@ -464,4 +464,3 @@ Before relying on collateral in production, confirm:
 | Emergency stop | You can pause signing and revoke delegated authority quickly. |
 | Withdrawal | The team understands request, grace-period, and finalization behavior. |
 | Recovery | Failed and out-of-order events can be reconciled safely. |
-

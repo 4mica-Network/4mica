@@ -105,13 +105,13 @@ parameters.
 
 The supply rate changes with market conditions, especially:
 
-- how much liquidity has been supplied;
-- how much of that liquidity is borrowed;
-- the market's interest-rate curve;
-- reserve and protocol parameters;
-- borrower demand;
-- asset-specific risk settings;
-- governance decisions.
+- how much liquidity has been supplied
+- how much of that liquidity is borrowed
+- the market's interest-rate curve
+- reserve and protocol parameters
+- borrower demand
+- asset-specific risk settings
+- governance decisions
 
 This is why the rate is variable. A current annual percentage yield is an
 annualized view of recent or current conditions, not a promise that the same
@@ -217,12 +217,12 @@ window. If it does not, eligible locked collateral can cover the default.
 
 The fact that collateral earned yield does not change these responsibilities:
 
-- guarantees still need sufficient capacity when issued;
-- net debit positions still need to be monitored;
-- settlement deadlines still apply;
-- default coverage may consume collateral;
-- unresolved V2 guarantees can keep capacity locked;
-- withdrawals remain subject to obligations.
+- guarantees still need sufficient capacity when issued
+- net debit positions still need to be monitored
+- settlement deadlines still apply
+- default coverage may consume collateral
+- unresolved V2 guarantees can keep capacity locked
+- withdrawals remain subject to obligations
 
 Yield makes the collateral productive. It does not erase the debt the
 collateral secures.
@@ -359,13 +359,13 @@ redemption quality can change.
 
 Relevant risks include:
 
-- loss of the intended peg;
-- issuer or reserve problems;
-- address freezing or blacklisting;
-- bridge or wrapped-asset risk;
-- low market liquidity;
-- oracle divergence;
-- incompatible token behavior.
+- loss of the intended peg
+- issuer or reserve problems
+- address freezing or blacklisting
+- bridge or wrapped-asset risk
+- low market liquidity
+- oracle divergence
+- incompatible token behavior
 
 A quoted APY should never be evaluated separately from the asset that earns it.
 A lower rate on a stronger asset may be preferable to a higher rate on an asset
@@ -398,11 +398,11 @@ controls.
 
 Users should understand:
 
-- which contracts can be upgraded;
-- who can pause relevant actions;
-- how supported markets are selected;
-- whether asset parameters can change;
-- how migrations or deprecations are communicated.
+- which contracts can be upgraded
+- who can pause relevant actions
+- how supported markets are selected
+- whether asset parameters can change
+- how migrations or deprecations are communicated
 
 ### Blockchain and infrastructure risk
 
@@ -485,11 +485,11 @@ The payment lifecycle still recorded and settled the full \$4,000. The
 
 This distinction matters for accounting:
 
-- seller payments are operating expenses or purchases;
-- yield is income or return on collateral;
-- defaults are payment-obligation outcomes;
-- gas and infrastructure are operational costs;
-- changes in token value are asset gains or losses.
+- seller payments are operating expenses or purchases
+- yield is income or return on collateral
+- defaults are payment-obligation outcomes
+- gas and infrastructure are operational costs
+- changes in token value are asset gains or losses
 
 Applications should present these values separately before offering a combined
 “net cost” view.
@@ -501,19 +501,19 @@ and risk exposure.
 
 Keeping too little can cause:
 
-- insufficient capacity during traffic spikes;
-- rejected guarantees;
-- frequent deposit transactions;
-- operational interruptions while waiting for finality;
-- low resilience when V2 validation or settlement locks capacity longer.
+- insufficient capacity during traffic spikes
+- rejected guarantees
+- frequent deposit transactions
+- operational interruptions while waiting for finality
+- low resilience when V2 validation or settlement locks capacity longer
 
 Keeping too much can cause:
 
-- unnecessary smart-contract and stablecoin exposure;
-- larger losses if a signer or protocol path is compromised;
-- more capital subject to withdrawal timing;
-- misleading pressure to pursue a small yield advantage;
-- concentration in one network, asset, or strategy.
+- unnecessary smart-contract and stablecoin exposure
+- larger losses if a signer or protocol path is compromised
+- more capital subject to withdrawal timing
+- misleading pressure to pursue a small yield advantage
+- concentration in one network, asset, or strategy
 
 A practical target begins with payment needs:
 
@@ -585,16 +585,16 @@ should use actual position changes, not today's APY applied backward.
 
 Alerts can cover:
 
-- material stablecoin depeg;
-- sudden utilization or rate changes;
-- low available redemption liquidity;
-- contract pause or market freeze;
-- unsupported or deprecated collateral asset;
-- rapid growth in locked exposure;
-- settlement deadlines approaching;
-- unexpected withdrawal request;
-- yield accrual diverging from the authoritative position;
-- failed redemption or withdrawal finalization.
+- material stablecoin depeg
+- sudden utilization or rate changes
+- low available redemption liquidity
+- contract pause or market freeze
+- unsupported or deprecated collateral asset
+- rapid growth in locked exposure
+- settlement deadlines approaching
+- unexpected withdrawal request
+- yield accrual diverging from the authoritative position
+- failed redemption or withdrawal finalization
 
 ## Security and operational practices
 

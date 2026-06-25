@@ -59,9 +59,9 @@ Two standards are emerging at this layer. ERC-8004 is a draft proposal backed by
 
 Start with the smallest identity footprint that makes your payment flow auditable and revocable. Expand as your agent surface grows:
 
-- issue per-agent signing keys, not shared keys across the system;
-- attach explicit spending policy to each key before any agent calls an external service;
-- keep delegation chains short since one or two levels is almost always enough;
-- log every payment authorization with agent address, signer, policy version, and timestamp;
-- build revocation before you need it and know how to invalidate a specific key without disrupting other agents or active sessions;
-- treat reputation as future infrastructure and design your identity model to accommodate portable credentials even if you can't use them yet.
+- issue per-agent signing keys, not shared keys across the system
+- attach explicit spending policy to each key before any agent calls an external service
+- keep delegation chains short since one or two levels is almost always enough
+- log every payment authorization with agent address, signer, policy version, and timestamp
+- build revocation before you need it and know how to invalidate a specific key without disrupting other agents or active sessions
+- treat reputation as future infrastructure and design your identity model to accommodate portable credentials even if you can't use them yet

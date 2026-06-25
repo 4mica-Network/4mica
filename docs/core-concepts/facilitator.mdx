@@ -62,14 +62,14 @@ guarantee without the payer's signature or bypass Core's collateral checks.
 Without a facilitator, every seller would need to implement the complete
 payment adapter:
 
-- decode multiple x402 envelope versions;
-- interpret schemes and CAIP-2 network identifiers;
-- compare signed claims with route-specific payment requirements;
-- handle V1 and V2 guarantee fields;
-- validate encoding and signing schemes;
-- call the correct Core deployment;
-- normalize success and error responses;
-- return settlement evidence to middleware.
+- decode multiple x402 envelope versions
+- interpret schemes and <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> network identifiers
+- compare signed claims with route-specific payment requirements
+- handle V1 and V2 guarantee fields
+- validate encoding and signing schemes
+- call the correct Core deployment
+- normalize success and error responses
+- return settlement evidence to middleware
 
 Those responsibilities are easy to implement inconsistently across languages,
 frameworks, and seller applications. The facilitator provides one stable
@@ -78,13 +78,13 @@ server-side interface for them.
 The seller still owns the commercial and product decisions. The facilitator
 does not decide:
 
-- which route requires payment;
-- what the route costs;
-- which assets or networks the seller advertises;
-- which wallet receives the obligation;
-- whether a buyer is allowed to use the service;
-- what work counts as delivery;
-- which refund, retry, or support policy applies.
+- which route requires payment
+- what the route costs
+- which assets or networks the seller advertises
+- which wallet receives the obligation
+- whether a buyer is allowed to use the service
+- what work counts as delivery
+- which refund, retry, or support policy applies
 
 The result is a clean division: the seller defines the sale, the payer
 authorizes it, the facilitator adapts the HTTP payment, and Core decides whether
@@ -185,11 +185,11 @@ For the complete exchange, see
 `GET /supported` reports which payment kinds the facilitator currently accepts.
 A payment kind can include:
 
-- the payment scheme, such as `4mica-credit`;
-- the CAIP-2 network identifier;
-- the x402 protocol version;
-- scheme-specific capabilities or metadata;
-- supported extensions or signer information where available.
+- the payment scheme, such as `4mica-credit`
+- the CAIP-2 network identifier
+- the x402 protocol version
+- scheme-specific capabilities or metadata
+- supported extensions or signer information where available
 
 A seller should use this information before advertising a payment option.
 Otherwise, it may offer a scheme or network that its configured facilitator
@@ -197,11 +197,11 @@ cannot process.
 
 Discovery is particularly important when:
 
-- moving from a test network to production;
-- enabling a new x402 version;
-- changing facilitator deployments;
-- supporting several networks from one service;
-- rolling out new scheme capabilities gradually.
+- moving from a test network to production
+- enabling a new x402 version
+- changing facilitator deployments
+- supporting several networks from one service
+- rolling out new scheme capabilities gradually
 
 <Warning>
 Do not infer support from the facilitator URL alone. Query its capabilities and
@@ -220,16 +220,16 @@ lock collateral, create a guarantee, or return a BLS certificate.
 
 The check can detect inconsistencies such as:
 
-- malformed x402 envelopes;
-- unsupported or inconsistent versions;
-- incorrect payment schemes;
-- network mismatches;
-- recipient addresses that differ from `payTo`;
-- amounts that do not satisfy the advertised requirement;
-- asset mismatches;
-- missing signed claims;
-- invalid request structure;
-- incompatible V2 validation data.
+- malformed x402 envelopes
+- unsupported or inconsistent versions
+- incorrect payment schemes
+- network mismatches
+- recipient addresses that differ from `payTo`
+- amounts that do not satisfy the advertised requirement
+- asset mismatches
+- missing signed claims
+- invalid request structure
+- incompatible V2 validation data
 
 The seller must submit the same requirements it advertised to the buyer. Those
 requirements are the comparison point for the signed payload.
@@ -242,13 +242,13 @@ bad payments before allocating expensive application resources.
 
 It does **not** mean:
 
-- Core has accepted the guarantee;
-- the payer currently has sufficient available collateral;
-- the request identity is unused;
-- a BLS certificate exists;
-- a V2 result has passed validation;
-- the obligation is included in clearing;
-- final settlement has completed.
+- Core has accepted the guarantee
+- the payer currently has sufficient available collateral
+- the request identity is unused
+- a BLS certificate exists
+- a V2 result has passed validation
+- the obligation is included in clearing
+- final settlement has completed
 
 `/verify` is therefore a risk-reduction step, not final payment acceptance.
 
@@ -284,13 +284,13 @@ and submits the signed guarantee to Core.
 
 Core then performs the authoritative checks, including:
 
-- payer signature and signing scheme;
-- signed payer, recipient, amount, asset, request ID, and timestamp;
-- accepted guarantee version;
-- duplicate guarantee identity;
-- supported policy and deployment configuration;
-- trusted validation registry and chain for V2;
-- payer collateral and available capacity.
+- payer signature and signing scheme
+- signed payer, recipient, amount, asset, request ID, and timestamp
+- accepted guarantee version
+- duplicate guarantee identity
+- supported policy and deployment configuration
+- trusted validation registry and chain for V2
+- payer collateral and available capacity
 
 If every check succeeds, Core locks the necessary capacity and returns a BLS
 certificate. The facilitator sends that certificate back to the seller in its
@@ -308,12 +308,12 @@ that HTTP request.
 
 After issuance:
 
-- V1 normally becomes `FINALIZED_PAYABLE`;
-- V2 normally begins in `PENDING_VALIDATION`;
-- payable guarantees enter a clearing cycle;
-- bilateral obligations are netted;
-- net debtor and creditor positions settle later;
-- locked collateral can cover an eligible default.
+- V1 normally becomes `FINALIZED_PAYABLE`
+- V2 normally begins in `PENDING_VALIDATION`
+- payable guarantees enter a clearing cycle
+- bilateral obligations are netted
+- net debtor and creditor positions settle later
+- locked collateral can cover an eligible default
 
 This separation is what allows fast request-time payment acceptance without an
 individual on-chain transaction for every resource call.
@@ -394,21 +394,21 @@ payment lifecycle.
 
 It can establish that:
 
-- Core accepted a guarantee with specific claims;
-- the request has a protocol-recognized identity;
-- the seller is the signed recipient;
-- the amount and asset were part of the accepted request;
-- the appropriate guarantee version was accepted;
-- collateral capacity was checked and reserved at issuance;
-- V2 validation terms were included where applicable.
+- Core accepted a guarantee with specific claims
+- the request has a protocol-recognized identity
+- the seller is the signed recipient
+- the amount and asset were part of the accepted request
+- the appropriate guarantee version was accepted
+- collateral capacity was checked and reserved at issuance
+- V2 validation terms were included where applicable
 
 The certificate does not prove:
 
-- that the seller delivered the promised resource;
-- that an AI output was useful or correct;
-- that a V2 validation result has already passed;
-- that the seller has already received final net settlement;
-- that a refund or commercial dispute has been resolved.
+- that the seller delivered the promised resource
+- that an AI output was useful or correct
+- that a V2 validation result has already passed
+- that the seller has already received final net settlement
+- that a refund or commercial dispute has been resolved
 
 Payment evidence and delivery evidence should remain linked but conceptually
 separate. Sellers can follow
@@ -435,14 +435,14 @@ facilitator cannot create an accepted payment obligation.
 
 It should not be able to:
 
-- raise the amount after the payer signs;
-- redirect the payment to another recipient;
-- substitute another asset without invalidating authorization;
-- invent a valid payer signature;
-- reuse an accepted request identity as a new guarantee;
-- withdraw payer collateral to an arbitrary wallet;
-- make a V2 result pass without satisfying its signed policy;
-- bypass Core's accepted-version or capacity checks.
+- raise the amount after the payer signs
+- redirect the payment to another recipient
+- substitute another asset without invalidating authorization
+- invent a valid payer signature
+- reuse an accepted request identity as a new guarantee
+- withdraw payer collateral to an arbitrary wallet
+- make a V2 result pass without satisfying its signed policy
+- bypass Core's accepted-version or capacity checks
 
 Core independently verifies the submitted guarantee. A malicious or broken
 facilitator can delay, reject, misroute, or fail to submit requests, but it
@@ -460,11 +460,11 @@ than embedding it into buyer-facing business logic.
 
 Server-side configuration allows a seller to:
 
-- select the correct deployment for each environment;
-- change infrastructure without changing its public route;
-- apply timeouts, retries, logging, and circuit breaking;
-- keep internal operational details away from browser clients;
-- verify that test and production traffic cannot cross accidentally.
+- select the correct deployment for each environment
+- change infrastructure without changing its public route
+- apply timeouts, retries, logging, and circuit breaking
+- keep internal operational details away from browser clients
+- verify that test and production traffic cannot cross accidentally
 
 Hosted 4Mica facilitator deployments commonly use:
 
@@ -565,14 +565,14 @@ messages, downloads, or workflow side effects.
 
 A useful idempotency record connects:
 
-- `req_id` and guarantee identity;
-- protected route and HTTP method;
-- payer and recipient wallets;
-- quoted amount, asset, and network;
-- facilitator verification result;
-- Core settlement result and certificate;
-- application execution state;
-- response or artifact reference.
+- `req_id` and guarantee identity
+- protected route and HTTP method
+- payer and recipient wallets
+- quoted amount, asset, and network
+- facilitator verification result
+- Core settlement result and certificate
+- application execution state
+- response or artifact reference
 
 When a buyer retries, return or resume the existing outcome when appropriate
 instead of starting unrelated work.
@@ -611,15 +611,15 @@ secrets or unnecessary customer content.
 
 Recommended records include:
 
-- request timestamp, route, and method;
-- facilitator deployment and network;
-- payment scheme and x402 version;
-- payer, recipient, amount, and asset;
-- request or guarantee identity;
-- verification decision and stable error category;
-- settlement decision and certificate reference;
-- application delivery status;
-- V2 policy identifier where applicable.
+- request timestamp, route, and method
+- facilitator deployment and network
+- payment scheme and x402 version
+- payer, recipient, amount, and asset
+- request or guarantee identity
+- verification decision and stable error category
+- settlement decision and certificate reference
+- application delivery status
+- V2 policy identifier where applicable
 
 Do not log private keys, bearer credentials, raw authorization secrets, or
 sensitive request bodies merely because they pass through payment middleware.
@@ -664,7 +664,7 @@ content commitments.
   </Accordion>
 </AccordionGroup>
 
-## Practical mental model
+## Mental model
 
 Think of the facilitator as a protocol-aware payment adapter:
 
@@ -674,9 +674,9 @@ Think of the facilitator as a protocol-aware payment adapter:
 
 That mental model keeps the boundaries clear:
 
-- HTTP 402 belongs to the seller-buyer exchange;
-- verification filters bad payment envelopes;
-- settlement requests authoritative Core acceptance;
-- the certificate records that acceptance;
-- delivery remains the seller's responsibility;
-- clearing and final settlement continue asynchronously.
+- HTTP 402 belongs to the seller-buyer exchange
+- verification filters bad payment envelopes
+- settlement requests authoritative Core acceptance
+- the certificate records that acceptance
+- delivery remains the seller's responsibility
+- clearing and final settlement continue asynchronously

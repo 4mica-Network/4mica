@@ -321,12 +321,12 @@ only a weak or local check.
 
 Sellers should:
 
-- configure the intended facilitator URL per environment;
-- verify payment requirements match the route being served;
-- call `/verify` before expensive work when appropriate;
-- call `/settle` before treating the payment as accepted;
-- persist the returned certificate or receipt;
-- handle facilitator errors without serving unpaid work.
+- configure the intended facilitator URL per environment
+- verify payment requirements match the route being served
+- call `/verify` before expensive work when appropriate
+- call `/settle` before treating the payment as accepted
+- persist the returned certificate or receipt
+- handle facilitator errors without serving unpaid work
 
 Read [facilitator](./facilitator), [payment flow](/api-reference/payment-flow),
 and the [Facilitator API](/api-reference/facilitator/verify) reference.

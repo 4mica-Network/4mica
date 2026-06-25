@@ -35,6 +35,10 @@ The payload contains an `accepts` array with one or more payment options. The cl
 
 ## Payment requirements fields
 
+<Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> tokens are identified by their contract address in the `asset` field.
+
+<Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> identifies the blockchain network in the `network` field.
+
 | Field               | Type   | Description                                                                         |
 | ------------------- | ------ | ----------------------------------------------------------------------------------- |
 | `scheme`            | string | Payment scheme. `4mica-credit` for 4Mica guarantee flow; `exact` for direct transfer. |

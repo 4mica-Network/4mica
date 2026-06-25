@@ -25,6 +25,11 @@ PAY_TO=0xYourSellerAddress
 NETWORK=eip155:84532
 ```
 
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes. Never commit the private key.
+</Warning>
+
 ## Install
 
 Install the 4Mica server package when you protect routes. Install the x402 client wrappers when your app needs to pay protected routes.
@@ -67,11 +72,11 @@ Use a separate service wallet in production. Keep your main wallet away from aut
 
 Deposit collateral before the buyer signs 4Mica payment guarantees. Collateral backs each guarantee and covers unpaid net positions according to protocol rules.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 
-For server-side protection, use `paymentMiddlewareFromConfig` from `@4mica/x402/server/express`. The middleware returns HTTP 402 responses, verifies retried payment headers, settles the guarantee, and serves the protected route after payment succeeds.
+For seller-side protection, use `paymentMiddlewareFromConfig` from `@4mica/x402/server/express`. The middleware returns HTTP 402 responses, verifies retried payment headers, settles the guarantee, and serves the protected route after payment succeeds.
 
 ```ts
 import express from "express";
@@ -107,7 +112,7 @@ app.listen(3030, () => {
 
 Use `@x402/fetch` or `@x402/axios` to wrap your HTTP client with automatic 402 handling. The wrappers create unique request IDs, sign payment guarantees using `FourMicaEvmScheme`, and retry requests without any additional code.
 
-Already using Coinbase x402 clients? Keep the same wrapper and swap in `FourMicaEvmScheme` instead of the exact scheme.
+If you are already using Coinbase x402 clients, keep the same wrapper and swap in `FourMicaEvmScheme` instead of the exact scheme.
 
 ### Using wrapFetchWithPaymentFromConfig
 
@@ -206,36 +211,3 @@ const client = new x402Client().register("eip155:84532", scheme);
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 ```
-
-## Flow summary
-
-1. Call the protected resource and receive HTTP 402 with payment requirements.
-2. The wrapper validates the payment requirements and creates a unique request ID.
-3. The wrapper signs a guarantee with your key and retries with a payment header.
-4. The server verifies and settles the payment, then returns the protected response.
-
-## Framework guides
-
-<Columns cols={2}>
-  <Card title="NextJS" icon="box" href="/quick-start/nextjs">
-    Protect paid routes from a NextJS Node server entry and call paid APIs from route handlers.
-  </Card>
-  <Card title="Express" icon="route" href="/quick-start/express">
-    Use the canonical 4Mica Express middleware for server-side route protection.
-  </Card>
-  <Card title="Hono" icon="zap" href="/quick-start/hono">
-    Add paid endpoints to a Hono service while keeping the 4Mica guarantee flow explicit.
-  </Card>
-  <Card title="Nuxt" icon="sparkles" href="/quick-start/nuxt">
-    Connect a Nuxt app to a 4Mica-protected Node API route.
-  </Card>
-  <Card title="SvelteKit" icon="component" href="/quick-start/sveltekit">
-    Serve SvelteKit with a Node adapter and protect paid API routes.
-  </Card>
-  <Card title="Remix" icon="refresh-cw" href="/quick-start/remix">
-    Add 4Mica middleware to a Remix Express server.
-  </Card>
-  <Card title="Bun" icon="terminal" href="/quick-start/bun">
-    Run the same 4Mica Node integration on Bun.
-  </Card>
-</Columns>
