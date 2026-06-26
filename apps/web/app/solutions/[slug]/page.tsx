@@ -282,7 +282,7 @@ function SolutionFaq({ solution }: { solution: SolutionContent }) {
             Something else on your mind?
           </span>
           <a
-            href={links.mailto.contact}
+            href={links.mailto.support}
             className="text-ink-muted underline underline-offset-4 transition-colors hover:text-ink-strong"
           >
             Contact us
@@ -359,7 +359,7 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
                 <i className="ri-arrow-right-line text-md" />
               </Link>
               <a
-                href={links.mailto.contact}
+                href={links.mailto.sales}
                 className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-white/10"
               >
                 Talk to sales

@@ -77,7 +77,7 @@ export default function FaqSection() {
             Something else on your mind?
           </span>
           <a
-            href={links.mailto.contact}
+            href={links.mailto.support}
             className="text-ink-muted underline underline-offset-4 transition-colors hover:text-ink-strong"
           >
             Contact us

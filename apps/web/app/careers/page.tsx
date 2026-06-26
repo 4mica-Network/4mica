@@ -100,7 +100,7 @@ export default function CareersPage() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href={links.mailto.contact}
+                href={links.mailto.careers}
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-white px-5 py-2.5 font-semibold text-black text-md transition-colors hover:bg-white/90"
               >
                 Chat with us

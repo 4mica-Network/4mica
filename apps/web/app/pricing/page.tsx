@@ -90,7 +90,7 @@ const TIERS: Tier[] = [
       "Usage and settlement reporting",
       "Email support",
     ],
-    cta: { label: "Talk to sales", href: links.mailto.contact, external: true },
+    cta: { label: "Talk to sales", href: links.mailto.sales, external: true },
     highlight: true,
   },
   {
@@ -107,7 +107,7 @@ const TIERS: Tier[] = [
       "Custom SLAs and terms",
       "Security review",
     ],
-    cta: { label: "Contact sales", href: links.mailto.contact, external: true },
+    cta: { label: "Contact sales", href: links.mailto.sales, external: true },
   },
 ];
 

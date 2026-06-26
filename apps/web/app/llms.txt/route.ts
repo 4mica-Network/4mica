@@ -93,7 +93,7 @@ export function llms(): LlmsConfig {
   if (!isProductionEnvironment()) {
     return {
       version: "1.0",
-      contact: links.mailto.contact,
+      contact: links.mailto.support,
       policy: POLICY_URLS,
       rules: NON_PRODUCTION_RULE,
     };
@@ -101,7 +101,7 @@ export function llms(): LlmsConfig {
 
   return {
     version: "1.0",
-    contact: links.mailto.contact,
+    contact: links.mailto.support,
     policy: POLICY_URLS,
     references: links.social.githubCore,
     rules: PRODUCTION_RULES,

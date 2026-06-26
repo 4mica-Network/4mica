@@ -24,7 +24,7 @@ export default function HeroSection() {
             {/* CTAs */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                href="/pricing"
+                href="https://docs.4mica.io"
                 className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
               >
                 <span>Start building</span>

@@ -86,17 +86,17 @@ export default function Footer() {
             <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
               Roadmap
             </Link>
-            <a href={links.mailto.contact} className={footerLinkClass}>
+            <a href={links.mailto.sales} className={footerLinkClass}>
               Contact sales
             </a>
           </div>
 
           <div className="flex flex-col gap-y-3">
             <div className="mb-2 font-medium text-ink-strong">Support</div>
-            <a href={links.mailto.contact} className={footerLinkClass}>
+            <a href={links.mailto.support} className={footerLinkClass}>
               Get support
             </a>
-            <a href={links.mailto.contact} className={footerLinkClass}>
+            <a href={links.mailto.support} className={footerLinkClass}>
               Managed support plans
             </a>
           </div>
@@ -134,7 +134,7 @@ export default function Footer() {
 
           <div className="flex w-full items-center justify-between sm:order-2 sm:w-auto sm:gap-4">
             <a
-              href={links.mailto.contact}
+              href={links.mailto.support}
               aria-label="Email 4Mica"
               className={footerLinkClass}
             >

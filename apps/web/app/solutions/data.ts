@@ -146,7 +146,7 @@ export const solutions: SolutionContent[] = [
         title: "Talk through agent risk",
         desc: "Design collateral, limits, and settlement windows for your agent network.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -264,7 +264,7 @@ export const solutions: SolutionContent[] = [
         title: "Plan an API rollout",
         desc: "Walk through metering, limits, and settlement design with the 4Mica team.",
         icon: "ri-calendar-check-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -381,7 +381,7 @@ export const solutions: SolutionContent[] = [
         title: "Discuss chain support",
         desc: "Coordinate network requirements for your protocol or app.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -498,7 +498,7 @@ export const solutions: SolutionContent[] = [
         title: "Design a rollout",
         desc: "Scope the buyer and seller experience with 4Mica.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -616,7 +616,7 @@ export const solutions: SolutionContent[] = [
         title: "Architecture review",
         desc: "Map 4Mica into your platform's billing, risk, and support model.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -733,7 +733,7 @@ export const solutions: SolutionContent[] = [
         title: "Contact sales",
         desc: "Discuss SLAs, implementation planning, and production rollout support.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
@@ -850,7 +850,7 @@ export const solutions: SolutionContent[] = [
         title: "Founder support",
         desc: "Get help deciding where payments should enter your product.",
         icon: "ri-chat-3-line",
-        href: links.mailto.contact,
+        href: links.mailto.sales,
       },
     ],
     faqs: [
