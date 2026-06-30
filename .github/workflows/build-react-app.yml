@@ -1,91 +1,81 @@
-name: Build and Deploy 4mica Website
+name: Deploy 4mica Website
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+    env:
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ vars.SERVER_USER || 'mo' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-        env:
-          NEXT_PUBLIC_PROJECT_ID: ${{ vars.NEXT_PUBLIC_PROJECT_ID }}
-          NEXT_PUBLIC_REOWN_PROJECT_ID: ${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
-          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
-          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-          NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA: ${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA }}
-          NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY: ${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY }}
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Upload hashed assets with immutable cache
+      - name: Configure SSH
         run: |
-          aws s3 sync apps/web/out/_next/static s3://${{ secrets.S3_BUCKET }}/_next/static \
-            --cache-control "public,max-age=31536000,immutable" \
-            --delete
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload HTML with no-cache
+      - name: Write remote web environment
         run: |
-          aws s3 sync apps/web/out/ s3://${{ secrets.S3_BUCKET }} \
-            --exclude "*" \
-            --include "*.html" \
-            --cache-control "public,max-age=0,must-revalidate" \
-            --delete
+          set -euo pipefail
+          ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p $DEPLOY_PATH/apps/web"
+          ssh "$SERVER_USER@$SERVER_HOST" "cat > $DEPLOY_PATH/apps/web/.env" <<EOF
+          NEXT_PUBLIC_PROJECT_ID=${{ vars.NEXT_PUBLIC_PROJECT_ID }}
+          NEXT_PUBLIC_REOWN_PROJECT_ID=${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+          NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA }}
+          NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA }}
+          WEB_PORT=${{ vars.WEB_PORT || '8080' }}
+          EOF
+          ssh "$SERVER_USER@$SERVER_HOST" "chmod 600 $DEPLOY_PATH/apps/web/.env"
 
-      - name: Upload remaining assets with standard cache
+      - name: Deploy web app with Docker Compose
         run: |
-          aws s3 sync apps/web/out/ s3://${{ secrets.S3_BUCKET }} \
-            --exclude "_next/static/*" \
-            --exclude "*.html" \
-            --cache-control "public,max-age=86400" \
-            --delete
+          set -euo pipefail
+          if [ "$DEPLOY_ENV" = "dev" ]; then
+            BRANCH="dev"
+          else
+            BRANCH="main"
+          fi
 
-      - name: Upload extensionless HTML route aliases with no-cache
-        run: |
-          while IFS= read -r -d '' file; do
-            key="${file#apps/web/out/}"
-            key="${key%.html}"
+          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" "$BRANCH" <<'EOF'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+          BRANCH="$2"
 
-            if [[ "$key" == "index" || "$key" == "404" || "$key" == "_not-found" ]]; then
-              continue
-            fi
+          cd "$DEPLOY_PATH"
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          git pull --ff-only origin "$BRANCH"
 
-            aws s3api put-object \
-              --bucket "${{ secrets.S3_BUCKET }}" \
-              --key "$key" \
-              --body "$file" \
-              --content-type "text/html; charset=utf-8" \
-              --cache-control "public,max-age=0,must-revalidate"
-
-            aws s3api put-object \
-              --bucket "${{ secrets.S3_BUCKET }}" \
-              --key "$key/" \
-              --body "$file" \
-              --content-type "text/html; charset=utf-8" \
-              --cache-control "public,max-age=0,must-revalidate"
-          done < <(find apps/web/out -type f -name "*.html" -print0)
-
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+          cd apps/web
+          docker compose --env-file .env down
+          docker compose --env-file .env up -d --build --remove-orphans
+          docker image prune -f
+          docker compose ps
+          EOF
