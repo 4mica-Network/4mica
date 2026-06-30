@@ -39,23 +39,7 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
 
-      - name: Write remote web environment
-        run: |
-          set -euo pipefail
-          ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p $DEPLOY_PATH/apps/web"
-          ssh "$SERVER_USER@$SERVER_HOST" "cat > $DEPLOY_PATH/apps/web/.env" <<EOF
-          NEXT_PUBLIC_PROJECT_ID=${{ vars.NEXT_PUBLIC_PROJECT_ID }}
-          NEXT_PUBLIC_REOWN_PROJECT_ID=${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
-          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
-          NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
-          NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
-          NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA }}
-          NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA }}
-          WEB_PORT=${{ vars.WEB_PORT || '8080' }}
-          EOF
-          ssh "$SERVER_USER@$SERVER_HOST" "chmod 600 $DEPLOY_PATH/apps/web/.env"
-
-      - name: Deploy web app with Docker Compose
+      - name: Prepare remote checkout
         run: |
           set -euo pipefail
           if [ "$DEPLOY_ENV" = "dev" ]; then
@@ -77,6 +61,11 @@ jobs:
 
           if [ ! -d "$DEPLOY_PATH/.git" ]; then
             echo "No git checkout found at $DEPLOY_PATH."
+            if [ -d "$DEPLOY_PATH" ] && [ -n "$(find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+              BACKUP_PATH="${DEPLOY_PATH}.bootstrap-$(date +%Y%m%d%H%M%S)"
+              echo "Moving existing non-git directory to $BACKUP_PATH."
+              mv "$DEPLOY_PATH" "$BACKUP_PATH"
+            fi
             echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
             mkdir -p "$(dirname "$DEPLOY_PATH")"
             git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
@@ -87,8 +76,37 @@ jobs:
           git fetch origin "$BRANCH"
           git checkout "$BRANCH"
           git pull --ff-only origin "$BRANCH"
+          EOF
 
-          cd apps/web
+      - name: Write remote web environment
+        run: |
+          set -euo pipefail
+          ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p $DEPLOY_PATH/apps/web"
+          ssh "$SERVER_USER@$SERVER_HOST" "cat > $DEPLOY_PATH/apps/web/.env" <<EOF
+          NEXT_PUBLIC_PROJECT_ID=${{ vars.NEXT_PUBLIC_PROJECT_ID }}
+          NEXT_PUBLIC_REOWN_PROJECT_ID=${{ vars.NEXT_PUBLIC_REOWN_PROJECT_ID }}
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+          NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA }}
+          NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA=${{ vars.NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA }}
+          WEB_PORT=${{ vars.WEB_PORT || '8080' }}
+          EOF
+          ssh "$SERVER_USER@$SERVER_HOST" "chmod 600 $DEPLOY_PATH/apps/web/.env"
+
+      - name: Deploy web app with Docker Compose
+        run: |
+          set -euo pipefail
+          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" <<'EOF'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+
+          case "$DEPLOY_PATH" in
+            "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+            "~") DEPLOY_PATH="$HOME" ;;
+          esac
+
+          cd "$DEPLOY_PATH/apps/web"
           docker compose --env-file .env down
           docker compose --env-file .env up -d --build --remove-orphans
           docker image prune -f
