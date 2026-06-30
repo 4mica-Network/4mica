@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkConfig, routes } from "@4mica/url";
 import { createAppKit } from "@reown/appkit/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type React from "react";
@@ -12,10 +13,13 @@ const resolveAppUrl = () => {
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
-  const envUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL;
-  if (!envUrl) return "https://4mica.xyz";
-  return envUrl.startsWith("http") ? envUrl : `https://${envUrl}`;
+  return new LinkConfig({
+    ...process.env,
+    NEXT_PUBLIC_BASE_URL:
+      process.env.NEXT_PUBLIC_BASE_URL ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      process.env.NEXT_PUBLIC_VERCEL_URL,
+  }).base;
 };
 
 const appUrl = resolveAppUrl();
@@ -24,7 +28,7 @@ const metadata = {
   name: "4Mica",
   description: "4Mica - Sub-second transactions across any blockchain",
   url: appUrl,
-  icons: [`${appUrl}/assets/logo_transparent.png`],
+  icons: [`${appUrl}${routes.logo}`],
 };
 
 createAppKit({

@@ -12,7 +12,7 @@ Your payment errors should fail closed. If the agent cannot verify a seller, fit
 | Unsupported network | Seller requires a network your client has not registered. | Skip, choose another seller, or add the network intentionally. |
 | Missing collateral | Wallet cannot back the payment guarantee. | Add collateral or lower the task budget. |
 | Price over limit | Seller price exceeds policy. | Ask for approval, choose another seller, or stop. |
-| Seller mismatch | Domain, tab endpoint, or `payTo` address does not match expectations. | Do not sign. Treat as suspicious. |
+| Seller mismatch | Domain, route, or `payTo` address does not match expectations. | Do not sign. Treat as suspicious. |
 | Invalid signature | Payment signing failed or produced an invalid payload. | Retry only after checking signer and network configuration. |
 | Seller verification failure | Seller rejected the payment retry. | Log the failure and avoid repeated automatic retries. |
 | Task budget exhausted | The agent has spent its allowed budget. | Stop or ask for a higher budget. |
@@ -31,7 +31,7 @@ Use strict retry rules that separate temporary transport failures from payment o
 | Policy failure | Do not retry automatically. Choose a different seller, get a lower price, or ask for approval. |
 | Over-budget payment | Stop before signing and ask for more budget. |
 | Seller mismatch | Do not retry. Treat the mismatch as suspicious until you verify it. |
-| Seller verification failure | Retry only after checking signer, network, tab, and seller configuration. |
+| Seller verification failure | Retry only after checking signer, network, request ID, and seller configuration. |
 
 Always record the final failure reason in the task log.
 
@@ -52,7 +52,7 @@ Use stable status names so your UI, logs, and support process speak the same lan
 | `needs_approval` | The agent found a payment that exceeds policy. |
 | `insufficient_collateral` | The wallet cannot back the payment guarantee. |
 | `blocked_seller` | Your policy does not allow this seller. |
-| `payment_failed` | Signing, tab opening, or seller verification failed. |
+| `payment_failed` | Signing, guarantee issuance, or seller verification failed. |
 | `budget_exhausted` | The task reached its spending limit. |
 | `paid` | The request was paid and a response was received. |
 

@@ -6,13 +6,13 @@ description: "How 4Mica transactions are signed, issued, validated, cleared, and
 A 4Mica transaction is a **cryptographic guarantee**: a signed payment commitment backed by payer collateral.
 The payer does not send an on-chain transfer for every request.
 They sign a guarantee, the recipient submits it to 4Mica Core, and Core returns a BLS certificate after it verifies the request and locks collateral.
-The BLS certificate is the payment authorization.
+The <Tooltip headline="BLS certificate" tip="BLS stands for Boneh–Lynn–Shacham, a digital signature scheme that produces compact, publicly verifiable signatures. 4Mica Core signs the certificate after verifying the guarantee and locking the required collateral capacity.">BLS certificate</Tooltip> is the payment authorization.
 After the recipient verifies it, they can provide the service knowing Core accepted the guarantee.
 
 There are two types of guarantees:
 
 - **V1** is payable as soon as Core issues it. Use it for agreed payments.
-- **V2** is validation-gated. A verifier, such as an ERC-8004 validation registry, must confirm the job before the recipient can use the validation path for payment.
+- **V2** is validation-gated. A verifier, such as an <Tooltip headline="ERC-8004" tip="An Ethereum standard for discovering, identifying, and evaluating autonomous agents through on-chain registries. 4Mica can use its validation registry as a trusted source of job-result evidence.">ERC-8004 validation registry</Tooltip>, must confirm the job before the recipient can use the validation path for payment.
 
 With **V1**, the payer and recipient already accept the payment terms.
 Core checks the payer signature, user status, accepted version, and collateral.
@@ -26,10 +26,8 @@ The recipient can use the validation path only if the trusted registry publishes
 ### Where `req_id` comes from
 
 `req_id` must exist before the payer signs because it is part of the signed request.
-In x402 flows, the SDK often gets this value from a tab helper as `nextReqId`.
-That helper may be backed by Core in older tab-based deployments.
-
-The current cycle-native Core issuance path, `/core/guarantees`, does not generate `req_id`.
+The payer or SDK generates a unique request identifier before signing.
+The cycle-native Core issuance path, `/core/guarantees`, does not generate `req_id`.
 It verifies the signed value, derives the deterministic `guarantee_id` from it, and rejects another guarantee with the same identity.
 
 ## How V1 works
@@ -70,7 +68,7 @@ Core verifies them, but it does not rewrite them.
 | ------------------- | --------- | --------------------------- | ---------------------------------- |
 | `user_address`      | `address` | Payer / SDK                 | Payer wallet.                      |
 | `recipient_address` | `address` | Recipient, then payer / SDK | Recipient wallet.                  |
-| `req_id`            | `uint256` | Payer / SDK or tab helper   | Request counter.                   |
+| `req_id`            | `uint256` | Payer / SDK                 | Unique request identifier.         |
 | `amount`            | `uint256` | Recipient, then payer / SDK | Token base units.                  |
 | `asset_address`     | `address` | Recipient, then payer / SDK | Settlement asset. `0x0` means ETH. |
 | `timestamp`         | `uint64`  | Payer / SDK                 | Request time.                      |
@@ -156,7 +154,7 @@ V2 signs all V1 request fields plus `validation_policy`.
 | ------------------- | --------- | --------------------------- | ----------------- |
 | `user_address`      | `address` | Payer / SDK                 | Payer wallet.     |
 | `recipient_address` | `address` | Recipient, then payer / SDK | Recipient wallet. |
-| `req_id`            | `uint256` | Payer / SDK or tab helper   | Request counter.  |
+| `req_id`            | `uint256` | Payer / SDK                 | Unique request identifier. |
 | `amount`            | `uint256` | Recipient, then payer / SDK | Token base units. |
 | `asset_address`     | `address` | Recipient, then payer / SDK | Settlement asset. |
 | `timestamp`         | `uint64`  | Payer / SDK                 | Request time.     |

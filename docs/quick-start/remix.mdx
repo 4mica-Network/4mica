@@ -5,12 +5,16 @@ description: "Use 4Mica with a Remix Express server."
 
 Use Remix with 4Mica by mounting the payment middleware in your Express server before the Remix request handler. This gives paid routes the full 4Mica server flow while Remix handles the rest of your app.
 
+<Warning>
+  This integration is not stable yet. For now, use the
+  [NodeJS quick start](/quick-start/nodejs) for the supported implementation.
+</Warning>
+
 ## Prerequisites
 
 - Remix running on an Express server.
 - A seller wallet address for `payTo`.
 - A buyer wallet with deposited collateral.
-- A server-hosted tab endpoint.
 
 ## Install
 
@@ -41,14 +45,18 @@ For wallet setup, see [Wallet](/core-concepts/wallet).
 ```bash
 PRIVATE_KEY=0xYourPrivateKey
 PAY_TO=0xYourSellerAddress
-TAB_ENDPOINT=http://localhost:3000/payment/tab
 ```
+
+<Warning>
+  Use the private key only for buyer-side signing. Use `PAY_TO` as the seller
+  address advertised by protected routes.
+</Warning>
 
 ## Deposit collateral
 
 Deposit collateral for the buyer wallet before it calls protected Remix-backed APIs. Use Base Sepolia until the flow works end to end.
 
-For collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
+To learn more about collateral setup, see [Deposits and Withdrawals](/core-concepts/deposits-and-withdrawals).
 
 ## Protect a route
 
@@ -73,10 +81,6 @@ server.use(
         },
         description: "Access to premium Remix content",
       },
-    },
-    {
-      advertisedEndpoint:
-        process.env.TAB_ENDPOINT ?? "http://localhost:3000/payment/tab",
     },
   ),
 );

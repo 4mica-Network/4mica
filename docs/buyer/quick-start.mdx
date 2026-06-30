@@ -28,7 +28,7 @@ You should control:
     Use a wallet for the agent or application, not your main wallet. Keep automated signing separate from personal funds.
   </Step>
   <Step title="Deposit collateral">
-    Deposit ETH or a supported ERC-20 into 4Mica on the network your target sellers accept.
+    Deposit ETH or a supported <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> into 4Mica on the network your target sellers accept.
   </Step>
   <Step title="Register the client scheme">
     Configure the 4Mica client for each network the agent may use.
@@ -40,7 +40,7 @@ You should control:
     Use a wrapped HTTP client so the agent can handle paid resources while Your policy decides which payments to sign.
   </Step>
   <Step title="Audit the task">
-    Record each payment with the seller, route, amount, reason, tab, request ID, and task result.
+    Record each payment with the seller, route, amount, reason, guarantee ID, request ID, and task result.
   </Step>
 </Steps>
 
@@ -93,7 +93,7 @@ Every paid request should produce a record that explains what happened:
 - why the payment happened;
 - which task or request it belongs to;
 - what result came back;
-- whether the tab or settlement obligation is still open.
+- whether the guarantee or settlement obligation is still open.
 
 For audit trails, see [Payment Proof and Audit](/buyer/payment-proof-and-audit).
 

@@ -55,7 +55,7 @@ Write completion criteria before launch, not during the support conversation. It
 
 Limit exposure per buyer or agent before traffic grows. Useful limits include maximum requests per minute, paid value per hour, concurrent tasks, downstream spend, task duration, and unpaid quote attempts.
 
-You can enforce limits by payer address, agent identity, account, domain, API key, tab, or IP depending on what your integration captures.
+You can enforce limits by payer address, agent identity, account, domain, API key, guarantee, or IP depending on what your integration captures.
 
 ## Suspicious activity
 
@@ -63,7 +63,7 @@ Pause or reject payment flows when behavior no longer matches a normal buyer. Re
 
 Payment validation is necessary, but not the whole abuse system. Keep application-level policy close to the paid route.
 
-For abuse patterns, send wallet, tab, route, and timestamp details to [support](mailto:support@4mica.io).
+For abuse patterns, send wallet, guarantee, route, and timestamp details to [support](mailto:support@4mica.io).
 
 ## Build confidence with collateral
 
@@ -89,5 +89,5 @@ Before launch, make sure your risk controls match the cost of your routes.
 - keep free trials narrow
 - log every paid request and response
 - define refund rules before launch
-- monitor claim windows
+- monitor clearing, payment, and finality deadlines
 - block suspicious payers quickly

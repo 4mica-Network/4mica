@@ -15,30 +15,30 @@ type Pulse = {
   progress: number;
   speed: number;
   delayMs: number;
+  phase: number;
 };
 
 const config = {
-  nodeDensity: 22000,
-  nodeMin: 30,
-  nodeMax: 30,
-  linkDistanceScale: 1.5,
-  nodeRadius: { min: 6, max: 7.6 },
-  pulseMin: 15,
-  pulseMax: 15,
-  pulseSpeed: { min: 0.0004, max: 0.0004 },
-  pulseDelayMs: { min: 140, max: 220 },
-  pulseRadius: 0.9,
-  pulseGlowRadius: 8,
-  pulseTrail: 22,
-  pulseTrailWidth: 0.9,
-  pulseTrailAlpha: 0.08,
-  flashFade: 6,
-  parallaxStrength: 5,
-  lineColor: "rgba(120, 140, 160, 0.04)",
-  nodeColor: "rgba(150, 170, 190, 0.12)",
-  nodeFlash: "rgba(150, 170, 190, 0.18)",
-  pulseCore: "rgba(163, 255, 214, 0.28)",
-  pulseGlow: "rgba(72, 201, 176, 0.12)",
+  nodeDensity: 13500,
+  nodeMin: 46,
+  nodeMax: 72,
+  linkDistanceScale: 0.34,
+  nodeRadius: { min: 2.2, max: 3.4 },
+  pulseMin: 8,
+  pulseMax: 14,
+  pulseSpeed: { min: 0.00016, max: 0.00028 },
+  pulseDelayMs: { min: 520, max: 1800 },
+  pulseRadius: 1.35,
+  pulseGlowRadius: 20,
+  pulseTrail: 72,
+  pulseTrailWidth: 1.6,
+  pulseTrailAlpha: 0.28,
+  flashFade: 2.8,
+  lineColor: "rgba(109, 109, 109, 0.24)",
+  nodeColor: "rgba(48, 48, 48, 0.95)",
+  nodeFlash: "rgba(216, 216, 216, 0.24)",
+  pulseCore: "rgba(216, 216, 216, 0.7)",
+  pulseGlow: "rgba(216, 216, 216, 0.18)",
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -58,11 +58,6 @@ const pickRandomNode = (count: number, exclude?: number) => {
     candidate = Math.floor(Math.random() * count);
   }
   return candidate;
-};
-const pickRandomPair = (count: number, excludeFrom?: number) => {
-  const from = pickRandomNode(count, excludeFrom);
-  const to = pickRandomNode(count, from);
-  return { from, to };
 };
 
 export default function GlobalNetworkBackground() {
@@ -85,6 +80,27 @@ export default function GlobalNetworkBackground() {
     const nodes: Node[] = [];
     const neighbors: number[][] = [];
     const pulses: Pulse[] = [];
+
+    const pickLinkedPair = (excludeFrom?: number) => {
+      const linkedNodes = neighbors
+        .map((items, index) => ({ index, items }))
+        .filter(
+          ({ index, items }) =>
+            items.length > 0 &&
+            (excludeFrom === undefined || index !== excludeFrom),
+        );
+
+      if (linkedNodes.length === 0) {
+        const from = pickRandomNode(nodes.length, excludeFrom);
+        const to = pickRandomNode(nodes.length, from);
+        return { from, to };
+      }
+
+      const source =
+        linkedNodes[Math.floor(Math.random() * linkedNodes.length)];
+      const to = source.items[Math.floor(Math.random() * source.items.length)];
+      return { from: source.index, to };
+    };
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -161,13 +177,14 @@ export default function GlobalNetworkBackground() {
         config.pulseMax,
       );
       for (let i = 0; i < count; i += 1) {
-        const pair = pickRandomPair(nodes.length);
+        const pair = pickLinkedPair();
         pulses.push({
           from: pair.from,
           to: pair.to,
           progress: Math.random(),
           speed: rand(config.pulseSpeed.min, config.pulseSpeed.max),
           delayMs: rand(0, config.pulseDelayMs.max),
+          phase: Math.random() * Math.PI * 2,
         });
       }
     };
@@ -224,9 +241,15 @@ export default function GlobalNetworkBackground() {
           pulse.progress = 0;
           const arrived = pulse.to;
           nodes[arrived].flash = 1;
-          const pair = pickRandomPair(nodes.length, arrived);
-          pulse.from = pair.from;
-          pulse.to = pair.to;
+          const nextNeighbors = neighbors[arrived].filter(
+            (index) => index !== pulse.from,
+          );
+          const nextTo =
+            nextNeighbors.length > 0
+              ? nextNeighbors[Math.floor(Math.random() * nextNeighbors.length)]
+              : pickLinkedPair(arrived).to;
+          pulse.from = arrived;
+          pulse.to = nextTo;
           pulse.speed = rand(config.pulseSpeed.min, config.pulseSpeed.max);
           pulse.delayMs = rand(
             config.pulseDelayMs.min,
@@ -237,7 +260,6 @@ export default function GlobalNetworkBackground() {
     };
 
     const drawLinks = (offsetX: number, offsetY: number) => {
-      ctx.strokeStyle = config.lineColor;
       ctx.lineWidth = 1;
       for (let i = 0; i < nodes.length; i += 1) {
         for (let j = i + 1; j < nodes.length; j += 1) {
@@ -245,7 +267,18 @@ export default function GlobalNetworkBackground() {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.hypot(dx, dy);
           if (dist < linkDistance) {
-            ctx.globalAlpha = (1 - dist / linkDistance) * 0.55;
+            const alpha = (1 - dist / linkDistance) * 0.7;
+            const gradient = ctx.createLinearGradient(
+              nodes[i].x + offsetX,
+              nodes[i].y + offsetY,
+              nodes[j].x + offsetX,
+              nodes[j].y + offsetY,
+            );
+            gradient.addColorStop(0, "rgba(109, 109, 109, 0)");
+            gradient.addColorStop(0.5, config.lineColor);
+            gradient.addColorStop(1, "rgba(109, 109, 109, 0)");
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = gradient;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x + offsetX, nodes[i].y + offsetY);
             ctx.lineTo(nodes[j].x + offsetX, nodes[j].y + offsetY);
@@ -263,24 +296,32 @@ export default function GlobalNetworkBackground() {
         if (pulse.delayMs > 0) continue;
         const from = nodes[pulse.from];
         const to = nodes[pulse.to];
-        const x = from.x + (to.x - from.x) * pulse.progress + offsetX;
-        const y = from.y + (to.y - from.y) * pulse.progress + offsetY;
+        const eased =
+          pulse.progress * pulse.progress * (3 - 2 * pulse.progress);
+        const x = from.x + (to.x - from.x) * eased + offsetX;
+        const y = from.y + (to.y - from.y) * eased + offsetY;
         const dx = to.x - from.x;
         const dy = to.y - from.y;
         const length = Math.hypot(dx, dy) || 1;
         const ux = dx / length;
         const uy = dy / length;
-        const trailX = x - ux * config.pulseTrail;
-        const trailY = y - uy * config.pulseTrail;
+        const trailLength = Math.min(config.pulseTrail, length * eased);
+        const trailX = x - ux * trailLength;
+        const trailY = y - uy * trailLength;
 
         const trailGradient = ctx.createLinearGradient(trailX, trailY, x, y);
-        trailGradient.addColorStop(0, "rgba(72, 201, 176, 0)");
+        trailGradient.addColorStop(0, "rgba(216, 216, 216, 0)");
+        trailGradient.addColorStop(
+          0.72,
+          `rgba(216, 216, 216, ${config.pulseTrailAlpha * 0.45})`,
+        );
         trailGradient.addColorStop(
           1,
-          `rgba(72, 201, 176, ${config.pulseTrailAlpha})`,
+          `rgba(216, 216, 216, ${config.pulseTrailAlpha})`,
         );
         ctx.strokeStyle = trailGradient;
         ctx.lineWidth = config.pulseTrailWidth;
+        ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(trailX, trailY);
         ctx.lineTo(x, y);
@@ -295,16 +336,18 @@ export default function GlobalNetworkBackground() {
           config.pulseGlowRadius,
         );
         glow.addColorStop(0, config.pulseGlow);
-        glow.addColorStop(0.5, "rgba(72, 201, 176, 0.12)");
-        glow.addColorStop(1, "rgba(72, 201, 176, 0)");
+        glow.addColorStop(0.45, "rgba(216, 216, 216, 0.08)");
+        glow.addColorStop(1, "rgba(216, 216, 216, 0)");
         ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(x, y, config.pulseGlowRadius, 0, Math.PI * 2);
         ctx.fill();
 
+        const pulseBreath =
+          0.86 + Math.sin(pulse.phase + pulse.progress * Math.PI * 2) * 0.14;
         ctx.fillStyle = config.pulseCore;
         ctx.beginPath();
-        ctx.arc(x, y, config.pulseRadius, 0, Math.PI * 2);
+        ctx.arc(x, y, config.pulseRadius * pulseBreath, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
@@ -315,13 +358,26 @@ export default function GlobalNetworkBackground() {
         const x = node.x + offsetX;
         const y = node.y + offsetY;
         const glowStrength = node.flash;
-        const size = node.r * 2;
+        const glowRadius = node.r * 5;
+        const nodeGlow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+        nodeGlow.addColorStop(0, "rgba(216, 216, 216, 0.12)");
+        nodeGlow.addColorStop(1, "rgba(216, 216, 216, 0)");
+        ctx.fillStyle = nodeGlow;
+        ctx.beginPath();
+        ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = config.nodeColor;
-        ctx.fillRect(x - size / 2, y - size / 2, size, size);
+        ctx.beginPath();
+        ctx.arc(x, y, node.r, 0, Math.PI * 2);
+        ctx.fill();
+
         if (glowStrength > 0.01) {
-          ctx.globalAlpha = Math.min(0.3, glowStrength * 0.3);
+          ctx.globalAlpha = Math.min(0.28, glowStrength * 0.28);
           ctx.fillStyle = config.nodeFlash;
-          ctx.fillRect(x - size / 2, y - size / 2, size, size);
+          ctx.beginPath();
+          ctx.arc(x, y, node.r * 4, 0, Math.PI * 2);
+          ctx.fill();
           ctx.globalAlpha = 1;
         }
       }
@@ -384,10 +440,10 @@ export default function GlobalNetworkBackground() {
   }, []);
 
   return (
-    <div className="global-background" aria-hidden="true">
-      <div className="global-bg-base" />
+    <div className="bg-black" aria-hidden="true">
+      <div className="bg-black" />
       <canvas ref={canvasRef} className="global-network-canvas" />
-      <div className="global-bg-vignette" />
+      <div className="bg-black" />
     </div>
   );
 }

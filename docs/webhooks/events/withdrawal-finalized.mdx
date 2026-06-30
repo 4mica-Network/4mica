@@ -1,0 +1,107 @@
+---
+title: "Withdrawal finalized"
+description: "Handle the withdrawal.finalized webhook event."
+---
+
+`withdrawal.finalized`
+
+Sent after a withdrawal completes and funds leave the 4Mica collateral
+position. Use it to mark the pending withdrawal complete and refresh balances.
+
+## Event fields
+
+<ResponseField name="id" type="string" required />
+<ResponseField name="type" type="string" required post={["withdrawal.finalized"]} />
+<ResponseField name="created_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="api_version" type="string" required />
+<ResponseField name="data" type="object" required />
+<ResponseField name="data.withdrawal_id" type="string" required />
+<ResponseField name="data.user_address" type="string" required />
+<ResponseField name="data.asset_address" type="string" required />
+<ResponseField name="data.amount" type="string" required />
+<ResponseField name="data.network" type="string" required />
+<ResponseField name="data.finalized_at" type="string" required post={["ISO 8601 datetime"]} />
+<ResponseField name="data.transaction_hash" type="string" required />
+<ResponseField name="data.status" type="string" required post={["finalized"]} />
+
+## Event examples
+
+<RequestExample dropdown>
+```json Payload
+{
+  "id": "evt_01JY3P4C8M2T6X9A5Q7N1V0BRD",
+  "type": "withdrawal.finalized",
+  "created_at": "2026-07-14T16:05:00.000Z",
+  "api_version": "2026-06-01",
+  "data": {
+    "withdrawal_id": "wd_01JY3N6Z",
+    "user_address": "0x1111111111111111111111111111111111111111",
+    "asset_address": "0x3333333333333333333333333333333333333333",
+    "amount": "5000000",
+    "network": "eip155:84532",
+    "finalized_at": "2026-07-14T16:04:58.000Z",
+    "transaction_hash": "0xWithdrawalFinalizationTransaction",
+    "status": "finalized"
+  }
+}
+```
+```javascript title="JavaScript"
+app.post("/webhooks/4mica", rawBodyMiddleware, async (req, res) => {
+  verifyWebhookSignature(req);
+  const event = JSON.parse(req.body.toString("utf8"));
+
+  if (await eventStore.has(event.id)) return res.sendStatus(200);
+
+  if (event.type === "withdrawal.finalized") {
+    await withdrawals.markFinalized(
+      event.data.withdrawal_id,
+      event.data.finalized_at,
+      event.data.transaction_hash,
+    );
+    await wallets.refreshCollateral(
+      event.data.user_address,
+      event.data.asset_address,
+      event.data.network,
+    );
+  }
+
+  await eventStore.record(event.id);
+  res.sendStatus(200);
+});
+```
+```python title="Python"
+@app.post("/webhooks/4mica")
+async def handle_webhook(request: Request):
+    raw_body = await request.body()
+    verify_webhook_signature(request.headers, raw_body)
+    event = json.loads(raw_body)
+
+    if await event_store.has(event["id"]):
+        return Response(status_code=200)
+
+    if event["type"] == "withdrawal.finalized":
+        data = event["data"]
+        await withdrawals.mark_finalized(
+            data["withdrawal_id"],
+            data["finalized_at"],
+            data["transaction_hash"],
+        )
+        await wallets.refresh_collateral(
+            data["user_address"],
+            data["asset_address"],
+            data["network"],
+        )
+
+    await event_store.record(event["id"])
+    return Response(status_code=200)
+```
+</RequestExample>
+
+## Recommended handling
+
+- Match the event to the pending record with `withdrawal_id`.
+- Refresh the authoritative collateral balance after processing.
+- Keep the transaction hash available for audit and support.
+- Do not create a new withdrawal record if the requested event arrived late.
+
+See [deposits and withdrawals](/core-concepts/deposits-and-withdrawals).

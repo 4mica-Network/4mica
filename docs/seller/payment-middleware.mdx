@@ -13,10 +13,10 @@ For a protected route, the middleware handles the payment gate before your appli
 
 <Steps>
   <Step title="Return payment requirements">
-    When a request is unpaid, the route returns HTTP 402 with the price, asset, network, `payTo` address, and hosted tab endpoint.
+    When a request is unpaid, the route returns HTTP 402 with the price, asset, network, and `payTo` address.
   </Step>
   <Step title="Accept the paid retry">
-    The buyer retries with an x402 payment header after opening or reusing a tab.
+    The buyer signs a guarantee with a unique request ID and retries with an x402 payment header.
   </Step>
   <Step title="Verify and settle">
     The middleware verifies the signed guarantee and settles through the facilitator.
@@ -34,29 +34,20 @@ This keeps your paid product API-native. Buyers and agents can discover the pric
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 
 app.use(
-  paymentMiddlewareFromConfig(
-    {
-      "POST /agent/summarize": {
-        accepts: {
-          scheme: "4mica-credit",
-          price: "$0.02",
-          network: "eip155:84532",
-          payTo: "0xYourSellerAddress",
-        },
+  paymentMiddlewareFromConfig({
+    "POST /agent/summarize": {
+      accepts: {
+        scheme: "4mica-credit",
+        price: "$0.02",
+        network: "eip155:84532",
+        payTo: "0xYourSellerAddress",
       },
     },
-    {
-      advertisedEndpoint: "https://api.example.com/payment/tab",
-    }
-  )
+  })
 );
 ```
 
 After changing route pricing or `payTo`, confirm the advertised values in [4mica dashboard](https://app.4mica.io).
-
-<Warning>
-Keep `advertisedEndpoint` on a route you control. Sending buyers directly to a raw facilitator URL makes your payment surface harder to verify and harder to support.
-</Warning>
 
 ## Fields you should make explicit
 
@@ -66,7 +57,7 @@ Keep `advertisedEndpoint` on a route you control. Sending buyers directly to a r
 | `price` | Set the amount for this unit of work. Start small in sandbox. |
 | `network` | Use Base Sepolia (`eip155:84532`) for testing and Base (`eip155:8453`) for production when supported by your route. |
 | `payTo` | Use your wallet address that should receive payment. |
-| `advertisedEndpoint` | Use a route hosted by your API, not a raw facilitator URL. |
+| Guarantee version | Use V1 for immediately payable work or V2 for validation-gated work. |
 
 ## Pricing dynamic work
 
@@ -92,7 +83,7 @@ Log enough information to connect payment, request, and result.
 | Log field | Why it matters |
 | --- | --- |
 | Route and method | Shows which protected resource was called. |
-| Request ID and tab ID | Connects the application request to the payment flow. |
+| Request ID and guarantee ID | Connects the application request to the payment flow. |
 | Payer address and `payTo` address | Shows who paid and which seller address received the obligation. |
 | Quoted price | Shows what the buyer authorized. |
 | Payment header version | Helps debug client compatibility. |
@@ -107,7 +98,7 @@ Keep these logs close to dashboard settlement records so support can trace buyer
 
 If verification or settlement fails, do not run the paid handler. Return a clear payment failure response and include a stable error code that your support team can map back to logs.
 
-If a buyer retries repeatedly with invalid payment headers, rate limit the payer, tab, IP, or agent identity depending on what your application can observe.
+If a buyer retries repeatedly with invalid payment headers, rate limit the payer, guarantee, IP, or agent identity depending on what your application can observe.
 
 <Warning>
 Do not treat payment middleware failures as ordinary application errors. A failed verification means the paid handler should not run.

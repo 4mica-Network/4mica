@@ -1,0 +1,67 @@
+---
+title: "Agent identity"
+description: "What identifies an agent, what it proves, and how to keep authority scoped and revocable."
+---
+
+Think about how a website knows you're allowed to access your email. You have a username, a password, and a session that proves you logged in. The site checks those credentials on every request and stops serving you if they expire or change.
+
+Agent identity solves the same problem for autonomous software. An agent making a payment request needs to prove which actor is making the request, who authorized it, and what it is allowed to do. It also needs to show that authority can be revoked. Without those answers, a service has no way to decide whether to trust the request, price it correctly, or hold anyone accountable if something goes wrong.
+
+This is not the same problem as user identity. The design assumptions are different, and the failure modes are different.
+
+## Why agent identity is not user identity
+
+Human identity systems center on persistent, centralized accounts. A person logs in once, builds a transaction history, and carries that reputation forward. Banks, card networks, and fraud teams use that history to decide how much trust to extend.
+
+Agents don't fit that model. Each one may be newly created, ephemeral, or operating under a parent that holds the real account. The identity question shifts from "who is this person?" to a different set of questions:
+
+- **Which agent is acting?** A wallet address or cryptographic key identifies the payer, but a service may also need to know the agent's type, version, operator, or task context.
+- **Who authorized it?** An agent acting on behalf of a user or organization must carry proof of that delegation. Without it, the service has no way to verify the action was sanctioned.
+- **What is it permitted to do?** Spending limits, allowed services, time windows, and accepted assets constrain what an agent may request. Those policies need to travel with the agent, not be negotiated at each service.
+- **Can it be stopped?** If an agent acts outside its policy or is compromised, there must be a way to revoke its authority without shutting down the broader system.
+
+Human identity answers the first question reasonably well. It largely ignores the other three because a human user is present to handle exceptions in real time. Agents are not.
+
+## Identity, reputation, and credit
+
+These three concepts are related but distinct. Conflating them creates design mistakes.
+
+**Identity** answers: who are you? A wallet address, a signing key, or a verified credential establishes that a specific agent is making a request. Identity says nothing about whether that agent should be trusted.
+
+**Reputation** answers: how have you behaved? A record of past transactions, payment reliability, and counterparties tells a service whether this agent has earned trust. Reputation builds over time and is specific to context.
+
+**Credit** answers: how much risk will someone take on you? Credit extends a commitment based on a combination of identity and reputation. It is the layer that makes deferred payment and invoicing possible.
+
+All three matter for agentic payments. But you need to build and track them separately. An agent with strong identity but no reputation still has to pre-fund. An agent with reputation but weak identity credentials may fail policy checks. Conflating them produces systems that can't distinguish a new agent from an untrusted one.
+
+## What agent identity is made of
+
+A complete agent identity in a payment flow has four components:
+
+- **Wallet or account.** Identifies the payer and connects the agent to a funding source. A wallet is an internet-native account that can hold assets and sign transactions. Think of it as a bank account and a digital signature combined into one programmable object. The wallet address is the root identifier the payment system tracks: who owes what, who gets paid, and who to contact in a dispute.
+- **Signer.** The key that authorizes individual payment requests. In simple setups the signer is the wallet owner. In delegated setups, where an organization deploys many agents, the signer may be a narrower key with limited authority issued to the agent for a specific session or task.
+- **Policy.** The rules bound to the signer: which services may be called, how much may be spent, on which networks and assets, within which time windows. Policy turns a raw signing key into a scoped credential. Without it, a key is all-or-nothing.
+- **Metadata.** Descriptive context about the agent: operator, purpose, version, task. Not all services need it, but those that need it for compliance, logging, or pricing require it to travel with the request rather than arrive separately.
+
+These four work together. A wallet address alone tells a service who might pay. Adding a signer, policy, and metadata tells it whether to trust the request, what it's allowed to do, and how to handle it.
+
+## How identity connects to payment
+
+Identity and payment are not separate layers. They run together in the same request. Before a service does paid work, it checks two things: whether the request came from an authorized agent, and whether that agent can pay under the advertised terms. That decision depends on identity.
+
+Trust has to come before payment. This is why emerging agent standards treat identity and trust as a dedicated layer in the stack, sitting above communication protocols and below payment coordination protocols.
+
+Two standards are emerging at this layer. ERC-8004 is a draft proposal backed by MetaMask, Google, Coinbase, and the Ethereum Foundation. It establishes a shared on-chain registry for agent credentials: who the agent is, how it has behaved, and what capabilities it claims. Any service can query that registry and make a trust decision before accepting the request. Visa TAP (Trusted Agent Protocol) works at the payment network level. It embeds a verifiable credential in each payment request so merchants can confirm the agent is authorized by a real user rather than a bot or scraper, without querying an external registry.
+
+4Mica's x402 model embeds the credential directly in the payment request: the agent presents a signed certificate carrying its signer, policy, and authorization scope so the service can verify identity and payment capacity in a single step.
+
+## Builder guidance
+
+Start with the smallest identity footprint that makes your payment flow auditable and revocable. Expand as your agent surface grows:
+
+- issue per-agent signing keys, not shared keys across the system
+- attach explicit spending policy to each key before any agent calls an external service
+- keep delegation chains short since one or two levels is almost always enough
+- log every payment authorization with agent address, signer, policy version, and timestamp
+- build revocation before you need it and know how to invalidate a specific key without disrupting other agents or active sessions
+- treat reputation as future infrastructure and design your identity model to accommodate portable credentials even if you can't use them yet

@@ -1,0 +1,118 @@
+---
+title: "Agentic economy"
+description: "Why autonomous agents need open payment, identity, trust, and settlement rails."
+---
+
+The agentic economy is a market where autonomous software actors discover services, make decisions, and pay for work without a human clicking checkout every time. Agents call APIs, buy inference, fetch data, rent compute, place orders, and coordinate with other agents as part of a larger task.
+
+This changes the shape of commerce. The buyer is no longer always a person in a browser session, and the seller is no longer always a merchant with a storefront. Many transactions become API-native, high-frequency, small-value, and machine-initiated.
+
+## Internet assumes a human
+
+Internet economy is built around a person being present at every step. That assumption runs deeper than checkout flows.
+
+A person creates an account. A person reviews and accepts terms of service. A person enters payment details. A person approves each purchase. A person receives invoices. A person resolves disputes when something goes wrong.
+
+No one designed these steps to be automated. Each one assumes a human sits at the center of the transaction. That human makes judgment calls and bears responsibility for the outcome.
+
+Agents break every one of those assumptions. They operate continuously, without a browser session, across dozens of services at once, at speeds no person could match. They make hundreds of economic decisions inside a single task. They act without a persistent account, a verified identity, or a shared history with the services they call.
+
+The internet economy works because of the human in the loop. The agentic economy has to work without one.
+
+## What an agent task looks like
+
+Consider a concrete example. You tell a travel agent: "Plan a three-day trip to Berlin next week. I want sunny weather and I want to stay under €1,500."
+
+To complete the full task, the agent might:
+
+- pay a weather forecast API to identify sunny days next week in Berlin
+- buy access to flight availability data from one or more providers
+- query hotel APIs across several booking platforms
+- call mapping APIs to assess transit options and distances
+- request translation services for local venue information
+- negotiate and book transportation at each stage
+
+By the time the agent returns a plan, it may have interacted with dozens of services and made hundreds of small economic decisions. Each interaction required the agent to discover a price, decide whether to pay it, and complete a transaction. No human approved each step.
+
+This is what agentic commerce looks like in practice: many small machine-initiated payments assembled into a single useful outcome.
+
+## Subscriptions don't scale for agents
+
+Most software today is sold on subscriptions. You pay monthly for access to a tool and use it as needed. That model works when a person or team uses one product at a time.
+
+It breaks when an agent needs to call dozens of services to complete a single task.
+
+Your travel agent might need working relationships with thirty flight APIs, twenty hotel platforms, ten weather providers, and fifteen mapping services. Managing separate accounts, logins, billing cycles, and usage caps for each is not practical. The overhead compounds every time a new service is added.
+
+Subscriptions assumed human buyers: a stable identity, a consistent usage pattern, and a long-term relationship with each seller. Agents have none of those. They may call a service once in the middle of a task and never again. Subscriptions did not account for software that assembles services on demand.
+
+## Software becomes labor
+
+The shift from tools to agents is not just a technology change. It is an economic one.
+
+Traditional software assists. A person decides what to do, and the software helps them do it faster. The human is the worker and the software is the tool.
+
+Agentic software performs. A person states an outcome. The software plans the steps, calls the necessary services, spends within its policy, and returns the result. The software is the worker and the human is the supervisor.
+
+Software performing work needs what workers need: credentials, a budget, limits, and an audit trail. A tool doesn't need a wallet. An agent does.
+
+The progression is clearer in stages:
+
+1. **Tools:** software helps a person do work, but the person drives every step.
+2. **Assistants:** software drafts, summarizes, and suggests, but waits for the person to decide.
+3. **Agents:** software receives a goal, assembles the steps, calls other systems, pays for what it needs, and returns a result.
+
+The third stage creates economic obligations. Agents are no longer just producing text inside a chat window. They are initiating actions in the world on behalf of someone else.
+
+## Why it matters
+
+Most payment systems assumed human buyers: accounts, cards, invoices, fraud teams, and manual reconciliation. Agents need different rails:
+
+- **Portable identity:** a service needs to know which agent is acting, who controls it, and what permissions it has.
+- **Programmable payment:** an agent must be able to pay inside the workflow, not after a human opens an account or approves an invoice.
+- **Trust:** sellers need confidence before serving paid work, buyers need confidence that they will recieve what they paid for.
+- **Efficient settlement:** the system cannot afford an on-chain transaction, card authorization, or manual invoice cycle for every API call.
+- **Open access:** new services should be reachable by protocol, not only through closed platform integrations.
+
+Organizations deploy agents as economic participants before the surrounding payment, identity, and settlement systems are ready for them. Stablecoins and open protocols make money programmable. They don't yet give agents a way to turn many small machine requests into enforceable obligations that can settle later.
+
+## What agents buy and sell
+
+The agentic economy includes the full lifecycle of agent capabilities, not just agents buying finished products:
+
+- **Production:** developers, companies, and teams create specialized agents, tools, datasets, and services.
+- **Distribution:** agents and services become available through marketplaces, APIs, app stores, registries, and direct integrations.
+- **Consumption:** people, businesses, and other agents invoke those capabilities to complete work.
+
+That shift changes how software is valued. In a traditional SaaS model, the buyer pays to use a tool and a human operates it. In an agentic model, the buyer pays for completed work, delegated execution, or measurable outcomes. The economic unit moves from the seat or subscription toward the task, request, or result.
+
+## How agentic commerce changes each role
+
+For sellers, agentic commerce makes APIs monetizable as first-class products. You can expose a paid endpoint and serve machine customers without forcing every buyer through a human-oriented signup, dashboard, or sales process.
+
+For buyers, the payment relationship becomes more portable. An agent should move across services using consistent identity, spending policies, and payment credentials. It shouldn't need a separate account and prepaid balance on every service.
+
+For the market, open payment rails reduce the advantage of closed distribution. If agents can discover and pay for services directly, the best endpoint can win through price, reliability, latency, and data quality.
+
+For operators, trust and governance become product requirements. Agents need scoped authority, observability, revocation, and clear liability boundaries. A system that can act quickly also needs a way to prove what it did, why it did it, and who authorized it.
+
+## The stack the agentic economy needs
+
+Filling the infrastructure gap agents expose requires more than a single new protocol. A complete agentic commerce stack addresses seven distinct problems, each requiring its own layer:
+
+| Layer                          | What it solves                                                      | Example protocols                     |
+| ------------------------------ | ------------------------------------------------------------------- | ------------------------------------- |
+| **Agent communication**        | How agents find each other and exchange structured messages         | A2A, MCP                              |
+| **Agent trust**                | How a service verifies an agent's identity before transacting       | ERC-8004, Visa TAP                    |
+| **Mandate collection**         | How humans delegate scoped payment authority to agents              | AP2                                   |
+| **Transaction coordination**   | How agents discover prices, negotiate terms, and structure payments | ACP, UCP, MPP, x402, AXTP             |
+| **Transaction authentication** | How payment requests are validated and fraud is prevented           | 4Mica, VIC, MAP, stablecoins          |
+| **Payment rails**              | How funds move at final settlement                                  | ACH, wire, card networks, stablecoins |
+| **Clearing**                   | How obligations net across agents, providers, and chains            | 4Mica                                 |
+
+Each layer solves a problem the others don't address. The protocols listed are competing proposals, not settled standards. Some will be absorbed into adjacent layers; others will lose adoption entirely. The layered structure itself reflects requirements that persist regardless of which protocol wins.
+
+## Next steps
+
+- [Agentic payments](./agentic-payments): how agents pay and get paid with stablecoins and machine-readable payment flows.
+- [Agent identity](./agent-identity): wallets, signers, permissions, and policy for autonomous agents.

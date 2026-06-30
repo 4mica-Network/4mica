@@ -1,106 +1,172 @@
 "use client";
 
+import { links, routes } from "@4mica/url";
 import Link from "next/link";
+import { solutions } from "../app/solutions/data";
+
+const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
+
+function ExternalFooterLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="group flex items-center text-ink-body transition-colors hover:text-ink-strong"
+    >
+      {label}
+      <i className="ri-arrow-right-up-line ml-1 hidden text-md transition-transform duration-200 group-hover:block" />
+    </a>
+  );
+}
 
 export default function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <footer className="bg-transparent py-12 text-ink">
-      <div className="container mx-auto px-6">
-        <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <Link
-              href="/"
-              className="mb-4 block font-bold font-pacifico text-3xl"
-            >
-              4Mica
+    <footer className="flex w-full select-none justify-center pt-36 pb-6 text-md">
+      <div className="flex size-full max-w-300 flex-col items-center justify-center">
+        <div className="grid size-full grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Solutions</div>
+            {solutions.map((solution) => (
+              <Link
+                key={solution.slug}
+                href={`/solutions/${solution.slug}`}
+                className={footerLinkClass}
+              >
+                {solution.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Product</div>
+            <Link href="/solution" className={footerLinkClass}>
+              Solution
             </Link>
-            <p className="max-w-md text-ink/80 leading-relaxed">
-              Instant, cryptographically-backed lines-of-credit for any product.
-              Secure, seamless, and decentralized.
-            </p>
+            <Link href="/pricing" className={footerLinkClass}>
+              Pricing
+            </Link>
+            <Link
+              href={links.status}
+              className="group flex items-center text-ink-body transition-colors hover:text-ink-strong"
+              target="_blank"
+              rel="noreferrer"
+            >
+              System status
+              <i className="ri-arrow-right-up-line ml-1 hidden text-md transition-transform duration-200 group-hover:block" />
+            </Link>
           </div>
 
-          <div>
-            <h4 className="mb-4 font-semibold text-lg">Company</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/about" className="link-muted cursor-pointer">
-                  4Mica Mission
-                </Link>
-              </li>
-              <li>
-                <Link href="/team" className="link-muted cursor-pointer">
-                  Team
-                </Link>
-              </li>
-              <li>
-                <Link href="/#resources" className="link-muted cursor-pointer">
-                  Resources
-                </Link>
-              </li>
-              <li>
-                <Link href="/roadmap" className="link-muted cursor-pointer">
-                  Roadmap
-                </Link>
-              </li>
-              <li>
-                <Link href="/careers" className="link-muted cursor-pointer">
-                  Careers
-                </Link>
-              </li>
-            </ul>
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Developers</div>
+            <ExternalFooterLink href={links.status} label="API status" />
+            <ExternalFooterLink
+              href={links.social.githubCore}
+              label="API changelog"
+            />
+            <ExternalFooterLink
+              href={links.social.github}
+              label="Libraries and SDKs"
+            />
           </div>
 
-          <div>
-            <h4 className="mb-4 font-semibold text-lg">Follow Us</h4>
-            <div className="flex space-x-4">
-              <Link
-                href="https://x.com/0x4Mica"
-                className="link-muted cursor-pointer"
-              >
-                <div className="flex h-6 w-6 items-center justify-center">
-                  <i className="ri-twitter-line text-xl"></i>
-                </div>
-              </Link>
-              <Link
-                href="https://www.linkedin.com/company/4mica"
-                className="link-muted cursor-pointer"
-              >
-                <div className="flex h-6 w-6 items-center justify-center">
-                  <i className="ri-linkedin-line text-xl"></i>
-                </div>
-              </Link>
-              <Link
-                href="https://github.com/4mica-Network"
-                className="link-muted cursor-pointer"
-              >
-                <div className="flex h-6 w-6 items-center justify-center">
-                  <i className="ri-github-line text-xl"></i>
-                </div>
-              </Link>
-            </div>
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Company</div>
+            <Link href={routes.about} className={footerLinkClass}>
+              About
+            </Link>
+            <Link href={routes.careers} className={footerLinkClass}>
+              Jobs
+            </Link>
+            <Link href={routes.leadership} className={footerLinkClass}>
+              Team
+            </Link>
+            <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
+              Roadmap
+            </Link>
+            <a href={links.mailto.contact} className={footerLinkClass}>
+              Contact sales
+            </a>
+          </div>
+
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Support</div>
+            <a href={links.mailto.contact} className={footerLinkClass}>
+              Get support
+            </a>
+            <a href={links.mailto.contact} className={footerLinkClass}>
+              Managed support plans
+            </a>
+          </div>
+
+          <div className="flex flex-col gap-y-3">
+            <div className="mb-2 font-medium text-ink-strong">Resources</div>
+            <Link href={routes.terms} className={footerLinkClass}>
+              Licences
+            </Link>
+            <Link
+              href="/legal/restricted-businesses"
+              className={footerLinkClass}
+            >
+              Prohibited and restricted businesses
+            </Link>
+            <Link href="/sitemap.xml" className={footerLinkClass}>
+              Sitemap
+            </Link>
+            <Link href={routes.privacy} className={footerLinkClass}>
+              Privacy
+            </Link>
+            <Link href={routes.terms} className={footerLinkClass}>
+              Terms
+            </Link>
+            <Link href="/dpa" className={footerLinkClass}>
+              DPA
+            </Link>
           </div>
         </div>
 
-        <div className="border-ink/20 border-t pt-8">
-          <div className="flex flex-col items-center justify-between md:flex-row">
-            <p className="mb-4 text-ink/80 md:mb-0">
-              © 2026 4Mica. All rights reserved
-            </p>
-            <div className="flex space-x-6">
-              <Link
-                href="/privacy"
-                className="link-muted cursor-pointer whitespace-nowrap"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="/terms"
-                className="link-muted cursor-pointer whitespace-nowrap"
-              >
-                Terms of Service
-              </Link>
-            </div>
+        <div className="mt-14 flex w-full flex-col items-center gap-6 sm:flex-row sm:justify-between">
+          <div className="order-1 font-light text-ink-body text-md sm:order-2">
+            4Mica © {currentYear}
+          </div>
+
+          <div className="flex w-full items-center justify-between sm:order-2 sm:w-auto sm:gap-4">
+            <a
+              href={links.mailto.contact}
+              aria-label="Email 4Mica"
+              className={footerLinkClass}
+            >
+              <i className="ri-mail-line text-xl" />
+            </a>
+            <Link
+              href={links.social.github}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="4Mica on GitHub"
+              className={footerLinkClass}
+            >
+              <i className="ri-github-line text-xl" />
+            </Link>
+            <Link
+              href={links.social.linkedin}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="4Mica on LinkedIn"
+              className={footerLinkClass}
+            >
+              <i className="ri-linkedin-line text-xl" />
+            </Link>
+            <Link
+              href={links.social.x}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="4Mica on X"
+              className={footerLinkClass}
+            >
+              <i className="ri-twitter-x-line text-xl" />
+            </Link>
           </div>
         </div>
       </div>

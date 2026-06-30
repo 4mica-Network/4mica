@@ -35,16 +35,17 @@ The payload contains an `accepts` array listing the payment options the server a
       "resource": "https://api.example.com/data",
       "description": "Access to premium market data",
       "mimeType": "application/json",
-      "maxTimeoutSeconds": 300,
-      "extra": {
-        "tabEndpoint": "https://api.example.com/x402/tab"
-      }
+      "maxTimeoutSeconds": 300
     }
   ]
 }
 ```
 
 ### Payment requirements fields
+
+<Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> tokens are identified by their contract address in the `asset` field.
+
+<Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> identifies the blockchain network in the `network` field.
 
 | Field               | Type   | Description                                                                            |
 | ------------------- | ------ | -------------------------------------------------------------------------------------- |
@@ -57,7 +58,7 @@ The payload contains an `accepts` array listing the payment options the server a
 | `description`       | string | Human-readable description of what the resource provides.                              |
 | `mimeType`          | string | MIME type of the response the client receives after paying.                            |
 | `maxTimeoutSeconds` | number | Maximum seconds allowed between the client signing and settlement completing.          |
-| `extra`             | object | Scheme-specific data. For `4mica-credit`, must include `tabEndpoint`.                 |
+| `extra`             | object | Optional scheme-specific data, including V2 validation policy fields.                |
 
 The server decides which schemes, networks, and prices to advertise. The client decides which options it can fulfill. The `accepts` array lists options; neither side is locked into a single payment method.
 
@@ -84,7 +85,7 @@ If the client has payment requirements cached from a previous call to this resou
 
 ## The 4Mica credit flow
 
-When the scheme is `4mica-credit`, the payment is a signed guarantee backed by collateral held in 4Mica Core, not a direct on-chain token transfer. The flow adds a tab discovery step before the client signs.
+When the scheme is `4mica-credit`, the payment is a signed guarantee backed by collateral held in 4Mica Core, not a direct on-chain token transfer.
 
 ```mermaid
 sequenceDiagram
@@ -95,13 +96,8 @@ sequenceDiagram
 
     C->>R: GET /resource
     R-->>C: 402 + PaymentRequirements (scheme: 4mica-credit)
-    C->>R: POST /x402/tab (tabEndpoint from extra)
-    R->>F: POST /tabs (userAddress, recipientAddress, asset)
-    F->>Core: POST /core/payment-tabs
-    Core-->>F: tabId, nextReqId
-    F-->>R: tabId, nextReqId
-    R-->>C: tabId, nextReqId
-    C->>C: Sign guarantee (tabId, reqId, amount, asset, payTo)
+    C->>C: Generate unique reqId
+    C->>C: Sign guarantee (reqId, amount, asset, payTo)
     C->>R: GET /resource (X-PAYMENT: signed payload)
     R->>F: POST /verify
     F-->>R: isValid: true
@@ -112,21 +108,13 @@ sequenceDiagram
     R-->>C: 200 + resource body
 ```
 
-### The tab
-
-A tab is a scoped payment relationship between a payer and a recipient for a specific asset and guarantee version. Core creates the tab and returns a `tabId` and `nextReqId`. The client uses `nextReqId` as the `reqId` for its first signed guarantee and increments it on every subsequent request under the same tab.
-
-Each signed guarantee carries a unique `reqId`. Submitting a `reqId` the facilitator has already processed causes the request to fail, so every signed claim is tied to exactly one request and cannot be replayed.
-
-The `extra.tabEndpoint` in the 402 response points to a URL on the resource server, not on the facilitator. The client calls it with its wallet address and payment requirements; the resource server proxies the call to the facilitator. This keeps the facilitator off the client's network path and gives the server operator control over which clients can open tabs.
-
-Multiple requests to the same resource server reuse the same tab by incrementing `reqId`. Opening a new tab on every request is unnecessary.
-
 ### The guarantee
 
 The guarantee is a signed claim: the payer commits to a specific amount, recipient, asset, and request identifier. The resource server submits that claim to the facilitator at `/settle`. The facilitator passes it to Core, which locks the corresponding collateral and returns a BLS certificate.
 
-The BLS certificate is the settlement receipt. The resource server holds it and can call `remunerate` on-chain to collect the locked collateral if the payer does not repay the tab before its TTL expires.
+Each guarantee carries a unique `reqId`. Reusing the same signed identity is rejected, which ties every guarantee to one request and prevents replay.
+
+The BLS certificate is the payment authorization and settlement evidence. Payable guarantees enter clearing cycles, where obligations are netted before on-chain settlement.
 
 ### Why not settle on-chain per request
 
@@ -156,15 +144,13 @@ For inexpensive resources, skip `/verify` and call `/settle` directly. For compu
 As a resource server:
 
 - Return the 402 response before doing any work. Never serve content before the payment is verified.
-- Expose a tab endpoint at the URL you put in `extra.tabEndpoint`. That endpoint calls `POST /tabs` on the facilitator and returns `tabId` and `nextReqId` to the client. Keep the facilitator URL in your server-side config, not in the 402 payload.
 - Set `maxAmountRequired` in token base units: for USDC (6 decimals), $1.00 is `"1000000"`.
 - Set `maxTimeoutSeconds` to the time you are willing to wait between the client signing and your `/settle` call. 300 seconds is a reasonable starting point.
-- Persist the BLS certificate from `/settle`. You need it to call `remunerate` on-chain if the payer does not repay the tab before TTL.
+- Persist the BLS certificate from `/settle` and connect it to the request and delivery record.
 
 As a client:
 
-- Cache the tab per `(user, recipient, asset, guaranteeVersion)` and reuse it across requests. Each tab call costs a round trip.
-- Increment `reqId` from `nextReqId` on each request under the same tab. Never reuse a `reqId`.
+- Generate a unique `reqId` for every guarantee. Never reuse a signed request identity.
 - If the server returns a new 402 on the retry, read `invalidReason` before signing again.
 
 See [Transaction lifecycle](./transaction-lifecycle) for how guarantees move through Core and into clearing cycles.

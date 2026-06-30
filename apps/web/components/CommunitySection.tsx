@@ -1,28 +1,12 @@
 "use client";
 
 import Link from "next/link";
-
-const githubUrl = "https://github.com/4mica-Network/4mica-core/";
+import { githubUrl, hooks } from "./data";
 
 export default function CommunitySection() {
-  const hooks = [
-    {
-      label: "Star on GitHub",
-      href: githubUrl,
-    },
-    {
-      label: "Build with us",
-      href: githubUrl,
-    },
-    {
-      label: "Request early access",
-      href: "mailto:mairon@4mica.xyz?subject=Early%20Access%20Request&body=Hi%204Mica%20team,%20I%20would%20like%20early%20access.",
-    },
-  ];
-
   return (
     <section id="community" className="section-gloss py-20">
-      <div className="container mx-auto px-6">
+      <div className="w-full">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div>
             <p className="section-kicker">Community</p>
@@ -38,10 +22,7 @@ export default function CommunitySection() {
               >
                 Join Community
               </Link>
-              <Link
-                href="/resources/technical-docs"
-                className="btn btn-soft btn-md text-center"
-              >
+              <Link href="/pricing" className="btn btn-soft btn-md text-center">
                 Start Building
               </Link>
             </div>
@@ -51,7 +32,7 @@ export default function CommunitySection() {
               <Link
                 key={hook.label}
                 href={hook.href}
-                className="glass-panel rounded-2xl px-5 py-4 font-semibold text-ink-strong text-sm transition-colors hover:text-ink"
+                className="glass-panel rounded-md px-5 py-4 font-semibold text-ink-strong text-md transition-colors hover:text-ink"
               >
                 {hook.label}
               </Link>

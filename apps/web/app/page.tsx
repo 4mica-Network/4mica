@@ -1,15 +1,16 @@
 "use client";
 
-import CodeSamplesSection from "../components/CodeSamplesSection";
-import DocsCalloutSection from "../components/DocsCalloutSection";
-import FaqSection from "../components/FaqSection";
-import FinalCtaSection from "../components/FinalCtaSection";
-import Footer from "../components/Footer";
-import Header from "../components/Header";
-import HeroSection from "../components/HeroSection";
-import PartnersSection from "../components/PartnersSection";
-import UseCasesSection from "../components/UseCasesSection";
-import WhatYoureMissingSection from "../components/WhatYoureMissingSection";
+import Footer from "@components/Footer";
+import Header from "@components/Header";
+import CodeSamplesSection from "./_components/CodeSamplesSection";
+import DocsCalloutSection from "./_components/DocsCalloutSection";
+import FaqSection from "./_components/FaqSection";
+import FinalCtaSection from "./_components/FinalCtaSection";
+import HeroSection from "./_components/HeroSection";
+import PartnersSection from "./_components/PartnersSection";
+import ScrollToTopButton from "./_components/ScrollToTopButton";
+import UseCasesSection from "./_components/UseCasesSection";
+import WhatYoureMissingSection from "./_components/WhatYoureMissingSection";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
       <FaqSection />
       <FinalCtaSection />
       <Footer />
+      <ScrollToTopButton />
     </div>
   );
 }

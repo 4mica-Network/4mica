@@ -28,7 +28,7 @@ Agents need clear prices because they make decisions without a human checkout sc
 - price
 - accepted scheme, network, and asset
 - your `payTo` address
-- tab endpoint
+- guarantee version and validation requirements
 - quote limits or expiration rules
 
 That information lets a buyer agent compare the payment requirement with its own policy before it commits. It also gives both sides a clean record if the request later needs support, refund review, or dispute handling.
@@ -76,7 +76,7 @@ For valuable or expensive work, prefer tiny paid trials over unlimited free acce
 
 4Mica is designed for very small payments, but your economics still matter. Set a minimum that covers model cost, infrastructure, logging, support, fraud risk, and downstream paid calls.
 
-For extremely small units, batch work at the application level or use a tab to accumulate many small obligations before settlement.
+For extremely small units, batch work at the application level and let clearing cycles aggregate payable guarantees before settlement.
 
 ## Pricing checklist
 

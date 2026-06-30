@@ -1,172 +1,157 @@
 "use client";
 
+import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import DesktopNav from "./nav/DesktopNav";
+import MobileNav from "./nav/MobileNav";
 
 export default function Header() {
+  const [isLogoCompact, setIsLogoCompact] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  const companyLinks = [
-    { href: "/about", label: "4Mica Mission" },
-    { href: "/team", label: "Team" },
-    { href: "/roadmap", label: "Roadmap" },
-  ];
-
-  const primaryLinks = [
-    { href: "/resources/technical-docs", label: "Documents" },
-    { href: "/resources", label: "Resources" },
-  ];
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 0);
+    const onScroll = () => setIsLogoCompact(window.scrollY > 80);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    if (isMobileMenuOpen) {
+      document.addEventListener("keydown", onEscape);
+    }
+
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [isMobileMenuOpen]);
+
   return (
-    <>
-      <header
-        className={`sticky top-0 z-40 text-ink transition-all duration-300 ease-out ${
-          isScrolled
-            ? "glass-panel-strong translate-y-2"
-            : "translate-y-0 bg-transparent"
+    <header
+      className={`fixed top-0 right-0 left-0 z-40 flex h-20 w-full select-none justify-center px-4 text-ink transition-colors duration-300 sm:px-6 lg:px-8 ${
+        isMobileMenuOpen
+          ? "bg-[#000000]"
+          : "bg-[linear-gradient(to_bottom,rgba(0,0,0,1)_0%,rgba(0,0,0,0.5)_80%,rgba(0,0,0,0.1)_100%)]"
+      }`}
+    >
+      <nav
+        className={`flex size-full max-w-300 items-center justify-between ${
+          isMobileMenuOpen ? "overflow-hidden" : ""
         }`}
       >
-        <nav className="container mx-auto flex items-center justify-between px-8 py-6">
-          <Link href="/" className="flex items-center space-x-3">
+        <Link
+          href={routes.home}
+          className="relative box-border flex items-center gap-2"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <span
+            className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-md transition-all duration-300 ease-out ${
+              isLogoCompact ? "scale-95" : "scale-100"
+            }`}
+          >
             <Image
               src="/assets/logo_transparent.png"
               alt="4Mica logo"
-              width={180}
-              height={60}
-              className="h-10 w-auto rounded-lg object-cover"
+              width={72}
+              height={72}
+              className="h-full w-full object-cover"
               priority
+              draggable={false}
             />
-            <span className="font-bold font-pacifico text-2xl">4Mica</span>
+          </span>
+          <span
+            className={`relative font-bold font-pacifico text-xl transition-all duration-300 ease-out ${
+              isLogoCompact
+                ? "-translate-x-5 scale-y-50 opacity-0"
+                : "translate-x-0 scale-100 opacity-100"
+            }`}
+          >
+            4Mica
+          </span>
+        </Link>
+
+        <DesktopNav />
+
+        <div className="flex items-center gap-3">
+          <a
+            href={links.mailto.contact}
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
+          >
+            Talk to sales
+          </a>
+
+          <Link
+            href="/pricing"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
+          >
+            Try for free
           </Link>
 
-          <div className="hidden items-center gap-8 md:flex">
-            <div className="flex items-center space-x-8">
-              <div className="group relative">
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap text-ink transition-colors hover:text-brand-strong"
-                >
-                  Company
-                  <i className="ri-arrow-down-s-line text-lg"></i>
-                </button>
-                <div className="pointer-events-none absolute top-full left-0 translate-y-2 pt-2 opacity-0 transition-all duration-200 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-                  <div className="glass-panel-strong w-52 rounded-xl border border-white/10 shadow-lg">
-                    {companyLinks.map((item, index) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`block px-4 py-3 text-ink text-sm transition-colors hover:text-brand-strong ${
-                          index > 0 ? "border-white/10 border-t" : ""
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {primaryLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="cursor-pointer whitespace-nowrap text-ink transition-colors hover:text-brand-strong"
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <a
-                href="mailto:mairon@4mica.xyz"
-                className="whitespace-nowrap text-ink transition-colors hover:text-brand-strong"
-              >
-                Contact Us
-              </a>
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <button
-              type="button"
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="mobile-menu"
-              onClick={() => setIsMobileMenuOpen((open) => !open)}
-              className="text-ink"
-            >
-              <span className="sr-only">Toggle menu</span>
-              <div className="flex h-6 w-6 items-center justify-center">
-                <i
-                  className={`ri-${isMobileMenuOpen ? "close-line" : "menu-line"} text-xl`}
-                ></i>
-              </div>
-            </button>
-          </div>
-        </nav>
-      </header>
-
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
           <button
             type="button"
-            aria-label="Close menu"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-          <div
-            id="mobile-menu"
-            className="glass-panel-strong absolute top-20 right-4 left-4 rounded-2xl p-6"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-menu"
+            aria-label="Toggle mobile menu"
+            onClick={() => setIsMobileMenuOpen((open) => !open)}
+            className="flex h-8 w-8 items-center justify-center text-ink-muted transition-colors hover:text-ink-strong md:hidden"
           >
-            <div className="section-kicker">Company</div>
-            <div className="mt-3 space-y-2">
-              {companyLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block text-ink text-sm transition-colors hover:text-brand-strong"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-            <div className="section-kicker mt-6">Explore</div>
-            <div className="mt-3 space-y-2">
-              {primaryLinks.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block text-ink text-sm transition-colors hover:text-brand-strong"
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <a
-                href="mailto:mairon@4mica.xyz"
-                className="block text-ink text-sm transition-colors hover:text-brand-strong"
-              >
-                Contact Us
-              </a>
-            </div>
-            <div className="mt-6 grid gap-3">
-              <Link
-                href="/resources/technical-docs"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="btn btn-primary btn-md text-center"
-              >
-                Start Building
-              </Link>
-            </div>
+            <span className="sr-only">Toggle menu</span>
+            <span className="relative block h-4 w-5">
+              <span
+                className={`absolute top-0 left-0 h-px w-5 bg-current transition-transform duration-200 ${
+                  isMobileMenuOpen ? "translate-y-2 rotate-45" : ""
+                }`}
+              />
+              <span
+                className={`absolute top-2 left-0 h-px w-5 bg-current transition-opacity duration-200 ${
+                  isMobileMenuOpen ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <span
+                className={`absolute top-4 left-0 h-px w-5 bg-current transition-transform duration-200 ${
+                  isMobileMenuOpen ? "-translate-y-2 -rotate-45" : ""
+                }`}
+              />
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      <div
+        id="mobile-menu"
+        className={`absolute top-20 right-0 left-0 max-h-[calc(100vh-5rem)] overflow-y-auto bg-black px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
+          isMobileMenuOpen
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0"
+        }`}
+      >
+        <div className="mx-auto max-w-300 rounded-b-md pt-4">
+          <MobileNav onNavigate={() => setIsMobileMenuOpen(false)} />
+
+          <div className="mt-6 grid gap-3">
+            <a
+              href={links.mailto.contact}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="h-9 rounded-md border border-white/15 bg-black px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong"
+            >
+              Talk to sales
+            </a>
+            <Link
+              href="/pricing"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
+            >
+              Try for free
+            </Link>
           </div>
         </div>
-      )}
-    </>
+      </div>
+    </header>
   );
 }
