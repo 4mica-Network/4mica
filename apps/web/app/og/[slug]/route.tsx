@@ -98,7 +98,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         "",
       DESCRIPTION_LIMIT,
     );
-    const _pathLabel = normalizedPath === "/" ? "4mica.xyz" : normalizedPath;
+    const _pathLabel = normalizedPath === "/" ? "4mica.io" : normalizedPath;
     const logoUrl = new URL("/assets/og-logo.png", request.url).toString();
 
     return new ImageResponse(
