@@ -59,6 +59,11 @@ jobs:
             "~") DEPLOY_PATH="$HOME" ;;
           esac
 
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          ssh-keygen -F github.com >/dev/null || ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
           if [ ! -d "$DEPLOY_PATH/.git" ]; then
             echo "No git checkout found at $DEPLOY_PATH."
             if [ -d "$DEPLOY_PATH" ] && [ -n "$(find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 -print -quit)" ]; then

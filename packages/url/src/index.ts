@@ -23,6 +23,10 @@ const defaultEnv = (): Env => {
 
 const stripTrailingSlash = (url: string): string => url.replace(/\/$/, "");
 const toRoot = (url: string): string => url.replace(/^https?:\/\//, "");
+const firstNonEmpty = (
+  ...values: Array<string | undefined>
+): string | undefined =>
+  values.find((value) => value !== undefined && value.trim() !== "");
 
 const resolveUrl = (url: string): string =>
   url.startsWith("http") ? url : `https://${url}`;
@@ -30,15 +34,17 @@ const resolveUrl = (url: string): string =>
 const resolveBases = (env: Env): Bases => {
   const base = stripTrailingSlash(
     resolveUrl(
-      env.NEXT_PUBLIC_BASE_URL ??
-        env.VITE_BASE_URL ??
-        env.BASE_URL ??
-        "https://4mica.xyz",
+      firstNonEmpty(
+        env.NEXT_PUBLIC_BASE_URL,
+        env.VITE_BASE_URL,
+        env.BASE_URL,
+      ) ?? "https://4mica.io",
     ),
   );
   const appBase = stripTrailingSlash(
     resolveUrl(
-      env.NEXT_PUBLIC_APP_URL ?? env.VITE_APP_URL ?? env.APP_URL ?? base,
+      firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
+        base,
     ),
   );
 
