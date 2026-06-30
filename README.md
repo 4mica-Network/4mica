@@ -177,7 +177,7 @@ pnpm lint:linter  # Apply linter fixes only
 | `NEXT_PUBLIC_PROJECT_ID` | Yes | Primary Reown AppKit project ID. |
 | `NEXT_PUBLIC_REOWN_PROJECT_ID` | Fallback | Alternate Reown project ID name. |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Fallback | Legacy WalletConnect project ID name. |
-| `NEXT_PUBLIC_APP_URL` | No | Public app URL used for metadata. Defaults to `https://4mica.xyz`. |
+| `NEXT_PUBLIC_APP_URL` | No | Public app URL used for metadata. Defaults to `https://4mica.io`. |
 | `NEXT_PUBLIC_VERCEL_URL` | No | Vercel-provided URL fallback for metadata. |
 | `NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA` | Deploy-time | Sepolia core contract address for hosted builds. |
 | `NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY` | Deploy-time | Polygon Amoy core contract address for hosted builds. |
