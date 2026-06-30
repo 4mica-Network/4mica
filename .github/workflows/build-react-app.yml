@@ -24,10 +24,11 @@ jobs:
       SERVER_USER: ${{ vars.SERVER_USER || 'mo' }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      REPO_SSH_URL: git@github.com:${{ github.repository }}.git
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure SSH
         run: |
@@ -63,12 +64,26 @@ jobs:
             BRANCH="main"
           fi
 
-          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" "$BRANCH" <<'EOF'
+          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" "$BRANCH" "$REPO_SSH_URL" <<'EOF'
           set -euo pipefail
           DEPLOY_PATH="$1"
           BRANCH="$2"
+          REPO_SSH_URL="$3"
+
+          case "$DEPLOY_PATH" in
+            "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+            "~") DEPLOY_PATH="$HOME" ;;
+          esac
+
+          if [ ! -d "$DEPLOY_PATH/.git" ]; then
+            echo "No git checkout found at $DEPLOY_PATH."
+            echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
+            mkdir -p "$(dirname "$DEPLOY_PATH")"
+            git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
+          fi
 
           cd "$DEPLOY_PATH"
+          git remote set-url origin "$REPO_SSH_URL"
           git fetch origin "$BRANCH"
           git checkout "$BRANCH"
           git pull --ff-only origin "$BRANCH"
