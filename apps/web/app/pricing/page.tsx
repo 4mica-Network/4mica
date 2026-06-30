@@ -49,7 +49,7 @@ function ShinyHoverBorder({
 type Tier = {
   name: string;
   price: string;
-  cadence?: string;
+  eyebrow?: string;
   tagline: string;
   features: string[];
   cta: { label: string; href: string; external?: boolean };
@@ -66,6 +66,8 @@ const TIERS: Tier[] = [
       "TypeScript & Python SDKs",
       "x402 facilitator access",
       "Community support",
+      "Protocol docs and examples",
+      "Basic settlement sandbox",
     ],
     cta: {
       label: "Start building",
@@ -75,28 +77,60 @@ const TIERS: Tier[] = [
   },
   {
     name: "Scale",
-    price: "Usage-based",
-    tagline: "Go to mainnet and pay a small fee per settlement.",
+    eyebrow: "Most popular",
+    price: "Volume-based",
+    tagline:
+      "Pay a percentage of cleared transaction volume. Settlement costs included.",
     features: [
-      "Mainnet across supported chains",
-      "Batched on-chain settlement",
-      "Yield on collateral",
+      "Mainnet across chains",
+      "% fee on cleared volume",
+      "Settlement costs covered",
+      "Yield passed through",
+      "Production facilitator access",
+      "Usage and settlement reporting",
       "Email support",
     ],
-    cta: { label: "Talk to sales", href: links.mailto.contact, external: true },
+    cta: { label: "Talk to sales", href: links.mailto.sales, external: true },
     highlight: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
-    tagline: "Volume pricing, SLAs, and dedicated support.",
+    tagline:
+      "Custom terms for high volume networks, facilitators, and marketplaces.",
     features: [
-      "Custom SLAs & terms",
+      "Custom clearing fee",
+      "Volume commitments",
       "Priority settlement",
+      "Yield-sharing options",
       "Dedicated support",
+      "Custom SLAs and terms",
       "Security review",
     ],
-    cta: { label: "Contact sales", href: links.mailto.contact, external: true },
+    cta: { label: "Contact sales", href: links.mailto.sales, external: true },
+  },
+];
+
+const INCLUDED = [
+  {
+    icon: "ri-bank-line",
+    title: "Non-custodial collateral",
+    desc: "Collateral remains controlled by protocol contracts and backs open payment obligations.",
+  },
+  {
+    icon: "ri-exchange-dollar-line",
+    title: "Batched settlement",
+    desc: "Many off-chain guarantees collapse into fewer on-chain settlement actions.",
+  },
+  {
+    icon: "ri-seedling-line",
+    title: "Yield-aware design",
+    desc: "Supported collateral can earn yield while it backs credit-based payment activity.",
+  },
+  {
+    icon: "ri-code-box-line",
+    title: "SDK-first integration",
+    desc: "Use TypeScript and Python clients with x402-compatible HTTP payment flows.",
   },
 ];
 
@@ -110,11 +144,12 @@ export default function PricingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">Pricing</p>
             <h1 className="section-title font-normal">
-              Simple, usage-based pricing
+              Pricing that scales with settlement volume
             </h1>
             <p className="section-lead mx-auto max-w-2xl">
-              Start free on testnets and pay only as you settle. No setup fees,
-              no prefunding, no lock-in.
+              Build free on testnets, then move to volume-based pricing when
+              payments clear on mainnet. No per-request gas billing, no surprise
+              settlement line items.
             </p>
           </div>
 
@@ -132,13 +167,13 @@ export default function PricingPage() {
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
                   <div className="relative z-10">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-h-8 items-center gap-2">
                       <h2 className="font-semibold text-ink-strong text-xl">
                         {tier.name}
                       </h2>
-                      {tier.highlight && (
+                      {tier.eyebrow && (
                         <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-ink-strong text-md">
-                          Most popular
+                          {tier.eyebrow}
                         </span>
                       )}
                     </div>
@@ -147,11 +182,6 @@ export default function PricingPage() {
                       <span className="font-semibold text-3xl text-white tracking-tight">
                         {tier.price}
                       </span>
-                      {tier.cadence && (
-                        <span className="text-ink-muted text-md">
-                          {tier.cadence}
-                        </span>
-                      )}
                     </div>
                     <p className="mt-2 text-ink-muted text-md leading-relaxed">
                       {tier.tagline}
@@ -202,6 +232,41 @@ export default function PricingPage() {
             Collateral stays in your control and earns yield — 4Mica never holds
             funds.
           </p>
+
+          <section className="mt-24">
+            <div className="mb-10 max-w-2xl">
+              <p className="section-kicker">Included</p>
+              <h2 className="section-title font-normal">
+                Core rails across every plan
+              </h2>
+              <p className="section-lead max-w-xl">
+                The plan changes how you go live and operate at scale. The core
+                payment model stays consistent from sandbox to production.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 overflow-hidden rounded-md border border-white/10 bg-black/25 sm:grid-cols-2 lg:grid-cols-4">
+              {INCLUDED.map((item) => (
+                <div
+                  key={item.title}
+                  className="group relative border-white/10 border-b p-6 transition-colors duration-500 hover:bg-white/[0.018] sm:nth-last-[-n+2]:border-b-0 sm:odd:border-r lg:border-r lg:border-b-0 lg:last:border-r-0"
+                >
+                  <ShinyHoverBorder radiusClass="rounded-none" />
+                  <div className="relative z-10">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-white">
+                      <i className={item.icon} />
+                    </div>
+                    <h3 className="font-semibold text-ink-strong text-lg">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
       </div>
       <Footer />

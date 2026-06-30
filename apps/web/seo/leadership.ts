@@ -12,6 +12,6 @@ export const LEADERSHIP_META_DATA = createPageMetadata({
     "AI agent infrastructure",
     "cryptography founders",
   ],
-  url: links.leadership,
+  url: links.team,
   imageAlt: "4Mica leadership team",
 });

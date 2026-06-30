@@ -284,6 +284,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@4mica/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
       '@4mica/url':
         specifier: workspace:*
         version: link:../../packages/url
@@ -420,6 +423,28 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/tailwind-config:
+    dependencies:
+      tailwindcss:
+        specifier: '>=4.0.0'
+        version: 4.3.0
+      tailwindcss-animate:
+        specifier: '>=1.0.0'
+        version: 1.0.7(tailwindcss@4.3.0)
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.0
+      tailwindcss-animate:
+        specifier: 'catalog:'
+        version: 1.0.7(tailwindcss@4.3.0)
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 6.0.3
 
   packages/tsconfig: {}
 

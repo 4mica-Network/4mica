@@ -1,0 +1,33 @@
+{
+  "name": "@4mica/tailwind-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./preset": "./src/preset.ts",
+    "./styles.css": "./styles/styles.css",
+    "./tokens": "./src/tokens.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "README.md",
+    "src",
+    "styles"
+  ],
+  "peerDependencies": {
+    "tailwindcss": ">=4.0.0",
+    "tailwindcss-animate": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "tailwindcss": "catalog:",
+    "tailwindcss-animate": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

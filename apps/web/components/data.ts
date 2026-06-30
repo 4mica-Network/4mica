@@ -10,7 +10,7 @@ export const benefits = [
 
 export const companyLinks = [
   { href: routes.about, label: "4Mica Mission" },
-  { href: routes.leadership, label: "Team" },
+  { href: routes.team, label: "Team" },
   { href: `${routes.about}#roadmap`, label: "Roadmap" },
 ];
 
@@ -71,7 +71,7 @@ export const aboutCards = [
     title: "Team",
     description:
       "Meet the founders building the payment layer for instant commerce",
-    href: routes.leadership,
+    href: routes.team,
   },
   {
     title: "Roadmap",

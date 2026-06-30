@@ -1,0 +1,8 @@
+{
+  "extends": "@4mica/tsconfig/lib.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
