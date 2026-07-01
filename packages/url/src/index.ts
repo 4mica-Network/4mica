@@ -27,18 +27,26 @@ const toRoot = (url: string): string => url.replace(/^https?:\/\//, "");
 const resolveUrl = (url: string): string =>
   url.startsWith("http") ? url : `https://${url}`;
 
+// Treat unset AND empty/whitespace-only env vars as absent. Docker's
+// `ENV FOO=$FOO` with no build arg sets FOO to "", which `??` would keep,
+// producing an invalid base like "https:/".
+const firstNonEmpty = (...values: (string | undefined)[]): string | undefined =>
+  values.find((value) => value != null && value.trim() !== "");
+
 const resolveBases = (env: Env): Bases => {
   const base = stripTrailingSlash(
     resolveUrl(
-      env.NEXT_PUBLIC_BASE_URL ??
-        env.VITE_BASE_URL ??
-        env.BASE_URL ??
-        "https://4mica.xyz",
+      firstNonEmpty(
+        env.NEXT_PUBLIC_BASE_URL,
+        env.VITE_BASE_URL,
+        env.BASE_URL,
+      ) ?? "https://4mica.xyz",
     ),
   );
   const appBase = stripTrailingSlash(
     resolveUrl(
-      env.NEXT_PUBLIC_APP_URL ?? env.VITE_APP_URL ?? env.APP_URL ?? base,
+      firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
+        base,
     ),
   );
 
@@ -81,7 +89,8 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     signin: `${appBase}/sign-in`,
     signup: `${appBase}/sign-up`,
     waitlist: `${appBase}/waitlist`,
-    docs: `${base}${routes.technicalDocs}`,
+    docs: "https://docs.4mica.io",
+    docsChangelog: "https://docs.4mica.io/updates/changelogs",
     status: "https://status.4mica.xyz",
     facilitator: "https://x402.4mica.xyz",
     facilitatorTabs: "https://x402.4mica.xyz/tabs",

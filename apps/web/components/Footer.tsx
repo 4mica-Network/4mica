@@ -70,11 +70,15 @@ export default function Footer() {
               {messages.footer.sections.developers}
             </div>
             <ExternalFooterLink
+              href={links.docs}
+              label={messages.navigation.documentation}
+            />
+            <ExternalFooterLink
               href={links.status}
               label={messages.navigation.apiStatus}
             />
             <ExternalFooterLink
-              href={links.social.githubCore}
+              href={links.docsChangelog}
               label={messages.navigation.apiChangelog}
             />
             <ExternalFooterLink

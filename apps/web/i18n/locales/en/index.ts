@@ -26,6 +26,8 @@ export const en = {
     developers: "Developers",
     pricing: "Pricing",
     byUseCase: "By use case",
+    documentation: "Documentation",
+    documentationDescription: "Guides, SDKs, and API reference",
     apiStatus: "API status",
     apiStatusDescription: "Live uptime",
     apiChangelog: "API changelog",
