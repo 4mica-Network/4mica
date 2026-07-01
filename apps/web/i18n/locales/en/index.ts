@@ -444,6 +444,29 @@ await clearingHouse.claimNetCredit(
         color: "rgb(var(--color-warning))",
       },
     ],
+    teamMembers: [
+      {
+        name: "Akash Madhusudan",
+        role: "CEO & Co-Founder",
+        image: "/assets/akash.jpg",
+        imagePosition: "50% 18%",
+        bio: "Spent a decade solving real problems across banking, AI, and cryptography to build 4Mica",
+      },
+      {
+        name: "Mairon Mahzoun",
+        role: "CTO & Co-Founder",
+        image: "/assets/mairon.jpg",
+        imagePosition: "50% 20%",
+        bio: "Everyone talks about AI and web3. Few understand money. 4mica exists because I grew tired of watching the web3 community claiming it had solved payments. It didn't. So I decided to.",
+      },
+      {
+        name: "Tomer Ashur",
+        role: "Co-Founder",
+        image: "/assets/tomer.png",
+        imagePosition: "50% 15%",
+        bio: "Cryptography-savant, ex-professor, ex-captain, now leading the instant transaction layer for commerce 2.0",
+      },
+    ],
     steps: [
       {
         step: "01",
