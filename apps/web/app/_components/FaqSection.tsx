@@ -2,6 +2,7 @@
 
 import { links } from "@4mica/url";
 import { useState } from "react";
+import { messages } from "@/i18n";
 import { FAQS } from "../data";
 
 export default function FaqSection() {
@@ -25,8 +26,10 @@ export default function FaqSection() {
     <section id="faq" className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
         <div className="mb-6">
-          <p className="section-kicker">FAQ</p>
-          <h2 className="section-title mt-2 font-normal">Common questions</h2>
+          <p className="section-kicker">{messages.home.sections.faqKicker}</p>
+          <h2 className="section-title mt-2 font-normal">
+            {messages.home.sections.faqTitle}
+          </h2>
         </div>
 
         <div className="w-full">
@@ -74,13 +77,13 @@ export default function FaqSection() {
         {/* Contact Support */}
         <div className="mt-14 flex items-center justify-start gap-1.5 text-md">
           <span className="font-normal text-ink-muted">
-            Something else on your mind?
+            {messages.home.sections.faqSupportPrompt}
           </span>
           <a
             href={links.mailto.contact}
             className="text-ink-muted underline underline-offset-4 transition-colors hover:text-ink-strong"
           >
-            Contact us
+            {messages.home.sections.contactUs}
           </a>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { messages } from "@/i18n";
 import { USE_CASES } from "../data";
 
 export default function UseCasesSection() {
@@ -7,13 +8,14 @@ export default function UseCasesSection() {
     <section id="use-cases" className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
         <div className="mb-16 text-center">
-          <p className="section-kicker">Use cases</p>
+          <p className="section-kicker">
+            {messages.sharedContent.sections.useCases.kicker}
+          </p>
           <h2 className="section-title font-normal">
-            Built for the scale you need
+            {messages.sharedContent.sections.useCases.title}
           </h2>
           <p className="section-lead mx-auto max-w-xl">
-            API monetization, agentic commerce, paywalled content. 4Mica handles
-            the payment layer so you don&apos;t have to.
+            {messages.sharedContent.sections.useCases.lead}
           </p>
         </div>
 

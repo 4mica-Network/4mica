@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import type { CSSProperties, PointerEvent } from "react";
 import { useRef, useState } from "react";
+import { messages } from "@/i18n";
 import {
   micaLines,
   micaNet,
@@ -176,12 +177,14 @@ export default function WhatYoureMissingSection() {
           variants={fadeUp}
           transition={{ duration: 0.36, ease: "easeOut" }}
         >
-          <p className="section-kicker">The real cost</p>
+          <p className="section-kicker">
+            {messages.home.sections.realCostKicker}
+          </p>
           <h2 className="section-title font-normal">
-            Agentic economy breaks at scale.
+            {messages.home.sections.realCostTitle}
           </h2>
           <p className="section-lead mx-auto max-w-xl">
-            1M API calls, 10k USDC volume, 1 year.
+            {messages.home.sections.realCostLead}
           </p>
         </motion.div>
 
@@ -189,11 +192,11 @@ export default function WhatYoureMissingSection() {
           <ComparisonCard
             accent={RED}
             direction="left"
-            eyebrow="x402"
+            eyebrow={messages.home.sections.x402Eyebrow}
             icon="ri-close-circle-line"
             lines={x402Lines}
-            subtitle="per-transaction settlement"
-            totalLabel="Total cost"
+            subtitle={messages.home.sections.x402Subtitle}
+            totalLabel={messages.home.sections.totalCost}
             totalValue={`$${x402Total.toLocaleString()} USDC`}
           />
 
@@ -201,11 +204,11 @@ export default function WhatYoureMissingSection() {
             accent={GREEN}
             delay={0.08}
             direction="right"
-            eyebrow="With 4Mica"
+            eyebrow={messages.home.sections.micaEyebrow}
             icon="ri-checkbox-circle-line"
             lines={micaLines}
-            subtitle="credit layer + batch settlement"
-            totalLabel="Net cost"
+            subtitle={messages.home.sections.micaSubtitle}
+            totalLabel={messages.home.sections.netCost}
             totalValue={`$${micaNet.toLocaleString()} USDC`}
           />
         </div>
@@ -225,16 +228,18 @@ export default function WhatYoureMissingSection() {
 
           <div>
             <p className="mb-2 text-ink-muted text-md">
-              Same 1M calls. Same starting capital.
+              {messages.home.sections.deltaLead}
             </p>
             <p className="flex flex-col gap-1 font-medium text-3xl text-ink-strong leading-tight sm:flex-row sm:items-baseline sm:gap-3 md:text-3xl">
-              <span>${netDelta.toLocaleString()} saved</span>
+              <span>
+                ${netDelta.toLocaleString()} {messages.home.sections.saved}
+              </span>
               <span className="hidden text-2xl text-ink-subtle/60 sm:inline">
                 /
               </span>
               <span>
-                {SCENARIO.x402LatencyHours - SCENARIO.micaLatencyHours} hours
-                reclaimed
+                {SCENARIO.x402LatencyHours - SCENARIO.micaLatencyHours} hours{" "}
+                {messages.home.sections.reclaimed}
               </span>
             </p>
           </div>

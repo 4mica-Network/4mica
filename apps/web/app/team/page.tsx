@@ -1,87 +1,13 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import LifeAt4Mica from "./LifeAt4Mica";
 import TeamGrid from "./TeamGrid";
 
-const VALUES = [
-  {
-    title: "Relentless",
-    icon: "ri-fire-line",
-    desc: "We push through hard problems and don't stop until it ships.",
-  },
-  {
-    title: "Open",
-    icon: "ri-eye-line",
-    desc: "We default to transparency, open standards, and honest feedback.",
-  },
-  {
-    title: "Delightful",
-    icon: "ri-sparkling-2-line",
-    desc: "We obsess over the details that make every interaction effortless.",
-  },
-  {
-    title: "Unified",
-    icon: "ri-team-line",
-    desc: "We move as one team with shared goals and shared ownership.",
-  },
-  {
-    title: "Innovative",
-    icon: "ri-lightbulb-flash-line",
-    desc: "We question defaults and build what doesn't exist yet.",
-  },
-];
+const VALUES = messages.team.values;
 
-const PERKS = [
-  {
-    title: "Competitive equity",
-    icon: "ri-money-dollar-circle-fill",
-    color: "text-purple-400",
-    desc: "We pay well and we pay fairly, with transparent compensation practices.",
-  },
-  {
-    title: "Health benefits",
-    icon: "ri-heart-pulse-fill",
-    color: "text-pink-400",
-    desc: "We've got you covered with comprehensive health, dental, and vision plans.",
-  },
-  {
-    title: "Equipment & office",
-    icon: "ri-computer-fill",
-    color: "text-blue-400",
-    desc: "You get a laptop, of course, plus an additional $1,000 USD to upgrade your home office.",
-  },
-  {
-    title: "Flexible time-off",
-    icon: "ri-time-fill",
-    color: "text-green-400",
-    desc: "Unlimited PTO and sick leave. When you work, we pay. When you don't work, we still pay.",
-  },
-  {
-    title: "Retirement benefits",
-    icon: "ri-bank-fill",
-    color: "text-sky-400",
-    desc: "We offer retirement support with coverage varying by country.",
-  },
-  {
-    title: "Paid leave",
-    icon: "ri-user-fill",
-    color: "text-yellow-400",
-    desc: "Time off to help you rest, care for loved ones, or welcome a new addition to your family.",
-  },
-  {
-    title: "L&D stipend",
-    icon: "ri-book-open-fill",
-    color: "text-pink-300",
-    desc: "Get $3,000 USD per year towards your professional learning and development.",
-  },
-  {
-    title: "Wellness stipend",
-    icon: "ri-settings-4-fill",
-    color: "text-orange-500",
-    desc: "Get $200 USD a month for a gym membership, new shoes, or the world's largest smoothie.",
-  },
-];
+const PERKS = messages.team.perks;
 
 function ShinyHoverBorder({
   radiusClass = "rounded-md",
@@ -118,12 +44,10 @@ export default function LeadershipPage() {
         <section className="w-full">
           {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">Team</p>
-            <h1 className="section-title font-normal">Meet the team</h1>
+            <p className="section-kicker">{messages.team.kicker}</p>
+            <h1 className="section-title font-normal">{messages.team.title}</h1>
             <p className="section-lead mx-auto max-w-2xl">
-              4Mica is led by founders who have shipped payment infrastructure
-              across finance, AI, and cryptography. We are focused on bringing
-              production-grade credit rails to web3 commerce.
+              {messages.team.lead}
             </p>
           </div>
 
@@ -134,20 +58,17 @@ export default function LeadershipPage() {
             <ShinyHoverBorder radiusClass="rounded-md" />
             <div className="relative z-10">
               <h2 className="font-semibold text-2xl text-ink-strong">
-                How we work
+                {messages.team.howWeWorkTitle}
               </h2>
               <p className="mt-3 max-w-3xl text-ink-body text-lg leading-relaxed">
-                We build with a security-first mindset and keep every protocol
-                component auditable. The team ships with a focus on production
-                reliability, clear integration paths, and measurable outcomes
-                for partners.
+                {messages.team.howWeWorkLead}
               </p>
               <div className="mt-6">
                 <Link
                   href="/about"
                   className="inline-flex items-center gap-2 font-semibold text-ink-strong text-md transition-colors hover:text-white"
                 >
-                  Read our mission
+                  {messages.team.readMission}
                   <i className="ri-arrow-right-line text-md" />
                 </Link>
               </div>
@@ -157,10 +78,12 @@ export default function LeadershipPage() {
           {/* Our values */}
           <div className="mt-24">
             <div className="mx-auto max-w-2xl text-center">
-              <p className="section-kicker">Values</p>
-              <h2 className="section-title font-normal">Our values</h2>
+              <p className="section-kicker">{messages.team.valuesKicker}</p>
+              <h2 className="section-title font-normal">
+                {messages.team.valuesTitle}
+              </h2>
               <p className="section-lead mx-auto max-w-2xl">
-                The principles that guide how we build and work together.
+                {messages.team.valuesLead}
               </p>
             </div>
 
@@ -192,9 +115,9 @@ export default function LeadershipPage() {
           {/* Perks & benefits */}
           <div className="mt-24">
             <div className="mx-auto max-w-2xl text-center">
-              <p className="section-kicker">Benefits</p>
+              <p className="section-kicker">{messages.team.benefitsKicker}</p>
               <h2 className="section-title font-normal">
-                Perks &amp; benefits
+                {messages.team.benefitsTitle}
               </h2>
             </div>
 

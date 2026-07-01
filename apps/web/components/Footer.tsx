@@ -2,6 +2,7 @@
 
 import { links, routes } from "@4mica/url";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { solutions } from "../app/solutions/data";
 
 const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
@@ -28,7 +29,9 @@ export default function Footer() {
       <div className="flex size-full max-w-300 flex-col items-center justify-center">
         <div className="grid size-full grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Solutions</div>
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.solutions}
+            </div>
             {solutions.map((solution) => (
               <Link
                 key={solution.slug}
@@ -41,12 +44,14 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Product</div>
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.product}
+            </div>
             <Link href="/solution" className={footerLinkClass}>
-              Solution
+              {messages.footer.product.solution}
             </Link>
             <Link href="/pricing" className={footerLinkClass}>
-              Pricing
+              {messages.footer.product.pricing}
             </Link>
             <Link
               href={links.status}
@@ -54,75 +59,86 @@ export default function Footer() {
               target="_blank"
               rel="noreferrer"
             >
-              System status
+              {messages.footer.product.systemStatus}
               <i className="ri-arrow-right-up-line ml-1 hidden text-md transition-transform duration-200 group-hover:block" />
             </Link>
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Developers</div>
-            <ExternalFooterLink href={links.status} label="API status" />
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.developers}
+            </div>
+            <ExternalFooterLink
+              href={links.status}
+              label={messages.navigation.apiStatus}
+            />
             <ExternalFooterLink
               href={links.social.githubCore}
-              label="API changelog"
+              label={messages.navigation.apiChangelog}
             />
             <ExternalFooterLink
               href={links.social.github}
-              label="Libraries and SDKs"
+              label={messages.navigation.librariesAndSdks}
             />
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Company</div>
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.company}
+            </div>
             <Link href={routes.about} className={footerLinkClass}>
-              About
+              {messages.footer.company.about}
             </Link>
             <Link href={routes.careers} className={footerLinkClass}>
-              Jobs
+              {messages.footer.company.jobs}
             </Link>
-            <Link href={routes.leadership} className={footerLinkClass}>
-              Team
+            <Link href={routes.team} className={footerLinkClass}>
+              {messages.footer.company.team}
             </Link>
             <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
-              Roadmap
+              {messages.footer.company.roadmap}
             </Link>
             <a href={links.mailto.sales} className={footerLinkClass}>
-              Contact sales
+              {messages.footer.company.contactSales}
             </a>
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Support</div>
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.support}
+            </div>
             <a href={links.mailto.support} className={footerLinkClass}>
-              Get support
+              {messages.footer.support.getSupport}
             </a>
             <a href={links.mailto.support} className={footerLinkClass}>
-              Managed support plans
+              {messages.footer.support.managedSupportPlans}
             </a>
           </div>
 
           <div className="flex flex-col gap-y-3">
-            <div className="mb-2 font-medium text-ink-strong">Resources</div>
+            <div className="mb-2 font-medium text-ink-strong">
+              {messages.footer.sections.resources}
+            </div>
             <Link href={routes.terms} className={footerLinkClass}>
-              Licences
+              {messages.footer.resources.licences}
             </Link>
             <Link
               href="/legal/restricted-businesses"
               className={footerLinkClass}
             >
-              Prohibited and restricted businesses
+              {messages.footer.resources.restrictedBusinesses}
             </Link>
             <Link href="/sitemap.xml" className={footerLinkClass}>
-              Sitemap
+              {messages.footer.resources.sitemap}
             </Link>
             <Link href={routes.privacy} className={footerLinkClass}>
-              Privacy
+              {messages.footer.resources.privacy}
             </Link>
             <Link href={routes.terms} className={footerLinkClass}>
-              Terms
+              {messages.footer.resources.terms}
             </Link>
             <Link href="/dpa" className={footerLinkClass}>
-              DPA
+              {messages.footer.resources.dpa}
             </Link>
           </div>
         </div>
@@ -135,7 +151,7 @@ export default function Footer() {
           <div className="flex w-full items-center justify-between sm:order-2 sm:w-auto sm:gap-4">
             <a
               href={links.mailto.support}
-              aria-label="Email 4Mica"
+              aria-label={messages.common.a11y.email4Mica}
               className={footerLinkClass}
             >
               <i className="ri-mail-line text-xl" />
@@ -144,7 +160,7 @@ export default function Footer() {
               href={links.social.github}
               target="_blank"
               rel="noreferrer"
-              aria-label="4Mica on GitHub"
+              aria-label={messages.common.a11y.github}
               className={footerLinkClass}
             >
               <i className="ri-github-line text-xl" />
@@ -153,7 +169,7 @@ export default function Footer() {
               href={links.social.linkedin}
               target="_blank"
               rel="noreferrer"
-              aria-label="4Mica on LinkedIn"
+              aria-label={messages.common.a11y.linkedin}
               className={footerLinkClass}
             >
               <i className="ri-linkedin-line text-xl" />
@@ -162,7 +178,7 @@ export default function Footer() {
               href={links.social.x}
               target="_blank"
               rel="noreferrer"
-              aria-label="4Mica on X"
+              aria-label={messages.common.a11y.x}
               className={footerLinkClass}
             >
               <i className="ri-twitter-x-line text-xl" />

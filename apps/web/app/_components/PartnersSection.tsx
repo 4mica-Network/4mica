@@ -4,6 +4,7 @@ import { links } from "@4mica/url";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
 
 const arrowNudge: Variants = {
@@ -102,13 +103,14 @@ export default function PartnersSection() {
               </g>
             </svg>
           </div>
-          <p className="section-kicker">Ecosystem</p>
+          <p className="section-kicker">
+            {messages.sharedContent.sections.ecosystem.kicker}
+          </p>
           <h2 className="section-title font-normal">
-            Built on primitives you already trust
+            {messages.sharedContent.sections.ecosystem.title}
           </h2>
           <p className="section-lead mx-auto max-w-xl">
-            4Mica is not a new protocol stack. It is a credit layer on top of
-            production infrastructure.
+            {messages.sharedContent.sections.ecosystem.lead}
           </p>
         </div>
 

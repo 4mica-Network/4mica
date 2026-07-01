@@ -1,3 +1,4 @@
+import { messages } from "@/i18n";
 import { milestones } from "../data";
 
 type Status = "Shipped" | "In progress" | "Planned";
@@ -82,10 +83,12 @@ export default function TimelineSection({
       <div className="mx-auto w-full max-w-3xl">
         {showHeader && (
           <div className="mb-14 text-center">
-            <p className="section-kicker">Roadmap</p>
-            <h2 className="section-title font-normal">Product roadmap</h2>
+            <p className="section-kicker">{messages.about.roadmap.kicker}</p>
+            <h2 className="section-title font-normal">
+              {messages.about.roadmap.title}
+            </h2>
             <p className="section-lead mx-auto max-w-2xl">
-              Our journey to revolutionize web3 commerce.
+              {messages.about.roadmap.lead}
             </p>
           </div>
         )}
@@ -99,7 +102,7 @@ export default function TimelineSection({
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <title>Roadmap path</title>
+            <title>{messages.about.roadmap.pathTitle}</title>
             <path
               d={path}
               stroke="rgba(255,255,255,0.10)"

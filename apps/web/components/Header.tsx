@@ -4,6 +4,7 @@ import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { messages } from "@/i18n";
 import DesktopNav from "./nav/DesktopNav";
 import MobileNav from "./nav/MobileNav";
 
@@ -57,7 +58,7 @@ export default function Header() {
           >
             <Image
               src="/assets/logo_transparent.png"
-              alt="4Mica logo"
+              alt={messages.common.logoAlt}
               width={72}
               height={72}
               className="h-full w-full object-cover"
@@ -72,7 +73,7 @@ export default function Header() {
                 : "translate-x-0 scale-100 opacity-100"
             }`}
           >
-            4Mica
+            {messages.common.brandName}
           </span>
         </Link>
 
@@ -83,25 +84,25 @@ export default function Header() {
             href={links.mailto.contact}
             className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
           >
-            Talk to sales
+            {messages.common.actions.talkToSales}
           </a>
 
           <Link
             href="/pricing"
             className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
           >
-            Try for free
+            {messages.common.actions.tryForFree}
           </Link>
 
           <button
             type="button"
             aria-expanded={isMobileMenuOpen}
             aria-controls="mobile-menu"
-            aria-label="Toggle mobile menu"
+            aria-label={messages.common.a11y.toggleMobileMenu}
             onClick={() => setIsMobileMenuOpen((open) => !open)}
             className="flex h-8 w-8 items-center justify-center text-ink-muted transition-colors hover:text-ink-strong md:hidden"
           >
-            <span className="sr-only">Toggle menu</span>
+            <span className="sr-only">{messages.common.a11y.toggleMenu}</span>
             <span className="relative block h-4 w-5">
               <span
                 className={`absolute top-0 left-0 h-px w-5 bg-current transition-transform duration-200 ${
@@ -140,14 +141,14 @@ export default function Header() {
               onClick={() => setIsMobileMenuOpen(false)}
               className="h-9 rounded-md border border-white/15 bg-black px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong"
             >
-              Talk to sales
+              {messages.common.actions.talkToSales}
             </a>
             <Link
               href="/pricing"
               onClick={() => setIsMobileMenuOpen(false)}
               className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
             >
-              Try for free
+              {messages.common.actions.tryForFree}
             </Link>
           </div>
         </div>

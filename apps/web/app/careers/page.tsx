@@ -1,6 +1,7 @@
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import { messages } from "@/i18n";
 
 function ShinyHoverBorder({
   radiusClass = "rounded-md",
@@ -29,23 +30,7 @@ function ShinyHoverBorder({
   );
 }
 
-const GET_INVOLVED = [
-  {
-    title: "Contribute code",
-    icon: "ri-git-branch-line",
-    desc: "Open a PR or an issue on our repos — every protocol component is open and auditable.",
-  },
-  {
-    title: "Share research",
-    icon: "ri-flask-line",
-    desc: "Working on payments, cryptography, or credit? We'd love to compare notes.",
-  },
-  {
-    title: "Partner with us",
-    icon: "ri-shake-hands-line",
-    desc: "Building a service that needs instant settlement? Let's explore an integration.",
-  },
-];
+const GET_INVOLVED = messages.careers.getInvolved;
 
 export default function CareersPage() {
   return (
@@ -55,12 +40,12 @@ export default function CareersPage() {
         <section className="w-full">
           {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">Careers</p>
-            <h1 className="section-title font-normal">Build with us</h1>
+            <p className="section-kicker">{messages.careers.kicker}</p>
+            <h1 className="section-title font-normal">
+              {messages.careers.title}
+            </h1>
             <p className="section-lead mx-auto max-w-2xl">
-              We&apos;re not actively hiring right now — but we always welcome
-              contributions and collaboration with builders who care about
-              instant, on-chain commerce.
+              {messages.careers.lead}
             </p>
           </div>
 
@@ -92,18 +77,17 @@ export default function CareersPage() {
           {/* CTA */}
           <div className="mt-24 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
-              Let&apos;s chat
+              {messages.careers.ctaTitle}
             </h2>
             <p className="section-lead mx-auto max-w-xl">
-              If you want to contribute, share research, or explore a
-              partnership, reach out and we&apos;ll get back quickly.
+              {messages.careers.ctaLead}
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
                 href={links.mailto.contact}
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-white px-5 py-2.5 font-semibold text-black text-md transition-colors hover:bg-white/90"
               >
-                Chat with us
+                {messages.common.actions.chatWithUs}
                 <i className="ri-chat-3-line text-md" />
               </a>
               <a
@@ -113,7 +97,7 @@ export default function CareersPage() {
                 className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-white/10"
               >
                 <i className="ri-github-fill text-md" />
-                Star on GitHub
+                {messages.common.actions.starOnGithub}
               </a>
             </div>
           </div>

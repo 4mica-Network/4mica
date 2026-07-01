@@ -1,5 +1,6 @@
 "use client";
 
+import { messages } from "@/i18n";
 import { STEPS } from "../data";
 
 const getCodeLineKey = (line: string, counts: Map<string, number>) => {
@@ -14,13 +15,14 @@ export default function DocsCalloutSection() {
       <div className="mx-auto w-full max-w-300">
         <div className="w-full overflow-hidden rounded-md border border-white/10 bg-black/25">
           <div className="border-white/10 border-b px-6 py-8 text-left sm:px-8">
-            <p className="section-kicker">How it works</p>
+            <p className="section-kicker">
+              {messages.home.sections.howItWorksKicker}
+            </p>
             <h3 className="mt-4 max-w-3xl font-normal text-3xl text-ink-strong tracking-tight md:text-5xl">
-              Separate payment authorization from settlement
+              {messages.home.sections.howItWorksTitle}
             </h3>
             <p className="mt-4 max-w-xl text-ink-body text-md leading-relaxed md:text-md">
-              Pay with programmable cryptographic credit. Settle thousands of
-              payments in one on-chain transaction.
+              {messages.home.sections.howItWorksLead}
             </p>
           </div>
 
@@ -136,14 +138,14 @@ export default function DocsCalloutSection() {
 
             <div>
               <p className="mb-2 text-ink-muted text-md">
-                Same x402 protocol. Same HTTP clients.
+                {messages.home.sections.howItWorksProtocolNote}
               </p>
               <p className="flex max-w-4xl flex-col gap-1 font-medium text-ink-strong text-xl leading-tight sm:flex-row sm:items-baseline sm:gap-3 md:text-2xl">
-                <span>Replace thousands of transactions</span>
+                <span>{messages.home.sections.replaceTransactions}</span>
                 <span className="hidden text-ink-subtle/60 text-lg sm:inline">
                   /
                 </span>
-                <span>one net settlement per cycle</span>
+                <span>{messages.home.sections.oneSettlement}</span>
               </p>
             </div>
           </div>

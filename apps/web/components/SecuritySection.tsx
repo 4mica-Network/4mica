@@ -1,5 +1,6 @@
 "use client";
 
+import { messages } from "@/i18n";
 import { SECURITY_POINTS } from "./data";
 export default function SecuritySection() {
   return (
@@ -9,22 +10,24 @@ export default function SecuritySection() {
           <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.6fr] lg:gap-16">
             {/* Left */}
             <div>
-              <p className="section-kicker">Security</p>
-              <h2 className="section-title">Plain UX, hard guarantees</h2>
+              <p className="section-kicker">
+                {messages.sharedContent.sections.security.kicker}
+              </p>
+              <h2 className="section-title">
+                {messages.sharedContent.sections.security.title}
+              </h2>
               <p className="section-lead">
-                The protocol is designed so that trust is enforced by math and
-                contracts, not by 4Mica.
+                {messages.sharedContent.sections.security.lead}
               </p>
               <div
                 className="glass-panel mt-6 rounded-md px-5 py-4"
                 style={{ borderColor: "rgb(74 222 128 / 0.28)" }}
               >
                 <p className="font-semibold text-ink-strong text-md">
-                  Non-custodial by design
+                  {messages.sharedContent.sections.security.cardTitle}
                 </p>
                 <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
-                  Your collateral is in Aave. Your guarantees are on-chain.
-                  4Mica is the coordination layer. It cannot move your funds.
+                  {messages.sharedContent.sections.security.cardLead}
                 </p>
               </div>
             </div>

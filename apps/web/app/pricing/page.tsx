@@ -3,20 +3,14 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import { createPageMetadata } from "@seo/shared";
 import Link from "next/link";
+import { messages } from "@/i18n";
 
 export const metadata = createPageMetadata({
-  title: "4Mica Pricing | Usage-Based Credit Payments",
-  description:
-    "Simple, usage-based pricing for 4Mica's credit-backed payment rails. Start free on testnets and pay as you settle.",
-  keywords: [
-    "4Mica pricing",
-    "usage-based pricing",
-    "payment infrastructure pricing",
-    "x402 pricing",
-    "credit payments",
-  ],
+  title: messages.pricing.seo.title,
+  description: messages.pricing.seo.description,
+  keywords: [...messages.pricing.seo.keywords],
   url: "/pricing",
-  imageAlt: "4Mica pricing",
+  imageAlt: messages.pricing.seo.imageAlt,
 });
 
 function ShinyHoverBorder({
@@ -51,88 +45,40 @@ type Tier = {
   price: string;
   eyebrow?: string;
   tagline: string;
-  features: string[];
+  features: readonly string[];
   cta: { label: string; href: string; external?: boolean };
   highlight?: boolean;
 };
 
 const TIERS: Tier[] = [
   {
-    name: "Build",
-    price: "Free",
-    tagline: "Ship your integration on testnets with full SDK access.",
-    features: [
-      "All supported testnets",
-      "TypeScript & Python SDKs",
-      "x402 facilitator access",
-      "Community support",
-      "Protocol docs and examples",
-      "Basic settlement sandbox",
-    ],
+    ...messages.pricing.tiers[0],
     cta: {
-      label: "Start building",
+      label: messages.pricing.tiers[0].ctaLabel,
       href: links.social.githubCore,
       external: true,
     },
   },
   {
-    name: "Scale",
-    eyebrow: "Most popular",
-    price: "Volume-based",
-    tagline:
-      "Pay a percentage of cleared transaction volume. Settlement costs included.",
-    features: [
-      "Mainnet across chains",
-      "% fee on cleared volume",
-      "Settlement costs covered",
-      "Yield passed through",
-      "Production facilitator access",
-      "Usage and settlement reporting",
-      "Email support",
-    ],
-    cta: { label: "Talk to sales", href: links.mailto.sales, external: true },
+    ...messages.pricing.tiers[1],
+    cta: {
+      label: messages.pricing.tiers[1].ctaLabel,
+      href: links.mailto.sales,
+      external: true,
+    },
     highlight: true,
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    tagline:
-      "Custom terms for high volume networks, facilitators, and marketplaces.",
-    features: [
-      "Custom clearing fee",
-      "Volume commitments",
-      "Priority settlement",
-      "Yield-sharing options",
-      "Dedicated support",
-      "Custom SLAs and terms",
-      "Security review",
-    ],
-    cta: { label: "Contact sales", href: links.mailto.sales, external: true },
+    ...messages.pricing.tiers[2],
+    cta: {
+      label: messages.pricing.tiers[2].ctaLabel,
+      href: links.mailto.sales,
+      external: true,
+    },
   },
 ];
 
-const INCLUDED = [
-  {
-    icon: "ri-bank-line",
-    title: "Non-custodial collateral",
-    desc: "Collateral remains controlled by protocol contracts and backs open payment obligations.",
-  },
-  {
-    icon: "ri-exchange-dollar-line",
-    title: "Batched settlement",
-    desc: "Many off-chain guarantees collapse into fewer on-chain settlement actions.",
-  },
-  {
-    icon: "ri-seedling-line",
-    title: "Yield-aware design",
-    desc: "Supported collateral can earn yield while it backs credit-based payment activity.",
-  },
-  {
-    icon: "ri-code-box-line",
-    title: "SDK-first integration",
-    desc: "Use TypeScript and Python clients with x402-compatible HTTP payment flows.",
-  },
-];
+const INCLUDED = messages.pricing.included;
 
 export default function PricingPage() {
   return (
@@ -142,14 +88,12 @@ export default function PricingPage() {
         <section className="w-full">
           {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">Pricing</p>
+            <p className="section-kicker">{messages.pricing.kicker}</p>
             <h1 className="section-title font-normal">
-              Pricing that scales with settlement volume
+              {messages.pricing.title}
             </h1>
             <p className="section-lead mx-auto max-w-2xl">
-              Build free on testnets, then move to volume-based pricing when
-              payments clear on mainnet. No per-request gas billing, no surprise
-              settlement line items.
+              {messages.pricing.lead}
             </p>
           </div>
 
@@ -229,19 +173,19 @@ export default function PricingPage() {
           </div>
 
           <p className="mt-8 text-center text-ink-subtle text-md">
-            Collateral stays in your control and earns yield — 4Mica never holds
-            funds.
+            {messages.pricing.collateralNote}
           </p>
 
           <section className="mt-24">
             <div className="mb-10 max-w-2xl">
-              <p className="section-kicker">Included</p>
+              <p className="section-kicker">
+                {messages.pricing.includedKicker}
+              </p>
               <h2 className="section-title font-normal">
-                Core rails across every plan
+                {messages.pricing.includedTitle}
               </h2>
               <p className="section-lead max-w-xl">
-                The plan changes how you go live and operate at scale. The core
-                payment model stays consistent from sandbox to production.
+                {messages.pricing.includedLead}
               </p>
             </div>
 
