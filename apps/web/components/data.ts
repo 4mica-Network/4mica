@@ -54,4 +54,6 @@ export const aboutCards = [
 
 export const SECURITY_POINTS = messages.sharedContent.securityPoints;
 
+export const teamMembers = messages.sharedContent.teamMembers;
+
 export const steps = messages.sharedContent.steps;
