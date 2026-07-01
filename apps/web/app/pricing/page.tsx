@@ -3,20 +3,14 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import { createPageMetadata } from "@seo/shared";
 import Link from "next/link";
+import { messages } from "@/i18n";
 
 export const metadata = createPageMetadata({
-  title: "4Mica Pricing | Usage-Based Credit Payments",
-  description:
-    "Simple, usage-based pricing for 4Mica's credit-backed payment rails. Start free on testnets and pay as you settle.",
-  keywords: [
-    "4Mica pricing",
-    "usage-based pricing",
-    "payment infrastructure pricing",
-    "x402 pricing",
-    "credit payments",
-  ],
+  title: messages.pricing.seo.title,
+  description: messages.pricing.seo.description,
+  keywords: [...messages.pricing.seo.keywords],
   url: "/pricing",
-  imageAlt: "4Mica pricing",
+  imageAlt: messages.pricing.seo.imageAlt,
 });
 
 function ShinyHoverBorder({
@@ -27,7 +21,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -49,56 +43,42 @@ function ShinyHoverBorder({
 type Tier = {
   name: string;
   price: string;
-  cadence?: string;
+  eyebrow?: string;
   tagline: string;
-  features: string[];
+  features: readonly string[];
   cta: { label: string; href: string; external?: boolean };
   highlight?: boolean;
 };
 
 const TIERS: Tier[] = [
   {
-    name: "Build",
-    price: "Free",
-    tagline: "Ship your integration on testnets with full SDK access.",
-    features: [
-      "All supported testnets",
-      "TypeScript & Python SDKs",
-      "x402 facilitator access",
-      "Community support",
-    ],
+    ...messages.pricing.tiers[0],
     cta: {
-      label: "Start building",
+      label: messages.pricing.tiers[0].ctaLabel,
       href: links.social.githubCore,
       external: true,
     },
   },
   {
-    name: "Scale",
-    price: "Usage-based",
-    tagline: "Go to mainnet and pay a small fee per settlement.",
-    features: [
-      "Mainnet across supported chains",
-      "Batched on-chain settlement",
-      "Yield on collateral",
-      "Email support",
-    ],
-    cta: { label: "Talk to sales", href: links.mailto.contact, external: true },
+    ...messages.pricing.tiers[1],
+    cta: {
+      label: messages.pricing.tiers[1].ctaLabel,
+      href: links.mailto.sales,
+      external: true,
+    },
     highlight: true,
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    tagline: "Volume pricing, SLAs, and dedicated support.",
-    features: [
-      "Custom SLAs & terms",
-      "Priority settlement",
-      "Dedicated support",
-      "Security review",
-    ],
-    cta: { label: "Contact sales", href: links.mailto.contact, external: true },
+    ...messages.pricing.tiers[2],
+    cta: {
+      label: messages.pricing.tiers[2].ctaLabel,
+      href: links.mailto.sales,
+      external: true,
+    },
   },
 ];
+
+const INCLUDED = messages.pricing.included;
 
 export default function PricingPage() {
   return (
@@ -108,50 +88,44 @@ export default function PricingPage() {
         <section className="w-full">
           {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">Pricing</p>
+            <p className="section-kicker">{messages.pricing.kicker}</p>
             <h1 className="section-title font-normal">
-              Simple, usage-based pricing
+              {messages.pricing.title}
             </h1>
             <p className="section-lead mx-auto max-w-2xl">
-              Start free on testnets and pay only as you settle. No setup fees,
-              no prefunding, no lock-in.
+              {messages.pricing.lead}
             </p>
           </div>
 
           {/* Tiers — connected block */}
-          <div className="mt-14 overflow-hidden rounded-md border border-white/10">
-            <div className="grid divide-y divide-white/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
+            <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {TIERS.map((tier) => (
                 <div
                   key={tier.name}
                   className={`group relative p-8 transition-colors duration-500 sm:p-10 ${
                     tier.highlight
-                      ? "bg-[#101010] hover:bg-[#161616]"
-                      : "bg-[#0a0a0a] hover:bg-[#101010]"
+                      ? "bg-surface-solid hover:bg-surface"
+                      : "bg-surface hover:bg-surface-solid"
                   }`}
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
                   <div className="relative z-10">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-h-8 items-center gap-2">
                       <h2 className="font-semibold text-ink-strong text-xl">
                         {tier.name}
                       </h2>
-                      {tier.highlight && (
-                        <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-ink-strong text-md">
-                          Most popular
+                      {tier.eyebrow && (
+                        <span className="rounded-full border border-overlay/20 bg-overlay/10 px-2.5 py-0.5 text-ink-strong text-md">
+                          {tier.eyebrow}
                         </span>
                       )}
                     </div>
 
                     <div className="mt-5 flex items-baseline gap-1">
-                      <span className="font-semibold text-3xl text-white tracking-tight">
+                      <span className="font-semibold text-3xl text-ink-strong tracking-tight">
                         {tier.price}
                       </span>
-                      {tier.cadence && (
-                        <span className="text-ink-muted text-md">
-                          {tier.cadence}
-                        </span>
-                      )}
                     </div>
                     <p className="mt-2 text-ink-muted text-md leading-relaxed">
                       {tier.tagline}
@@ -163,7 +137,7 @@ export default function PricingPage() {
                           key={feature}
                           className="flex items-start gap-2.5 text-ink-body text-md"
                         >
-                          <i className="ri-check-line mt-0.5 text-white" />
+                          <i className="ri-check-line mt-0.5 text-ink-strong" />
                           {feature}
                         </li>
                       ))}
@@ -174,8 +148,8 @@ export default function PricingPage() {
                         href={tier.cta.href}
                         className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
                           tier.highlight
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "border border-white/15 bg-white/5 text-ink-strong hover:bg-white/10"
+                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
                         }`}
                       >
                         {tier.cta.label}
@@ -185,8 +159,8 @@ export default function PricingPage() {
                         href={tier.cta.href}
                         className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
                           tier.highlight
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "border border-white/15 bg-white/5 text-ink-strong hover:bg-white/10"
+                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
                         }`}
                       >
                         {tier.cta.label}
@@ -199,9 +173,44 @@ export default function PricingPage() {
           </div>
 
           <p className="mt-8 text-center text-ink-subtle text-md">
-            Collateral stays in your control and earns yield — 4Mica never holds
-            funds.
+            {messages.pricing.collateralNote}
           </p>
+
+          <section className="mt-24">
+            <div className="mb-10 max-w-2xl">
+              <p className="section-kicker">
+                {messages.pricing.includedKicker}
+              </p>
+              <h2 className="section-title font-normal">
+                {messages.pricing.includedTitle}
+              </h2>
+              <p className="section-lead max-w-xl">
+                {messages.pricing.includedLead}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 sm:grid-cols-2 lg:grid-cols-4">
+              {INCLUDED.map((item) => (
+                <div
+                  key={item.title}
+                  className="group relative border-overlay/10 border-b p-6 transition-colors duration-500 hover:bg-overlay/[0.018] sm:nth-last-[-n+2]:border-b-0 sm:odd:border-r lg:border-r lg:border-b-0 lg:last:border-r-0"
+                >
+                  <ShinyHoverBorder radiusClass="rounded-none" />
+                  <div className="relative z-10">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
+                      <i className={item.icon} />
+                    </div>
+                    <h3 className="font-semibold text-ink-strong text-lg">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
       </div>
       <Footer />

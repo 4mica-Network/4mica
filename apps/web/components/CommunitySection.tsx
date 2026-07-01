@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { githubUrl, hooks } from "./data";
 
 export default function CommunitySection() {
@@ -9,21 +10,24 @@ export default function CommunitySection() {
       <div className="w-full">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div>
-            <p className="section-kicker">Community</p>
-            <h2 className="section-title">Build the payment tab standard</h2>
+            <p className="section-kicker">
+              {messages.sharedContent.sections.community.kicker}
+            </p>
+            <h2 className="section-title">
+              {messages.sharedContent.sections.community.title}
+            </h2>
             <p className="section-lead">
-              We are building in public with developers who ship infra. Join the
-              discussion, open issues, and help shape the protocol.
+              {messages.sharedContent.sections.community.lead}
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link
                 href={githubUrl}
                 className="btn btn-primary btn-md text-center"
               >
-                Join Community
+                {messages.sharedContent.sections.community.joinCommunity}
               </Link>
               <Link href="/pricing" className="btn btn-soft btn-md text-center">
-                Start Building
+                {messages.common.actions.startBuilding}
               </Link>
             </div>
           </div>

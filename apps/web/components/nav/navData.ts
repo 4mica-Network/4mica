@@ -1,4 +1,5 @@
 import { links } from "@4mica/url";
+import { messages } from "@/i18n";
 import { solutions } from "../../app/solutions/data";
 
 export type NavLinkItem = {
@@ -30,37 +31,37 @@ const solutionItems: NavLinkItem[] = solutions.map((solution) => ({
 
 export const NAV_ITEMS: NavItem[] = [
   {
-    label: "Solutions",
+    label: messages.navigation.solutions,
     children: [
       {
-        title: "By use case",
+        title: messages.navigation.byUseCase,
         items: solutionItems,
       },
     ],
   },
   {
-    label: "Developers",
+    label: messages.navigation.developers,
     children: [
       {
         items: [
           {
-            title: "API status",
+            title: messages.navigation.apiStatus,
             href: links.status,
-            description: "Live uptime",
+            description: messages.navigation.apiStatusDescription,
             icon: "ri-pulse-line",
             external: true,
           },
           {
-            title: "API changelog",
+            title: messages.navigation.apiChangelog,
             href: links.social.githubCore,
-            description: "Releases and updates",
+            description: messages.navigation.apiChangelogDescription,
             icon: "ri-git-commit-line",
             external: true,
           },
           {
-            title: "Libraries and SDKs",
+            title: messages.navigation.librariesAndSdks,
             href: links.social.github,
-            description: "TypeScript and Python",
+            description: messages.navigation.librariesAndSdksDescription,
             icon: "ri-terminal-box-line",
             external: true,
           },
@@ -69,7 +70,7 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: "Pricing",
+    label: messages.navigation.pricing,
     href: "/pricing",
   },
 ];

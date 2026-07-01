@@ -13,7 +13,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -129,13 +129,13 @@ export default function SolutionPage() {
           </div>
 
           {/* Problem + Case study — one connected block */}
-          <div className="mt-14 overflow-hidden rounded-md border border-white/10">
-            <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-white/10">
+          <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
+            <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-overlay/10">
               {/* Problem */}
-              <div className="group relative border-white/10 border-b bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-10 lg:border-b-0">
+              <div className="group relative border-overlay/10 border-b bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10 lg:border-b-0">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-md text-red-300 uppercase tracking-widest">
+                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-overlay/10 bg-overlay/5 px-3 py-1 text-md text-red-300 uppercase tracking-widest">
                     <i className="ri-error-warning-line" />
                     Problem
                   </div>
@@ -166,11 +166,11 @@ export default function SolutionPage() {
               </div>
 
               {/* Case study */}
-              <div className="group relative bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-10">
+              <div className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
-                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-ink-muted text-md uppercase tracking-widest">
-                    <i className="ri-lightbulb-line text-white" />
+                  <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-overlay/10 bg-overlay/5 px-3 py-1 text-ink-muted text-md uppercase tracking-widest">
+                    <i className="ri-lightbulb-line text-ink-strong" />
                     Case study · API monetization
                   </div>
                   <Image
@@ -182,13 +182,13 @@ export default function SolutionPage() {
                   />
                   <ul className="space-y-4 text-ink-muted text-lg">
                     <li className="flex items-start gap-3">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-overlay/40" />
                       Aligned offers ultra-cheap verification costs.
                     </li>
                     <li className="flex flex-wrap items-baseline gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 self-center rounded-full bg-white/40" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 self-center rounded-full bg-overlay/40" />
                       Aligned cost{" "}
-                      <span className="font-bold text-white text-xl">
+                      <span className="font-bold text-ink-strong text-xl">
                         $0.019
                       </span>{" "}
                       vs payment gas fee{" "}
@@ -197,11 +197,11 @@ export default function SolutionPage() {
                       </span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-overlay/40" />
                       Gas fees are 8× higher than the service cost.
                     </li>
                     <li className="flex items-start gap-3">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-overlay/40" />
                       Payment limitations prevent scaling.
                     </li>
                   </ul>
@@ -217,12 +217,12 @@ export default function SolutionPage() {
               <h2 className="section-title font-normal">The 4Mica solution</h2>
             </div>
 
-            <div className="mt-12 overflow-hidden rounded-md border border-white/10">
+            <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">
               <div className="grid sm:grid-cols-2 lg:grid-cols-3">
                 {SOLUTION_FEATURES.map((feature, i) => (
                   <div
                     key={feature.title}
-                    className={`group relative border-white/10 bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] ${
+                    className={`group relative border-overlay/10 bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid ${
                       i > 0 ? "border-t" : ""
                     } ${i < 2 ? "sm:border-t-0" : ""} ${
                       i % 2 === 1 ? "sm:border-l" : ""
@@ -232,7 +232,7 @@ export default function SolutionPage() {
                   >
                     <ShinyHoverBorder radiusClass="rounded-none" />
                     <div className="relative z-10">
-                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-white">
+                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
                         <i className={feature.icon} />
                       </div>
                       <h3 className="font-semibold text-ink-strong text-xl">
@@ -258,22 +258,22 @@ export default function SolutionPage() {
             </div>
 
             {/* Flow + config — one connected block */}
-            <div className="mt-12 overflow-hidden rounded-md border border-white/10">
-              <div className="divide-y divide-white/10">
+            <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">
+              <div className="divide-y divide-overlay/10">
                 {/* Flow */}
-                <div className="grid divide-y divide-white/10 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+                <div className="grid divide-y divide-overlay/10 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
                   {ARCHITECTURE_STEPS.map((step, i) => (
                     <div
                       key={step.title}
-                      className="group relative bg-[#0a0a0a] p-6 transition-colors duration-500 hover:bg-[#101010] sm:p-8"
+                      className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
                     >
                       <ShinyHoverBorder radiusClass="rounded-none" />
                       <div className="relative z-10">
                         <div className="mb-4 flex items-center gap-3">
-                          <span className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white text-xl">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-ink-strong text-xl">
                             <i className={step.icon} />
                           </span>
-                          <span className="font-medium text-md text-white/30">
+                          <span className="font-medium text-ink-strong/30 text-md">
                             0{i + 1}
                           </span>
                         </div>
@@ -289,15 +289,15 @@ export default function SolutionPage() {
                 </div>
 
                 {/* Config */}
-                <div className="grid divide-y divide-white/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+                <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
                   {CONFIG_CARDS.map((card) => (
                     <div
                       key={card.title}
-                      className="group relative bg-[#0a0a0a] p-6 transition-colors duration-500 hover:bg-[#101010] sm:p-8"
+                      className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
                     >
                       <ShinyHoverBorder radiusClass="rounded-none" />
                       <div className="relative z-10 flex items-start gap-4">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white text-xl">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/10 bg-overlay/5 text-ink-strong text-xl">
                           <i className={card.icon} />
                         </span>
                         <div>

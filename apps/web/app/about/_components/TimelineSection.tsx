@@ -1,3 +1,4 @@
+import { messages } from "@/i18n";
 import { milestones } from "../data";
 
 type Status = "Shipped" | "In progress" | "Planned";
@@ -5,17 +6,17 @@ type Status = "Shipped" | "In progress" | "Planned";
 function StatusChip({ status }: { status: Status }) {
   const styles =
     status === "Shipped"
-      ? "border-white/10 bg-white/5 text-ink-body"
+      ? "border-overlay/10 bg-overlay/5 text-ink-body"
       : status === "In progress"
-        ? "border-white/20 bg-white/10 text-ink-strong"
-        : "border-white/10 text-ink-muted";
+        ? "border-overlay/20 bg-overlay/10 text-ink-strong"
+        : "border-overlay/10 text-ink-muted";
 
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-md ${styles}`}
     >
       {status === "In progress" && (
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-strong" />
       )}
       {status === "Shipped" && <i className="ri-check-line" />}
       {status}
@@ -82,10 +83,12 @@ export default function TimelineSection({
       <div className="mx-auto w-full max-w-3xl">
         {showHeader && (
           <div className="mb-14 text-center">
-            <p className="section-kicker">Roadmap</p>
-            <h2 className="section-title font-normal">Product roadmap</h2>
+            <p className="section-kicker">{messages.about.roadmap.kicker}</p>
+            <h2 className="section-title font-normal">
+              {messages.about.roadmap.title}
+            </h2>
             <p className="section-lead mx-auto max-w-2xl">
-              Our journey to revolutionize web3 commerce.
+              {messages.about.roadmap.lead}
             </p>
           </div>
         )}
@@ -99,10 +102,10 @@ export default function TimelineSection({
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <title>Roadmap path</title>
+            <title>{messages.about.roadmap.pathTitle}</title>
             <path
               d={path}
-              stroke="rgba(255,255,255,0.10)"
+              stroke="rgb(var(--overlay) / 0.10)"
               strokeWidth={8}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -110,7 +113,7 @@ export default function TimelineSection({
             />
             <path
               d={path}
-              stroke="rgba(255,255,255,0.35)"
+              stroke="rgb(var(--overlay) / 0.35)"
               strokeWidth={2}
               strokeLinecap="round"
               strokeDasharray="0.5 7"
@@ -136,10 +139,10 @@ export default function TimelineSection({
                 <div
                   className={`relative flex h-12 w-12 items-center justify-center rounded-full shadow-[0_0_0_6px_rgba(8,8,10,0.92)] transition-transform duration-300 group-hover:scale-110 ${
                     milestone.done
-                      ? "bg-white text-black"
+                      ? "bg-ink-strong text-surface-deep"
                       : index === currentIndex
-                        ? "border-2 border-white bg-[#0a0a0a] text-white"
-                        : "border border-white/25 bg-[#0a0a0a] text-ink-muted"
+                        ? "border-2 border-overlay bg-surface text-ink-strong"
+                        : "border border-overlay/25 bg-surface text-ink-muted"
                   }`}
                 >
                   {milestone.done ? (
@@ -162,7 +165,7 @@ export default function TimelineSection({
                   </div>
 
                   {/* Description popover (floats, doesn't shift layout) */}
-                  <div className="pointer-events-none absolute top-full left-1/2 z-50 mt-3 w-60 max-w-[80vw] -translate-x-1/2 translate-y-1 rounded-lg border border-white/10 bg-[#0a0a0a]/95 px-4 py-3 text-ink-muted text-md leading-relaxed opacity-0 shadow-2xl backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="pointer-events-none absolute top-full left-1/2 z-50 mt-3 w-60 max-w-[80vw] -translate-x-1/2 translate-y-1 rounded-lg border border-overlay/10 bg-surface/95 px-4 py-3 text-ink-muted text-md leading-relaxed opacity-0 shadow-2xl backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                     {milestone.description}
                   </div>
                 </div>

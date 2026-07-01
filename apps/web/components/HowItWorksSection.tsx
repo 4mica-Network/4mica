@@ -1,15 +1,20 @@
 "use client";
 
+import { messages } from "@/i18n";
 import { steps } from "./data";
 export default function HowItWorksSection() {
   return (
     <section id="how-it-works" className="section-gloss py-20">
       <div className="w-full">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="section-kicker">How it works</p>
-          <h2 className="section-title">Three steps to instant spend</h2>
+          <p className="section-kicker">
+            {messages.sharedContent.sections.howItWorks.kicker}
+          </p>
+          <h2 className="section-title">
+            {messages.sharedContent.sections.howItWorks.title}
+          </h2>
           <p className="section-lead">
-            Plain flow first, cryptographic guarantees underneath
+            {messages.sharedContent.sections.howItWorks.lead}
           </p>
         </div>
 

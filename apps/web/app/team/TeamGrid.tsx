@@ -32,7 +32,7 @@ function TeamMemberCard({ member }: { member: Member }) {
         />
         {/* biome-ignore lint/a11y/noStaticElementInteractions: cursor-tracking spotlight is a decorative visual enhancement with no keyboard equivalent. */}
         <div
-          className="group/card relative h-60 w-44 overflow-hidden rounded-full border border-white/10 bg-[#0a0a0a]"
+          className="group/card relative h-60 w-44 overflow-hidden rounded-full border border-overlay/10 bg-surface"
           onMouseMove={handleMove}
           onMouseLeave={() => setSpot((s) => ({ ...s, active: false }))}
         >

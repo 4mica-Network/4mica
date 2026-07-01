@@ -4,6 +4,7 @@ import { links } from "@4mica/url";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
 
 const arrowNudge: Variants = {
@@ -102,17 +103,18 @@ export default function PartnersSection() {
               </g>
             </svg>
           </div>
-          <p className="section-kicker">Ecosystem</p>
+          <p className="section-kicker">
+            {messages.sharedContent.sections.ecosystem.kicker}
+          </p>
           <h2 className="section-title font-normal">
-            Built on primitives you already trust
+            {messages.sharedContent.sections.ecosystem.title}
           </h2>
           <p className="section-lead mx-auto max-w-xl">
-            4Mica is not a new protocol stack. It is a credit layer on top of
-            production infrastructure.
+            {messages.sharedContent.sections.ecosystem.lead}
           </p>
         </div>
 
-        <div className="mb-16 w-full overflow-hidden rounded-md border border-white/10 bg-black/25">
+        <div className="mb-16 w-full overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
           <div className="grid grid-cols-1 md:grid-cols-3">
             {PRIMITIVES.map((p, index) => {
               const hoverRadius =
@@ -125,10 +127,10 @@ export default function PartnersSection() {
               return (
                 <div
                   key={p.name}
-                  className="group relative flex min-w-0 flex-col gap-4 border-white/10 border-b p-6 transition-colors duration-500 hover:bg-white/[0.018] md:border-r md:last:border-r-0"
+                  className="group relative flex min-w-0 flex-col gap-4 border-overlay/10 border-b p-6 transition-colors duration-500 hover:bg-overlay/[0.018] md:border-r md:last:border-r-0"
                 >
                   <div
-                    className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${hoverRadius}`}
+                    className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${hoverRadius}`}
                   />
                   <div
                     className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${hoverRadius}`}
@@ -143,7 +145,7 @@ export default function PartnersSection() {
                       WebkitMaskComposite: "xor",
                     }}
                   />
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10 transition-colors duration-500 group-hover:bg-white/6 group-hover:ring-white/15">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10 transition-colors duration-500 group-hover:bg-overlay/6 group-hover:ring-overlay/15">
                     <i className={`${p.icon} text-3xl`} />
                   </div>
                   <div>
@@ -169,9 +171,9 @@ export default function PartnersSection() {
             {TRUST_POINTS.map((t) => (
               <div
                 key={t.label}
-                className="flex min-w-0 items-start gap-4 border-white/10 border-b p-6 transition-colors duration-500 last:border-b-0 hover:bg-white/[0.018] sm:border-r sm:border-b-0 sm:last:border-r-0"
+                className="flex min-w-0 items-start gap-4 border-overlay/10 border-b p-6 transition-colors duration-500 last:border-b-0 hover:bg-overlay/[0.018] sm:border-r sm:border-b-0 sm:last:border-r-0"
               >
-                <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10">
+                <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10">
                   <i className={`${t.icon} text-2xl`} />
                 </div>
                 <div>
@@ -187,7 +189,7 @@ export default function PartnersSection() {
           </div>
 
           {/* Partner logos */}
-          <div className="border-white/10 border-t px-6 py-8 text-left sm:px-8">
+          <div className="border-overlay/10 border-t px-6 py-8 text-left sm:px-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-ink-strong text-xl">
@@ -202,7 +204,7 @@ export default function PartnersSection() {
                 <motion.div className="flex" initial="rest" whileHover="hover">
                   <Link
                     href="/pricing"
-                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-200 hover:bg-white"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-ink-strong px-4 py-2 font-semibold text-md text-surface-deep transition-colors duration-200 hover:bg-ink-strong/90"
                   >
                     Get started
                     <motion.span
@@ -241,7 +243,11 @@ export default function PartnersSection() {
                     alt={partner.name}
                     width={160}
                     height={48}
-                    className="max-h-12 w-auto object-contain grayscale filter transition-all duration-300 hover:grayscale-0"
+                    className={`max-h-12 w-auto object-contain grayscale filter transition-all duration-300 hover:grayscale-0 ${
+                      "invertOnLight" in partner && partner.invertOnLight
+                        ? "invert dark:invert-0"
+                        : ""
+                    }`}
                   />
                 </Link>
               ))}
