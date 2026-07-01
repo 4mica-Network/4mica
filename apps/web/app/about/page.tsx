@@ -2,6 +2,7 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import Image from "next/image";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { teamMembers } from "../team/data";
 import TimelineSection from "./_components/TimelineSection";
 import { companyInfo, highlights } from "./data";
@@ -15,7 +16,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -45,15 +46,17 @@ export default function AboutPage() {
         <section className="w-full">
           {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">Company</p>
-            <h1 className="section-title font-normal">Our mission</h1>
+            <p className="section-kicker">{messages.about.kicker}</p>
+            <h1 className="section-title font-normal">
+              {messages.about.title}
+            </h1>
           </div>
 
           {/* Mission + highlights + company info — one connected block */}
-          <div className="mt-14 overflow-hidden rounded-md border border-white/10">
-            <div className="flex flex-col divide-y divide-white/10">
+          <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
+            <div className="flex flex-col divide-y divide-overlay/10">
               {/* Mission card */}
-              <div className="group relative overflow-hidden bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-12">
+              <div className="group relative overflow-hidden bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-12">
                 {/* Decorative glow */}
                 <div
                   className="pointer-events-none absolute -top-24 -right-20 h-72 w-72 rounded-full blur-3xl transition-opacity duration-500 group-hover:opacity-80"
@@ -64,21 +67,16 @@ export default function AboutPage() {
                 />
                 <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:gap-8">
                   <div className="max-w-4xl">
-                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-ink-muted text-md uppercase tracking-widest">
-                      <i className="ri-focus-3-line text-white" />
-                      Why we exist
+                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-overlay/10 bg-overlay/5 px-3 py-1 text-ink-muted text-md uppercase tracking-widest">
+                      <i className="ri-focus-3-line text-ink-strong" />
+                      {messages.about.whyWeExist}
                     </div>
                     <p className="text-left text-xl leading-relaxed sm:text-2xl">
-                      <span className="font-medium text-white">
-                        4Mica is a lightweight overlay that enables services to
-                        extend cryptographically backed lines of credit across
-                        any blockchain.
+                      <span className="font-medium text-ink-strong">
+                        {messages.about.missionStrong}
                       </span>{" "}
                       <span className="text-ink-muted">
-                        Acting as a credit layer for instant, low-friction
-                        settlements and guaranteed fair exchange, 4Mica fixes
-                        Web3&apos;s inefficient pre-funded model and makes
-                        programmable credit accessible to all.
+                        {messages.about.missionBody}
                       </span>
                     </p>
                   </div>
@@ -90,7 +88,7 @@ export default function AboutPage() {
                 {highlights.map((highlight, i) => (
                   <div
                     key={highlight.title}
-                    className={`group relative border-white/10 bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-10 ${
+                    className={`group relative border-overlay/10 bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10 ${
                       i > 0 ? "border-t" : ""
                     } ${i > 0 && i < 2 ? "sm:border-t-0" : ""} ${
                       i % 2 === 1 ? "sm:border-l" : ""
@@ -98,7 +96,7 @@ export default function AboutPage() {
                   >
                     <ShinyHoverBorder radiusClass="rounded-none" />
                     <div className="relative z-10">
-                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-ink-strong transition-colors duration-500 group-hover:text-white">
+                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong transition-colors duration-500 group-hover:text-ink-strong">
                         <i className={highlight.icon} />
                       </div>
                       <h3 className="font-semibold text-ink-strong text-xl">
@@ -113,16 +111,16 @@ export default function AboutPage() {
               </div>
 
               {/* Company info */}
-              <div className="group relative bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-10">
+              <div className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
                   <h2 className="font-semibold text-2xl text-ink-strong">
-                    Company Info
+                    {messages.about.companyInfoTitle}
                   </h2>
                   <div className="mt-8 grid grid-cols-2 gap-x-12 gap-y-6">
                     {companyInfo.map((item) => (
                       <div key={item.label} className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white text-xl">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/10 bg-overlay/5 text-ink-strong text-xl">
                           <i className={item.icon} />
                         </div>
                         <div className="flex flex-col gap-0.5">
@@ -149,14 +147,14 @@ export default function AboutPage() {
             <div className="mt-24">
               <div className="mx-auto max-w-2xl text-center">
                 <h2 className="font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
-                  A few words from the founders
+                  {messages.about.founderTitle}
                 </h2>
                 <p className="mt-4 text-ink-muted text-md leading-relaxed md:text-lg">
-                  Why we started 4Mica and what we believe in.
+                  {messages.about.founderLead}
                 </p>
               </div>
 
-              <div className="group relative mt-12 w-full overflow-hidden rounded-3xl border border-white/10 bg-black/25 px-6 py-12 transition-colors duration-500 hover:bg-white/[0.018] sm:px-10 sm:py-14">
+              <div className="group relative mt-12 w-full overflow-hidden rounded-3xl border border-overlay/10 bg-surface-deep/25 px-6 py-12 transition-colors duration-500 hover:bg-overlay/[0.018] sm:px-10 sm:py-14">
                 <ShinyHoverBorder radiusClass="rounded-3xl" />
                 <div className="relative z-10 text-center">
                   <p className="mx-auto max-w-3xl text-ink-body text-lg leading-relaxed sm:text-xl">
@@ -168,9 +166,7 @@ export default function AboutPage() {
                     <span className="font-medium text-ink-strong">
                       {cto.name.split(" ")[0]}
                     </span>
-                    . We started 4Mica to make programmable credit effortless.
-                    Just like APIs connect the web, we believe value should flow
-                    with the same clarity between agents.
+                    . {messages.about.founderQuote}
                   </p>
 
                   <div className="mt-10 flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-8">
@@ -185,7 +181,7 @@ export default function AboutPage() {
                       {founders.map((founder, index) => (
                         <span
                           key={founder.name}
-                          className={`relative inline-flex h-14 w-14 overflow-hidden rounded-full border-2 border-white/15 bg-white/5 ${
+                          className={`relative inline-flex h-14 w-14 overflow-hidden rounded-full border-2 border-overlay/15 bg-overlay/5 ${
                             index === 0 ? "z-10" : "z-20"
                           }`}
                         >
@@ -219,15 +215,15 @@ export default function AboutPage() {
           {/* Careers CTA */}
           <div className="mt-24 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
-              Help us build the future of coordination
+              {messages.about.careersTitle}
             </h2>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <ViewOpenRolesButton />
               <Link
-                href="/leadership"
-                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-white px-5 py-2.5 font-semibold text-black text-md transition-colors hover:bg-white/90"
+                href="/team"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-ink-strong px-5 py-2.5 font-semibold text-md text-surface-deep transition-colors hover:bg-ink-strong/90"
               >
-                Meet the team
+                {messages.common.actions.meetTheTeam}
               </Link>
             </div>
           </div>

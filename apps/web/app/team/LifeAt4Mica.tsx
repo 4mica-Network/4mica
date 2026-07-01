@@ -2,6 +2,7 @@
 
 import { motion, useAnimationFrame, useMotionValue } from "framer-motion";
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { messages } from "@/i18n";
 
 interface Testimonial {
   id: string;
@@ -11,61 +12,20 @@ interface Testimonial {
   avatar: string;
 }
 
-const testimonials: Testimonial[] = [
-  {
-    id: "priya-protocol",
-    quote:
-      "The bar for correctness is high here — we move real money, and everyone treats it that way.",
-    name: "Priya S.",
-    role: "Protocol Engineer",
-    avatar: "PS",
-  },
-  {
-    id: "daniel-backend",
-    quote:
-      "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
-    name: "Daniel V.",
-    role: "Backend Engineer",
-    avatar: "DV",
-  },
-  {
-    id: "lena-research",
-    quote:
-      "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
-    name: "Lena K.",
-    role: "Cryptography Researcher",
-    avatar: "LK",
-  },
-  {
-    id: "marco-product",
-    quote:
-      "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
-    name: "Marco T.",
-    role: "Product",
-    avatar: "MT",
-  },
-  {
-    id: "sofia-security",
-    quote:
-      "Every line of the protocol is auditable, and so is every decision. That clarity is rare.",
-    name: "Sofia R.",
-    role: "Security Engineer",
-    avatar: "SR",
-  },
-];
+const testimonials: readonly Testimonial[] = messages.team.testimonials;
 
 const TestimonialCard = forwardRef<HTMLDivElement, { data: Testimonial }>(
   ({ data }, ref) => (
     <div
       ref={ref}
-      className="mr-4 min-w-70 max-w-100 rounded-xl border border-white/10 bg-black/25 p-6 sm:mr-6 sm:min-w-90"
+      className="mr-4 min-w-70 max-w-100 rounded-xl border border-overlay/10 bg-surface-deep/25 p-6 sm:mr-6 sm:min-w-90"
     >
       <div className="flex h-full flex-col justify-between gap-6">
         <blockquote className="font-medium text-ink-body text-md leading-relaxed sm:text-lg">
           &ldquo;{data.quote}&rdquo;
         </blockquote>
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 font-semibold text-ink-strong text-md">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-overlay/10 bg-overlay/5 font-semibold text-ink-strong text-md">
             {data.avatar}
           </span>
           <div className="flex flex-col">
@@ -113,10 +73,12 @@ export default function LifeAt4Mica() {
   return (
     <div className="mt-24">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="section-kicker">Culture</p>
-        <h2 className="section-title font-normal">Life at 4Mica</h2>
+        <p className="section-kicker">{messages.team.cultureKicker}</p>
+        <h2 className="section-title font-normal">
+          {messages.team.cultureTitle}
+        </h2>
         <p className="section-lead mx-auto max-w-2xl">
-          Notes from the team on what it&apos;s like to build here.
+          {messages.team.cultureLead}
         </p>
       </div>
 

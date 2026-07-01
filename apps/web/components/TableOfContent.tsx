@@ -73,12 +73,12 @@ export default function TableOfContent({ toc }: { toc: TocItem[] }) {
         Table of Contents
       </h5>
       <div className="relative">
-        <div className="absolute top-0 bottom-0 left-[3px] w-px bg-white/10" />
+        <div className="absolute top-0 bottom-0 left-[3px] w-px bg-overlay/10" />
         <ul className="list-inside space-y-2 pl-4">
           {toc.map(({ id, text }) => (
             <li key={id} className="relative">
               {activeId === id && (
-                <div className="absolute top-1/2 left-[-14px] h-full w-[3px] -translate-y-1/2 rounded-full bg-white" />
+                <div className="absolute top-1/2 left-[-14px] h-full w-[3px] -translate-y-1/2 rounded-full bg-overlay" />
               )}
               <a
                 href={`#${id}`}

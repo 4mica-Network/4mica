@@ -1,5 +1,6 @@
 "use client";
 
+import { messages } from "@/i18n";
 import { benefits } from "./data";
 export default function BenefitsSection() {
   return (
@@ -7,13 +8,14 @@ export default function BenefitsSection() {
       <div className="w-full">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
-            <p className="section-kicker">Benefits</p>
+            <p className="section-kicker">
+              {messages.sharedContent.sections.benefits.kicker}
+            </p>
             <h2 className="section-title">
-              Built for developers who ship fast
+              {messages.sharedContent.sections.benefits.title}
             </h2>
             <p className="section-lead">
-              Start with plain UX. Add verifiable credit guarantees when you are
-              ready.
+              {messages.sharedContent.sections.benefits.lead}
             </p>
           </div>
           <div className="glass-panel rounded-md p-6 sm:p-8">

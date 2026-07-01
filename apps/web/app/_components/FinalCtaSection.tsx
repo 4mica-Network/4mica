@@ -2,6 +2,7 @@
 
 import { links } from "@4mica/url";
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { STATS } from "../data";
 
 export default function FinalCtaSection() {
@@ -9,13 +10,14 @@ export default function FinalCtaSection() {
     <section className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="section-kicker">Start building</p>
+          <p className="section-kicker">
+            {messages.home.sections.finalCtaKicker}
+          </p>
           <h2 className="section-title mt-4 mb-2 text-balance font-normal text-ink-strong">
-            Stop paying per transaction.
+            {messages.home.sections.finalCtaTitle}
           </h2>{" "}
           <span className="font-normal text-ink-muted">
-            Batch thousands of payments, settle once, and let your collateral
-            earn yield while your agents scale.
+            {messages.home.sections.finalCtaLead}
           </span>
           {/* Stats */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
@@ -28,18 +30,18 @@ export default function FinalCtaSection() {
                   <span className="text-ink-muted text-md">{s.label}</span>
                 </div>
                 {i < STATS.length - 1 && (
-                  <div className="hidden h-8 w-px bg-white/10 sm:block" />
+                  <div className="hidden h-8 w-px bg-overlay/10 sm:block" />
                 )}
               </div>
             ))}
           </div>
           {/* Divider between stats */}
-          <div className="mt-10 flex flex-col justify-center gap-3 border-white/10 border-t pt-10 sm:flex-row">
+          <div className="mt-10 flex flex-col justify-center gap-3 border-overlay/10 border-t pt-10 sm:flex-row">
             <Link
               href="/pricing"
-              className="btn btn-lg rounded-full bg-white text-center font-semibold text-black shadow-lg transition-colors hover:bg-white/90"
+              className="btn btn-lg rounded-full bg-ink-strong text-center font-semibold text-surface-deep shadow-lg transition-colors hover:bg-ink-strong/90"
             >
-              Start Building
+              {messages.common.actions.startBuilding}
             </Link>
             <Link
               href={links.social.githubCore}
@@ -48,7 +50,7 @@ export default function FinalCtaSection() {
               className="btn btn-soft btn-lg rounded-full text-center"
             >
               <i className="ri-github-fill" />
-              View Source
+              {messages.home.sections.viewSource}
             </Link>
           </div>
         </div>

@@ -11,7 +11,7 @@ export default function DropdownMenuItem({
   const content = (
     <>
       {item.icon && (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-lg text-white transition-colors group-hover/item:border-white/30 group-hover/item:bg-white/10">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-overlay/10 bg-overlay/5 text-ink-strong text-lg transition-colors group-hover/item:border-overlay/30 group-hover/item:bg-overlay/10">
           <i className={item.icon} />
         </span>
       )}
@@ -34,7 +34,7 @@ export default function DropdownMenuItem({
   );
 
   const className =
-    "group/item flex items-center gap-3 rounded-lg py-2.5 pr-8 pl-2.5 transition-colors hover:bg-white/5";
+    "group/item flex items-center gap-3 rounded-lg py-2.5 pr-8 pl-2.5 transition-colors hover:bg-overlay/5";
 
   if (item.external) {
     return (

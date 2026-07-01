@@ -2,6 +2,7 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import TableOfContent, { type TocItem } from "@components/TableOfContent";
 import type { ReactNode } from "react";
+import { messages } from "@/i18n";
 
 type LegalPageProps = {
   kicker?: string;
@@ -12,7 +13,7 @@ type LegalPageProps = {
 };
 
 export default function LegalPage({
-  kicker = "Legal",
+  kicker = messages.legal.defaultKicker,
   title,
   lastUpdated,
   toc,
@@ -26,7 +27,7 @@ export default function LegalPage({
           <p className="section-kicker">{kicker}</p>
           <h1 className="section-title font-normal">{title}</h1>
           <p className="mt-3 text-ink-muted text-md">
-            Last updated {lastUpdated}
+            {messages.legal.lastUpdated} {lastUpdated}
           </p>
         </header>
 

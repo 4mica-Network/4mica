@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "@context/ThemeProvider";
 import { useEffect, useRef } from "react";
 
 type Node = {
@@ -34,11 +35,29 @@ const config = {
   pulseTrailWidth: 1.6,
   pulseTrailAlpha: 0.28,
   flashFade: 2.8,
-  lineColor: "rgba(109, 109, 109, 0.24)",
-  nodeColor: "rgba(48, 48, 48, 0.95)",
-  nodeFlash: "rgba(216, 216, 216, 0.24)",
-  pulseCore: "rgba(216, 216, 216, 0.7)",
-  pulseGlow: "rgba(216, 216, 216, 0.18)",
+};
+
+// Theme-aware canvas colors. `line`/`accent` are bare "r, g, b" triples so we
+// can compose arbitrary alpha stops; `node` is a full rgba. In dark mode we use
+// additive ("lighter") blending for glowing pulses on black; in light mode we
+// switch to normal blending with darker slate inks so they read on white.
+const CANVAS_PALETTES = {
+  dark: {
+    line: "109, 109, 109",
+    accent: "216, 216, 216",
+    node: "rgba(48, 48, 48, 0.95)",
+    nodeGlow: 0.12,
+    pulseComposite: "lighter" as GlobalCompositeOperation,
+  },
+  light: {
+    // Very soft, light slate so the network reads as a faint texture on light
+    // surfaces rather than obvious dark specks.
+    line: "203, 213, 225",
+    accent: "203, 213, 225",
+    node: "rgba(203, 213, 225, 0.4)",
+    nodeGlow: 0.03,
+    pulseComposite: "source-over" as GlobalCompositeOperation,
+  },
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -63,12 +82,15 @@ const pickRandomNode = (count: number, exclude?: number) => {
 export default function GlobalNetworkBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const reduceMotionRef = useRef(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const palette = CANVAS_PALETTES[theme];
 
     let width = 0;
     let height = 0;
@@ -274,9 +296,9 @@ export default function GlobalNetworkBackground() {
               nodes[j].x + offsetX,
               nodes[j].y + offsetY,
             );
-            gradient.addColorStop(0, "rgba(109, 109, 109, 0)");
-            gradient.addColorStop(0.5, config.lineColor);
-            gradient.addColorStop(1, "rgba(109, 109, 109, 0)");
+            gradient.addColorStop(0, `rgba(${palette.line}, 0)`);
+            gradient.addColorStop(0.5, `rgba(${palette.line}, 0.24)`);
+            gradient.addColorStop(1, `rgba(${palette.line}, 0)`);
             ctx.globalAlpha = alpha;
             ctx.strokeStyle = gradient;
             ctx.beginPath();
@@ -291,7 +313,7 @@ export default function GlobalNetworkBackground() {
 
     const drawPulses = (offsetX: number, offsetY: number) => {
       ctx.save();
-      ctx.globalCompositeOperation = "lighter";
+      ctx.globalCompositeOperation = palette.pulseComposite;
       for (const pulse of pulses) {
         if (pulse.delayMs > 0) continue;
         const from = nodes[pulse.from];
@@ -310,14 +332,14 @@ export default function GlobalNetworkBackground() {
         const trailY = y - uy * trailLength;
 
         const trailGradient = ctx.createLinearGradient(trailX, trailY, x, y);
-        trailGradient.addColorStop(0, "rgba(216, 216, 216, 0)");
+        trailGradient.addColorStop(0, `rgba(${palette.accent}, 0)`);
         trailGradient.addColorStop(
           0.72,
-          `rgba(216, 216, 216, ${config.pulseTrailAlpha * 0.45})`,
+          `rgba(${palette.accent}, ${config.pulseTrailAlpha * 0.45})`,
         );
         trailGradient.addColorStop(
           1,
-          `rgba(216, 216, 216, ${config.pulseTrailAlpha})`,
+          `rgba(${palette.accent}, ${config.pulseTrailAlpha})`,
         );
         ctx.strokeStyle = trailGradient;
         ctx.lineWidth = config.pulseTrailWidth;
@@ -335,9 +357,9 @@ export default function GlobalNetworkBackground() {
           y,
           config.pulseGlowRadius,
         );
-        glow.addColorStop(0, config.pulseGlow);
-        glow.addColorStop(0.45, "rgba(216, 216, 216, 0.08)");
-        glow.addColorStop(1, "rgba(216, 216, 216, 0)");
+        glow.addColorStop(0, `rgba(${palette.accent}, 0.18)`);
+        glow.addColorStop(0.45, `rgba(${palette.accent}, 0.08)`);
+        glow.addColorStop(1, `rgba(${palette.accent}, 0)`);
         ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(x, y, config.pulseGlowRadius, 0, Math.PI * 2);
@@ -345,7 +367,7 @@ export default function GlobalNetworkBackground() {
 
         const pulseBreath =
           0.86 + Math.sin(pulse.phase + pulse.progress * Math.PI * 2) * 0.14;
-        ctx.fillStyle = config.pulseCore;
+        ctx.fillStyle = `rgba(${palette.accent}, 0.7)`;
         ctx.beginPath();
         ctx.arc(x, y, config.pulseRadius * pulseBreath, 0, Math.PI * 2);
         ctx.fill();
@@ -360,21 +382,24 @@ export default function GlobalNetworkBackground() {
         const glowStrength = node.flash;
         const glowRadius = node.r * 5;
         const nodeGlow = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
-        nodeGlow.addColorStop(0, "rgba(216, 216, 216, 0.12)");
-        nodeGlow.addColorStop(1, "rgba(216, 216, 216, 0)");
+        nodeGlow.addColorStop(
+          0,
+          `rgba(${palette.accent}, ${palette.nodeGlow})`,
+        );
+        nodeGlow.addColorStop(1, `rgba(${palette.accent}, 0)`);
         ctx.fillStyle = nodeGlow;
         ctx.beginPath();
         ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = config.nodeColor;
+        ctx.fillStyle = palette.node;
         ctx.beginPath();
         ctx.arc(x, y, node.r, 0, Math.PI * 2);
         ctx.fill();
 
         if (glowStrength > 0.01) {
           ctx.globalAlpha = Math.min(0.28, glowStrength * 0.28);
-          ctx.fillStyle = config.nodeFlash;
+          ctx.fillStyle = `rgba(${palette.accent}, 0.24)`;
           ctx.beginPath();
           ctx.arc(x, y, node.r * 4, 0, Math.PI * 2);
           ctx.fill();
@@ -437,13 +462,13 @@ export default function GlobalNetworkBackground() {
         prefersReducedMotion.removeListener(updateReducedMotion);
       }
     };
-  }, []);
+  }, [theme]);
 
   return (
-    <div className="bg-black" aria-hidden="true">
-      <div className="bg-black" />
+    <div className="bg-surface-deep" aria-hidden="true">
+      <div className="bg-surface-deep" />
       <canvas ref={canvasRef} className="global-network-canvas" />
-      <div className="bg-black" />
+      <div className="bg-surface-deep" />
     </div>
   );
 }

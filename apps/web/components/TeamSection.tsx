@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { messages } from "@/i18n";
 import { teamMembers } from "./data";
 
 export default function TeamSection() {
@@ -8,11 +9,12 @@ export default function TeamSection() {
     <section id="team" className="section-gloss py-20">
       <div className="w-full">
         <div className="mb-16 text-center">
-          <h2 className="section-title mb-6">Meet Our Team</h2>
+          <h2 className="section-title mb-6">
+            {messages.sharedContent.sections.team.title}
+          </h2>
           <div className="mx-auto mb-8 accent-bar"></div>
           <p className="section-lead mx-auto max-w-2xl">
-            Leading experts in Cryptography, blockchain, and payment
-            infrastructure
+            {messages.sharedContent.sections.team.lead}
           </p>
         </div>
 

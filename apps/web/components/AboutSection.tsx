@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { messages } from "@/i18n";
 import { aboutCards } from "./data";
 
 export default function AboutSection() {
@@ -8,14 +9,14 @@ export default function AboutSection() {
     <section id="about" className="section-gloss py-24">
       <div className="w-full">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="section-kicker">About Us</p>
+          <p className="section-kicker">
+            {messages.sharedContent.sections.about.kicker}
+          </p>
           <h2 className="section-title">
-            The credit layer for instant, on-chain commerce
+            {messages.sharedContent.sections.about.title}
           </h2>
           <p className="section-lead">
-            4Mica issues cryptographic payment tabs that keep capital productive
-            while delivering real-time UX. We help teams monetize APIs and
-            on-chain commerce without forcing users to pre-fund every request.
+            {messages.sharedContent.sections.about.lead}
           </p>
         </div>
         <div className="mx-auto mt-12 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
@@ -32,7 +33,7 @@ export default function AboutSection() {
                 {card.description}
               </p>
               <span className="link-accent mt-4 inline-flex items-center font-semibold text-md">
-                Learn more
+                {messages.sharedContent.sections.about.learnMore}
                 <i className="ri-arrow-right-line ml-2 text-md"></i>
               </span>
             </Link>

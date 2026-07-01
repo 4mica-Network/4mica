@@ -28,7 +28,7 @@ export default function MobileNav({ onNavigate }: { onNavigate: () => void }) {
             <button
               type="button"
               onClick={() => toggle(item.label)}
-              className="flex w-full items-center justify-between rounded-lg p-3 font-medium text-ink-strong transition-colors hover:bg-white/5"
+              className="flex w-full items-center justify-between rounded-lg p-3 font-medium text-ink-strong transition-colors hover:bg-overlay/5"
             >
               <span>{item.label}</span>
               <i
@@ -62,7 +62,7 @@ export default function MobileNav({ onNavigate }: { onNavigate: () => void }) {
             key={item.label}
             href={item.href ?? "#"}
             onClick={onNavigate}
-            className="flex w-full items-center rounded-lg p-3 font-medium text-ink-strong transition-colors hover:bg-white/5"
+            className="flex w-full items-center rounded-lg p-3 font-medium text-ink-strong transition-colors hover:bg-overlay/5"
           >
             {item.label}
           </Link>
