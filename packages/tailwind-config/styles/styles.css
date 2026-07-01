@@ -637,6 +637,38 @@
   .code-token.variable {
     color: #f4c28b;
   }
+
+  /* Shiki (Vesper theme) — strip the theme's own chrome so the panel's
+     black surface and font stack show through, keep only token colors. */
+  .shiki-code .shiki {
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    white-space: pre;
+  }
+
+  .shiki-code .shiki code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  /* Optional gutter line numbers (matches the previous numbered look). */
+  .shiki-numbered .shiki code {
+    counter-reset: line;
+  }
+
+  .shiki-numbered .shiki .line::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 1.5rem;
+    margin-right: 1rem;
+    text-align: right;
+    font-size: 10px;
+    color: rgb(var(--ink-subtle) / 0.6);
+    user-select: none;
+  }
 }
 
 @keyframes scanLine {
