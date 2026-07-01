@@ -17,7 +17,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -54,7 +54,7 @@ export default function LeadershipPage() {
           <TeamGrid />
 
           {/* How we work */}
-          <div className="group relative mt-20 w-full overflow-hidden rounded-md border border-white/10 bg-black/25 p-8 transition-colors duration-500 hover:bg-white/[0.018] sm:p-10">
+          <div className="group relative mt-20 w-full overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018] sm:p-10">
             <ShinyHoverBorder radiusClass="rounded-md" />
             <div className="relative z-10">
               <h2 className="font-semibold text-2xl text-ink-strong">
@@ -66,7 +66,7 @@ export default function LeadershipPage() {
               <div className="mt-6">
                 <Link
                   href="/about"
-                  className="inline-flex items-center gap-2 font-semibold text-ink-strong text-md transition-colors hover:text-white"
+                  className="inline-flex items-center gap-2 font-semibold text-ink-strong text-md transition-colors hover:text-ink-strong"
                 >
                   {messages.team.readMission}
                   <i className="ri-arrow-right-line text-md" />
@@ -87,16 +87,16 @@ export default function LeadershipPage() {
               </p>
             </div>
 
-            <div className="mt-12 overflow-hidden rounded-md border border-white/10">
-              <div className="grid divide-y divide-white/10 lg:grid-cols-5 lg:divide-x lg:divide-y-0">
+            <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">
+              <div className="grid divide-y divide-overlay/10 lg:grid-cols-5 lg:divide-x lg:divide-y-0">
                 {VALUES.map((value) => (
                   <div
                     key={value.title}
-                    className="group relative bg-[#0a0a0a] p-6 transition-colors duration-500 hover:bg-[#101010] sm:p-8"
+                    className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
                   >
                     <ShinyHoverBorder radiusClass="rounded-none" />
                     <div className="relative z-10">
-                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-white">
+                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
                         <i className={value.icon} />
                       </div>
                       <h3 className="font-semibold text-ink-strong text-xl">
@@ -125,7 +125,7 @@ export default function LeadershipPage() {
               {PERKS.map((perk) => (
                 <div
                   key={perk.title}
-                  className="rounded-2xl border border-white/5 bg-white/3 p-6 transition-colors duration-300 hover:bg-white/5"
+                  className="rounded-2xl border border-overlay/5 bg-overlay/3 p-6 transition-colors duration-300 hover:bg-overlay/5"
                 >
                   <i className={`${perk.icon} text-2xl ${perk.color}`} />
                   <h3 className="mt-6 font-semibold text-ink-strong text-lg">

@@ -31,7 +31,7 @@ export default function HeroSection() {
               </a>
               <a
                 href="#how-it-works"
-                className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-[#151515]"
+                className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-surface-deep"
               >
                 <i className="ri-play-fill relative z-10 text-lg leading-none" />
                 <span className="relative z-10">

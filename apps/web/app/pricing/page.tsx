@@ -21,7 +21,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -98,15 +98,15 @@ export default function PricingPage() {
           </div>
 
           {/* Tiers — connected block */}
-          <div className="mt-14 overflow-hidden rounded-md border border-white/10">
-            <div className="grid divide-y divide-white/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
+            <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {TIERS.map((tier) => (
                 <div
                   key={tier.name}
                   className={`group relative p-8 transition-colors duration-500 sm:p-10 ${
                     tier.highlight
-                      ? "bg-[#101010] hover:bg-[#161616]"
-                      : "bg-[#0a0a0a] hover:bg-[#101010]"
+                      ? "bg-surface-solid hover:bg-surface"
+                      : "bg-surface hover:bg-surface-solid"
                   }`}
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
@@ -116,14 +116,14 @@ export default function PricingPage() {
                         {tier.name}
                       </h2>
                       {tier.eyebrow && (
-                        <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-ink-strong text-md">
+                        <span className="rounded-full border border-overlay/20 bg-overlay/10 px-2.5 py-0.5 text-ink-strong text-md">
                           {tier.eyebrow}
                         </span>
                       )}
                     </div>
 
                     <div className="mt-5 flex items-baseline gap-1">
-                      <span className="font-semibold text-3xl text-white tracking-tight">
+                      <span className="font-semibold text-3xl text-ink-strong tracking-tight">
                         {tier.price}
                       </span>
                     </div>
@@ -137,7 +137,7 @@ export default function PricingPage() {
                           key={feature}
                           className="flex items-start gap-2.5 text-ink-body text-md"
                         >
-                          <i className="ri-check-line mt-0.5 text-white" />
+                          <i className="ri-check-line mt-0.5 text-ink-strong" />
                           {feature}
                         </li>
                       ))}
@@ -148,8 +148,8 @@ export default function PricingPage() {
                         href={tier.cta.href}
                         className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
                           tier.highlight
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "border border-white/15 bg-white/5 text-ink-strong hover:bg-white/10"
+                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
                         }`}
                       >
                         {tier.cta.label}
@@ -159,8 +159,8 @@ export default function PricingPage() {
                         href={tier.cta.href}
                         className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
                           tier.highlight
-                            ? "bg-white text-black hover:bg-white/90"
-                            : "border border-white/15 bg-white/5 text-ink-strong hover:bg-white/10"
+                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
                         }`}
                       >
                         {tier.cta.label}
@@ -189,15 +189,15 @@ export default function PricingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 overflow-hidden rounded-md border border-white/10 bg-black/25 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 sm:grid-cols-2 lg:grid-cols-4">
               {INCLUDED.map((item) => (
                 <div
                   key={item.title}
-                  className="group relative border-white/10 border-b p-6 transition-colors duration-500 hover:bg-white/[0.018] sm:nth-last-[-n+2]:border-b-0 sm:odd:border-r lg:border-r lg:border-b-0 lg:last:border-r-0"
+                  className="group relative border-overlay/10 border-b p-6 transition-colors duration-500 hover:bg-overlay/[0.018] sm:nth-last-[-n+2]:border-b-0 sm:odd:border-r lg:border-r lg:border-b-0 lg:last:border-r-0"
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
                   <div className="relative z-10">
-                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-white">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
                       <i className={item.icon} />
                     </div>
                     <h3 className="font-semibold text-ink-strong text-lg">

@@ -40,7 +40,7 @@ export default function FaqSection() {
             return (
               <div
                 key={faq.question}
-                className={isLast ? "" : "border-white/10 border-b"}
+                className={isLast ? "" : "border-overlay/10 border-b"}
               >
                 <button
                   type="button"

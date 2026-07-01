@@ -18,14 +18,14 @@ const TestimonialCard = forwardRef<HTMLDivElement, { data: Testimonial }>(
   ({ data }, ref) => (
     <div
       ref={ref}
-      className="mr-4 min-w-70 max-w-100 rounded-xl border border-white/10 bg-black/25 p-6 sm:mr-6 sm:min-w-90"
+      className="mr-4 min-w-70 max-w-100 rounded-xl border border-overlay/10 bg-surface-deep/25 p-6 sm:mr-6 sm:min-w-90"
     >
       <div className="flex h-full flex-col justify-between gap-6">
         <blockquote className="font-medium text-ink-body text-md leading-relaxed sm:text-lg">
           &ldquo;{data.quote}&rdquo;
         </blockquote>
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 font-semibold text-ink-strong text-md">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-overlay/10 bg-overlay/5 font-semibold text-ink-strong text-md">
             {data.avatar}
           </span>
           <div className="flex flex-col">

@@ -16,7 +16,7 @@ function ShinyHoverBorder({
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
+        className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
       />
       <div
         className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${radiusClass}`}
@@ -109,21 +109,21 @@ function SolutionUseCases({ solution }: { solution: SolutionContent }) {
           {solution.useCases.map((group) => (
             <div
               key={group.label}
-              className="overflow-hidden rounded-md border border-white/10 bg-black/25"
+              className="overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25"
             >
-              <div className="border-white/10 border-b px-6 py-5">
+              <div className="border-overlay/10 border-b px-6 py-5">
                 <h3 className="font-semibold text-ink-strong text-xl">
                   {group.label}
                 </h3>
               </div>
-              <div className="divide-y divide-white/10">
+              <div className="divide-y divide-overlay/10">
                 {group.cards.map((card) => (
                   <div
                     key={card.title}
-                    className="group relative flex gap-4 p-6 transition-colors duration-500 hover:bg-white/[0.018]"
+                    className="group relative flex gap-4 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
                   >
                     <ShinyHoverBorder radiusClass="rounded-none" />
-                    <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10">
+                    <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10">
                       <i className={`${card.icon} text-2xl`} />
                     </div>
                     <div className="relative z-10 min-w-0">
@@ -155,16 +155,16 @@ function SolutionProcess({ solution }: { solution: SolutionContent }) {
           lead="The path is deliberately small: configure the payment session, verify each request, then settle the cycle with durable records."
         />
 
-        <ol className="grid grid-cols-1 overflow-hidden rounded-md border border-white/10 bg-black/25 lg:grid-cols-3">
+        <ol className="grid grid-cols-1 overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 lg:grid-cols-3">
           {solution.process.map((step, index) => (
             <li
               key={step.order}
-              className="group relative border-white/10 border-b p-7 transition-colors duration-500 last:border-b-0 hover:bg-white/[0.018] lg:border-r lg:border-b-0 lg:last:border-r-0"
+              className="group relative border-overlay/10 border-b p-7 transition-colors duration-500 last:border-b-0 hover:bg-overlay/[0.018] lg:border-r lg:border-b-0 lg:last:border-r-0"
             >
               <ShinyHoverBorder radiusClass="rounded-none" />
               <div className="relative z-10">
                 <div className="mb-8 flex items-center justify-between">
-                  <span className="font-medium text-5xl text-white/20 leading-none transition-colors duration-500 group-hover:text-white/35">
+                  <span className="font-medium text-5xl text-ink-strong/20 leading-none transition-colors duration-500 group-hover:text-ink-strong/35">
                     {step.order}
                   </span>
                   <i
@@ -196,11 +196,11 @@ function ResourceLink({ resource }: { resource: SolutionResourceCard }) {
       href={resource.href}
       target={isExternal ? "_blank" : undefined}
       rel={isExternal ? "noopener noreferrer" : undefined}
-      className="group relative flex min-h-48 flex-col rounded-md border border-white/10 bg-black/25 p-6 transition-colors duration-500 hover:bg-white/[0.018]"
+      className="group relative flex min-h-48 flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
     >
       <ShinyHoverBorder />
       <div className="relative z-10 mb-8 flex items-start justify-between gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-white/[0.035] text-ink-strong ring-1 ring-white/10">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10">
           <i className={`${resource.icon} text-2xl`} />
         </div>
         <i className="ri-arrow-right-up-line text-ink-subtle text-xl transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-ink-body" />
@@ -261,7 +261,7 @@ function SolutionFaq({ solution }: { solution: SolutionContent }) {
             return (
               <details
                 key={faq.question}
-                className={`group ${isLast ? "" : "border-white/10 border-b"}`}
+                className={`group ${isLast ? "" : "border-overlay/10 border-b"}`}
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-0 pt-6 pb-4 text-left marker:hidden">
                   <span className="font-semibold text-ink-strong text-md">
@@ -316,16 +316,16 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
           </div>
 
           {/* Points — connected block */}
-          <div className="mt-14 overflow-hidden rounded-md border border-white/10">
-            <div className="grid divide-y divide-white/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
+            <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {solution.points.map((point) => (
                 <div
                   key={point.title}
-                  className="group relative bg-[#0a0a0a] p-8 transition-colors duration-500 hover:bg-[#101010] sm:p-10"
+                  className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10"
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
                   <div className="relative z-10">
-                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-2xl text-white">
+                    <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
                       <i className={point.icon} />
                     </div>
                     <h3 className="font-semibold text-ink-strong text-xl">
@@ -353,14 +353,14 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/pricing"
-                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-white px-5 py-2.5 font-semibold text-black text-md transition-colors hover:bg-white/90"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-ink-strong px-5 py-2.5 font-semibold text-md text-surface-deep transition-colors hover:bg-ink-strong/90"
               >
                 Start building
                 <i className="ri-arrow-right-line text-md" />
               </Link>
               <a
                 href={links.mailto.sales}
-                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-white/10"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-overlay/10"
               >
                 Talk to sales
               </a>

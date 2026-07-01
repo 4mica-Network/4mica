@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "@context/ThemeProvider";
 import { motion } from "framer-motion";
 import type { CSSProperties, PointerEvent } from "react";
 import { useRef, useState } from "react";
@@ -13,9 +14,13 @@ import {
   x402Total,
 } from "../data";
 
-const RED = "#f87171";
-const GREEN = "#4ade80";
-const NEUTRAL_BORDER = "rgba(255, 255, 255, 0.1)";
+// Bright shades read well on the dark theme; deeper 600-level shades keep
+// enough contrast on light surfaces.
+const ACCENTS = {
+  dark: { red: "#f87171", green: "#4ade80" },
+  light: { red: "#dc2626", green: "#16a34a" },
+};
+const NEUTRAL_BORDER = "rgb(var(--overlay) / 0.1)";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -77,7 +82,7 @@ function ComparisonCard({
   return (
     <motion.div
       ref={cardRef}
-      className="group relative flex flex-col overflow-hidden rounded-md bg-black/25 transition-colors duration-500"
+      className="group relative flex flex-col overflow-hidden rounded-md bg-surface-deep/25 transition-colors duration-500"
       style={{ "--card-accent": accent } as CSSProperties}
       onPointerMove={handlePointerMove}
       onPointerEnter={handlePointerEnter}
@@ -109,7 +114,7 @@ function ComparisonCard({
         }}
       />
 
-      <div className="relative z-10 flex items-center justify-between px-6 py-4 transition-colors duration-500 group-hover:bg-white/2.5">
+      <div className="relative z-10 flex items-center justify-between px-6 py-4 transition-colors duration-500 group-hover:bg-overlay/2.5">
         <div>
           <p className="font-semibold text-ink-strong text-md uppercase tracking-widest transition-colors duration-500 group-hover:text-(--card-accent)">
             {eyebrow}
@@ -152,7 +157,7 @@ function ComparisonCard({
             </motion.div>
           ))}
         </div>
-        <div className="mt-6 flex items-center justify-between border-white/10 border-t pt-4 transition-colors duration-500 group-hover:border-white/15">
+        <div className="mt-6 flex items-center justify-between border-overlay/10 border-t pt-4 transition-colors duration-500 group-hover:border-overlay/15">
           <span className="font-semibold text-ink-strong text-md">
             {totalLabel}
           </span>
@@ -166,6 +171,9 @@ function ComparisonCard({
 }
 
 export default function WhatYoureMissingSection() {
+  const { theme } = useTheme();
+  const { red: RED, green: GREEN } = ACCENTS[theme];
+
   return (
     <section className="section-gloss py-20">
       <div className="mx-auto w-full max-w-300">
@@ -222,7 +230,10 @@ export default function WhatYoureMissingSection() {
           variants={fadeUp}
           transition={{ duration: 0.36, delay: 0.14, ease: "easeOut" }}
         >
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center text-[#4ade80]">
+          <div
+            className="flex h-20 w-20 shrink-0 items-center justify-center"
+            style={{ color: GREEN }}
+          >
             <i className="ri-arrow-up-double-line text-6xl" />
           </div>
 

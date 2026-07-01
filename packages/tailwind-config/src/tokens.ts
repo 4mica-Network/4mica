@@ -53,8 +53,12 @@ export const fourMicaRgbColors = {
   "brand-deep": "rgb(var(--brand-deep) / <alpha-value>)",
   "brand-soft": "rgb(var(--brand-soft) / <alpha-value>)",
   "brand-violet": "rgb(var(--brand-violet) / <alpha-value>)",
+  surface: "rgb(var(--surface) / <alpha-value>)",
   "surface-solid": "rgb(var(--surface-solid) / <alpha-value>)",
   "surface-deep": "rgb(var(--surface-deep) / <alpha-value>)",
+  // Theme-aware contrast overlay: white in dark mode, dark slate in light mode.
+  // Use for hairlines and glass fills, e.g. border-overlay/10, bg-overlay/5.
+  overlay: "rgb(var(--overlay) / <alpha-value>)",
 } as const;
 
 export const colors = {

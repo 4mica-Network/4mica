@@ -21,8 +21,15 @@ export const PARTNERS = [
     name: "ChaosChain",
     logo: "/assets/chaos_chain_logo.svg",
     href: links.partner.chaosChain,
+    // White monochrome logo — invert to dark so it stays visible in light mode.
+    invertOnLight: true,
   },
-  { name: "Wachai", logo: "/assets/wachai.png", href: links.partner.wachai },
+  {
+    name: "Wachai",
+    logo: "/assets/wachai.png",
+    href: links.partner.wachai,
+    invertOnLight: true,
+  },
 ];
 
 export const TRUST_POINTS = messages.home.trustPoints;

@@ -1,7 +1,75 @@
 @layer base {
+  /*
+   * Light theme (default base). Dark theme lives in `.dark` below and is the
+   * brand default applied by the theme script on first paint. Components read
+   * the semantic RGB tokens (--ink-*, --brand-*, --surface-*, --overlay), so
+   * flipping these values re-skins the whole app.
+   */
   :root {
+    --background: 210 40% 99%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 202 90% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 202 90% 94%;
+    --accent-foreground: 202 90% 30%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 202 90% 50%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    /* Ink — dark slate text on light surfaces */
+    --ink-strong: 15 23 42;
+    --ink: 15 23 42;
+    --ink-body: 51 65 85;
+    --ink-muted: 100 116 139;
+    --ink-subtle: 148 163 184;
+
+    /* Brand — deepened so accents stay legible on white */
+    --brand: 3 105 161;
+    --brand-strong: 7 116 144;
+    --brand-teal: 13 148 136;
+    --brand-deep: 30 64 175;
+    --brand-soft: 20 184 166;
+    --brand-violet: 79 70 229;
+
+    /* Surfaces — light */
+    --surface: 255 255 255;
+    --surface-solid: 255 255 255;
+    --surface-deep: 247 248 250;
+
+    /* Contrast overlay for hairlines/glass — dark slate over light surfaces */
+    --overlay: 15 23 42;
+
+    --font-display: var(--font-intervar);
+    --font-sans: var(--font-intervar);
+    --font-pacifico: var(--font-intervar);
+    --font-mono:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    /* Semantic colors */
+    --color-success: 22 163 74;
+    --color-warning: 217 119 6;
+    --color-danger: 220 38 38;
+  }
+
+  .dark {
     --background: 0 0% 0%;
-    --foreground: 216 216 216;
+    --foreground: 0 0% 98%;
     --card: 220 22% 9%;
     --card-foreground: 210 40% 96%;
     --popover: 220 22% 9%;
@@ -14,67 +82,44 @@
     --muted-foreground: 215 20% 70%;
     --accent: 215 40% 18%;
     --accent-foreground: 210 40% 96%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 62.8% 45%;
     --destructive-foreground: 0 0% 98%;
     --border: 220 25% 20%;
     --input: 220 25% 20%;
     --ring: 205 90% 65%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Ink — light text on dark surfaces */
     --ink-strong: 216 216 216;
     --ink: 216 216 216;
     --ink-body: 161 161 161;
     --ink-muted: 161 161 161;
     --ink-subtle: 109 109 109;
+
+    /* Brand — original vivid values */
     --brand: 123 203 255;
     --brand-strong: 60 174 245;
     --brand-teal: 72 201 176;
     --brand-deep: 30 77 216;
     --brand-soft: 163 255 214;
     --brand-violet: 92 124 250;
-    --surface-solid: 5 11 29;
+
+    /* Surfaces — dark (neutral, matching the original #0a0a0a / #101010 cards) */
+    --surface: 10 10 10;
+    --surface-solid: 16 16 16;
     --surface-deep: 0 0 0;
-    --font-display: var(--font-intervar);
-    --font-sans: var(--font-intervar);
-    --font-pacifico: var(--font-intervar);
-    --font-mono:
-      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-      "Courier New", monospace;
+
+    /* Contrast overlay — white over dark surfaces */
+    --overlay: 255 255 255;
+
     /* Semantic colors */
     --color-success: 74 222 128;
     --color-warning: 251 146 60;
     --color-danger: 248 113 113;
-  }
-
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
   }
 }
 
@@ -84,11 +129,11 @@
   }
 
   html {
-    background: #000000;
+    background: rgb(var(--surface-deep));
   }
 
   body {
-    background-color: #000000;
+    background-color: rgb(var(--surface-deep));
     color: rgb(var(--ink-body));
     min-height: 100%;
     font-family: var(--font-sans);
@@ -97,6 +142,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   h1,
@@ -234,12 +282,12 @@
   }
 
   .hero-cta-ghost::before {
-    background: #dedede;
+    background: rgb(var(--ink-strong));
   }
 
   .hero-cta-ghost:hover {
-    border-color: rgba(255, 255, 255, 0.24);
-    color: #151515;
+    border-color: rgb(var(--overlay) / 0.24);
+    color: rgb(var(--surface-deep));
   }
 
   .btn-outline {
@@ -262,18 +310,18 @@
   }
 
   .btn-invert:hover {
-    background: #ffffff;
+    background: rgb(var(--ink-strong));
     transform: translateY(-1px);
   }
 
   .btn-soft {
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid rgb(var(--overlay) / 0.18);
     color: rgb(var(--ink-body));
     background: transparent;
   }
 
   .btn-soft:hover {
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgb(var(--overlay) / 0.4);
     color: rgb(var(--ink-strong));
   }
 
@@ -323,7 +371,7 @@
 
   .glass-panel {
     background: rgb(var(--surface-solid) / 0.32);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgb(var(--overlay) / 0.08);
     box-shadow: 0 16px 32px rgba(2, 8, 20, 0.5);
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
@@ -331,7 +379,7 @@
 
   .glass-panel-strong {
     background: rgb(var(--surface-solid) / 0.52);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgb(var(--overlay) / 0.12);
     box-shadow: 0 18px 40px rgba(2, 8, 20, 0.6);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
@@ -387,7 +435,7 @@
   }
 
   .global-bg-base {
-    background: #000000;
+    background: rgb(var(--surface-deep));
   }
 
   .global-bg-vignette {
@@ -411,6 +459,10 @@
   }
 
   .global-network-canvas {
+    opacity: 0.22;
+  }
+
+  .dark .global-network-canvas {
     opacity: 0.6;
   }
 

@@ -12,7 +12,7 @@ export default function ViewOpenRolesButton() {
       initial="rest"
       animate="rest"
       whileHover="hover"
-      className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-white/10"
+      className="inline-flex items-center justify-center gap-1.5 rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-overlay/10"
     >
       View open roles
       <motion.i

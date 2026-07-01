@@ -37,8 +37,8 @@ export default function Header() {
     <header
       className={`fixed top-0 right-0 left-0 z-40 flex h-20 w-full select-none justify-center px-4 text-ink transition-colors duration-300 sm:px-6 lg:px-8 ${
         isMobileMenuOpen
-          ? "bg-[#000000]"
-          : "bg-[linear-gradient(to_bottom,rgba(0,0,0,1)_0%,rgba(0,0,0,0.5)_80%,rgba(0,0,0,0.1)_100%)]"
+          ? "bg-surface-deep"
+          : "bg-[linear-gradient(to_bottom,rgb(var(--surface-deep))_0%,rgb(var(--surface-deep)/0.5)_80%,rgb(var(--surface-deep)/0.1)_100%)]"
       }`}
     >
       <nav
@@ -82,14 +82,14 @@ export default function Header() {
         <div className="flex items-center gap-3">
           <a
             href={links.mailto.contact}
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-white/15 bg-black px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-overlay/15 bg-surface-deep px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-overlay/10 hover:text-ink-strong md:flex"
           >
             {messages.common.actions.talkToSales}
           </a>
 
           <Link
             href="/pricing"
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#dedede] px-4 py-2 font-semibold text-[#151515] text-md transition-colors duration-75 ease-in hover:bg-white md:flex"
+            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-ink-strong px-4 py-2 font-semibold text-md text-surface-deep transition-colors duration-75 ease-in hover:bg-ink-strong/90 md:flex"
           >
             {messages.common.actions.tryForFree}
           </Link>
@@ -126,7 +126,7 @@ export default function Header() {
 
       <div
         id="mobile-menu"
-        className={`absolute top-20 right-0 left-0 max-h-[calc(100vh-5rem)] overflow-y-auto bg-black px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
+        className={`absolute top-20 right-0 left-0 max-h-[calc(100vh-5rem)] overflow-y-auto bg-surface-deep px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
           isMobileMenuOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
@@ -139,14 +139,14 @@ export default function Header() {
             <a
               href={links.mailto.contact}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="h-9 rounded-md border border-white/15 bg-black px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-white/10 hover:text-ink-strong"
+              className="h-9 rounded-md border border-overlay/15 bg-surface-deep px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-overlay/10 hover:text-ink-strong"
             >
               {messages.common.actions.talkToSales}
             </a>
             <Link
               href="/pricing"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="h-9 rounded-md bg-[#dedede] px-4 py-2 text-center font-semibold text-[#151515] text-md transition-colors hover:bg-white"
+              className="h-9 rounded-md bg-ink-strong px-4 py-2 text-center font-semibold text-md text-surface-deep transition-colors hover:bg-ink-strong/90"
             >
               {messages.common.actions.tryForFree}
             </Link>

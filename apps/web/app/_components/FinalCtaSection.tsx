@@ -30,16 +30,16 @@ export default function FinalCtaSection() {
                   <span className="text-ink-muted text-md">{s.label}</span>
                 </div>
                 {i < STATS.length - 1 && (
-                  <div className="hidden h-8 w-px bg-white/10 sm:block" />
+                  <div className="hidden h-8 w-px bg-overlay/10 sm:block" />
                 )}
               </div>
             ))}
           </div>
           {/* Divider between stats */}
-          <div className="mt-10 flex flex-col justify-center gap-3 border-white/10 border-t pt-10 sm:flex-row">
+          <div className="mt-10 flex flex-col justify-center gap-3 border-overlay/10 border-t pt-10 sm:flex-row">
             <Link
               href="/pricing"
-              className="btn btn-lg rounded-full bg-white text-center font-semibold text-black shadow-lg transition-colors hover:bg-white/90"
+              className="btn btn-lg rounded-full bg-ink-strong text-center font-semibold text-surface-deep shadow-lg transition-colors hover:bg-ink-strong/90"
             >
               {messages.common.actions.startBuilding}
             </Link>

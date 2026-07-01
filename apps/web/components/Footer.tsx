@@ -1,6 +1,7 @@
 "use client";
 
 import { links, routes } from "@4mica/url";
+import ThemeToggle from "@components/ThemeToggle";
 import Link from "next/link";
 import { messages } from "@/i18n";
 import { solutions } from "../app/solutions/data";
@@ -149,6 +150,7 @@ export default function Footer() {
           </div>
 
           <div className="flex w-full items-center justify-between sm:order-2 sm:w-auto sm:gap-4">
+            <ThemeToggle />
             <a
               href={links.mailto.support}
               aria-label={messages.common.a11y.email4Mica}

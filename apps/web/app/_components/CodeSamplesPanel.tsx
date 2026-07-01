@@ -28,7 +28,7 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
           </div>
 
           {/* Code panel */}
-          <div className="group relative w-full overflow-hidden rounded-md border border-white/10 bg-black/25">
+          <div className="group relative w-full overflow-hidden rounded-md border border-overlay/10 bg-[#101010] shadow-black/20 shadow-xl">
             <div className="pointer-events-none absolute inset-0 z-20 rounded-md border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <div
               className="pointer-events-none absolute inset-0 z-20 rounded-md opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -44,7 +44,7 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
               }}
             />
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-white/10 border-b bg-black/40 px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-white/10 border-b bg-white/3 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-md bg-red-500/80" />
                 <div className="h-2.5 w-2.5 rounded-md bg-yellow-500/80" />
@@ -91,7 +91,7 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
             </div>
 
             {/* Code body */}
-            <div className="max-w-full overflow-x-auto bg-black p-5 transition-colors duration-500 group-hover:bg-[#050505] sm:p-6">
+            <div className="max-w-full overflow-x-auto bg-[#101010] p-5 transition-colors duration-500 group-hover:bg-[#141414] sm:p-6">
               <div
                 className="shiki-code shiki-numbered font-mono text-md leading-6"
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes source text at build time; html contains only its own token markup.
@@ -100,7 +100,7 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 border-white/10 border-t bg-black/25 px-5 py-3 text-ink-subtle text-md">
+            <div className="flex items-center gap-3 border-white/10 border-t bg-white/3 px-5 py-3 text-ink-subtle text-md">
               <i className="ri-code-box-line shrink-0 text-2xl text-ink-strong" />
               <div className="flex flex-col">
                 <span className="font-medium text-ink-strong">

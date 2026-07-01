@@ -19,7 +19,7 @@ export default function NavDropdown({
   onItemClick?: () => void;
 }) {
   return (
-    <div className="w-max max-w-[90vw] rounded-xl border border-white/10 bg-black/95 p-3 shadow-2xl backdrop-blur-sm">
+    <div className="w-max max-w-[90vw] rounded-xl border border-overlay/10 bg-surface-deep/95 p-3 shadow-2xl backdrop-blur-sm">
       <div className="flex flex-col gap-3">
         {sections.map((section) => (
           <div key={section.title ?? "section"}>

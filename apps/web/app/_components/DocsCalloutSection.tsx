@@ -10,8 +10,8 @@ export default async function DocsCalloutSection() {
   return (
     <section id="how-it-works" className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
-        <div className="w-full overflow-hidden rounded-md border border-white/10 bg-black/25">
-          <div className="border-white/10 border-b px-6 py-8 text-left sm:px-8">
+        <div className="w-full overflow-hidden rounded-md border border-overlay/10 bg-surface">
+          <div className="border-overlay/10 border-b px-6 py-8 text-left sm:px-8">
             <p className="section-kicker">
               {messages.home.sections.howItWorksKicker}
             </p>
@@ -26,9 +26,9 @@ export default async function DocsCalloutSection() {
           {STEPS.map((step, i) => (
             <div
               key={step.num}
-              className="group relative border-white/10 border-b transition-colors duration-500 last:border-b-0 hover:bg-white/[0.018]"
+              className="group relative border-overlay/10 border-b transition-colors duration-500 last:border-b-0 hover:bg-overlay/[0.018]"
             >
-              <div className="pointer-events-none absolute inset-0 z-20 border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+              <div className="pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
               <div
                 className="pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                 style={{
@@ -44,10 +44,10 @@ export default async function DocsCalloutSection() {
               />
               <div className="relative z-10 grid gap-0 lg:grid-cols-[1fr_1.2fr]">
                 {/* Left */}
-                <div className="flex min-w-0 flex-col justify-between border-white/10 border-b p-6 sm:p-8 lg:border-r lg:border-b-0">
+                <div className="flex min-w-0 flex-col justify-between border-overlay/10 border-b p-6 sm:p-8 lg:border-r lg:border-b-0">
                   <div>
                     <div className="mb-5 flex items-baseline gap-4">
-                      <span className="font-medium text-4xl text-white/20 leading-none transition-colors duration-500 group-hover:text-white/35">
+                      <span className="font-medium text-4xl text-ink-strong/20 leading-none transition-colors duration-500 group-hover:text-ink-strong/35">
                         {step.num}
                       </span>
                       <span className="font-medium text-ink-muted text-md uppercase tracking-widest transition-colors duration-500 group-hover:text-ink-body">
@@ -64,7 +64,7 @@ export default async function DocsCalloutSection() {
                 </div>
 
                 {/* Right */}
-                <div className="min-w-0 bg-black p-5 transition-colors duration-500 group-hover:bg-[#050505] sm:p-6">
+                <div className="min-w-0 bg-[#101010] p-5 transition-colors duration-500 group-hover:bg-[#141414] sm:p-6">
                   <div className="mb-4 flex items-center gap-1.5">
                     <div className="h-2 w-2 rounded-md bg-[#ff5555]/70" />
                     <div className="h-2 w-2 rounded-md bg-[#f1fa8c]/70" />
