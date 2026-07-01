@@ -38,7 +38,9 @@ export default function FinalCtaSection() {
           {/* Divider between stats */}
           <div className="mt-10 flex flex-col justify-center gap-3 border-overlay/10 border-t pt-10 sm:flex-row">
             <Link
-              href="/pricing"
+              href={links.docs}
+              target="_blank"
+              rel="noreferrer"
               className="btn btn-lg rounded-full bg-ink-strong text-center font-semibold text-surface-deep shadow-lg transition-colors hover:bg-ink-strong/90"
             >
               {messages.common.actions.startBuilding}

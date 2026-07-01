@@ -24,7 +24,9 @@ export default function HeroSection() {
             {/* CTAs */}
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <a
-                href="/pricing"
+                href={links.docs}
+                target="_blank"
+                rel="noreferrer"
                 className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
               >
                 <span>{messages.common.actions.startBuilding}</span>

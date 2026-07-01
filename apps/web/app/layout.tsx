@@ -11,9 +11,10 @@ import I18nProvider from "@/i18n/I18nProvider";
 const { base } = new LinkConfig({
   ...process.env,
   NEXT_PUBLIC_BASE_URL:
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.NEXT_PUBLIC_VERCEL_URL,
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL ||
+    undefined,
 });
 const metadataBase = new URL(base);
 
