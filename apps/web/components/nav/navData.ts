@@ -45,6 +45,13 @@ export const NAV_ITEMS: NavItem[] = [
       {
         items: [
           {
+            title: messages.navigation.documentation,
+            href: links.docs,
+            description: messages.navigation.documentationDescription,
+            icon: "ri-book-open-line",
+            external: true,
+          },
+          {
             title: messages.navigation.apiStatus,
             href: links.status,
             description: messages.navigation.apiStatusDescription,
@@ -53,7 +60,7 @@ export const NAV_ITEMS: NavItem[] = [
           },
           {
             title: messages.navigation.apiChangelog,
-            href: links.social.githubCore,
+            href: links.docsChangelog,
             description: messages.navigation.apiChangelogDescription,
             icon: "ri-git-commit-line",
             external: true,
