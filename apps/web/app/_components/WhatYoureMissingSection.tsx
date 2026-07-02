@@ -57,17 +57,25 @@ function ComparisonCard({
   totalValue,
 }: ComparisonCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  // The pointer-follow glow position is written to CSS vars on this ref so
+  // moving the cursor never re-renders the card. `isHovered` only toggles on
+  // enter/leave, which is cheap and gates the border background swap.
+  const borderRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const [pointerPosition, setPointerPosition] = useState({ x: 0, y: 0 });
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!cardRef.current || event.pointerType === "touch") return;
+    if (!cardRef.current || !borderRef.current || event.pointerType === "touch")
+      return;
 
     const rect = cardRef.current.getBoundingClientRect();
-    setPointerPosition({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
+    borderRef.current.style.setProperty(
+      "--px",
+      `${event.clientX - rect.left}px`,
+    );
+    borderRef.current.style.setProperty(
+      "--py",
+      `${event.clientY - rect.top}px`,
+    );
   };
 
   const handlePointerEnter = (event: PointerEvent<HTMLDivElement>) => {
@@ -94,11 +102,12 @@ function ComparisonCard({
       transition={{ duration: 0.38, delay, ease: "easeOut" }}
     >
       <div
+        ref={borderRef}
         className="pointer-events-none absolute inset-0 rounded-md transition-all duration-500 ease-out"
         style={{
           padding: "1px",
           background: isHovered
-            ? `radial-gradient(circle 430px at ${pointerPosition.x}px ${pointerPosition.y}px, ${accent}99, ${accent}33 34%, ${NEUTRAL_BORDER} 68%)`
+            ? `radial-gradient(circle 430px at var(--px, 50%) var(--py, 0px), ${accent}99, ${accent}33 34%, ${NEUTRAL_BORDER} 68%)`
             : NEUTRAL_BORDER,
           mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
           maskComposite: "exclude",

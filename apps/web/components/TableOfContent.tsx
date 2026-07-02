@@ -10,9 +10,16 @@ export default function TableOfContent({ toc }: { toc: TocItem[] }) {
   const [activeId, setActiveId] = useState<string>(toc[0]?.id ?? "");
   const isScrollingRef = useRef(false);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirror activeId in a ref so the scroll listener can read it without being a
+  // dependency of the effect — otherwise the listener tears down and re-attaches
+  // on every active-section change.
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
 
   useEffect(() => {
-    const handleScroll = () => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
       if (isScrollingRef.current) return;
 
       const scrollPosition = window.scrollY + SCROLL_OFFSET;
@@ -29,17 +36,26 @@ export default function TableOfContent({ toc }: { toc: TocItem[] }) {
         }
       }
 
-      if (currentSectionId && currentSectionId !== activeId) {
+      if (currentSectionId && currentSectionId !== activeIdRef.current) {
         setActiveId(currentSectionId);
         window.history.replaceState(null, "", `#${currentSectionId}`);
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
-    handleScroll();
+    // Coalesce scroll events into one layout-read per frame to avoid thrash.
+    const handleScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
 
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [toc, activeId]);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    measure();
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [toc]);
 
   const handleClick = (
     event: React.MouseEvent<HTMLAnchorElement>,
