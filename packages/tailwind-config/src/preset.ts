@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
-import { borderRadius, colors, fontSize } from "./tokens";
+import { borderRadius, colors, fontSize, spacing } from "./tokens";
 
 export const preset = {
   theme: {
@@ -8,6 +8,7 @@ export const preset = {
       borderRadius,
       colors,
       fontSize,
+      spacing,
     },
   },
   plugins: [animate],
