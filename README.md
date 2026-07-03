@@ -22,7 +22,6 @@ The site currently includes:
 - Product and company pages for 4Mica.
 - Technical docs for x402 integrations.
 - TypeScript, Python, and Rust-oriented integration content.
-- Wallet and network configuration through Reown AppKit and Wagmi.
 - Static export deployment for CDN-backed hosting.
 
 ## Tech Stack
@@ -34,8 +33,6 @@ The site currently includes:
 - [pnpm](https://pnpm.io/) workspaces for dependency management.
 - [Biome](https://biomejs.dev/) for linting and formatting.
 - [Vitest](https://vitest.dev/) for tests and coverage.
-- [Reown AppKit](https://reown.com/appkit), [Wagmi](https://wagmi.sh/), and
-  [Viem](https://viem.sh/) for wallet and chain integrations.
 
 ## Repository Structure
 
@@ -58,7 +55,6 @@ The site currently includes:
 
 - Node.js 20 or newer.
 - pnpm 10.28.2 or newer.
-- A Reown project ID for wallet features.
 
 Enable pnpm with Corepack if needed:
 
@@ -78,17 +74,6 @@ Create a local environment file:
 ```bash
 cp apps/web/.env.example apps/web/.env.local
 ```
-
-Then set your Reown project ID:
-
-```bash
-NEXT_PUBLIC_PROJECT_ID=your_reown_project_id_here
-NEXT_PUBLIC_REOWN_PROJECT_ID=your_reown_project_id_here
-```
-
-`NEXT_PUBLIC_PROJECT_ID` is the primary variable. The app also supports
-`NEXT_PUBLIC_REOWN_PROJECT_ID` and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for
-compatibility.
 
 Start the development server:
 
@@ -174,13 +159,9 @@ pnpm lint:linter  # Apply linter fixes only
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_PROJECT_ID` | Yes | Primary Reown AppKit project ID. |
-| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Fallback | Alternate Reown project ID name. |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Fallback | Legacy WalletConnect project ID name. |
+| `NEXT_PUBLIC_BASE_URL` | No | Canonical site URL used for metadata. |
 | `NEXT_PUBLIC_APP_URL` | No | Public app URL used for metadata. Defaults to `https://4mica.io`. |
 | `NEXT_PUBLIC_VERCEL_URL` | No | Vercel-provided URL fallback for metadata. |
-| `NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA` | Deploy-time | Sepolia core contract address for hosted builds. |
-| `NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY` | Deploy-time | Polygon Amoy core contract address for hosted builds. |
 
 ## Testing and Quality
 
@@ -222,12 +203,8 @@ Required deployment secrets and variables include:
 - `AWS_REGION`
 - `S3_BUCKET`
 - `CLOUDFRONT_DISTRIBUTION_ID`
-- `NEXT_PUBLIC_PROJECT_ID`
-- `NEXT_PUBLIC_REOWN_PROJECT_ID`
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+- `NEXT_PUBLIC_BASE_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA`
-- `NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY`
 
 ## Contributing
 
@@ -275,8 +252,8 @@ Thanks to everyone who helps build 4Mica.
 ## Acknowledgements
 
 4Mica is built with and inspired by excellent open-source projects, including
-Next.js, React, Tailwind CSS, Turbo, pnpm, Biome, Vitest, Reown AppKit, Wagmi,
-Viem, Radix UI, Lucide, Framer Motion, and the broader x402 ecosystem.
+Next.js, React, Tailwind CSS, Turbo, pnpm, Biome, Vitest, Framer Motion, and the
+broader x402 ecosystem.
 
 ## License
 
