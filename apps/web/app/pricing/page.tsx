@@ -1,17 +1,11 @@
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
-import { createPageMetadata } from "@seo/shared";
+import { metaFor } from "@seo/pages";
 import Link from "next/link";
 import { messages } from "@/i18n";
 
-export const metadata = createPageMetadata({
-  title: messages.pricing.seo.title,
-  description: messages.pricing.seo.description,
-  keywords: [...messages.pricing.seo.keywords],
-  url: "/pricing",
-  imageAlt: messages.pricing.seo.imageAlt,
-});
+export const metadata = metaFor("/pricing");
 
 function ShinyHoverBorder({
   radiusClass = "rounded-md",

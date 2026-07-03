@@ -1,7 +1,7 @@
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
-import { createPageMetadata } from "@seo/shared";
+import { metaForSolution } from "@seo/pages";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -45,22 +45,7 @@ export async function generateMetadata({
   params,
 }: RouteParams): Promise<Metadata> {
   const { slug } = await params;
-  const solution = getSolution(slug);
-  if (!solution) return {};
-
-  return createPageMetadata({
-    title: `4Mica for ${solution.label}`,
-    description: solution.intro,
-    keywords: [
-      "4Mica",
-      solution.label,
-      "credit-backed payments",
-      "instant settlement",
-      "x402",
-    ],
-    url: `/solutions/${solution.slug}`,
-    imageAlt: `4Mica for ${solution.label}`,
-  });
+  return metaForSolution(slug) ?? {};
 }
 
 function SectionHeader({

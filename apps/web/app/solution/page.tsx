@@ -1,9 +1,9 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
-import { SOLUTION_META_DATA } from "@seo/solution";
+import { metaFor } from "@seo/pages";
 import Image from "next/image";
 
-export const metadata = SOLUTION_META_DATA;
+export const metadata = metaFor("/solution");
 
 function ShinyHoverBorder({
   radiusClass = "rounded-md",

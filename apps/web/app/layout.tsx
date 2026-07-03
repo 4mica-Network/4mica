@@ -4,7 +4,7 @@ import "./globals.css";
 import { LinkConfig } from "@4mica/url";
 import GlobalNetworkBackground from "@components/GlobalNetworkBackgroundLazy";
 import ThemeProvider, { themeInitScript } from "@context/ThemeProvider";
-import { HOME_META_DATA } from "@seo/home";
+import { metaFor } from "@seo/pages";
 
 const { base } = new LinkConfig({
   ...process.env,
@@ -17,7 +17,7 @@ const { base } = new LinkConfig({
 const metadataBase = new URL(base);
 
 export const metadata: Metadata = {
-  ...HOME_META_DATA,
+  ...metaFor("/"),
   metadataBase,
   authors: [{ name: "Mairon Mahzoun" }],
 };

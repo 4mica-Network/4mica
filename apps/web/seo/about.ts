@@ -1,7 +1,8 @@
 import { links } from "@4mica/url";
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const ABOUT_META_DATA = createPageMetadata({
+export const ABOUT_SEO: PageSeo = {
+  path: links.about,
   title: "About 4Mica | Mission and Company",
   description:
     "Learn how 4Mica builds cryptographically backed credit rails for instant, low-friction settlement across web3 services and AI agents.",
@@ -13,6 +14,5 @@ export const ABOUT_META_DATA = createPageMetadata({
     "programmable credit",
     "agentic commerce",
   ],
-  url: links.about,
   imageAlt: "About 4Mica",
-});
+};

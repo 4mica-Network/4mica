@@ -1,7 +1,8 @@
 import { links } from "@4mica/url";
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const LEADERSHIP_META_DATA = createPageMetadata({
+export const LEADERSHIP_SEO: PageSeo = {
+  path: links.team,
   title: "Team | 4Mica",
   description:
     "Meet the 4Mica team building production-grade credit rails for AI agents, APIs, and web3 commerce.",
@@ -12,6 +13,5 @@ export const LEADERSHIP_META_DATA = createPageMetadata({
     "AI agent infrastructure",
     "cryptography founders",
   ],
-  url: links.team,
   imageAlt: "4Mica leadership team",
-});
+};
