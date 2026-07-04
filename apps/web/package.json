@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@4mica/tailwind-config": "workspace:*",
+    "@4mica/ui": "workspace:*",
     "@4mica/url": "workspace:*",
     "@mdx-js/loader": "3.1.1",
     "@mdx-js/react": "3.1.1",

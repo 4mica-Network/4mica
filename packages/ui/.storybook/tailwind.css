@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@4mica/tailwind-config/styles.css";
+/* Load the shared preset so brand tokens + custom utilities (e.g. text-md) resolve. */
+@config "../tailwind.config.ts";
