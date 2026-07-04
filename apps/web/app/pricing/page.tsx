@@ -97,14 +97,14 @@ export default function PricingPage() {
               {TIERS.map((tier) => (
                 <div
                   key={tier.name}
-                  className={`group relative p-8 transition-colors duration-500 sm:p-10 ${
+                  className={`group relative flex flex-col p-8 transition-colors duration-500 sm:p-10 ${
                     tier.highlight
                       ? "bg-surface-solid hover:bg-surface"
                       : "bg-surface hover:bg-surface-solid"
                   }`}
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
-                  <div className="relative z-10">
+                  <div className="relative z-10 flex flex-1 flex-col">
                     <div className="flex min-h-8 items-center gap-2">
                       <h2 className="font-semibold text-ink-strong text-xl">
                         {tier.name}
@@ -137,29 +137,31 @@ export default function PricingPage() {
                       ))}
                     </ul>
 
-                    {tier.cta.external ? (
-                      <a
-                        href={tier.cta.href}
-                        className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
-                          tier.highlight
-                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
-                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
-                        }`}
-                      >
-                        {tier.cta.label}
-                      </a>
-                    ) : (
-                      <Link
-                        href={tier.cta.href}
-                        className={`mt-8 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
-                          tier.highlight
-                            ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
-                            : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
-                        }`}
-                      >
-                        {tier.cta.label}
-                      </Link>
-                    )}
+                    <div className="mt-auto pt-8">
+                      {tier.cta.external ? (
+                        <a
+                          href={tier.cta.href}
+                          className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
+                            tier.highlight
+                              ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                              : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
+                          }`}
+                        >
+                          {tier.cta.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={tier.cta.href}
+                          className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
+                            tier.highlight
+                              ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+                              : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
+                          }`}
+                        >
+                          {tier.cta.label}
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
