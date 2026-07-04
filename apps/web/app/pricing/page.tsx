@@ -1,3 +1,4 @@
+import { cn } from "@4mica/ui";
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
@@ -48,6 +49,71 @@ const TIERS: Tier[] = [
 
 const INCLUDED = messages.pricing.included;
 
+function PricingCard({ tier }: { tier: Tier }) {
+  const cardClassName = cn(
+    "group relative flex flex-col p-8 transition-colors duration-500 sm:p-10",
+    tier.highlight
+      ? "bg-surface-solid hover:bg-surface"
+      : "bg-surface hover:bg-surface-solid",
+  );
+
+  const ctaClassName = cn(
+    "inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors",
+    tier.highlight
+      ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
+      : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10",
+  );
+
+  return (
+    <div className={cardClassName}>
+      <ShinyHoverBorder radiusClass="rounded-none" />
+      <div className="relative z-10 flex flex-1 flex-col">
+        <div className="flex min-h-8 items-center gap-2">
+          <h2 className="font-semibold text-ink-strong text-xl">{tier.name}</h2>
+          {tier.eyebrow && (
+            <span className="rounded-full border border-overlay/20 bg-overlay/10 px-2.5 py-0.5 text-ink-strong text-md">
+              {tier.eyebrow}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-baseline gap-1">
+          <span className="font-semibold text-3xl text-ink-strong tracking-tight">
+            {tier.price}
+          </span>
+        </div>
+        <p className="mt-2 text-ink-muted text-md leading-relaxed">
+          {tier.tagline}
+        </p>
+
+        <ul className="mt-6 space-y-3">
+          {tier.features.map((feature) => (
+            <li
+              key={feature}
+              className="flex items-start gap-2.5 text-ink-body text-md"
+            >
+              <i className="ri-check-line mt-0.5 text-ink-strong" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-auto pt-8">
+          {tier.cta.external ? (
+            <a href={tier.cta.href} className={ctaClassName}>
+              {tier.cta.label}
+            </a>
+          ) : (
+            <Link href={tier.cta.href} className={ctaClassName}>
+              {tier.cta.label}
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PricingPage() {
   return (
     <div className="min-h-screen">
@@ -69,75 +135,7 @@ export default function PricingPage() {
           <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
             <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {TIERS.map((tier) => (
-                <div
-                  key={tier.name}
-                  className={`group relative flex flex-col p-8 transition-colors duration-500 sm:p-10 ${
-                    tier.highlight
-                      ? "bg-surface-solid hover:bg-surface"
-                      : "bg-surface hover:bg-surface-solid"
-                  }`}
-                >
-                  <ShinyHoverBorder radiusClass="rounded-none" />
-                  <div className="relative z-10 flex flex-1 flex-col">
-                    <div className="flex min-h-8 items-center gap-2">
-                      <h2 className="font-semibold text-ink-strong text-xl">
-                        {tier.name}
-                      </h2>
-                      {tier.eyebrow && (
-                        <span className="rounded-full border border-overlay/20 bg-overlay/10 px-2.5 py-0.5 text-ink-strong text-md">
-                          {tier.eyebrow}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-5 flex items-baseline gap-1">
-                      <span className="font-semibold text-3xl text-ink-strong tracking-tight">
-                        {tier.price}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-ink-muted text-md leading-relaxed">
-                      {tier.tagline}
-                    </p>
-
-                    <ul className="mt-6 space-y-3">
-                      {tier.features.map((feature) => (
-                        <li
-                          key={feature}
-                          className="flex items-start gap-2.5 text-ink-body text-md"
-                        >
-                          <i className="ri-check-line mt-0.5 text-ink-strong" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-auto pt-8">
-                      {tier.cta.external ? (
-                        <a
-                          href={tier.cta.href}
-                          className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
-                            tier.highlight
-                              ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
-                              : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
-                          }`}
-                        >
-                          {tier.cta.label}
-                        </a>
-                      ) : (
-                        <Link
-                          href={tier.cta.href}
-                          className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md px-5 py-2.5 font-semibold text-md transition-colors ${
-                            tier.highlight
-                              ? "bg-ink-strong text-surface-deep hover:bg-ink-strong/90"
-                              : "border border-overlay/15 bg-overlay/5 text-ink-strong hover:bg-overlay/10"
-                          }`}
-                        >
-                          {tier.cta.label}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <PricingCard key={tier.name} tier={tier} />
               ))}
             </div>
           </div>
