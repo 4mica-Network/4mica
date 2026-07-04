@@ -28,10 +28,15 @@
     "lint:linter": "biome lint --write --diagnostic-level=error .",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
+    "check:exports": "turbo run check:exports",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build --filter=@4mica/sdk* && changeset publish",
     "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
+    "@changesets/cli": "catalog:",
     "@4mica/tsconfig": "workspace:*",
     "@types/node": "catalog:node24",
     "@types/npm-registry-fetch": "catalog:",

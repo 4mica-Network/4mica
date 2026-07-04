@@ -1,0 +1,65 @@
+{
+  "name": "@4mica/sdk-node",
+  "version": "1.3.0",
+  "description": "Node.js adapter for the 4Mica SDK: env-driven client and x402 paywall factories",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/homepage.git",
+    "directory": "packages/sdk-node"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "4mica",
+    "sdk",
+    "node",
+    "x402",
+    "payments"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "check:exports": "attw --pack . --profile node16 && publint --strict"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@arethetypeswrong/cli": "catalog:",
+    "@types/node": "catalog:node24",
+    "publint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}

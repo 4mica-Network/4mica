@@ -1,0 +1,89 @@
+{
+  "name": "@4mica/sdk",
+  "version": "1.3.0",
+  "description": "Universal, runtime-neutral TypeScript SDK for the 4Mica payment network",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/homepage.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/4mica-Network/homepage/tree/main/packages/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/4mica-Network/homepage/issues"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "4mica",
+    "payments",
+    "payment-network",
+    "x402",
+    "blockchain",
+    "sdk",
+    "typescript",
+    "viem"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "check:exports": "attw --pack . --profile node16 && publint --strict"
+  },
+  "dependencies": {
+    "@noble/curves": "catalog:",
+    "@quillai-network/wachai-validation-sdk": "catalog:",
+    "viem": "catalog:"
+  },
+  "optionalDependencies": {
+    "@coinbase/cdp-sdk": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@arethetypeswrong/cli": "catalog:",
+    "@types/node": "catalog:node24",
+    "publint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}
