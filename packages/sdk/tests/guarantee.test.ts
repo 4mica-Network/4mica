@@ -22,10 +22,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 1n,
+      cycleId: 1n,
       reqId: 2n,
       amount: 3n,
-      totalAmount: 4n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 123456,
       version: 1,
@@ -34,7 +33,7 @@ describe("guarantee codec", () => {
     const decoded = decodeGuaranteeClaims(encoded);
     expect(decoded.userAddress).toBe(claims.userAddress);
     expect(decoded.recipientAddress).toBe(claims.recipientAddress);
-    expect(decoded.tabId).toBe(claims.tabId);
+    expect(decoded.cycleId).toBe(claims.cycleId);
     expect(decoded.amount).toBe(claims.amount);
   });
 
@@ -43,10 +42,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 1n,
+      cycleId: 1n,
       reqId: 2n,
       amount: 3n,
-      totalAmount: 4n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 123456,
       version: 99,
@@ -59,10 +57,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 1n,
+      cycleId: 1n,
       reqId: 2n,
       amount: 3n,
-      totalAmount: 4n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 123456,
       version: 2,
@@ -75,10 +72,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 5n,
+      cycleId: 5n,
       reqId: 6n,
       amount: 100n,
-      totalAmount: 200n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 999999,
       version: 2,
@@ -90,10 +86,9 @@ describe("guarantee codec", () => {
     expect(decoded.version).toBe(2);
     expect(decoded.userAddress).toBe(claims.userAddress);
     expect(decoded.recipientAddress).toBe(claims.recipientAddress);
-    expect(decoded.tabId).toBe(claims.tabId);
+    expect(decoded.cycleId).toBe(claims.cycleId);
     expect(decoded.reqId).toBe(claims.reqId);
     expect(decoded.amount).toBe(claims.amount);
-    expect(decoded.totalAmount).toBe(claims.totalAmount);
     expect(decoded.timestamp).toBe(claims.timestamp);
 
     const policy = decoded.validationPolicy!;
@@ -116,10 +111,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 3n,
+      cycleId: 3n,
       reqId: 3n,
       amount: 1000n,
-      totalAmount: 1000n,
       assetAddress: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
       timestamp: 1700000000,
       version: 2,
@@ -132,10 +126,9 @@ describe("guarantee codec", () => {
     };
     const decoded = decodeGuaranteeClaims(encodeGuaranteeClaims(claims));
     expect(decoded.version).toBe(2);
-    expect(decoded.tabId).toBe(3n);
+    expect(decoded.cycleId).toBe(3n);
     expect(decoded.reqId).toBe(3n);
     expect(decoded.amount).toBe(1000n);
-    expect(decoded.totalAmount).toBe(1000n);
     expect(decoded.assetAddress.toLowerCase()).toBe(
       "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
     );
@@ -150,10 +143,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(32),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 1n,
+      cycleId: 1n,
       reqId: 0n,
       amount: 1n,
-      totalAmount: 1n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 1,
       version: 1,
@@ -172,10 +164,9 @@ describe("guarantee codec", () => {
       domain: new Uint8Array(31),
       userAddress: "0x0000000000000000000000000000000000000001",
       recipientAddress: "0x0000000000000000000000000000000000000002",
-      tabId: 1n,
+      cycleId: 1n,
       reqId: 2n,
       amount: 3n,
-      totalAmount: 4n,
       assetAddress: "0x0000000000000000000000000000000000000000",
       timestamp: 123456,
       version: 1,
@@ -196,7 +187,7 @@ describe("guarantee codec", () => {
   });
 
   it("decodes legacy unwrapped V1 format (no outer envelope)", () => {
-    // The decoder accepts raw 320-byte V1 ABI encoding without the (uint64, bytes) wrapper
+    // The decoder accepts raw 288-byte V1 ABI encoding without the (uint64, bytes) wrapper
     const rawV1 = encodeAbiParameters(
       [
         { type: "bytes32" },
@@ -204,7 +195,6 @@ describe("guarantee codec", () => {
         { type: "uint256" },
         { type: "address" },
         { type: "address" },
-        { type: "uint256" },
         { type: "uint256" },
         { type: "address" },
         { type: "uint64" },
@@ -217,7 +207,6 @@ describe("guarantee codec", () => {
         "0x0000000000000000000000000000000000000001",
         "0x0000000000000000000000000000000000000002",
         33n,
-        44n,
         "0x0000000000000000000000000000000000000000",
         555n,
         1n,
@@ -225,10 +214,9 @@ describe("guarantee codec", () => {
     );
     const decoded = decodeGuaranteeClaims(rawV1);
     expect(decoded.version).toBe(1);
-    expect(decoded.tabId).toBe(11n);
+    expect(decoded.cycleId).toBe(11n);
     expect(decoded.reqId).toBe(22n);
     expect(decoded.amount).toBe(33n);
-    expect(decoded.totalAmount).toBe(44n);
   });
 
   it("rejects wrapped V1 with incorrect inner byte length", () => {
@@ -249,7 +237,6 @@ describe("guarantee codec", () => {
         { type: "address" },
         { type: "address" },
         { type: "uint256" },
-        { type: "uint256" },
         { type: "address" },
         { type: "uint64" },
         { type: "uint64" },
@@ -261,7 +248,6 @@ describe("guarantee codec", () => {
         "0x0000000000000000000000000000000000000001",
         "0x0000000000000000000000000000000000000002",
         3n,
-        4n,
         "0x0000000000000000000000000000000000000000",
         5n,
         2n,

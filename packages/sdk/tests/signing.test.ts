@@ -22,7 +22,6 @@ function buildV2Claims(userAddress: string): PaymentGuaranteeRequestClaimsV2 {
   const base = PaymentGuaranteeRequestClaims.new(
     userAddress,
     "0x0000000000000000000000000000000000000002",
-    42,
     123,
     999,
     null,
@@ -32,7 +31,6 @@ function buildV2Claims(userAddress: string): PaymentGuaranteeRequestClaimsV2 {
   const partial = new PaymentGuaranteeRequestClaimsV2({
     userAddress: base.userAddress,
     recipientAddress: base.recipientAddress,
-    tabId: base.tabId,
     reqId: base.reqId,
     amount: base.amount,
     timestamp: base.timestamp,
@@ -72,7 +70,6 @@ describe("PaymentSigner", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       "0x0000000000000000000000000000000000000011",
       "0x0000000000000000000000000000000000000002",
-      1,
       5,
       1234,
       null,
@@ -92,7 +89,6 @@ describe("PaymentSigner", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       accountAddress,
       "0x0000000000000000000000000000000000000002",
-      42,
       123,
       999,
       null,
@@ -116,7 +112,6 @@ describe("PaymentSigner", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       accountAddress,
       "0x0000000000000000000000000000000000000002",
-      42,
       123,
       999,
       null,
@@ -139,7 +134,6 @@ describe("PaymentGuaranteeRequestClaimsV2", () => {
         new PaymentGuaranteeRequestClaimsV2({
           userAddress: "0x0000000000000000000000000000000000000001",
           recipientAddress: "0x0000000000000000000000000000000000000002",
-          tabId: 1n,
           reqId: 0n,
           amount: 1n,
           timestamp: 1,
@@ -164,7 +158,6 @@ describe("PaymentGuaranteeRequestClaimsV2", () => {
         new PaymentGuaranteeRequestClaimsV2({
           userAddress: "0x0000000000000000000000000000000000000001",
           recipientAddress: "0x0000000000000000000000000000000000000002",
-          tabId: 1n,
           reqId: 0n,
           amount: 1n,
           timestamp: 1,
@@ -187,7 +180,6 @@ describe("PaymentGuaranteeRequestClaimsV2", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       "0x0000000000000000000000000000000000000001",
       "0x0000000000000000000000000000000000000002",
-      1,
       5,
       100,
       null,
@@ -247,7 +239,6 @@ describe("PaymentSigner V2", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       localSigner.address.toLowerCase(),
       "0x0000000000000000000000000000000000000002",
-      42,
       123,
       999,
       null,
@@ -270,7 +261,6 @@ describe("PaymentSigner unsupported scheme", () => {
     const claims = PaymentGuaranteeRequestClaims.new(
       localSigner.address.toLowerCase(),
       "0x0000000000000000000000000000000000000002",
-      42,
       123,
       999,
       null,
@@ -300,7 +290,6 @@ describe("validateGuaranteeTypedData", () => {
         SolGuaranteeRequestClaimsV1: [
           { name: "user", type: "address" },
           { name: "recipient", type: "address" },
-          { name: "tabId", type: "uint256" },
           { name: "reqId", type: "uint256" },
           { name: "amount", type: "uint256" },
           { name: "asset", type: "address" },
@@ -310,7 +299,6 @@ describe("validateGuaranteeTypedData", () => {
       message: {
         user: "0x0000000000000000000000000000000000000001",
         recipient: "0x0000000000000000000000000000000000000002",
-        tabId: "1",
         reqId: "2",
         amount: "3",
         asset: "0x0000000000000000000000000000000000000000",
@@ -329,7 +317,6 @@ describe("validateGuaranteeTypedData", () => {
         SolGuaranteeRequestClaimsV1: [
           { name: "user", type: "address" },
           { name: "recipient", type: "address" },
-          { name: "tabId", type: "uint256" },
           { name: "reqId", type: "uint256" },
           { name: "amount", type: "uint256" },
           { name: "asset", type: "address" },
@@ -339,7 +326,6 @@ describe("validateGuaranteeTypedData", () => {
       message: {
         user: "0x0000000000000000000000000000000000000001",
         recipient: "0x0000000000000000000000000000000000000002",
-        tabId: "1",
         reqId: "2",
         amount: "3",
         asset: "0x0000000000000000000000000000000000000000",
@@ -358,7 +344,6 @@ describe("validateGuaranteeTypedData", () => {
         SolGuaranteeRequestClaimsV1: [
           { name: "user", type: "address" },
           { name: "recipient", type: "address" },
-          { name: "tabId", type: "uint256" },
           { name: "reqId", type: "uint256" },
           { name: "amount", type: "uint256" },
           { name: "asset", type: "address" },
@@ -368,7 +353,6 @@ describe("validateGuaranteeTypedData", () => {
       message: {
         user: "0x0000000000000000000000000000000000000001",
         recipient: "0x0000000000000000000000000000000000000002",
-        tabId: "1",
         reqId: "2",
         amount: "3",
         asset: "0x0000000000000000000000000000000000000000",

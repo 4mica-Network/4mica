@@ -10,7 +10,6 @@ import { serializeU256 } from "./utils";
 interface PaymentPayloadClaimsBase {
   user_address: string;
   recipient_address: string;
-  tab_id: string;
   req_id: string;
   amount: string;
   timestamp: number;
@@ -57,7 +56,6 @@ export function serializePaymentClaims(
     version: "v1",
     user_address: claims.userAddress.toLowerCase(),
     recipient_address: claims.recipientAddress.toLowerCase(),
-    tab_id: serializeU256(claims.tabId),
     req_id: serializeU256(claims.reqId),
     amount: serializeU256(claims.amount),
     asset_address: claims.assetAddress.toLowerCase(),

@@ -11,10 +11,11 @@ import {
   http,
   parseGwei,
 } from "viem";
+import { clearingHouseAbi } from "./abi/clearinghouse";
 import { core4micaAbi } from "./abi/core4mica";
 import { getChain } from "./chain";
 import { ContractError } from "./errors";
-import { hexFromBytes, parseU256 } from "./utils";
+import { parseU256 } from "./utils";
 
 /**
  * Extract a human-readable message from a viem contract error, falling back
@@ -58,14 +59,21 @@ type Erc20Contract = GetContractReturnType<
   }
 >;
 
+type ClearingHouseContract = GetContractReturnType<
+  typeof clearingHouseAbi,
+  {
+    public: ReturnType<typeof createPublicClient>;
+    wallet: TWalletClient;
+  }
+>;
+
 export type TxReceiptWaitOptions = {
   timeout?: number;
   pollingInterval?: number;
   gas?: bigint;
 };
 
-const DEFAULT_REMUNERATE_GAS_LIMIT = 8_000_000n;
-const DEFAULT_PAY_TAB_ERC20_GAS_LIMIT = 300_000n;
+const DEFAULT_CLEARING_GAS_LIMIT = 1_000_000n;
 const DEFAULT_MAX_FEE_PER_GAS = parseGwei("0.1");
 const DEFAULT_MAX_PRIORITY_FEE_PER_GAS = parseGwei("0.1");
 const DEFAULT_RECEIPT_TIMEOUT_MS = 60_000;
@@ -80,6 +88,7 @@ export class ContractGateway {
   readonly walletClient: TWalletClient;
   readonly contract: CoreContract;
   private erc20Cache = new Map<string, Erc20Contract>();
+  private clearingHouseCache = new Map<string, ClearingHouseContract>();
   private txQueue: Promise<void> = Promise.resolve();
 
   private constructor(
@@ -142,6 +151,20 @@ export class ContractGateway {
       );
     }
     return this.erc20Cache.get(token)!;
+  }
+
+  private clearingHouse(address: string): ClearingHouseContract {
+    if (!this.clearingHouseCache.has(address)) {
+      this.clearingHouseCache.set(
+        address,
+        getContract({
+          address: address as Hex,
+          abi: clearingHouseAbi,
+          client: { public: this.publicClient, wallet: this.walletClient },
+        }),
+      );
+    }
+    return this.clearingHouseCache.get(address)!;
   }
 
   private enqueueTx<T>(fn: () => Promise<T>): Promise<T> {
@@ -363,70 +386,6 @@ export class ContractGateway {
     }));
   }
 
-  async getPaymentStatus(tabId: number | bigint): Promise<{
-    paid: bigint;
-    remunerated: boolean;
-    asset: Hex;
-  }> {
-    const [paid, remunerated, asset] =
-      await this.contract.read.getPaymentStatus([parseU256(tabId)]);
-
-    return {
-      paid,
-      remunerated,
-      asset,
-    };
-  }
-
-  async payTabEth(
-    tabId: number | bigint,
-    reqId: number | bigint,
-    amount: number | bigint | string,
-    recipient: string,
-    waitOptions?: TxReceiptWaitOptions,
-  ) {
-    const { receipt } = this.splitWaitOptions(waitOptions);
-    const data = new TextEncoder().encode(
-      `tab_id:${tabId.toString(16)};req_id:${reqId.toString(16)}`,
-    );
-    const hash = await this.enqueueTx(() =>
-      this.walletClient.sendTransaction({
-        to: recipient as Hex,
-        value: parseU256(amount),
-        data: hexFromBytes(data),
-        ...this.defaultFeeParams(),
-      }),
-    );
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
-  }
-
-  async payTabErc20(
-    tabId: number | bigint,
-    amount: number | bigint | string,
-    erc20Token: string,
-    recipient: string,
-    waitOptions?: TxReceiptWaitOptions,
-  ) {
-    const { gas, receipt } = this.splitWaitOptions(waitOptions);
-    const parsedAmount = parseU256(amount);
-
-    // payTabInERC20Token uses safeTransferFrom, so the contract must be an
-    // approved spender. Auto-approve if the current allowance is insufficient.
-    await this.approveErc20(erc20Token, parsedAmount, waitOptions);
-
-    const hash = await this.enqueueTx(() =>
-      this.contract.write.payTabInERC20Token(
-        [parseU256(tabId), erc20Token as Hex, parsedAmount, recipient as Hex],
-        {
-          gas: gas ?? DEFAULT_PAY_TAB_ERC20_GAS_LIMIT,
-          ...this.defaultFeeParams(),
-        },
-      ),
-    );
-
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
-  }
-
   async requestWithdrawal(
     amount: number | bigint | string,
     erc20Token?: string,
@@ -496,25 +455,74 @@ export class ContractGateway {
     return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
   }
 
-  async remunerate(
-    claimsBlob: Uint8Array,
-    signatureWords: Uint8Array[],
+  /**
+   * Claim a net credit committed for a settlement cycle (`claimNetCredit`).
+   *
+   * @param contractAddress - ClearingHouse contract address (from the clearing action).
+   * @param cycleId - On-chain `bytes32` cycle identifier.
+   * @param netCredit - Net credit amount committed for the caller.
+   * @param proof - Merkle proof of the caller's committed leaf.
+   */
+  async claimNetCredit(
+    contractAddress: string,
+    cycleId: Hex,
+    netCredit: bigint,
+    proof: Hex[],
     waitOptions?: TxReceiptWaitOptions,
   ) {
     const { gas, receipt } = this.splitWaitOptions(waitOptions);
-    const sigStruct = {
-      x_c0_a: hexFromBytes(signatureWords[0]),
-      x_c0_b: hexFromBytes(signatureWords[1]),
-      x_c1_a: hexFromBytes(signatureWords[2]),
-      x_c1_b: hexFromBytes(signatureWords[3]),
-      y_c0_a: hexFromBytes(signatureWords[4]),
-      y_c0_b: hexFromBytes(signatureWords[5]),
-      y_c1_a: hexFromBytes(signatureWords[6]),
-      y_c1_b: hexFromBytes(signatureWords[7]),
-    };
+    const ch = this.clearingHouse(contractAddress);
     const hash = await this.enqueueTx(() =>
-      this.contract.write.remunerate([hexFromBytes(claimsBlob), sigStruct], {
-        gas: gas ?? DEFAULT_REMUNERATE_GAS_LIMIT,
+      ch.write.claimNetCredit([cycleId, netCredit, proof], {
+        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
+        ...this.defaultFeeParams(),
+      }),
+    );
+    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+  }
+
+  /**
+   * Pay a net debit committed for a settlement cycle (`payNetDebit`).
+   *
+   * @param payableValue - Native value to attach (non-zero only for native-asset debtors).
+   */
+  async payNetDebit(
+    contractAddress: string,
+    cycleId: Hex,
+    netDebit: bigint,
+    proof: Hex[],
+    payableValue: bigint,
+    waitOptions?: TxReceiptWaitOptions,
+  ) {
+    const { gas, receipt } = this.splitWaitOptions(waitOptions);
+    const ch = this.clearingHouse(contractAddress);
+    const hash = await this.enqueueTx(() =>
+      ch.write.payNetDebit([cycleId, netDebit, proof], {
+        value: payableValue,
+        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
+        ...this.defaultFeeParams(),
+      }),
+    );
+    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+  }
+
+  /**
+   * Mark a debtor defaulted after the clearing payment finality deadline
+   * (`markDefaulted`).
+   */
+  async markDefaulted(
+    contractAddress: string,
+    cycleId: Hex,
+    debtor: Hex,
+    netDebit: bigint,
+    proof: Hex[],
+    waitOptions?: TxReceiptWaitOptions,
+  ) {
+    const { gas, receipt } = this.splitWaitOptions(waitOptions);
+    const ch = this.clearingHouse(contractAddress);
+    const hash = await this.enqueueTx(() =>
+      ch.write.markDefaulted([cycleId, debtor, netDebit, proof], {
+        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
         ...this.defaultFeeParams(),
       }),
     );

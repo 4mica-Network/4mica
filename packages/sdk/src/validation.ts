@@ -14,7 +14,7 @@ export const VALIDATION_REQUEST_BINDING_DOMAIN = "4MICA_VALIDATION_REQUEST_V2";
 /**
  * Compute the `validationSubjectHash` for a V2 payment guarantee request.
  *
- * Binds the payment subject (tab, user, recipient, amount, asset, timestamp) to
+ * Binds the payment subject (req, user, recipient, amount, asset, timestamp) to
  * a keccak256 hash prefixed by {@link VALIDATION_SUBJECT_BINDING_DOMAIN} so that
  * on-chain validators can verify which payment the validation refers to.
  *
@@ -31,7 +31,6 @@ export function computeValidationSubjectHash(
     [
       { type: "bytes32" },
       { type: "uint256" },
-      { type: "uint256" },
       { type: "address" },
       { type: "address" },
       { type: "uint256" },
@@ -40,7 +39,6 @@ export function computeValidationSubjectHash(
     ],
     [
       bindingDomain,
-      claims.tabId,
       claims.reqId,
       claims.userAddress as Hex,
       claims.recipientAddress as Hex,

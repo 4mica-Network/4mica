@@ -33,7 +33,6 @@ class StubSigner {
 class StubX402Flow extends X402Flow {
   protected async requestTab(): Promise<TabResponse> {
     return {
-      tabId: "2",
       userAddress: "0x0000000000000000000000000000000000000001",
       nextReqId: "7",
     };
@@ -76,10 +75,7 @@ describe("X402Flow", () => {
 
     expect(envelope.x402Version).toBe(1);
     expect(envelope.scheme).toBe(SCHEME);
-    expect(envelope.payload.claims.tab_id).toBe("0x2");
     expect(envelope.payload.claims.req_id).toBe("0x7");
-
-    expect(signed.payload.claims.tab_id).toBe("0x2");
     expect(signed.payload.claims.req_id).toBe("0x7");
     expect(signed.payload.claims.amount).toBe("0x5");
   });
@@ -116,10 +112,7 @@ describe("X402Flow", () => {
     expect(envelope.accepted.scheme).toBe(SCHEME);
     expect(envelope.accepted.amount).toBe("10");
     expect(envelope.resource.url).toBe("https://api.example.com/data");
-    expect(envelope.payload.claims.tab_id).toBe("0x2");
     expect(envelope.payload.claims.req_id).toBe("0x7");
-
-    expect(signed.payload.claims.tab_id).toBe("0x2");
     expect(signed.payload.claims.req_id).toBe("0x7");
     expect(signed.payload.claims.amount).toBe("0xa");
   });
@@ -164,7 +157,6 @@ describe("X402Flow", () => {
 
     const flow = new X402Flow(new StubSigner(), fetch as FetchFn);
     const payment = await flow.signPayment(requirements, userAddress);
-    expect(payment.payload.claims.tab_id).toBe("0x1234");
     expect(payment.payload.claims.req_id).toBe("0x4");
 
     const settled = await flow.settlePayment(
@@ -240,7 +232,6 @@ describe("X402Flow", () => {
     class MismatchFlow extends X402Flow {
       protected async requestTab(): Promise<TabResponse> {
         return {
-          tabId: "2",
           userAddress: "0x0000000000000000000000000000000000000002",
           nextReqId: "7",
         };
@@ -302,7 +293,6 @@ describe("X402Flow", () => {
         const body = JSON.parse(init?.body as string);
         return new Response(
           JSON.stringify({
-            tabId: "0x1234",
             userAddress: body.userAddress,
             nextReqId: "4",
           }),

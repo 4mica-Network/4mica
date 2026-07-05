@@ -4,62 +4,59 @@ import {
   AdminApiKeyInfo,
   AdminApiKeySecret,
   AssetBalanceInfo,
-  CollateralEventInfo,
+  ClearingParticipantProof,
+  ClearingSettlementActionResponse,
   CorePublicParameters,
-  GuaranteeInfo,
   PaymentGuaranteeRequestClaimsV2,
-  PendingRemunerationInfo,
   RecipientPaymentInfo,
   SupportedTokensResponse,
-  TabInfo,
   UserSuspensionStatus,
 } from "../src/models";
 
 describe("models fromRpc", () => {
-  it("parses tab info with snake_case fields", () => {
-    const tab = TabInfo.fromRpc({
-      tab_id: "0x10",
-      user_address: "0x0000000000000000000000000000000000000001",
-      recipient_address: "0x0000000000000000000000000000000000000002",
+  it("parses clearing participant proof with snake_case fields", () => {
+    const proof = ClearingParticipantProof.fromRpc({
+      cycle_id: "0x" + "aa".repeat(32),
+      cycle_id_text: "cycle-1",
       asset_address: "0x0000000000000000000000000000000000000000",
-      start_timestamp: 100,
-      ttl_seconds: 60,
-      status: "OPEN",
-      settlement_status: "PENDING",
-      created_at: 10,
-      updated_at: 20,
-    });
-    expect(tab.tabId).toBe(16n);
-    expect(tab.userAddress).toBe("0x0000000000000000000000000000000000000001");
-  });
-
-  it("parses guarantee info with mixed fields", () => {
-    const guarantee = GuaranteeInfo.fromRpc({
-      tabId: "0x1",
-      req_id: "0x2",
-      from_address: "0x0000000000000000000000000000000000000001",
-      toAddress: "0x0000000000000000000000000000000000000002",
-      asset_address: "0x0000000000000000000000000000000000000000",
+      participant: "0x0000000000000000000000000000000000000001",
+      role: "NET_CREDITOR",
       amount: "0x10",
-      timestamp: 123,
+      net_debit: "0",
+      net_credit: "0x10",
+      leaf: "0x" + "bb".repeat(32),
+      merkle_root: "0x" + "cc".repeat(32),
+      proof: ["0x" + "dd".repeat(32)],
     });
-    expect(guarantee.tabId).toBe(1n);
-    expect(guarantee.reqId).toBe(2n);
-    expect(guarantee.amount).toBe(16n);
+    expect(proof.cycleId).toBe("0x" + "aa".repeat(32));
+    expect(proof.role).toBe("NET_CREDITOR");
+    expect(proof.amount).toBe(16n);
+    expect(proof.netCredit).toBe(16n);
+    expect(proof.proof).toEqual(["0x" + "dd".repeat(32)]);
   });
 
-  it("parses collateral event with optional ids", () => {
-    const ev = CollateralEventInfo.fromRpc({
-      id: "1",
-      user_address: "0x0000000000000000000000000000000000000001",
+  it("parses clearing settlement action with snake_case fields", () => {
+    const action = ClearingSettlementActionResponse.fromRpc({
+      contract_address: "0x0000000000000000000000000000000000000009",
+      function_name: "claimNetCredit",
+      action: "claim_net_credit",
+      cycle_id: "0x" + "aa".repeat(32),
+      cycle_id_text: "cycle-1",
       asset_address: "0x0000000000000000000000000000000000000000",
-      amount: "0x2",
-      event_type: "DEPOSIT",
-      created_at: 123,
+      participant: "0x0000000000000000000000000000000000000001",
+      debtor: null,
+      amount: "0x10",
+      payable_value: "0",
+      proof: ["0x" + "dd".repeat(32)],
     });
-    expect(ev.amount).toBe(2n);
-    expect(ev.tabId).toBe(null);
-    expect(ev.reqId).toBe(null);
+    expect(action.contractAddress).toBe(
+      "0x0000000000000000000000000000000000000009",
+    );
+    expect(action.functionName).toBe("claimNetCredit");
+    expect(action.action).toBe("claim_net_credit");
+    expect(action.amount).toBe(16n);
+    expect(action.payableValue).toBe(0n);
+    expect(action.debtor).toBeNull();
   });
 
   it("parses asset balance", () => {
@@ -73,34 +70,6 @@ describe("models fromRpc", () => {
     });
     expect(balance.total).toBe(10n);
     expect(balance.locked).toBe(2n);
-  });
-
-  it("parses pending remuneration info", () => {
-    const pending = PendingRemunerationInfo.fromRpc({
-      tab: {
-        tab_id: "0x1",
-        user_address: "0x0000000000000000000000000000000000000001",
-        recipient_address: "0x0000000000000000000000000000000000000002",
-        asset_address: "0x0000000000000000000000000000000000000000",
-        start_timestamp: 100,
-        ttl_seconds: 60,
-        status: "OPEN",
-        settlement_status: "PENDING",
-        created_at: 10,
-        updated_at: 20,
-      },
-      latest_guarantee: {
-        tab_id: "0x1",
-        req_id: "0x0",
-        from_address: "0x0000000000000000000000000000000000000001",
-        to_address: "0x0000000000000000000000000000000000000002",
-        asset_address: "0x0000000000000000000000000000000000000000",
-        amount: "0x5",
-        timestamp: 1,
-      },
-    });
-    expect(pending.tab.tabId).toBe(1n);
-    expect(pending.latestGuarantee?.amount).toBe(5n);
   });
 
   it("parses recipient payment info", () => {
@@ -137,42 +106,6 @@ describe("models fromRpc", () => {
     expect(secret.apiKey).toBe("secret");
   });
 
-  it("parses collateral event with tabId and reqId present", () => {
-    const ev = CollateralEventInfo.fromRpc({
-      id: "5",
-      user_address: "0x0000000000000000000000000000000000000001",
-      asset_address: "0x0000000000000000000000000000000000000000",
-      amount: "0x10",
-      event_type: "WITHDRAWAL",
-      tab_id: "0x3",
-      req_id: "0x7",
-      created_at: 999,
-    });
-    expect(ev.tabId).toBe(3n);
-    expect(ev.reqId).toBe(7n);
-    expect(ev.amount).toBe(16n);
-  });
-
-  it("parses pending remuneration with null latest_guarantee", () => {
-    const pending = PendingRemunerationInfo.fromRpc({
-      tab: {
-        tab_id: "0x2",
-        user_address: "0x0000000000000000000000000000000000000001",
-        recipient_address: "0x0000000000000000000000000000000000000002",
-        asset_address: "0x0000000000000000000000000000000000000000",
-        start_timestamp: 100,
-        ttl_seconds: 60,
-        status: "OPEN",
-        settlement_status: "PENDING",
-        created_at: 10,
-        updated_at: 20,
-      },
-      latest_guarantee: null,
-    });
-    expect(pending.tab.tabId).toBe(2n);
-    expect(pending.latestGuarantee).toBeNull();
-  });
-
   it("parses user suspension status", () => {
     const status = UserSuspensionStatus.fromRpc({
       user_address: "0x0000000000000000000000000000000000000001",
@@ -186,7 +119,6 @@ describe("models fromRpc", () => {
 const V2_BASE = {
   userAddress: "0x0000000000000000000000000000000000000001",
   recipientAddress: "0x0000000000000000000000000000000000000002",
-  tabId: 1n,
   reqId: 0n,
   amount: 1n,
   timestamp: 1,

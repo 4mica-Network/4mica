@@ -276,7 +276,73 @@ importers:
         specifier: 'catalog:'
         version: 18.0.0
 
-  apps/example-express:
+  apps/example-buyer-express:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 6.0.3
+
+  apps/example-buyer-hono:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 6.0.3
+
+  apps/example-buyer-next:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 6.0.3
+
+  apps/example-seller-express:
     dependencies:
       '@4mica/sdk':
         specifier: workspace:*
@@ -284,6 +350,9 @@ importers:
       '@4mica/sdk-express':
         specifier: workspace:*
         version: link:../../packages/sdk-express
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
       express:
         specifier: 'catalog:'
         version: 5.2.1
@@ -304,7 +373,7 @@ importers:
         specifier: catalog:typescript-latest
         version: 6.0.3
 
-  apps/example-hono:
+  apps/example-seller-hono:
     dependencies:
       '@4mica/sdk':
         specifier: workspace:*
@@ -312,6 +381,9 @@ importers:
       '@4mica/sdk-hono':
         specifier: workspace:*
         version: link:../../packages/sdk-hono
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.14(hono@4.12.27)
@@ -328,6 +400,43 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 6.0.3
+
+  apps/example-seller-next:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-next':
+        specifier: workspace:*
+        version: link:../../packages/sdk-next
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+      next:
+        specifier: 'catalog:'
+        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.7
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.16
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.16)
       typescript:
         specifier: catalog:typescript-latest
         version: 6.0.3
@@ -452,7 +561,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
     optionalDependencies:
       '@coinbase/cdp-sdk':
         specifier: 'catalog:'
@@ -8977,6 +9086,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
+  '@vitest/mocker@4.1.8(vite@8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))':
+    dependencies:
+      '@vitest/spy': 4.1.8
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+
   '@vitest/mocker@4.1.8(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.8
@@ -12249,6 +12366,21 @@ snapshots:
       fsevents: 2.3.3
       lightningcss: 1.32.0
 
+  vite@8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.15
+      rolldown: 1.0.3
+      tinyglobby: 0.2.17
+    optionalDependencies:
+      '@types/node': 24.12.4
+      esbuild: 0.27.7
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      tsx: 4.22.4
+      yaml: 2.9.0
+
   vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
@@ -12278,6 +12410,36 @@ snapshots:
       jiti: 2.7.0
       tsx: 4.22.4
       yaml: 2.9.0
+
+  vitest@4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)):
+    dependencies:
+      '@vitest/expect': 4.1.8
+      '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.8
+      '@vitest/runner': 4.1.8
+      '@vitest/snapshot': 4.1.8
+      '@vitest/spy': 4.1.8
+      '@vitest/utils': 4.1.8
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.2.4
+      tinyglobby: 0.2.17
+      tinyrainbow: 3.1.0
+      vite: 8.0.16(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 24.12.4
+      '@vitest/coverage-v8': 4.1.8(vitest@4.1.8)
+      '@vitest/ui': 4.1.8(vitest@4.1.8)
+      jsdom: 29.1.1(@noble/hashes@2.2.0)
+    transitivePeerDependencies:
+      - msw
 
   vitest@4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0)):
     dependencies:

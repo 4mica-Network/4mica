@@ -1,9 +1,9 @@
 {
-  "name": "@4mica/example-express",
+  "name": "@4mica/example-seller-express",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Runnable example: gating an Express route behind a 4Mica x402 paywall",
+  "description": "Seller (recipient): gate an Express route behind a 4Mica x402 paywall",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts"
@@ -11,6 +11,7 @@
   "dependencies": {
     "@4mica/sdk": "workspace:*",
     "@4mica/sdk-express": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
     "express": "catalog:"
   },
   "devDependencies": {

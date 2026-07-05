@@ -31,7 +31,7 @@ export class Client {
   readonly rpc: RpcProxy;
   /** Chain and contract parameters fetched from the core service at startup. */
   readonly params: CorePublicParameters;
-  /** viem-backed gateway for on-chain calls (deposit, remunerate, …). */
+  /** viem-backed gateway for on-chain calls (deposit, claimNetCredit, …). */
   readonly gateway: ContractGateway;
   /** 32-byte domain separator used to verify V1 BLS guarantee certificates. */
   readonly guaranteeDomain: string;

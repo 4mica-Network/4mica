@@ -40,7 +40,6 @@ export interface PaymentRequirementsExtra {
 }
 
 export interface TabResponse {
-  tabId: string;
   userAddress: string;
   nextReqId?: string;
 }

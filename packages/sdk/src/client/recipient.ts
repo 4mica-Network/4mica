@@ -1,28 +1,26 @@
-import { signatureToWordsAsync } from "../bls";
+import type { Hex } from "viem";
 import type { TxReceiptWaitOptions } from "../contract";
-import { DEBUG_CERTS } from "../debug";
 import { VerificationError } from "../errors";
 import { decodeGuaranteeClaims } from "../guarantee";
 import {
   AssetBalanceInfo,
   type BLSCert,
-  CollateralEventInfo,
-  GuaranteeInfo,
+  ClearingParticipantProof,
+  ClearingSettlementActionResponse,
   type PaymentGuaranteeClaims,
   type PaymentGuaranteeRequestClaims,
   type PaymentGuaranteeRequestClaimsV2,
-  PendingRemunerationInfo,
   RecipientPaymentInfo,
   type SigningScheme,
-  TabInfo,
-  type TabPaymentStatus,
 } from "../models";
 import { buildPaymentPayload } from "../payment";
-import { normalizeAddress, parseU256 } from "../utils";
+import { ensureHexPrefix, normalizeAddress } from "../utils";
 import type { Client } from "./index";
-import { isNumericLike, tabStatusFromRpc } from "./shared";
 
-/** Recipient-side operations: tab management, guarantee issuance, remuneration. */
+/**
+ * Recipient-side operations: guarantee issuance/verification and cycle-based
+ * clearing settlement.
+ */
 export class RecipientClient {
   constructor(private client: Client) {}
 
@@ -35,64 +33,10 @@ export class RecipientClient {
   }
 
   /**
-   * Create a payment tab via the core RPC.
-   *
-   * @param userAddress - Address of the payer.
-   * @param recipientAddress - Address of the recipient.
-   * @param erc20Token - ERC20 token address for the tab, or `null`/`undefined` for ETH.
-   * @param ttl - Optional time-to-live in seconds.
-   * @param guaranteeVersion - Guarantee version for the version-scoped tab identity.
-   * @returns `{ tabId, assetAddress, nextReqId }` — the tab ID, the asset address as stored
-   *   by the core (use this for all subsequent claims), and the first request ID to use.
-   * @throws {@link RpcError} if the request fails.
-   */
-  async createTab(
-    userAddress: string,
-    recipientAddress: string,
-    erc20Token: string | undefined | null,
-    ttl?: number | null,
-    guaranteeVersion = 1,
-  ): Promise<{ tabId: bigint; assetAddress: string; nextReqId: bigint }> {
-    const body = {
-      user_address: normalizeAddress(userAddress),
-      recipient_address: normalizeAddress(recipientAddress),
-      erc20_token: erc20Token ? normalizeAddress(erc20Token) : null,
-      ttl: ttl ?? null,
-      guarantee_version: guaranteeVersion,
-    };
-    const result = await this.client.rpc.createPaymentTab(body);
-    const record = result as Record<string, unknown>;
-    const tabIdRaw = record.id ?? record.tabId ?? record.tab_id;
-    const tabId = isNumericLike(tabIdRaw) ? tabIdRaw : 0;
-    const erc20Raw = record.erc20_token ?? record.erc20Token;
-    const assetAddress =
-      typeof erc20Raw === "string" && erc20Raw
-        ? erc20Raw
-        : "0x0000000000000000000000000000000000000000";
-    const nextReqIdRaw = record.next_req_id ?? record.nextReqId ?? 0;
-    return {
-      tabId: parseU256(tabId),
-      assetAddress,
-      nextReqId: parseU256(isNumericLike(nextReqIdRaw) ? nextReqIdRaw : 0),
-    };
-  }
-
-  /**
-   * Query the on-chain payment status of a tab.
-   *
-   * @param tabId - Tab identifier.
-   * @returns `{ paid, remunerated, asset }`.
-   */
-  async getTabPaymentStatus(tabId: number | bigint): Promise<TabPaymentStatus> {
-    const status = await this.client.gateway.getPaymentStatus(tabId);
-    return tabStatusFromRpc(status);
-  }
-
-  /**
    * Issue a BLS-signed payment guarantee certificate via the core RPC.
    *
-   * The returned {@link BLSCert} can be stored and later passed to
-   * {@link remunerate} to claim the payment on-chain.
+   * The returned {@link BLSCert} can be stored and later settled via the
+   * cycle-clearing flow ({@link claimNetCredit}).
    *
    * @param claims - Signed payment claims (V1 or V2).
    * @param signature - ECDSA signature hex string from the payer.
@@ -156,131 +100,54 @@ export class RecipientClient {
   }
 
   /**
-   * Claim payment on-chain by submitting a verified BLS certificate.
+   * Fetch this recipient's committed position + Merkle proof for a cycle.
    *
-   * Verifies the certificate first (see {@link verifyPaymentGuarantee}), then
-   * converts the BLS signature into the G2 coordinate words expected by the
-   * contract and submits the `remunerate` transaction.
+   * @param cycleId - On-chain `bytes32` cycle identifier.
+   */
+  async getClearingParticipantProof(
+    cycleId: string,
+  ): Promise<ClearingParticipantProof> {
+    const raw = await this.client.rpc.getClearingParticipantProof(
+      cycleId,
+      this.recipientAddress,
+    );
+    return ClearingParticipantProof.fromRpc(raw);
+  }
+
+  /**
+   * Fetch the prepared `claimNetCredit` action for this recipient in a cycle.
    *
-   * Requires the optional `@noble/curves` package for BLS point decompression.
+   * @param cycleId - On-chain `bytes32` cycle identifier.
+   */
+  async getClearingClaimNetCreditAction(
+    cycleId: string,
+  ): Promise<ClearingSettlementActionResponse> {
+    const raw = await this.client.rpc.getClearingClaimNetCreditAction(
+      cycleId,
+      this.recipientAddress,
+    );
+    return ClearingSettlementActionResponse.fromRpc(raw);
+  }
+
+  /**
+   * Claim this recipient's committed net credit for a settlement cycle on-chain.
    *
-   * @param cert - BLS certificate to settle.
+   * Fetches the prepared clearing action (contract address, amount, and Merkle
+   * proof) from core, then submits `claimNetCredit` to the ClearingHouse.
+   *
+   * @param cycleId - On-chain `bytes32` cycle identifier.
    * @param waitOptions - Optional timeout/polling overrides for receipt polling.
-   * @throws {@link VerificationError} if the certificate is invalid or `claims`/`signature`
-   *   are not hex strings.
    * @throws {@link ContractError} if the contract call fails.
    */
-  async remunerate(cert: BLSCert, waitOptions?: TxReceiptWaitOptions) {
-    await this.verifyPaymentGuarantee(cert);
-    const describeValue = (value: unknown): string => {
-      if (value === null) return "null";
-      if (value === undefined) return "undefined";
-      if (Array.isArray(value)) return `array(len=${value.length})`;
-      if (typeof value === "object") {
-        const keys = Object.keys(value as Record<string, unknown>);
-        return `object(keys=${keys.slice(0, 6).join(",")}${keys.length > 6 ? ",..." : ""})`;
-      }
-      return typeof value;
-    };
-    if (DEBUG_CERTS) {
-      const preview =
-        typeof cert.signature === "string" ? cert.signature.slice(0, 12) : "";
-      console.log(
-        `  debug remunerate: signature=${describeValue(cert.signature)} ${preview}`,
-      );
-    }
-    if (typeof cert.claims !== "string") {
-      throw new VerificationError(
-        `certificate.claims must be a hex string, got ${describeValue(cert.claims)}`,
-      );
-    }
-    if (typeof cert.signature !== "string") {
-      throw new VerificationError(
-        `certificate.signature must be a hex string, got ${describeValue(cert.signature)}`,
-      );
-    }
-    const sigWords = await signatureToWordsAsync(cert.signature);
-    const claimsBytes = Buffer.from(cert.claims.replace(/^0x/, ""), "hex");
-    if (waitOptions) {
-      return this.client.gateway.remunerate(claimsBytes, sigWords, waitOptions);
-    }
-    return this.client.gateway.remunerate(claimsBytes, sigWords);
-  }
-
-  /** List all tabs for this recipient that have been settled on-chain. */
-  async listSettledTabs(): Promise<TabInfo[]> {
-    const tabs = await this.client.rpc.listSettledTabs(this.recipientAddress);
-    return tabs.map((t) => TabInfo.fromRpc(t));
-  }
-
-  /** List all tabs with outstanding (un-remunerated) guarantees for this recipient. */
-  async listPendingRemunerations(): Promise<PendingRemunerationInfo[]> {
-    const items = await this.client.rpc.listPendingRemunerations(
-      this.recipientAddress,
+  async claimNetCredit(cycleId: string, waitOptions?: TxReceiptWaitOptions) {
+    const action = await this.getClearingClaimNetCreditAction(cycleId);
+    return this.client.gateway.claimNetCredit(
+      action.contractAddress,
+      ensureHexPrefix(action.cycleId) as Hex,
+      action.amount,
+      action.proof.map((p) => ensureHexPrefix(p) as Hex),
+      waitOptions,
     );
-    return items.map((item) => PendingRemunerationInfo.fromRpc(item));
-  }
-
-  /**
-   * Fetch a single tab by ID.
-   *
-   * @param tabId - Tab identifier.
-   * @returns The tab, or `null` if not found.
-   */
-  async getTab(tabId: number | bigint): Promise<TabInfo | null> {
-    const result = await this.client.rpc.getTab(tabId);
-    return result ? TabInfo.fromRpc(result) : null;
-  }
-
-  /**
-   * List all tabs belonging to this recipient.
-   *
-   * @param settlementStatuses - Optional filter on settlement status (e.g. `['PENDING']`).
-   */
-  async listRecipientTabs(settlementStatuses?: string[]): Promise<TabInfo[]> {
-    const tabs = await this.client.rpc.listRecipientTabs(
-      this.recipientAddress,
-      settlementStatuses,
-    );
-    return tabs.map((t) => TabInfo.fromRpc(t));
-  }
-
-  /**
-   * List all guarantee requests associated with a tab.
-   *
-   * @param tabId - Tab identifier.
-   */
-  async getTabGuarantees(tabId: number | bigint): Promise<GuaranteeInfo[]> {
-    const guarantees = await this.client.rpc.getTabGuarantees(tabId);
-    return guarantees.map((g) => GuaranteeInfo.fromRpc(g));
-  }
-
-  /**
-   * Fetch the most recent guarantee for a tab.
-   *
-   * @param tabId - Tab identifier.
-   * @returns The latest {@link GuaranteeInfo}, or `null` if none exists.
-   */
-  async getLatestGuarantee(
-    tabId: number | bigint,
-  ): Promise<GuaranteeInfo | null> {
-    const result = await this.client.rpc.getLatestGuarantee(tabId);
-    return result ? GuaranteeInfo.fromRpc(result) : null;
-  }
-
-  /**
-   * Fetch a specific guarantee by tab ID and request ID.
-   *
-   * @param tabId - Tab identifier.
-   * @param reqId - Guarantee request identifier.
-   * @returns The {@link GuaranteeInfo}, or `null` if not found.
-   */
-  async getGuarantee(
-    tabId: number | bigint,
-    reqId: number | bigint,
-  ): Promise<GuaranteeInfo | null> {
-    const result = await this.client.rpc.getGuarantee(tabId, reqId);
-    return result ? GuaranteeInfo.fromRpc(result) : null;
   }
 
   /** List all on-chain payments received by this recipient. */
@@ -289,18 +156,6 @@ export class RecipientClient {
       this.recipientAddress,
     );
     return payments.map((p) => RecipientPaymentInfo.fromRpc(p));
-  }
-
-  /**
-   * List collateral deposit/withdrawal events associated with a tab.
-   *
-   * @param tabId - Tab identifier.
-   */
-  async getCollateralEventsForTab(
-    tabId: number | bigint,
-  ): Promise<CollateralEventInfo[]> {
-    const events = await this.client.rpc.getCollateralEventsForTab(tabId);
-    return events.map((ev) => CollateralEventInfo.fromRpc(ev));
   }
 
   /**

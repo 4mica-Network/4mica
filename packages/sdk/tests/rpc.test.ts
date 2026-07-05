@@ -70,17 +70,14 @@ describe("RpcProxy", () => {
 
   it("surfaces api errors", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input) => {
-      expect(input.toString()).toContain("settlement_status=unknown");
-      return new Response(
-        JSON.stringify({ error: "invalid settlement status: unknown" }),
-        {
-          status: 400,
-        },
-      );
+      expect(input.toString()).toContain("action=claim_net_credit");
+      return new Response(JSON.stringify({ error: "cycle not found" }), {
+        status: 400,
+      });
     });
     const proxy = new RpcProxy("http://example.com", undefined, fetchMock);
     await expect(
-      proxy.listRecipientTabs("0xdeadbeef", ["unknown"]),
+      proxy.getClearingClaimNetCreditAction("0xcycle", "0xcreditor"),
     ).rejects.toThrow(RpcError);
   });
 
@@ -161,17 +158,20 @@ describe("RpcProxy", () => {
     ).getPublicParams();
   });
 
-  it("encodes settlement status query params", async () => {
+  it("encodes the clearing action query param", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input) => {
       const url = new URL(input.toString());
-      expect(url.pathname).toContain("/core/recipients/0xdead/tabs");
-      expect(url.searchParams.getAll("settlement_status")).toEqual([
-        "PENDING",
-        "SETTLED",
-      ]);
-      return new Response(JSON.stringify([]), { status: 200 });
+      expect(url.pathname).toContain(
+        "/core/cycles/0xcycle/participants/0xpart/clearing-action",
+      );
+      expect(url.searchParams.get("action")).toBe("pay_net_debit");
+      return new Response(JSON.stringify({}), { status: 200 });
     });
     const proxy = new RpcProxy("http://example.com", undefined, fetchMock);
-    await proxy.listRecipientTabs("0xdead", ["PENDING", "SETTLED"]);
+    await proxy.getClearingSettlementAction(
+      "0xcycle",
+      "0xpart",
+      "pay_net_debit",
+    );
   });
 });

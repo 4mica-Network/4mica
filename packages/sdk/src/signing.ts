@@ -25,7 +25,6 @@ export const GUARANTEE_EIP712_TYPES = {
   SolGuaranteeRequestClaimsV1: [
     { name: "user", type: "address" },
     { name: "recipient", type: "address" },
-    { name: "tabId", type: "uint256" },
     { name: "reqId", type: "uint256" },
     { name: "amount", type: "uint256" },
     { name: "asset", type: "address" },
@@ -42,7 +41,6 @@ export const GUARANTEE_EIP712_TYPES_V2 = {
   SolGuaranteeRequestClaimsV2: [
     { name: "user", type: "address" },
     { name: "recipient", type: "address" },
-    { name: "tabId", type: "uint256" },
     { name: "reqId", type: "uint256" },
     { name: "amount", type: "uint256" },
     { name: "asset", type: "address" },
@@ -70,7 +68,6 @@ export type GuaranteeTypedData = {
   message: {
     user: Hex;
     recipient: Hex;
-    tabId: bigint;
     reqId: bigint;
     amount: bigint;
     asset: Hex;
@@ -89,7 +86,6 @@ export type GuaranteeTypedDataV2 = {
   message: {
     user: Hex;
     recipient: Hex;
-    tabId: bigint;
     reqId: bigint;
     amount: bigint;
     asset: Hex;
@@ -180,7 +176,6 @@ export function validateGuaranteeTypedData(
   const requiredFields = [
     "user",
     "recipient",
-    "tabId",
     "reqId",
     "amount",
     "asset",
@@ -209,7 +204,6 @@ export function validateGuaranteeTypedData(
     }
   }
 
-  ensureBigIntish(message.tabId, "tabId");
   ensureBigIntish(message.reqId, "reqId");
   ensureBigIntish(message.amount, "amount");
   ensureBigIntish(message.timestamp, "timestamp");
@@ -272,7 +266,6 @@ export function buildGuaranteeTypedData(
     message: {
       user: claims.userAddress as Hex,
       recipient: claims.recipientAddress as Hex,
-      tabId: claims.tabId,
       reqId: claims.reqId,
       amount: claims.amount,
       asset: claims.assetAddress as Hex,
@@ -296,7 +289,6 @@ export function buildGuaranteeTypedDataV2(
     message: {
       user: claims.userAddress as Hex,
       recipient: claims.recipientAddress as Hex,
-      tabId: claims.tabId,
       reqId: claims.reqId,
       amount: claims.amount,
       asset: claims.assetAddress as Hex,
@@ -323,7 +315,6 @@ export function encodeGuaranteeEip191V2(
       { type: "address" },
       { type: "uint256" },
       { type: "uint256" },
-      { type: "uint256" },
       { type: "address" },
       { type: "uint64" },
       { type: "address" },
@@ -339,7 +330,6 @@ export function encodeGuaranteeEip191V2(
     [
       claims.userAddress as Hex,
       claims.recipientAddress as Hex,
-      claims.tabId,
       claims.reqId,
       claims.amount,
       claims.assetAddress as Hex,
@@ -372,14 +362,12 @@ export function encodeGuaranteeEip191(
       { type: "address" },
       { type: "uint256" },
       { type: "uint256" },
-      { type: "uint256" },
       { type: "address" },
       { type: "uint64" },
     ],
     [
       claims.userAddress as Hex,
       claims.recipientAddress as Hex,
-      claims.tabId,
       claims.reqId,
       claims.amount,
       claims.assetAddress as Hex,

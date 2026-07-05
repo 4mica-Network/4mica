@@ -11,7 +11,7 @@ The official TypeScript SDK for interacting with the 4Mica payment network.
 payments. This SDK provides:
 
 - **User Client**: deposit collateral, sign payments, and manage withdrawals in ETH or ERC20 tokens
-- **Recipient Client**: create payment tabs, verify payment guarantees, and claim from user collateral
+- **Recipient Client**: issue and verify payment guarantees, and claim net credit from cleared settlement cycles
 - **X402 Flow Helper**: generate X-PAYMENT headers for 402-protected HTTP resources via an X402-compatible service
 - **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a route behind an x402 payment
 - **Admin RPCs**: manage user suspension and admin API keys (when authorized)
@@ -200,8 +200,8 @@ Env vars: `4MICA_BEARER_TOKEN`, `4MICA_AUTH_URL`, `4MICA_AUTH_REFRESH_MARGIN_SEC
 
 The SDK exposes three main entry points:
 
-- `client.user`: payer-side operations (collateral, signing, withdrawals)
-- `client.recipient`: recipient-side operations (tabs, guarantees, remuneration)
+- `client.user`: payer-side operations (collateral, signing, withdrawals, net-debit settlement)
+- `client.recipient`: recipient-side operations (guarantees, cycle-clearing net-credit settlement)
 - `X402Flow`: helper for 402-protected HTTP resources
 
 ### End-to-end Example (Base Sepolia + x402 v2)
@@ -209,10 +209,10 @@ The SDK exposes three main entry points:
 See `examples/base-sepolia-x402-facilitator-e2e.ts` for a full flow in the `examples` folder:
 
 - deposit collateral
-- create/get a tab via facilitator
+- resolve a payment session via the facilitator's `tabEndpoint` (returns the next `reqId`)
 - issue and verify V1 + V2 guarantees
-- `payTab` in ERC20 for V1
-- remunerate V2 only after `wachai-validation-sdk` returns a passing ERC-8004 validation
+- settle a cleared cycle: payer `payNetDebit`, recipient `claimNetCredit`
+- settle V2 only after `wachai-validation-sdk` returns a passing ERC-8004 validation
 - submit + finalize withdrawal
 
 Run it with:
@@ -339,18 +339,24 @@ Notes:
 - `signPayment` and `signPaymentV2` always use EIP-712 signing and will error if the scheme is not 4mica.
 - `UserClient.signPayment` supports `SigningScheme.EIP712` (default) and `SigningScheme.EIP191`.
 - `settlePayment` only hits `/settle`; resource servers should still call `/verify` first when enforcing access.
-- `RecipientClient.remunerate` requires the optional `@noble/curves` dependency for BLS decoding.
+- `RecipientClient.claimNetCredit` requires the optional `@noble/curves` dependency for BLS decoding.
 
 ### API Methods Summary
 
-#### UserClient Methods
+Settlement is **cycle-based**: core nets each participant's obligations for a clearing cycle into a
+single net-debit or net-credit committed to an on-chain Merkle root. Participants settle by fetching
+their prepared clearing action (contract address, amount, and Merkle proof) from core, then calling
+the `ClearingHouse`. `cycleId` is the on-chain `bytes32` cycle identifier.
+
+#### UserClient Methods (payer / net-debtor)
 
 - `approveErc20(token, amount)`
 - `deposit(amount, erc20Token?)`
 - `getUser()`
-- `getTabPaymentStatus(tabId)`
 - `signPayment(claims, scheme?)`
-- `payTab(tabId, reqId, amount, recipientAddress, erc20Token?)`
+- `getClearingPayNetDebitAction(cycleId)` — fetch the prepared `payNetDebit` action
+- `payNetDebit(cycleId)` — settle the signer's committed net debit on-chain
+- `markDefaulted(cycleId, debtor)` — mark a debtor defaulted past the finality deadline
 - `requestWithdrawal(amount, erc20Token?)`
 - `cancelWithdrawal(erc20Token?)`
 - `finalizeWithdrawal(erc20Token?)`
@@ -358,26 +364,16 @@ Notes:
 ERC20 approval behavior:
 
 - `deposit(amount, erc20Token)` requires a prior `approveErc20(token, amount)` call.
-- `payTab(...)` auto-approves the Core4Mica contract when paying an ERC20 tab and the current
-  allowance is below the payment amount.
 - `approveErc20` returns `undefined` when the existing allowance is already sufficient.
 
-#### RecipientClient Methods
+#### RecipientClient Methods (payee / net-creditor)
 
-- `createTab(userAddress, recipientAddress, erc20Token?, ttl?, guaranteeVersion?)`
-- `getTabPaymentStatus(tabId)`
 - `issuePaymentGuarantee(claims, signature, scheme)` — accepts V1 or V2 claims
 - `verifyPaymentGuarantee(cert)`
-- `remunerate(cert)` — requires `@noble/curves` peer dependency
-- `listSettledTabs()`
-- `listPendingRemunerations()`
-- `getTab(tabId)`
-- `listRecipientTabs(settlementStatuses?)`
-- `getTabGuarantees(tabId)`
-- `getLatestGuarantee(tabId)`
-- `getGuarantee(tabId, reqId)`
+- `getClearingParticipantProof(cycleId)` — this recipient's committed position + Merkle proof
+- `getClearingClaimNetCreditAction(cycleId)` — fetch the prepared `claimNetCredit` action
+- `claimNetCredit(cycleId)` — claim the committed net credit on-chain (requires `@noble/curves`)
 - `listRecipientPayments()`
-- `getCollateralEventsForTab(tabId)`
 - `getUserAssetBalance(userAddress, assetAddress)`
 
 #### Admin / RPC Methods
@@ -407,7 +403,6 @@ import {
 const baseClaims = PaymentGuaranteeRequestClaims.new(
   userAddress,
   recipientAddress,
-  tabId,
   amount,
   timestamp,
   erc20Token,

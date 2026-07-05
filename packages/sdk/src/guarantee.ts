@@ -11,20 +11,19 @@ import type {
 } from "./models";
 import { ensureHexPrefix, hexFromBytes, parseU256 } from "./utils";
 
-const CLAIMS_ENCODED_BYTES = 32 * 10;
+const CLAIMS_ENCODED_BYTES = 32 * 9;
 // Minimum bytes for a valid outer envelope: uint64 + bytes offset + bytes length
 const MIN_ENVELOPE_BYTES = 32 * 2 + 32;
 const CLAIM_TYPES = [
-  { type: "bytes32" },
-  { type: "uint256" },
-  { type: "uint256" },
-  { type: "address" },
-  { type: "address" },
-  { type: "uint256" },
-  { type: "uint256" },
-  { type: "address" },
-  { type: "uint64" },
-  { type: "uint64" },
+  { type: "bytes32" }, // domain
+  { type: "uint256" }, // cycle_id
+  { type: "uint256" }, // req_id
+  { type: "address" }, // client (user)
+  { type: "address" }, // recipient
+  { type: "uint256" }, // amount
+  { type: "address" }, // asset
+  { type: "uint64" }, // timestamp
+  { type: "uint64" }, // version
 ] as const;
 
 // V2 adds: validation_registry_address, validation_request_hash, validation_chain_id,
@@ -32,12 +31,11 @@ const CLAIM_TYPES = [
 //          validation_subject_hash, job_hash, required_validation_tag (dynamic string)
 const CLAIM_TYPES_V2 = [
   { type: "bytes32" }, // domain
-  { type: "uint256" }, // tab_id
+  { type: "uint256" }, // cycle_id
   { type: "uint256" }, // req_id
   { type: "address" }, // client (user)
   { type: "address" }, // recipient
   { type: "uint256" }, // amount
-  { type: "uint256" }, // total_amount
   { type: "address" }, // asset
   { type: "uint64" }, // timestamp
   { type: "uint64" }, // version
@@ -57,12 +55,11 @@ const CLAIM_TYPES_V2_TUPLE = [
     type: "tuple",
     components: [
       { name: "domain", type: "bytes32" },
-      { name: "tabId", type: "uint256" },
+      { name: "cycleId", type: "uint256" },
       { name: "reqId", type: "uint256" },
       { name: "user", type: "address" },
       { name: "recipient", type: "address" },
       { name: "amount", type: "uint256" },
-      { name: "totalAmount", type: "uint256" },
       { name: "asset", type: "address" },
       { name: "timestamp", type: "uint64" },
       { name: "claimsVersion", type: "uint64" },
@@ -98,7 +95,7 @@ function normalizeHexBytes(data: string | Uint8Array): Hex {
  * ABI-encode a {@link PaymentGuaranteeClaims} object into a hex string.
  *
  * Produces the outer `(uint64 version, bytes innerClaims)` envelope format expected
- * by the Core4Mica contract. Supports V1 (10 fields) and V2 (19 fields with validation policy).
+ * by the Core4Mica contract. Supports V1 (9 fields) and V2 (18 fields with validation policy).
  *
  * @param claims - Decoded claims to encode. Must have `version` set to `1` or `2`.
  * @returns `0x`-prefixed hex string of the ABI-encoded envelope.
@@ -110,12 +107,11 @@ export function encodeGuaranteeClaims(claims: PaymentGuaranteeClaims): string {
     const domain = ensureDomainBytes(claims.domain);
     const encoded = encodeAbiParameters(CLAIM_TYPES, [
       hexFromBytes(domain),
-      parseU256(claims.tabId),
+      parseU256(claims.cycleId),
       parseU256(claims.reqId),
       claims.userAddress as Hex,
       claims.recipientAddress as Hex,
       parseU256(claims.amount),
-      parseU256(claims.totalAmount),
       claims.assetAddress as Hex,
       BigInt(claims.timestamp),
       BigInt(claims.version),
@@ -137,12 +133,11 @@ export function encodeGuaranteeClaims(claims: PaymentGuaranteeClaims): string {
     const encoded = encodeAbiParameters(CLAIM_TYPES_V2_TUPLE, [
       {
         domain: hexFromBytes(domain),
-        tabId: parseU256(claims.tabId),
+        cycleId: parseU256(claims.cycleId),
         reqId: parseU256(claims.reqId),
         user: claims.userAddress as Hex,
         recipient: claims.recipientAddress as Hex,
         amount: parseU256(claims.amount),
-        totalAmount: parseU256(claims.totalAmount),
         asset: claims.assetAddress as Hex,
         timestamp: BigInt(claims.timestamp),
         claimsVersion: BigInt(claims.version),
@@ -172,7 +167,7 @@ export function encodeGuaranteeClaims(claims: PaymentGuaranteeClaims): string {
  * Decode ABI-encoded guarantee claims into a {@link PaymentGuaranteeClaims} object.
  *
  * Accepts either the modern `(uint64 version, bytes innerClaims)` envelope or the legacy
- * unwrapped V1 format (raw 320-byte ABI encoding without an outer envelope).
+ * unwrapped V1 format (raw 288-byte ABI encoding without an outer envelope).
  *
  * @param data - Hex string or raw bytes of the ABI-encoded claims.
  * @returns Decoded {@link PaymentGuaranteeClaims} with `version` set to `1` or `2`.
@@ -233,12 +228,11 @@ function decodeV1Claims(encoded: Hex): PaymentGuaranteeClaims {
   }
   const [
     domain,
-    tabId,
+    cycleId,
     reqId,
     user,
     recipient,
     amount,
-    totalAmount,
     asset,
     timestamp,
     claimsVersion,
@@ -254,10 +248,9 @@ function decodeV1Claims(encoded: Hex): PaymentGuaranteeClaims {
     domain: toBytes(domain as Hex),
     userAddress: user as string,
     recipientAddress: recipient as string,
-    tabId: parseU256(tabId),
+    cycleId: parseU256(cycleId),
     reqId: parseU256(reqId),
     amount: parseU256(amount),
-    totalAmount: parseU256(totalAmount),
     assetAddress: asset as string,
     timestamp: Number(timestamp),
     version: Number(claimsVersion),
@@ -273,24 +266,23 @@ function decodeV2Claims(encoded: Hex): PaymentGuaranteeClaims {
       const decoded = decodeAbiParameters(CLAIM_TYPES_V2, encoded);
       return buildDecodedV2Claims({
         domain: decoded[0],
-        tabId: decoded[1],
+        cycleId: decoded[1],
         reqId: decoded[2],
         user: decoded[3],
         recipient: decoded[4],
         amount: decoded[5],
-        totalAmount: decoded[6],
-        asset: decoded[7],
-        timestamp: decoded[8],
-        claimsVersion: decoded[9],
-        validationRegistryAddress: decoded[10],
-        validationRequestHash: decoded[11],
-        validationChainId: decoded[12],
-        validatorAddress: decoded[13],
-        validatorAgentId: decoded[14],
-        minValidationScore: decoded[15],
-        validationSubjectHash: decoded[16],
-        jobHash: decoded[17],
-        requiredValidationTag: decoded[18],
+        asset: decoded[6],
+        timestamp: decoded[7],
+        claimsVersion: decoded[8],
+        validationRegistryAddress: decoded[9],
+        validationRequestHash: decoded[10],
+        validationChainId: decoded[11],
+        validatorAddress: decoded[12],
+        validatorAgentId: decoded[13],
+        minValidationScore: decoded[14],
+        validationSubjectHash: decoded[15],
+        jobHash: decoded[16],
+        requiredValidationTag: decoded[17],
       });
     } catch (flatErr) {
       throw new VerificationError(
@@ -302,12 +294,11 @@ function decodeV2Claims(encoded: Hex): PaymentGuaranteeClaims {
 
 function buildDecodedV2Claims(decoded: {
   domain: unknown;
-  tabId: unknown;
+  cycleId: unknown;
   reqId: unknown;
   user: unknown;
   recipient: unknown;
   amount: unknown;
-  totalAmount: unknown;
   asset: unknown;
   timestamp: unknown;
   claimsVersion: unknown;
@@ -323,12 +314,11 @@ function buildDecodedV2Claims(decoded: {
 }): PaymentGuaranteeClaims {
   const {
     domain,
-    tabId,
+    cycleId,
     reqId,
     user,
     recipient,
     amount,
-    totalAmount,
     asset,
     timestamp,
     claimsVersion,
@@ -364,10 +354,9 @@ function buildDecodedV2Claims(decoded: {
     domain: toBytes(domain as Hex),
     userAddress: user as string,
     recipientAddress: recipient as string,
-    tabId: parseU256(tabId as bigint | number | string),
+    cycleId: parseU256(cycleId as bigint | number | string),
     reqId: parseU256(reqId as bigint | number | string),
     amount: parseU256(amount as bigint | number | string),
-    totalAmount: parseU256(totalAmount as bigint | number | string),
     assetAddress: asset as string,
     timestamp: Number(timestamp as bigint | number | string),
     version: Number(claimsVersion),

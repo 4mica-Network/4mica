@@ -259,7 +259,6 @@ export class X402Flow {
     }
     const body = await resp.json();
     return {
-      tabId: body.tabId ?? body.tab_id,
       userAddress: body.userAddress ?? body.user_address,
       nextReqId:
         body.nextReqId ?? body.next_req_id ?? body.reqId ?? body.req_id,
@@ -271,7 +270,6 @@ export class X402Flow {
     tab: TabResponse,
     userAddress: string,
   ): PaymentGuaranteeRequestClaims {
-    const tabId = parseU256(tab.tabId);
     const reqId =
       tab.nextReqId !== undefined && tab.nextReqId !== null
         ? parseU256(tab.nextReqId)
@@ -290,7 +288,6 @@ export class X402Flow {
     return PaymentGuaranteeRequestClaims.new(
       userAddress,
       normalizeAddress(requirements.payTo),
-      tabId,
       amount,
       timestamp,
       requirements.asset,
@@ -311,7 +308,6 @@ export class X402Flow {
     const partialClaims = new PaymentGuaranteeRequestClaimsV2({
       userAddress: base.userAddress,
       recipientAddress: base.recipientAddress,
-      tabId: base.tabId,
       reqId: base.reqId,
       amount: base.amount,
       timestamp: base.timestamp,

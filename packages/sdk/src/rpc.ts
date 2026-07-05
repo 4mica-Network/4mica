@@ -8,6 +8,7 @@ import {
 import {
   AdminApiKeyInfo,
   AdminApiKeySecret,
+  type ClearingSettlementActionKind,
   CorePublicParameters,
   SupportedTokensResponse,
   UserSuspensionStatus,
@@ -17,10 +18,6 @@ const SDK_CLIENT_HEADER_VALUE = `ts-sdk-4mica/${__SDK_VERSION__}`;
 
 export type FetchFn = HttpFetchFn;
 export type BearerTokenProvider = () => string | Promise<string>;
-
-function serializeTabId(tabId: number | bigint): string {
-  return `0x${BigInt(tabId).toString(16)}`;
-}
 
 export class RpcProxy {
   private baseUrl: string;
@@ -138,91 +135,64 @@ export class RpcProxy {
     return this.post<Record<string, unknown>>("/core/guarantees", body);
   }
 
-  async createPaymentTab(body: unknown): Promise<Record<string, unknown>> {
-    return this.post<Record<string, unknown>>("/core/payment-tabs", body);
-  }
-
-  async listSettledTabs(
-    recipientAddress: string,
-  ): Promise<Record<string, unknown>[]> {
-    return this.get<Record<string, unknown>[]>(
-      `/core/recipients/${recipientAddress}/settled-tabs`,
+  /**
+   * Fetch a participant's committed position + Merkle proof for a settlement cycle.
+   *
+   * @param cycleId - On-chain `bytes32` cycle identifier.
+   * @param participant - Participant address.
+   */
+  async getClearingParticipantProof(
+    cycleId: string,
+    participant: string,
+  ): Promise<Record<string, unknown>> {
+    return this.get<Record<string, unknown>>(
+      `/core/cycles/${cycleId}/participants/${participant}/clearing-proof`,
     );
   }
 
-  async listPendingRemunerations(
-    recipientAddress: string,
-  ): Promise<Record<string, unknown>[]> {
-    return this.get<Record<string, unknown>[]>(
-      `/core/recipients/${recipientAddress}/pending-remunerations`,
+  /**
+   * Fetch a prepared ClearingHouse settlement action for a participant.
+   *
+   * @param cycleId - On-chain `bytes32` cycle identifier.
+   * @param participant - Participant address.
+   * @param action - `pay_net_debit`, `claim_net_credit`, or `mark_defaulted`.
+   */
+  async getClearingSettlementAction(
+    cycleId: string,
+    participant: string,
+    action: ClearingSettlementActionKind,
+  ): Promise<Record<string, unknown>> {
+    return this.get<Record<string, unknown>>(
+      `/core/cycles/${cycleId}/participants/${participant}/clearing-action?action=${encodeURIComponent(action)}`,
     );
   }
 
-  async getTab(
-    tabId: number | bigint,
-  ): Promise<Record<string, unknown> | null> {
-    return this.get<Record<string, unknown> | null>(
-      `/core/tabs/${serializeTabId(tabId)}`,
+  /** Prepared `payNetDebit` action for a net-debtor participant. */
+  async getClearingPayNetDebitAction(
+    cycleId: string,
+    debtor: string,
+  ): Promise<Record<string, unknown>> {
+    return this.getClearingSettlementAction(cycleId, debtor, "pay_net_debit");
+  }
+
+  /** Prepared `claimNetCredit` action for a net-creditor participant. */
+  async getClearingClaimNetCreditAction(
+    cycleId: string,
+    creditor: string,
+  ): Promise<Record<string, unknown>> {
+    return this.getClearingSettlementAction(
+      cycleId,
+      creditor,
+      "claim_net_credit",
     );
   }
 
-  async listRecipientTabs(
-    recipientAddress: string,
-    settlementStatuses?: string[],
-  ): Promise<Record<string, unknown>[]> {
-    let query = "";
-    if (settlementStatuses?.length) {
-      query =
-        "?" +
-        settlementStatuses
-          .map((s) => `settlement_status=${encodeURIComponent(s)}`)
-          .join("&");
-    }
-    return this.get<Record<string, unknown>[]>(
-      `/core/recipients/${recipientAddress}/tabs${query}`,
-    );
-  }
-
-  async listUserTabs(
-    userAddress: string,
-    settlementStatuses?: string[],
-  ): Promise<Record<string, unknown>[]> {
-    let query = "";
-    if (settlementStatuses?.length) {
-      query =
-        "?" +
-        settlementStatuses
-          .map((s) => `settlement_status=${encodeURIComponent(s)}`)
-          .join("&");
-    }
-    return this.get<Record<string, unknown>[]>(
-      `/core/users/${userAddress}/tabs${query}`,
-    );
-  }
-
-  async getTabGuarantees(
-    tabId: number | bigint,
-  ): Promise<Record<string, unknown>[]> {
-    return this.get<Record<string, unknown>[]>(
-      `/core/tabs/${serializeTabId(tabId)}/guarantees`,
-    );
-  }
-
-  async getLatestGuarantee(
-    tabId: number | bigint,
-  ): Promise<Record<string, unknown> | null> {
-    return this.get<Record<string, unknown> | null>(
-      `/core/tabs/${serializeTabId(tabId)}/guarantees/latest`,
-    );
-  }
-
-  async getGuarantee(
-    tabId: number | bigint,
-    reqId: number | bigint,
-  ): Promise<Record<string, unknown> | null> {
-    return this.get<Record<string, unknown> | null>(
-      `/core/tabs/${serializeTabId(tabId)}/guarantees/${reqId}`,
-    );
+  /** Prepared `markDefaulted` action for a debtor past the payment deadline. */
+  async getClearingMarkDefaultedAction(
+    cycleId: string,
+    debtor: string,
+  ): Promise<Record<string, unknown>> {
+    return this.getClearingSettlementAction(cycleId, debtor, "mark_defaulted");
   }
 
   async listRecipientPayments(
@@ -230,14 +200,6 @@ export class RpcProxy {
   ): Promise<Record<string, unknown>[]> {
     return this.get<Record<string, unknown>[]>(
       `/core/recipients/${recipientAddress}/payments`,
-    );
-  }
-
-  async getCollateralEventsForTab(
-    tabId: number | bigint,
-  ): Promise<Record<string, unknown>[]> {
-    return this.get<Record<string, unknown>[]>(
-      `/core/tabs/${serializeTabId(tabId)}/collateral-events`,
     );
   }
 

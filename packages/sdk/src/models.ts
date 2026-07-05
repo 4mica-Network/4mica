@@ -39,7 +39,6 @@ export interface PaymentSignature {
 export class PaymentGuaranteeRequestClaims {
   userAddress: string;
   recipientAddress: string;
-  tabId: bigint;
   reqId: bigint;
   amount: bigint;
   timestamp: number;
@@ -48,7 +47,6 @@ export class PaymentGuaranteeRequestClaims {
   constructor(init: {
     userAddress: string;
     recipientAddress: string;
-    tabId: bigint;
     reqId?: bigint;
     amount: bigint;
     timestamp: number;
@@ -56,7 +54,6 @@ export class PaymentGuaranteeRequestClaims {
   }) {
     this.userAddress = init.userAddress;
     this.recipientAddress = init.recipientAddress;
-    this.tabId = init.tabId;
     this.reqId = init.reqId ?? 0n;
     this.amount = init.amount;
     this.timestamp = init.timestamp;
@@ -66,7 +63,6 @@ export class PaymentGuaranteeRequestClaims {
   static new(
     userAddress: string,
     recipientAddress: string,
-    tabId: number | bigint | string,
     amount: number | bigint | string,
     timestamp: number,
     erc20Token?: string | null,
@@ -76,7 +72,6 @@ export class PaymentGuaranteeRequestClaims {
     return new PaymentGuaranteeRequestClaims({
       userAddress: normalizeAddress(userAddress),
       recipientAddress: normalizeAddress(recipientAddress),
-      tabId: parseU256(tabId),
       reqId: reqId !== undefined ? parseU256(reqId) : 0n,
       amount: parseU256(amount),
       timestamp: Number(timestamp),
@@ -121,7 +116,6 @@ export class PaymentGuaranteeRequestClaimsV2 extends PaymentGuaranteeRequestClai
   constructor(init: {
     userAddress: string;
     recipientAddress: string;
-    tabId: bigint;
     reqId?: bigint;
     amount: bigint;
     timestamp: number;
@@ -169,10 +163,9 @@ export interface PaymentGuaranteeClaims {
   domain: Uint8Array;
   userAddress: string;
   recipientAddress: string;
-  tabId: bigint;
+  cycleId: bigint;
   reqId: bigint;
   amount: bigint;
-  totalAmount: bigint;
   assetAddress: string;
   timestamp: number;
   version: number;
@@ -188,16 +181,6 @@ export interface BLSCert {
   claims: string;
   /** BLS12-381 G2 signature as a hex string. */
   signature: string;
-}
-
-/** On-chain payment status of a tab, returned by `getTabPaymentStatus`. */
-export interface TabPaymentStatus {
-  /** Cumulative amount paid so far (in token base units). */
-  paid: bigint;
-  /** Whether the recipient has already called `remunerate` on-chain. */
-  remunerated: boolean;
-  /** Asset address (`0x000...` for ETH). */
-  asset: string;
 }
 
 /** On-chain collateral position for a single asset, returned by `getUser`. */
@@ -269,133 +252,119 @@ export class AdminApiKeySecret {
   }
 }
 
-export class TabInfo {
+/**
+ * Off-chain clearing settlement action a participant performs against the
+ * ClearingHouse contract for a given cycle.
+ */
+export type ClearingSettlementActionKind =
+  | "pay_net_debit"
+  | "claim_net_credit"
+  | "mark_defaulted";
+
+/** Role a participant holds in a settlement cycle. */
+export type ClearingParticipantRole =
+  | "NET_CREDITOR"
+  | "NET_DEBTOR"
+  | "BALANCED"
+  | string;
+
+/**
+ * A participant's committed position in a settlement cycle, with the Merkle
+ * proof needed to settle on-chain. Returned by `getClearingParticipantProof`.
+ */
+export class ClearingParticipantProof {
   constructor(
-    public tabId: bigint,
-    public userAddress: string,
-    public recipientAddress: string,
+    /** On-chain `bytes32` cycle identifier. */
+    public cycleId: string,
+    /** Core database cycle identifier. */
+    public cycleIdText: string,
     public assetAddress: string,
-    public startTimestamp: number,
-    public ttlSeconds: number,
-    public status: string,
-    public settlementStatus: string,
-    public createdAt: number,
-    public updatedAt: number,
-    public totalAmount: bigint = 0n,
-    public paidAmount: bigint = 0n,
+    public participant: string,
+    public role: ClearingParticipantRole,
+    /** Amount used with the participant's role-specific ClearingHouse call. */
+    public amount: bigint,
+    public netDebit: bigint,
+    public netCredit: bigint,
+    public leaf: string,
+    public merkleRoot: string,
+    public proof: string[],
   ) {}
 
-  static fromRpc(raw: Record<string, unknown>): TabInfo {
-    return new TabInfo(
-      parseU256(
-        (getAny(raw, "tab_id", "tabId") ?? 0) as number | bigint | string,
-      ),
-      (getAny(raw, "user_address", "userAddress") ?? "") as string,
-      (getAny(raw, "recipient_address", "recipientAddress") ?? "") as string,
+  static fromRpc(raw: Record<string, unknown>): ClearingParticipantProof {
+    const proofRaw = getAny(raw, "proof") ?? [];
+    return new ClearingParticipantProof(
+      (getAny(raw, "cycle_id", "cycleId") ?? "") as string,
+      (getAny(raw, "cycle_id_text", "cycleIdText") ?? "") as string,
       (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
-      Number(getAny(raw, "start_timestamp", "startTimestamp")),
-      Number(getAny(raw, "ttl_seconds", "ttlSeconds")),
-      (getAny(raw, "status") ?? "") as string,
-      (getAny(raw, "settlement_status", "settlementStatus") ?? "") as string,
-      Number(getAny(raw, "created_at", "createdAt")),
-      Number(getAny(raw, "updated_at", "updatedAt")),
+      (getAny(raw, "participant") ?? "") as string,
+      (getAny(raw, "role") ?? "") as ClearingParticipantRole,
+      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
       parseU256(
-        (getAny(raw, "total_amount", "totalAmount") ?? 0) as
+        (getAny(raw, "net_debit", "netDebit") ?? 0) as number | bigint | string,
+      ),
+      parseU256(
+        (getAny(raw, "net_credit", "netCredit") ?? 0) as
           | number
           | bigint
           | string,
       ),
+      (getAny(raw, "leaf") ?? "") as string,
+      (getAny(raw, "merkle_root", "merkleRoot") ?? "") as string,
+      (Array.isArray(proofRaw) ? proofRaw : []).map(String),
+    );
+  }
+}
+
+/**
+ * A prepared ClearingHouse contract call for a participant, including the amount
+ * and Merkle proof. Returned by `getClearingSettlementAction` and its helpers.
+ */
+export class ClearingSettlementActionResponse {
+  constructor(
+    /** ClearingHouse contract address. */
+    public contractAddress: string,
+    /** Contract function to call (`payNetDebit`, `claimNetCredit`, `markDefaulted`). */
+    public functionName: string,
+    public action: ClearingSettlementActionKind,
+    /** On-chain `bytes32` cycle identifier. */
+    public cycleId: string,
+    /** Core database cycle identifier. */
+    public cycleIdText: string,
+    public assetAddress: string,
+    /** Participant whose committed Merkle leaf is proven. */
+    public participant: string,
+    /** Alias for `participant` when `action = mark_defaulted`. */
+    public debtor: string | null,
+    /** Amount argument for the selected ClearingHouse function. */
+    public amount: bigint,
+    /** Native value to attach — non-zero only for native-asset debtor payments. */
+    public payableValue: bigint,
+    public proof: string[],
+  ) {}
+
+  static fromRpc(
+    raw: Record<string, unknown>,
+  ): ClearingSettlementActionResponse {
+    const proofRaw = getAny(raw, "proof") ?? [];
+    const debtor = getAny(raw, "debtor");
+    return new ClearingSettlementActionResponse(
+      (getAny(raw, "contract_address", "contractAddress") ?? "") as string,
+      (getAny(raw, "function_name", "functionName") ?? "") as string,
+      (getAny(raw, "action") ??
+        "claim_net_credit") as ClearingSettlementActionKind,
+      (getAny(raw, "cycle_id", "cycleId") ?? "") as string,
+      (getAny(raw, "cycle_id_text", "cycleIdText") ?? "") as string,
+      (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
+      (getAny(raw, "participant") ?? "") as string,
+      typeof debtor === "string" ? debtor : null,
+      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
       parseU256(
-        (getAny(raw, "paid_amount", "paidAmount") ?? 0) as
+        (getAny(raw, "payable_value", "payableValue") ?? 0) as
           | number
           | bigint
           | string,
       ),
-    );
-  }
-}
-
-export class GuaranteeInfo {
-  constructor(
-    public tabId: bigint,
-    public reqId: bigint,
-    public fromAddress: string,
-    public toAddress: string,
-    public assetAddress: string,
-    public amount: bigint,
-    public timestamp: number,
-    public certificate?: string | null,
-  ) {}
-
-  static fromRpc(raw: Record<string, unknown>): GuaranteeInfo {
-    return new GuaranteeInfo(
-      parseU256(
-        (getAny(raw, "tab_id", "tabId") ?? 0) as number | bigint | string,
-      ),
-      parseU256(
-        (getAny(raw, "req_id", "reqId") ?? 0) as number | bigint | string,
-      ),
-      (getAny(raw, "from_address", "fromAddress") ?? "") as string,
-      (getAny(raw, "to_address", "toAddress") ?? "") as string,
-      (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
-      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
-      Number(
-        getAny(raw, "start_timestamp", "startTimestamp", "timestamp") ?? 0,
-      ),
-      getAny(raw, "certificate"),
-    );
-  }
-}
-
-export class PendingRemunerationInfo {
-  constructor(
-    public tab: TabInfo,
-    public latestGuarantee?: GuaranteeInfo | null,
-  ) {}
-
-  static fromRpc(raw: Record<string, unknown>): PendingRemunerationInfo {
-    const latest = getAny<Record<string, unknown>>(
-      raw,
-      "latest_guarantee",
-      "latestGuarantee",
-    );
-    return new PendingRemunerationInfo(
-      TabInfo.fromRpc(getAny(raw, "tab") ?? {}),
-      latest ? GuaranteeInfo.fromRpc(latest) : null,
-    );
-  }
-}
-
-export class CollateralEventInfo {
-  constructor(
-    public id: string,
-    public userAddress: string,
-    public assetAddress: string,
-    public amount: bigint,
-    public eventType: string,
-    public tabId?: bigint | null,
-    public reqId?: bigint | null,
-    public txId?: string | null,
-    public createdAt: number = 0,
-  ) {}
-
-  static fromRpc(raw: Record<string, unknown>): CollateralEventInfo {
-    const tabId = getAny(raw, "tab_id", "tabId");
-    const reqId = getAny(raw, "req_id", "reqId");
-    return new CollateralEventInfo(
-      (getAny(raw, "id") ?? "") as string,
-      (getAny(raw, "user_address", "userAddress") ?? "") as string,
-      (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
-      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
-      (getAny(raw, "event_type", "eventType") ?? "") as string,
-      tabId !== undefined && tabId !== null
-        ? parseU256(tabId as number | bigint | string)
-        : null,
-      reqId !== undefined && reqId !== null
-        ? parseU256(reqId as number | bigint | string)
-        : null,
-      getAny(raw, "tx_id", "txId"),
-      Number(getAny(raw, "created_at", "createdAt") ?? 0),
+      (Array.isArray(proofRaw) ? proofRaw : []).map(String),
     );
   }
 }

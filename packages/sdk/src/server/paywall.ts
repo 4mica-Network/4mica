@@ -170,7 +170,8 @@ function requireResponse(
  * header is present, and otherwise decodes the header and forwards the payment
  * payload to the verifier's `issueGuarantee`. A successful guarantee means the
  * payment is cryptographically covered → allow the request. On-chain settlement
- * (`remunerate`) is intentionally left as an out-of-band recipient operation.
+ * (the cycle-clearing `claimNetCredit` flow) is intentionally left as an
+ * out-of-band recipient operation.
  *
  * @param verifier - `client.rpc`, the SDK `Client`, or any {@link GuaranteeVerifier}.
  * @param config - Advertised requirements for the protected resource.
