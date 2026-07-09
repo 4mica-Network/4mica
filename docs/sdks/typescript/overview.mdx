@@ -1,0 +1,118 @@
+---
+title: "TypeScript SDK"
+description: "Install and use @4mica/sdk, the runtime-neutral SDK for the 4Mica payment network."
+---
+
+# TypeScript SDK
+
+`@4mica/sdk` is the official TypeScript SDK for the 4Mica payment network. Use it to deposit collateral, sign payment guarantees, verify and settle them, run the x402 HTTP flow, and gate your own routes behind a payment.
+
+The SDK exposes five capabilities:
+
+- **User client** (`client.user`) — deposit collateral, sign payments, and manage withdrawals in ETH or ERC20 tokens.
+- **Recipient client** (`client.recipient`) — issue and verify payment guarantees, and claim net credit from cleared settlement cycles.
+- **X402 flow helper** (`X402Flow`) — turn a `402 Payment Required` response into a signed payment header.
+- **Server paywall** (`@4mica/sdk/server`) — an edge-safe primitive that gates a route behind an x402 payment.
+- **Admin RPCs** (`client.rpc`) — manage user suspension and admin API keys when authorized.
+
+## Runtime-neutral
+
+`@4mica/sdk` runs on Node, Bun, Deno, and edge runtimes. HTTP uses the global `fetch`, and the `@4mica/sdk/server` subpath is `Buffer`-free so it runs on the edge.
+
+<Note>
+  Prefer a runtime or framework adapter for idiomatic wiring: `@4mica/sdk-node`,
+  `@4mica/sdk-bun`, and `@4mica/sdk-deno` for env-driven client and paywall
+  factories, and `@4mica/sdk-next`, `@4mica/sdk-express`, and `@4mica/sdk-hono`
+  for thin x402 middleware.
+</Note>
+
+## Install
+
+Node.js 18 or later is required.
+
+<CodeGroup>
+
+```bash npm
+npm install @4mica/sdk
+```
+
+```bash pnpm
+pnpm install @4mica/sdk
+```
+
+```bash yarn
+yarn add @4mica/sdk
+```
+
+```bash bun
+bun add @4mica/sdk
+```
+
+</CodeGroup>
+
+## Networks
+
+The default network is Ethereum Sepolia. Select a network with `.network()` or the `4MICA_NETWORK` environment variable.
+
+| Shorthand          | CAIP-2            | Core API URL                              |
+| ------------------ | ----------------- | ----------------------------------------- |
+| `base`             | `eip155:8453`     | `https://base.api.4mica.xyz/`             |
+| `base-sepolia`     | `eip155:84532`    | `https://base.sepolia.api.4mica.xyz/`     |
+| `ethereum-sepolia` | `eip155:11155111` | `https://ethereum.sepolia.api.4mica.xyz/` |
+
+Read network details from the exported `NETWORKS` constant:
+
+```ts
+import { NETWORKS } from "@4mica/sdk";
+
+console.log(NETWORKS.base.caip2); // "eip155:8453"
+console.log(NETWORKS.base.rpcUrl); // "https://base.api.4mica.xyz/"
+```
+
+## Your first client
+
+Build a config, create a `Client`, and always close it when you are done. Start on Base Sepolia (`eip155:84532`) with a test wallet.
+
+```ts
+import { Client, ConfigBuilder } from "@4mica/sdk";
+
+const cfg = new ConfigBuilder()
+  .network("base-sepolia") // or "ethereum-sepolia" (default)
+  .walletPrivateKey(process.env.PRIVATE_KEY as `0x${string}`)
+  .build();
+
+const client = await Client.new(cfg);
+try {
+  // use client.user, client.recipient, and client.rpc
+} finally {
+  await client.aclose();
+}
+```
+
+`Client.new` connects to the core service, fetches public parameters, and wires up the on-chain gateway. From the client you reach the three entry points:
+
+- `client.user` — payer-side operations (collateral, signing, withdrawals, net-debit settlement).
+- `client.recipient` — recipient-side operations (guarantees, net-credit settlement).
+- `X402Flow` — the helper for `402`-protected HTTP resources.
+
+<Warning>
+  Keep private keys in environment variables instead of committing them to your
+  code. Use a dedicated test wallet while you develop.
+</Warning>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Configuration" icon="gear" href="/sdks/typescript/configuration">
+    Initialize a client with `ConfigBuilder`, environment variables, or a custom signer.
+  </Card>
+  <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
+    Deposit collateral, sign payments, issue guarantees, and settle cleared cycles.
+  </Card>
+  <Card title="X402 flow" icon="arrows-rotate" href="/sdks/typescript/x402-flow">
+    Turn a `402 Payment Required` response into a signed payment header.
+  </Card>
+  <Card title="Server paywall" icon="shield" href="/sdks/typescript/server-paywall">
+    Gate any route behind an x402 payment with the edge-safe primitive.
+  </Card>
+</Columns>

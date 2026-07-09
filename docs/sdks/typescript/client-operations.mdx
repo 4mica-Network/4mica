@@ -1,0 +1,215 @@
+---
+title: "Client operations"
+description: "Deposit collateral, sign payments, issue guarantees, and settle cleared cycles."
+---
+
+# Client operations
+
+The client exposes two entry points: `client.user` for payer-side operations and `client.recipient` for recipient-side operations. Admin RPCs live under `client.rpc`.
+
+Settlement is **cycle-based**. Core nets each participant's obligations for a clearing cycle into a single net-debit or net-credit committed to an on-chain Merkle root. Participants settle by fetching their prepared clearing action (contract address, amount, and Merkle proof) from core, then calling the `ClearingHouse`. `cycleId` is the on-chain `bytes32` cycle identifier.
+
+## UserClient
+
+Payer-side operations for the net-debtor: collateral, payment signing, cycle settlement, and withdrawals.
+
+Deposit collateral, then sign a payment guarantee request:
+
+```ts
+import { PaymentGuaranteeRequestClaims } from "@4mica/sdk";
+
+// Deposit ETH collateral (in wei)
+await client.user.deposit(1_000_000_000_000_000n); // 0.001 ETH
+
+// Build and sign a payment guarantee request
+const claims = PaymentGuaranteeRequestClaims.new(
+  userAddress, // payer address
+  recipientAddress,
+  "1000", // amount in the asset's base units
+  Math.floor(Date.now() / 1000), // timestamp (seconds)
+);
+
+const { signature, scheme } = await client.user.signPayment(claims);
+```
+
+To deposit an ERC20 token, approve the contract first:
+
+```ts
+await client.user.approveErc20(tokenAddress, "1000");
+await client.user.deposit("1000", tokenAddress);
+```
+
+<Note>
+  `deposit(amount, erc20Token)` requires a prior `approveErc20(token, amount)`
+  call. `approveErc20` returns `undefined` when the existing allowance is already
+  sufficient.
+</Note>
+
+### UserClient methods
+
+- `approveErc20(token, amount)` — approve the Core4Mica contract to spend an ERC20 token.
+- `deposit(amount, erc20Token?)` — deposit collateral. Omit `erc20Token` to deposit ETH.
+- `getUser()` — fetch all asset positions for the signer, including locked collateral and pending withdrawals.
+- `signPayment(claims, scheme?)` — sign a V1 or V2 payment guarantee request.
+- `getClearingPayNetDebitAction(cycleId)` — fetch the prepared `payNetDebit` action for a cycle.
+- `payNetDebit(cycleId)` — settle the signer's committed net debit on-chain.
+- `markDefaulted(cycleId, debtor)` — mark a debtor defaulted past the payment finality deadline.
+- `requestWithdrawal(amount, erc20Token?)` — initiate a timelocked collateral withdrawal.
+- `cancelWithdrawal(erc20Token?)` — cancel a pending withdrawal before the timelock expires.
+- `finalizeWithdrawal(erc20Token?)` — finalize a withdrawal after the timelock elapses.
+
+## RecipientClient
+
+Recipient-side operations for the net-creditor: guarantee issuance and verification, plus cycle-clearing net-credit settlement.
+
+Issue a guarantee from a signed request, then verify the returned certificate:
+
+```ts
+const cert = await client.recipient.issuePaymentGuarantee(
+  claims,
+  signature,
+  scheme,
+);
+
+// Later, verify and decode the certificate
+const verified = await client.recipient.verifyPaymentGuarantee(cert);
+```
+
+### RecipientClient methods
+
+- `issuePaymentGuarantee(claims, signature, scheme)` — issue a BLS-signed guarantee certificate. Accepts V1 or V2 claims.
+- `verifyPaymentGuarantee(cert)` — decode a certificate and validate its domain separator against the on-chain configuration.
+- `getClearingParticipantProof(cycleId)` — fetch this recipient's committed position and Merkle proof.
+- `getClearingClaimNetCreditAction(cycleId)` — fetch the prepared `claimNetCredit` action.
+- `claimNetCredit(cycleId)` — claim the committed net credit on-chain.
+- `listRecipientPayments()` — list all on-chain payments received by this recipient.
+- `getUserAssetBalance(userAddress, assetAddress)` — fetch the collateral a user has locked for an asset.
+
+<Note>
+  `claimNetCredit` and certificate verification require the optional
+  `@noble/curves` dependency for BLS decoding.
+</Note>
+
+## Building claims
+
+Build V1 claims with the `PaymentGuaranteeRequestClaims.new` factory. It normalizes addresses and parses `uint256` values. The asset defaults to the zero address, which represents native ETH.
+
+```ts
+import { PaymentGuaranteeRequestClaims, SigningScheme } from "@4mica/sdk";
+
+const claims = PaymentGuaranteeRequestClaims.new(
+  userAddress,
+  recipientAddress,
+  amount, // number | bigint | string
+  timestamp, // seconds
+  erc20Token, // optional; omit for native ETH
+  reqId, // optional
+);
+```
+
+Signing uses `SigningScheme.EIP712` by default. Use `SigningScheme.EIP191` for wallets that do not support typed data:
+
+```ts
+const { signature, scheme } = await client.user.signPayment(
+  claims,
+  SigningScheme.EIP191,
+);
+```
+
+## V2 guarantees
+
+V2 guarantees attach an on-chain validation policy so a validator agent can attest to the quality or validity of a payment before it is settled. Compute the canonical hashes in order — the subject hash first, then the request hash — then construct `PaymentGuaranteeRequestClaimsV2`.
+
+```ts
+import {
+  PaymentGuaranteeRequestClaims,
+  PaymentGuaranteeRequestClaimsV2,
+  computeValidationSubjectHash,
+  computeValidationRequestHash,
+  SigningScheme,
+} from "@4mica/sdk";
+
+// 1) Build base V1 claims first
+const baseClaims = PaymentGuaranteeRequestClaims.new(
+  userAddress,
+  recipientAddress,
+  amount,
+  timestamp,
+  erc20Token,
+  reqId,
+);
+
+// 2) Compute the subject hash, then build the partial V2 claims
+const validationSubjectHash = computeValidationSubjectHash(baseClaims);
+
+const partialV2 = new PaymentGuaranteeRequestClaimsV2({
+  ...baseClaims,
+  validationRegistryAddress: "0x...",
+  validationRequestHash: "0x" + "00".repeat(32), // placeholder
+  validationChainId: 1,
+  validatorAddress: "0x...",
+  validatorAgentId: 1n,
+  minValidationScore: 80, // 1–100
+  validationSubjectHash,
+  jobHash: "0x...",
+  requiredValidationTag: "my-tag",
+});
+
+// 3) Compute the request hash and finalize the claims
+const validationRequestHash = computeValidationRequestHash(partialV2);
+const claimsV2 = new PaymentGuaranteeRequestClaimsV2({
+  ...partialV2,
+  validationRequestHash,
+});
+
+// 4) Sign and issue
+const { signature, scheme } = await client.user.signPayment(
+  claimsV2,
+  SigningScheme.EIP712,
+);
+const cert = await client.recipient.issuePaymentGuarantee(
+  claimsV2,
+  signature,
+  scheme,
+);
+```
+
+<Note>
+  `minValidationScore` must be between 1 and 100. Constructing
+  `PaymentGuaranteeRequestClaimsV2` with a value outside that range throws a
+  `ValidationError`.
+</Note>
+
+## Admin RPCs
+
+Admin methods are available under `client.rpc` and require an admin API key.
+
+- `updateUserSuspension(userAddress, suspended)` — suspend or reinstate a user.
+- `createAdminApiKey({ name, scopes })` — create a scoped admin API key.
+- `listAdminApiKeys()` — list existing admin API keys.
+- `revokeAdminApiKey(keyId)` — revoke an admin API key.
+
+## Transaction receipt options
+
+On-chain methods accept an optional final `waitOptions` argument to override receipt polling: `{ timeout?, pollingInterval?, gas? }`.
+
+```ts
+await client.user.deposit("1000", tokenAddress, {
+  timeout: 90_000,
+  pollingInterval: 2_000,
+});
+```
+
+## Next steps
+
+<Columns cols={3}>
+  <Card title="X402 flow" icon="arrows-rotate" href="/sdks/typescript/x402-flow">
+    Sign payment headers for `402`-protected HTTP resources.
+  </Card>
+  <Card title="Server paywall" icon="shield" href="/sdks/typescript/server-paywall">
+    Gate any route behind an x402 payment.
+  </Card>
+  <Card title="Error handling" icon="triangle-exclamation" href="/sdks/typescript/errors">
+    Catch and distinguish 4Mica SDK errors.
+  </Card>
+</Columns>

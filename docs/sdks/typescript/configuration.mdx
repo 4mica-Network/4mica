@@ -1,0 +1,156 @@
+---
+title: "Configuration"
+description: "Initialize a 4Mica client with ConfigBuilder, environment variables, or a custom signer."
+---
+
+# Configuration
+
+`@4mica/sdk` needs a signing key and can use sensible defaults for everything else. Build a `Config` with `ConfigBuilder`, then pass it to `Client.new`.
+
+## Options
+
+| Option                 | Required                         | Description                                                             |
+| ---------------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `walletPrivateKey`     | Yes, unless `signer` is provided | Private key used for signing.                                           |
+| `signer`               | Yes, unless `walletPrivateKey`   | A pre-built viem `Account`. Mutually exclusive with `walletPrivateKey`. |
+| `network`              | No                               | Network shorthand or CAIP-2 id. Defaults to `ethereum-sepolia`.         |
+| `rpcUrl`               | No                               | Override the core API URL directly (for self-hosted deployments).       |
+| `ethereumHttpRpcUrl`   | No                               | Ethereum JSON-RPC endpoint. Fetched from core when omitted.             |
+| `contractAddress`      | No                               | Core4Mica contract address. Fetched from core when omitted.             |
+| `adminApiKey`          | No                               | API key for admin RPCs.                                                 |
+| `bearerToken`          | No                               | Static bearer token for auth. Disables SIWE auth.                       |
+| `authUrl`              | No                               | SIWE auth endpoint. Defaults to `rpcUrl` when auth is enabled.          |
+| `authRefreshMarginSecs`| No                               | Seconds before expiry at which the session refreshes. Defaults to 60.   |
+
+<Note>
+  `ethereumHttpRpcUrl` and `contractAddress` are fetched from the core service by
+  default. The SDK validates the connected chain id but does not verify the
+  contract address or code. Only override these if you need values that differ
+  from the server defaults.
+</Note>
+
+## Using ConfigBuilder
+
+`ConfigBuilder` is a fluent builder. Chain the options you need, then call `build()`.
+
+```ts
+import { Client, ConfigBuilder } from "@4mica/sdk";
+
+const cfg = new ConfigBuilder()
+  .network("base") // or "ethereum-sepolia" (default)
+  .walletPrivateKey("0x...")
+  .build();
+
+const client = await Client.new(cfg);
+```
+
+`build()` throws a `ConfigError` when a signer or wallet key is missing, a URL is invalid, or the auth refresh margin is not a finite non-negative number.
+
+## Using environment variables
+
+Call `fromEnv()` to load configuration from the environment.
+
+```bash
+4MICA_WALLET_PRIVATE_KEY="0x..."
+4MICA_NETWORK="base"                   # shorthand or CAIP-2 id
+# or override the URL directly:
+# 4MICA_RPC_URL="https://base.sepolia.api.4mica.xyz/"
+4MICA_ETHEREUM_HTTP_RPC_URL="http://localhost:8545"
+4MICA_CONTRACT_ADDRESS="0x..."
+4MICA_ADMIN_API_KEY="ak_..."
+4MICA_BEARER_TOKEN="Bearer <access_token>"
+4MICA_AUTH_URL="https://ethereum.sepolia.api.4mica.xyz/"
+4MICA_AUTH_REFRESH_MARGIN_SECS="60"
+```
+
+```ts
+import { Client, ConfigBuilder } from "@4mica/sdk";
+
+const cfg = new ConfigBuilder().fromEnv().build();
+const client = await Client.new(cfg);
+```
+
+<Note>
+  Most shells do not allow variable names that start with a digit. To set them
+  inline for a single command, use `env`: `env 4MICA_WALLET_PRIVATE_KEY="0x..."
+  4MICA_NETWORK="base" node app.js`.
+</Note>
+
+## Using a custom signer
+
+To integrate a hardware wallet, remote signer, or MPC wallet, pass a viem `Account`. It must expose `address`, `signTypedData`, and `signMessage`.
+
+```ts
+import { Client, ConfigBuilder } from "@4mica/sdk";
+import { privateKeyToAccount } from "viem/accounts";
+
+const signer = privateKeyToAccount(process.env.PAYER_KEY as `0x${string}`);
+const cfg = new ConfigBuilder().signer(signer).build();
+const client = await Client.new(cfg);
+```
+
+### Coinbase CDP wallet
+
+Use `createCdpAccount` for a Coinbase CDP MPC wallet whose private key never leaves CDP. It returns a viem `Account` you can pass to `.signer()`. This requires the optional `@coinbase/cdp-sdk` dependency.
+
+```ts
+import { Client, ConfigBuilder, createCdpAccount } from "@4mica/sdk";
+
+const signer = await createCdpAccount({
+  apiKeyId: process.env.CDP_API_KEY_ID!,
+  apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+  walletSecret: process.env.CDP_WALLET_SECRET!,
+  name: "my-agent-wallet", // idempotent — the same name returns the same wallet
+});
+
+const cfg = new ConfigBuilder().network("base-sepolia").signer(signer).build();
+const client = await Client.new(cfg);
+```
+
+## SIWE authentication
+
+Auth is enabled by default. Enable automatic SIWE refresh, or pass a static bearer token.
+
+```ts
+import { Client, ConfigBuilder } from "@4mica/sdk";
+
+const cfg = new ConfigBuilder()
+  .walletPrivateKey("0x...")
+  .rpcUrl("https://api.4mica.xyz/")
+  .enableAuth()
+  .build();
+
+const client = await Client.new(cfg);
+await client.login(); // optional: the first RPC call also triggers auth
+```
+
+Or use a static token instead of SIWE:
+
+```ts
+const cfg = new ConfigBuilder()
+  .walletPrivateKey("0x...")
+  .bearerToken("Bearer <access_token>")
+  .build();
+```
+
+<Warning>
+  Never commit private keys. Use a test wallet while you develop and a dedicated
+  service wallet, hardware-backed signer, MPC wallet, or hosted key management
+  system in production.
+</Warning>
+
+<Tip>
+  Start on Base Sepolia (`eip155:84532`) with small amounts. Once a flow works end
+  to end, move shared values into environment variables and switch networks.
+</Tip>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Overview" icon="book-open" href="/sdks/typescript/overview">
+    Install the SDK and see the capabilities at a glance.
+  </Card>
+  <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
+    Deposit collateral, sign payments, issue guarantees, and settle cleared cycles.
+  </Card>
+</Columns>

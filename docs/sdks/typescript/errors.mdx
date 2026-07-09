@@ -1,0 +1,67 @@
+---
+title: "Error handling"
+description: "Catch and distinguish 4Mica SDK errors, all rooted at FourMicaError."
+---
+
+# Error handling
+
+All SDK errors extend `FourMicaError`. Import the specific classes to branch on failure type.
+
+| Error                    | When it is thrown                                             |
+| ------------------------ | ------------------------------------------------------------ |
+| `ConfigError`            | Invalid `ConfigBuilder` input.                               |
+| `RpcError`               | The 4Mica core service returned an error. Carries `.status` and `.body`. |
+| `SigningError`           | The signing scheme is unsupported, or the signer address does not match the claims. |
+| `ContractError`          | An on-chain call failed or returned an unexpected result.    |
+| `VerificationError`      | A BLS certificate failed to decode or its domain did not match. |
+| `X402Error`              | An x402 flow error: bad scheme, tab resolution, or settlement. |
+| `AuthError`              | Base class for all authentication errors.                    |
+| `AuthMissingConfigError` | `login()` was called but auth is not configured.             |
+
+The `Auth*` family also includes `AuthUrlError`, `AuthTransportError`, `AuthDecodeError`, `AuthApiError`, and `AuthConfigError`, all extending `AuthError`.
+
+## Distinguishing errors
+
+Import the classes you want to handle and branch with `instanceof`.
+
+```ts
+import {
+  ConfigError, // invalid ConfigBuilder input
+  RpcError, // 4Mica core service error (has .status and .body)
+  SigningError, // signing scheme unsupported or address mismatch
+  ContractError, // on-chain call failed or unexpected result
+  VerificationError, // BLS certificate decode or domain mismatch
+  X402Error, // x402 flow error
+  AuthError, // base class for all auth errors
+  AuthMissingConfigError, // auth not configured when login() is called
+} from "@4mica/sdk";
+
+try {
+  const verified = await client.recipient.verifyPaymentGuarantee(cert);
+  await client.recipient.claimNetCredit(cycleId);
+} catch (err) {
+  if (err instanceof VerificationError) {
+    // bad certificate — decode failed or domain mismatch
+  } else if (err instanceof ContractError) {
+    // on-chain settlement failed
+  } else if (err instanceof RpcError) {
+    console.error(err.status, err.body);
+  }
+}
+```
+
+<Note>
+  Every error extends `FourMicaError`, so you can catch that base class to handle
+  any SDK failure in one place.
+</Note>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Overview" icon="book-open" href="/sdks/typescript/overview">
+    Install the SDK and see the capabilities at a glance.
+  </Card>
+  <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
+    Deposit collateral, sign payments, and settle cleared cycles.
+  </Card>
+</Columns>
