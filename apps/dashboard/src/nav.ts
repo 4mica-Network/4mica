@@ -1,9 +1,13 @@
 import {
   ArrowRightLeft,
+  BadgeCheck,
+  Bell,
   Blocks,
   Bot,
+  Building2,
   ChartColumn,
   CircleHelp,
+  Code,
   CreditCard,
   FilePlus,
   Fingerprint,
@@ -11,7 +15,10 @@ import {
   Landmark,
   ListChecks,
   type LucideIcon,
+  Mail,
   Settings,
+  ShieldCheck,
+  User,
   Users,
   Wallet,
 } from "lucide-react";
@@ -61,18 +68,19 @@ export const FOOTER_ITEMS: NavItem[] = [
   { to: "/help", label: "Help", icon: CircleHelp },
 ];
 
-/** Secondary navigation inside the Settings section. */
-export const SETTINGS_NAV: { to: string; label: string }[] = [
-  { to: "/settings/personal-details", label: "Personal details" },
+/** Secondary navigation shown in the sidebar while inside the Settings area. */
+export const SETTINGS_NAV: NavItem[] = [
+  { to: "/settings/personal-details", label: "Personal details", icon: User },
   {
     to: "/settings/communication-preferences",
     label: "Communication preferences",
+    icon: Mail,
   },
-  { to: "/settings/business", label: "Business" },
-  { to: "/settings/team", label: "Team" },
-  { to: "/settings/notifications", label: "Notifications" },
-  { to: "/settings/plans", label: "Plans" },
-  { to: "/settings/4mica-profile", label: "4Mica profile" },
-  { to: "/settings/compliance", label: "Compliance" },
-  { to: "/settings/developer", label: "Developer" },
+  { to: "/settings/business", label: "Business", icon: Building2 },
+  { to: "/settings/team", label: "Team", icon: Users },
+  { to: "/settings/notifications", label: "Notifications", icon: Bell },
+  { to: "/settings/plans", label: "Plans", icon: CreditCard },
+  { to: "/settings/4mica-profile", label: "4Mica profile", icon: BadgeCheck },
+  { to: "/settings/compliance", label: "Compliance", icon: ShieldCheck },
+  { to: "/settings/developer", label: "Developer", icon: Code },
 ];

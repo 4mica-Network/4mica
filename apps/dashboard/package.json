@@ -1,6 +1,6 @@
 {
   "name": "@4mica/dashboard",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Local 4Mica dashboard — manage trading agents, transactions, and the trade allow-list (sandbox mode).",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@4mica/ui": "workspace:*",
+    "framer-motion": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
