@@ -44,6 +44,9 @@ export function AgentProfilePage() {
             <Button intent="outline" asChild>
               <Link to="/agents">Back</Link>
             </Button>
+            <Button intent="outline" asChild>
+              <Link to={`/agents/${agent.id}/advanced`}>Advanced</Link>
+            </Button>
             <Button
               intent={agent.published ? "soft" : "primary"}
               onClick={togglePublish}

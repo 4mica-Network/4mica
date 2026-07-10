@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@4mica/ui": "workspace:*",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router-dom": "catalog:"
