@@ -1,3 +1,9 @@
+packages:
+  - apps/*
+  - examples/*
+  - packages/*
+  - '!**/.next/**'
+
 allowBuilds:
   '@reown/appkit': false
   bufferutil: false
@@ -6,6 +12,7 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   utf-8-validate: false
+
 catalog:
   '@arethetypeswrong/cli': ^0.18.2
   '@biomejs/biome': ^2.4.16
@@ -25,8 +32,8 @@ catalog:
   '@testing-library/react': ^16.3.2
   '@testing-library/user-event': ^14.6.1
   '@types/express': ^5.0.0
-  '@types/npm-registry-fetch': ^8.0.9
   '@types/node': ^25.9.1
+  '@types/npm-registry-fetch': ^8.0.9
   '@types/react': ^19.2.16
   '@types/react-dom': ^19.2.3
   '@vitest/coverage-v8': ^4.1.8
@@ -77,13 +84,9 @@ catalog:
   vitest: ^4.1.8
   wagmi: ^3.6.16
   yargs: ^18.0.0
+
 catalogs:
   node24:
     '@types/node': ^24.10.1
   typescript-latest:
-    typescript: latest
-packages:
-  - "apps/*"
-  - "examples/*"
-  - "packages/*"
-  - '!**/.next/**'
+    typescript: catalog:typescript-latest
