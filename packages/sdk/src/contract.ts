@@ -10,6 +10,7 @@ import {
   type HttpTransport,
   http,
   parseGwei,
+  type WalletClient,
 } from "viem";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
 import { core4micaAbi } from "@/abi/core4mica";
@@ -39,9 +40,7 @@ function wrapViemError(error: unknown, context: string): ContractError {
 }
 
 type TPublicClient = ReturnType<typeof createPublicClient>;
-type TWalletClient = ReturnType<
-  typeof createWalletClient<HttpTransport, Chain, Account>
->;
+type TWalletClient = WalletClient<HttpTransport, Chain, Account>;
 
 type CoreContract = GetContractReturnType<
   typeof core4micaAbi,
