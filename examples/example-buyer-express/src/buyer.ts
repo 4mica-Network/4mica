@@ -1,4 +1,22 @@
-const SELLER_URL = process.env.SELLER_URL ?? "http://localhost:3000/premium";
+import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+function resolveSellerUrl() {
+  if (process.env.SELLER_URL) return process.env.SELLER_URL;
+  try {
+    const base = readFileSync(
+      join(tmpdir(), "4mica-example-express.url"),
+      "utf8",
+    ).trim();
+    if (base) return `${base}/premium`;
+  } catch {
+    return "http://localhost:3000/premium";
+  }
+  return "http://localhost:3000/premium";
+}
+
+const SELLER_URL = resolveSellerUrl();
 
 type X402PaymentRequired = {
   x402Version: number;

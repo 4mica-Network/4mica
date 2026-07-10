@@ -89,4 +89,4 @@ catalogs:
   node24:
     '@types/node': ^24.10.1
   typescript-latest:
-    typescript: catalog:typescript-latest
+    typescript: latest

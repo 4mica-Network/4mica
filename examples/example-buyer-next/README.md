@@ -41,9 +41,9 @@ Expected output:
 
 Runs in **demo mode** out of the box — **no variables required**.
 
-| Variable | Default | When to change |
+| Variable | Default | Notes |
 | --- | --- | --- |
-| `SELLER_URL` | `http://localhost:3002/api/protected` | Point at the seller. Must match the seller's host/port (the Next seller is fixed at 3002). |
+| `SELLER_URL` | auto-discovered | Resolved as: `SELLER_URL` env → the running seller's published URL (`<tmpdir>/4mica-example-next.url`) → `http://localhost:3002/api/protected`. Set it explicitly only to target a seller on another host. |
 
 ## Going live (real payments)
 

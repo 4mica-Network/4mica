@@ -39,9 +39,12 @@ pnpm --filter @4mica/example-buyer-next start
 
 Runs in **demo mode** out of the box — **no variables required**.
 
-The port is fixed at **3002** via the `dev`/`start` scripts (`next dev -p 3002`),
-not an env var. To change it, edit `package.json` and update the buyer's
-`SELLER_URL` plus `tabEndpoint` in `app/api/protected/route.ts` to match.
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PORT` | `3002` | Preferred port. A small `scripts/serve.mjs` wrapper probes from here upward for a free port and launches `next` on it (so a busy 3002 no longer fails to start). |
+
+The chosen URL is published to `<tmpdir>/4mica-example-next.url`, so the paired
+buyer finds the server automatically even when the port moves.
 
 ## Going live (real payments)
 

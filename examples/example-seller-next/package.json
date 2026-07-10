@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Seller (recipient): gate a Next.js App Router route behind a 4Mica x402 paywall",
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "node scripts/serve.mjs dev",
     "build": "next build",
-    "start": "next start -p 3002"
+    "start": "node scripts/serve.mjs start"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",
@@ -22,6 +22,6 @@
     "@types/node": "catalog:node24",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:typescript-latest"
+    "typescript": "^5.7.0"
   }
 }

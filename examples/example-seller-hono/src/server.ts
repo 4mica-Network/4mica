@@ -1,7 +1,12 @@
+import { rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { PaywallConfig, PaywallVerifier } from "@4mica/sdk-hono";
 import { paywall } from "@4mica/sdk-hono";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+
+const PORT_FILE = join(tmpdir(), "4mica-example-hono.url");
 
 const verifier: PaywallVerifier = {
   async issueGuarantee(payload) {
@@ -38,8 +43,27 @@ app.get("/premium", (c) => {
   });
 });
 
-const port = Number(process.env.PORT ?? 3001);
-serve({ fetch: app.fetch, port }, () => {
-  console.log(`[seller-hono] listening on http://localhost:${port}`);
-  console.log(`  GET /premium is paywalled — run the buyer to pay for it.`);
-});
+function listen(port: number, attemptsLeft = 20) {
+  const server = serve({ fetch: app.fetch, port }, (info) => {
+    const url = `http://localhost:${info.port}`;
+    PAYWALL_CONFIG.tabEndpoint = `${url}/session`;
+    writeFileSync(PORT_FILE, url);
+    console.log(`[seller-hono] listening on ${url}`);
+    console.log(`  GET /premium is paywalled — run the buyer to pay for it.`);
+  });
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE" && attemptsLeft > 0) {
+      console.log(`[seller-hono] port ${port} in use, trying ${port + 1}…`);
+      listen(port + 1, attemptsLeft - 1);
+    } else {
+      throw err;
+    }
+  });
+}
+
+const cleanup = () => rmSync(PORT_FILE, { force: true });
+process.on("exit", cleanup);
+process.on("SIGINT", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
+
+listen(Number(process.env.PORT ?? 3001));

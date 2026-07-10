@@ -46,12 +46,13 @@ pnpm --filter @4mica/example-buyer-express start
 
 Runs in **demo mode** out of the box — **no variables required**.
 
-| Variable | Default | When to change |
+| Variable | Default | Notes |
 | --- | --- | --- |
-| `PORT` | `3000` | Port to listen on. If you change it, set the buyer's `SELLER_URL` to match, and update `tabEndpoint` in `src/server.ts`. |
+| `PORT` | `3000` | Preferred port. If it's already in use, the server automatically tries the next one (3001, 3002, …) and logs the port it settled on. |
 
-Example: `PORT=4000 pnpm --filter @4mica/example-seller-express dev`, then run the
-buyer with `SELLER_URL=http://localhost:4000/premium`.
+The chosen URL is published to a temp file
+(`<tmpdir>/4mica-example-express.url`), so the paired buyer finds the server
+automatically even when the port moves — you don't need to set `SELLER_URL`.
 
 ## Going live (real payments)
 

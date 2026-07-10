@@ -41,9 +41,9 @@ Expected output:
 
 Runs in **demo mode** out of the box — **no variables required**.
 
-| Variable | Default | When to change |
+| Variable | Default | Notes |
 | --- | --- | --- |
-| `SELLER_URL` | `http://localhost:3001/premium` | Point at the seller. Must match the seller's host/port (e.g. if you started it with `PORT=4001`, use `SELLER_URL=http://localhost:4001/premium`). |
+| `SELLER_URL` | auto-discovered | Resolved as: `SELLER_URL` env → the running seller's published URL (`<tmpdir>/4mica-example-hono.url`) → `http://localhost:3001/premium`. Set it explicitly only to target a seller on another host. |
 
 ## Going live (real payments)
 
