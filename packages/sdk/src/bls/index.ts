@@ -1,55 +1,7 @@
 import { toBytes } from "viem";
+import type { BlsField, BlsModule, BlsSignatureInput } from "@/bls/models";
 import { DEBUG_BLS } from "@/debug";
 import { VerificationError } from "@/errors";
-
-type BlsField = { value?: string | number | bigint } | string | number | bigint;
-type BlsSignatureInput =
-  | string
-  | Uint8Array
-  | ArrayBuffer
-  | ArrayLike<number>
-  | { type?: string; data?: number[] }
-  | { bytes?: unknown }
-  | { signature?: unknown };
-
-type BlsModule = {
-  bls12_381: {
-    G2: {
-      ProjectivePoint?: {
-        fromHex(bytes: Uint8Array | string): {
-          toAffine(): {
-            x: {
-              c?: readonly [BlsField, BlsField];
-              c0?: BlsField;
-              c1?: BlsField;
-            };
-            y: {
-              c?: readonly [BlsField, BlsField];
-              c0?: BlsField;
-              c1?: BlsField;
-            };
-          };
-        };
-      };
-      Point?: {
-        fromHex(bytes: Uint8Array | string): {
-          toAffine(): {
-            x: {
-              c?: readonly [BlsField, BlsField];
-              c0?: BlsField;
-              c1?: BlsField;
-            };
-            y: {
-              c?: readonly [BlsField, BlsField];
-              c0?: BlsField;
-              c1?: BlsField;
-            };
-          };
-        };
-      };
-    };
-  };
-};
 
 let curvesCache: BlsModule | null = null;
 let curvesPromise: Promise<BlsModule> | null = null;

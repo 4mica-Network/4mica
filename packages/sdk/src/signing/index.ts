@@ -14,7 +14,16 @@ import {
   SigningScheme,
 } from "@/models";
 import { isRecord } from "@/serde";
+import type {
+  GuaranteeSigningContextOptions,
+  GuaranteeTypedDataValidationOptions,
+} from "@/signing/models";
 import { ensureHexPrefix, normalizeAddress, ValidationError } from "@/utils";
+
+export type {
+  GuaranteeSigningContextOptions,
+  GuaranteeTypedDataValidationOptions,
+} from "@/signing/models";
 
 export const GUARANTEE_EIP712_TYPES = {
   EIP712Domain: [
@@ -100,17 +109,6 @@ export type GuaranteeTypedDataV2 = {
     jobHash: Hex;
     requiredValidationTag: string;
   };
-};
-
-export type GuaranteeTypedDataValidationOptions = {
-  expectedChainId?: number;
-  expectedSigner?: string;
-  expectedRecipient?: string;
-};
-
-export type GuaranteeSigningContextOptions = {
-  signerAddress?: string;
-  signerChainId?: number;
 };
 
 const fieldsMatch = (

@@ -1,4 +1,5 @@
 import { type Account, privateKeyToAccount } from "viem/accounts";
+import type { Config } from "@/config/models";
 import { ConfigError } from "@/errors";
 import { resolveNetworkRpcUrl } from "@/networks";
 import {
@@ -8,25 +9,7 @@ import {
   validateUrl,
 } from "@/utils";
 
-/** Validated configuration used to construct a {@link Client}. Produced by {@link ConfigBuilder.build}. */
-export interface Config {
-  /** URL of the 4Mica core RPC service. */
-  rpcUrl: string;
-  /** viem `Account` used to sign payments and authenticate requests. */
-  signer: Account;
-  /** Override for the Ethereum HTTP RPC URL (defaults to the value returned by the core service). */
-  ethereumHttpRpcUrl?: string;
-  /** Override for the Core4Mica contract address (defaults to the value returned by the core service). */
-  contractAddress?: string;
-  /** API key for admin-scoped RPC endpoints. */
-  adminApiKey?: string;
-  /** Static bearer token for authenticated RPC calls. Mutually exclusive with SIWE auth. */
-  bearerToken?: string;
-  /** URL of the SIWE authentication endpoint. Defaults to `rpcUrl` when auth is enabled. */
-  authUrl?: string;
-  /** Seconds before token expiry at which the auth session proactively refreshes. Defaults to 60. */
-  authRefreshMarginSecs?: number;
-}
+export type { Config } from "@/config/models";
 
 /**
  * Fluent builder for {@link Config}.

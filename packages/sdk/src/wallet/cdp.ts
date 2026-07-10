@@ -12,17 +12,7 @@ import {
   type TypedDataDefinition,
 } from "viem";
 import { toAccount } from "viem/accounts";
-
-export interface CdpAccountConfig {
-  /** CDP API key ID from the Coinbase Developer Platform dashboard. */
-  apiKeyId: string;
-  /** CDP API key secret from the Coinbase Developer Platform dashboard. */
-  apiKeySecret: string;
-  /** CDP wallet secret — required for account creation/signing operations. */
-  walletSecret: string;
-  /** Idempotency name — getOrCreateAccount always returns the same wallet for a given name. */
-  name: string;
-}
+import type { CdpAccountConfig } from "@/wallet/models";
 
 /** Creates a viem Account backed by a Coinbase CDP MPC wallet (private key never leaves CDP). */
 export async function createCdpAccount(

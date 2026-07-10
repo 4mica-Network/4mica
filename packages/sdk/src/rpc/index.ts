@@ -1,10 +1,6 @@
 import { ADMIN_API_KEY_HEADER } from "@/constants";
 import { RpcError } from "@/errors";
-import {
-  type FetchFn as HttpFetchFn,
-  normalizeBaseUrl,
-  requestJson,
-} from "@/http";
+import { normalizeBaseUrl, requestJson } from "@/http";
 import {
   AdminApiKeyInfo,
   AdminApiKeySecret,
@@ -13,11 +9,11 @@ import {
   SupportedTokensResponse,
   UserSuspensionStatus,
 } from "@/models";
+import type { BearerTokenProvider, FetchFn } from "@/rpc/models";
+
+export type { BearerTokenProvider, FetchFn } from "@/rpc/models";
 
 const SDK_CLIENT_HEADER_VALUE = `ts-sdk-4mica/${__SDK_VERSION__}`;
-
-export type FetchFn = HttpFetchFn;
-export type BearerTokenProvider = () => string | Promise<string>;
 
 export class RpcProxy {
   private baseUrl: string;

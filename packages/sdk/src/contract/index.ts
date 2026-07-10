@@ -1,22 +1,28 @@
 import {
   type Account,
-  type Chain,
   createPublicClient,
   createWalletClient,
   erc20Abi,
-  type GetContractReturnType,
   getContract,
   type Hex,
-  type HttpTransport,
   http,
   parseGwei,
-  type WalletClient,
 } from "viem";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
 import { core4micaAbi } from "@/abi/core4mica";
 import { getChain } from "@/chain";
+import type {
+  ClearingHouseContract,
+  CoreContract,
+  Erc20Contract,
+  TPublicClient,
+  TWalletClient,
+  TxReceiptWaitOptions,
+} from "@/contract/models";
 import { ContractError } from "@/errors";
 import { parseU256 } from "@/utils";
+
+export type { TxReceiptWaitOptions } from "@/contract/models";
 
 /**
  * Extract a human-readable message from a viem contract error, falling back
@@ -38,39 +44,6 @@ function wrapViemError(error: unknown, context: string): ContractError {
   }
   return new ContractError(`${context}: ${String(error)}`);
 }
-
-type TPublicClient = ReturnType<typeof createPublicClient>;
-type TWalletClient = WalletClient<HttpTransport, Chain, Account>;
-
-type CoreContract = GetContractReturnType<
-  typeof core4micaAbi,
-  {
-    public: ReturnType<typeof createPublicClient>;
-    wallet: TWalletClient;
-  }
->;
-
-type Erc20Contract = GetContractReturnType<
-  typeof erc20Abi,
-  {
-    public: ReturnType<typeof createPublicClient>;
-    wallet: TWalletClient;
-  }
->;
-
-type ClearingHouseContract = GetContractReturnType<
-  typeof clearingHouseAbi,
-  {
-    public: ReturnType<typeof createPublicClient>;
-    wallet: TWalletClient;
-  }
->;
-
-export type TxReceiptWaitOptions = {
-  timeout?: number;
-  pollingInterval?: number;
-  gas?: bigint;
-};
 
 const DEFAULT_CLEARING_GAS_LIMIT = 1_000_000n;
 const DEFAULT_MAX_FEE_PER_GAS = parseGwei("0.1");

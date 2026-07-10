@@ -1,11 +1,6 @@
 import { X402Error } from "@/errors";
 import { base64ToUtf8 } from "@/server/base64";
-import type {
-  X402PaymentEnvelopeV1,
-  X402PaymentEnvelopeV2,
-} from "@/x402/models";
-
-export type X402PaymentEnvelope = X402PaymentEnvelopeV1 | X402PaymentEnvelopeV2;
+import type { X402PaymentEnvelope } from "@/server/models";
 
 /**
  * Decode a base64 `X-PAYMENT` header into its x402 payment envelope.

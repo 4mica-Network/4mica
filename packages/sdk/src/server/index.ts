@@ -12,7 +12,6 @@ export {
   bytesToBase64,
   utf8ToBase64,
 } from "@/server/base64";
-export type { X402PaymentEnvelope } from "@/server/envelope";
 export { parsePaymentHeader } from "@/server/envelope";
 export type {
   GuaranteeVerifier,
@@ -22,7 +21,8 @@ export type {
   PaywallGuarantee,
   PaywallInput,
   PaywallVerifier,
-} from "@/server/paywall";
+  X402PaymentEnvelope,
+} from "@/server/models";
 export { createPaywall } from "@/server/paywall";
 export type {
   PaymentRequirementsExtra,

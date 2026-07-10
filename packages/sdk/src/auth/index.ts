@@ -1,4 +1,9 @@
 import type { Account } from "viem";
+import type {
+  AuthNonceResponse,
+  AuthTokens,
+  SiweTemplate,
+} from "@/auth/models";
 import {
   AuthApiError,
   AuthConfigError,
@@ -14,25 +19,11 @@ import type { FetchFn } from "@/rpc";
 import { isRecord, type RecordValue, readNumber, readString } from "@/serde";
 import { ValidationError, validateUrl } from "@/utils";
 
-export type AuthTokens = {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-};
-
-export type SiweTemplate = {
-  domain: string;
-  uri: string;
-  chainId: number;
-  statement: string;
-  expiration: string;
-  issuedAt: string;
-};
-
-export type AuthNonceResponse = {
-  nonce: string;
-  siwe: SiweTemplate;
-};
+export type {
+  AuthNonceResponse,
+  AuthTokens,
+  SiweTemplate,
+} from "@/auth/models";
 
 const missingField = (label: string) =>
   new AuthDecodeError(`invalid auth response: missing ${label}`);
