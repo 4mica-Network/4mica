@@ -3,18 +3,6 @@ import { paywall } from "@4mica/sdk-hono";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
-/**
- * SELLER (recipient) — gates `GET /premium` behind a 4Mica x402 payment.
- *
- * Real usage — build a recipient client from env and pass `client.rpc`:
- *
- *   import { createClient } from "@4mica/sdk-node";
- *   const client = await createClient();       // reads 4MICA_* env
- *   ...paywall(client.rpc, PAYWALL_CONFIG)
- *
- * On-chain settlement is out-of-band: claim net credit for a cleared cycle with
- * `client.recipient.claimNetCredit(cycleId)`.
- */
 const verifier: PaywallVerifier = {
   async issueGuarantee(payload) {
     console.log("[seller] verifying payment payload:", payload);

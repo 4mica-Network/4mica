@@ -1,22 +1,3 @@
-/**
- * BUYER (payer) — pays for the Hono seller's paywalled `/premium` route.
- *
- * The x402 handshake:
- *   1. GET /premium               → 402 with payment requirements (`accepts`)
- *   2. Sign a payment for the selected requirement → base64 `X-PAYMENT` header
- *   3. GET /premium with X-PAYMENT → 200 + `X-PAYMENT-RESPONSE`
- *
- * Real usage — sign with the SDK against live 4Mica core (set 4MICA_* env):
- *
- *   import { createClient } from "@4mica/sdk-node";
- *   import { X402Flow } from "@4mica/sdk";
- *   const client = await createClient();
- *   const flow = X402Flow.fromClient(client);
- *   const payment = await flow.signPayment(requirements, client.signer.signer.address);
- *   const header = payment.header;
- *
- * This demo builds the header locally so it runs against the mock seller.
- */
 const SELLER_URL = process.env.SELLER_URL ?? "http://localhost:3001/premium";
 
 type X402PaymentRequired = {

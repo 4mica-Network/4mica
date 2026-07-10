@@ -1,14 +1,14 @@
-import {
-  type Account,
-  type Chain,
+import type {
+  Account,
+  Chain,
   createPublicClient,
   erc20Abi,
-  type GetContractReturnType,
-  type HttpTransport,
-  type WalletClient,
+  GetContractReturnType,
+  HttpTransport,
+  WalletClient,
 } from "viem";
-import { clearingHouseAbi } from "@/abi/clearinghouse";
-import { core4micaAbi } from "@/abi/core4mica";
+import type { clearingHouseAbi } from "@/abi/clearinghouse";
+import type { core4micaAbi } from "@/abi/core4mica";
 
 export type TPublicClient = ReturnType<typeof createPublicClient>;
 export type TWalletClient = WalletClient<HttpTransport, Chain, Account>;

@@ -1,21 +1,8 @@
 import type { PaywallConfig, PaywallVerifier } from "@4mica/sdk-next";
 import { withPaywall } from "@4mica/sdk-next";
 
-// The paywall reads the request body / issues a guarantee at request time.
 export const dynamic = "force-dynamic";
 
-/**
- * SELLER (recipient) — gates `GET /api/protected` behind a 4Mica x402 payment.
- *
- * Real usage — build a recipient client from env and pass `client.rpc`:
- *
- *   import { createClient } from "@4mica/sdk-node";
- *   const client = await createClient();       // reads 4MICA_* env
- *   ...withPaywall(handler, client.rpc, PAYWALL_CONFIG)
- *
- * The helpers are Web-standard and edge-safe. On-chain settlement is out-of-band:
- * claim net credit for a cleared cycle with `client.recipient.claimNetCredit(cycleId)`.
- */
 const verifier: PaywallVerifier = {
   async issueGuarantee(payload) {
     console.log("[seller] verifying payment payload:", payload);
