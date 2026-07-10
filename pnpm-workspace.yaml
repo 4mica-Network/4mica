@@ -84,5 +84,6 @@ catalogs:
     typescript: latest
 packages:
   - "apps/*"
+  - "examples/*"
   - "packages/*"
   - '!**/.next/**'
