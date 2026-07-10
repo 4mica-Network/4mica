@@ -20,6 +20,27 @@ they run in **demo mode** with a mock verifier and a locally-built payment
 header — no live credentials required. For the real flow, wire `@4mica/sdk-node`'s
 `createClient()` (reads `4MICA_*` env) as shown in each file's header comment.
 
+## AI agents that trade information
+
+Two additional examples show **autonomous agents paying each other over x402** —
+the machine-to-machine use case 4Mica is built for:
+
+| Example | Role | What it does |
+| --- | --- | --- |
+| [`example-agent-comedian`](./example-agent-comedian) | Seller agent | Generates jokes with Claude, gives the setup free, **paywalls the punchline with dynamic per-category pricing**, and adapts to buyer ratings. |
+| [`example-agent-critic`](./example-agent-critic) | Buyer agent | A comedy curator with a **goal + budget** that judges each free setup, decides whether the punchline is worth paying for, pays via x402, rates it, and **adapts its strategy** (multi-armed bandit) until its set is curated. |
+
+They're genuinely agentic (goals, budgets, per-transaction decisions, evaluation,
+adaptation), not endpoints behind a paywall. Run the comedian, then the critic:
+
+```bash
+pnpm --filter @4mica/example-agent-comedian dev     # seller, port 4100
+pnpm --filter @4mica/example-agent-critic start     # buyer
+```
+
+They run offline by default; set `ANTHROPIC_API_KEY` to have Claude write and
+judge the jokes for real. See each folder's README for the full trade protocol.
+
 Each example is a workspace package and depends on the SDK via `"@4mica/sdk":
 "workspace:*"`, so pnpm symlinks it to the local `packages/sdk` — you're always
 running your working copy, never a published version.

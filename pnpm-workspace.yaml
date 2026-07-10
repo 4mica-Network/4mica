@@ -79,7 +79,7 @@ catalog:
   tsup: ^8.5.1
   tsx: ^4.22.4
   turbo: latest
-  typescript: ^6.0.3
+  typescript: ^5.9.0
   viem: 2.x
   vitest: ^4.1.8
   wagmi: ^3.6.16
@@ -89,4 +89,4 @@ catalogs:
   node24:
     '@types/node': ^24.10.1
   typescript-latest:
-    typescript: latest
+    typescript: ^5.9.0

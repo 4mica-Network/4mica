@@ -1,13 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@4mica/tsconfig/lib.json",
+  "extends": "@4mica/tsconfig/base.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "ignoreDeprecations": "5.0",
     "lib": ["ES2022", "DOM"],
-    "noEmit": true,
-    "verbatimModuleSyntax": false
+    "noEmit": true
   },
-  "include": ["src", "tsup.config.ts"]
+  "include": ["src"]
 }
