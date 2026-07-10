@@ -4,11 +4,9 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "ignoreDeprecations": "5.0",
     "lib": ["ES2022", "DOM"],
     "noEmit": true,
     "verbatimModuleSyntax": false,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

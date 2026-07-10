@@ -31,7 +31,7 @@
     "check:exports": "turbo run check:exports",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build --filter=@4mica/sdk* && changeset publish",
+    "release": "turbo run build --filter=@4mica/sdk* --filter=@4mica/cli && changeset publish",
     "prepare": "husky"
   },
   "devDependencies": {

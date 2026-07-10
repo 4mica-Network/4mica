@@ -39,9 +39,16 @@ The site currently includes:
 ```txt
 .
 ├── apps
-│   └── web                 # Next.js website and docs app
+│   ├── web                 # Next.js website and docs app
+│   └── dashboard           # Vite + React dashboard (agents, transactions, whitelist)
 ├── packages
-│   └── tsconfig            # Shared TypeScript configs
+│   ├── sdk                 # @4mica/sdk — universal x402 payment SDK (+ sdk-node/-express/-hono/-next/…)
+│   ├── cli                 # @4mica/cli — the `4mica` scaffolding CLI
+│   ├── ui                  # Shared React component library
+│   ├── tailwind-config     # Shared Tailwind v4 preset and tokens
+│   ├── tsconfig            # Shared TypeScript configs
+│   └── url                 # Shared routes/links helpers
+├── examples                # Runnable buyer/seller/agent demos (SDK test harness)
 ├── scripts                 # Workspace utility scripts
 ├── biome.json              # Lint and format configuration
 ├── pnpm-workspace.yaml     # Workspace package definitions
@@ -211,35 +218,15 @@ Required deployment secrets and variables include:
 We want this project to feel good to contribute to: clear setup, small focused
 pull requests, and respectful review.
 
-1. Fork the repository.
-2. Create a feature branch:
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — full development guide: setup,
+  repository layout, common commands, and how to develop and test the SDK, the
+  `4mica` CLI, and the dashboard locally.
+- **[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)** — the standards we hold each
+  other to as a community.
 
-   ```bash
-   git checkout -b feat/your-change
-   ```
-
-3. Install dependencies and start the app:
-
-   ```bash
-   pnpm install
-   pnpm dev
-   ```
-
-4. Make your changes.
-5. Run the quality checks:
-
-   ```bash
-   pnpm lint
-   pnpm typecheck
-   pnpm test
-   pnpm build
-   ```
-
-6. Open a pull request with a concise description, screenshots for visual
-   changes, and any deployment or environment notes.
-
-Good first contributions include copy improvements, documentation fixes,
-accessibility improvements, test coverage, and small UI polish.
+In short: fork, branch (`git checkout -b feat/your-change`), make your change,
+run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, and open a pull
+request with a concise description (and screenshots for UI changes).
 
 ## Contributors
 
