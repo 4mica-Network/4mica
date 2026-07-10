@@ -8,11 +8,11 @@ import {
   AuthTransportError,
   AuthUrlError,
   SigningError,
-} from "./errors";
-import { normalizeBaseUrl, requestJson } from "./http";
-import type { FetchFn } from "./rpc";
-import { isRecord, type RecordValue, readNumber, readString } from "./serde";
-import { ValidationError, validateUrl } from "./utils";
+} from "@/errors";
+import { normalizeBaseUrl, requestJson } from "@/http";
+import type { FetchFn } from "@/rpc";
+import { isRecord, type RecordValue, readNumber, readString } from "@/serde";
+import { ValidationError, validateUrl } from "@/utils";
 
 export type AuthTokens = {
   accessToken: string;

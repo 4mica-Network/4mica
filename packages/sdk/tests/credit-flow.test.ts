@@ -1,23 +1,23 @@
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it, vi } from "vitest";
-import type { Client } from "../src/client";
-import { RecipientClient } from "../src/client/recipient";
-import { UserClient } from "../src/client/user";
-import type { ContractGateway } from "../src/contract";
-import { VerificationError } from "../src/errors";
-import { encodeGuaranteeClaims } from "../src/guarantee";
+import type { Client } from "@/client";
+import { RecipientClient } from "@/client/recipient";
+import { UserClient } from "@/client/user";
+import type { ContractGateway } from "@/contract";
+import { VerificationError } from "@/errors";
+import { encodeGuaranteeClaims } from "@/guarantee";
 import {
   CorePublicParameters,
   PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   SigningScheme,
-} from "../src/models";
-import { buildPaymentPayload } from "../src/payment";
-import type { RpcProxy } from "../src/rpc";
+} from "@/models";
+import { buildPaymentPayload } from "@/payment";
+import type { RpcProxy } from "@/rpc";
 import {
   computeValidationRequestHash,
   computeValidationSubjectHash,
-} from "../src/validation";
+} from "@/validation";
 
 const USER = "0x0000000000000000000000000000000000000011";
 const RECIPIENT = "0x0000000000000000000000000000000000000022";

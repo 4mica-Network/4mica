@@ -1,5 +1,5 @@
-import type { PaymentSignature } from "../models";
-import type { PaymentPayload } from "../payment";
+import type { PaymentSignature } from "@/models";
+import type { PaymentPayload } from "@/payment";
 
 export interface PaymentRequirementsV1 {
   scheme: string;

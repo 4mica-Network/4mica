@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { signatureToWords, signatureToWordsAsync } from "../src/bls";
-import { VerificationError } from "../src/errors";
+import { signatureToWords, signatureToWordsAsync } from "@/bls";
+import { VerificationError } from "@/errors";
 
 describe("BLS helpers", () => {
   it("rejects invalid signature hex (sync)", () => {

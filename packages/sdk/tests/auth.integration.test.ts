@@ -1,10 +1,10 @@
 import type { Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import { AuthSession } from "../src/auth";
-import { Client } from "../src/client";
-import { ConfigBuilder } from "../src/config";
-import { RpcError } from "../src/errors";
+import { AuthSession } from "@/auth";
+import { Client } from "@/client";
+import { ConfigBuilder } from "@/config";
+import { RpcError } from "@/errors";
 
 const DEFAULT_RPC_URL = "http://127.0.0.1:3000";
 const DEFAULT_AUTH_URL = "http://127.0.0.1:3000";

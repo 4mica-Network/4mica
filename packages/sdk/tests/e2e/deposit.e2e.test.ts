@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import type { Client } from "../../src";
+import type { Client } from "@/index";
 import {
   describeE2E,
   ETH_DECIMALS,

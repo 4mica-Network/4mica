@@ -1,7 +1,8 @@
 import type { Hex } from "viem";
-import type { TxReceiptWaitOptions } from "../contract";
-import { VerificationError } from "../errors";
-import { decodeGuaranteeClaims } from "../guarantee";
+import type { Client } from "@/client/index";
+import type { TxReceiptWaitOptions } from "@/contract";
+import { VerificationError } from "@/errors";
+import { decodeGuaranteeClaims } from "@/guarantee";
 import {
   AssetBalanceInfo,
   type BLSCert,
@@ -12,10 +13,9 @@ import {
   type PaymentGuaranteeRequestClaimsV2,
   RecipientPaymentInfo,
   type SigningScheme,
-} from "../models";
-import { buildPaymentPayload } from "../payment";
-import { ensureHexPrefix, normalizeAddress } from "../utils";
-import type { Client } from "./index";
+} from "@/models";
+import { buildPaymentPayload } from "@/payment";
+import { ensureHexPrefix, normalizeAddress } from "@/utils";
 
 /**
  * Recipient-side operations: guarantee issuance/verification and cycle-based

@@ -1,14 +1,14 @@
 import type { Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it, vi } from "vitest";
-import { AuthClient, AuthSession, buildSiweMessage } from "../src/auth";
+import { AuthClient, AuthSession, buildSiweMessage } from "@/auth";
 import {
   AuthApiError,
   AuthConfigError,
   AuthDecodeError,
   AuthTransportError,
-} from "../src/errors";
-import type { FetchFn } from "../src/rpc";
+} from "@/errors";
+import type { FetchFn } from "@/rpc";
 
 const PRIVATE_KEY =
   "0x59c6995e998f97a5a0044976f7be35d5ad91c0cfa55b5cfb20b07a1c60f4c5bc";

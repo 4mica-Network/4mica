@@ -1,18 +1,18 @@
-import { X402Error } from "../errors";
+import { X402Error } from "@/errors";
 import {
   PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   type PaymentSignature,
   SigningScheme,
-} from "../models";
-import { buildPaymentPayload } from "../payment";
-import type { FetchFn } from "../rpc";
-import { parsePaymentHeader } from "../server/envelope";
-import { normalizeAddress, parseU256 } from "../utils";
+} from "@/models";
+import { buildPaymentPayload } from "@/payment";
+import type { FetchFn } from "@/rpc";
+import { parsePaymentHeader } from "@/server/envelope";
+import { normalizeAddress, parseU256 } from "@/utils";
 import {
   computeValidationRequestHash,
   computeValidationSubjectHash,
-} from "../validation";
+} from "@/validation";
 import type {
   PaymentRequirementsExtra,
   PaymentRequirementsV1,
@@ -24,9 +24,9 @@ import type {
   X402ResourceInfo,
   X402SettledPayment,
   X402SignedPayment,
-} from "./models";
+} from "@/x402/models";
 
-export * from "./models";
+export * from "@/x402/models";
 
 type ValidationPolicyExtra = Required<
   Pick<

@@ -8,20 +8,20 @@ import {
   parseUnits,
 } from "viem";
 import { afterAll, describe, expect, it } from "vitest";
-import { erc20Abi } from "../src/abi/erc20";
-import { Client } from "../src/client";
-import { ConfigBuilder } from "../src/config";
-import { RpcError } from "../src/errors";
-import type { BLSCert } from "../src/models";
+import { erc20Abi } from "@/abi/erc20";
+import { Client } from "@/client";
+import { ConfigBuilder } from "@/config";
+import { RpcError } from "@/errors";
+import type { BLSCert } from "@/models";
 import {
   PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   SigningScheme,
-} from "../src/models";
+} from "@/models";
 import {
   computeValidationRequestHash,
   computeValidationSubjectHash,
-} from "../src/validation";
+} from "@/validation";
 import {
   type PaymentRequirementsV1,
   type PaymentRequirementsV2,
@@ -30,7 +30,7 @@ import {
   type X402PaymentEnvelopeV1,
   type X402PaymentEnvelopeV2,
   type X402PaymentRequired,
-} from "../src/x402";
+} from "@/x402";
 
 const DEFAULT_RPC_URL = "http://127.0.0.1:3000/";
 const DEFAULT_PAYER_KEY =

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { X402Error } from "../src/errors";
+import { X402Error } from "@/errors";
 import {
   type PaymentGuaranteeRequestClaims,
   type PaymentSignature,
   SigningScheme,
-} from "../src/models";
-import type { FetchFn } from "../src/rpc";
+} from "@/models";
+import type { FetchFn } from "@/rpc";
 import {
   type PaymentRequirementsV1,
   type PaymentRequirementsV2,
   type TabResponse,
   X402Flow,
   type X402PaymentRequired,
-} from "../src/x402";
+} from "@/x402";
 
 const SCHEME = "4mica-credit";
 

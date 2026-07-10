@@ -11,7 +11,7 @@ import {
   RecipientPaymentInfo,
   SupportedTokensResponse,
   UserSuspensionStatus,
-} from "../src/models";
+} from "@/models";
 
 describe("models fromRpc", () => {
   it("parses clearing participant proof with snake_case fields", () => {

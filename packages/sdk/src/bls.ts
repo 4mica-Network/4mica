@@ -1,6 +1,6 @@
 import { toBytes } from "viem";
-import { DEBUG_BLS } from "./debug";
-import { VerificationError } from "./errors";
+import { DEBUG_BLS } from "@/debug";
+import { VerificationError } from "@/errors";
 
 type BlsField = { value?: string | number | bigint } | string | number | bigint;
 type BlsSignatureInput =

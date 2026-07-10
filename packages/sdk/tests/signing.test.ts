@@ -1,19 +1,19 @@
 import type { Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import { SigningError } from "../src/errors";
+import { SigningError } from "@/errors";
 import {
   CorePublicParameters,
   PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   SigningScheme,
-} from "../src/models";
-import { PaymentSigner, validateGuaranteeTypedData } from "../src/signing";
-import { ValidationError } from "../src/utils";
+} from "@/models";
+import { PaymentSigner, validateGuaranteeTypedData } from "@/signing";
+import { ValidationError } from "@/utils";
 import {
   computeValidationRequestHash,
   computeValidationSubjectHash,
-} from "../src/validation";
+} from "@/validation";
 
 const PRIVATE_KEY =
   "0x59c6995e998f97a5a0044976f7be35d5ad91c0cfa55b5cfb20b07a1c60f4c5bc" as Hex;

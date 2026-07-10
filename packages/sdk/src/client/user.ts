@@ -1,5 +1,6 @@
 import type { Hex } from "viem";
-import type { TxReceiptWaitOptions } from "../contract";
+import type { Client } from "@/client/index";
+import type { TxReceiptWaitOptions } from "@/contract";
 import {
   ClearingSettlementActionResponse,
   type PaymentGuaranteeRequestClaims,
@@ -7,9 +8,8 @@ import {
   type PaymentSignature,
   SigningScheme,
   type UserInfo,
-} from "../models";
-import { ensureHexPrefix, normalizeAddress, parseU256 } from "../utils";
-import type { Client } from "./index";
+} from "@/models";
+import { ensureHexPrefix, normalizeAddress, parseU256 } from "@/utils";
 
 /** Payer-side operations: collateral management, payment signing, withdrawals. */
 export class UserClient {

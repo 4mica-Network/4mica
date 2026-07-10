@@ -6,20 +6,14 @@
  * are thin glue over {@link createPaywall}.
  */
 
-export type {
-  PaymentRequirementsExtra,
-  PaymentRequirementsV2,
-  X402PaymentRequired,
-  X402ResourceInfo,
-} from "../x402/models";
 export {
   base64ToBytes,
   base64ToUtf8,
   bytesToBase64,
   utf8ToBase64,
-} from "./base64";
-export type { X402PaymentEnvelope } from "./envelope";
-export { parsePaymentHeader } from "./envelope";
+} from "@/server/base64";
+export type { X402PaymentEnvelope } from "@/server/envelope";
+export { parsePaymentHeader } from "@/server/envelope";
 export type {
   GuaranteeVerifier,
   Paywall,
@@ -28,5 +22,11 @@ export type {
   PaywallGuarantee,
   PaywallInput,
   PaywallVerifier,
-} from "./paywall";
-export { createPaywall } from "./paywall";
+} from "@/server/paywall";
+export { createPaywall } from "@/server/paywall";
+export type {
+  PaymentRequirementsExtra,
+  PaymentRequirementsV2,
+  X402PaymentRequired,
+  X402ResourceInfo,
+} from "@/x402/models";

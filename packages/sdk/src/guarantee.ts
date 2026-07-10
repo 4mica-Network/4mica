@@ -4,12 +4,12 @@ import {
   type Hex,
   toBytes,
 } from "viem";
-import { VerificationError } from "./errors";
+import { VerificationError } from "@/errors";
 import type {
   PaymentGuaranteeClaims,
   PaymentGuaranteeValidationPolicyV2,
-} from "./models";
-import { ensureHexPrefix, hexFromBytes, parseU256 } from "./utils";
+} from "@/models";
+import { ensureHexPrefix, hexFromBytes, parseU256 } from "@/utils";
 
 const CLAIMS_ENCODED_BYTES = 32 * 9;
 // Minimum bytes for a valid outer envelope: uint64 + bytes offset + bytes length

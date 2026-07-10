@@ -1,10 +1,10 @@
-import { ADMIN_API_KEY_HEADER } from "./constants";
-import { RpcError } from "./errors";
+import { ADMIN_API_KEY_HEADER } from "@/constants";
+import { RpcError } from "@/errors";
 import {
   type FetchFn as HttpFetchFn,
   normalizeBaseUrl,
   requestJson,
-} from "./http";
+} from "@/http";
 import {
   AdminApiKeyInfo,
   AdminApiKeySecret,
@@ -12,7 +12,7 @@ import {
   CorePublicParameters,
   SupportedTokensResponse,
   UserSuspensionStatus,
-} from "./models";
+} from "@/models";
 
 const SDK_CLIENT_HEADER_VALUE = `ts-sdk-4mica/${__SDK_VERSION__}`;
 

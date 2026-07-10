@@ -1,12 +1,12 @@
 import type { FourMicaFacilitatorClient } from "@4mica/x402/server";
 import { keccak256 } from "viem";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Client } from "../../src";
+import type { Client } from "@/index";
 import type {
   X402PaymentEnvelopeV1,
   X402PaymentEnvelopeV2,
   X402PaymentRequired,
-} from "../../src/x402";
+} from "@/x402";
 import {
   clientAddress,
   describeE2E,

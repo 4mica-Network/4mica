@@ -1,8 +1,8 @@
 import type { Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigBuilder } from "../src/config";
-import { ConfigError } from "../src/errors";
+import { ConfigBuilder } from "@/config";
+import { ConfigError } from "@/errors";
 
 describe("ConfigBuilder", () => {
   beforeEach(() => {

@@ -9,6 +9,11 @@ export default defineConfig({
   define: {
     __SDK_VERSION__: JSON.stringify(pkg.version),
   },
+  resolve: {
+    alias: {
+      "@": new URL("./src", import.meta.url).pathname,
+    },
+  },
   test: {
     include: ["tests/**/*.test.ts"],
     exclude: [

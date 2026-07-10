@@ -3,18 +3,18 @@ import { type Account, encodeAbiParameters, type Hex } from "viem";
 export {
   computeValidationRequestHash,
   computeValidationSubjectHash,
-} from "./validation";
+} from "@/validation";
 
-import { SigningError } from "./errors";
+import { SigningError } from "@/errors";
 import {
   type CorePublicParameters,
   type PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   type PaymentSignature,
   SigningScheme,
-} from "./models";
-import { isRecord } from "./serde";
-import { ensureHexPrefix, normalizeAddress, ValidationError } from "./utils";
+} from "@/models";
+import { isRecord } from "@/serde";
+import { ensureHexPrefix, normalizeAddress, ValidationError } from "@/utils";
 
 export const GUARANTEE_EIP712_TYPES = {
   EIP712Domain: [

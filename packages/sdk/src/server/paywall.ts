@@ -1,11 +1,11 @@
+import { utf8ToBase64 } from "@/server/base64";
+import { parsePaymentHeader } from "@/server/envelope";
 import type {
   PaymentRequirementsExtra,
   PaymentRequirementsV2,
   X402PaymentRequired,
   X402ResourceInfo,
-} from "../x402/models";
-import { utf8ToBase64 } from "./base64";
-import { parsePaymentHeader } from "./envelope";
+} from "@/x402/models";
 
 const X402_VERSION = 1;
 const DEFAULT_SCHEME = "4mica";

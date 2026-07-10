@@ -1,8 +1,8 @@
 import { encodeAbiParameters } from "viem";
 import { describe, expect, it } from "vitest";
-import { VerificationError } from "../src/errors";
-import { decodeGuaranteeClaims, encodeGuaranteeClaims } from "../src/guarantee";
-import type { PaymentGuaranteeClaims } from "../src/models";
+import { VerificationError } from "@/errors";
+import { decodeGuaranteeClaims, encodeGuaranteeClaims } from "@/guarantee";
+import type { PaymentGuaranteeClaims } from "@/models";
 
 const V2_POLICY = {
   validationRegistryAddress: "0x0000000000000000000000000000000000000011",

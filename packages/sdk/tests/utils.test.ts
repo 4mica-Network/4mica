@@ -7,7 +7,7 @@ import {
   serializeU256,
   ValidationError,
   validateUrl,
-} from "../src/utils";
+} from "@/utils";
 
 describe("utils", () => {
   it("validateUrl rejects bad input", () => {

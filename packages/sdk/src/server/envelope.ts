@@ -1,9 +1,9 @@
-import { X402Error } from "../errors";
+import { X402Error } from "@/errors";
+import { base64ToUtf8 } from "@/server/base64";
 import type {
   X402PaymentEnvelopeV1,
   X402PaymentEnvelopeV2,
-} from "../x402/models";
-import { base64ToUtf8 } from "./base64";
+} from "@/x402/models";
 
 export type X402PaymentEnvelope = X402PaymentEnvelopeV1 | X402PaymentEnvelopeV2;
 

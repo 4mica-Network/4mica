@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { ADMIN_API_KEY_HEADER } from "../src/constants";
-import { RpcError } from "../src/errors";
-import type { FetchFn } from "../src/rpc";
-import { RpcProxy } from "../src/rpc";
+import { ADMIN_API_KEY_HEADER } from "@/constants";
+import { RpcError } from "@/errors";
+import type { FetchFn } from "@/rpc";
+import { RpcProxy } from "@/rpc";
 
 describe("RpcProxy", () => {
   it("round trips public params", async () => {

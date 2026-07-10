@@ -8,11 +8,8 @@ import {
   type SupportedTokenInfo,
   type TabResponse,
   X402Flow,
-} from "../../src";
-import type {
-  PaymentRequirementsV1,
-  PaymentRequirementsV2,
-} from "../../src/x402";
+} from "@/index";
+import type { PaymentRequirementsV1, PaymentRequirementsV2 } from "@/x402";
 
 export const DEFAULT_RPC_URL = "http://127.0.0.1:3000/";
 export const DEFAULT_PAYER_KEY =

@@ -2,8 +2,8 @@ import { encodeAbiParameters, type Hex, keccak256 } from "viem";
 import type {
   PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
-} from "./models";
-import { ensureHexPrefix } from "./utils";
+} from "@/models";
+import { ensureHexPrefix } from "@/utils";
 
 /** Binding domain string used as a prefix when hashing validation subjects. */
 export const VALIDATION_SUBJECT_BINDING_DOMAIN = "4MICA_VALIDATION_SUBJECT_V1";

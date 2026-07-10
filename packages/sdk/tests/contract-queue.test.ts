@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ContractGateway } from "../src/contract";
+import { ContractGateway } from "@/contract";
 
 const DUMMY_ADDRESS = "0x0000000000000000000000000000000000000001";
 const CYCLE_ID = `0x${"aa".repeat(32)}` as const;

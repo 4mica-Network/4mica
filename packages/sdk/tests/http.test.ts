@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  extractErrorMessage,
-  normalizeBaseUrl,
-  requestJson,
-} from "../src/http";
+import { extractErrorMessage, normalizeBaseUrl, requestJson } from "@/http";
 
 describe("http helpers", () => {
   it("normalizeBaseUrl trims trailing slash", () => {

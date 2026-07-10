@@ -1,14 +1,14 @@
-import type { AuthTokens } from "../auth";
-import { AuthSession } from "../auth";
-import type { Config } from "../config";
-import { ContractGateway } from "../contract";
-import { AuthMissingConfigError } from "../errors";
-import type { CorePublicParameters } from "../models";
-import { resolvePublicRpcUrl } from "../networks";
-import { RpcProxy } from "../rpc";
-import { PaymentSigner } from "../signing";
-import { RecipientClient } from "./recipient";
-import { UserClient } from "./user";
+import type { AuthTokens } from "@/auth";
+import { AuthSession } from "@/auth";
+import { RecipientClient } from "@/client/recipient";
+import { UserClient } from "@/client/user";
+import type { Config } from "@/config";
+import { ContractGateway } from "@/contract";
+import { AuthMissingConfigError } from "@/errors";
+import type { CorePublicParameters } from "@/models";
+import { resolvePublicRpcUrl } from "@/networks";
+import { RpcProxy } from "@/rpc";
+import { PaymentSigner } from "@/signing";
 
 /**
  * Top-level SDK client. Holds a live connection to the 4Mica core RPC and the
@@ -147,5 +147,5 @@ export class Client {
   }
 }
 
-export { RecipientClient } from "./recipient";
-export { UserClient } from "./user";
+export { RecipientClient } from "@/client/recipient";
+export { UserClient } from "@/client/user";

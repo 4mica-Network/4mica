@@ -1,11 +1,11 @@
-import { SigningError } from "./errors";
+import { SigningError } from "@/errors";
 import {
   type PaymentGuaranteeRequestClaims,
   PaymentGuaranteeRequestClaimsV2,
   type PaymentSignature,
   type SigningScheme,
-} from "./models";
-import { serializeU256 } from "./utils";
+} from "@/models";
+import { serializeU256 } from "@/utils";
 
 interface PaymentPayloadClaimsBase {
   user_address: string;

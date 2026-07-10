@@ -11,11 +11,11 @@ import {
   http,
   parseGwei,
 } from "viem";
-import { clearingHouseAbi } from "./abi/clearinghouse";
-import { core4micaAbi } from "./abi/core4mica";
-import { getChain } from "./chain";
-import { ContractError } from "./errors";
-import { parseU256 } from "./utils";
+import { clearingHouseAbi } from "@/abi/clearinghouse";
+import { core4micaAbi } from "@/abi/core4mica";
+import { getChain } from "@/chain";
+import { ContractError } from "@/errors";
+import { parseU256 } from "@/utils";
 
 /**
  * Extract a human-readable message from a viem contract error, falling back

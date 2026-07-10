@@ -1,12 +1,12 @@
 import { type Account, privateKeyToAccount } from "viem/accounts";
-import { ConfigError } from "./errors";
-import { resolveNetworkRpcUrl } from "./networks";
+import { ConfigError } from "@/errors";
+import { resolveNetworkRpcUrl } from "@/networks";
 import {
   normalizeAddress,
   normalizePrivateKey,
   ValidationError,
   validateUrl,
-} from "./utils";
+} from "@/utils";
 
 /** Validated configuration used to construct a {@link Client}. Produced by {@link ConfigBuilder.build}. */
 export interface Config {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PaywallConfig, PaywallInput } from "../src/server";
-import { createPaywall, utf8ToBase64 } from "../src/server";
+import type { PaywallConfig, PaywallInput } from "@/server";
+import { createPaywall, utf8ToBase64 } from "@/server";
 
 const config: PaywallConfig = {
   payTo: "0x1111111111111111111111111111111111111111",

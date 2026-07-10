@@ -1,6 +1,6 @@
 import type { FourMicaFacilitatorClient } from "@4mica/x402/server";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import type { Client } from "../../src";
+import type { Client } from "@/index";
 import {
   clientAddress,
   describeE2E,
