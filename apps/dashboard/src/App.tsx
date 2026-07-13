@@ -5,7 +5,6 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { PageHeader } from "./components/ui";
 import { APP_PAGES, type PageMeta, SETTINGS_PAGES } from "./pages";
 
-/** A top-level page is just its title + description. */
 function Page({ title, description }: PageMeta) {
   return <PageHeader title={title} subtitle={description} />;
 }

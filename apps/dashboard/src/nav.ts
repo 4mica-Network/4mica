@@ -65,13 +65,12 @@ export const FOOTER_ITEMS: NavItem[] = [
 ];
 
 export const SETTINGS_NAV: NavItem[] = [
-  { to: "/settings/account", label: "Account", icon: User },
   { to: "/settings/profile", label: "Profile", icon: BadgeCheck },
+  { to: "/settings/account", label: "Account", icon: User },
   { to: "/settings/business", label: "Business", icon: Building2 },
   { to: "/settings/team", label: "Team", icon: Users },
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/plans", label: "Plans", icon: CreditCard },
-
   { to: "/settings/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/settings/developer", label: "Developer", icon: Code },
 ];

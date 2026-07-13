@@ -6,7 +6,6 @@ import { defineConfig } from "vite";
 const require = createRequire(import.meta.url);
 const pkg = require("./package.json") as { version: string };
 
-// Rolldown-powered Vite. The 4mica CLI (`4mica dashboard`) opens this port.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {

@@ -1,16 +1,8 @@
-/**
- * Single source of truth for every page's route, title, and description. Pages
- * are currently just a header (title + description), so they're described as
- * data and rendered generically in App.tsx — no per-page component needed.
- */
-
-/** Organisation name appended to every document title. */
 export const ORG_NAME = "4Mica Workspace";
 
 export interface PageMeta {
   title: string;
   description: string;
-  /** Route path relative to the shell. Omit for the index route. */
   path?: string;
   index?: boolean;
 }

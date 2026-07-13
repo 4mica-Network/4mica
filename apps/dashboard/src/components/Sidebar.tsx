@@ -172,12 +172,12 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         className="min-w-50 bg-surface-deep p-1"
       >
         <NavLink
-          to="/settings/4mica-profile"
+          to="/settings/profile"
           onClick={() => setOpen(false)}
           className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
         >
           <UserCog className="h-4 w-4" />
-          Profile settings
+          Preferences
         </NavLink>
         <button
           type="button"
@@ -218,9 +218,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       await navigator.clipboard.writeText(PUBLIC_PROFILE_URL);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // clipboard unavailable — ignore.
-    }
+    } catch {}
   };
 
   return (
@@ -282,7 +280,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           <ActionRow
             icon={Eye}
             label="View public profile"
-            onClick={() => navigate("/settings/4mica-profile")}
+            onClick={() => navigate("/settings/profile")}
             collapsed={collapsed}
           />
           <ActionRow

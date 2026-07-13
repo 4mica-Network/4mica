@@ -48,11 +48,6 @@ const inversePlacementMap: Record<Placement, Placement> = {
   right: "left",
 };
 
-/**
- * A portal-rendered floating panel anchored to `anchorRef`. Positions itself
- * relative to the anchor, flips when it would overflow the viewport, and closes
- * on outside click. Styling uses the shared design tokens (popover surface).
- */
 export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
   function Dropdown(
     {
