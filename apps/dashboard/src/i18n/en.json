@@ -1,7 +1,6 @@
 {
   "org": "4Mica Workspace",
   "monogram": "4M",
-
   "sidebar.backToApp": "Back to app",
   "sidebar.viewPublicProfile": "View public profile",
   "sidebar.copyPublicProfile": "Copy public profile",
@@ -9,11 +8,9 @@
   "sidebar.preferences": "Preferences",
   "sidebar.signOut": "Sign out",
   "sidebar.version": "v{{version}}",
-
   "nav.section.money": "Money",
   "nav.section.business": "Business",
-
-  "nav.home": "Home",
+  "nav.home": "Overview",
   "nav.balances": "Balances",
   "nav.transactions": "Transactions",
   "nav.payments": "Payments",
@@ -35,7 +32,6 @@
   "nav.plans": "Plans",
   "nav.compliance": "Compliance",
   "nav.developer": "Developer",
-
   "page.overview.title": "Overview",
   "page.overview.description": "Your agents, payments, and settlement at a glance.",
   "page.balances.title": "Balances",
@@ -68,7 +64,6 @@
   "page.invoice.description": "Bill a customer or agent for a one-off or recurring charge.",
   "page.help.title": "Help",
   "page.help.description": "Guides, API docs, and support for building on 4Mica.",
-
   "page.settings.account.title": "Account",
   "page.settings.account.description": "Your name, email, and how you sign in.",
   "page.settings.profile.title": "Profile",

@@ -64,7 +64,7 @@ export const NAV_SECTIONS: NavSection[] = [
 ];
 
 export const FOOTER_ITEMS: NavItem[] = [
-  { to: "/settings", labelKey: "nav.settings", icon: Settings },
+  { to: "/settings/profile", labelKey: "nav.settings", icon: Settings },
   { to: "/help", labelKey: "nav.help", icon: CircleHelp },
 ];
 
