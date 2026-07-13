@@ -15,19 +15,26 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "../nav";
 
 const EXPANDED_WIDTH = 256;
-const COLLAPSED_WIDTH = 68;
+const COLLAPSED_WIDTH = 60;
 const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
 const PUBLIC_PROFILE_URL = "https://4mica.io/@4mica-workspace";
 
 const rowClass = (active: boolean) =>
   cn(
-    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 font-medium text-sm transition-colors",
+    "flex h-9 w-full items-center overflow-hidden rounded-md font-medium text-sm transition-colors",
     active
       ? "bg-overlay/10 text-ink-strong"
       : "text-ink-muted hover:bg-overlay/5 hover:text-ink-body",
   );
 
-/** Label that fades (rather than unmounts) so collapse/expand stays smooth. */
+function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center">
+      <Icon className="h-4 w-4" strokeWidth={2} />
+    </span>
+  );
+}
+
 function Label({
   collapsed,
   children,
@@ -40,7 +47,7 @@ function Label({
   return (
     <span
       className={cn(
-        "truncate transition-opacity duration-200",
+        "min-w-0 truncate transition-opacity duration-200",
         collapsed ? "opacity-0" : "opacity-100",
         className,
       )}
@@ -67,7 +74,6 @@ function NavRow({
   collapsed: boolean;
   end?: boolean;
 }) {
-  const Icon = item.icon;
   return (
     <Tooltip
       title={item.label}
@@ -81,8 +87,10 @@ function NavRow({
           end={end}
           className={({ isActive }) => rowClass(isActive)}
         >
-          <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-          <Label collapsed={collapsed}>{item.label}</Label>
+          <RowIcon icon={item.icon} />
+          <Label collapsed={collapsed} className="pr-2.5">
+            {item.label}
+          </Label>
         </NavLink>
       </span>
     </Tooltip>
@@ -90,7 +98,7 @@ function NavRow({
 }
 
 function ActionRow({
-  icon: Icon,
+  icon,
   label,
   tooltip,
   onClick,
@@ -111,15 +119,16 @@ function ActionRow({
     >
       <span className="block w-full">
         <button type="button" onClick={onClick} className={rowClass(false)}>
-          <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-          <Label collapsed={collapsed}>{label}</Label>
+          <RowIcon icon={icon} />
+          <Label collapsed={collapsed} className="pr-2.5">
+            {label}
+          </Label>
         </button>
       </span>
     </Tooltip>
   );
 }
 
-/** Main-mode workspace switcher: avatar + name + chevron opening a dropdown. */
 function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -130,16 +139,18 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         ref={anchorRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-overlay/5"
+        className="flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-colors hover:bg-overlay/5"
       >
-        <AvatarCircle />
+        <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
+          <AvatarCircle />
+        </span>
         <span
           className={cn(
-            "flex min-w-0 items-center gap-1 transition-opacity duration-200",
+            "flex min-w-0 flex-1 items-center gap-1 pr-2 transition-opacity duration-200",
             collapsed ? "opacity-0" : "opacity-100",
           )}
         >
-          <span className="truncate font-medium text-ink-strong text-sm">
+          <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
             4Mica Workspace
           </span>
           <motion.span
@@ -181,14 +192,15 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-/** Settings-mode header: static avatar + name, no chevron/dropdown. */
 function StaticBrand({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg p-2">
-      <AvatarCircle />
+    <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
+      <span className="grid h-11 w-9 shrink-0 place-items-center">
+        <AvatarCircle />
+      </span>
       <Label
         collapsed={collapsed}
-        className="font-medium text-ink-strong text-sm"
+        className="pr-2 font-medium text-ink-strong text-sm"
       >
         4Mica Workspace
       </Label>
