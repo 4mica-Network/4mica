@@ -9,14 +9,11 @@ import type {
 
 const NATIVE = "0x0000000000000000000000000000000000000000";
 
-// Module-level store so mutations persist across page navigations, exactly as
-// a real backend would. Reset on full page reload (sandbox semantics).
 let agents = seedAgents();
 const transactions = seedTransactions();
 let whitelist = seedWhitelist();
 let counter = 100;
 
-/** Small artificial latency so the UI exercises real loading states. */
 function delay<T>(value: T, ms = 220): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }

@@ -3,15 +3,12 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 
-/** Full-screen application shell: collapsible left sidebar + full-width content. */
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <div className="flex h-screen bg-surface-deep text-ink-body">
       <div className="relative shrink-0">
         <Sidebar collapsed={collapsed} />
-        {/* Collapse handle: sits on the sidebar's right edge near the bottom,
-            styled like the content surface so it reads as part of it. */}
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}

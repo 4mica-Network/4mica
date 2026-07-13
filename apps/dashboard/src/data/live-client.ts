@@ -1,10 +1,5 @@
 import type { DashboardClient } from "./client";
 
-/**
- * Live (hosted API) client seam. Not wired in v1 — the hosted 4Mica API +
- * accounts + sandbox→live promotion land later. Every method shares the
- * DashboardClient signature so pages need no changes when this is implemented.
- */
 export function liveClient(_baseUrl: string): DashboardClient {
   const notReady = () => {
     throw new Error(

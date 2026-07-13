@@ -2,8 +2,7 @@ import { cn } from "@4mica/ui";
 import { useTitle } from "ahooks";
 import type { ReactNode } from "react";
 import type { TransactionStatus, Verification } from "../data/types";
-
-const ORG_NAME = "4Mica Workspace";
+import { ORG_NAME } from "../pages";
 
 export function Card({
   children,
