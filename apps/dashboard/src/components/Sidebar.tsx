@@ -11,6 +11,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "../nav";
 
@@ -58,9 +59,10 @@ function Label({
 }
 
 function AvatarCircle() {
+  const { t } = useTranslation();
   return (
     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/15 font-semibold text-sm text-white">
-      4M
+      {t("monogram")}
     </span>
   );
 }
@@ -74,13 +76,10 @@ function NavRow({
   collapsed: boolean;
   end?: boolean;
 }) {
+  const { t } = useTranslation();
+  const label = t(item.labelKey);
   return (
-    <Tooltip
-      title={item.label}
-      placement="right"
-      disabled={!collapsed}
-      delay={80}
-    >
+    <Tooltip title={label} placement="right" disabled={!collapsed} delay={80}>
       <span className="block w-full">
         <NavLink
           to={item.to}
@@ -89,7 +88,7 @@ function NavRow({
         >
           <RowIcon icon={item.icon} />
           <Label collapsed={collapsed} className="pr-2.5">
-            {item.label}
+            {label}
           </Label>
         </NavLink>
       </span>
@@ -130,6 +129,7 @@ function ActionRow({
 }
 
 function AvatarMenu({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
 
@@ -151,7 +151,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           )}
         >
           <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            4Mica Workspace
+            {t("org")}
           </span>
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
@@ -177,7 +177,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
         >
           <UserCog className="h-4 w-4" />
-          Preferences
+          {t("sidebar.preferences")}
         </NavLink>
         <button
           type="button"
@@ -185,7 +185,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {t("sidebar.signOut")}
         </button>
       </Dropdown>
     </>
@@ -193,6 +193,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
 }
 
 function StaticBrand({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
       <span className="grid h-11 w-9 shrink-0 place-items-center">
@@ -202,13 +203,14 @@ function StaticBrand({ collapsed }: { collapsed: boolean }) {
         collapsed={collapsed}
         className="pr-2 font-medium text-ink-strong text-sm"
       >
-        4Mica Workspace
+        {t("org")}
       </Label>
     </div>
   );
 }
 
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation();
   const inSettings = useLocation().pathname.startsWith("/settings");
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -220,6 +222,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       setTimeout(() => setCopied(false), 1500);
     } catch {}
   };
+
+  const copyLabel = copied
+    ? t("sidebar.copied")
+    : t("sidebar.copyPublicProfile");
 
   return (
     <motion.aside
@@ -234,7 +240,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             <div className="mb-2">
               <ActionRow
                 icon={ArrowLeft}
-                label="Back to app"
+                label={t("sidebar.backToApp")}
                 onClick={() => navigate("/")}
                 collapsed={collapsed}
               />
@@ -252,13 +258,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
               <NavRow key={item.to} item={item} collapsed={collapsed} />
             ))
           : NAV_SECTIONS.map((section, i) => (
-              <div key={section.title ?? `section-${i}`} className="mb-1">
-                {section.title && (
+              <div key={section.titleKey ?? `section-${i}`} className="mb-1">
+                {section.titleKey && (
                   <Label
                     collapsed={collapsed}
                     className="block px-2.5 pt-2 pb-0.5 text-2xs text-ink-subtle uppercase tracking-wide"
                   >
-                    {section.title}
+                    {t(section.titleKey)}
                   </Label>
                 )}
                 <div className="flex flex-col gap-0.5">
@@ -279,14 +285,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         <div className="flex flex-col gap-0.5">
           <ActionRow
             icon={Eye}
-            label="View public profile"
+            label={t("sidebar.viewPublicProfile")}
             onClick={() => navigate("/settings/profile")}
             collapsed={collapsed}
           />
           <ActionRow
             icon={copied ? Check : Copy}
-            label={copied ? "Copied!" : "Copy public profile"}
-            tooltip={copied ? "Copied!" : "Copy public profile"}
+            label={copyLabel}
+            tooltip={copyLabel}
             onClick={copyProfile}
             collapsed={collapsed}
           />
@@ -301,7 +307,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             collapsed={collapsed}
             className="font-medium text-ink-muted text-xs"
           >
-            v{__APP_VERSION__}
+            {t("sidebar.version", { version: __APP_VERSION__ })}
           </Label>
         </div>
       </div>

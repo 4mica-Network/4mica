@@ -1,18 +1,20 @@
 import { useTitle } from "ahooks";
-import { ORG_NAME } from "../pages";
+import { useTranslation } from "react-i18next";
 
 export function SettingsPanel({
-  title,
-  description,
+  titleKey,
+  descriptionKey,
 }: {
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }) {
-  useTitle(`${title} - ${ORG_NAME}`);
+  const { t } = useTranslation();
+  const title = t(titleKey);
+  useTitle(`${title} - ${t("org")}`);
   return (
     <section>
       <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>
-      <p className="mt-1 text-ink-muted text-sm">{description}</p>
+      <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
     </section>
   );
 }

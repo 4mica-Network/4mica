@@ -1,8 +1,6 @@
-export const ORG_NAME = "4Mica Workspace";
-
 export interface PageMeta {
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
   path?: string;
   index?: boolean;
 }
@@ -10,134 +8,131 @@ export interface PageMeta {
 export const APP_PAGES: PageMeta[] = [
   {
     index: true,
-    title: "Overview",
-    description: "Your agents, payments, and settlement at a glance.",
+    titleKey: "page.overview.title",
+    descriptionKey: "page.overview.description",
   },
   {
     path: "balances",
-    title: "Balances",
-    description: "Available and pending funds across your assets and networks.",
+    titleKey: "page.balances.title",
+    descriptionKey: "page.balances.description",
   },
   {
     path: "transactions",
-    title: "Transactions",
-    description: "x402 payments between agents on your account.",
+    titleKey: "page.transactions.title",
+    descriptionKey: "page.transactions.description",
   },
   {
     path: "payments",
-    title: "Payments",
-    description: "Every x402 payment your account has sent or received.",
+    titleKey: "page.payments.title",
+    descriptionKey: "page.payments.description",
   },
   {
     path: "payments/disputes",
-    title: "Disputes",
-    description:
-      "Payments under dispute and their evidence and resolution status.",
+    titleKey: "page.disputes.title",
+    descriptionKey: "page.disputes.description",
   },
   {
     path: "wallet",
-    title: "Wallet",
-    description: "Your on-chain wallet, collateral, and withdrawal controls.",
+    titleKey: "page.wallet.title",
+    descriptionKey: "page.wallet.description",
   },
   {
     path: "customers",
-    title: "Customers",
-    description:
-      "Counterparties that pay your agents and the value they drive.",
+    titleKey: "page.customers.title",
+    descriptionKey: "page.customers.description",
   },
   {
     path: "agents",
-    title: "Agents",
-    description: "Agents allowed to trade on your account.",
+    titleKey: "page.agents.title",
+    descriptionKey: "page.agents.description",
   },
   {
     path: "agents/:id",
-    title: "Agent",
-    description: "Agent details, pricing, policy, and verification.",
+    titleKey: "page.agent.title",
+    descriptionKey: "page.agent.description",
   },
   {
     path: "agents/:id/advanced",
-    title: "Advanced",
-    description: "Trading limits, suspension, and destructive actions.",
+    titleKey: "page.advanced.title",
+    descriptionKey: "page.advanced.description",
   },
   {
     path: "whitelist",
-    title: "Whitelist",
-    description: "Agents permitted to trade on your account.",
+    titleKey: "page.whitelist.title",
+    descriptionKey: "page.whitelist.description",
   },
   {
     path: "apps",
-    title: "Apps",
-    description: "Connected apps and integrations built on the 4Mica SDK.",
+    titleKey: "page.apps.title",
+    descriptionKey: "page.apps.description",
   },
   {
     path: "reports",
-    title: "Reports",
-    description: "Revenue, volume, and settlement reports you can export.",
+    titleKey: "page.reports.title",
+    descriptionKey: "page.reports.description",
   },
   {
     path: "identity",
-    title: "Identity",
-    description:
-      "ERC-8004 validation identity, validators, and trust registries.",
+    titleKey: "page.identity.title",
+    descriptionKey: "page.identity.description",
   },
   {
     path: "create-invoice",
-    title: "Invoice",
-    description: "Bill a customer or agent for a one-off or recurring charge.",
+    titleKey: "page.invoice.title",
+    descriptionKey: "page.invoice.description",
   },
   {
     path: "help",
-    title: "Help",
-    description: "Guides, API docs, and support for building on 4Mica.",
+    titleKey: "page.help.title",
+    descriptionKey: "page.help.description",
   },
 ];
 
 export interface SettingsPageMeta {
   path: string;
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }
 
 export const SETTINGS_PAGES: SettingsPageMeta[] = [
   {
     path: "account",
-    title: "Account",
-    description: "Your name, email, and how you sign in.",
+    titleKey: "page.settings.account.title",
+    descriptionKey: "page.settings.account.description",
   },
   {
     path: "profile",
-    title: "Profile",
-    description: "The public profile other agents see when they discover you.",
+    titleKey: "page.settings.profile.title",
+    descriptionKey: "page.settings.profile.description",
   },
   {
     path: "business",
-    title: "Business",
-    description: "Legal entity, address, and tax details for your account.",
+    titleKey: "page.settings.business.title",
+    descriptionKey: "page.settings.business.description",
   },
   {
     path: "team",
-    title: "Team",
-    description: "Invite teammates and manage their roles and permissions.",
+    titleKey: "page.settings.team.title",
+    descriptionKey: "page.settings.team.description",
   },
   {
     path: "notifications",
-    title: "Notifications",
-    description: "Control alerts for payments, disputes, and agent activity.",
+    titleKey: "page.settings.notifications.title",
+    descriptionKey: "page.settings.notifications.description",
   },
   {
     path: "plans",
-    title: "Plans",
-    description: "Your current plan, usage, and billing.",
+    titleKey: "page.settings.plans.title",
+    descriptionKey: "page.settings.plans.description",
   },
   {
     path: "compliance",
-    title: "Compliance",
-    description: "KYC/KYB status, verification, and regulatory documents.",
+    titleKey: "page.settings.compliance.title",
+    descriptionKey: "page.settings.compliance.description",
   },
   {
     path: "developer",
-    title: "Developer",
-    description: "API keys, webhooks, and the sandbox → live switch.",
+    titleKey: "page.settings.developer.title",
+    descriptionKey: "page.settings.developer.description",
   },
 ];

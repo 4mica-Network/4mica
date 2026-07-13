@@ -108,6 +108,9 @@ catalogs:
     husky:
       specifier: ^9.1.7
       version: 9.1.7
+    i18next:
+      specifier: ^26.3.6
+      version: 26.3.6
     jsdom:
       specifier: ^29.1.1
       version: 29.1.1
@@ -147,6 +150,9 @@ catalogs:
     react-dom:
       specifier: ^19.2.7
       version: 19.2.7
+    react-i18next:
+      specifier: ^17.0.9
+      version: 17.0.9
     react-router-dom:
       specifier: ^7.18.1
       version: 7.18.1
@@ -305,6 +311,9 @@ importers:
       framer-motion:
         specifier: 'catalog:'
         version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      i18next:
+        specifier: 'catalog:'
+        version: 26.3.6(typescript@5.9.3)
       lucide-react:
         specifier: 'catalog:'
         version: 1.23.0(react@19.2.7)
@@ -314,6 +323,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.7(react@19.2.7)
+      react-i18next:
+        specifier: 'catalog:'
+        version: 17.0.9(i18next@26.3.6(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
       react-router-dom:
         specifier: 'catalog:'
         version: 7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -4862,6 +4874,9 @@ packages:
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
+  html-parse-stringify@3.0.1:
+    resolution: {integrity: sha512-KknJ50kTInJ7qIScF3jeaFRpMpE8/lfiTdzf/twXyPBLAGrLRTmkz3AdTnKeh40X8k9L2fdYwEp/42WGXIRGcg==}
+
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
 
@@ -4892,6 +4907,14 @@ packages:
     resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
     engines: {node: '>=18'}
     hasBin: true
+
+  i18next@26.3.6:
+    resolution: {integrity: sha512-Bu5Z2nAXgfVyM8xvW3jk9EKRIuX37PudsrBViThNFx7CR7aaYTpP01cxNB/E4c4UUzTDiAZRstEhsRfPOL/8xA==}
+    peerDependencies:
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
@@ -5946,6 +5969,22 @@ packages:
   react-fast-compare@3.2.2:
     resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
 
+  react-i18next@17.0.9:
+    resolution: {integrity: sha512-buLzOSqHtXxjf+qgSrLWNTXVZ1jSwO6kUv3uJqSP1roGBPgNnbhFm7OmdVwWcgf2gIbUyP0J333uPyx+Btsi3w==}
+    peerDependencies:
+      i18next: '>= 26.2.0'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5 || ^6 || ^7
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -6650,6 +6689,11 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  use-sync-external-store@1.6.0:
+    resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   util@0.12.5:
     resolution: {integrity: sha512-kZf/K6hEIrWHI6XqOFUiiMa+79wE/D8Q+NCNAWclkyg3b4d2k7s0QGepNjiABc+aR3N1PAyHL7p6UcLY6LmrnA==}
 
@@ -6801,6 +6845,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  void-elements@3.1.0:
+    resolution: {integrity: sha512-Dhxzh5HZuiHQhbvTW9AMetFfBHDMYpo23Uo9btPXgdYP+3T5S+p+jgNy7spra+veYhBP2dCSgxR/i2Y02h5/6w==}
+    engines: {node: '>=0.10.0'}
 
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
@@ -10672,6 +10720,10 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
+  html-parse-stringify@3.0.1:
+    dependencies:
+      void-elements: 3.1.0
+
   html-void-elements@3.0.0: {}
 
   http-cache-semantics@4.2.0: {}
@@ -10703,6 +10755,10 @@ snapshots:
   human-signals@8.0.1: {}
 
   husky@9.1.7: {}
+
+  i18next@26.3.6(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
 
   iconv-lite@0.7.2:
     dependencies:
@@ -11967,6 +12023,17 @@ snapshots:
 
   react-fast-compare@3.2.2: {}
 
+  react-i18next@17.0.9(i18next@26.3.6(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 3.0.1
+      i18next: 26.3.6(typescript@5.9.3)
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      react-dom: 19.2.7(react@19.2.7)
+      typescript: 5.9.3
+
   react-is@17.0.2: {}
 
   react-router-dom@7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
@@ -12782,6 +12849,10 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
+  use-sync-external-store@1.6.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+
   util@0.12.5:
     dependencies:
       inherits: 2.0.4
@@ -12974,6 +13045,8 @@ snapshots:
       jsdom: 29.1.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
+
+  void-elements@3.1.0: {}
 
   w3c-xmlserializer@5.0.0:
     dependencies:

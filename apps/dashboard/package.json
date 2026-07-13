@@ -14,9 +14,11 @@
     "@4mica/ui": "workspace:*",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",
+    "i18next": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-i18next": "catalog:",
     "react-router-dom": "catalog:"
   },
   "devDependencies": {

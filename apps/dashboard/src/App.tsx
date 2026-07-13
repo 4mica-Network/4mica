@@ -5,8 +5,8 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { PageHeader } from "./components/ui";
 import { APP_PAGES, type PageMeta, SETTINGS_PAGES } from "./pages";
 
-function Page({ title, description }: PageMeta) {
-  return <PageHeader title={title} subtitle={description} />;
+function Page({ titleKey, descriptionKey }: PageMeta) {
+  return <PageHeader titleKey={titleKey} descriptionKey={descriptionKey} />;
 }
 
 export function App() {

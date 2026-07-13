@@ -1,20 +1,24 @@
 import { useTitle } from "ahooks";
-import { ORG_NAME } from "../pages";
+import { useTranslation } from "react-i18next";
 
 export function PageHeader({
-  title,
-  subtitle,
+  titleKey,
+  descriptionKey,
 }: {
-  title: string;
-  subtitle?: string;
+  titleKey: string;
+  descriptionKey?: string;
 }) {
-  useTitle(`${title} - ${ORG_NAME}`);
+  const { t } = useTranslation();
+  const title = t(titleKey);
+  useTitle(`${title} - ${t("org")}`);
   return (
     <div className="mb-6">
       <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
         {title}
       </h1>
-      {subtitle && <p className="mt-1 text-ink-muted text-sm">{subtitle}</p>}
+      {descriptionKey && (
+        <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
+      )}
     </div>
   );
 }
