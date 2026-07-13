@@ -1,6 +1,9 @@
 import { cn } from "@4mica/ui";
+import { useTitle } from "ahooks";
 import type { ReactNode } from "react";
 import type { TransactionStatus, Verification } from "../data/types";
+
+const ORG_NAME = "4Mica Workspace";
 
 export function Card({
   children,
@@ -30,6 +33,7 @@ export function PageHeader({
   subtitle?: string;
   action?: ReactNode;
 }) {
+  useTitle(`${title} - ${ORG_NAME}`);
   return (
     <div className="mb-6 flex items-start justify-between gap-4">
       <div>

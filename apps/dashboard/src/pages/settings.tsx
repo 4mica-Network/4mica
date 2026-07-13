@@ -1,3 +1,7 @@
+import { useTitle } from "ahooks";
+
+const ORG_NAME = "4Mica Workspace";
+
 function SettingsPanel({
   title,
   description,
@@ -5,6 +9,7 @@ function SettingsPanel({
   title: string;
   description: string;
 }) {
+  useTitle(`${title} - ${ORG_NAME}`);
   return (
     <section>
       <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@4mica/ui": "workspace:*",
+    "ahooks": "catalog:",
     "framer-motion": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
