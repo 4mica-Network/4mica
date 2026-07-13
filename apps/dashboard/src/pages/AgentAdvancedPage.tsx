@@ -3,7 +3,7 @@ import { PageHeader } from "../components/ui";
 export function AgentAdvancedPage() {
   return (
     <PageHeader
-      title="Agent · Advanced"
+      title="Advanced"
       subtitle="Trading limits, suspension, and destructive actions."
     />
   );

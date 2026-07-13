@@ -36,15 +36,11 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
-
-        {/* Money */}
         <Route path="balances" element={<BalancesPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="payments/disputes" element={<DisputesPage />} />
         <Route path="wallet" element={<WalletPage />} />
-
-        {/* Business */}
         <Route path="customers" element={<CustomersPage />} />
         <Route path="agents" element={<AgentsPage />} />
         <Route path="agents/:id" element={<AgentProfilePage />} />
@@ -54,8 +50,6 @@ export function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="identity" element={<IdentityPage />} />
         <Route path="create-invoice" element={<CreateInvoicePage />} />
-
-        {/* Settings (nested) */}
         <Route path="settings" element={<SettingsLayout />}>
           <Route index element={<Navigate to="personal-details" replace />} />
           <Route
@@ -74,7 +68,6 @@ export function App() {
           <Route path="compliance" element={<ComplianceSettings />} />
           <Route path="developer" element={<DeveloperSettings />} />
         </Route>
-
         <Route path="help" element={<HelpPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

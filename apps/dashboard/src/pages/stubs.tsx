@@ -96,7 +96,7 @@ export function CreateInvoicePage() {
   return (
     <Placeholder
       icon={FilePlus}
-      title="Create invoice"
+      title="Invoice"
       description="Bill a customer or agent for a one-off or recurring charge."
     />
   );

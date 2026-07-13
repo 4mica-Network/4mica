@@ -15,7 +15,6 @@ import {
   Landmark,
   ListChecks,
   type LucideIcon,
-  Mail,
   Settings,
   ShieldCheck,
   User,
@@ -27,7 +26,6 @@ export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** Exact-match active state (used for the index route). */
   end?: boolean;
 }
 
@@ -36,7 +34,6 @@ export interface NavSection {
   items: NavItem[];
 }
 
-/** Primary sidebar navigation, grouped like a real product console. */
 export const NAV_SECTIONS: NavSection[] = [
   { items: [{ to: "/", label: "Home", icon: House, end: true }] },
   {
@@ -62,25 +59,19 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Pinned to the bottom of the sidebar. */
 export const FOOTER_ITEMS: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/help", label: "Help", icon: CircleHelp },
 ];
 
-/** Secondary navigation shown in the sidebar while inside the Settings area. */
 export const SETTINGS_NAV: NavItem[] = [
-  { to: "/settings/personal-details", label: "Personal details", icon: User },
-  {
-    to: "/settings/communication-preferences",
-    label: "Communication preferences",
-    icon: Mail,
-  },
+  { to: "/settings/account", label: "Account", icon: User },
+  { to: "/settings/profile", label: "Profile", icon: BadgeCheck },
   { to: "/settings/business", label: "Business", icon: Building2 },
   { to: "/settings/team", label: "Team", icon: Users },
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/plans", label: "Plans", icon: CreditCard },
-  { to: "/settings/4mica-profile", label: "4Mica profile", icon: BadgeCheck },
+
   { to: "/settings/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/settings/developer", label: "Developer", icon: Code },
 ];

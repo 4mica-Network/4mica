@@ -21,7 +21,7 @@ function SettingsPanel({
 export function PersonalDetailsSettings() {
   return (
     <SettingsPanel
-      title="Personal details"
+      title="Personal"
       description="Your name, email, and how you sign in."
     />
   );
@@ -30,7 +30,7 @@ export function PersonalDetailsSettings() {
 export function CommunicationPreferencesSettings() {
   return (
     <SettingsPanel
-      title="Communication preferences"
+      title="Communication"
       description="Choose which product and marketing emails you receive."
     />
   );
@@ -75,7 +75,7 @@ export function PlansSettings() {
 export function ProfileSettings() {
   return (
     <SettingsPanel
-      title="4Mica profile"
+      title="Profile"
       description="The public profile other agents see when they discover you."
     />
   );
