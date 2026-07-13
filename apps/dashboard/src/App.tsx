@@ -1,9 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AppShell } from "./components/AppShell";
-import { SettingsLayout } from "./components/SettingsLayout";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { PageHeader } from "./components/ui";
-import { APP_PAGES, type PageMeta, SETTINGS_PAGES } from "./pages";
+import { AppShell } from "@/components/AppShell";
+import { SettingsLayout } from "@/components/SettingsLayout";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { PageHeader } from "@/components/ui";
+import { APP_PAGES, type PageMeta, SETTINGS_PAGES } from "@/pages";
 
 function Page({ titleKey, descriptionKey }: PageMeta) {
   return <PageHeader titleKey={titleKey} descriptionKey={descriptionKey} />;

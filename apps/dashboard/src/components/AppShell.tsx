@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Sidebar } from "./Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
