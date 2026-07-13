@@ -158,7 +158,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         placement="bottom"
         matchAnchorWidth={!collapsed}
         onClickOutside={() => setOpen(false)}
-        className="min-w-50 p-1"
+        className="min-w-50 bg-surface-deep p-1"
       >
         <NavLink
           to="/settings/4mica-profile"
@@ -221,12 +221,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       <div className="flex flex-col gap-0.5 p-3">
         {inSettings ? (
           <>
-            <ActionRow
-              icon={ArrowLeft}
-              label="Back to app"
-              onClick={() => navigate("/")}
-              collapsed={collapsed}
-            />
+            <div className="mb-2">
+              <ActionRow
+                icon={ArrowLeft}
+                label="Back to app"
+                onClick={() => navigate("/")}
+                collapsed={collapsed}
+              />
+            </div>
             <StaticBrand collapsed={collapsed} />
           </>
         ) : (

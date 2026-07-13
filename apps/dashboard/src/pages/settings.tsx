@@ -1,25 +1,14 @@
-import type { ReactNode } from "react";
-import { Card } from "../components/ui";
-
 function SettingsPanel({
   title,
   description,
-  children,
 }: {
   title: string;
   description: string;
-  children?: ReactNode;
 }) {
   return (
     <section>
       <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>
-      <p className="mt-1 mb-4 text-ink-muted text-sm">{description}</p>
-      {children ?? (
-        <Card className="text-ink-muted text-sm">
-          Configuration for {title.toLowerCase()} will appear here once
-          connected to the live 4Mica API.
-        </Card>
-      )}
+      <p className="mt-1 text-ink-muted text-sm">{description}</p>
     </section>
   );
 }
