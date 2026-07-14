@@ -248,7 +248,7 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       <div
         ref={internalRef}
         className={cn(
-          "fixed z-[9999] rounded-lg border border-border bg-popover text-popover-foreground shadow-lg transition-opacity",
+          "fixed z-9999 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg transition-opacity",
           ready ? "opacity-100" : "pointer-events-none opacity-0",
           className,
         )}
