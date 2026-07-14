@@ -1,0 +1,27 @@
+{
+  "name": "@4mica/example-seller-next",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Seller (recipient): gate a Next.js App Router route behind a 4Mica x402 paywall",
+  "scripts": {
+    "dev": "node scripts/serve.mjs dev",
+    "build": "next build",
+    "start": "node scripts/serve.mjs start"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-next": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

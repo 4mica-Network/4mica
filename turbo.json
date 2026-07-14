@@ -7,7 +7,7 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "start": {
       "cache": false
@@ -21,6 +21,9 @@
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]
+    },
+    "check:exports": {
+      "dependsOn": ["build"]
     },
     "clean": {
       "cache": false

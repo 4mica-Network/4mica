@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "export",
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
-  transpilePackages: ["@4mica/url"],
+  transpilePackages: ["@4mica/url", "@4mica/ui"],
 
   turbopack: {
     root: path.resolve(__dirname, "../.."),

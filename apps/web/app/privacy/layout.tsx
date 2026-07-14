@@ -1,7 +1,7 @@
-import { PRIVACY_META_DATA } from "@seo/privacy";
+import { metaFor } from "@seo/pages";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = PRIVACY_META_DATA;
+export const metadata: Metadata = metaFor("/privacy");
 
 export default function PrivacyLayout({
   children,

@@ -1,0 +1,18 @@
+{
+  "name": "@4mica/sdk-nuxt",
+  "version": "1.3.0",
+  "description": "Nuxt adapter for the 4Mica SDK (coming soon)",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "4mica",
+    "sdk",
+    "nuxt",
+    "x402",
+    "payments"
+  ]
+}

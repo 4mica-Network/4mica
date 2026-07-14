@@ -1,7 +1,7 @@
-import { ABOUT_META_DATA } from "@seo/about";
+import { metaFor } from "@seo/pages";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = ABOUT_META_DATA;
+export const metadata: Metadata = metaFor("/about");
 
 export default function AboutLayout({
   children,

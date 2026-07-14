@@ -4,6 +4,7 @@ import { links } from "@4mica/url";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { messages } from "@/i18n";
 import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
 
@@ -16,6 +17,28 @@ const arrowNudge: Variants = {
 };
 
 export default function PartnersSection() {
+  // Pause the SMIL orbit + blur filter (an always-running, continuously
+  // recomposited animation) whenever the ecosystem mark is scrolled out of view.
+  const orbitRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const svg = orbitRef.current;
+    if (!svg || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          svg.unpauseAnimations();
+        } else {
+          svg.pauseAnimations();
+        }
+      },
+      { rootMargin: "100px" },
+    );
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
@@ -23,6 +46,7 @@ export default function PartnersSection() {
         <div className="mb-12 text-center">
           <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
             <svg
+              ref={orbitRef}
               aria-hidden="true"
               className="h-12 w-full overflow-visible"
               fill="none"

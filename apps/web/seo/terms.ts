@@ -1,7 +1,8 @@
 import { links } from "@4mica/url";
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const TERMS_META_DATA = createPageMetadata({
+export const TERMS_SEO: PageSeo = {
+  path: links.terms,
   title: "Terms of Service | 4Mica",
   description:
     "Review the 4Mica Terms of Service for using the site, wallet-connected interfaces, and blockchain payment software.",
@@ -12,6 +13,5 @@ export const TERMS_META_DATA = createPageMetadata({
     "blockchain payments terms",
     "4Mica legal",
   ],
-  url: links.terms,
   imageAlt: "4Mica Terms of Service",
-});
+};

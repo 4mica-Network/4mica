@@ -1,11 +1,11 @@
 import { links } from "@4mica/url";
 import { messages } from "@/i18n";
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const HOME_META_DATA = createPageMetadata({
+export const HOME_SEO: PageSeo = {
+  path: links.home,
   title: messages.seo.home.title,
   description: messages.seo.home.description,
   keywords: [...messages.seo.home.keywords],
-  url: links.home,
   imageAlt: messages.seo.home.imageAlt,
-});
+};

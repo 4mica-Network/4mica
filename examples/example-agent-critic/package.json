@@ -1,0 +1,21 @@
+{
+  "name": "@4mica/example-agent-critic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Critic agent (buyer): curates a comedy set under a budget — judges free setups, pays for punchlines via x402, rates them, and adapts its strategy",
+  "scripts": {
+    "start": "tsx src/critic.ts"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "@anthropic-ai/sdk": "^0.110.0"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

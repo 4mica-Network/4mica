@@ -1,0 +1,68 @@
+{
+  "name": "@4mica/cli",
+  "version": "0.1.0",
+  "description": "Scaffold, run, and manage 4Mica agents and payment apps from the command line",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/homepage.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/4mica-Network/homepage/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/4mica-Network/homepage/issues"
+  },
+  "keywords": [
+    "4mica",
+    "cli",
+    "create",
+    "scaffold",
+    "x402",
+    "payments",
+    "agents"
+  ],
+  "bin": {
+    "4mica": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "snapshot.json"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prebuild": "node scripts/gen-snapshot.mjs",
+    "build": "tsup",
+    "gen:snapshot": "node scripts/gen-snapshot.mjs",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "check:exports": "publint --strict"
+  },
+  "dependencies": {
+    "@clack/prompts": "catalog:",
+    "execa": "catalog:",
+    "find-up": "catalog:",
+    "ora": "catalog:",
+    "picocolors": "catalog:",
+    "read-pkg": "catalog:",
+    "terminal-link": "catalog:",
+    "yargs": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "@types/yargs": "catalog:",
+    "publint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}

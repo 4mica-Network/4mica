@@ -1,6 +1,7 @@
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const SOLUTION_META_DATA = createPageMetadata({
+export const SOLUTION_SEO: PageSeo = {
+  path: "/solution",
   title: "4Mica Solution | Credit-Backed, Instant Payments",
   description:
     "How 4Mica delivers credit-backed, capital-efficient, and instant payments for any service — web3 or traditional.",
@@ -12,6 +13,5 @@ export const SOLUTION_META_DATA = createPageMetadata({
     "x402 credit",
     "agentic commerce",
   ],
-  url: "/solution",
   imageAlt: "4Mica solution overview",
-});
+};

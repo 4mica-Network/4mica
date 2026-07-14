@@ -1,5 +1,5 @@
 export { type EnglishMessages, en } from "./locales/en/index";
-export { defaultLocale, locales, messages, resources } from "./resources";
+export { defaultLocale, locales, messages } from "./resources";
 
 export function t(key: string, options?: Record<string, unknown>) {
   if (options) {

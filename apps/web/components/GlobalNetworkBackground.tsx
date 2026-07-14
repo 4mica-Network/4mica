@@ -83,6 +83,19 @@ export default function GlobalNetworkBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const reduceMotionRef = useRef(false);
   const { theme } = useTheme();
+  // Current theme, read inside the animation loop so a theme toggle updates the
+  // palette without tearing down and rebuilding the whole node graph / RAF loop.
+  const themeRef = useRef(theme);
+  // One-shot redraw exposed by the setup effect, used to repaint immediately on
+  // theme change when the loop is paused (reduced motion / hidden tab).
+  const redrawRef = useRef<(() => void) | null>(null);
+
+  // Keep the palette in sync on theme change and repaint once, without re-running
+  // the heavy setup effect below.
+  useEffect(() => {
+    themeRef.current = theme;
+    redrawRef.current?.();
+  }, [theme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,7 +103,7 @@ export default function GlobalNetworkBackground() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const palette = CANVAS_PALETTES[theme];
+    let palette = CANVAS_PALETTES[themeRef.current];
 
     let width = 0;
     let height = 0;
@@ -409,6 +422,8 @@ export default function GlobalNetworkBackground() {
     };
 
     const renderFrame = (dtMs: number) => {
+      // Re-read the palette each frame so theme changes apply without rebuilding.
+      palette = CANVAS_PALETTES[themeRef.current];
       ctx.clearRect(0, 0, width, height);
       const offsetX = 0;
       const offsetY = 0;
@@ -446,7 +461,23 @@ export default function GlobalNetworkBackground() {
       }
     };
 
-    window.addEventListener("resize", resize);
+    // Coalesce resize bursts into a single rebuild per frame — `resize`
+    // regenerates the O(n²) neighbor graph, so running it on every raw resize
+    // event thrashes during a drag-resize.
+    let resizeFrame = 0;
+    const handleResize = () => {
+      if (resizeFrame) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        resize();
+      });
+    };
+
+    // Expose a one-shot redraw so the theme-sync effect can repaint immediately
+    // when the animation loop is paused (reduced motion / hidden tab).
+    redrawRef.current = () => renderFrame(0);
+
+    window.addEventListener("resize", handleResize);
     resize();
     if (!reduceMotionRef.current) {
       start();
@@ -454,7 +485,9 @@ export default function GlobalNetworkBackground() {
 
     return () => {
       stop();
-      window.removeEventListener("resize", resize);
+      if (resizeFrame) cancelAnimationFrame(resizeFrame);
+      redrawRef.current = null;
+      window.removeEventListener("resize", handleResize);
       document.removeEventListener("visibilitychange", handleVisibility);
       if (prefersReducedMotion.removeEventListener) {
         prefersReducedMotion.removeEventListener("change", updateReducedMotion);
@@ -462,7 +495,9 @@ export default function GlobalNetworkBackground() {
         prefersReducedMotion.removeListener(updateReducedMotion);
       }
     };
-  }, [theme]);
+    // Setup runs once; theme changes are handled via themeRef + the sync effect
+    // above so we never rebuild the node graph / RAF loop on a theme toggle.
+  }, []);
 
   return (
     <div className="bg-surface-deep" aria-hidden="true">

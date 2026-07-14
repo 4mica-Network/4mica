@@ -1,0 +1,24 @@
+{
+  "name": "@4mica/example-agent-comedian",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Comedian agent (seller): sells jokes — free setup, paywalled punchline priced dynamically, adapts to demand and ratings",
+  "scripts": {
+    "dev": "tsx watch src/comedian.ts",
+    "start": "tsx src/comedian.ts"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "@anthropic-ai/sdk": "^0.110.0",
+    "express": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:node24",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

@@ -1,10 +1,4 @@
-import {
-  DEFAULT_PAGE_PATH,
-  FALLBACK_METADATA,
-  KNOWN_PAGE_PATHS,
-  normalizePath,
-  resolvePageMetadata,
-} from "@seo/pageMetaData";
+import { FALLBACK_METADATA, metadataForSlug, pageSlugs } from "@seo/pages";
 import { SITE_NAME } from "@seo/shared";
 import { ImageResponse } from "next/og";
 import type { CSSProperties } from "react";
@@ -53,13 +47,6 @@ const getTextTitle = (title: MetadataTitle | null | undefined) => {
 const getDescription = (description: unknown) =>
   typeof description === "string" ? description : undefined;
 
-const pathToSlug = (path: string) =>
-  path === "/" ? "home" : path.replace(/^\/+|\/+$/g, "").replace(/\//g, "-");
-
-const slugToPath = new Map(
-  KNOWN_PAGE_PATHS.map((path) => [pathToSlug(path), path]),
-);
-
 const baseContainerStyles: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -75,15 +62,13 @@ const baseContainerStyles: CSSProperties = {
 };
 
 export function generateStaticParams() {
-  return KNOWN_PAGE_PATHS.map((path) => ({ slug: pathToSlug(path) }));
+  return pageSlugs();
 }
 
 export async function GET(request: Request, { params }: RouteContext) {
   try {
     const { slug } = await params;
-    const pagePath = slugToPath.get(slug);
-    const normalizedPath = normalizePath(pagePath) ?? DEFAULT_PAGE_PATH;
-    const metadata = resolvePageMetadata(normalizedPath);
+    const metadata = metadataForSlug(slug) ?? FALLBACK_METADATA;
 
     const title = truncate(
       metadata.openGraph?.title?.toString() ??
@@ -98,7 +83,6 @@ export async function GET(request: Request, { params }: RouteContext) {
         "",
       DESCRIPTION_LIMIT,
     );
-    const _pathLabel = normalizedPath === "/" ? "4mica.io" : normalizedPath;
     const logoUrl = new URL("/assets/og-logo.png", request.url).toString();
 
     return new ImageResponse(

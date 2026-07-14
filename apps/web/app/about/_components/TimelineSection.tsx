@@ -24,10 +24,6 @@ function StatusChip({ status }: { status: Status }) {
   );
 }
 
-type TimelineSectionProps = {
-  showHeader?: boolean;
-};
-
 // Road geometry. X in percent (responsive); Y in pixels (so labels fit).
 const PER_ROW = 2;
 const X_LEFT = 12;
@@ -39,9 +35,7 @@ const NODE_TOP = 70; // first row center, px
 const ROW_GAP = 210; // distance between rows, px
 const BOTTOM = 170; // reserved space for the last row's labels, px
 
-export default function TimelineSection({
-  showHeader = true,
-}: TimelineSectionProps) {
+export default function TimelineSection() {
   const currentIndex = milestones.findIndex((m) => !m.done);
   const count = milestones.length;
   const rows = Math.ceil(count / PER_ROW);
@@ -81,17 +75,15 @@ export default function TimelineSection({
   return (
     <section id="roadmap" className="section-gloss mt-24 scroll-mt-24">
       <div className="mx-auto w-full max-w-3xl">
-        {showHeader && (
-          <div className="mb-14 text-center">
-            <p className="section-kicker">{messages.about.roadmap.kicker}</p>
-            <h2 className="section-title font-normal">
-              {messages.about.roadmap.title}
-            </h2>
-            <p className="section-lead mx-auto max-w-2xl">
-              {messages.about.roadmap.lead}
-            </p>
-          </div>
-        )}
+        <div className="mb-14 text-center">
+          <p className="section-kicker">{messages.about.roadmap.kicker}</p>
+          <h2 className="section-title font-normal">
+            {messages.about.roadmap.title}
+          </h2>
+          <p className="section-lead mx-auto max-w-2xl">
+            {messages.about.roadmap.lead}
+          </p>
+        </div>
 
         <div className="relative mx-auto" style={{ height: `${height}px` }}>
           {/* The road */}

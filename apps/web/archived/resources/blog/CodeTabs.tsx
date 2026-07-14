@@ -314,7 +314,7 @@ export default function CodeTabs({
                     key={`${blockKey}-${getLineKey(line, lineCounts)}`}
                     className="grid grid-cols-[2.2rem_1fr] gap-3"
                   >
-                    <span className="select-none text-right text-[10px] text-ink-subtle sm:text-md">
+                    <span className="select-none text-right text-2xs text-ink-subtle sm:text-md">
                       {lineIndex + 1}
                     </span>
                     <span

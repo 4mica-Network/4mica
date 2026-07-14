@@ -43,7 +43,8 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA=$NEXT_PUBLIC_4MICA_CORE_CONTRACT_ETH_SEPOLIA
 ENV NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA=$NEXT_PUBLIC_4MICA_CORE_CONTRACT_BASE_SEPOLIA
 
-RUN pnpm --filter @4mica/web build
+# Build via Turbo so workspace deps (e.g. @4mica/ui -> dist/) are built first.
+RUN turbo build --filter=@4mica/web
 
 FROM node:24-alpine AS runner
 WORKDIR /app

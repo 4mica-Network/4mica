@@ -1,0 +1,69 @@
+{
+  "name": "@4mica/sdk-next",
+  "version": "1.3.0",
+  "description": "Next.js App Router helpers for gating routes behind a 4Mica x402 payment",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/homepage.git",
+    "directory": "packages/sdk-next"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "4mica",
+    "sdk",
+    "next",
+    "nextjs",
+    "x402",
+    "payments"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "check:exports": "attw --pack . --profile node16 && publint --strict"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "next": ">=14"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@arethetypeswrong/cli": "catalog:",
+    "@types/node": "catalog:node24",
+    "publint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}

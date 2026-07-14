@@ -1,21 +1,34 @@
 "use client";
 
 import Image from "next/image";
-import { type MouseEvent as ReactMouseEvent, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useRef } from "react";
 import { teamMembers } from "./data";
 
 type Member = (typeof teamMembers)[number];
 
 function TeamMemberCard({ member }: { member: Member }) {
-  const [spot, setSpot] = useState({ x: 50, y: 50, active: false });
+  // Drive the cursor spotlight via CSS custom properties on the ref instead of
+  // React state, so pointer movement causes no re-render of the card.
+  const spotRef = useRef<HTMLDivElement | null>(null);
 
   const handleMove = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const el = spotRef.current;
+    if (!el) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    setSpot({
-      x: ((event.clientX - rect.left) / rect.width) * 100,
-      y: ((event.clientY - rect.top) / rect.height) * 100,
-      active: true,
-    });
+    el.style.setProperty(
+      "--spot-x",
+      `${((event.clientX - rect.left) / rect.width) * 100}%`,
+    );
+    el.style.setProperty(
+      "--spot-y",
+      `${((event.clientY - rect.top) / rect.height) * 100}%`,
+    );
+    el.style.opacity = "1";
+  };
+
+  const handleLeave = () => {
+    const el = spotRef.current;
+    if (el) el.style.opacity = "0";
   };
 
   return (
@@ -34,7 +47,7 @@ function TeamMemberCard({ member }: { member: Member }) {
         <div
           className="group/card relative h-60 w-44 overflow-hidden rounded-full border border-overlay/10 bg-surface"
           onMouseMove={handleMove}
-          onMouseLeave={() => setSpot((s) => ({ ...s, active: false }))}
+          onMouseLeave={handleLeave}
         >
           <Image
             src={member.image}
@@ -45,13 +58,15 @@ function TeamMemberCard({ member }: { member: Member }) {
             className="object-cover grayscale transition duration-500 ease-out group-hover/card:grayscale-0"
             style={{ objectPosition: member.imagePosition ?? "50% 20%" }}
           />
-          {/* Cursor-following spotlight */}
+          {/* Cursor-following spotlight (position driven via CSS vars on ref) */}
           <div
+            ref={spotRef}
             className="pointer-events-none absolute inset-0 transition-opacity duration-300"
             style={{
-              opacity: spot.active ? 1 : 0,
+              opacity: 0,
               mixBlendMode: "soft-light",
-              background: `radial-gradient(circle at ${spot.x}% ${spot.y}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 55%)`,
+              background:
+                "radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255,255,255,0.6), rgba(255,255,255,0) 55%)",
             }}
           />
         </div>
