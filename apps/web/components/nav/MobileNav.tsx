@@ -40,7 +40,7 @@ export default function MobileNav({ onNavigate }: { onNavigate: () => void }) {
             <div
               className={`overflow-hidden transition-all duration-300 ease-in-out ${
                 open.has(item.label)
-                  ? "max-h-[1400px] opacity-100"
+                  ? "max-h-collapse opacity-100"
                   : "max-h-0 opacity-0"
               }`}
             >

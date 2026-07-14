@@ -22,7 +22,6 @@ The site currently includes:
 - Product and company pages for 4Mica.
 - Technical docs for x402 integrations.
 - TypeScript, Python, and Rust-oriented integration content.
-- Wallet and network configuration through Reown AppKit and Wagmi.
 - Static export deployment for CDN-backed hosting.
 
 ## Tech Stack
@@ -34,17 +33,22 @@ The site currently includes:
 - [pnpm](https://pnpm.io/) workspaces for dependency management.
 - [Biome](https://biomejs.dev/) for linting and formatting.
 - [Vitest](https://vitest.dev/) for tests and coverage.
-- [Reown AppKit](https://reown.com/appkit), [Wagmi](https://wagmi.sh/), and
-  [Viem](https://viem.sh/) for wallet and chain integrations.
 
 ## Repository Structure
 
 ```txt
 .
 ├── apps
-│   └── web                 # Next.js website and docs app
+│   ├── web                 # Next.js website and docs app
+│   └── dashboard           # Vite + React dashboard (agents, transactions, whitelist)
 ├── packages
-│   └── tsconfig            # Shared TypeScript configs
+│   ├── sdk                 # @4mica/sdk — universal x402 payment SDK (+ sdk-node/-express/-hono/-next/…)
+│   ├── cli                 # @4mica/cli — the `4mica` scaffolding CLI
+│   ├── ui                  # Shared React component library
+│   ├── tailwind-config     # Shared Tailwind v4 preset and tokens
+│   ├── tsconfig            # Shared TypeScript configs
+│   └── url                 # Shared routes/links helpers
+├── examples                # Runnable buyer/seller/agent demos (SDK test harness)
 ├── scripts                 # Workspace utility scripts
 ├── biome.json              # Lint and format configuration
 ├── pnpm-workspace.yaml     # Workspace package definitions
@@ -58,7 +62,6 @@ The site currently includes:
 
 - Node.js 20 or newer.
 - pnpm 10.28.2 or newer.
-- A Reown project ID for wallet features.
 
 Enable pnpm with Corepack if needed:
 
@@ -78,17 +81,6 @@ Create a local environment file:
 ```bash
 cp apps/web/.env.example apps/web/.env.local
 ```
-
-Then set your Reown project ID:
-
-```bash
-NEXT_PUBLIC_PROJECT_ID=your_reown_project_id_here
-NEXT_PUBLIC_REOWN_PROJECT_ID=your_reown_project_id_here
-```
-
-`NEXT_PUBLIC_PROJECT_ID` is the primary variable. The app also supports
-`NEXT_PUBLIC_REOWN_PROJECT_ID` and `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for
-compatibility.
 
 Start the development server:
 
@@ -174,13 +166,9 @@ pnpm lint:linter  # Apply linter fixes only
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_PROJECT_ID` | Yes | Primary Reown AppKit project ID. |
-| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Fallback | Alternate Reown project ID name. |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Fallback | Legacy WalletConnect project ID name. |
+| `NEXT_PUBLIC_BASE_URL` | No | Canonical site URL used for metadata. |
 | `NEXT_PUBLIC_APP_URL` | No | Public app URL used for metadata. Defaults to `https://4mica.io`. |
 | `NEXT_PUBLIC_VERCEL_URL` | No | Vercel-provided URL fallback for metadata. |
-| `NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA` | Deploy-time | Sepolia core contract address for hosted builds. |
-| `NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY` | Deploy-time | Polygon Amoy core contract address for hosted builds. |
 
 ## Testing and Quality
 
@@ -222,47 +210,23 @@ Required deployment secrets and variables include:
 - `AWS_REGION`
 - `S3_BUCKET`
 - `CLOUDFRONT_DISTRIBUTION_ID`
-- `NEXT_PUBLIC_PROJECT_ID`
-- `NEXT_PUBLIC_REOWN_PROJECT_ID`
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+- `NEXT_PUBLIC_BASE_URL`
 - `NEXT_PUBLIC_APP_URL`
-- `NEXT_PUBLIC_4MICA_CORE_CONTRACT_SEPOLIA`
-- `NEXT_PUBLIC_4MICA_CORE_CONTRACT_AMOY`
 
 ## Contributing
 
 We want this project to feel good to contribute to: clear setup, small focused
 pull requests, and respectful review.
 
-1. Fork the repository.
-2. Create a feature branch:
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — full development guide: setup,
+  repository layout, common commands, and how to develop and test the SDK, the
+  `4mica` CLI, and the dashboard locally.
+- **[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)** — the standards we hold each
+  other to as a community.
 
-   ```bash
-   git checkout -b feat/your-change
-   ```
-
-3. Install dependencies and start the app:
-
-   ```bash
-   pnpm install
-   pnpm dev
-   ```
-
-4. Make your changes.
-5. Run the quality checks:
-
-   ```bash
-   pnpm lint
-   pnpm typecheck
-   pnpm test
-   pnpm build
-   ```
-
-6. Open a pull request with a concise description, screenshots for visual
-   changes, and any deployment or environment notes.
-
-Good first contributions include copy improvements, documentation fixes,
-accessibility improvements, test coverage, and small UI polish.
+In short: fork, branch (`git checkout -b feat/your-change`), make your change,
+run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`, and open a pull
+request with a concise description (and screenshots for UI changes).
 
 ## Contributors
 
@@ -275,8 +239,8 @@ Thanks to everyone who helps build 4Mica.
 ## Acknowledgements
 
 4Mica is built with and inspired by excellent open-source projects, including
-Next.js, React, Tailwind CSS, Turbo, pnpm, Biome, Vitest, Reown AppKit, Wagmi,
-Viem, Radix UI, Lucide, Framer Motion, and the broader x402 ecosystem.
+Next.js, React, Tailwind CSS, Turbo, pnpm, Biome, Vitest, Framer Motion, and the
+broader x402 ecosystem.
 
 ## License
 

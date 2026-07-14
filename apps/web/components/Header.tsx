@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@4mica/ui";
 import { links, routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
@@ -80,19 +81,23 @@ export default function Header() {
         <DesktopNav />
 
         <div className="flex items-center gap-3">
-          <a
-            href={links.mailto.contact}
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md border border-overlay/15 bg-surface-deep px-4 py-2 font-semibold text-ink-body text-md transition-colors hover:bg-overlay/10 hover:text-ink-strong md:flex"
+          <Button
+            asChild
+            intent="soft"
+            className="hidden h-9 whitespace-nowrap md:inline-flex"
           >
-            {messages.common.actions.talkToSales}
-          </a>
+            <a href={links.mailto.contact}>
+              {messages.common.actions.talkToSales}
+            </a>
+          </Button>
 
-          <Link
-            href="/pricing"
-            className="hidden h-9 items-center justify-center whitespace-nowrap rounded-md bg-ink-strong px-4 py-2 font-semibold text-md text-surface-deep transition-colors duration-75 ease-in hover:bg-ink-strong/90 md:flex"
+          <Button
+            asChild
+            intent="invert"
+            className="hidden h-9 whitespace-nowrap hover:transform-none md:inline-flex"
           >
-            {messages.common.actions.tryForFree}
-          </Link>
+            <Link href="/pricing">{messages.common.actions.tryForFree}</Link>
+          </Button>
 
           <button
             type="button"
@@ -136,20 +141,24 @@ export default function Header() {
           <MobileNav onNavigate={() => setIsMobileMenuOpen(false)} />
 
           <div className="mt-6 grid gap-3">
-            <a
-              href={links.mailto.contact}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="h-9 rounded-md border border-overlay/15 bg-surface-deep px-4 py-2 text-center font-semibold text-ink-body text-md transition-colors hover:bg-overlay/10 hover:text-ink-strong"
+            <Button asChild intent="soft" block className="h-9">
+              <a
+                href={links.mailto.contact}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {messages.common.actions.talkToSales}
+              </a>
+            </Button>
+            <Button
+              asChild
+              intent="invert"
+              block
+              className="h-9 hover:transform-none"
             >
-              {messages.common.actions.talkToSales}
-            </a>
-            <Link
-              href="/pricing"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="h-9 rounded-md bg-ink-strong px-4 py-2 text-center font-semibold text-md text-surface-deep transition-colors hover:bg-ink-strong/90"
-            >
-              {messages.common.actions.tryForFree}
-            </Link>
+              <Link href="/pricing" onClick={() => setIsMobileMenuOpen(false)}>
+                {messages.common.actions.tryForFree}
+              </Link>
+            </Button>
           </div>
         </div>
       </div>

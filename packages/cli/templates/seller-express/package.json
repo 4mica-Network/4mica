@@ -1,0 +1,22 @@
+{
+  "name": "__PROJECT_NAME__",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "__DESCRIPTION__",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-express": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "express": "catalog:"
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "@types/node": "catalog:node24",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useAnimationFrame, useMotionValue } from "framer-motion";
-import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { type Ref, useCallback, useEffect, useRef, useState } from "react";
 import { messages } from "@/i18n";
 
 interface Testimonial {
@@ -14,8 +14,14 @@ interface Testimonial {
 
 const testimonials: readonly Testimonial[] = messages.team.testimonials;
 
-const TestimonialCard = forwardRef<HTMLDivElement, { data: Testimonial }>(
-  ({ data }, ref) => (
+function TestimonialCard({
+  data,
+  ref,
+}: {
+  data: Testimonial;
+  ref?: Ref<HTMLDivElement>;
+}) {
+  return (
     <div
       ref={ref}
       className="mr-4 min-w-70 max-w-100 rounded-xl border border-overlay/10 bg-surface-deep/25 p-6 sm:mr-6 sm:min-w-90"
@@ -35,9 +41,8 @@ const TestimonialCard = forwardRef<HTMLDivElement, { data: Testimonial }>(
         </div>
       </div>
     </div>
-  ),
-);
-TestimonialCard.displayName = "TestimonialCard";
+  );
+}
 
 export default function LifeAt4Mica() {
   const firstCardRef = useRef<HTMLDivElement>(null);

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="28" viewBox="0 0 120 28" fill="none" role="img" aria-label="4Mica UI">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3CAEF5" />
+      <stop offset="1" stop-color="#48C9B0" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="4" width="20" height="20" rx="5" fill="url(#brand)" />
+  <text x="4.5" y="19" font-family="Inter, ui-sans-serif, system-ui" font-size="13" font-weight="700" fill="#0a0a0a">4</text>
+  <text x="28" y="19" font-family="Inter, ui-sans-serif, system-ui" font-size="15" font-weight="700" fill="#D8D8D8">Mica UI</text>
+</svg>

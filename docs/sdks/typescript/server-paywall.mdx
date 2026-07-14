@@ -1,0 +1,102 @@
+---
+title: "Server paywall"
+description: "Gate any route behind an x402 payment with the edge-safe @4mica/sdk/server primitive."
+---
+
+# Server paywall
+
+`createPaywall` from `@4mica/sdk/server` gates any route behind an x402 payment. When no valid `X-PAYMENT` header is present, the paywall returns a `402` with the payment requirements. Otherwise it verifies the payment and lets the request through, adding an `X-PAYMENT-RESPONSE` header.
+
+The `@4mica/sdk/server` subpath is `Buffer`-free, so the paywall runs on edge runtimes as well as Node, Bun, and Deno.
+
+```ts
+import { createPaywall } from "@4mica/sdk/server";
+
+const paywall = createPaywall(client.rpc, {
+  payTo: "0x...",
+  asset: "0x0000000000000000000000000000000000000000", // zero address = native ETH
+  network: "base-sepolia",
+  amount: "1000", // integer string in the asset's base units
+  tabEndpoint: "https://your-recipient.example/tab",
+});
+```
+
+<Note>
+  The verifier can be `client.rpc`, the `client` itself, or any object exposing an
+  `issueGuarantee` method (a bare `GuaranteeVerifier`).
+</Note>
+
+## Configuration
+
+`PaywallConfig` requires the advertised requirements and accepts several optional overrides.
+
+| Field                | Required | Description                                                             |
+| -------------------- | -------- | ----------------------------------------------------------------------- |
+| `payTo`              | Yes      | Recipient address that collateral is claimed against.                   |
+| `asset`              | Yes      | Token address, or the zero address for native ETH.                      |
+| `network`            | Yes      | Network id (shorthand or CAIP-2) advertised to the payer.               |
+| `amount`             | Yes      | Amount required, as an integer string in the asset's base units.        |
+| `tabEndpoint`        | Yes      | Endpoint the payer calls to open a tab (advertised via `extra.tabEndpoint`). |
+| `scheme`             | No       | Advertised scheme. Defaults to `"4mica"`.                               |
+| `x402Version`        | No       | Advertised x402 version.                                                |
+| `description`        | No       | Human-readable description of the protected resource.                   |
+| `mimeType`           | No       | MIME type of the protected resource.                                    |
+| `maxTimeoutSeconds`  | No       | Maximum time the payer has to complete payment.                         |
+| `extra`              | No       | Extra requirements, such as a V2 validation policy.                     |
+| `resource`           | No       | Override the described resource in the 402 body.                        |
+| `buildRequirements`  | No       | Fully override the advertised 402 body. Takes precedence over the fields above. |
+
+## Web-standard usage
+
+`paywall.handle(request)` works with any Web `Request`/`Response` runtime, including Hono, Next.js route handlers, SvelteKit, Remix, Deno, and `Bun.serve`. It returns a `Response` on `402`, or an object to merge onto your downstream response.
+
+```ts
+const result = await paywall.handle(request);
+if (result instanceof Response) return result; // 402 — payment required
+
+// Payment verified — run your handler, then merge result.headers
+const body = await runHandler();
+return new Response(body, { headers: result.headers });
+// result.guarantee holds the issued guarantee (claims + signature)
+```
+
+## Low-level primitive
+
+`paywall.protect(input)` is framework-agnostic. Pass the request method, url, and a case-insensitive header reader, and receive a decision.
+
+```ts
+const decision = await paywall.protect({
+  method: request.method,
+  url: request.url,
+  header: (name) => request.headers.get(name),
+});
+
+if (!decision.ok) {
+  // decision.status === 402, decision.body holds the payment requirements
+  return respondWith(decision.status, decision.body, decision.headers);
+}
+// decision.guarantee holds the issued guarantee
+// decision.responseHeaders includes X-PAYMENT-RESPONSE
+```
+
+<Note>
+  The paywall only **verifies** payment. On-chain settlement stays out of band as
+  a recipient operation — see the cycle-clearing `claimNetCredit` flow in
+  [Client operations](/sdks/typescript/client-operations).
+</Note>
+
+<Tip>
+  Prefer a framework adapter — `@4mica/sdk-express`, `@4mica/sdk-hono`, or
+  `@4mica/sdk-next` — for idiomatic middleware that wraps this primitive.
+</Tip>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="X402 flow" icon="arrows-rotate" href="/sdks/typescript/x402-flow">
+    Sign payment headers on the client side.
+  </Card>
+  <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
+    Deposit collateral, sign payments, and settle cleared cycles.
+  </Card>
+</Columns>

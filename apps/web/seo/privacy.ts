@@ -1,7 +1,8 @@
 import { links } from "@4mica/url";
-import { createPageMetadata } from "./shared";
+import type { PageSeo } from "./shared";
 
-export const PRIVACY_META_DATA = createPageMetadata({
+export const PRIVACY_SEO: PageSeo = {
+  path: links.privacy,
   title: "Privacy Policy | 4Mica",
   description:
     "Read the 4Mica Privacy Policy to understand how the site handles usage data, wallet addresses, and service-related information.",
@@ -12,6 +13,5 @@ export const PRIVACY_META_DATA = createPageMetadata({
     "blockchain data privacy",
     "4Mica data policy",
   ],
-  url: links.privacy,
   imageAlt: "4Mica Privacy Policy",
-});
+};

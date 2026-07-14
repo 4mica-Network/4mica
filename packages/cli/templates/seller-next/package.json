@@ -1,0 +1,25 @@
+{
+  "name": "__PROJECT_NAME__",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "__DESCRIPTION__",
+  "scripts": {
+    "dev": "node scripts/serve.mjs dev",
+    "build": "next build",
+    "start": "node scripts/serve.mjs start"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-next": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:node24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

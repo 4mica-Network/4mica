@@ -72,6 +72,12 @@ export const borderRadius = {
   sm: "calc(var(--radius) - 4px)",
 } as const;
 
+export const spacing = {
+  "0.75": "0.1875rem", // 3px — hairline rail / indicator width (0.75 step)
+  collapse: "87.5rem", // 1400px — max-height cap for expand/collapse animation
+} as const;
+
 export const fontSize = {
+  "2xs": ["0.625rem", { lineHeight: "1rem" }], // 10px micro-label
   md: ["0.9375rem", { lineHeight: "1.5rem" }],
 } as const;

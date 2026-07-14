@@ -1,0 +1,122 @@
+---
+title: "X402 flow"
+description: "Turn a 402 Payment Required response into a signed payment header with X402Flow."
+---
+
+# X402 flow
+
+`X402Flow` handles the client-side x402 payment protocol for 4Mica. It turns the `paymentRequirements` from a `402 Payment Required` response into a signed payment header (and an optional `/settle` call) that the facilitator accepts.
+
+Create a flow from your client:
+
+```ts
+import { Client, ConfigBuilder, X402Flow } from "@4mica/sdk";
+
+const cfg = new ConfigBuilder().walletPrivateKey("0x...").build();
+const client = await Client.new(cfg);
+const flow = X402Flow.fromClient(client);
+```
+
+Before signing, `X402Flow` resolves a tab by calling `extra.tabEndpoint`, which returns the next request id. Both signing methods always use EIP-712 and error if the scheme is not a 4Mica scheme.
+
+## What the SDK expects
+
+At minimum, `paymentRequirements` must include:
+
+- `scheme` and `network` — the scheme must include `4mica` (for example `4mica-credit`).
+- `payTo` (recipient address), `asset`, and `maxAmountRequired` (v1) or `amount` (v2).
+- `extra.tabEndpoint` for tab resolution.
+
+## Version 1
+
+Version 1 returns payment requirements in the JSON response body. Sign them into an `X-PAYMENT` header.
+
+```ts
+import type { PaymentRequirementsV1 } from "@4mica/sdk";
+
+type ResourceResponse = {
+  x402Version: number;
+  accepts: PaymentRequirementsV1[];
+  error?: string;
+};
+
+// 1) GET the protected endpoint and parse the JSON body
+const res = await fetch("https://resource-url/resource");
+const body = (await res.json()) as ResourceResponse;
+
+// 2) Select a payment option
+const requirements = body.accepts[0];
+
+// 3) Build the X-PAYMENT header
+const payment = await flow.signPayment(requirements, "0xUser");
+
+// 4) Call the protected resource with the header
+await fetch("https://resource-url/resource", {
+  headers: { "X-PAYMENT": payment.header },
+});
+```
+
+## Version 2
+
+Version 2 delivers requirements in a base64-encoded `payment-required` header and signs them into a `PAYMENT-SIGNATURE` header. If `accepted.extra` contains a complete validation policy, the SDK builds V2 claims automatically; otherwise it falls back to V1.
+
+```ts
+import type { X402PaymentRequired, PaymentRequirementsV2 } from "@4mica/sdk";
+
+// 1) GET the protected endpoint and read the payment-required header
+const res = await fetch("https://resource-url/resource");
+const header = res.headers.get("payment-required");
+if (!header) throw new Error("Missing payment-required header");
+
+// 2) Decode the header
+const decoded = Buffer.from(header, "base64").toString("utf8");
+const paymentRequired = JSON.parse(decoded) as X402PaymentRequired;
+
+// 3) Select a payment option
+const accepted = paymentRequired.accepts[0] as PaymentRequirementsV2;
+
+// 4) Build the PAYMENT-SIGNATURE header
+const signed = await flow.signPaymentV2(paymentRequired, accepted, "0xUser");
+
+// 5) Call the protected resource with the header
+await fetch("https://resource-url/resource", {
+  headers: { "PAYMENT-SIGNATURE": signed.header },
+});
+```
+
+## Settle through a facilitator
+
+If your resource server proxies to a facilitator, reuse the SDK to settle a payment after verifying it. `settlePayment` POSTs to `{facilitatorUrl}/settle`.
+
+```ts
+import type { PaymentRequirementsV1, X402SignedPayment } from "@4mica/sdk";
+
+async function settle(
+  facilitatorUrl: string,
+  paymentRequirements: PaymentRequirementsV1,
+  payment: X402SignedPayment,
+) {
+  const settled = await flow.settlePayment(
+    payment,
+    paymentRequirements,
+    facilitatorUrl,
+  );
+  console.log("settlement result:", settled.settlement);
+}
+```
+
+<Note>
+  `settlePayment` only hits `/settle`. Resource servers should still verify a
+  payment before granting access.
+</Note>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Server paywall" icon="shield" href="/sdks/typescript/server-paywall">
+    Gate any route behind an x402 payment.
+  </Card>
+  <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
+    Deposit collateral, sign payments, and settle cleared cycles.
+  </Card>
+</Columns>

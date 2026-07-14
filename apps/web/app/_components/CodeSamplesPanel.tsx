@@ -49,7 +49,7 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
                 <div className="h-2.5 w-2.5 rounded-md bg-red-500/80" />
                 <div className="h-2.5 w-2.5 rounded-md bg-yellow-500/80" />
                 <div className="h-2.5 w-2.5 rounded-md bg-green-500/80" />
-                <span className="ml-2 truncate text-[10px] text-white uppercase tracking-wider">
+                <span className="ml-2 truncate text-2xs text-white uppercase tracking-wider">
                   {side === "client" ? "agent / client" : "api / server"} ·{" "}
                   {lang}
                 </span>

@@ -1,7 +1,7 @@
-import { CAREERS_META_DATA } from "@seo/careers";
+import { metaFor } from "@seo/pages";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = CAREERS_META_DATA;
+export const metadata: Metadata = metaFor("/careers");
 
 export default function CareersLayout({
   children,
