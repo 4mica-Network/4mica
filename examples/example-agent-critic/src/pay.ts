@@ -4,7 +4,7 @@ type Requirement = {
   asset: string;
   amount: string;
   payTo: string;
-  extra?: { tabEndpoint?: string };
+  extra?: { reqId?: string };
 };
 
 type Required402 = { x402Version: number; accepts: Requirement[] };

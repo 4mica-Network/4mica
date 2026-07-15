@@ -20,18 +20,11 @@ export const PAYWALL_CONFIG: PaywallConfig = {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "http://localhost:__PORT__/session",
+  reqId: "0x1",
   description: "Premium market data feed",
 };
 
 const app = new Hono();
-
-app.post("/session", (c) =>
-  c.json({
-    userAddress: "0x2222222222222222222222222222222222222222",
-    nextReqId: "0x1",
-  }),
-);
 
 app.use("/premium", paywall(verifier, PAYWALL_CONFIG));
 app.get("/premium", (c) => {
@@ -46,7 +39,6 @@ app.get("/premium", (c) => {
 function listen(port: number, attemptsLeft = 20) {
   const server = serve({ fetch: app.fetch, port }, (info) => {
     const url = `http://localhost:${info.port}`;
-    PAYWALL_CONFIG.tabEndpoint = `${url}/session`;
     writeFileSync(PORT_FILE, url);
     console.log(`[seller-hono] listening on ${url}`);
     console.log(`  GET /premium is paywalled — run the buyer to pay for it.`);

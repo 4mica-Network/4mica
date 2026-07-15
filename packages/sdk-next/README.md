@@ -28,7 +28,7 @@ export const GET = withPaywall(
     asset: "0x0000000000000000000000000000000000000000",
     network: "base-sepolia",
     amount: "1000",
-    tabEndpoint: "https://your-recipient.example/tab",
+    reqId: "0x1",
   },
 );
 ```
@@ -50,7 +50,7 @@ const gate = paywallMiddleware(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://your-recipient.example/tab",
+  reqId: "0x1",
 });
 
 export const config = { matcher: "/api/protected/:path*" };

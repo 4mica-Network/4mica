@@ -14,7 +14,7 @@ All SDK errors extend `FourMicaError`. Import the specific classes to branch on 
 | `SigningError`           | The signing scheme is unsupported, or the signer address does not match the claims. |
 | `ContractError`          | An on-chain call failed or returned an unexpected result.    |
 | `VerificationError`      | A BLS certificate failed to decode or its domain did not match. |
-| `X402Error`              | An x402 flow error: bad scheme, tab resolution, or settlement. |
+| `X402Error`              | An x402 flow error: bad scheme or settlement.                |
 | `AuthError`              | Base class for all authentication errors.                    |
 | `AuthMissingConfigError` | `login()` was called but auth is not configured.             |
 

@@ -7,7 +7,7 @@ const config: PaywallConfig = {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://recipient.example/tab",
+  reqId: "1",
 };
 
 function inputWith(header: string | null): PaywallInput {
@@ -40,9 +40,7 @@ describe("createPaywall", () => {
     if (decision.ok) throw new Error("expected 402");
     expect(decision.status).toBe(402);
     expect(decision.body.accepts[0]?.payTo).toBe(config.payTo);
-    expect(decision.body.accepts[0]?.extra?.tabEndpoint).toBe(
-      config.tabEndpoint,
-    );
+    expect(decision.body.accepts[0]?.extra?.reqId).toBe(config.reqId);
     expect(verifier.issueGuarantee).not.toHaveBeenCalled();
   });
 

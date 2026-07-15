@@ -17,7 +17,7 @@ const client = await Client.new(cfg);
 const flow = X402Flow.fromClient(client);
 ```
 
-Before signing, `X402Flow` resolves a tab by calling `extra.tabEndpoint`, which returns the next request id. Both signing methods always use EIP-712 and error if the scheme is not a 4Mica scheme.
+Before signing, `X402Flow` reads the next request id from `extra.reqId` (defaulting to `0x0` when absent). Both signing methods always use EIP-712 and error if the scheme is not a 4Mica scheme.
 
 ## What the SDK expects
 
@@ -25,7 +25,7 @@ At minimum, `paymentRequirements` must include:
 
 - `scheme` and `network` — the scheme must include `4mica` (for example `4mica-credit`).
 - `payTo` (recipient address), `asset`, and `maxAmountRequired` (v1) or `amount` (v2).
-- `extra.tabEndpoint` for tab resolution.
+- `extra.reqId` for the request id to sign against (optional; defaults to `0x0`).
 
 ## Version 1
 

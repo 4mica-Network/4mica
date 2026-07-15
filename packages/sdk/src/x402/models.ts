@@ -28,7 +28,8 @@ export interface PaymentRequirementsV2 {
 export type PaymentRequirements = PaymentRequirementsV2;
 
 export interface PaymentRequirementsExtra {
-  tabEndpoint?: string;
+  /** Next request id to sign the payment claims against (integer or hex string). */
+  reqId?: string;
   // V2 validation policy fields (flat, matching Rust SDK extra map)
   validationRegistryAddress?: string;
   validationChainId?: number;
@@ -37,11 +38,6 @@ export interface PaymentRequirementsExtra {
   minValidationScore?: number;
   jobHash?: string;
   requiredValidationTag?: string;
-}
-
-export interface TabResponse {
-  userAddress: string;
-  nextReqId?: string;
 }
 
 export type X402PaymentPayloadClaims = PaymentPayload["claims"];

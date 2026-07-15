@@ -23,7 +23,7 @@ const verifier: PaywallVerifier = {
   },
 };
 
-const CONFIG_BASE: Omit<PaywallConfig, "amount" | "tabEndpoint"> = {
+const CONFIG_BASE: Omit<PaywallConfig, "amount"> = {
   payTo: "0x1111111111111111111111111111111111111111",
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
@@ -79,7 +79,7 @@ app.get("/punchline", async (req, res) => {
   const config: PaywallConfig = {
     ...CONFIG_BASE,
     amount: String(listing.price),
-    tabEndpoint: `${baseUrl}/session`,
+    reqId: "0x1",
   };
   const paywall = createPaywall(verifier, config);
   const decision = await paywall.protect({
@@ -116,13 +116,6 @@ app.post("/rating", (req, res) => {
     );
   }
   res.json({ ok: true });
-});
-
-app.post("/session", (_req, res) => {
-  res.json({
-    userAddress: "0x2222222222222222222222222222222222222222",
-    nextReqId: "0x1",
-  });
 });
 
 function listen(port: number, attemptsLeft = 20) {
