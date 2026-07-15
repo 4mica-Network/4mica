@@ -37,7 +37,7 @@ export class Client {
   readonly guaranteeDomain: string;
   /** Payer-side operations: deposit, sign, withdraw. */
   readonly user: UserClient;
-  /** Recipient-side operations: tabs, guarantees, remuneration. */
+  /** Recipient-side operations: guarantees, remuneration. */
   readonly recipient: RecipientClient;
   /** Payment signing wrapper around the configured viem Account. */
   readonly signer: PaymentSigner;

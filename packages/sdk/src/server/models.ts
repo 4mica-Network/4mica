@@ -39,14 +39,14 @@ export interface PaywallConfig {
   network: string;
   /** Amount required, as an integer string in the asset's base units. */
   amount: string;
-  /** Endpoint the payer calls to open/resolve a tab (advertised via `extra.tabEndpoint`). */
-  tabEndpoint: string;
+  /** Next request id advertised to the payer (via `extra.reqId`); the payer signs claims against it. */
+  reqId?: string;
   scheme?: string;
   x402Version?: number;
   description?: string;
   mimeType?: string;
   maxTimeoutSeconds?: number;
-  /** Extra requirements (e.g. a V2 validation policy); merged over `tabEndpoint`. */
+  /** Extra requirements (e.g. a V2 validation policy); merged over `reqId`. */
   extra?: PaymentRequirementsExtra;
   /** Override the described resource in the 402 body. */
   resource?: Partial<X402ResourceInfo>;

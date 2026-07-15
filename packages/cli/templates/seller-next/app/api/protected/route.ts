@@ -15,7 +15,7 @@ const PAYWALL_CONFIG: PaywallConfig = {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: `${process.env.EXAMPLE_BASE_URL ?? "http://localhost:__PORT__"}/api/session`,
+  reqId: "0x1",
   description: "Premium market data feed",
 };
 

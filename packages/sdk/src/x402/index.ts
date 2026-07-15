@@ -17,11 +17,9 @@ import type {
   PaymentRequirementsExtra,
   PaymentRequirementsV1,
   PaymentRequirementsV2,
-  TabResponse,
   X402PaymentEnvelopeV1,
   X402PaymentEnvelopeV2,
   X402PaymentRequired,
-  X402ResourceInfo,
   X402SettledPayment,
   X402SignedPayment,
 } from "@/x402/models";
@@ -68,8 +66,8 @@ export interface FlowSigner {
 /**
  * Handles the x402 HTTP 402 payment protocol for 4Mica.
  *
- * Orchestrates the full client-side x402 flow: resolving a tab from the recipient's
- * tab endpoint, building and signing payment claims (V1 or V2), and optionally settling
+ * Orchestrates the full client-side x402 flow: building and signing payment claims
+ * (V1 or V2) using the request id advertised in `extra.reqId`, and optionally settling
  * the payment against a facilitator service.
  *
  * @example
@@ -105,23 +103,22 @@ export class X402Flow {
   /**
    * Sign an x402 V1 payment.
    *
-   * Resolves a tab from `paymentRequirements.extra.tabEndpoint`, builds V1 claims,
-   * signs them with EIP-712, and returns the base64-encoded payment header together
-   * with the raw payload and signature.
+   * Builds V1 claims from `paymentRequirements` (request id sourced from
+   * `extra.reqId`), signs them with EIP-712, and returns the base64-encoded payment
+   * header together with the raw payload and signature.
    *
    * @param paymentRequirements - V1 payment requirements from the `402 Payment Required` response.
    * @param userAddress - Address of the paying user.
    * @returns Signed payment ready to attach as the `X-PAYMENT` request header.
-   * @throws {@link X402Error} if the scheme is not a 4Mica scheme or the tab endpoint fails.
+   * @throws {@link X402Error} if the scheme is not a 4Mica scheme.
    */
   async signPayment(
     paymentRequirements: PaymentRequirementsV1,
     userAddress: string,
   ): Promise<X402SignedPayment> {
     X402Flow.validateScheme(paymentRequirements.scheme);
-    const tab = await this.requestTab(1, paymentRequirements, userAddress);
 
-    const claims = this.buildClaims(paymentRequirements, tab, userAddress);
+    const claims = this.buildClaims(paymentRequirements, userAddress);
     const signature = await this.signer.signPayment(
       claims,
       SigningScheme.EIP712,
@@ -151,7 +148,7 @@ export class X402Flow {
    * @param accepted - The accepted V2 payment requirements.
    * @param userAddress - Address of the paying user.
    * @returns Signed payment ready to attach as the `X-PAYMENT` request header.
-   * @throws {@link X402Error} if the scheme is not a 4Mica scheme or the tab endpoint fails.
+   * @throws {@link X402Error} if the scheme is not a 4Mica scheme.
    */
   async signPaymentV2(
     paymentRequired: X402PaymentRequired,
@@ -160,16 +157,10 @@ export class X402Flow {
   ): Promise<X402SignedPayment> {
     X402Flow.validateScheme(accepted.scheme);
     const isV2Claims = hasValidationPolicy(accepted.extra);
-    const tab = await this.requestTab(
-      isV2Claims ? 2 : 1,
-      accepted,
-      userAddress,
-      paymentRequired.resource,
-    );
 
     const claims = isV2Claims
-      ? this.buildClaimsV2(accepted, tab, userAddress)
-      : this.buildClaims(accepted, tab, userAddress);
+      ? this.buildClaimsV2(accepted, userAddress)
+      : this.buildClaims(accepted, userAddress);
 
     const signature = await this.signer.signPayment(
       claims,
@@ -233,57 +224,20 @@ export class X402Flow {
     return { payment, settlement };
   }
 
-  protected async requestTab(
-    x402Version: number,
-    paymentRequirements: PaymentRequirementsV1 | PaymentRequirementsV2,
-    userAddress: string,
-    resource?: X402ResourceInfo,
-  ): Promise<TabResponse> {
-    const tabEndpoint = paymentRequirements.extra?.tabEndpoint;
-    if (!tabEndpoint || typeof tabEndpoint !== "string") {
-      throw new X402Error("missing tabEndpoint in paymentRequirements.extra");
-    }
-    const resp = await this.fetchFn(tabEndpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        x402Version,
-        userAddress,
-        paymentRequirements,
-        resource,
-      }),
-    });
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new X402Error(`tab resolution failed: ${resp.status} ${text}`);
-    }
-    const body = await resp.json();
-    return {
-      userAddress: body.userAddress ?? body.user_address,
-      nextReqId:
-        body.nextReqId ?? body.next_req_id ?? body.reqId ?? body.req_id,
-    };
-  }
-
   protected buildClaims(
     requirements: PaymentRequirementsV1 | PaymentRequirementsV2,
-    tab: TabResponse,
     userAddress: string,
   ): PaymentGuaranteeRequestClaims {
     const reqId =
-      tab.nextReqId !== undefined && tab.nextReqId !== null
-        ? parseU256(tab.nextReqId)
+      requirements.extra?.reqId !== undefined &&
+      requirements.extra?.reqId !== null
+        ? parseU256(requirements.extra.reqId)
         : 0n;
     const amount = parseU256(
       "maxAmountRequired" in requirements
         ? requirements.maxAmountRequired
         : requirements.amount,
     );
-    if (tab.userAddress.toLowerCase() !== userAddress.toLowerCase()) {
-      throw new X402Error(
-        `user mismatch in paymentRequirements: found ${tab.userAddress}, expected ${userAddress}`,
-      );
-    }
     const timestamp = Math.floor(Date.now() / 1000);
     return PaymentGuaranteeRequestClaims.new(
       userAddress,
@@ -297,10 +251,9 @@ export class X402Flow {
 
   protected buildClaimsV2(
     requirements: PaymentRequirementsV2,
-    tab: TabResponse,
     userAddress: string,
   ): PaymentGuaranteeRequestClaimsV2 {
-    const base = this.buildClaims(requirements, tab, userAddress);
+    const base = this.buildClaims(requirements, userAddress);
     const extra = requirements.extra!;
 
     const validationSubjectHash = computeValidationSubjectHash(base);

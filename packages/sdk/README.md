@@ -38,7 +38,7 @@ const paywall = createPaywall(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://your-recipient.example/tab",
+  reqId: "0x1", // next request id, advertised via extra.reqId
 });
 
 // Web-standard (Hono, Next route handlers, SvelteKit, Remix, Deno, Bun.serve):
@@ -209,7 +209,7 @@ The SDK exposes three main entry points:
 See `examples/base-sepolia-x402-facilitator-e2e.ts` for a full flow in the `examples` folder:
 
 - deposit collateral
-- resolve a payment session via the facilitator's `tabEndpoint` (returns the next `reqId`)
+- sign payment claims against the request id from `extra.reqId`
 - issue and verify V1 + V2 guarantees
 - settle a cleared cycle: payer `payNetDebit`, recipient `claimNetCredit`
 - settle V2 only after `wachai-validation-sdk` returns a passing ERC-8004 validation
@@ -233,9 +233,9 @@ At minimum you need:
 
 - `scheme` and `network` (scheme must include `4mica`, e.g. `4mica-credit`)
 - `payTo` (recipient address), `asset`, and `maxAmountRequired` (v1) or `amount` (v2)
-- `extra.tabEndpoint` for tab resolution
+- `extra.reqId` for the request id to sign against (optional; defaults to `0x0`)
 
-`X402Flow` will refresh the tab by calling `extra.tabEndpoint` before signing.
+`X402Flow` reads `extra.reqId` and signs the claims against it immediately — no provisioning round-trip.
 
 #### X402 Version 1
 
@@ -443,7 +443,7 @@ import {
   SigningError, // signing scheme unsupported or address mismatch
   ContractError, // on-chain call failed or unexpected result
   VerificationError, // BLS certificate decode/domain mismatch
-  X402Error, // x402 flow error (bad scheme, tab resolution, settlement)
+  X402Error, // x402 flow error (bad scheme, settlement)
   AuthError, // base class for all auth errors
   AuthMissingConfigError, // auth not configured when login() is called
 } from '@4mica/sdk';

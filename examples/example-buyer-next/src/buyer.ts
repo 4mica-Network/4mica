@@ -26,7 +26,7 @@ type X402PaymentRequired = {
     asset: string;
     amount: string;
     payTo: string;
-    extra?: { tabEndpoint?: string };
+    extra?: { reqId?: string };
   }>;
 };
 

@@ -93,7 +93,6 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     docsChangelog: "https://docs.4mica.io/updates/changelogs",
     status: "https://status.4mica.xyz",
     facilitator: "https://x402.4mica.xyz",
-    facilitatorTabs: "https://x402.4mica.xyz/tabs",
     facilitatorSettle: "https://x402.4mica.xyz/settle",
     api: {
       base: "https://base.api.4mica.xyz/",

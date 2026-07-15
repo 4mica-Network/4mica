@@ -66,7 +66,10 @@ function buildRequirements(
     amount: config.amount,
     payTo: config.payTo,
     maxTimeoutSeconds: config.maxTimeoutSeconds,
-    extra: { tabEndpoint: config.tabEndpoint, ...config.extra },
+    extra: {
+      ...(config.reqId !== undefined ? { reqId: config.reqId } : {}),
+      ...config.extra,
+    },
   };
   return {
     x402Version: config.x402Version ?? X402_VERSION,

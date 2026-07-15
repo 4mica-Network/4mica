@@ -17,7 +17,7 @@ const paywall = createPaywall(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000", // zero address = native ETH
   network: "base-sepolia",
   amount: "1000", // integer string in the asset's base units
-  tabEndpoint: "https://your-recipient.example/tab",
+  reqId: "0x1", // next request id, advertised via extra.reqId
 });
 ```
 
@@ -36,7 +36,7 @@ const paywall = createPaywall(client.rpc, {
 | `asset`              | Yes      | Token address, or the zero address for native ETH.                      |
 | `network`            | Yes      | Network id (shorthand or CAIP-2) advertised to the payer.               |
 | `amount`             | Yes      | Amount required, as an integer string in the asset's base units.        |
-| `tabEndpoint`        | Yes      | Endpoint the payer calls to open a tab (advertised via `extra.tabEndpoint`). |
+| `reqId`              | No       | Next request id advertised to the payer (via `extra.reqId`); the payer signs claims against it. |
 | `scheme`             | No       | Advertised scheme. Defaults to `"4mica"`.                               |
 | `x402Version`        | No       | Advertised x402 version.                                                |
 | `description`        | No       | Human-readable description of the protected resource.                   |
