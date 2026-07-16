@@ -74,11 +74,11 @@ export const en = {
       titleLine1: "The clearing house for",
       titleLine2: "the agentic economy",
       subtitle:
-        "4Mica gives agents one place to pay on credit, earn yield, and settle transactions without clearing every request on-chain.",
+        "4Mica gives agents one place to pay with credit, earn yield, and settle transactions without clearing every request on-chain.",
       supportedOn: "Supported on",
       supportedNetworks: {
-        base: "Base",
-        ethereumSepolia: "Ethereum Sepolia",
+        base: "Base Mainnet",
+        ethereumSepolia: "Base/Ethereum Sepolia Testnets",
         baseSepolia: "Base Sepolia",
       },
     },
@@ -305,7 +305,7 @@ await clearingHouse.claimNetCredit(
     },
     sections: {
       realCostKicker: "The real cost",
-      realCostTitle: "Agentic economy breaks at scale.",
+      realCostTitle: "Agentic payments break at scale.",
       realCostLead: "1M API calls, 10k USDC volume, 1 year.",
       howItWorksKicker: "How it works",
       howItWorksTitle: "Separate payment authorization from settlement",
