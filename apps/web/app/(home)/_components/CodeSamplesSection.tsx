@@ -4,7 +4,7 @@ import path from "node:path";
 import { highlight } from "@lib/shiki";
 import CodeSamplesPanel, { type CodeHtml } from "./CodeSamplesPanel";
 
-const SNIPPET_DIR = path.join(process.cwd(), "app/_components/snippets");
+const SNIPPET_DIR = path.join(process.cwd(), "app/(home)/_components/snippets");
 
 const read = (file: string) =>
   fs.readFileSync(path.join(SNIPPET_DIR, file), "utf8");

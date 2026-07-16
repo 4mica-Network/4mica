@@ -1,6 +1,6 @@
 import { links } from "@4mica/url";
 import { messages } from "@/i18n";
-import { solutions } from "../../app/solutions/data";
+import { solutions } from "../../app/(site)/solutions/data";
 
 export type NavLinkItem = {
   title: string;

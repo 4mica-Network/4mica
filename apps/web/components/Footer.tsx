@@ -4,7 +4,7 @@ import { links, routes } from "@4mica/url";
 import ThemeToggle from "@components/ThemeToggle";
 import Link from "next/link";
 import { messages } from "@/i18n";
-import { solutions } from "../app/solutions/data";
+import { solutions } from "../app/(site)/solutions/data";
 
 const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
 

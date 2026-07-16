@@ -3,14 +3,14 @@ import { readToc } from "@components/legal/readToc";
 import { metaFor } from "@seo/pages";
 import Content from "./content.mdx";
 
-export const metadata = metaFor("/dpa");
+export const metadata = metaFor("/legal/restricted-businesses");
 
-export default function DpaPage() {
-  const toc = readToc("app/dpa/content.mdx");
+export default function RestrictedBusinessesPage() {
+  const toc = readToc("app/(site)/legal/restricted-businesses/content.mdx");
 
   return (
     <LegalPage
-      title="Data Processing Agreement"
+      title="Restricted and prohibited businesses"
       lastUpdated="June 2026"
       toc={toc}
     >
