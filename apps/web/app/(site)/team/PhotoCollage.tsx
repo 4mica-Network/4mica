@@ -1,12 +1,14 @@
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { messages } from "@/i18n";
 
 const PHOTOS = messages.team.gallery;
 
-// CSS multi-column gives a real masonry flow with no JS and no measuring, which
-// keeps this a server component. `break-inside-avoid` stops a photo splitting
-// across a column boundary. Photos keep their natural aspect ratio — each one
-// carries its own intrinsic width/height, so there is no layout shift on load.
+// Per-tile tilt, by position. Presentation rather than copy, so it lives here
+// and not in the message catalogue. Kept small and irregular — a uniform angle
+// reads as a mistake, while these read as photos dropped on a table.
+const TILTS = ["-2.5deg", "1.8deg", "-1.2deg", "2.4deg", "-1.9deg", "1.3deg"];
+
 export default function PhotoCollage() {
   return (
     <div className="mt-24">
@@ -20,11 +22,15 @@ export default function PhotoCollage() {
         </p>
       </div>
 
-      <div className="mt-12 gap-4 space-y-4 sm:columns-2 lg:columns-3">
-        {PHOTOS.map((photo) => (
+      {/* CSS multi-column keeps the masonry flow with no JS and no measuring, so
+          this stays a server component. The uneven column heights are what give
+          the wall its staggered look. */}
+      <div className="photo-wall mx-auto mt-14 max-w-5xl gap-6 rounded-md px-4 py-8 sm:columns-2 sm:px-6 lg:columns-3">
+        {PHOTOS.map((photo, index) => (
           <figure
             key={photo.src}
-            className="group relative mb-4 break-inside-avoid overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25"
+            style={{ "--tilt": TILTS[index % TILTS.length] } as CSSProperties}
+            className="group/photo photo-tile relative mb-6 break-inside-avoid rounded-md border border-overlay/10 bg-surface-solid p-2 shadow-black/20 shadow-lg"
           >
             <Image
               src={photo.src}
@@ -32,7 +38,7 @@ export default function PhotoCollage() {
               width={photo.width}
               height={photo.height}
               sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-              className="h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+              className="h-auto w-full rounded-sm grayscale transition duration-500 ease-out group-hover/photo:grayscale-0"
             />
           </figure>
         ))}

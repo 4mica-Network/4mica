@@ -3,6 +3,7 @@ import Header from "@components/Header";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import Link from "next/link";
 import { messages } from "@/i18n";
+import OpenRolesSection from "./OpenRolesSection";
 import PhotoCollage from "./PhotoCollage";
 import TeamGrid from "./TeamGrid";
 
@@ -47,6 +48,9 @@ export default function LeadershipPage() {
 
           {/* Photo collage */}
           <PhotoCollage />
+
+          {/* Open roles CTA */}
+          <OpenRolesSection />
         </section>
       </div>
       <Footer />

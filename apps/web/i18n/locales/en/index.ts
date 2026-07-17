@@ -518,8 +518,8 @@ await clearingHouse.claimNetCredit(
     valuesLead: "The principles that guide how we build and work together.",
     benefitsKicker: "Benefits",
     benefitsTitle: "Perks & benefits",
-    cultureKicker: "Culture",
-    cultureTitle: "Life at 4Mica",
+    cultureKicker: "Team notes",
+    cultureTitle: "Voices from the team",
     cultureLead: "Notes from the team on what it's like to build here.",
     values: [
       {
@@ -857,10 +857,11 @@ await clearingHouse.claimNetCredit(
     howWeWorkLead:
       "We build with a security-first mindset and keep every protocol component auditable. The team ships with a focus on production reliability, clear integration paths, and measurable outcomes for partners.",
     readMission: "Read our mission",
-    galleryKicker: "Moments",
-    galleryTitle: "The team, off-script",
+    openRolesTitle: "Help us build the future of agentic commerce",
+    galleryKicker: "Culture",
+    galleryTitle: "Life at 4Mica",
     galleryLead:
-      "Conferences, offsites, and the everyday in between — a few moments from building 4Mica.",
+      "We're builders from all corners of the world who care deeply about our work, but we also know when to step back and enjoy life. Some of our best ideas come when we're not staring at screens.",
     gallery: [
       {
         src: "/team/team_2.avif",

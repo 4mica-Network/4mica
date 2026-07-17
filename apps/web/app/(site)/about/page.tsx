@@ -1,13 +1,13 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
+import ViewOpenRolesButton from "@components/ViewOpenRolesButton";
 import Image from "next/image";
 import Link from "next/link";
 import { messages } from "@/i18n";
 import { teamMembers } from "../team/data";
 import TimelineSection from "./_components/TimelineSection";
 import { companyInfo, highlights } from "./data";
-import ViewOpenRolesButton from "./ViewOpenRolesButton";
 
 export default function AboutPage() {
   const founders = teamMembers.slice(0, 2);
