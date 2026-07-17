@@ -12,7 +12,7 @@ interface Testimonial {
   avatar: string;
 }
 
-const testimonials: readonly Testimonial[] = messages.team.testimonials;
+const testimonials: readonly Testimonial[] = messages.careers.testimonials;
 
 function TestimonialCard({
   data,
@@ -78,12 +78,12 @@ export default function LifeAt4Mica() {
   return (
     <div className="mt-24">
       <div className="mx-auto max-w-2xl text-center">
-        <p className="section-kicker">{messages.team.cultureKicker}</p>
+        <p className="section-kicker">{messages.careers.cultureKicker}</p>
         <h2 className="section-title font-normal">
-          {messages.team.cultureTitle}
+          {messages.careers.cultureTitle}
         </h2>
         <p className="section-lead mx-auto max-w-2xl">
-          {messages.team.cultureLead}
+          {messages.careers.cultureLead}
         </p>
       </div>
 

@@ -513,6 +513,133 @@ await clearingHouse.claimNetCredit(
     ctaTitle: "Let's chat",
     ctaLead:
       "If you want to contribute, share research, or explore a partnership, reach out and we'll get back quickly.",
+    valuesKicker: "Values",
+    valuesTitle: "Our values",
+    valuesLead: "The principles that guide how we build and work together.",
+    benefitsKicker: "Benefits",
+    benefitsTitle: "Perks & benefits",
+    cultureKicker: "Culture",
+    cultureTitle: "Life at 4Mica",
+    cultureLead: "Notes from the team on what it's like to build here.",
+    values: [
+      {
+        title: "Relentless",
+        icon: "ri-fire-line",
+        desc: "We push through hard problems and don't stop until it ships.",
+      },
+      {
+        title: "Open",
+        icon: "ri-eye-line",
+        desc: "We default to transparency, open standards, and honest feedback.",
+      },
+      {
+        title: "Delightful",
+        icon: "ri-sparkling-2-line",
+        desc: "We obsess over the details that make every interaction effortless.",
+      },
+      {
+        title: "Unified",
+        icon: "ri-team-line",
+        desc: "We move as one team with shared goals and shared ownership.",
+      },
+      {
+        title: "Innovative",
+        icon: "ri-lightbulb-flash-line",
+        desc: "We question defaults and build what doesn't exist yet.",
+      },
+    ],
+    perks: [
+      {
+        title: "Competitive equity",
+        icon: "ri-money-dollar-circle-fill",
+        color: "text-purple-400",
+        desc: "We pay well and we pay fairly, with transparent compensation practices.",
+      },
+      {
+        title: "Health benefits",
+        icon: "ri-heart-pulse-fill",
+        color: "text-pink-400",
+        desc: "We've got you covered with comprehensive health, dental, and vision plans.",
+      },
+      {
+        title: "Equipment & office",
+        icon: "ri-computer-fill",
+        color: "text-blue-400",
+        desc: "You get a laptop, of course, plus an additional $1,000 USD to upgrade your home office.",
+      },
+      {
+        title: "Flexible time-off",
+        icon: "ri-time-fill",
+        color: "text-green-400",
+        desc: "Unlimited PTO and sick leave. When you work, we pay. When you don't work, we still pay.",
+      },
+      {
+        title: "Retirement benefits",
+        icon: "ri-bank-fill",
+        color: "text-sky-400",
+        desc: "We offer retirement support with coverage varying by country.",
+      },
+      {
+        title: "Paid leave",
+        icon: "ri-user-fill",
+        color: "text-yellow-400",
+        desc: "Time off to help you rest, care for loved ones, or welcome a new addition to your family.",
+      },
+      {
+        title: "L&D stipend",
+        icon: "ri-book-open-fill",
+        color: "text-pink-300",
+        desc: "Get $3,000 USD per year towards your professional learning and development.",
+      },
+      {
+        title: "Wellness stipend",
+        icon: "ri-settings-4-fill",
+        color: "text-orange-500",
+        desc: "Get $200 USD a month for a gym membership, new shoes, or the world's largest smoothie.",
+      },
+    ],
+    testimonials: [
+      {
+        id: "priya-protocol",
+        quote:
+          "The bar for correctness is high here — we move real money, and everyone treats it that way.",
+        name: "Priya S.",
+        role: "Protocol Engineer",
+        avatar: "PS",
+      },
+      {
+        id: "daniel-backend",
+        quote:
+          "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
+        name: "Daniel V.",
+        role: "Backend Engineer",
+        avatar: "DV",
+      },
+      {
+        id: "lena-research",
+        quote:
+          "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
+        name: "Lena K.",
+        role: "Cryptography Researcher",
+        avatar: "LK",
+      },
+      {
+        id: "marco-product",
+        quote:
+          "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
+        name: "Marco T.",
+        role: "Product",
+        avatar: "MT",
+      },
+      {
+        id: "sofia-security",
+        quote:
+          "Every line of the protocol is auditable, and so is every decision. That clarity is rare.",
+        name: "Sofia R.",
+        role: "Security Engineer",
+        avatar: "SR",
+      },
+    ],
   },
   pricing: {
     seo: {
@@ -730,131 +857,46 @@ await clearingHouse.claimNetCredit(
     howWeWorkLead:
       "We build with a security-first mindset and keep every protocol component auditable. The team ships with a focus on production reliability, clear integration paths, and measurable outcomes for partners.",
     readMission: "Read our mission",
-    valuesKicker: "Values",
-    valuesTitle: "Our values",
-    valuesLead: "The principles that guide how we build and work together.",
-    benefitsKicker: "Benefits",
-    benefitsTitle: "Perks & benefits",
-    cultureKicker: "Culture",
-    cultureTitle: "Life at 4Mica",
-    cultureLead: "Notes from the team on what it's like to build here.",
-    values: [
+    galleryKicker: "Moments",
+    galleryTitle: "The team, off-script",
+    galleryLead:
+      "Conferences, offsites, and the everyday in between — a few moments from building 4Mica.",
+    gallery: [
       {
-        title: "Relentless",
-        icon: "ri-fire-line",
-        desc: "We push through hard problems and don't stop until it ships.",
+        src: "/team/team_2.avif",
+        alt: "The 4Mica team and fellow builders gathered outside the Base Batches venue.",
+        width: 1600,
+        height: 1200,
       },
       {
-        title: "Open",
-        icon: "ri-eye-line",
-        desc: "We default to transparency, open standards, and honest feedback.",
+        src: "/team/team_3.avif",
+        alt: "Two 4Mica teammates at a Base community event.",
+        width: 1200,
+        height: 1600,
       },
       {
-        title: "Delightful",
-        icon: "ri-sparkling-2-line",
-        desc: "We obsess over the details that make every interaction effortless.",
+        src: "/team/team_1.avif",
+        alt: "A 4Mica founder presenting the protocol on stage at Base Batches.",
+        width: 1600,
+        height: 890,
       },
       {
-        title: "Unified",
-        icon: "ri-team-line",
-        desc: "We move as one team with shared goals and shared ownership.",
+        src: "/team/team_4.avif",
+        alt: "Two teammates in front of a fountain on a team offsite.",
+        width: 1200,
+        height: 1600,
       },
       {
-        title: "Innovative",
-        icon: "ri-lightbulb-flash-line",
-        desc: "We question defaults and build what doesn't exist yet.",
-      },
-    ],
-    perks: [
-      {
-        title: "Competitive equity",
-        icon: "ri-money-dollar-circle-fill",
-        color: "text-purple-400",
-        desc: "We pay well and we pay fairly, with transparent compensation practices.",
+        src: "/team/team_5.avif",
+        alt: "A teammate in front of a wall of brightly coloured lava lamps.",
+        width: 1600,
+        height: 1200,
       },
       {
-        title: "Health benefits",
-        icon: "ri-heart-pulse-fill",
-        color: "text-pink-400",
-        desc: "We've got you covered with comprehensive health, dental, and vision plans.",
-      },
-      {
-        title: "Equipment & office",
-        icon: "ri-computer-fill",
-        color: "text-blue-400",
-        desc: "You get a laptop, of course, plus an additional $1,000 USD to upgrade your home office.",
-      },
-      {
-        title: "Flexible time-off",
-        icon: "ri-time-fill",
-        color: "text-green-400",
-        desc: "Unlimited PTO and sick leave. When you work, we pay. When you don't work, we still pay.",
-      },
-      {
-        title: "Retirement benefits",
-        icon: "ri-bank-fill",
-        color: "text-sky-400",
-        desc: "We offer retirement support with coverage varying by country.",
-      },
-      {
-        title: "Paid leave",
-        icon: "ri-user-fill",
-        color: "text-yellow-400",
-        desc: "Time off to help you rest, care for loved ones, or welcome a new addition to your family.",
-      },
-      {
-        title: "L&D stipend",
-        icon: "ri-book-open-fill",
-        color: "text-pink-300",
-        desc: "Get $3,000 USD per year towards your professional learning and development.",
-      },
-      {
-        title: "Wellness stipend",
-        icon: "ri-settings-4-fill",
-        color: "text-orange-500",
-        desc: "Get $200 USD a month for a gym membership, new shoes, or the world's largest smoothie.",
-      },
-    ],
-    testimonials: [
-      {
-        id: "priya-protocol",
-        quote:
-          "The bar for correctness is high here — we move real money, and everyone treats it that way.",
-        name: "Priya S.",
-        role: "Protocol Engineer",
-        avatar: "PS",
-      },
-      {
-        id: "daniel-backend",
-        quote:
-          "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
-        name: "Daniel V.",
-        role: "Backend Engineer",
-        avatar: "DV",
-      },
-      {
-        id: "lena-research",
-        quote:
-          "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
-        name: "Lena K.",
-        role: "Cryptography Researcher",
-        avatar: "LK",
-      },
-      {
-        id: "marco-product",
-        quote:
-          "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
-        name: "Marco T.",
-        role: "Product",
-        avatar: "MT",
-      },
-      {
-        id: "sofia-security",
-        quote:
-          "Every line of the protocol is auditable, and so is every decision. That clarity is rare.",
-        name: "Sofia R.",
-        role: "Security Engineer",
-        avatar: "SR",
+        src: "/team/team_6.avif",
+        alt: "A teammate out in a snowy city street during a winter conference trip.",
+        width: 960,
+        height: 1280,
       },
     ],
   },

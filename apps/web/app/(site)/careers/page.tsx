@@ -3,8 +3,13 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { messages } from "@/i18n";
+import LifeAt4Mica from "./LifeAt4Mica";
 
 const GET_INVOLVED = messages.careers.getInvolved;
+
+const VALUES = messages.careers.values;
+
+const PERKS = messages.careers.perks;
 
 export default function CareersPage() {
   return (
@@ -47,6 +52,75 @@ export default function CareersPage() {
               ))}
             </div>
           </div>
+
+          {/* Our values */}
+          <div className="mt-24">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="section-kicker">{messages.careers.valuesKicker}</p>
+              <h2 className="section-title font-normal">
+                {messages.careers.valuesTitle}
+              </h2>
+              <p className="section-lead mx-auto max-w-2xl">
+                {messages.careers.valuesLead}
+              </p>
+            </div>
+
+            <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">
+              <div className="grid divide-y divide-overlay/10 lg:grid-cols-5 lg:divide-x lg:divide-y-0">
+                {VALUES.map((value) => (
+                  <div
+                    key={value.title}
+                    className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
+                  >
+                    <ShinyHoverBorder radiusClass="rounded-none" />
+                    <div className="relative z-10">
+                      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
+                        <i className={value.icon} />
+                      </div>
+                      <h3 className="font-semibold text-ink-strong text-xl">
+                        {value.title}
+                      </h3>
+                      <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                        {value.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Perks & benefits */}
+          <div className="mt-24">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="section-kicker">
+                {messages.careers.benefitsKicker}
+              </p>
+              <h2 className="section-title font-normal">
+                {messages.careers.benefitsTitle}
+              </h2>
+            </div>
+
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PERKS.map((perk) => (
+                <div
+                  key={perk.title}
+                  className="rounded-2xl border border-overlay/5 bg-overlay/3 p-6 transition-colors duration-300 hover:bg-overlay/5"
+                >
+                  <i className={`${perk.icon} text-2xl ${perk.color}`} />
+                  <h3 className="mt-6 font-semibold text-ink-strong text-lg">
+                    {perk.title}
+                  </h3>
+                  <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                    {perk.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Life at 4Mica */}
+          <LifeAt4Mica />
 
           {/* CTA */}
           <div className="mt-24 text-center">
