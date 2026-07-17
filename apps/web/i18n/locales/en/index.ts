@@ -518,6 +518,8 @@ await clearingHouse.claimNetCredit(
     valuesLead: "The principles that guide how we build and work together.",
     benefitsKicker: "Benefits",
     benefitsTitle: "Perks & benefits",
+    benefitsLead:
+      "The support and the resources to do your best work — wherever in the world you happen to be.",
     cultureKicker: "Team notes",
     cultureTitle: "Voices from the team",
     cultureLead: "Notes from the team on what it's like to build here.",

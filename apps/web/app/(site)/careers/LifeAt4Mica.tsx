@@ -76,7 +76,7 @@ export default function LifeAt4Mica() {
   });
 
   return (
-    <div className="mt-24">
+    <div className="mt-40">
       <div className="mx-auto max-w-2xl text-center">
         <p className="section-kicker">{messages.careers.cultureKicker}</p>
         <h2 className="section-title font-normal">

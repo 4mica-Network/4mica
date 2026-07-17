@@ -54,7 +54,7 @@ export default function CareersPage() {
           </div>
 
           {/* Our values */}
-          <div className="mt-24">
+          <div className="mt-40">
             <div className="mx-auto max-w-2xl text-center">
               <p className="section-kicker">{messages.careers.valuesKicker}</p>
               <h2 className="section-title font-normal">
@@ -90,15 +90,21 @@ export default function CareersPage() {
             </div>
           </div>
 
-          {/* Perks & benefits */}
-          <div className="mt-24">
-            <div className="mx-auto max-w-2xl text-center">
-              <p className="section-kicker">
-                {messages.careers.benefitsKicker}
+          {/* Perks & benefits — split header. Deliberately left-aligned to break
+              up the run of centered sections above and below it. */}
+          <div className="mt-40">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="max-w-xl">
+                <p className="section-kicker">
+                  {messages.careers.benefitsKicker}
+                </p>
+                <h2 className="section-title font-normal">
+                  {messages.careers.benefitsTitle}
+                </h2>
+              </div>
+              <p className="max-w-sm text-ink-body text-md leading-relaxed md:pb-2">
+                {messages.careers.benefitsLead}
               </p>
-              <h2 className="section-title font-normal">
-                {messages.careers.benefitsTitle}
-              </h2>
             </div>
 
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -123,7 +129,7 @@ export default function CareersPage() {
           <LifeAt4Mica />
 
           {/* CTA */}
-          <div className="mt-24 text-center">
+          <div className="mt-40 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
               {messages.careers.ctaTitle}
             </h2>
