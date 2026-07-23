@@ -5,12 +5,18 @@ import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
 import { faqSchema, pageSchema } from "@seo/structuredData";
+import Link from "next/link";
 import { messages } from "@/i18n";
 import SavingsCalculator from "./SavingsCalculator";
 
 export const metadata = metaFor("/pricing");
 
 const content = messages.pricing;
+
+// A single rhythm for the gap between sections, so every subject change gets
+// the same pause. Scales with the viewport: tight on phones, generous on
+// desktop where the eye has further to travel.
+const SECTION_GAP = "mt-28 sm:mt-36 lg:mt-44";
 
 function SectionHeader({
   kicker,
@@ -26,7 +32,9 @@ function SectionHeader({
   return (
     <div
       className={
-        align === "center" ? "mb-12 text-center" : "mb-10 max-w-2xl text-left"
+        align === "center"
+          ? "mb-14 text-center lg:mb-16"
+          : "mb-12 max-w-2xl text-left lg:mb-14"
       }
     >
       <p className="section-kicker">{kicker}</p>
@@ -44,9 +52,81 @@ function SectionHeader({
   );
 }
 
+function AudienceSection() {
+  return (
+    <section className={SECTION_GAP}>
+      <SectionHeader
+        kicker={content.audience.kicker}
+        title={content.audience.title}
+        lead={content.audience.lead}
+      />
+
+      <div className="overflow-hidden rounded-md border border-overlay/10">
+        <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          {content.audience.cards.map((card) => (
+            <Link
+              key={card.label}
+              href={card.href}
+              className={`group relative flex flex-col p-8 transition-colors duration-500 ${
+                "primary" in card && card.primary
+                  ? "bg-surface-solid hover:bg-surface"
+                  : "bg-surface hover:bg-surface-solid"
+              }`}
+            >
+              <ShinyHoverBorder radiusClass="rounded-none" />
+              <div className="relative z-10 flex flex-1 flex-col">
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-md border border-overlay/10 bg-overlay/5 text-2xl text-ink-strong">
+                    <i className={card.icon} />
+                  </div>
+                  {"primary" in card && card.primary ? (
+                    <span className="rounded-full border border-overlay/20 bg-overlay/10 px-2.5 py-0.5 text-ink-strong text-md">
+                      {content.audience.primaryBadge}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="font-medium text-ink-muted text-md uppercase tracking-widest">
+                  {card.label}
+                </p>
+                <h3 className="mt-2 font-semibold text-ink-strong text-xl">
+                  {card.title}
+                </h3>
+                <p className="mt-3 text-ink-muted text-md leading-relaxed">
+                  {card.desc}
+                </p>
+
+                <div className="mt-auto pt-6">
+                  <p className="text-ink-subtle text-md uppercase tracking-wider">
+                    {card.driver}
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 font-semibold text-ink-strong text-md">
+                    {card.label}
+                    <i className="ri-arrow-right-line text-md transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 flex gap-3 rounded-md border border-overlay/10 bg-surface-deep/25 px-6 py-5">
+        <i
+          className="ri-robot-2-line mt-0.5 shrink-0 text-ink-subtle text-xl"
+          aria-hidden="true"
+        />
+        <p className="text-ink-muted text-md leading-relaxed">
+          {content.audience.agentsNote}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function PricingModel() {
   return (
-    <section className="mt-20">
+    <section className={SECTION_GAP}>
       <SectionHeader
         kicker={content.model.kicker}
         title={content.model.title}
@@ -82,7 +162,7 @@ function PricingModel() {
 
 function FeeBreakdown() {
   return (
-    <section className="mt-24">
+    <section className={SECTION_GAP}>
       <SectionHeader
         kicker={content.fee.kicker}
         title={content.fee.title}
@@ -145,7 +225,7 @@ function FeeBreakdown() {
 
 function FacilitatorSavings() {
   return (
-    <section className="mt-24">
+    <section className={SECTION_GAP}>
       <SectionHeader
         kicker={content.facilitators.kicker}
         title={content.facilitators.title}
@@ -220,7 +300,7 @@ function FacilitatorSavings() {
 
 function YieldSection() {
   return (
-    <section className="mt-24">
+    <section className={SECTION_GAP}>
       <SectionHeader
         kicker={content.yieldSection.kicker}
         title={content.yieldSection.title}
@@ -254,8 +334,8 @@ function YieldSection() {
 
 function VolumePricing() {
   return (
-    <section className="mt-24">
-      <div className="grid gap-8 rounded-md border border-overlay/10 bg-surface-deep/25 p-8 sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+    <section className={SECTION_GAP}>
+      <div className="grid gap-8 rounded-md border border-overlay/10 bg-surface-deep/25 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
         <div>
           <p className="section-kicker">{content.volume.kicker}</p>
           <h2 className="section-title font-normal">{content.volume.title}</h2>
@@ -289,7 +369,7 @@ function VolumePricing() {
 
 function PricingFaq() {
   return (
-    <section id="faq" className="mt-24">
+    <section id="faq" className={SECTION_GAP}>
       <SectionHeader kicker={content.faqKicker} title={content.faqTitle} />
 
       <div className="w-full">
@@ -328,18 +408,14 @@ export default function PricingPage() {
         )}
       />
       <Header />
-      <div className="pt-36 pb-20">
+      <div className="pt-18 pb-32">
         <section className="w-full">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="section-kicker">{content.kicker}</p>
-            <h1 className="section-title font-normal">{content.title}</h1>
-            <p className="section-lead mx-auto max-w-2xl">{content.lead}</p>
-          </div>
-
+          <AudienceSection />
+          <FacilitatorSavings />
           <PricingModel />
           <FeeBreakdown />
 
-          <section className="mt-24">
+          <section className={SECTION_GAP}>
             <SectionHeader
               kicker={content.calculator.kicker}
               title={content.calculator.title}
@@ -348,12 +424,10 @@ export default function PricingPage() {
             <SavingsCalculator />
           </section>
 
-          <FacilitatorSavings />
           <YieldSection />
           <VolumePricing />
           <PricingFaq />
-
-          <section className="mt-24">
+          <section className={SECTION_GAP}>
             <SectionHeader
               kicker={content.includedKicker}
               title={content.includedTitle}
