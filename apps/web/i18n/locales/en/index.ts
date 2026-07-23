@@ -1,9 +1,12 @@
+import { partners } from "./partners";
+
 export const en = {
+  partners,
   common: {
     brandName: "4Mica",
     logoAlt: "4Mica logo",
     actions: {
-      talkToSales: "Talk to sales",
+      talkToSales: "Talk to our team",
       tryForFree: "Try for free",
       startBuilding: "Start building",
       seeHowItWorks: "See how it works",
@@ -36,6 +39,7 @@ export const en = {
     librariesAndSdksDescription: "TypeScript and Python",
     blog: "Blog",
     blogDescription: "Engineering notes and product updates",
+    partners: "Partners",
   },
   footer: {
     sections: {
@@ -55,6 +59,7 @@ export const en = {
       about: "About",
       jobs: "Jobs",
       team: "Team",
+      partners: "Partners",
       roadmap: "Roadmap",
       contactSales: "Contact sales",
     },
@@ -87,49 +92,69 @@ export const en = {
     },
     faqs: [
       {
-        question: "What exactly is a credit layer for x402?",
+        question: "Does 4Mica work with existing x402 clients?",
         answer:
-          "Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window, resulting in orders of magnitude fewer transactions.",
+          "Yes, as long as the client and server can register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use; sellers configure their x402 middleware to advertise and verify it. No change to your HTTP logic.",
       },
       {
-        question: "What is a payment tab?",
+        question: "What assets does 4Mica support?",
         answer:
-          "A tab is a credit session opened by the recipient (POST /tabs). It has a tabId, TTL, and version. Individual spends within the tab are identified by a reqId that increments with each signed guarantee.",
-      },
-      {
-        question: "What is a payment guarantee?",
-        answer:
-          "A payment guarantee is an EIP-712 signed claim that the payer attaches as an X-PAYMENT header. It commits to tabId, reqId, amounts, addresses, and timestamp. The facilitator verifies the signature and issues a BLS-signed certificate for on-chain settlement.",
+          "ETH and the ERC-20 tokens enabled by the active Core deployment. USDC and USDT are the defaults where enabled, and operators can configure others. A route only accepts the asset it advertises, so check the deployment's token list before going live.",
       },
       {
         question: "How does yield work?",
         answer:
-          "Stablecoin deposits route through Aave via depositStablecoin(). The protocol holds aTokens on your behalf. APY accrues continuously and offsets the cost of payments.",
+          "Configured stablecoin collateral is supplied to Aave, and the protocol holds the interest-bearing aTokens. Collateral keeps accruing while capacity is reserved for guarantees, and the yield belongs to the collateral position — the payer — not the seller. Yield is variable and not guaranteed, so verify the current deployment configuration before depositing production funds.",
       },
       {
-        question: "When do users settle?",
+        question: "What is a clearing layer?",
         answer:
-          "Users call payTabInERC20Token() after 7 days. If they don't, the recipient's on-chain claim window opens at day 14 (remunerationGracePeriod) and closes at day 21 (tabExpirationTime).",
+          "It is the layer between authorizing a payment and moving money. Instead of a transfer per request, buyers sign collateral-backed guarantees that are batched into clearing cycles. A cycle accepts guarantees, closes, computes net positions, and commits those positions on-chain — the same job a clearing house does for traditional payments.",
+      },
+      {
+        question: "How is 4Mica different from standard x402?",
+        answer:
+          "Standard x402 turns every request into its own on-chain transfer. 4Mica's 4mica-credit scheme authorizes the request against collateral-backed credit and settles later, so requests clear off-chain in one round trip and only net positions ever move on-chain.",
+      },
+      {
+        question: "Who should integrate 4Mica?",
+        answer:
+          "AI agent developers paying for APIs, data feeds, and model endpoints during a task; API and service providers who want to charge per request without accounts, subscriptions, invoices, or prepaid balances; marketplaces and agent-to-agent workflows tracking many small obligations. The fit is high-volume, low-value payments where checkout and invoicing infrastructure is the bottleneck.",
+      },
+      {
+        question: "How does 4Mica reduce settlement costs?",
+        answer:
+          "Authorization is separated from settlement. Per request there is an off-chain signature and a Core verification — no chain write, no gas. Payable guarantees then enter a clearing cycle and settle as net positions: 40 outgoing and 27 incoming guarantees become a single net debit of 13, so one movement replaces 67. Netting changes settlement movement, not payment history — every individual record stays intact.",
+      },
+      {
+        question: "Is 4Mica live on mainnet?",
+        answer:
+          "Yes. Base (eip155:8453) is the production network. Base Sepolia (eip155:84532) is the development network and Ethereum Sepolia (eip155:11155111) is there for cross-network compatibility testing. We recommend building against Base Sepolia first and moving to mainnet once your flows are tested.",
+      },
+      {
+        question: "How can facilitators integrate 4Mica?",
+        answer:
+          "Existing x402 facilitators add the 4mica-credit scheme to their /supported response, call Core from their settle logic to submit guarantees and return the BLS certificate, validate both V1 and V2 guarantee structures, and use CAIP-2 network identifiers. You can also point sellers at the hosted facilitator instead of running your own.",
+      },
+      {
+        question: "What is a payment guarantee?",
+        answer:
+          "The buyer's signed commitment to pay a specific amount to a specific recipient. It binds payer, recipient, amount, asset, request ID, and timestamp, and travels with the request. Core verifies the signature and available collateral, then issues a BLS certificate — that certificate is what proves the guarantee was accepted.",
+      },
+      {
+        question: "When does settlement happen?",
+        answer:
+          "Guarantees enter clearing cycles configured per deployment. A cycle accepts guarantees, closes, computes net positions, commits them on-chain, and opens the payment and finality windows. Check your deployment's parameters rather than assuming a fixed schedule.",
       },
       {
         question: "How are disputes handled?",
         answer:
-          "V2 guarantees use ERC-8004's ValidationRegistry. The payer signs a guarantee committing to a specific validator, agent, score threshold, and job hash. If the validation fails on-chain, remunerate() reverts and collateral stays locked. Validators post a 0–100 score on-chain.",
+          "V1 guarantees become payable once Core verifies them. V2 guarantees wait on a validation condition — a registry, validator, score threshold, and job hash committed in the signature — so payment is bound to an objectively verifiable outcome. 4Mica records signatures, certificates, lifecycle state, and settlement evidence; subjective quality, retries, and refunds stay a product policy decision.",
       },
       {
         question: "How do withdrawals work?",
         answer:
-          "Call requestWithdrawal() to start the timelock, then finalizeWithdrawal() after the withdrawalGracePeriod (default 22 days). A 6-hour synchronizationDelay prevents race conditions with open tabs.",
-      },
-      {
-        question: "Which assets are supported?",
-        answer:
-          "ETH and stablecoins. USDC and USDT are enabled by default. Other ERC-20s can be configured by the operator.",
-      },
-      {
-        question: "Does it work with existing x402 clients?",
-        answer:
-          "Yes. 4Mica is x402-compatible. Wrap your existing fetch or requests client with the 4Mica scheme adapter. One line of code. No changes to your server or HTTP logic.",
+          "Withdrawals are request-and-finalize with a delay in between. Finalization requires the configured grace period to pass and no obligations preventing it, so check open guarantees before withdrawing collateral. Durations are deployment parameters, not fixed constants.",
       },
     ],
     useCases: [
@@ -699,7 +724,7 @@ await clearingHouse.claimNetCredit(
           "Usage and settlement reporting",
           "Email support",
         ],
-        ctaLabel: "Talk to sales",
+        ctaLabel: "Talk to our team",
       },
       {
         name: "Enterprise",
@@ -952,6 +977,20 @@ await clearingHouse.claimNetCredit(
         "open source collaboration",
       ],
       imageAlt: "4Mica careers",
+    },
+    partners: {
+      title: "Partners | Build Agent Payments with 4Mica",
+      description:
+        "Partner with 4Mica: integrate credit-backed x402 payments, route agent traffic through the credit layer, or introduce the builders who need it.",
+      keywords: [
+        "4Mica partners",
+        "partner program",
+        "x402 integration",
+        "agent payments",
+        "technology partnership",
+        "referral partner",
+      ],
+      imageAlt: "4Mica partner program",
     },
     blog: {
       title: "Blog | Engineering Notes and Product Updates",

@@ -7,6 +7,7 @@ import { CAREERS_SEO } from "./careers";
 import { DPA_SEO } from "./dpa";
 import { HOME_SEO } from "./home";
 import { LEADERSHIP_SEO } from "./leadership";
+import { PARTNERS_SEO } from "./partners";
 import { PRICING_SEO } from "./pricing";
 import { PRIVACY_SEO } from "./privacy";
 import { RESTRICTED_BUSINESSES_SEO } from "./restrictedBusinesses";
@@ -61,6 +62,7 @@ const STATIC_PAGES = {
   "/blog": BLOG_SEO,
   "/careers": CAREERS_SEO,
   "/team": LEADERSHIP_SEO,
+  "/partners": PARTNERS_SEO,
   "/privacy": PRIVACY_SEO,
   "/solution": SOLUTION_SEO,
   "/terms": TERMS_SEO,

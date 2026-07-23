@@ -86,4 +86,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: messages.navigation.pricing,
     href: "/pricing",
   },
+  {
+    label: messages.navigation.partners,
+    href: links.partners,
+  },
 ];

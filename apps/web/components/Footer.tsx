@@ -100,6 +100,9 @@ export default function Footer() {
             <Link href={routes.team} className={footerLinkClass}>
               {messages.footer.company.team}
             </Link>
+            <Link href={routes.partners} className={footerLinkClass}>
+              {messages.footer.company.partners}
+            </Link>
             <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
               {messages.footer.company.roadmap}
             </Link>
