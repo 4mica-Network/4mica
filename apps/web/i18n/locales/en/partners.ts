@@ -74,7 +74,7 @@ export const partners = {
         title: "Route payments through the credit layer",
         desc: "For facilitators, wallets, and infrastructure providers that move agent traffic and want it settled net rather than per request.",
         points: [
-          "Facilitator endpoints for tabs, verification, and settlement",
+          "Facilitator endpoints for verification, settlement, and BLS certificates",
           "Coverage across Base and Ethereum networks",
           "Shared operational runbooks and status reporting",
         ],
@@ -154,7 +154,7 @@ export const partners = {
       {
         order: "02",
         title: "Design the integration",
-        desc: "We scope the flow together — tabs, limits, settlement cadence — and agree the commercial terms in writing.",
+        desc: "We scope the flow together — guarantees, spending limits, settlement cadence — and agree the commercial terms in writing.",
       },
       {
         order: "03",
@@ -205,7 +205,7 @@ export const partners = {
       {
         question: "How long does an integration take?",
         answer:
-          "It depends on your stack, but the protocol surface is deliberately small — open a tab, authorize requests against a limit, settle the cycle. We scope the work with you before anything is committed.",
+          "It depends on your stack, but the protocol surface is deliberately small — sign a guarantee, authorize the request against a limit, settle the cycle. We scope the work with you before anything is committed.",
       },
       {
         question: "How do commercial terms work?",

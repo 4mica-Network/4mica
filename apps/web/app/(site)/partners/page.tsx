@@ -1,8 +1,10 @@
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
+import { faqSchema, pageSchema } from "@seo/structuredData";
 import Image from "next/image";
 import Link from "next/link";
 import { PARTNERS } from "@/app/(home)/data";
@@ -95,7 +97,7 @@ function EcosystemLogos() {
           >
             <Image
               src={partner.logo}
-              alt={partner.name}
+              alt={`${partner.name} logo`}
               width={160}
               height={48}
               className={`max-h-12 w-auto object-contain grayscale filter transition-all duration-300 hover:grayscale-0 ${
@@ -388,6 +390,12 @@ function PartnerFaq() {
 export default function PartnersPage() {
   return (
     <div className="min-h-screen">
+      <JsonLd
+        data={pageSchema(
+          [{ name: "Partners", path: "/partners" }],
+          [faqSchema("/partners", content.faq.items)],
+        )}
+      />
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">

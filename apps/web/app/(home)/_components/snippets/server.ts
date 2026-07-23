@@ -17,12 +17,12 @@ app.use(
         },
       },
     },
-    { advertisedEndpoint: "https://api.example.com/tabs" },
+    { advertisedEndpoint: "https://api.example.com/x402" },
     undefined,
     [
       {
         network: "eip155:84532",
-        server: new FourMicaEvmScheme("https://api.example.com/tabs"),
+        server: new FourMicaEvmScheme("https://api.example.com/x402"),
       },
     ],
   ),

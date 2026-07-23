@@ -1,6 +1,8 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
+import { pageSchema } from "@seo/structuredData";
 import Link from "next/link";
 import { messages } from "@/i18n";
 import OpenRolesSection from "./OpenRolesSection";
@@ -10,6 +12,7 @@ import TeamGrid from "./TeamGrid";
 export default function LeadershipPage() {
   return (
     <div className="min-h-screen">
+      <JsonLd data={pageSchema([{ name: "Team", path: "/team" }])} />
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">

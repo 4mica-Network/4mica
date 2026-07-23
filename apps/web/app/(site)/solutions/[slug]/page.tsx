@@ -1,8 +1,10 @@
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaForSolution } from "@seo/pages";
+import { solutionSchema } from "@seo/structuredData";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -184,7 +186,7 @@ function SolutionResources({ solution }: { solution: SolutionContent }) {
           <SectionHeader
             kicker="Integrations"
             title="Works with the stack you already use"
-            lead="Use 4Mica through x402-compatible HTTP clients, SDKs, protocol docs, and direct rollout support."
+            lead="Use 4Mica through x402-compatible HTTP clients, SDKs, any x402 facilitator, and the settlement infrastructure behind them."
             align="left"
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -262,6 +264,7 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
 
   return (
     <div className="min-h-screen">
+      <JsonLd data={solutionSchema(solution)} />
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">

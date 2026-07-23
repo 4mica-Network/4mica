@@ -86,7 +86,7 @@ export const solutions: SolutionContent[] = [
           },
           {
             title: "Control spend windows",
-            desc: "Set tab limits, TTLs, and settlement windows so agents can move quickly inside defined risk bounds.",
+            desc: "Set spending limits, expiry, and settlement windows so agents can move quickly inside defined risk bounds.",
             icon: "ri-timer-flash-line",
           },
           {
@@ -115,8 +115,8 @@ export const solutions: SolutionContent[] = [
     process: [
       {
         order: "01",
-        title: "Open a tab for the agent",
-        desc: "Create a credit session with a TTL, payer, recipient, and terms the agent can spend against.",
+        title: "Give the agent credit",
+        desc: "Back the agent with collateral and the spending limits, payer, recipient, and terms it can sign against.",
       },
       {
         order: "02",
@@ -138,7 +138,7 @@ export const solutions: SolutionContent[] = [
       },
       {
         title: "Protocol docs",
-        desc: "Read the tab, guarantee, and settlement flows before production rollout.",
+        desc: "Read the guarantee, clearing, and settlement flows before production rollout.",
         icon: "ri-book-open-line",
         href: links.docs,
       },
@@ -164,7 +164,7 @@ export const solutions: SolutionContent[] = [
       {
         question: "How do providers know a request will be paid?",
         answer:
-          "Providers verify the guarantee, tab, payer, amount, and terms before serving the resource.",
+          "Providers verify the guarantee, payer, amount, asset, and terms before serving the resource.",
       },
     ],
   },
@@ -484,7 +484,7 @@ export const solutions: SolutionContent[] = [
     resources: [
       {
         title: "Marketplace payment design",
-        desc: "Model buyer tabs, seller claims, and cycle settlement for your market.",
+        desc: "Model buyer guarantees, seller claims, and cycle settlement for your market.",
         icon: "ri-store-2-line",
         href: links.docs,
       },
@@ -556,7 +556,7 @@ export const solutions: SolutionContent[] = [
           },
           {
             title: "Standardize billing primitives",
-            desc: "Give teams the same tab, guarantee, and settlement model across many products.",
+            desc: "Give teams the same credit, guarantee, and settlement model across many products.",
             icon: "ri-instance-line",
           },
           {
@@ -648,7 +648,7 @@ export const solutions: SolutionContent[] = [
     points: [
       {
         title: "Auditable by default",
-        desc: "Every tab, guarantee, and settlement is verifiable end to end.",
+        desc: "Every guarantee, clearing cycle, and settlement is verifiable end to end.",
         icon: "ri-file-shield-2-line",
       },
       {
@@ -688,7 +688,7 @@ export const solutions: SolutionContent[] = [
         cards: [
           {
             title: "Audit every obligation",
-            desc: "Trace tabs, signed guarantees, settlement certificates, and claims end to end.",
+            desc: "Trace signed guarantees, BLS certificates, clearing cycles, and claims end to end.",
             icon: "ri-search-eye-line",
           },
           {

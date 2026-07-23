@@ -15,10 +15,24 @@ const { base } = new LinkConfig({
 });
 const metadataBase = new URL(base);
 
+// Search-engine ownership verification. Set the tokens as build-time env vars
+// (GitHub repo variables -> apps/web/.env) and the meta tags appear on every
+// page; unset, nothing is emitted.
+const verification = {
+  google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+  other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+    ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION }
+    : undefined,
+};
+
 export const metadata: Metadata = {
   ...metaFor("/"),
   metadataBase,
+  applicationName: "4Mica",
   authors: [{ name: "Mairon Mahzoun" }],
+  creator: "4Mica",
+  publisher: "4Mica",
+  verification,
 };
 
 export default function RootLayout({

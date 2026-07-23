@@ -1,6 +1,6 @@
 ---
 title: How 4Mica works
-description: A walkthrough of the credit layer behind x402 payments — how a tab is opened, how requests are authorized, and how a cycle settles on-chain.
+description: A walkthrough of the x402 credit and clearing layer — how an agent gets credit, how requests clear off-chain, and how a cycle settles net on-chain.
 date: 2026-07-15
 author: Mairon Mahzoun
 authorAvatar: /assets/mairon.jpg
@@ -9,7 +9,7 @@ category: Engineering
 tags: [x402, credit, settlement]
 thumbnail: /blog/how-4mica-works/hero.svg
 thumbnailAlt: Diagram of the 4Mica credit and settlement flow
-keywords: [x402 credit layer, agent payments, on-chain settlement]
+keywords: [x402 credit layer, agentic payments, payment clearing, settlement infrastructure]
 ---
 
 Agents make a lot of very small requests. Paying for each of them on-chain is
@@ -18,11 +18,11 @@ could be doing something useful. 4Mica sits between the two: agents pay on
 credit, requests clear instantly, and the resulting balance settles on-chain
 once per cycle.
 
-## Opening a tab
+## Giving an agent credit
 
-A tab is the running balance between one payer and one service. The client
-registers the 4Mica credit scheme once, then keeps using the same `fetch` it
-already had — the scheme negotiates the tab on the first paid request.
+Credit comes from one collateral position, not from a balance per counterparty.
+The client registers the `4mica-credit` scheme once and keeps using the same
+`fetch` it already had — every paid request is then signed against that credit.
 
 ```typescript
 import { FourMicaEvmScheme } from "@4mica/x402/client";
@@ -43,9 +43,9 @@ const response = await fetchWithPayment("https://api.example.com/data");
 ## Authorizing a request
 
 On the server side the middleware advertises a price per route. When a request
-arrives, the facilitator checks the payer's remaining credit against the price,
-records the charge on the tab, and answers in a single round trip. Nothing
-touches the chain yet.
+arrives, the payer signs a guarantee for that amount, the facilitator submits it
+to Core, and Core verifies the signature and available collateral before
+returning a BLS certificate — one round trip, no chain write.
 
 ```typescript
 import { FourMicaEvmScheme } from "@4mica/x402/server";
@@ -63,27 +63,27 @@ app.use(
         },
       },
     },
-    { advertisedEndpoint: "https://api.example.com/tabs" },
+    { advertisedEndpoint: "https://api.example.com/x402" },
   ),
 );
 ```
 
-Because the check is a balance lookup rather than a transfer, authorization
-stays in the millisecond range even when an agent is issuing thousands of calls
+Because authorization is a signature check against available collateral rather
+than a transfer, it stays fast even when an agent is issuing thousands of calls
 a minute.
 
 ![The 4Mica request flow: agent, facilitator, and settlement](/blog/how-4mica-works/flow.svg)
 
-## Settling the cycle
+## Settling the clearing cycle
 
-At the end of a cycle every tab is netted down to a single figure per
-counterparty, and only that figure moves on-chain. A thousand `$0.01` calls
-become one settlement, so the on-chain cost is amortized across the whole cycle
-rather than paid per request.
+Payable guarantees accumulate into a clearing cycle. The cycle closes, computes
+net positions per counterparty, and commits only those net positions on-chain.
+Forty outgoing and twenty-seven incoming guarantees become a single net debit of
+thirteen — one movement instead of sixty-seven.
 
-Each settlement carries the tab records that produced it, which is what makes
-the result auditable after the fact: the netted amount can always be expanded
-back into the individual charges behind it.
+Netting changes settlement movement, not payment history. Every guarantee and
+certificate behind a net position stays on record, so a settled figure can
+always be expanded back into the individual charges that produced it.
 
 ## What it means for integrations
 

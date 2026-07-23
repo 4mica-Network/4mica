@@ -82,7 +82,7 @@ export const en = {
       titleLine1: "The clearing house for",
       titleLine2: "the agentic economy",
       subtitle:
-        "4Mica gives agents one place to pay with credit, earn yield, and settle transactions without clearing every request on-chain.",
+        "4Mica is the credit and clearing layer for x402: agents pay for APIs with stablecoin-backed credit, earn yield on collateral, and settle net on-chain instead of clearing every request.",
       supportedOn: "Supported on",
       supportedNetworks: {
         base: "Base Mainnet",
@@ -338,8 +338,9 @@ await clearingHouse.claimNetCredit(
       howItWorksKicker: "How it works",
       howItWorksTitle: "Separate payment authorization from settlement",
       howItWorksLead:
-        "Pay with programmable cryptographic credit. Settle thousands of payments in one on-chain transaction.",
-      howItWorksProtocolNote: "Same x402 protocol. Same HTTP clients.",
+        "Pay with programmable cryptographic credit. Payment clearing runs off-chain, so thousands of API payments settle in one on-chain transaction.",
+      howItWorksProtocolNote:
+        "Same x402 protocol. Same HTTP clients. Works with any x402 facilitator.",
       replaceTransactions: "Replace thousands of transactions",
       oneSettlement: "one net settlement per cycle",
       includedKicker: "Included",
@@ -367,7 +368,7 @@ await clearingHouse.claimNetCredit(
     sections: {
       community: {
         kicker: "Community",
-        title: "Build the payment tab standard",
+        title: "Build the agentic payments standard",
         lead: "We are building in public with developers who ship infra. Join the discussion, open issues, and help shape the protocol.",
         joinCommunity: "Join Community",
       },
@@ -392,7 +393,7 @@ await clearingHouse.claimNetCredit(
       about: {
         kicker: "About Us",
         title: "The credit layer for instant, on-chain commerce",
-        lead: "4Mica issues cryptographic payment tabs that keep capital productive while delivering real-time UX. We help teams monetize APIs and on-chain commerce without forcing users to pre-fund every request.",
+        lead: "4Mica is the credit and clearing layer for x402 payments: agents pay on credit against collateral, requests clear instantly, and balances settle net on-chain. We help teams monetize APIs and agentic commerce without forcing users to pre-fund every request.",
         learnMore: "Learn more",
       },
       team: {
@@ -500,8 +501,9 @@ await clearingHouse.claimNetCredit(
     steps: [
       {
         step: "01",
-        title: "Recipient opens a tab",
-        description: "Create a tab_id with asset and limits for a user",
+        title: "Deposit collateral once",
+        description:
+          "One collateral position backs credit across every service an agent pays",
       },
       {
         step: "02",
@@ -510,9 +512,9 @@ await clearingHouse.claimNetCredit(
       },
       {
         step: "03",
-        title: "User settles after 7 days",
+        title: "Settle net, once per cycle",
         description:
-          "Settle later, or claim collateral after the on-chain grace period",
+          "Payable guarantees enter a clearing cycle and settle as net positions on-chain",
       },
     ],
   },
@@ -673,21 +675,23 @@ await clearingHouse.claimNetCredit(
   },
   pricing: {
     seo: {
-      title: "4Mica Pricing | Usage-Based Credit Payments",
+      title: "Pricing for x402 API Payments | 4Mica",
       description:
-        "Simple, usage-based pricing for 4Mica's credit-backed payment rails. Start free on testnets and pay as you settle.",
+        "Usage-based pricing for 4Mica's x402 credit and clearing layer. Start free on testnets, pay as you settle, and charge per API request in stablecoins.",
       keywords: [
         "4Mica pricing",
-        "usage-based pricing",
-        "payment infrastructure pricing",
         "x402 pricing",
-        "credit payments",
+        "API payments",
+        "stablecoin payments",
+        "usage-based pricing",
+        "payment credit",
+        "settlement infrastructure",
       ],
-      imageAlt: "4Mica pricing",
+      imageAlt: "4Mica pricing for x402 API payments",
     },
     kicker: "Pricing",
     title: "Pricing that scales with settlement volume",
-    lead: "Build free on testnets, then move to volume-based pricing when payments clear on mainnet. No per-request gas billing, no surprise settlement line items.",
+    lead: "Build free on testnets, then move to volume-based pricing when payments clear on mainnet. Charge for API payments in stablecoins with no per-request gas billing and no surprise settlement line items.",
     collateralNote:
       "Collateral stays in your control and earns yield — 4Mica never holds funds.",
     includedKicker: "Included",
@@ -785,13 +789,13 @@ await clearingHouse.claimNetCredit(
         title: "Credit-backed UX",
         icon: "ri-bank-card-line",
         description:
-          "Issue cryptographic tabs so users can pay instantly without prefunding each call.",
+          "Agents pay on credit against collateral, so no one prefunds a balance for every API call.",
       },
       {
         title: "Guaranteed settlement",
         icon: "ri-shield-check-line",
         description:
-          "BLS guarantees and enforceable claims keep every tab auditable and recoverable.",
+          "BLS-certified guarantees and enforceable claims keep every payment auditable and recoverable.",
       },
       {
         title: "Cross-chain ready",
@@ -815,7 +819,7 @@ await clearingHouse.claimNetCredit(
       {
         label: "Core product",
         icon: "ri-stack-line",
-        value: "Tabs, guarantees, settlement APIs",
+        value: "Guarantees, clearing cycles, settlement APIs",
       },
       {
         label: "Integrations",
@@ -937,6 +941,7 @@ await clearingHouse.claimNetCredit(
     tableOfContents: "Table of contents",
   },
   blog: {
+    heading: "The 4Mica blog: x402, agentic payments, and settlement",
     allArticles: "All articles",
     minRead: "min read",
     empty: "No posts yet — check back soon.",
@@ -949,23 +954,26 @@ await clearingHouse.claimNetCredit(
   },
   seo: {
     home: {
-      title: "4Mica | Credit Layer for x402 Agent Payments",
+      title: "4Mica | x402 Credit and Clearing Layer for Agent Payments",
       description:
-        "4Mica is the clearinghouse for the agentic economy, enabling x402-compatible agents and APIs to pay on credit, net transactions, and settle on-chain.",
+        "4Mica is the credit and clearing layer for x402: AI agents pay for APIs with stablecoin-backed credit, clear requests instantly, and settle net on-chain.",
       keywords: [
         "4Mica",
+        "x402",
         "x402 credit layer",
-        "agent payments",
+        "agentic payments",
+        "agentic commerce",
+        "payment clearing",
+        "settlement infrastructure",
+        "payment credit",
+        "API payments",
+        "stablecoin payments",
         "AI agent payments",
-        "on-chain credit",
-        "web3 payment infrastructure",
-        "micropayments",
-        "agentic economy",
       ],
-      imageAlt: "4Mica credit layer for x402 payments",
+      imageAlt: "4Mica x402 credit and clearing layer for agentic payments",
     },
     careers: {
-      title: "Careers | Build Agent Payment Infrastructure",
+      title: "Careers | Build x402 Settlement Infrastructure | 4Mica",
       description:
         "Explore collaboration and contribution opportunities with 4Mica as we build credit-backed payment infrastructure for web3 commerce.",
       keywords: [
@@ -979,32 +987,35 @@ await clearingHouse.claimNetCredit(
       imageAlt: "4Mica careers",
     },
     partners: {
-      title: "Partners | Build Agent Payments with 4Mica",
+      title: "x402 Facilitator and Integration Partners | 4Mica",
       description:
-        "Partner with 4Mica: integrate credit-backed x402 payments, route agent traffic through the credit layer, or introduce the builders who need it.",
+        "Partner with 4Mica: integrate credit-backed x402 payments, run facilitator infrastructure on the clearing layer, or refer the teams building agentic commerce.",
       keywords: [
         "4Mica partners",
-        "partner program",
+        "x402 facilitators",
+        "facilitator infrastructure",
         "x402 integration",
-        "agent payments",
-        "technology partnership",
+        "agentic payments",
+        "settlement infrastructure",
+        "partner program",
         "referral partner",
       ],
-      imageAlt: "4Mica partner program",
+      imageAlt: "4Mica x402 facilitator and integration partner program",
     },
     blog: {
-      title: "Blog | Engineering Notes and Product Updates",
+      title: "Blog | x402 and Agentic Payments | 4Mica",
       description:
-        "Deep dives on x402, credit-backed settlement, and agent payment infrastructure from the team building 4Mica.",
+        "Engineering deep dives on x402, payment clearing, credit-backed settlement, and the infrastructure behind agentic commerce, from the team building 4Mica.",
       keywords: [
         "4Mica blog",
         "x402",
-        "agent payments",
-        "credit-backed payments",
-        "payment infrastructure",
+        "agentic payments",
+        "payment clearing",
+        "settlement infrastructure",
+        "payment credit",
         "engineering blog",
       ],
-      imageAlt: "4Mica blog",
+      imageAlt: "4Mica blog on x402 and agentic payments",
     },
   },
 } as const;

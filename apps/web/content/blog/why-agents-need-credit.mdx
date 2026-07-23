@@ -44,7 +44,8 @@ costs exactly one round trip.
 - **One line, many counterparties.** Capital backs the payer, not each
   individual relationship, so adding a service costs nothing up front.
 - **Instant authorization.** Checking a limit is a lookup, not a transfer.
-- **Netted settlement.** Charges accumulate on a tab and settle once per cycle,
+- **Netted settlement.** Guarantees accumulate into a clearing cycle and settle
+  as net positions,
   so on-chain cost is amortized instead of paid per request.
 - **Auditable by construction.** Every netted settlement expands back into the
   individual charges that produced it.

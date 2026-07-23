@@ -1,7 +1,9 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import ViewOpenRolesButton from "@components/ViewOpenRolesButton";
+import { pageSchema } from "@seo/structuredData";
 import Image from "next/image";
 import Link from "next/link";
 import { messages } from "@/i18n";
@@ -15,6 +17,7 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen">
+      <JsonLd data={pageSchema([{ name: "About", path: "/about" }])} />
       <Header />
       <div className="pt-64 pb-20">
         <section className="w-full">
@@ -161,7 +164,7 @@ export default function AboutPage() {
                         >
                           <Image
                             src={founder.image}
-                            alt={founder.name}
+                            alt={`${founder.name}, ${founder.role} at 4Mica`}
                             width={56}
                             height={56}
                             className="h-full w-full object-cover"

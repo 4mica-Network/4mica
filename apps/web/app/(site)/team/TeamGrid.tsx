@@ -51,7 +51,7 @@ function TeamMemberCard({ member }: { member: Member }) {
         >
           <Image
             src={member.image}
-            alt={member.name}
+            alt={`${member.name}, ${member.role} at 4Mica`}
             fill
             sizes="176px"
             quality={100}

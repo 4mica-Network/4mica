@@ -1,7 +1,9 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
+import { pageSchema } from "@seo/structuredData";
 import Image from "next/image";
 
 export const metadata = metaFor("/solution");
@@ -60,7 +62,7 @@ const ARCHITECTURE_STEPS = [
   {
     title: "Instant value-exchange",
     icon: "ri-flashlight-line",
-    desc: "Cryptographic payment tabs.",
+    desc: "Collateral-backed payment guarantees.",
   },
   {
     title: "Settlement on L1",
@@ -90,6 +92,7 @@ const CONFIG_CARDS = [
 export default function SolutionPage() {
   return (
     <div className="min-h-screen">
+      <JsonLd data={pageSchema([{ name: "Solution", path: "/solution" }])} />
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">
@@ -100,6 +103,11 @@ export default function SolutionPage() {
               Credit-backed, capital-efficient, and instant payments for any
               service — web3 or traditional.
             </h1>
+            <p className="section-lead mx-auto max-w-2xl">
+              4Mica is the payment clearing and settlement infrastructure behind
+              x402: agents and APIs pay on credit, any x402 facilitator can
+              verify the request, and balances settle net in stablecoins.
+            </p>
           </div>
 
           {/* Problem + Case study — one connected block */}
@@ -149,7 +157,7 @@ export default function SolutionPage() {
                   </div>
                   <Image
                     src="/assets/aligned_layer_logo.png"
-                    alt="Aligned Layer"
+                    alt="Aligned Layer logo — 4Mica API monetization case study"
                     width={320}
                     height={120}
                     className="mb-6 h-12 w-auto object-contain opacity-90"
@@ -188,7 +196,9 @@ export default function SolutionPage() {
           <div className="mt-24">
             <div className="mx-auto max-w-2xl text-center">
               <p className="section-kicker">How it works</p>
-              <h2 className="section-title font-normal">The 4Mica solution</h2>
+              <h2 className="section-title font-normal">
+                The 4Mica clearing and settlement layer
+              </h2>
             </div>
 
             <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">

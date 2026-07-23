@@ -264,7 +264,7 @@ export default function PartnersSection() {
                 >
                   <Image
                     src={partner.logo}
-                    alt={partner.name}
+                    alt={`${partner.name} logo`}
                     width={160}
                     height={48}
                     className={`max-h-12 w-auto object-contain grayscale filter transition-all duration-300 hover:grayscale-0 ${

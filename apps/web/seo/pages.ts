@@ -27,19 +27,44 @@ import { TERMS_SEO } from "./terms";
 export const pathToSlug = (path: string): string =>
   path === "/" ? "home" : path.replace(/^\/+|\/+$/g, "").replace(/\//g, "-");
 
+// Google truncates meta descriptions around 160 characters. Prefer the longest
+// run of whole sentences that fits; fall back to a word-boundary cut when even
+// the first sentence is too long, so a description is never chopped mid-word.
+const DESCRIPTION_LIMIT = 160;
+
+export const clampDescription = (text: string): string => {
+  if (text.length <= DESCRIPTION_LIMIT) return text;
+
+  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g) ?? [];
+  let kept = "";
+  for (const sentence of sentences) {
+    if ((kept + sentence).trim().length > DESCRIPTION_LIMIT) break;
+    kept += sentence;
+  }
+  kept = kept.trim();
+
+  // A single-sentence prefix that drops most of the text reads as truncated
+  // copy rather than a summary, so only accept a reasonably full one.
+  if (kept.length >= 110) return kept;
+
+  const cut = text.slice(0, DESCRIPTION_LIMIT - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ")).trimEnd()}…`;
+};
+
 // Module-private metadata factory — the only caller is this registry.
 const buildMetadata = (seo: PageSeo): Metadata => {
   const ogImage = `/og/${pathToSlug(seo.path)}`;
+  const description = clampDescription(seo.description);
 
   return {
     title: seo.title,
-    description: seo.description,
+    description,
     keywords: seo.keywords,
     robots: "index, follow",
     alternates: { canonical: seo.path },
     openGraph: {
       title: seo.title,
-      description: seo.description,
+      description,
       url: seo.path,
       siteName: SITE_NAME,
       images: [{ url: ogImage, width: 1200, height: 630, alt: seo.imageAlt }],
@@ -48,7 +73,7 @@ const buildMetadata = (seo: PageSeo): Metadata => {
     twitter: {
       card: "summary_large_image",
       title: seo.title,
-      description: seo.description,
+      description,
       images: [ogImage],
     },
   };
@@ -90,16 +115,19 @@ export const metaForSolution = (slug: string): Metadata | undefined => {
 
   return buildMetadata({
     path: solutionPath(solution.slug),
-    title: `4Mica for ${solution.label}`,
+    title: `${solution.label} | x402 Agentic Payments | 4Mica`,
     description: solution.intro,
     keywords: [
       "4Mica",
       solution.label,
-      "credit-backed payments",
-      "instant settlement",
       "x402",
+      "agentic payments",
+      "payment credit",
+      "payment clearing",
+      "settlement infrastructure",
+      "stablecoin payments",
     ],
-    imageAlt: `4Mica for ${solution.label}`,
+    imageAlt: `4Mica x402 credit and settlement for ${solution.label.toLowerCase()}`,
   });
 };
 

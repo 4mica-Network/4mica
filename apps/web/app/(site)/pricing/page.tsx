@@ -2,8 +2,10 @@ import { cn } from "@4mica/ui";
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
+import { pageSchema } from "@seo/structuredData";
 import Link from "next/link";
 import { messages } from "@/i18n";
 
@@ -117,6 +119,7 @@ function PricingCard({ tier }: { tier: Tier }) {
 export default function PricingPage() {
   return (
     <div className="min-h-screen">
+      <JsonLd data={pageSchema([{ name: "Pricing", path: "/pricing" }])} />
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">

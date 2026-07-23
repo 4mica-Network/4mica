@@ -2,8 +2,10 @@ import FeaturedPost from "@components/blog/FeaturedPost";
 import PostList from "@components/blog/PostList";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
 import { getAllBlogPosts } from "@lib/blog";
 import { metaFor } from "@seo/pages";
+import { blogListSchema } from "@seo/structuredData";
 import { messages } from "@/i18n";
 
 export const metadata = metaFor("/blog");
@@ -14,9 +16,11 @@ export default function BlogPage() {
 
   return (
     <div className="min-h-screen">
+      <JsonLd data={blogListSchema(posts)} />
       <Header />
       <div className="pt-28 pb-20">
         <section className="w-full">
+          <h1 className="sr-only">{messages.blog.heading}</h1>
           {featured ? (
             <>
               <FeaturedPost post={featured} />

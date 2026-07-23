@@ -1,6 +1,8 @@
 import BlogPostLayout from "@components/blog/BlogPostLayout";
+import JsonLd from "@components/JsonLd";
 import { getBlogPost, getBlogSlugs } from "@lib/blog";
 import { metaForBlogPost } from "@seo/pages";
+import { blogPostSchema } from "@seo/structuredData";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -30,8 +32,11 @@ export default async function BlogPostPage({ params }: RouteParams) {
   const { default: Post } = await import(`@/content/blog/${slug}.mdx`);
 
   return (
-    <BlogPostLayout post={post} toc={post.toc}>
-      <Post />
-    </BlogPostLayout>
+    <>
+      <JsonLd data={blogPostSchema(post)} />
+      <BlogPostLayout post={post} toc={post.toc}>
+        <Post />
+      </BlogPostLayout>
+    </>
   );
 }

@@ -1,5 +1,7 @@
 import Footer from "@components/Footer";
 import Header from "@components/Header";
+import JsonLd from "@components/JsonLd";
+import { homeSchema } from "@seo/structuredData";
 import CodeSamplesSection from "./_components/CodeSamplesSection";
 import DocsCalloutSection from "./_components/DocsCalloutSection";
 import FaqSection from "./_components/FaqSection";
@@ -13,6 +15,7 @@ import WhatYoureMissingSection from "./_components/WhatYoureMissingSection";
 export default function Home() {
   return (
     <div className="min-h-screen">
+      <JsonLd data={homeSchema()} />
       <Header />
       <HeroSection />
       <WhatYoureMissingSection />
