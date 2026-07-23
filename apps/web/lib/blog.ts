@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { tocFromMarkdown } from "@components/legal/tocFromMarkdown";
 import type { TocItem } from "@components/TableOfContent";
+import {
+  type BlogPostMeta,
+  readingMinutesOf,
+  toCategoryLabel,
+} from "@lib/blogMeta";
 import matter from "gray-matter";
 
 /**
@@ -16,22 +21,6 @@ import matter from "gray-matter";
 
 const BLOG_DIR = path.join(process.cwd(), "content/blog");
 const MDX_EXTENSION = ".mdx";
-
-export type BlogPostMeta = {
-  slug: string;
-  title: string;
-  description: string;
-  /** ISO `YYYY-MM-DD`. */
-  date: string;
-  author: string;
-  /** Public URL of the author portrait; falls back to initials when absent. */
-  authorAvatar?: string;
-  tags: string[];
-  thumbnail?: string;
-  thumbnailAlt?: string;
-  keywords: string[];
-  draft: boolean;
-};
 
 export type BlogPost = BlogPostMeta & {
   toc: TocItem[];
@@ -74,6 +63,8 @@ export const parseBlogPost = (
     );
   }
 
+  const tags = toStringArray(data.tags);
+
   const meta: BlogPostMeta = {
     slug,
     title: String(data.title),
@@ -81,10 +72,16 @@ export const parseBlogPost = (
     date: toIsoDate(data.date),
     author: String(data.author),
     authorAvatar: data.authorAvatar ? String(data.authorAvatar) : undefined,
-    tags: toStringArray(data.tags),
+    authorRole: data.authorRole ? String(data.authorRole) : undefined,
+    // An explicit `category` is used verbatim; a tag fallback gets title-cased.
+    category: data.category
+      ? String(data.category)
+      : toCategoryLabel(tags[0] ?? ""),
+    tags,
     thumbnail: data.thumbnail ? String(data.thumbnail) : undefined,
     thumbnailAlt: data.thumbnailAlt ? String(data.thumbnailAlt) : undefined,
     keywords: toStringArray(data.keywords),
+    readingMinutes: readingMinutesOf(content),
     draft: data.draft === true,
   };
 
@@ -142,14 +139,3 @@ export const getBlogPost = (slug: string): BlogPost | undefined => {
 
   return { ...meta, toc: tocFromMarkdown(content) };
 };
-
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  day: "2-digit",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-/** `2026-07-22` -> `July 22, 2026`. Pinned to UTC so SSG output is stable. */
-export const formatPostDate = (date: string): string =>
-  dateFormatter.format(new Date(`${date}T00:00:00Z`));

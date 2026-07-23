@@ -1,12 +1,12 @@
 import { slugify } from "@components/slugify";
 import { describe, expect, it } from "vitest";
 import {
-  formatPostDate,
   getAllBlogPosts,
   getBlogPost,
   getBlogSlugs,
   parseBlogPost,
 } from "./blog";
+import { formatPostDate } from "./blogMeta";
 
 const frontmatter = (extra = "") => `---
 title: A post
@@ -33,6 +33,32 @@ describe("parseBlogPost", () => {
     expect(meta.thumbnail).toBeUndefined();
     expect(meta.authorAvatar).toBeUndefined();
     expect(meta.draft).toBe(false);
+  });
+
+  it("falls back to the first tag as the display category", () => {
+    const { meta } = parseBlogPost(
+      "a-post",
+      frontmatter("tags: [best-practices, x402]\n"),
+    );
+    expect(meta.category).toBe("Best Practices");
+  });
+
+  it("uses an explicit category verbatim", () => {
+    const { meta } = parseBlogPost(
+      "a-post",
+      frontmatter("category: Best practices\ntags: [x402]\n"),
+    );
+    expect(meta.category).toBe("Best practices");
+  });
+
+  it("leaves alphanumeric tokens alone when title-casing a category", () => {
+    const { meta } = parseBlogPost("a-post", frontmatter("tags: [x402]\n"));
+    expect(meta.category).toBe("x402");
+  });
+
+  it("estimates a read time of at least one minute", () => {
+    const { meta } = parseBlogPost("a-post", frontmatter());
+    expect(meta.readingMinutes).toBe(1);
   });
 
   it("reads the author avatar when one is set", () => {

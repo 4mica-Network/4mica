@@ -3,7 +3,7 @@ import AuthorAvatar from "@components/blog/AuthorAvatar";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import TableOfContent, { type TocItem } from "@components/TableOfContent";
-import { type BlogPostMeta, formatPostDate } from "@lib/blog";
+import { type BlogPostMeta, formatPostDate } from "@lib/blogMeta";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -44,6 +44,10 @@ export default function BlogPostLayout({
             <span className="text-ink-body">{post.author}</span>
             <span aria-hidden="true">·</span>
             <time dateTime={post.date}>{formatPostDate(post.date)}</time>
+            <span aria-hidden="true">·</span>
+            <span>
+              {post.readingMinutes} {messages.blog.minRead}
+            </span>
           </div>
 
           {post.tags.length > 0 ? (

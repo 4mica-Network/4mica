@@ -912,10 +912,10 @@ await clearingHouse.claimNetCredit(
     tableOfContents: "Table of contents",
   },
   blog: {
-    kicker: "Blog",
-    title: "Notes from the 4Mica team",
-    lead: "Engineering deep dives, protocol updates, and what we are learning while building the credit layer for the agentic economy.",
+    allArticles: "All articles",
+    minRead: "min read",
     empty: "No posts yet — check back soon.",
+    emptyCategory: "No posts in this category yet.",
     backToBlog: "All posts",
     author: "Written by",
     published: "Published",
