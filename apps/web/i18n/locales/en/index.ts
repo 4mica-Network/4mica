@@ -28,6 +28,7 @@ export const en = {
     solutions: "Solutions",
     developers: "Developers",
     pricing: "Pricing",
+    byCustomer: "By customer",
     byUseCase: "By use case",
     documentation: "Documentation",
     documentationDescription: "Guides, SDKs, and API reference",
@@ -119,7 +120,12 @@ export const en = {
       {
         question: "Who should integrate 4Mica?",
         answer:
-          "AI agent developers paying for APIs, data feeds, and model endpoints during a task; API and service providers who want to charge per request without accounts, subscriptions, invoices, or prepaid balances; marketplaces and agent-to-agent workflows tracking many small obligations. The fit is high-volume, low-value payments where checkout and invoicing infrastructure is the bottleneck.",
+          "x402 facilitators first: adding the 4mica-credit scheme lets every seller behind your endpoint take credit-backed payments, with 4Mica running as the clearing layer behind your brand. Then API and service providers who want to charge per request without accounts, invoices, or prepaid balances, and agent frameworks that want paid tool use built in. The fit is high-volume, low-value payments where checkout and invoicing infrastructure is the bottleneck.",
+      },
+      {
+        question: "Are individual AI agents 4Mica customers?",
+        answer:
+          "No — an agent is the end user, not the counterparty. The customer is whoever operates it: the facilitator, platform, framework, or team that holds the collateral, sets the spending limits, and carries the commercial relationship. Agents spend inside those limits, which is why there is no signup aimed at agents themselves.",
       },
       {
         question: "How does 4Mica reduce settlement costs?",
@@ -403,7 +409,7 @@ await clearingHouse.claimNetCredit(
       useCases: {
         kicker: "Use cases",
         title: "Built for the scale you need",
-        lead: "API monetization, agentic commerce, paywalled content. 4Mica handles the payment layer so you don't have to.",
+        lead: "Built first for x402 facilitators, then for the API providers and agent frameworks behind them. 4Mica handles the credit and clearing layer so you don't have to.",
       },
       ecosystem: {
         kicker: "Ecosystem",

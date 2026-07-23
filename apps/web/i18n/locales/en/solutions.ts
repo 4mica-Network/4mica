@@ -35,13 +35,28 @@ export type SolutionFaq = {
   answer: string;
 };
 
+/**
+ * Who a solution page is written for.
+ *
+ * `customer` pages address the people we sell to, in priority order:
+ * facilitators first (the primary customer), then API providers and agent
+ * frameworks. `useCase` pages address a market or scenario and can be reached
+ * by any of them. Individual agents are deliberately absent — they spend
+ * against an operator's collateral, so they are end users of the product
+ * rather than a party we contract with. See `/solutions/agent-frameworks`.
+ */
+export type SolutionGroup = "customer" | "useCase";
+
 export type SolutionContent = {
   slug: string;
   label: string;
   icon: string;
+  group: SolutionGroup;
   description: string;
   headline: string;
   intro: string;
+  /** Overrides the generated `<title>` when the label alone misses the terms. */
+  seoTitle?: string;
   points: SolutionPoint[];
   useCases: SolutionUseCaseGroup[];
   process: SolutionProcessStep[];
@@ -51,9 +66,383 @@ export type SolutionContent = {
 
 export const solutions: SolutionContent[] = [
   {
+    slug: "facilitators",
+    label: "Facilitators",
+    icon: "ri-cloud-line",
+    group: "customer",
+    description: "Credit rails behind your facilitator",
+    headline: "Offer credit-backed x402 payments under your own brand.",
+    intro:
+      "Facilitators are who 4Mica is built for first. Add the 4mica-credit scheme to the facilitator you already operate and the sellers behind it get instant authorization and netted settlement — you stay the interface your customers integrate with, and the clearing layer sits behind you.",
+    seoTitle: "For Facilitators | x402 Facilitator Infrastructure | 4Mica",
+    points: [
+      {
+        title: "You stay the interface",
+        desc: "Your endpoint, your brand, your relationship. 4Mica runs behind it as the credit and clearing layer, the way a CDN sits behind a site.",
+        icon: "ri-shield-keyhole-line",
+      },
+      {
+        title: "A scheme, not a stack",
+        desc: "Advertise 4mica-credit in /supported and call Core from your settle path. No collateral engine, netting logic, or contracts to build.",
+        icon: "ri-puzzle-line",
+      },
+      {
+        title: "Micropayments that clear",
+        desc: "Requests are authorized off-chain in one round trip, so traffic that was uneconomic per transfer becomes viable.",
+        icon: "ri-flashlight-line",
+      },
+    ],
+    useCases: [
+      {
+        label: "For facilitator operators",
+        cards: [
+          {
+            title: "Add credit to your scheme list",
+            desc: "Keep your existing schemes and offer credit-backed payments alongside them from the same endpoint.",
+            icon: "ri-stack-line",
+          },
+          {
+            title: "Cut on-chain writes",
+            desc: "Guarantees net down inside clearing cycles, so settlement cost stops scaling with request count.",
+            icon: "ri-git-merge-line",
+          },
+          {
+            title: "Keep the trust boundary",
+            desc: "Core independently verifies every signed claim, so the facilitator never has to hold payer keys or custody funds.",
+            icon: "ri-lock-2-line",
+          },
+        ],
+      },
+      {
+        label: "For the sellers you serve",
+        cards: [
+          {
+            title: "No prefunding to onboard",
+            desc: "Buyers arrive with collateral-backed credit instead of a balance they had to top up with each seller first.",
+            icon: "ri-user-add-line",
+          },
+          {
+            title: "Verified before delivery",
+            desc: "Expensive work runs only after a guarantee is accepted and a BLS certificate is returned.",
+            icon: "ri-shield-check-line",
+          },
+        ],
+      },
+    ],
+    process: [
+      {
+        order: "01",
+        title: "Advertise the scheme",
+        desc: "Add 4mica-credit and the CAIP-2 networks you cover to your /supported response so clients can discover it.",
+      },
+      {
+        order: "02",
+        title: "Call Core on settle",
+        desc: "Submit the signed guarantee from your settle path, validate V1 and V2 structures, and return the BLS certificate.",
+      },
+      {
+        order: "03",
+        title: "Settle cycles net",
+        desc: "Payable guarantees enter clearing cycles and commit as net positions on-chain instead of one transfer per request.",
+      },
+    ],
+    resources: [
+      {
+        title: "Facilitator concepts",
+        desc: "Where the facilitator sits between sellers and Core, and what it is not responsible for.",
+        icon: "ri-book-open-line",
+        href: `${links.docs}/core-concepts/facilitator`,
+      },
+      {
+        title: "Facilitator API reference",
+        desc: "The /supported, /verify, /settle, and /health contracts in full.",
+        icon: "ri-code-box-line",
+        href: `${links.docs}/api-reference/facilitator/settle`,
+      },
+      {
+        title: "Talk to the team",
+        desc: "Scope coverage, networks, and settlement cadence for your deployment.",
+        icon: "ri-chat-3-line",
+        href: links.mailto.partnership,
+      },
+    ],
+    faqs: [
+      {
+        question: "Do we have to run 4Mica Core ourselves?",
+        answer:
+          "No. Your facilitator calls Core over its API to submit guarantees and receive BLS certificates. You can also point sellers at the hosted facilitator if you would rather not operate one at all.",
+      },
+      {
+        question: "Do our sellers or buyers have to change clients?",
+        answer:
+          "Only to register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use and sellers keep their existing x402 middleware and routes.",
+      },
+      {
+        question: "Does the facilitator take custody of funds?",
+        answer:
+          "No. Collateral is held by the protocol contracts and authorization comes from the payer's EIP-712 signature. A facilitator can delay or reject a request but cannot rewrite an authorization or move funds.",
+      },
+      {
+        question: "How is this different from settling each x402 request?",
+        answer:
+          "Per-request settlement puts one transfer on-chain per call. With the credit scheme, requests are authorized off-chain against collateral and only the net position of a clearing cycle is committed.",
+      },
+    ],
+  },
+  {
+    slug: "api-providers",
+    label: "API providers",
+    icon: "ri-plug-line",
+    group: "customer",
+    description: "Charge per request, no accounts",
+    headline:
+      "Charge per request without accounts, invoices, or prepaid balances.",
+    intro:
+      "Sellers are the second audience 4Mica serves. Protect a route with x402 middleware, advertise a price, and get paid in stablecoins as clearing cycles settle — no signup flow, no invoicing, and no per-request gas to absorb.",
+    seoTitle: "For API Providers | Charge Per Request with x402 | 4Mica",
+    points: [
+      {
+        title: "Price the route, not the customer",
+        desc: "Advertise a price per endpoint and let any x402-compatible buyer pay it on first contact.",
+        icon: "ri-price-tag-3-line",
+      },
+      {
+        title: "Verify before you spend",
+        desc: "Return 402 before expensive work and serve only once Core has accepted the guarantee.",
+        icon: "ri-shield-check-line",
+      },
+      {
+        title: "Revenue that reconciles",
+        desc: "High-frequency traffic collapses into netted settlement with the guarantee records behind every figure.",
+        icon: "ri-file-list-3-line",
+      },
+    ],
+    useCases: [
+      {
+        label: "For API and platform teams",
+        cards: [
+          {
+            title: "Monetize per call",
+            desc: "Charge for inference, data, search, compute, or premium actions at the granularity you actually deliver them.",
+            icon: "ri-cpu-line",
+          },
+          {
+            title: "Skip the signup funnel",
+            desc: "No account creation, API key issuance, or prepaid balance before a buyer's first paid request.",
+            icon: "ri-user-shared-line",
+          },
+          {
+            title: "Sell fractions of a cent",
+            desc: "Per-request on-chain cost disappears, so small unit prices stop being eaten by settlement.",
+            icon: "ri-coins-line",
+          },
+        ],
+      },
+      {
+        label: "For finance and ops",
+        cards: [
+          {
+            title: "Settle in stablecoins",
+            desc: "Take payout in the assets your deployment enables, with USDC and USDT as the common defaults.",
+            icon: "ri-exchange-dollar-line",
+          },
+          {
+            title: "Audit any line item",
+            desc: "Every net settlement expands back into the individual guarantees and certificates that produced it.",
+            icon: "ri-search-eye-line",
+          },
+        ],
+      },
+    ],
+    process: [
+      {
+        order: "01",
+        title: "Protect a route",
+        desc: "Add the payment middleware to one endpoint and configure scheme, network, asset, price, and payTo.",
+      },
+      {
+        order: "02",
+        title: "Verify, then serve",
+        desc: "The middleware returns 402 with your price, checks the guarantee through the facilitator, and releases the response.",
+      },
+      {
+        order: "03",
+        title: "Get paid per cycle",
+        desc: "Accepted guarantees settle as net positions, so revenue arrives without per-request on-chain cost.",
+      },
+    ],
+    resources: [
+      {
+        title: "Payment middleware",
+        desc: "Protect routes in Express, FastAPI, Hono, Next.js, and more.",
+        icon: "ri-code-box-line",
+        href: `${links.docs}/seller/payment-middleware`,
+      },
+      {
+        title: "Seller quick start",
+        desc: "Turn an API, model, dataset, or workflow into a paid 4Mica resource.",
+        icon: "ri-book-open-line",
+        href: `${links.docs}/seller/quick-start`,
+      },
+      {
+        title: "Pricing",
+        desc: "What 4Mica costs as your settlement volume grows.",
+        icon: "ri-price-tag-3-line",
+        href: "/pricing",
+      },
+    ],
+    faqs: [
+      {
+        question: "Do buyers need an account with us first?",
+        answer:
+          "No. A buyer arrives with collateral-backed credit and pays on the first request, so there is no signup, key issuance, or prepaid balance in front of your revenue.",
+      },
+      {
+        question: "What happens if a buyer cannot cover the request?",
+        answer:
+          "Core rejects an under-backed guarantee, so no certificate is returned and you simply do not serve the work. Keep anything expensive behind that check.",
+      },
+      {
+        question: "Which frameworks are supported?",
+        answer:
+          "TypeScript and Python middleware covering Express, Hono, Next.js, Nuxt, SvelteKit, Remix, Bun, FastAPI, and Flask, plus the edge-safe server primitive for anything else.",
+      },
+      {
+        question: "Can we still price dynamically?",
+        answer:
+          "Yes. Fixed prices are advertised in the 402 response, and for variable work you can quote a task with a maximum amount, expiry, and completion rules.",
+      },
+    ],
+  },
+  {
+    slug: "agent-frameworks",
+    label: "Agent frameworks and agents",
+    icon: "ri-flow-chart",
+    group: "customer",
+    description: "Payment rails inside your framework",
+    headline: "Give every agent in your framework a way to pay.",
+    intro:
+      "Frameworks and the teams that operate agents are 4Mica's third audience. Register the credit scheme once and every agent built on your framework can pay for APIs, tools, and data inside ordinary HTTP requests, spending against the operator's collateral within limits the operator sets.",
+    seoTitle: "For Agent Frameworks and Agents | x402 Payments | 4Mica",
+    points: [
+      {
+        title: "One integration, every agent",
+        desc: "Register the scheme in your HTTP layer and each agent inherits the ability to pay — no per-agent wallet or funding step.",
+        icon: "ri-git-branch-line",
+      },
+      {
+        title: "Budgets the operator controls",
+        desc: "Limit spend per request, task, seller, asset, or window, and require approval above a threshold.",
+        icon: "ri-timer-flash-line",
+      },
+      {
+        title: "Payment proof per task",
+        desc: "Every spend carries a request ID and certificate, so payments tie back to the work that triggered them.",
+        icon: "ri-shield-user-line",
+      },
+    ],
+    useCases: [
+      {
+        label: "For framework maintainers",
+        cards: [
+          {
+            title: "Ship payments as a capability",
+            desc: "Offer paid tool use as a first-class feature rather than leaving each user to build a payment path.",
+            icon: "ri-tools-line",
+          },
+          {
+            title: "Keep the HTTP surface",
+            desc: "The credit scheme wraps the client your framework already uses; a 402 becomes a signed retry.",
+            icon: "ri-route-line",
+          },
+        ],
+      },
+      {
+        label: "For teams running agents",
+        cards: [
+          {
+            title: "Fund once, spend anywhere",
+            desc: "One collateral position backs every service an agent reaches, instead of a balance per counterparty.",
+            icon: "ri-wallet-3-line",
+          },
+          {
+            title: "Stop a run cold",
+            desc: "Pause signing, lower budgets, drop a seller, or rotate credentials without touching agent code.",
+            icon: "ri-stop-circle-line",
+          },
+          {
+            title: "Reconcile by task",
+            desc: "Group spends by task ID to see what a run cost and which services it paid.",
+            icon: "ri-list-check-2",
+          },
+        ],
+      },
+    ],
+    process: [
+      {
+        order: "01",
+        title: "Register the scheme",
+        desc: "Add the 4mica-credit client adapter to the fetch or HTTP layer your framework hands to agents.",
+      },
+      {
+        order: "02",
+        title: "Set the operator's limits",
+        desc: "Back the account with collateral and define the budgets and approval rules agents run inside.",
+      },
+      {
+        order: "03",
+        title: "Let agents transact",
+        desc: "Each 402 becomes a signed guarantee and a retry, and the spend joins the operator's next clearing cycle.",
+      },
+    ],
+    resources: [
+      {
+        title: "Buyer quick start",
+        desc: "Give an agent spending power with limits, visibility, and payment proof.",
+        icon: "ri-book-open-line",
+        href: `${links.docs}/buyer/quick-start`,
+      },
+      {
+        title: "Budgets and spending limits",
+        desc: "Control how much an agent can spend, when it needs approval, and when it must stop.",
+        icon: "ri-timer-flash-line",
+        href: `${links.docs}/buyer/budgets-and-spending-limits`,
+      },
+      {
+        title: "Automatic paid requests",
+        desc: "Turn 402 responses into automatic paid retries from the client you already use.",
+        icon: "ri-code-box-line",
+        href: `${links.docs}/buyer/make-paid-requests-automatically`,
+      },
+    ],
+    faqs: [
+      {
+        question: "Is an individual AI agent a 4Mica customer?",
+        answer:
+          "No. The customer is whoever operates the agent — the framework, the platform, or the team running it. That operator holds the collateral, sets the limits, and carries the commercial relationship. The agent is the end user that spends inside those limits, which is why there is no signup flow aimed at agents themselves.",
+      },
+      {
+        question: "Does each agent need its own wallet and funding?",
+        answer:
+          "No. Agents sign against credit backed by the operator's collateral position, so adding an agent does not mean funding another balance.",
+      },
+      {
+        question: "How do we cap what an agent can spend?",
+        answer:
+          "Set limits per request, task, seller, category, asset, network, or time window, and require manual approval for high-value payments or unfamiliar sellers.",
+      },
+      {
+        question: "What happens when an agent misbehaves?",
+        answer:
+          "Pause execution, disable signing, remove sellers, lower budgets, or rotate credentials. Check for open guarantees before withdrawing collateral so nothing is settled against a position you are unwinding.",
+      },
+    ],
+  },
+  {
     slug: "agentic-commerce",
     label: "Agentic commerce",
     icon: "ri-robot-2-line",
+    group: "useCase",
     description: "Payments for AI agents",
     headline: "Payments built for autonomous agents.",
     intro:
@@ -172,6 +561,7 @@ export const solutions: SolutionContent[] = [
     slug: "ai-companies",
     label: "AI companies",
     icon: "ri-brain-line",
+    group: "useCase",
     description: "Charge per API call",
     headline: "Usage-based billing for AI products.",
     intro:
@@ -289,6 +679,7 @@ export const solutions: SolutionContent[] = [
     slug: "cryptocurrency",
     label: "Cryptocurrency",
     icon: "ri-coin-line",
+    group: "useCase",
     description: "On-chain settlement",
     headline: "Instant settlement across chains.",
     intro:
@@ -406,6 +797,7 @@ export const solutions: SolutionContent[] = [
     slug: "marketplaces",
     label: "Marketplaces",
     icon: "ri-store-2-line",
+    group: "useCase",
     description: "Batch buyer payouts",
     headline: "Net settlement for two-sided markets.",
     intro:
@@ -524,6 +916,7 @@ export const solutions: SolutionContent[] = [
     slug: "platforms",
     label: "Platforms",
     icon: "ri-stack-line",
+    group: "useCase",
     description: "Built-in usage billing",
     headline: "Billing infrastructure for platforms.",
     intro:
@@ -641,6 +1034,7 @@ export const solutions: SolutionContent[] = [
     slug: "enterprises",
     label: "Enterprises",
     icon: "ri-building-2-line",
+    group: "useCase",
     description: "Credit rails at scale",
     headline: "Credit rails for serious volume.",
     intro:
@@ -758,6 +1152,7 @@ export const solutions: SolutionContent[] = [
     slug: "startups",
     label: "Startups",
     icon: "ri-rocket-2-line",
+    group: "useCase",
     description: "Live in three lines",
     headline: "Payments that scale with you.",
     intro:
@@ -877,3 +1272,11 @@ export const solutionSlugs = solutions.map((s) => s.slug);
 
 export const getSolution = (slug: string): SolutionContent | undefined =>
   solutions.find((s) => s.slug === slug);
+
+/** Audience pages, in customer priority order: facilitators lead. */
+export const customerSolutions = solutions.filter(
+  (s) => s.group === "customer",
+);
+
+/** Market and scenario pages, reachable from any audience. */
+export const useCaseSolutions = solutions.filter((s) => s.group === "useCase");

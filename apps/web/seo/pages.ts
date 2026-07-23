@@ -115,7 +115,8 @@ export const metaForSolution = (slug: string): Metadata | undefined => {
 
   return buildMetadata({
     path: solutionPath(solution.slug),
-    title: `${solution.label} | x402 Agentic Payments | 4Mica`,
+    title:
+      solution.seoTitle ?? `${solution.label} | x402 Agentic Payments | 4Mica`,
     description: solution.intro,
     keywords: [
       "4Mica",

@@ -15,7 +15,7 @@ export default function DesktopNav() {
               {item.label}
               <i className="ri-arrow-down-s-line text-md transition-transform duration-200 group-hover:rotate-180" />
             </button>
-            <div className="invisible absolute top-full left-1/2 z-50 -translate-x-1/3 translate-y-1 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+            <div className="invisible absolute top-full left-0 z-50 translate-y-1 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 lg:left-1/2 lg:-translate-x-1/2">
               <NavDropdown sections={item.children} />
             </div>
           </div>
