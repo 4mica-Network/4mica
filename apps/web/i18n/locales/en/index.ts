@@ -696,63 +696,218 @@ await clearingHouse.claimNetCredit(
       imageAlt: "4Mica pricing for x402 API payments",
     },
     kicker: "Pricing",
-    title: "Pricing that scales with settlement volume",
-    lead: "Build free on testnets, then move to volume-based pricing when payments clear on mainnet. Charge for API payments in stablecoins with no per-request gas billing and no surprise settlement line items.",
+    title: "Pricing that tracks what you settle",
+    lead: "There is no seat count and no monthly tier. Building and testing is free, and once you are clearing real volume on mainnet you pay a clearing fee on what actually settles — while your collateral keeps earning.",
     collateralNote:
-      "Collateral stays in your control and earns yield — 4Mica never holds funds.",
-    includedKicker: "Included",
-    includedTitle: "Core rails across every plan",
-    includedLead:
-      "The plan changes how you go live and operate at scale. The core payment model stays consistent from sandbox to production.",
-    tiers: [
+      "Collateral stays under protocol control and keeps earning while it backs payments — 4Mica never takes custody of your funds.",
+
+    model: {
+      kicker: "How it works",
+      title: "How 4Mica pricing works",
+      lead: "Four things determine what 4Mica costs you, and only one of them is a fee.",
+      cards: [
+        {
+          icon: "ri-flask-line",
+          title: "Free while you build",
+          desc: "Full SDK, facilitator, and testnet access on Base Sepolia and Ethereum Sepolia at no cost. Nothing is metered until you clear volume on mainnet.",
+        },
+        {
+          icon: "ri-percent-line",
+          title: "A clearing fee on settled volume",
+          desc: "The fee applies to volume that actually clears, not to requests you authorize. Idle capacity, retries, and rejected guarantees cost nothing.",
+        },
+        {
+          icon: "ri-gas-station-line",
+          title: "Gas per cycle, not per request",
+          desc: "Off-chain authorization means your on-chain footprint tracks settlement cycles instead of call volume — the saving grows with every request you add.",
+        },
+        {
+          icon: "ri-seedling-line",
+          title: "Yield stays with your collateral",
+          desc: "Supported stablecoin collateral can earn while it backs open guarantees, and that yield belongs to your position, offsetting the cost of holding it.",
+        },
+      ],
+    },
+
+    fee: {
+      kicker: "Clearing fee",
+      title: "How the clearing fee is calculated",
+      lead: "One line of arithmetic, applied once per clearing cycle.",
+      formula: "clearing fee = net settled volume × your agreed rate",
+      steps: [
+        {
+          order: "01",
+          title: "Guarantees accumulate",
+          desc: "Every authorized request adds a signed guarantee to the open cycle. Nothing is charged and nothing touches the chain yet.",
+        },
+        {
+          order: "02",
+          title: "The cycle nets down",
+          desc: "When the cycle closes, obligations between the same two parties offset each other and only the net position remains.",
+        },
+        {
+          order: "03",
+          title: "The fee applies to what settles",
+          desc: "Your rate is applied to that net settled figure, and the settlement commits on-chain with the records behind it.",
+        },
+      ],
+      notes: [
+        "Netting is what makes the fee base smaller than gross request volume — offsetting flows never become settlement movement.",
+        "Rates are agreed per integration rather than published as a fixed table, because facilitator, seller, and marketplace economics differ.",
+        "Network gas for the settlement transaction is separate and paid once per cycle, not once per request.",
+      ],
+    },
+
+    calculator: {
+      kicker: "Calculator",
+      title: "See what netting saves you",
+      lead: "Move the sliders to your own volume. The comparison is against settling every x402 request on-chain, which is what standard per-request payment costs today.",
+      baselineLabel: "Settling every request on-chain",
+      micaLabel: "With 4Mica",
+      inputs: {
+        requests: "Paid requests per month",
+        price: "Average price per request",
+        cadence: "Settlement cadence",
+        rate: "Your clearing rate",
+        gas: "Network cost per on-chain settlement",
+        collateral: "Collateral deposited",
+        apy: "Collateral yield (APY)",
+      },
+      cadenceOptions: {
+        monthly: "Monthly",
+        weekly: "Weekly",
+        daily: "Daily",
+        hourly: "Hourly",
+      },
+      rows: {
+        volume: "Payment volume",
+        onchain: "On-chain settlements",
+        gas: "Network gas",
+        fee: "Clearing fee",
+        yield: "Yield on collateral",
+        total: "Net monthly cost",
+        perRequest: "Effective cost per request",
+      },
+      results: {
+        savingTitle: "Monthly saving with 4Mica",
+        savingNegative:
+          "At this volume and rate, per-request settlement still costs less",
+        savingNegativeHint:
+          "Raise the volume or lengthen the cycle to find the crossover point.",
+        txAvoided: "On-chain transactions avoided",
+        reduction: "Lower cost of settlement",
+        breakeven: "Break-even volume at these settings",
+      },
+      disclaimer:
+        "Illustrative model, not a quote. Gas, yield, and clearing rate are inputs you control here — your rate is agreed per integration, network gas varies with chain conditions, and collateral yield is variable and not guaranteed.",
+    },
+
+    facilitators: {
+      kicker: "For facilitators",
+      title: "How facilitators save on settlement fees",
+      lead: "A facilitator settling per request pays for every call it passes through. On the credit scheme, it pays for cycles.",
+      example: {
+        title: "One cycle, two counterparties",
+        outgoing: "40 outgoing payable guarantees",
+        incoming: "27 incoming payable guarantees",
+        net: "13 settles as one net position",
+        note: "Sixty-seven obligations become a single settlement movement. Netting changes what moves, not what is recorded — every guarantee stays auditable.",
+      },
+      points: [
+        {
+          icon: "ri-git-merge-line",
+          title: "Gas tracks cycles, not calls",
+          desc: "Doubling the requests through your facilitator does not double your settlement cost, because the number of on-chain writes is set by cadence.",
+        },
+        {
+          icon: "ri-scales-3-line",
+          title: "Offsetting flows cancel",
+          desc: "When the parties behind your endpoint pay each other, those obligations net out before anything settles, so the fee base shrinks with them.",
+        },
+        {
+          icon: "ri-server-line",
+          title: "No clearing stack to run",
+          desc: "You add a scheme rather than building collateral accounting, netting, and settlement infrastructure and paying to operate it.",
+        },
+      ],
+    },
+
+    yieldSection: {
+      kicker: "Yield",
+      title: "How deposited capital can earn",
+      lead: "Collateral is not idle while it backs payments.",
+      points: [
+        {
+          icon: "ri-bank-line",
+          title: "Supplied to Aave",
+          desc: "Configured stablecoin collateral is supplied to Aave's lending markets and the protocol holds the interest-bearing aTokens.",
+        },
+        {
+          icon: "ri-lock-unlock-line",
+          title: "Earning while reserved",
+          desc: "Reserving capacity for guarantees locks the capacity, not the accrual — the underlying stablecoin keeps earning through the cycle.",
+        },
+        {
+          icon: "ri-user-star-line",
+          title: "It belongs to the payer",
+          desc: "Yield accrues to the collateral position rather than the seller receiving payments, offsetting the carrying cost of the capital you posted.",
+        },
+        {
+          icon: "ri-error-warning-line",
+          title: "Variable, not guaranteed",
+          desc: "Supply rates move with the market and principal carries smart-contract, depeg, and liquidity risk. Check the deployment configuration before depositing production funds.",
+        },
+      ],
+    },
+
+    volume: {
+      kicker: "Large volume",
+      title: "Custom pricing for high-volume integrations",
+      lead: "Facilitators, marketplaces, and networks clearing serious volume are priced individually rather than off a table.",
+      points: [
+        "A clearing rate that steps down as settled volume grows",
+        "Volume commitments in exchange for a lower rate",
+        "Yield-sharing arrangements on posted collateral",
+        "Settlement cadence and cycle windows tuned to your flow",
+        "Dedicated support, custom SLAs, and security review",
+      ],
+      cta: "Talk about volume pricing",
+    },
+
+    faqKicker: "FAQ",
+    faqTitle: "Questions about the fee",
+    faqs: [
       {
-        name: "Build",
-        price: "Free",
-        tagline: "Ship your integration on testnets with full SDK access.",
-        features: [
-          "All supported testnets",
-          "TypeScript & Python SDKs",
-          "x402 facilitator access",
-          "Community support",
-          "Protocol docs and examples",
-          "Basic settlement sandbox",
-        ],
-        ctaLabel: "Start building",
+        question: "Am I charged per request?",
+        answer:
+          "No. Authorizing a request is off-chain and free of both gas and fee. The clearing fee applies to the net volume that settles when a cycle closes.",
       },
       {
-        name: "Scale",
-        eyebrow: "Most popular",
-        price: "Volume-based",
-        tagline:
-          "Pay a percentage of cleared transaction volume. Settlement costs included.",
-        features: [
-          "Mainnet across chains",
-          "% fee on cleared volume",
-          "Settlement costs covered",
-          "Yield passed through",
-          "Production facilitator access",
-          "Usage and settlement reporting",
-          "Email support",
-        ],
-        ctaLabel: "Talk to our team",
+        question: "What if a cycle nets to zero?",
+        answer:
+          "Nothing settles, so there is nothing to charge a rate against. That is the point of netting — offsetting obligations never become settlement movement.",
       },
       {
-        name: "Enterprise",
-        price: "Custom",
-        tagline:
-          "Custom terms for high volume networks, facilitators, and marketplaces.",
-        features: [
-          "Custom clearing fee",
-          "Volume commitments",
-          "Priority settlement",
-          "Yield-sharing options",
-          "Dedicated support",
-          "Custom SLAs and terms",
-          "Security review",
-        ],
-        ctaLabel: "Contact sales",
+        question: "Who pays the network gas?",
+        answer:
+          "Gas is paid on the settlement transaction and on collateral actions such as deposits and withdrawals. Because settlement happens per cycle rather than per request, that cost stops scaling with traffic.",
+      },
+      {
+        question: "Does the yield reduce what I pay 4Mica?",
+        answer:
+          "It is separate. Yield accrues to your collateral position and offsets the cost of holding capital; the clearing fee is charged on settled volume. Both show up in the calculator above so you can see the net position.",
+      },
+      {
+        question: "Is there a free tier for production?",
+        answer:
+          "Testnets are free and unmetered. Mainnet volume is priced, and if you are still validating a product we would rather agree a small starting arrangement than have you rebuild later.",
       },
     ],
+
+    includedKicker: "Included",
+    includedTitle: "In every integration, at any volume",
+    includedLead:
+      "Pricing changes with volume. The payment model does not — the same rails run from your first sandbox request to production settlement.",
     included: [
       {
         icon: "ri-bank-line",
