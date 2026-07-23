@@ -2,6 +2,7 @@ import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import JsonLd from "@components/JsonLd";
+import SectionBackdrop from "@components/SectionBackdrop";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
 import { faqSchema, pageSchema } from "@seo/structuredData";
@@ -387,6 +388,176 @@ function PartnerFaq() {
   );
 }
 
+function PartnerEnablement() {
+  return (
+    <section className="section-gloss relative isolate overflow-hidden py-24">
+      <SectionBackdrop src="/bg/abstract-satin-folds.avif" position="left" />
+      <div className="mx-auto w-full max-w-300">
+        <SectionHeader
+          kicker={content.enablement.kicker}
+          title={content.enablement.title}
+          lead={content.enablement.lead}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {content.enablement.pillars.map((pillar) => (
+            <div
+              key={pillar.label}
+              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
+            >
+              <ShinyHoverBorder />
+              <div className="relative z-10 flex flex-1 flex-col">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-overlay/[0.035] text-2xl text-ink-strong ring-1 ring-overlay/10">
+                  <i className={pillar.icon} />
+                </div>
+                <p className="font-medium text-ink-muted text-md uppercase tracking-widest">
+                  {pillar.label}
+                </p>
+                <h3 className="mt-2 font-semibold text-ink-strong text-lg">
+                  {pillar.title}
+                </h3>
+                <ul className="mt-5 space-y-3">
+                  {pillar.points.map((point) => (
+                    <li key={point} className="flex gap-2.5 text-md">
+                      <i
+                        className="ri-check-line mt-0.5 shrink-0 text-ink-strong/60"
+                        aria-hidden="true"
+                      />
+                      <span className="text-ink-body leading-relaxed">
+                        {point}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PartnerStories() {
+  return (
+    <section className="section-gloss relative isolate overflow-hidden py-24">
+      <SectionBackdrop src="/bg/abstract-smoke.avif" position="right" />
+      <div className="mx-auto w-full max-w-300">
+        <SectionHeader
+          kicker={content.stories.kicker}
+          title={content.stories.title}
+          lead={content.stories.lead}
+        />
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.8fr] lg:items-stretch">
+          {content.stories.items.map((story) => (
+            <div
+              key={story.partner}
+              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018]"
+            >
+              <ShinyHoverBorder />
+              <div className="relative z-10 flex flex-1 flex-col">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <Image
+                    src={story.logo}
+                    alt={`${story.partner} logo`}
+                    width={200}
+                    height={60}
+                    className="h-9 w-auto object-contain opacity-90"
+                  />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-overlay/10 bg-overlay/5 px-3 py-1 text-ink-muted text-md uppercase tracking-widest">
+                    <i className="ri-lightbulb-line text-ink-strong" />
+                    {story.tag}
+                  </span>
+                </div>
+                <p className="text-ink-muted text-md leading-relaxed">
+                  {story.challenge}
+                </p>
+                <p className="mt-4 text-ink-body text-md leading-relaxed">
+                  {story.outcome}
+                </p>
+                <div className="mt-6 flex items-baseline gap-3 border-overlay/10 border-t pt-6">
+                  <span className="font-bold text-4xl text-ink-strong tabular-nums">
+                    {story.stat.value}
+                  </span>
+                  <span className="text-ink-muted text-md leading-snug">
+                    {story.stat.label}
+                  </span>
+                </div>
+                <Link
+                  href={story.href}
+                  className="mt-8 inline-flex items-center gap-1.5 self-start font-semibold text-ink-strong text-md transition-colors hover:text-ink-body"
+                >
+                  {story.cta}
+                  <i className="ri-arrow-right-line text-md transition-transform duration-300 group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
+          ))}
+
+          <div className="relative flex flex-col justify-center rounded-md border border-overlay/10 border-dashed bg-surface-deep/10 p-8">
+            <h3 className="font-semibold text-ink-strong text-xl">
+              {content.stories.invite.title}
+            </h3>
+            <p className="mt-3 text-ink-muted text-md leading-relaxed">
+              {content.stories.invite.desc}
+            </p>
+            <a
+              href={content.stories.invite.href}
+              className="mt-6 inline-flex items-center justify-center gap-1.5 self-start rounded-md bg-ink-strong px-5 py-2.5 font-semibold text-md text-surface-deep transition-colors hover:bg-ink-strong/90"
+            >
+              {content.stories.invite.cta}
+              <i className="ri-arrow-right-line text-md" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PartnerResources() {
+  return (
+    <section className="section-gloss py-24">
+      <div className="mx-auto w-full max-w-300">
+        <SectionHeader
+          kicker={content.resources.kicker}
+          title={content.resources.title}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {content.resources.items.map((item) => (
+            <a
+              key={item.title}
+              href={item.href}
+              target={item.external ? "_blank" : undefined}
+              rel={item.external ? "noopener noreferrer" : undefined}
+              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
+            >
+              <ShinyHoverBorder />
+              <div className="relative z-10 flex flex-1 flex-col">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-overlay/[0.035] text-2xl text-ink-strong ring-1 ring-overlay/10">
+                  <i className={item.icon} />
+                </div>
+                <h3 className="font-semibold text-ink-strong text-lg">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                  {item.desc}
+                </p>
+                <span className="mt-6 inline-flex items-center gap-1.5 font-semibold text-ink-strong text-md">
+                  {item.cta}
+                  <i className="ri-arrow-right-line text-md transition-transform duration-300 group-hover:translate-x-0.5" />
+                </span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function PartnersPage() {
   return (
     <div className="min-h-screen">
@@ -404,9 +575,12 @@ export default function PartnersPage() {
 
           <WhyPartner />
           <PartnerPrograms />
+          <PartnerEnablement />
           <PartnerBenefits />
+          <PartnerStories />
           <PartnerProcess />
           <OtherWays />
+          <PartnerResources />
           <PartnerFaq />
 
           <div className="mt-24 text-center">

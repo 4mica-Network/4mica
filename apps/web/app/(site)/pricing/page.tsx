@@ -431,7 +431,6 @@ export default function PricingPage() {
 
           <YieldSection />
           <VolumePricing />
-          <PricingFaq />
           <section className={SECTION_GAP}>
             <SectionHeader
               kicker={content.includedKicker}
@@ -465,6 +464,8 @@ export default function PricingPage() {
               {content.collateralNote}
             </p>
           </section>
+
+          <PricingFaq />
         </section>
       </div>
       <Footer />

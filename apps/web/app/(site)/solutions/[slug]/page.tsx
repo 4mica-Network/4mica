@@ -6,6 +6,7 @@ import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaForSolution } from "@seo/pages";
 import { solutionSchema } from "@seo/structuredData";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { SolutionContent, SolutionResourceCard } from "../data";
@@ -182,21 +183,50 @@ function SolutionResources({ solution }: { solution: SolutionContent }) {
   return (
     <section className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.3fr] lg:items-start">
-          <SectionHeader
-            kicker="Integrations"
-            title="Works with the stack you already use"
-            lead="Use 4Mica through x402-compatible HTTP clients, SDKs, any x402 facilitator, and the settlement infrastructure behind them."
-            align="left"
-          />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {solution.resources.map((resource, index) => (
-              <div
-                key={resource.title}
-                className={index === 0 ? "sm:col-span-2" : undefined}
-              >
-                <ResourceLink resource={resource} />
+        <div className="grid gap-8 lg:grid-cols-[1.3fr_0.9fr] lg:items-start">
+          <div className="flex flex-col gap-6">
+            <div className="overflow-hidden rounded-lg border border-overlay/10 bg-surface-deep/25 ring-1 ring-overlay/10">
+              <Image
+                src="/bg/abstract-integration.avif"
+                alt="Works with the stack you already use — use 4Mica through x402-compatible HTTP clients, SDKs, any x402 facilitator, and the settlement infrastructure behind them."
+                width={1672}
+                height={941}
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                className="h-auto w-full"
+                loading="lazy"
+              />
+            </div>
+            <div className="flex flex-col gap-5 rounded-lg border border-overlay/10 bg-surface-deep/25 p-6">
+              <div>
+                <h3 className="font-semibold text-ink-strong text-xl">
+                  Ready to integrate?
+                </h3>
+                <p className="mt-2 text-ink-muted text-md leading-relaxed">
+                  Plug 4Mica into your existing x402 flow in minutes — start
+                  with the docs or talk to the team.
+                </p>
               </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={links.docs}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-lg rounded-full bg-ink-strong text-center font-semibold text-surface-deep shadow-lg transition-colors hover:bg-ink-strong/90"
+                >
+                  Read the docs
+                </Link>
+                <Link
+                  href={links.mailto.sales}
+                  className="btn btn-soft btn-lg rounded-full text-center"
+                >
+                  Talk to us
+                </Link>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4">
+            {solution.resources.map((resource) => (
+              <ResourceLink key={resource.title} resource={resource} />
             ))}
           </div>
         </div>

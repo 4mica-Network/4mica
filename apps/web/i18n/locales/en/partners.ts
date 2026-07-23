@@ -141,6 +141,83 @@ export const partners = {
     ],
   },
 
+  enablement: {
+    kicker: "Go to market",
+    title: "How we help you grow",
+    lead: "Partnership does not stop at the integration. We back it with the same build, sell, market, and support motion we use for our own launches.",
+    pillars: [
+      {
+        icon: "ri-hammer-line",
+        label: "Build",
+        title: "Ship the integration",
+        points: [
+          "Architecture review and a walkthrough of the x402 flow",
+          "Client and server SDKs in TypeScript and Python",
+          "Funded testnet credentials to build against real settlement",
+        ],
+      },
+      {
+        icon: "ri-hand-coin-line",
+        label: "Co-sell",
+        title: "Reach agent-native demand",
+        points: [
+          "Warm introductions to teams that need credit-backed payments",
+          "Joint account planning and a shared deal channel",
+          "Referral and revenue-share terms agreed per partnership",
+        ],
+      },
+      {
+        icon: "ri-megaphone-line",
+        label: "Co-market",
+        title: "Launch it loudly",
+        points: [
+          "Joint launch posts, docs placement, and social amplification",
+          "A listing among the teams building on 4Mica",
+          "Co-hosted workshops, demos, and events",
+        ],
+      },
+      {
+        icon: "ri-customer-service-2-line",
+        label: "Engage",
+        title: "Stay close to the protocol",
+        points: [
+          "A direct channel to the engineers who maintain the protocol",
+          "Roadmap visibility and early access to new scheme features",
+          "Operational runbooks and status reporting for live traffic",
+        ],
+      },
+    ],
+  },
+
+  stories: {
+    kicker: "Proof",
+    title: "Partners already shipping on 4Mica",
+    lead: "Real integrations, not logos on a slide.",
+    items: [
+      {
+        partner: "Aligned Layer",
+        logo: "/assets/aligned_layer_logo.png",
+        tag: "API monetization",
+        challenge:
+          "Aligned's verification is ultra-cheap — around $0.019 per task — but on-chain payment gas ran about $0.14, eight times the cost of the service itself. Per-task billing was nearly impossible to scale.",
+        outcome:
+          "Routing payments through 4Mica's credit layer clears each request instantly and settles balances net once per cycle, so the payment stops dwarfing the service.",
+        stat: { value: "8×", label: "cheaper than paying gas per task" },
+        href: "/solution",
+        cta: "Read the case study",
+      },
+    ],
+    invite: {
+      title: "Building with 4Mica?",
+      desc: "If your users are hitting the limits of per-request settlement, let's tell that story together.",
+      cta: "Share your story",
+      href: mailto(
+        "Partner success story",
+        "Hi 4Mica team,\n\nWe would like to share our story building on 4Mica.\n\nCompany:\nWhat we shipped:\nResults so far:\n",
+      ),
+    },
+  },
+
   process: {
     kicker: "Process",
     title: "How a partnership starts",
@@ -184,6 +261,40 @@ export const partners = {
         desc: "Working on payment cryptography, credit risk, or agent identity? We publish, review, and co-author with teams doing serious work.",
         cta: "Compare notes",
         href: `${links.mailto.dev}?subject=${encodeURIComponent("Research collaboration")}`,
+      },
+    ],
+  },
+
+  resources: {
+    kicker: "Resources",
+    title: "Everything you need to get started",
+    items: [
+      {
+        icon: "ri-book-2-line",
+        title: "Partner documentation",
+        desc: "Integration guides, SDK references, and the full x402 protocol surface.",
+        cta: "Read the docs",
+        href: links.docs,
+        external: true,
+      },
+      {
+        icon: "ri-compass-3-line",
+        title: "Explore the ecosystem",
+        desc: "See the protocols and networks already building on 4Mica.",
+        cta: "View programs",
+        href: "#programs",
+        external: false,
+      },
+      {
+        icon: "ri-mail-send-line",
+        title: "Talk to partnerships",
+        desc: "Tell us what you are building and we will come back with a next step.",
+        cta: "Get in touch",
+        href: mailto(
+          "Partnership enquiry",
+          "Hi 4Mica team,\n\nWe would like to explore a partnership.\n\nCompany:\nWhat we build:\nWhat we have in mind:\n",
+        ),
+        external: false,
       },
     ],
   },
