@@ -1,13 +1,18 @@
 "use client";
 
 import { links } from "@4mica/url";
+import SectionBackdrop from "@components/SectionBackdrop";
 import Link from "next/link";
 import { messages } from "@/i18n";
 import { STATS } from "../data";
 
 export default function FinalCtaSection() {
   return (
-    <section className="section-gloss py-24">
+    <section className="section-gloss relative isolate overflow-hidden py-24">
+      <SectionBackdrop
+        src="/bg/abstract-wave-gradient.avif"
+        position="background"
+      />
       <div className="mx-auto w-full max-w-300">
         <div className="mx-auto max-w-3xl text-center">
           <p className="section-kicker">

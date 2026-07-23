@@ -1,11 +1,13 @@
 "use client";
 
 import { links } from "@4mica/url";
+import SectionBackdrop from "@components/SectionBackdrop";
 import { messages } from "@/i18n";
 
 export default function HeroSection() {
   return (
-    <section className="section-gloss relative">
+    <section className="section-gloss relative isolate overflow-hidden">
+      <SectionBackdrop src="/bg/abstract-aurora.avif" position="top" />
       <div className="relative z-10 w-full">
         <div className="w-full pt-32 pb-20 lg:pt-36 lg:pb-32">
           <div className="flex flex-col items-center text-center">

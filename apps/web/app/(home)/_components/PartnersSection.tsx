@@ -1,6 +1,7 @@
 "use client";
 
 import { links } from "@4mica/url";
+import SectionBackdrop from "@components/SectionBackdrop";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -40,7 +41,11 @@ export default function PartnersSection() {
   }, []);
 
   return (
-    <section className="section-gloss py-24">
+    <section className="section-gloss relative isolate overflow-hidden py-24">
+      <SectionBackdrop
+        src="/bg/abstract-silver-silk.avif"
+        position="background"
+      />
       <div className="mx-auto w-full max-w-300">
         {/* Ecosystem primitives */}
         <div className="mb-12 text-center">

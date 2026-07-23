@@ -1,7 +1,9 @@
+import { cn } from "@4mica/ui";
 import { links } from "@4mica/url";
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import JsonLd from "@components/JsonLd";
+import SectionBackdrop from "@components/SectionBackdrop";
 import ShinyHoverBorder from "@components/ShinyHoverBorder";
 import { metaFor } from "@seo/pages";
 import { faqSchema, pageSchema } from "@seo/structuredData";
@@ -225,7 +227,10 @@ function FeeBreakdown() {
 
 function FacilitatorSavings() {
   return (
-    <section className={SECTION_GAP}>
+    <section
+      className={cn(SECTION_GAP, "relative isolate overflow-hidden rounded-md")}
+    >
+      <SectionBackdrop src="/bg/abstract-marble.avif" position="right" />
       <SectionHeader
         kicker={content.facilitators.kicker}
         title={content.facilitators.title}
@@ -270,14 +275,14 @@ function FacilitatorSavings() {
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
-          <div className="divide-y divide-overlay/10">
+        <div className="overflow-hidden rounded-md">
+          <div>
             {content.facilitators.points.map((point) => (
               <div
                 key={point.title}
                 className="group relative flex gap-4 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
               >
-                <ShinyHoverBorder radiusClass="rounded-none" />
+                {/* <ShinyHoverBorder radiusClass="rounded-none" /> */}
                 <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10">
                   <i className={`${point.icon} text-2xl`} />
                 </div>
@@ -415,7 +420,7 @@ export default function PricingPage() {
           <PricingModel />
           <FeeBreakdown />
 
-          <section className={SECTION_GAP}>
+          <section className={cn(SECTION_GAP, "px-4 pt-6 sm:px-6 lg:px-8")}>
             <SectionHeader
               kicker={content.calculator.kicker}
               title={content.calculator.title}

@@ -1,3 +1,4 @@
+import SectionBackdrop from "@components/SectionBackdrop";
 import { highlight } from "@lib/shiki";
 import { messages } from "@/i18n";
 import { STEPS } from "../data";
@@ -8,7 +9,18 @@ export default async function DocsCalloutSection() {
   );
 
   return (
-    <section id="how-it-works" className="section-gloss py-24">
+    <section
+      id="how-it-works"
+      className="section-gloss relative isolate mt-32 overflow-hidden pt-80 pb-24"
+    >
+      <SectionBackdrop src="/bg/aerial-rail-yard.avif" position="right" />
+      <SectionBackdrop
+        src="/bg/aerial-intersection.avif"
+        position="top"
+        className="h-80 opacity-90 dark:opacity-100"
+        mask={null}
+        overlay="bg-gradient-to-b from-transparent to-surface-deep"
+      />
       <div className="mx-auto w-full max-w-300">
         <div className="w-full overflow-hidden rounded-md border border-overlay/10 bg-surface">
           <div className="border-overlay/10 border-b px-6 py-8 text-left sm:px-8">

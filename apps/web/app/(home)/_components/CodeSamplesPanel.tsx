@@ -1,5 +1,6 @@
 "use client";
 
+import SectionBackdrop from "@components/SectionBackdrop";
 import { useState } from "react";
 
 export type LangId = "typescript" | "python";
@@ -12,7 +13,11 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
   const [side, setSide] = useState<Side>("client");
 
   return (
-    <section id="integration" className="section-gloss py-24">
+    <section
+      id="integration"
+      className="section-gloss relative isolate overflow-hidden py-24"
+    >
+      <SectionBackdrop src="/bg/abstract-silk-waves.avif" position="right" />
       <div className="mx-auto w-full max-w-300">
         <div className="w-full">
           {/* Header */}
