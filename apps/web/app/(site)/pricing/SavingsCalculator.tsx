@@ -128,9 +128,9 @@ export default function SavingsCalculator() {
   const [requestIndex, setRequestIndex] = useState(4); // 1M requests
   const [priceIndex, setPriceIndex] = useState(2); // $0.01
   const [cadenceIndex, setCadenceIndex] = useState(2); // daily
-  const [collateralIndex, setCollateralIndex] = useState(3); // $50k
+  const [collateralIndex, setCollateralIndex] = useState(2); // $10k
   const [ratePercent, setRatePercent] = useState(0.5);
-  const [gasPerSettlement, setGasPerSettlement] = useState(0.02);
+  const [gasPerSettlement, setGasPerSettlement] = useState(0.01);
   const [apyPercent, setApyPercent] = useState(5);
 
   const model = useMemo(() => {
