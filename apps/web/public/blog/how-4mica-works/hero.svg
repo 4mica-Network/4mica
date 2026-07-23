@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="Credit layer between agents and settlement">
+  <defs>
+    <radialGradient id="spot" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16" />
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="link" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.7" />
+    </linearGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="600" fill="#000000" />
+  <rect width="1200" height="600" fill="url(#grid)" />
+  <rect width="1200" height="600" fill="url(#spot)" />
+
+  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+    <g>
+      <rect x="90" y="230" width="240" height="140" rx="12" fill="#0a0a0a" stroke="#ffffff" stroke-opacity="0.14" />
+      <text x="210" y="292" fill="#ffffff" fill-opacity="0.82" font-size="26" font-weight="600">Agent</text>
+      <text x="210" y="326" fill="#ffffff" fill-opacity="0.45" font-size="17">pays on credit</text>
+    </g>
+
+    <g>
+      <rect x="480" y="200" width="240" height="200" rx="12" fill="#101010" stroke="#ffffff" stroke-opacity="0.45" />
+      <text x="600" y="282" fill="#ffffff" font-size="26" font-weight="600">4Mica</text>
+      <text x="600" y="316" fill="#ffffff" fill-opacity="0.55" font-size="17">tab + limit check</text>
+      <text x="600" y="344" fill="#ffffff" fill-opacity="0.55" font-size="17">netting</text>
+    </g>
+
+    <g>
+      <rect x="870" y="230" width="240" height="140" rx="12" fill="#0a0a0a" stroke="#ffffff" stroke-opacity="0.14" />
+      <text x="990" y="292" fill="#ffffff" fill-opacity="0.82" font-size="26" font-weight="600">Settlement</text>
+      <text x="990" y="326" fill="#ffffff" fill-opacity="0.45" font-size="17">once per cycle</text>
+    </g>
+
+    <path d="M330 300H470" stroke="url(#link)" stroke-width="3" />
+    <path d="M470 300l-14-7v14z" fill="#ffffff" fill-opacity="0.7" />
+    <path d="M720 300H860" stroke="url(#link)" stroke-width="3" />
+    <path d="M860 300l-14-7v14z" fill="#ffffff" fill-opacity="0.7" />
+
+    <rect x="520" y="440" width="160" height="3" rx="1.5" fill="url(#rule)" />
+  </g>
+</svg>

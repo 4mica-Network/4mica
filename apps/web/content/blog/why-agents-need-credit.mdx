@@ -1,0 +1,59 @@
+---
+title: Why agents need credit, not prefunding
+description: Prefunding every counterparty does not survive contact with an agent that talks to hundreds of services. Credit is the primitive that does.
+date: 2026-06-24
+author: Mairon Mahzoun
+authorAvatar: /assets/mairon.jpg
+tags: [agents, credit, x402]
+thumbnail: /blog/why-agents-need-credit/hero.svg
+thumbnailAlt: Capital locked in prefunded balances versus a single credit line
+keywords: [agent payments, capital efficiency, prefunding, x402 credit]
+---
+
+The first version of almost every machine-payments system is prefunding: put a
+balance with each service you intend to use, draw it down, top it up when it
+runs low. It works fine for one or two counterparties. It stops working the
+moment an agent is choosing services dynamically.
+
+## The capital problem
+
+Prefunding forces you to answer a question you cannot answer in advance: how
+much will this agent spend, with this specific service, before the next top-up?
+Guess high and capital sits idle in balances you may never use. Guess low and
+the agent stalls mid-task waiting for a transfer to confirm.
+
+With a hundred services in reach, the idle capital is not a rounding error —
+it is a hundred separate buffers, each sized for a worst case that only one of
+them will hit.
+
+## The latency problem
+
+The other cost is time. A top-up is a chain transaction, and a chain
+transaction lands in seconds at best. An agent that discovers a new service
+mid-task has to stop, fund it, wait for confirmation, and only then make the
+call it wanted to make.
+
+Credit removes the stop. The spending limit is checked against a line the payer
+already holds, so a first request to a service the agent has never used before
+costs exactly one round trip.
+
+## What credit changes
+
+- **One line, many counterparties.** Capital backs the payer, not each
+  individual relationship, so adding a service costs nothing up front.
+- **Instant authorization.** Checking a limit is a lookup, not a transfer.
+- **Netted settlement.** Charges accumulate on a tab and settle once per cycle,
+  so on-chain cost is amortized instead of paid per request.
+- **Auditable by construction.** Every netted settlement expands back into the
+  individual charges that produced it.
+
+## The trade you are making
+
+Credit is not free of risk — it moves the risk from capital lockup to
+counterparty exposure, and that exposure has to be underwritten by someone.
+That is the part 4Mica takes on: limits, monitoring, and settlement guarantees
+sit in the credit layer, so services get paid and payers keep their capital
+working.
+
+For how that plays out in an integration, see
+[How 4Mica works](/blog/how-4mica-works).

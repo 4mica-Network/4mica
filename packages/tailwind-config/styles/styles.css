@@ -725,6 +725,43 @@
     color: rgb(var(--ink-subtle) / 0.6);
     user-select: none;
   }
+
+  /* MDX article body (blog posts). Element-level rules live here rather than
+     in `mdx-components.tsx` because Shiki replaces the whole `<pre><code>`
+     subtree and markdown images carry no dimensions to hand to a component.
+     Ordered by ascending specificity so later rules never lose to earlier ones. */
+  .blog-content img {
+    max-width: 100%;
+    height: auto;
+    margin: 1.5rem 0;
+    border-radius: 0.375rem;
+    border: 1px solid rgb(var(--overlay) / 0.1);
+  }
+
+  /* Shiki wraps block code in `pre.shiki`, so "not inside .shiki" == inline. */
+  .blog-content :not(.shiki) > code {
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    background-color: rgb(var(--overlay) / 0.08);
+    color: rgb(var(--ink-strong));
+    font-size: 0.875em;
+  }
+
+  .blog-content pre.shiki {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgb(var(--overlay) / 0.1);
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+  }
+
+  .blog-content pre.shiki code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+  }
 }
 
 @keyframes scanLine {

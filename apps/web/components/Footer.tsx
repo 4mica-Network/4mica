@@ -124,6 +124,9 @@ export default function Footer() {
             <div className="mb-2 font-medium text-ink-strong">
               {messages.footer.sections.resources}
             </div>
+            <Link href={routes.blog} className={footerLinkClass}>
+              {messages.footer.resources.blog}
+            </Link>
             <Link href={routes.terms} className={footerLinkClass}>
               {messages.footer.resources.licences}
             </Link>

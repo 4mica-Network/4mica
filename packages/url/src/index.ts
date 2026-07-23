@@ -66,7 +66,7 @@ const buildRoutes = () =>
     register: "/register",
     resources: "/resources",
     resourcesAnchor: "/#resources",
-    blog: "/resources/blog",
+    blog: "/blog",
     gettingPaidBy4Mica: "/resources/blog/getting-paid-by-4mica",
     how4MicaWorks: "/resources/blog/how-4mica-works",
     payingWith4Mica: "/resources/blog/paying-with-4mica",

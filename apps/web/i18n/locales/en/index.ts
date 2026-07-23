@@ -34,6 +34,8 @@ export const en = {
     apiChangelogDescription: "Releases and updates",
     librariesAndSdks: "Libraries and SDKs",
     librariesAndSdksDescription: "TypeScript and Python",
+    blog: "Blog",
+    blogDescription: "Engineering notes and product updates",
   },
   footer: {
     sections: {
@@ -61,6 +63,7 @@ export const en = {
       managedSupportPlans: "Managed support plans",
     },
     resources: {
+      blog: "Blog",
       licences: "Licences",
       restrictedBusinesses: "Prohibited and restricted businesses",
       sitemap: "Sitemap",
@@ -908,6 +911,17 @@ await clearingHouse.claimNetCredit(
     lastUpdated: "Last updated:",
     tableOfContents: "Table of contents",
   },
+  blog: {
+    kicker: "Blog",
+    title: "Notes from the 4Mica team",
+    lead: "Engineering deep dives, protocol updates, and what we are learning while building the credit layer for the agentic economy.",
+    empty: "No posts yet — check back soon.",
+    backToBlog: "All posts",
+    author: "Written by",
+    published: "Published",
+    tags: "Tags",
+    readPost: "Read post",
+  },
   seo: {
     home: {
       title: "4Mica | Credit Layer for x402 Agent Payments",
@@ -938,6 +952,20 @@ await clearingHouse.claimNetCredit(
         "open source collaboration",
       ],
       imageAlt: "4Mica careers",
+    },
+    blog: {
+      title: "Blog | Engineering Notes and Product Updates",
+      description:
+        "Deep dives on x402, credit-backed settlement, and agent payment infrastructure from the team building 4Mica.",
+      keywords: [
+        "4Mica blog",
+        "x402",
+        "agent payments",
+        "credit-backed payments",
+        "payment infrastructure",
+        "engineering blog",
+      ],
+      imageAlt: "4Mica blog",
     },
   },
 } as const;

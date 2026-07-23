@@ -72,6 +72,12 @@ export const NAV_ITEMS: NavItem[] = [
             icon: "ri-terminal-box-line",
             external: true,
           },
+          {
+            title: messages.navigation.blog,
+            href: links.blog,
+            description: messages.navigation.blogDescription,
+            icon: "ri-article-line",
+          },
         ],
       },
     ],

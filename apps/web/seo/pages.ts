@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getSolution, solutionSlugs } from "@/i18n/locales/en/solutions";
+import { getAllBlogPosts, getBlogPostMeta } from "@/lib/blog";
 import { ABOUT_SEO } from "./about";
+import { BLOG_SEO } from "./blog";
 import { CAREERS_SEO } from "./careers";
 import { DPA_SEO } from "./dpa";
 import { HOME_SEO } from "./home";
@@ -56,6 +58,7 @@ const buildMetadata = (seo: PageSeo): Metadata => {
 const STATIC_PAGES = {
   "/": HOME_SEO,
   "/about": ABOUT_SEO,
+  "/blog": BLOG_SEO,
   "/careers": CAREERS_SEO,
   "/team": LEADERSHIP_SEO,
   "/privacy": PRIVACY_SEO,
@@ -71,6 +74,8 @@ export type PagePath = keyof typeof STATIC_PAGES;
 const STATIC_PATHS = Object.keys(STATIC_PAGES) as PagePath[];
 
 const solutionPath = (slug: string) => `/solutions/${slug}`;
+
+const blogPostPath = (slug: string) => `/blog/${slug}`;
 
 /** Metadata for a known static page. `path` is checked at compile time. */
 export const metaFor = (path: PagePath): Metadata =>
@@ -96,10 +101,29 @@ export const metaForSolution = (slug: string): Metadata | undefined => {
   });
 };
 
-/** Every canonical page path — static pages plus the expanded solutions. */
+/** Metadata for a dynamic `/blog/[slug]` page, or undefined if unknown. */
+export const metaForBlogPost = (slug: string): Metadata | undefined => {
+  const post = getBlogPostMeta(slug);
+  if (!post) return undefined;
+
+  return buildMetadata({
+    path: blogPostPath(post.slug),
+    title: `${post.title} | ${SITE_NAME} Blog`,
+    description: post.description,
+    keywords: [...post.tags, ...post.keywords],
+    imageAlt: post.thumbnailAlt ?? post.title,
+    type: "article",
+  });
+};
+
+/**
+ * Every canonical page path — static pages plus the expanded solutions and
+ * blog posts. Sitemap entries and OG images follow from this list.
+ */
 export const allPagePaths = (): string[] => [
   ...STATIC_PATHS,
   ...solutionSlugs.map(solutionPath),
+  ...getAllBlogPosts().map((post) => blogPostPath(post.slug)),
 ];
 
 /** OG static params: one slug per page path (drives generateStaticParams). */
@@ -116,6 +140,12 @@ const metadataBySlug = new Map<string, Metadata>([
     const metadata = metaForSolution(slug);
     return metadata
       ? [[pathToSlug(solutionPath(slug)), metadata] as const]
+      : [];
+  }),
+  ...getAllBlogPosts().flatMap((post) => {
+    const metadata = metaForBlogPost(post.slug);
+    return metadata
+      ? [[pathToSlug(blogPostPath(post.slug)), metadata] as const]
       : [];
   }),
 ]);

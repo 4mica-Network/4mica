@@ -1,0 +1,94 @@
+---
+title: How 4Mica works
+description: A walkthrough of the credit layer behind x402 payments — how a tab is opened, how requests are authorized, and how a cycle settles on-chain.
+date: 2026-07-15
+author: Mairon Mahzoun
+authorAvatar: /assets/mairon.jpg
+tags: [x402, credit, settlement]
+thumbnail: /blog/how-4mica-works/hero.svg
+thumbnailAlt: Diagram of the 4Mica credit and settlement flow
+keywords: [x402 credit layer, agent payments, on-chain settlement]
+---
+
+Agents make a lot of very small requests. Paying for each of them on-chain is
+slow and expensive, and pre-funding every counterparty locks up capital that
+could be doing something useful. 4Mica sits between the two: agents pay on
+credit, requests clear instantly, and the resulting balance settles on-chain
+once per cycle.
+
+## Opening a tab
+
+A tab is the running balance between one payer and one service. The client
+registers the 4Mica credit scheme once, then keeps using the same `fetch` it
+already had — the scheme negotiates the tab on the first paid request.
+
+```typescript
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+// Every request is now credit-based — no gas, no chain round trip.
+const response = await fetchWithPayment("https://api.example.com/data");
+```
+
+## Authorizing a request
+
+On the server side the middleware advertises a price per route. When a request
+arrives, the facilitator checks the payer's remaining credit against the price,
+records the charge on the tab, and answers in a single round trip. Nothing
+touches the chain yet.
+
+```typescript
+import { FourMicaEvmScheme } from "@4mica/x402/server";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /data": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.01",
+          network: "eip155:84532",
+          payTo: "0xYourAddress",
+        },
+      },
+    },
+    { advertisedEndpoint: "https://api.example.com/tabs" },
+  ),
+);
+```
+
+Because the check is a balance lookup rather than a transfer, authorization
+stays in the millisecond range even when an agent is issuing thousands of calls
+a minute.
+
+![The 4Mica request flow: agent, facilitator, and settlement](/blog/how-4mica-works/flow.svg)
+
+## Settling the cycle
+
+At the end of a cycle every tab is netted down to a single figure per
+counterparty, and only that figure moves on-chain. A thousand `$0.01` calls
+become one settlement, so the on-chain cost is amortized across the whole cycle
+rather than paid per request.
+
+Each settlement carries the tab records that produced it, which is what makes
+the result auditable after the fact: the netted amount can always be expanded
+back into the individual charges behind it.
+
+## What it means for integrations
+
+The practical shape of an integration is small. Clients keep their HTTP client
+and add a scheme; services keep their routes and add a middleware. There is no
+new wallet to manage per counterparty, no contract to deploy, and no separate
+reconciliation pipeline to build — the credit layer is doing that work.
+
+If you want the full API surface, the [documentation](https://docs.4mica.io)
+covers the client and server SDKs in both TypeScript and Python.
