@@ -461,4 +461,70 @@ describe("X402Flow", () => {
       ),
     ).rejects.toThrow();
   });
+
+  it("opens the tab at the guarantee version matching the claims, not the x402 protocol version", async () => {
+    const userAddress = "0x0000000000000000000000000000000000000001";
+    const bodies: Array<Record<string, unknown>> = [];
+    const captureFetch: FetchFn = async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response(JSON.stringify({ userAddress, nextReqId: "7" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const flow = new X402Flow(new StubSigner(), captureFetch);
+
+    const v1Requirements: PaymentRequirementsV1 = {
+      scheme: SCHEME,
+      network: "testnet",
+      maxAmountRequired: "5",
+      payTo: "0x0000000000000000000000000000000000000003",
+      asset: "0x0000000000000000000000000000000000000000",
+      extra: { tabEndpoint: "https://example.com" },
+    };
+    await flow.signPayment(v1Requirements, userAddress);
+    // x402 protocol v1 → v1 claims → guarantee version 1. And the wire field is
+    // named for the axis it carries — no `x402Version` conflation.
+    expect(bodies.at(-1)?.guaranteeVersion).toBe(1);
+    expect(bodies.at(-1)).not.toHaveProperty("x402Version");
+
+    const acceptedNoPolicy: PaymentRequirementsV2 = {
+      scheme: SCHEME,
+      network: "testnet",
+      amount: "10",
+      payTo: "0x0000000000000000000000000000000000000003",
+      asset: "0x0000000000000000000000000000000000000000",
+      extra: { tabEndpoint: "https://example.com" },
+    };
+    const paymentRequired: X402PaymentRequired = {
+      x402Version: 2,
+      resource: { url: "u", description: "d", mimeType: "m" },
+      accepts: [acceptedNoPolicy],
+    };
+    await flow.signPaymentV2(paymentRequired, acceptedNoPolicy, userAddress);
+    // x402 protocol v2 but NO validation policy → v1 claims → guarantee version 1
+    // (this is the exact mismatch that produced "tab only accepts guarantee
+    // version 2, got 1" when the tab was opened at the protocol version instead).
+    expect(bodies.at(-1)?.guaranteeVersion).toBe(1);
+
+    const acceptedWithPolicy: PaymentRequirementsV2 = {
+      ...acceptedNoPolicy,
+      extra: {
+        tabEndpoint: "https://example.com",
+        validationRegistryAddress: "0x0000000000000000000000000000000000000011",
+        validationChainId: 1,
+        validatorAddress: "0x0000000000000000000000000000000000000022",
+        validatorAgentId: "7",
+        minValidationScore: 80,
+        jobHash: "0x" + "11".repeat(32),
+      },
+    };
+    await flow.signPaymentV2(
+      { ...paymentRequired, accepts: [acceptedWithPolicy] },
+      acceptedWithPolicy,
+      userAddress,
+    );
+    // validation policy present → v2 claims → guarantee version 2
+    expect(bodies.at(-1)?.guaranteeVersion).toBe(2);
+  });
 });

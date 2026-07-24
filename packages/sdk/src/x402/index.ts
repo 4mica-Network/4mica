@@ -232,9 +232,8 @@ export class X402Flow {
     const settlement = data ? JSON.parse(data) : {};
     return { payment, settlement };
   }
-
   protected async requestTab(
-    x402Version: number,
+    guaranteeVersion: number,
     paymentRequirements: PaymentRequirementsV1 | PaymentRequirementsV2,
     userAddress: string,
     resource?: X402ResourceInfo,
@@ -247,7 +246,7 @@ export class X402Flow {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        x402Version,
+        guaranteeVersion,
         userAddress,
         paymentRequirements,
         resource,
