@@ -1,6 +1,6 @@
 {
   "name": "@4mica/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scaffold, run, and manage 4Mica agents and payment apps from the command line",
   "license": "MIT",
   "type": "module",

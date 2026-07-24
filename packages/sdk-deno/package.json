@@ -1,6 +1,6 @@
 {
   "name": "@4mica/sdk-deno",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Deno adapter for the 4Mica SDK: Deno.env-driven client and x402 paywall factories",
   "license": "MIT",
   "type": "module",
