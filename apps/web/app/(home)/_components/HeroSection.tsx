@@ -7,7 +7,12 @@ import { messages } from "@/i18n";
 export default function HeroSection() {
   return (
     <section className="section-gloss relative isolate overflow-hidden">
-      <SectionBackdrop src="/bg/abstract-aurora.avif" position="top" />
+      <SectionBackdrop
+        src="/bg/abstract-aurora.avif"
+        position="top"
+        mask="radial-gradient(68% 85% at 50% 25%, #000 0%, transparent 68%)"
+        className="opacity-20 dark:opacity-40"
+      />
       <div className="relative z-10 w-full">
         <div className="w-full pt-32 pb-20 lg:pt-36 lg:pb-32">
           <div className="flex flex-col items-center text-center">
