@@ -1,17 +1,17 @@
 import {
-  HTTPRequestContext,
-  PaywallConfig,
-  PaywallProvider,
+  type FacilitatorClient,
+  type HTTPRequestContext,
+  type PaywallConfig,
+  type PaywallProvider,
+  type RoutesConfig,
   x402HTTPResourceServer,
   x402ResourceServer,
-  RoutesConfig,
-  FacilitatorClient,
 } from '@x402/core/server'
-import { SchemeNetworkServer, Network } from '@x402/core/types'
-import { NextFunction, Request, Response } from 'express'
-import { ExpressAdapter } from './adapter.js'
-import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../scheme.js'
+import type { Network, SchemeNetworkServer } from '@x402/core/types'
+import type { NextFunction, Request, Response } from 'express'
 import { FourMicaFacilitatorClient } from '../facilitator.js'
+import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../scheme.js'
+import { ExpressAdapter } from './adapter.js'
 
 /**
  * Configuration for payment tab handling
@@ -270,23 +270,23 @@ export function paymentMiddlewareFromHTTPServer(
           endCalled = resolve
         })
 
-        res.writeHead = function (...args: Parameters<typeof originalWriteHead>) {
+        res.writeHead = ((...args: Parameters<typeof originalWriteHead>) => {
           if (!settled) {
             bufferedCalls.push(['writeHead', args])
             return res
           }
           return originalWriteHead(...args)
-        } as typeof originalWriteHead
+        }) as typeof originalWriteHead
 
-        res.write = function (...args: Parameters<typeof originalWrite>) {
+        res.write = ((...args: Parameters<typeof originalWrite>) => {
           if (!settled) {
             bufferedCalls.push(['write', args])
             return true
           }
           return originalWrite(...args)
-        } as typeof originalWrite
+        }) as typeof originalWrite
 
-        res.end = function (...args: Parameters<typeof originalEnd>) {
+        res.end = ((...args: Parameters<typeof originalEnd>) => {
           if (!settled) {
             bufferedCalls.push(['end', args])
             // Signal that the handler has finished
@@ -294,9 +294,9 @@ export function paymentMiddlewareFromHTTPServer(
             return res
           }
           return originalEnd(...args)
-        } as typeof originalEnd
+        }) as typeof originalEnd
 
-        res.flushHeaders = function () {
+        res.flushHeaders = () => {
           if (!settled) {
             bufferedCalls.push(['flushHeaders', []])
             return

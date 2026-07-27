@@ -1,5 +1,5 @@
-import { FacilitatorConfig, HTTPFacilitatorClient } from '@x402/core/server'
-import { Network, PaymentPayload, PaymentRequirements, SettleResponse } from '@x402/core/types'
+import { type FacilitatorConfig, HTTPFacilitatorClient } from '@x402/core/server'
+import type { Network, PaymentPayload, PaymentRequirements, SettleResponse } from '@x402/core/types'
 
 const DEFAULT_FACILITATOR_URL = 'https://x402.4mica.xyz'
 

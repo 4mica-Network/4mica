@@ -1,10 +1,10 @@
-import {
+import type {
   AssetAmount,
+  MoneyParser,
   Network,
   PaymentRequirements,
   Price,
   SchemeNetworkServer,
-  MoneyParser,
 } from '@x402/core/types'
 
 export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532', 'eip155:8453']
@@ -131,7 +131,7 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     const cleanMoney = money.replace(/^\$/, '').trim()
     const amount = parseFloat(cleanMoney)
 
-    if (isNaN(amount)) {
+    if (Number.isNaN(amount)) {
       throw new Error(`Invalid money format: ${money}`)
     }
 
@@ -169,7 +169,7 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
    */
   private convertToTokenAmount(decimalAmount: string, decimals: number): string {
     const amount = parseFloat(decimalAmount)
-    if (isNaN(amount)) {
+    if (Number.isNaN(amount)) {
       throw new Error(`Invalid amount: ${decimalAmount}`)
     }
     // Convert to smallest unit (e.g., for USDC with 6 decimals: 0.10 * 10^6 = 100000)

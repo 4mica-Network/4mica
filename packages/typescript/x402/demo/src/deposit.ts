@@ -1,6 +1,6 @@
 import 'dotenv/config'
-import { privateKeyToAccount } from 'viem/accounts'
 import { Client, ConfigBuilder } from '@4mica/sdk'
+import { privateKeyToAccount } from 'viem/accounts'
 
 async function main() {
   const privateKey = process.env.PRIVATE_KEY

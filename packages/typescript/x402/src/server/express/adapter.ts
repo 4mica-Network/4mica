@@ -1,5 +1,5 @@
-import { HTTPAdapter } from '@x402/core/server'
-import { Request } from 'express'
+import type { HTTPAdapter } from '@x402/core/server'
+import type { Request } from 'express'
 
 /**
  * Express adapter implementation

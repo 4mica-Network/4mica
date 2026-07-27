@@ -1,13 +1,18 @@
-import { SchemeNetworkClient, PaymentRequirements, PaymentPayload, Network } from '@x402/core/types'
 import {
   Client,
   ConfigBuilder,
-  PaymentRequirementsV1,
+  type PaymentRequirementsV1,
   X402Flow,
-  X402PaymentRequired,
-  X402ResourceInfo,
+  type X402PaymentRequired,
+  type X402ResourceInfo,
 } from '@4mica/sdk'
-import { Account } from 'viem/accounts'
+import type {
+  Network,
+  PaymentPayload,
+  PaymentRequirements,
+  SchemeNetworkClient,
+} from '@x402/core/types'
+import type { Account } from 'viem/accounts'
 import { SUPPORTED_NETWORKS } from '../server/scheme.js'
 
 const NETWORK_RPC_URLS: Record<Network, string> = {

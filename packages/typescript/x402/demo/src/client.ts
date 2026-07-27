@@ -1,6 +1,6 @@
 import 'dotenv/config'
-import { wrapFetchWithPaymentFromConfig } from '@x402/fetch'
 import { FourMicaEvmScheme } from '@4mica/x402/client'
+import { wrapFetchWithPaymentFromConfig } from '@x402/fetch'
 import { privateKeyToAccount } from 'viem/accounts'
 
 async function main() {

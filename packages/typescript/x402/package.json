@@ -35,8 +35,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "lint": "eslint . --ext .ts",
-    "fmt": "prettier --check \"{src,tests}/**/*.{ts,js,json}\"",
+    "lint": "biome check .",
+    "lint:write": "biome check --write --diagnostic-level=error .",
+    "fmt": "biome format .",
+    "fmt:write": "biome format --write .",
     "demo:server": "cd demo && yarn server",
     "demo:client": "cd demo && yarn client",
     "demo:dev": "cd demo && yarn dev"
@@ -49,19 +51,11 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@eslint/js": "^9.39.2",
+    "@biomejs/biome": "^2.4.16",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.7",
-    "@typescript-eslint/eslint-plugin": "^8.48.1",
-    "@typescript-eslint/parser": "^8.48.1",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react": "^7.37.5",
     "express": "^5.2.1",
-    "globals": "^17.0.0",
-    "prettier": "^3.7.4",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.48.1",
     "vitest": "^4.0.17"
   },
   "peerDependencies": {

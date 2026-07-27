@@ -1,4 +1,4 @@
-import { PaymentRequirements } from '@x402/core/types'
+import type { PaymentRequirements } from '@x402/core/types'
 
 /**
  * Extra fields required by the 4mica V2 validation policy.
