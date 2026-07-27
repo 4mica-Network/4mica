@@ -10,17 +10,17 @@
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
-    "@4mica/sdk": "^0.5.3",
-    "@4mica/x402": "file:..",
-    "@x402/fetch": "^2.2.0",
-    "dotenv": "^16.4.7",
-    "express": "^5.2.1",
-    "viem": "^2.21.54"
+    "@4mica/sdk": "catalog:",
+    "@4mica/x402": "workspace:*",
+    "@x402/fetch": "catalog:",
+    "dotenv": "catalog:",
+    "express": "catalog:",
+    "viem": "catalog:"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.0.7",
-    "tsx": "^4.19.2",
-    "typescript": "^5.3.3"
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }
