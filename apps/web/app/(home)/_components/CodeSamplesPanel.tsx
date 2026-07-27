@@ -15,12 +15,11 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
   return (
     <section
       id="integration"
-      className="section-gloss relative isolate overflow-hidden py-24"
+      className="section-gloss relative isolate mt-24 overflow-hidden rounded-md py-24"
     >
       <SectionBackdrop src="/bg/abstract-silk-waves.avif" position="right" />
       <div className="mx-auto w-full max-w-300">
         <div className="w-full">
-          {/* Header */}
           <div className="mb-10">
             <p className="section-kicker">Integration</p>
             <h2 className="section-title mt-2 font-normal">
@@ -32,7 +31,6 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
             </p>
           </div>
 
-          {/* Code panel */}
           <div className="group relative w-full overflow-hidden rounded-md border border-overlay/10 bg-[#101010] shadow-black/20 shadow-xl">
             <div className="pointer-events-none absolute inset-0 z-20 rounded-md border border-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
             <div
@@ -95,7 +93,6 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
               </div>
             </div>
 
-            {/* Code body */}
             <div className="max-w-full overflow-x-auto bg-[#101010] p-5 transition-colors duration-500 group-hover:bg-[#141414] sm:p-6">
               <div
                 className="shiki-code shiki-numbered font-mono text-md leading-6"
@@ -104,7 +101,6 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
               />
             </div>
 
-            {/* Footer */}
             <div className="flex items-center gap-3 border-white/10 border-t bg-white/3 px-5 py-3 text-ink-subtle text-md">
               <i className="ri-code-box-line shrink-0 text-2xl text-ink-strong" />
               <div className="flex flex-col">

@@ -41,128 +41,124 @@ export default function PartnersSection() {
   }, []);
 
   return (
-    <section className="section-gloss relative isolate overflow-hidden py-24">
+    <section className="section-gloss relative isolate overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
       <SectionBackdrop
         src="/bg/abstract-silver-silk.avif"
         position="background"
       />
       <div className="mx-auto w-full max-w-300">
-        {/* Ecosystem primitives */}
-        <div className="mb-12 text-center">
-          <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
-            <svg
-              ref={orbitRef}
-              aria-hidden="true"
-              className="h-12 w-full overflow-visible"
-              fill="none"
-              viewBox="0 0 192 56"
-            >
-              <defs>
-                <linearGradient
-                  id="ecosystem-light-trail"
-                  x1="0"
-                  x2="1"
-                  y1="0"
-                  y2="0"
-                >
-                  <stop offset="0" stopColor="currentColor" stopOpacity="0" />
-                  <stop
-                    offset="0.7"
-                    stopColor="currentColor"
-                    stopOpacity="0.24"
-                  />
-                  <stop offset="1" stopColor="currentColor" stopOpacity="0.7" />
-                </linearGradient>
-                <filter
-                  id="ecosystem-dot-glow"
-                  x="-200%"
-                  y="-200%"
-                  width="500%"
-                  height="500%"
-                >
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              <path
-                id="ecosystem-orbit"
-                d="M16 46C40 6 152 6 176 46"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeOpacity="0.3"
-                strokeWidth="1"
-              />
-              <g filter="url(#ecosystem-dot-glow)">
-                <line
-                  x1="-18"
-                  x2="-3"
-                  y1="0"
-                  y2="0"
-                  stroke="url(#ecosystem-light-trail)"
+        <div className="mb-16 w-full overflow-hidden">
+          {/* Ecosystem header lives inside the card so the border wraps it and
+              it blends into the primitives grid below (matches DocsCallout). */}
+          <div className="border-overlay/10 border-b px-6 py-10 text-center sm:px-8">
+            <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
+              <svg
+                ref={orbitRef}
+                aria-hidden="true"
+                className="h-12 w-full overflow-visible"
+                fill="none"
+                viewBox="0 0 192 56"
+              >
+                <defs>
+                  <linearGradient
+                    id="ecosystem-light-trail"
+                    x1="0"
+                    x2="1"
+                    y1="0"
+                    y2="0"
+                  >
+                    <stop offset="0" stopColor="currentColor" stopOpacity="0" />
+                    <stop
+                      offset="0.7"
+                      stopColor="currentColor"
+                      stopOpacity="0.24"
+                    />
+                    <stop
+                      offset="1"
+                      stopColor="currentColor"
+                      stopOpacity="0.7"
+                    />
+                  </linearGradient>
+                  <filter
+                    id="ecosystem-dot-glow"
+                    x="-200%"
+                    y="-200%"
+                    width="500%"
+                    height="500%"
+                  >
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <path
+                  id="ecosystem-orbit"
+                  d="M16 46C40 6 152 6 176 46"
+                  stroke="currentColor"
                   strokeLinecap="round"
-                  strokeWidth="1.4"
+                  strokeOpacity="0.3"
+                  strokeWidth="1"
                 />
-                <circle r="7" fill="currentColor" opacity="0.08" />
-                <circle r="2.4" fill="currentColor">
-                  <animate
-                    attributeName="opacity"
-                    dur="2s"
-                    repeatCount="indefinite"
-                    values="0.55;1;0.55"
+                <g filter="url(#ecosystem-dot-glow)">
+                  <line
+                    x1="-18"
+                    x2="-3"
+                    y1="0"
+                    y2="0"
+                    stroke="url(#ecosystem-light-trail)"
+                    strokeLinecap="round"
+                    strokeWidth="1.4"
                   />
-                  <animate
-                    attributeName="r"
-                    dur="2s"
+                  <circle r="7" fill="currentColor" opacity="0.08" />
+                  <circle r="2.4" fill="currentColor">
+                    <animate
+                      attributeName="opacity"
+                      dur="2s"
+                      repeatCount="indefinite"
+                      values="0.55;1;0.55"
+                    />
+                    <animate
+                      attributeName="r"
+                      dur="2s"
+                      repeatCount="indefinite"
+                      values="2;2.8;2"
+                    />
+                  </circle>
+                  <animateMotion
+                    dur="6s"
+                    keyPoints="0;1;0"
+                    keyTimes="0;0.5;1"
                     repeatCount="indefinite"
-                    values="2;2.8;2"
-                  />
-                </circle>
-                <animateMotion
-                  dur="6s"
-                  keyPoints="0;1;0"
-                  keyTimes="0;0.5;1"
-                  repeatCount="indefinite"
-                  rotate="auto"
-                >
-                  <mpath href="#ecosystem-orbit" />
-                </animateMotion>
-              </g>
-            </svg>
+                    rotate="auto"
+                  >
+                    <mpath href="#ecosystem-orbit" />
+                  </animateMotion>
+                </g>
+              </svg>
+            </div>
+            <p className="section-kicker">
+              {messages.sharedContent.sections.ecosystem.kicker}
+            </p>
+            <h2 className="section-title font-normal">
+              {messages.sharedContent.sections.ecosystem.title}
+            </h2>
+            <p className="section-lead mx-auto max-w-xl">
+              {messages.sharedContent.sections.ecosystem.lead}
+            </p>
           </div>
-          <p className="section-kicker">
-            {messages.sharedContent.sections.ecosystem.kicker}
-          </p>
-          <h2 className="section-title font-normal">
-            {messages.sharedContent.sections.ecosystem.title}
-          </h2>
-          <p className="section-lead mx-auto max-w-xl">
-            {messages.sharedContent.sections.ecosystem.lead}
-          </p>
-        </div>
 
-        <div className="mb-16 w-full overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
           <div className="grid grid-cols-1 md:grid-cols-3">
-            {PRIMITIVES.map((p, index) => {
-              const hoverRadius =
-                index === 0
-                  ? "rounded-t-md md:rounded-tr-none"
-                  : index === PRIMITIVES.length - 1
-                    ? "md:rounded-tr-md"
-                    : "";
-
+            {PRIMITIVES.map((p) => {
               return (
                 <div
                   key={p.name}
                   className="group relative flex min-w-0 flex-col gap-4 border-overlay/10 border-b p-6 transition-colors duration-500 hover:bg-overlay/[0.018] md:border-r md:last:border-r-0"
                 >
+                  <div className="pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                   <div
-                    className={`pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${hoverRadius}`}
-                  />
-                  <div
-                    className={`pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${hoverRadius}`}
+                    className="pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
                     style={{
                       padding: "1px",
                       background:
@@ -218,7 +214,7 @@ export default function PartnersSection() {
           </div>
 
           {/* Partner logos */}
-          <div className="border-overlay/10 border-t px-6 py-8 text-left sm:px-8">
+          <div className="border-overlay/10 border-t px-6 py-8 pb-0 text-left sm:px-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-ink-strong text-xl">

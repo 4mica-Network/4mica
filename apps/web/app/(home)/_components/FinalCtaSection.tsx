@@ -24,7 +24,6 @@ export default function FinalCtaSection() {
           <span className="font-normal text-ink-muted">
             {messages.home.sections.finalCtaLead}
           </span>
-          {/* Stats */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
             {STATS.map((s, i) => (
               <div key={s.label} className="contents">
@@ -40,7 +39,6 @@ export default function FinalCtaSection() {
               </div>
             ))}
           </div>
-          {/* Divider between stats */}
           <div className="mt-10 flex flex-col justify-center gap-3 border-overlay/10 border-t pt-10 sm:flex-row">
             <Link
               href={links.docs}
