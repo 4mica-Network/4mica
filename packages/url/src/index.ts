@@ -176,6 +176,8 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
       alignedLayer: "https://alignedlayer.com/",
       chaosChain: "https://chaoscha.in/",
       wachai: "https://wach.ai/",
+      clawCash: "https://clawcash.xyz",
+      lambdaClass: "https://github.com/lambdaclass",
     },
   } as const;
 };

@@ -30,6 +30,20 @@ export const PARTNERS = [
     href: links.partner.wachai,
     invertOnLight: true,
   },
+  {
+    name: "ClawCash",
+    logo: "/assets/claw-cash.png",
+    href: links.partner.clawCash,
+    // Solid black logo — invert to white in dark mode so it stays visible.
+    invertOnDark: true,
+  },
+  {
+    name: "Lambda Class",
+    logo: "/assets/lambda-class.png",
+    href: links.partner.lambdaClass,
+    // Solid black logo — invert to white in dark mode so it stays visible.
+    invertOnDark: true,
+  },
 ];
 
 export const TRUST_POINTS = messages.home.trustPoints;

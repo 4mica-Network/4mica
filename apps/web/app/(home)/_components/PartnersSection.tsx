@@ -276,6 +276,10 @@ export default function PartnersSection() {
                       "invertOnLight" in partner && partner.invertOnLight
                         ? "invert dark:invert-0"
                         : ""
+                    } ${
+                      "invertOnDark" in partner && partner.invertOnDark
+                        ? "dark:invert"
+                        : ""
                     }`}
                   />
                 </Link>
