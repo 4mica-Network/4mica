@@ -6,11 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/4mica-Network/x402-4mica.git"
+    "url": "https://github.com/4mica-Network/facilitator-4mica.git",
+    "directory": "packages/typescript/x402"
   },
-  "homepage": "https://github.com/4mica-Network/x402-4mica#readme",
+  "homepage": "https://github.com/4mica-Network/facilitator-4mica/tree/main/packages/typescript/x402#readme",
   "bugs": {
-    "url": "https://github.com/4mica-Network/x402-4mica/issues"
+    "url": "https://github.com/4mica-Network/facilitator-4mica/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,32 +38,31 @@
     "test": "vitest run",
     "lint": "eslint . --ext .ts",
     "fmt": "prettier --check \"{src,tests}/**/*.{ts,js,json}\"",
-    "demo:server": "cd demo && yarn server",
-    "demo:client": "cd demo && yarn client",
-    "demo:dev": "cd demo && yarn dev"
+    "demo:server": "pnpm --filter @4mica/x402-demo server",
+    "demo:client": "pnpm --filter @4mica/x402-demo client",
+    "demo:dev": "pnpm --filter @4mica/x402-demo dev"
   },
   "dependencies": {
-    "@x402/core": "^2.9.0",
-    "@x402/extensions": "^2.9.0",
-    "@4mica/sdk": "^1.2.3",
-    "viem": "^2.45.1"
+    "@x402/core": "catalog:",
+    "@x402/extensions": "catalog:",
+    "@4mica/sdk": "catalog:",
+    "viem": "catalog:"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.2",
-    "@eslint/js": "^9.39.2",
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.0.7",
-    "@typescript-eslint/eslint-plugin": "^8.48.1",
-    "@typescript-eslint/parser": "^8.48.1",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react": "^7.37.5",
-    "express": "^5.2.1",
-    "globals": "^17.0.0",
-    "prettier": "^3.7.4",
-    "typescript": "^5.3.3",
-    "typescript-eslint": "^8.48.1",
-    "vitest": "^4.0.17"
+    "@arethetypeswrong/cli": "catalog:",
+    "@eslint/js": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "express": "catalog:",
+    "globals": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@x402/paywall": "^2.2.0",
