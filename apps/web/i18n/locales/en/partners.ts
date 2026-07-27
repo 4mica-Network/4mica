@@ -5,8 +5,8 @@ const mailto = (subject: string, body: string) =>
 
 export const partners = {
   kicker: "Partners",
-  title: "Build the agentic economy with 4Mica",
-  lead: "Bring instant, credit-backed settlement to the products your users already run. Integrate the protocol, route payments through it, or introduce the builders who need it.",
+  title: "Build the payment layer for the agentic economy",
+  lead: "Add credit-backed payments to the products your users already use. Integrate 4Mica, route payments through it, or introduce teams that need it.",
   primaryCta: "Talk to partnerships",
   primaryCtaHref: mailto(
     "Partnership enquiry",
@@ -16,50 +16,50 @@ export const partners = {
 
   ecosystem: {
     title: "Teams already building with 4Mica",
-    lead: "Protocols and networks we work with across validation, agent infrastructure, and settlement.",
+    lead: "Protocols and networks working with us across validation, agent infrastructure, and settlement.",
   },
 
   why: {
     kicker: "Why partner",
-    title: "Why partner with 4Mica?",
-    lead: "4Mica is the credit layer for x402 payments: agents pay on credit, requests clear instantly, and balances settle on-chain once per cycle.",
+    title: "Why work with 4Mica?",
+    lead: "4Mica adds credit and clearing to x402. Agents pay against collateral, requests are authorized off-chain, and net balances settle on-chain once per cycle.",
     cards: [
       {
         icon: "ri-radar-line",
-        title: "Reach agent-native demand",
-        desc: "Get in front of teams shipping autonomous agents that need to pay for APIs, inference, and data — today, not after a procurement cycle.",
+        title: "Reach teams building agents",
+        desc: "Reach teams building agents that need to pay for APIs, inference, and data.",
       },
       {
         icon: "ri-plug-line",
-        title: "Ship payments without new rails",
-        desc: "4Mica is x402-compatible. Partners integrate with the HTTP client and server they already run, rather than building a payment stack from scratch.",
+        title: "Add payments without rebuilding",
+        desc: "4Mica works with x402-compatible clients and servers, so you can add it to your existing HTTP stack instead of building new payment infrastructure.",
       },
       {
         icon: "ri-scales-3-line",
-        title: "Commercial terms that fit",
-        desc: "Revenue share, referral terms, and support commitments are agreed per partnership, so the arrangement matches what you actually bring.",
+        title: "Terms based on the partnership",
+        desc: "We agree on revenue share, referral terms, and support based on what each partner provides.",
       },
       {
         icon: "ri-team-line",
-        title: "Build with the core team",
-        desc: "A shared channel with the engineers who maintain the protocol — integration review, roadmap visibility, and fast answers.",
+        title: "Work with the core team",
+        desc: "Work directly with the engineers who maintain the protocol through integration reviews, roadmap updates, and a shared support channel.",
       },
     ],
   },
 
   programs: {
     kicker: "Programs",
-    title: "Which partner program is right for you?",
-    lead: "Three ways to work with us. Most partnerships start with one and grow into another.",
+    title: "Choose how you want to work with us",
+    lead: "Start with the program that matches what you build or who you support.",
     items: [
       {
         icon: "ri-code-box-line",
         label: "Technology partners",
         title: "Integrate 4Mica into your product",
-        desc: "For platforms, agent frameworks, and API providers that want credit-backed payments built in.",
+        desc: "For platforms, agent frameworks, and API providers adding credit-backed payments to their products.",
         points: [
           "Client and server SDKs in TypeScript and Python",
-          "x402-compatible: wrap the fetch or middleware you already use",
+          "Wrap the fetch client or middleware you already use",
           "Integration review and joint launch support",
         ],
         cta: "Start an integration",
@@ -72,10 +72,10 @@ export const partners = {
         icon: "ri-node-tree",
         label: "Infrastructure partners",
         title: "Route payments through the credit layer",
-        desc: "For facilitators, wallets, and infrastructure providers that move agent traffic and want it settled net rather than per request.",
+        desc: "For facilitators, wallets, and infrastructure providers that want to clear agent payments in cycles instead of settling each request on-chain.",
         points: [
           "Facilitator endpoints for verification, settlement, and BLS certificates",
-          "Coverage across Base and Ethereum networks",
+          "Support for Base and Ethereum networks",
           "Shared operational runbooks and status reporting",
         ],
         cta: "Talk to the team",
@@ -88,9 +88,9 @@ export const partners = {
         icon: "ri-shake-hands-line",
         label: "Ecosystem partners",
         title: "Introduce the builders who need credit rails",
-        desc: "For funds, accelerators, communities, and agencies working with teams that are hitting the limits of per-request settlement.",
+        desc: "For funds, accelerators, communities, and agencies that support teams using high-frequency payments.",
         points: [
-          "Perks and onboarding support for your portfolio or community",
+          "Onboarding support for your portfolio or community",
           "Co-marketing: launch posts, workshops, and events",
           "Referral terms agreed per partner",
         ],
@@ -106,45 +106,45 @@ export const partners = {
   benefits: {
     kicker: "Benefits",
     title: "What partners get",
-    lead: "The same support we give our own integrations.",
+    lead: "Practical support from integration through launch.",
     items: [
       {
         icon: "ri-chat-3-line",
         title: "A direct channel to the core team",
-        desc: "A shared channel with the engineers maintaining the protocol — not a ticket queue.",
+        desc: "A shared channel with the engineers who maintain the protocol.",
       },
       {
         icon: "ri-tools-line",
         title: "Technical onboarding",
-        desc: "Architecture review, integration walkthrough, and help sizing your first cycle.",
+        desc: "An architecture review, an integration walkthrough, and help planning your first clearing cycle.",
       },
       {
         icon: "ri-megaphone-line",
         title: "Co-marketing",
-        desc: "Joint launch posts, documentation placement, and social amplification when you ship.",
+        desc: "Joint launch posts, documentation placement, and coordinated promotion.",
       },
       {
         icon: "ri-rocket-line",
         title: "Early access",
-        desc: "Protocol releases and new scheme features before they reach general availability.",
+        desc: "Early access to protocol releases and new scheme features.",
       },
       {
         icon: "ri-flask-line",
         title: "Testnet environments",
-        desc: "Sandbox credentials and funded testnet flows so your team can build against real behaviour.",
+        desc: "Funded testnet flows so your team can test the integration before mainnet.",
       },
       {
         icon: "ri-file-list-3-line",
         title: "Clear commercial terms",
-        desc: "Revenue share and referral terms written down per partnership, with the settlement records to audit them.",
+        desc: "Written revenue-share and referral terms, supported by auditable settlement records.",
       },
     ],
   },
 
   enablement: {
     kicker: "Go to market",
-    title: "How we help you grow",
-    lead: "Partnership does not stop at the integration. We back it with the same build, sell, market, and support motion we use for our own launches.",
+    title: "Support from integration to launch",
+    lead: "We help you integrate, launch, reach customers, and operate the payment flow.",
     pillars: [
       {
         icon: "ri-hammer-line",
@@ -153,26 +153,26 @@ export const partners = {
         points: [
           "Architecture review and a walkthrough of the x402 flow",
           "Client and server SDKs in TypeScript and Python",
-          "Funded testnet credentials to build against real settlement",
+          "Funded testnet flows for testing settlement",
         ],
       },
       {
         icon: "ri-hand-coin-line",
         label: "Co-sell",
-        title: "Reach agent-native demand",
+        title: "Reach teams building agents",
         points: [
           "Warm introductions to teams that need credit-backed payments",
-          "Joint account planning and a shared deal channel",
+          "Joint account planning and a shared sales channel",
           "Referral and revenue-share terms agreed per partnership",
         ],
       },
       {
         icon: "ri-megaphone-line",
         label: "Co-market",
-        title: "Launch it loudly",
+        title: "Launch together",
         points: [
           "Joint launch posts, docs placement, and social amplification",
-          "A listing among the teams building on 4Mica",
+          "A listing in the 4Mica ecosystem",
           "Co-hosted workshops, demos, and events",
         ],
       },
@@ -191,25 +191,25 @@ export const partners = {
 
   stories: {
     kicker: "Proof",
-    title: "Partners already shipping on 4Mica",
-    lead: "Real integrations, not logos on a slide.",
+    title: "Partners building with 4Mica",
+    lead: "See how partners use 4Mica to reduce payment overhead.",
     items: [
       {
         partner: "Aligned Layer",
         logo: "/assets/aligned_layer_logo.png",
         tag: "API monetization",
         challenge:
-          "Aligned's verification is ultra-cheap — around $0.019 per task — but on-chain payment gas ran about $0.14, eight times the cost of the service itself. Per-task billing was nearly impossible to scale.",
+          "Aligned's verification costs about $0.019 per task, while on-chain payment gas cost about $0.14. The payment cost was roughly eight times the cost of the service.",
         outcome:
-          "Routing payments through 4Mica's credit layer clears each request instantly and settles balances net once per cycle, so the payment stops dwarfing the service.",
-        stat: { value: "8×", label: "cheaper than paying gas per task" },
+          "4Mica authorizes each payment off-chain and settles net balances once per cycle, reducing the settlement cost relative to the service.",
+        stat: { value: "8×", label: "payment gas versus service cost" },
         href: "/solution",
         cta: "Read the case study",
       },
     ],
     invite: {
       title: "Building with 4Mica?",
-      desc: "If your users are hitting the limits of per-request settlement, let's tell that story together.",
+      desc: "Share how your team uses 4Mica and what changed after integration.",
       cta: "Share your story",
       href: mailto(
         "Partner success story",
@@ -221,34 +221,34 @@ export const partners = {
   process: {
     kicker: "Process",
     title: "How a partnership starts",
-    lead: "Three steps from a first message to a live integration.",
+    lead: "Three steps from the first conversation to launch.",
     steps: [
       {
         order: "01",
         title: "Introduce your team",
-        desc: "Tell us what you build and where payments hurt today. One call is usually enough to know if there is a fit.",
+        desc: "Tell us what you build, how payments work today, and what you want to improve.",
       },
       {
         order: "02",
         title: "Design the integration",
-        desc: "We scope the flow together — guarantees, spending limits, settlement cadence — and agree the commercial terms in writing.",
+        desc: "We define the guarantees, spending limits, settlement cadence, responsibilities, and commercial terms.",
       },
       {
         order: "03",
         title: "Launch together",
-        desc: "Go live on mainnet with integration review, monitoring, and a joint announcement.",
+        desc: "Launch on mainnet with an integration review, operational monitoring, and a joint announcement.",
       },
     ],
   },
 
   other: {
-    kicker: "Also",
+    kicker: "More ways to partner",
     title: "Other ways to work with us",
     items: [
       {
         icon: "ri-seedling-line",
         title: "Perks for funds and accelerators",
-        desc: "Give your portfolio companies onboarding support and testnet credits so they can ship agent payments in their first sprint.",
+        desc: "Give your portfolio companies onboarding support and testnet access for agent payments.",
         cta: "Set up perks",
         href: mailto(
           "Portfolio perks",
@@ -258,7 +258,7 @@ export const partners = {
       {
         icon: "ri-microscope-line",
         title: "Research collaboration",
-        desc: "Working on payment cryptography, credit risk, or agent identity? We publish, review, and co-author with teams doing serious work.",
+        desc: "Work with us on payment cryptography, credit risk, or agent identity research.",
         cta: "Compare notes",
         href: `${links.mailto.dev}?subject=${encodeURIComponent("Research collaboration")}`,
       },
@@ -267,12 +267,12 @@ export const partners = {
 
   resources: {
     kicker: "Resources",
-    title: "Everything you need to get started",
+    title: "Resources for partners",
     items: [
       {
         icon: "ri-book-2-line",
         title: "Partner documentation",
-        desc: "Integration guides, SDK references, and the full x402 protocol surface.",
+        desc: "Integration guides, SDK references, and x402 protocol documentation.",
         cta: "Read the docs",
         href: links.docs,
         external: true,
@@ -280,7 +280,7 @@ export const partners = {
       {
         icon: "ri-compass-3-line",
         title: "Explore the ecosystem",
-        desc: "See the protocols and networks already building on 4Mica.",
+        desc: "See the protocols and networks working with 4Mica.",
         cta: "View programs",
         href: "#programs",
         external: false,
@@ -288,7 +288,7 @@ export const partners = {
       {
         icon: "ri-mail-send-line",
         title: "Talk to partnerships",
-        desc: "Tell us what you are building and we will come back with a next step.",
+        desc: "Tell us what you are building, and we will suggest the next step.",
         cta: "Get in touch",
         href: mailto(
           "Partnership enquiry",
@@ -301,27 +301,27 @@ export const partners = {
 
   faq: {
     kicker: "FAQ",
-    title: "Common questions",
+    title: "Partnership questions",
     items: [
       {
         question: "Who is a good fit for a partnership?",
         answer:
-          "Teams whose users make many small, frequent payments — agent platforms, API providers, inference and data services, wallets, and the funds and communities that back them. If per-request on-chain settlement is a cost or latency problem for you, there is something to talk about.",
+          "Facilitators are our primary partners and customers. We also work with agent platforms, API providers, wallets, infrastructure teams, and organizations that support them. The strongest fit is a product with many small payments where per-request on-chain settlement adds too much cost or delay.",
       },
       {
         question: "Do we need to change our payment stack?",
         answer:
-          "No. 4Mica is x402-compatible: clients wrap the fetch they already use and services add a middleware to the routes they already serve. Most integrations are a small change on both sides rather than a rebuild.",
+          "No. Clients wrap the fetch client they already use, and services add middleware to existing routes. Most integrations extend the current payment flow rather than replace it.",
       },
       {
         question: "How long does an integration take?",
         answer:
-          "It depends on your stack, but the protocol surface is deliberately small — sign a guarantee, authorize the request against a limit, settle the cycle. We scope the work with you before anything is committed.",
+          "It depends on your stack and deployment requirements. The core flow is small: sign a guarantee, authorize the request against a limit, and settle the clearing cycle. We define the scope before work begins.",
       },
       {
         question: "How do commercial terms work?",
         answer:
-          "They are agreed per partnership rather than fixed, because what partners bring differs — traffic, integration work, or introductions. Whatever is agreed is written down, and settlement records make it auditable.",
+          "We agree on terms for each partnership based on traffic, integration work, support, or referrals. We document the terms, and settlement records provide an audit trail.",
       },
     ],
     contactPrompt: "Something else on your mind?",
@@ -329,8 +329,8 @@ export const partners = {
   },
 
   cta: {
-    title: "Let's build the payment layer for agents",
-    lead: "Tell us what you are building and we will come back with a concrete next step.",
+    title: "Build the payment layer for the agentic economy",
+    lead: "Tell us what you are building, and we will suggest a concrete next step.",
     primary: "Talk to partnerships",
     secondary: "Read the docs",
   },
