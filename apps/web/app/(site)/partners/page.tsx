@@ -77,7 +77,7 @@ function PartnersHero() {
 
 function EcosystemLogos() {
   return (
-    <div className="mt-16 overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
+    <div className="mt-16 overflow-hidden rounded-md bg-surface-deep/25">
       <div className="border-overlay/10 border-b px-6 py-6 text-center sm:px-8">
         <p className="font-medium text-ink-strong text-xl">
           {content.ecosystem.title}
@@ -394,7 +394,7 @@ function PartnerFaq() {
 
 function PartnerEnablement() {
   return (
-    <section className="section-gloss relative isolate overflow-hidden py-24">
+    <section className="section-gloss relative isolate overflow-hidden rounded-md px-8 py-8">
       <SectionBackdrop src="/bg/abstract-satin-folds.avif" position="left" />
       <div className="mx-auto w-full max-w-300">
         <SectionHeader
@@ -444,7 +444,7 @@ function PartnerEnablement() {
 
 function PartnerStories() {
   return (
-    <section className="section-gloss relative isolate overflow-hidden py-24">
+    <section className="section-gloss relative isolate overflow-hidden rounded-md px-8 py-8">
       <SectionBackdrop src="/bg/abstract-smoke.avif" position="right" />
       <div className="mx-auto w-full max-w-300">
         <SectionHeader
@@ -453,11 +453,11 @@ function PartnerStories() {
           lead={content.stories.lead}
         />
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.8fr] lg:items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.8fr] lg:items-stretch">
           {content.stories.items.map((story) => (
             <div
               key={story.partner}
-              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018]"
+              className="group relative flex flex-col rounded-l-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018]"
             >
               <ShinyHoverBorder />
               <div className="relative z-10 flex flex-1 flex-col">
@@ -499,7 +499,7 @@ function PartnerStories() {
             </div>
           ))}
 
-          <div className="relative flex flex-col justify-center rounded-md border border-overlay/10 border-dashed bg-surface-deep/10 p-8">
+          <div className="relative flex flex-col justify-center rounded-r-md border border-overlay/10 border-l-0 bg-surface-deep/10 p-8">
             <h3 className="font-semibold text-ink-strong text-xl">
               {content.stories.invite.title}
             </h3>
