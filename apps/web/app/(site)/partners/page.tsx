@@ -403,39 +403,41 @@ function PartnerEnablement() {
           lead={content.enablement.lead}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {content.enablement.pillars.map((pillar) => (
-            <div
-              key={pillar.label}
-              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
-            >
-              <ShinyHoverBorder />
-              <div className="relative z-10 flex flex-1 flex-col">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-overlay/[0.035] text-2xl text-ink-strong ring-1 ring-overlay/10">
-                  <i className={pillar.icon} />
+        <div className="overflow-hidden rounded-md border border-overlay/10">
+          <div className="grid divide-y divide-overlay/10 sm:grid-cols-2 sm:divide-x lg:grid-cols-4 lg:divide-y-0">
+            {content.enablement.pillars.map((pillar) => (
+              <div
+                key={pillar.label}
+                className="group relative flex flex-col bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
+              >
+                <ShinyHoverBorder radiusClass="rounded-none" />
+                <div className="relative z-10 flex flex-1 flex-col">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-overlay/[0.035] text-2xl text-ink-strong ring-1 ring-overlay/10">
+                    <i className={pillar.icon} />
+                  </div>
+                  <p className="font-medium text-ink-muted text-md uppercase tracking-widest">
+                    {pillar.label}
+                  </p>
+                  <h3 className="mt-2 font-semibold text-ink-strong text-lg">
+                    {pillar.title}
+                  </h3>
+                  <ul className="mt-5 space-y-3">
+                    {pillar.points.map((point) => (
+                      <li key={point} className="flex gap-2.5 text-md">
+                        <i
+                          className="ri-check-line mt-0.5 shrink-0 text-ink-strong/60"
+                          aria-hidden="true"
+                        />
+                        <span className="text-ink-body leading-relaxed">
+                          {point}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <p className="font-medium text-ink-muted text-md uppercase tracking-widest">
-                  {pillar.label}
-                </p>
-                <h3 className="mt-2 font-semibold text-ink-strong text-lg">
-                  {pillar.title}
-                </h3>
-                <ul className="mt-5 space-y-3">
-                  {pillar.points.map((point) => (
-                    <li key={point} className="flex gap-2.5 text-md">
-                      <i
-                        className="ri-check-line mt-0.5 shrink-0 text-ink-strong/60"
-                        aria-hidden="true"
-                      />
-                      <span className="text-ink-body leading-relaxed">
-                        {point}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
