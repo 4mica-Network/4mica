@@ -35,16 +35,6 @@ export type SolutionFaq = {
   answer: string;
 };
 
-/**
- * Who a solution page is written for.
- *
- * `customer` pages address the people we sell to, in priority order:
- * facilitators first (the primary customer), then API providers and agent
- * frameworks. `useCase` pages address a market or scenario and can be reached
- * by any of them. Individual agents are deliberately absent — they spend
- * against an operator's collateral, so they are end users of the product
- * rather than a party we contract with. See `/solutions/agent-frameworks`.
- */
 export type SolutionGroup = "customer" | "useCase";
 
 export type SolutionContent = {
@@ -55,7 +45,6 @@ export type SolutionContent = {
   description: string;
   headline: string;
   intro: string;
-  /** Overrides the generated `<title>` when the label alone misses the terms. */
   seoTitle?: string;
   points: SolutionPoint[];
   useCases: SolutionUseCaseGroup[];
@@ -70,25 +59,25 @@ export const solutions: SolutionContent[] = [
     label: "Facilitators",
     icon: "ri-cloud-line",
     group: "customer",
-    description: "Credit rails behind your facilitator",
-    headline: "Offer credit-backed x402 payments under your own brand.",
+    description: "Add credit-backed payments to your facilitator",
+    headline: "Add credit-backed x402 payments to your facilitator.",
     intro:
-      "Facilitators are who 4Mica is built for first. Add the 4mica-credit scheme to the facilitator you already operate and the sellers behind it get instant authorization and netted settlement — you stay the interface your customers integrate with, and the clearing layer sits behind you.",
+      "4Mica is built first for facilitators. Add the 4mica-credit scheme to the facilitator you already run. Sellers get fast authorization and net settlement, while you keep the customer relationship and interface.",
     seoTitle: "For Facilitators | x402 Facilitator Infrastructure | 4Mica",
     points: [
       {
         title: "You stay the interface",
-        desc: "Your endpoint, your brand, your relationship. 4Mica runs behind it as the credit and clearing layer, the way a CDN sits behind a site.",
+        desc: "Keep your endpoint, brand, and customer relationship. 4Mica runs behind them as the credit and clearing layer.",
         icon: "ri-shield-keyhole-line",
       },
       {
         title: "A scheme, not a stack",
-        desc: "Advertise 4mica-credit in /supported and call Core from your settle path. No collateral engine, netting logic, or contracts to build.",
+        desc: "Advertise 4mica-credit in /supported and call Core from your settle path. You do not need to build collateral, netting, or settlement systems.",
         icon: "ri-puzzle-line",
       },
       {
-        title: "Micropayments that clear",
-        desc: "Requests are authorized off-chain in one round trip, so traffic that was uneconomic per transfer becomes viable.",
+        title: "Make micropayments viable",
+        desc: "Requests are authorized off-chain in one round trip, making small payments practical.",
         icon: "ri-flashlight-line",
       },
     ],
@@ -98,17 +87,17 @@ export const solutions: SolutionContent[] = [
         cards: [
           {
             title: "Add credit to your scheme list",
-            desc: "Keep your existing schemes and offer credit-backed payments alongside them from the same endpoint.",
+            desc: "Keep your current schemes and add credit-backed payments from the same endpoint.",
             icon: "ri-stack-line",
           },
           {
             title: "Cut on-chain writes",
-            desc: "Guarantees net down inside clearing cycles, so settlement cost stops scaling with request count.",
+            desc: "Guarantees are netted within each clearing cycle, so settlement costs do not rise with every request.",
             icon: "ri-git-merge-line",
           },
           {
-            title: "Keep the trust boundary",
-            desc: "Core independently verifies every signed claim, so the facilitator never has to hold payer keys or custody funds.",
+            title: "Keep control of trust",
+            desc: "Core verifies each signed claim, so the facilitator does not hold payer keys or customer funds.",
             icon: "ri-lock-2-line",
           },
         ],
@@ -117,13 +106,13 @@ export const solutions: SolutionContent[] = [
         label: "For the sellers you serve",
         cards: [
           {
-            title: "No prefunding to onboard",
-            desc: "Buyers arrive with collateral-backed credit instead of a balance they had to top up with each seller first.",
+            title: "No seller-specific prefunding",
+            desc: "Buyers use collateral-backed credit instead of topping up a separate balance with each seller.",
             icon: "ri-user-add-line",
           },
           {
             title: "Verified before delivery",
-            desc: "Expensive work runs only after a guarantee is accepted and a BLS certificate is returned.",
+            desc: "Run paid work only after the guarantee is accepted and the BLS certificate is returned.",
             icon: "ri-shield-check-line",
           },
         ],
@@ -137,19 +126,19 @@ export const solutions: SolutionContent[] = [
       },
       {
         order: "02",
-        title: "Call Core on settle",
-        desc: "Submit the signed guarantee from your settle path, validate V1 and V2 structures, and return the BLS certificate.",
+        title: "Call Core during settlement",
+        desc: "Submit the signed guarantee from your settle path, validate V1 and V2 guarantees, and return the BLS certificate.",
       },
       {
         order: "03",
-        title: "Settle cycles net",
-        desc: "Payable guarantees enter clearing cycles and commit as net positions on-chain instead of one transfer per request.",
+        title: "Settle net positions",
+        desc: "Payable guarantees enter clearing cycles and settle as net positions on-chain instead of one transfer per request.",
       },
     ],
     resources: [
       {
         title: "Facilitator concepts",
-        desc: "Where the facilitator sits between sellers and Core, and what it is not responsible for.",
+        desc: "Learn how the facilitator connects sellers to Core and what it is responsible for.",
         icon: "ri-book-open-line",
         href: `${links.docs}/core-concepts/facilitator`,
       },
@@ -161,7 +150,7 @@ export const solutions: SolutionContent[] = [
       },
       {
         title: "Talk to the team",
-        desc: "Scope coverage, networks, and settlement cadence for your deployment.",
+        desc: "Discuss network support and settlement cadence for your deployment.",
         icon: "ri-chat-3-line",
         href: links.mailto.partnership,
       },
@@ -175,7 +164,7 @@ export const solutions: SolutionContent[] = [
       {
         question: "Do our sellers or buyers have to change clients?",
         answer:
-          "Only to register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use and sellers keep their existing x402 middleware and routes.",
+          "They only need to register the 4mica-credit scheme. Buyers add the adapter to their current fetch wrapper, while sellers keep their existing x402 middleware and routes.",
       },
       {
         question: "Does the facilitator take custody of funds?",
@@ -194,26 +183,26 @@ export const solutions: SolutionContent[] = [
     label: "API providers",
     icon: "ri-plug-line",
     group: "customer",
-    description: "Charge per request, no accounts",
+    description: "Charge per request without accounts",
     headline:
       "Charge per request without accounts, invoices, or prepaid balances.",
     intro:
-      "Sellers are the second audience 4Mica serves. Protect a route with x402 middleware, advertise a price, and get paid in stablecoins as clearing cycles settle — no signup flow, no invoicing, and no per-request gas to absorb.",
+      "Protect a route with x402 middleware, set a price, and receive stablecoins when each clearing cycle settles. Buyers do not need an account, invoice, or prepaid balance.",
     seoTitle: "For API Providers | Charge Per Request with x402 | 4Mica",
     points: [
       {
-        title: "Price the route, not the customer",
-        desc: "Advertise a price per endpoint and let any x402-compatible buyer pay it on first contact.",
+        title: "Set a price per route",
+        desc: "Set a price for each endpoint and let any x402-compatible buyer pay on the first request.",
         icon: "ri-price-tag-3-line",
       },
       {
-        title: "Verify before you spend",
-        desc: "Return 402 before expensive work and serve only once Core has accepted the guarantee.",
+        title: "Verify before doing the work",
+        desc: "Return 402 before running expensive work, and respond only after Core accepts the guarantee.",
         icon: "ri-shield-check-line",
       },
       {
-        title: "Revenue that reconciles",
-        desc: "High-frequency traffic collapses into netted settlement with the guarantee records behind every figure.",
+        title: "Clear payment records",
+        desc: "High-frequency requests settle as net positions, with a guarantee record behind every amount.",
         icon: "ri-file-list-3-line",
       },
     ],
@@ -223,17 +212,17 @@ export const solutions: SolutionContent[] = [
         cards: [
           {
             title: "Monetize per call",
-            desc: "Charge for inference, data, search, compute, or premium actions at the granularity you actually deliver them.",
+            desc: "Charge for inference, data, search, compute, or premium actions one request at a time.",
             icon: "ri-cpu-line",
           },
           {
             title: "Skip the signup funnel",
-            desc: "No account creation, API key issuance, or prepaid balance before a buyer's first paid request.",
+            desc: "Buyers can make a paid request without creating an account, receiving an API key, or adding a prepaid balance.",
             icon: "ri-user-shared-line",
           },
           {
-            title: "Sell fractions of a cent",
-            desc: "Per-request on-chain cost disappears, so small unit prices stop being eaten by settlement.",
+            title: "Charge small amounts",
+            desc: "Without an on-chain transaction for each request, settlement costs do not consume small payments.",
             icon: "ri-coins-line",
           },
         ],
@@ -243,12 +232,12 @@ export const solutions: SolutionContent[] = [
         cards: [
           {
             title: "Settle in stablecoins",
-            desc: "Take payout in the assets your deployment enables, with USDC and USDT as the common defaults.",
+            desc: "Receive payment in the assets enabled by your deployment. USDC and USDT are common defaults.",
             icon: "ri-exchange-dollar-line",
           },
           {
-            title: "Audit any line item",
-            desc: "Every net settlement expands back into the individual guarantees and certificates that produced it.",
+            title: "Audit each payment",
+            desc: "Trace every net settlement back to the guarantees and certificates that produced it.",
             icon: "ri-search-eye-line",
           },
         ],
@@ -267,8 +256,8 @@ export const solutions: SolutionContent[] = [
       },
       {
         order: "03",
-        title: "Get paid per cycle",
-        desc: "Accepted guarantees settle as net positions, so revenue arrives without per-request on-chain cost.",
+        title: "Get paid each cycle",
+        desc: "Accepted guarantees settle as net positions, without an on-chain transaction for every request.",
       },
     ],
     resources: [
@@ -316,28 +305,28 @@ export const solutions: SolutionContent[] = [
   },
   {
     slug: "agent-frameworks",
-    label: "Agent frameworks and agents",
+    label: "Agent frameworks",
     icon: "ri-flow-chart",
     group: "customer",
-    description: "Payment rails inside your framework",
-    headline: "Give every agent in your framework a way to pay.",
+    description: "Add payments to your agent framework",
+    headline: "Give agents a built-in way to pay.",
     intro:
-      "Frameworks and the teams that operate agents are 4Mica's third audience. Register the credit scheme once and every agent built on your framework can pay for APIs, tools, and data inside ordinary HTTP requests, spending against the operator's collateral within limits the operator sets.",
+      "Register the credit scheme once, and agents can pay for APIs, tools, and data through normal HTTP requests. They spend against the operator's collateral and within the limits the operator sets.",
     seoTitle: "For Agent Frameworks and Agents | x402 Payments | 4Mica",
     points: [
       {
-        title: "One integration, every agent",
-        desc: "Register the scheme in your HTTP layer and each agent inherits the ability to pay — no per-agent wallet or funding step.",
+        title: "One integration for every agent",
+        desc: "Register the scheme in your HTTP layer, and each agent can pay without its own wallet or funding step.",
         icon: "ri-git-branch-line",
       },
       {
-        title: "Budgets the operator controls",
-        desc: "Limit spend per request, task, seller, asset, or window, and require approval above a threshold.",
+        title: "Operator-controlled budgets",
+        desc: "Set limits by request, task, seller, asset, or time window, and require approval above a threshold.",
         icon: "ri-timer-flash-line",
       },
       {
-        title: "Payment proof per task",
-        desc: "Every spend carries a request ID and certificate, so payments tie back to the work that triggered them.",
+        title: "Payment records by task",
+        desc: "Each payment includes a request ID and certificate, so you can trace it back to the task that caused it.",
         icon: "ri-shield-user-line",
       },
     ],
@@ -346,13 +335,13 @@ export const solutions: SolutionContent[] = [
         label: "For framework maintainers",
         cards: [
           {
-            title: "Ship payments as a capability",
-            desc: "Offer paid tool use as a first-class feature rather than leaving each user to build a payment path.",
+            title: "Make payments a built-in feature",
+            desc: "Support paid tools in the framework instead of asking each user to build their own payment flow.",
             icon: "ri-tools-line",
           },
           {
-            title: "Keep the HTTP surface",
-            desc: "The credit scheme wraps the client your framework already uses; a 402 becomes a signed retry.",
+            title: "Keep your current HTTP client",
+            desc: "The credit scheme wraps the client your framework already uses. A 402 response becomes a signed retry.",
             icon: "ri-route-line",
           },
         ],
@@ -361,18 +350,18 @@ export const solutions: SolutionContent[] = [
         label: "For teams running agents",
         cards: [
           {
-            title: "Fund once, spend anywhere",
-            desc: "One collateral position backs every service an agent reaches, instead of a balance per counterparty.",
+            title: "Use one collateral position",
+            desc: "One collateral position can back payments across services instead of keeping a balance with each provider.",
             icon: "ri-wallet-3-line",
           },
           {
-            title: "Stop a run cold",
-            desc: "Pause signing, lower budgets, drop a seller, or rotate credentials without touching agent code.",
+            title: "Stop spending quickly",
+            desc: "Pause signing, lower budgets, block a seller, or rotate credentials without changing agent code.",
             icon: "ri-stop-circle-line",
           },
           {
             title: "Reconcile by task",
-            desc: "Group spends by task ID to see what a run cost and which services it paid.",
+            desc: "Group payments by task ID to see the cost of each run and the services it used.",
             icon: "ri-list-check-2",
           },
         ],
@@ -391,8 +380,8 @@ export const solutions: SolutionContent[] = [
       },
       {
         order: "03",
-        title: "Let agents transact",
-        desc: "Each 402 becomes a signed guarantee and a retry, and the spend joins the operator's next clearing cycle.",
+        title: "Let agents pay",
+        desc: "Each 402 response becomes a signed guarantee and retry. The payment then joins the operator's next clearing cycle.",
       },
     ],
     resources: [
@@ -444,9 +433,9 @@ export const solutions: SolutionContent[] = [
     icon: "ri-robot-2-line",
     group: "useCase",
     description: "Payments for AI agents",
-    headline: "Payments built for autonomous agents.",
+    headline: "Payments for autonomous agents.",
     intro:
-      "Give AI agents a way to transact in real time. Agents sign off-chain guarantees and spend against pooled collateral, so every request settles instantly without prefunding or clearing on-chain.",
+      "Let AI agents pay during normal HTTP requests. They sign guarantees off-chain and spend against pooled collateral, so each request can be authorized without prefunding or an on-chain transaction.",
     points: [
       {
         title: "Pay per request",
@@ -459,8 +448,8 @@ export const solutions: SolutionContent[] = [
         icon: "ri-gas-station-line",
       },
       {
-        title: "x402-native",
-        desc: "Drop-in credit scheme for the x402 standard your agents already speak.",
+        title: "Works with x402",
+        desc: "Add the credit scheme to the x402 clients your agents already use.",
         icon: "ri-route-line",
       },
     ],
@@ -479,8 +468,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-timer-flash-line",
           },
           {
-            title: "Keep UX invisible",
-            desc: "No wallet popups or prefunding steps between the agent and the resource it needs.",
+            title: "Keep payments out of the way",
+            desc: "Agents can access paid resources without wallet pop-ups or prefunding steps.",
             icon: "ri-eye-off-line",
           },
         ],
@@ -494,8 +483,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-shield-user-line",
           },
           {
-            title: "Batch your revenue",
-            desc: "Collapse high-frequency agent traffic into settlement cycles that are easy to reconcile.",
+            title: "Settle revenue in batches",
+            desc: "Group high-frequency agent payments into settlement cycles that are easier to reconcile.",
             icon: "ri-stack-line",
           },
         ],
@@ -563,13 +552,13 @@ export const solutions: SolutionContent[] = [
     icon: "ri-brain-line",
     group: "useCase",
     description: "Charge per API call",
-    headline: "Usage-based billing for AI products.",
+    headline: "Charge for AI usage per request.",
     intro:
-      "Charge for inference, tools, and API calls with credit-backed settlement. Customers pay as they go while your collateral earns yield, making per-task pricing viable at scale.",
+      "Charge for inference, tools, and API calls with credit-backed settlement. Customers pay as they go, and supported collateral can keep earning yield.",
     points: [
       {
-        title: "Per-call monetization",
-        desc: "Bill each request with cryptographic guarantees instead of invoices.",
+        title: "Charge per call",
+        desc: "Charge each request using signed guarantees instead of invoices.",
         icon: "ri-cpu-line",
       },
       {
@@ -578,8 +567,8 @@ export const solutions: SolutionContent[] = [
         icon: "ri-percent-line",
       },
       {
-        title: "Production-ready SDKs",
-        desc: "TypeScript and Python clients wrap your existing HTTP stack.",
+        title: "TypeScript and Python SDKs",
+        desc: "Use TypeScript or Python clients with your existing HTTP stack.",
         icon: "ri-terminal-box-line",
       },
     ],
@@ -598,8 +587,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-speed-up-line",
           },
           {
-            title: "Serve new customers faster",
-            desc: "Let crypto-native users and agents start paying immediately from an existing wallet.",
+            title: "Let customers start sooner",
+            desc: "Let users and agents pay from an existing wallet without creating a prepaid account.",
             icon: "ri-user-add-line",
           },
         ],
@@ -613,8 +602,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-file-list-3-line",
           },
           {
-            title: "Offset costs with yield",
-            desc: "Collateral can earn while it backs usage, helping reduce the cost of payment operations.",
+            title: "Earn on supported collateral",
+            desc: "Supported collateral can earn yield while it backs payments.",
             icon: "ri-percent-line",
           },
         ],
@@ -681,9 +670,9 @@ export const solutions: SolutionContent[] = [
     icon: "ri-coin-line",
     group: "useCase",
     description: "On-chain settlement",
-    headline: "Instant settlement across chains.",
+    headline: "Fast payments with on-chain settlement.",
     intro:
-      "Move at off-chain speed without giving up on-chain guarantees. 4Mica issues BLS-signed certificates that settle on the parent chain, so value never leaks and disputes stay enforceable.",
+      "Authorize payments off-chain while keeping settlement enforceable on-chain. 4Mica issues BLS-signed certificates that can be used during settlement.",
     points: [
       {
         title: "On-chain guarantees",
@@ -691,13 +680,13 @@ export const solutions: SolutionContent[] = [
         icon: "ri-shield-check-line",
       },
       {
-        title: "Multi-chain ready",
-        desc: "The same credit rails work across Ethereum, Base, and emerging rollups.",
+        title: "Built for multiple networks",
+        desc: "Use the same credit model across Ethereum, Base, and compatible rollups.",
         icon: "ri-links-line",
       },
       {
         title: "Non-custodial",
-        desc: "Collateral stays in your control — 4Mica never holds funds.",
+        desc: "Collateral remains in protocol contracts. 4Mica does not hold customer funds.",
         icon: "ri-safe-2-line",
       },
     ],
@@ -706,8 +695,8 @@ export const solutions: SolutionContent[] = [
         label: "For protocol teams",
         cards: [
           {
-            title: "Keep settlement enforceable",
-            desc: "Use signed credit guarantees while preserving a path to on-chain claims and dispute handling.",
+            title: "Keep an on-chain claim path",
+            desc: "Use signed guarantees while keeping a path to on-chain claims and dispute handling.",
             icon: "ri-shield-check-line",
           },
           {
@@ -716,7 +705,7 @@ export const solutions: SolutionContent[] = [
             icon: "ri-arrow-left-right-line",
           },
           {
-            title: "Support EVM ecosystems",
+            title: "Support EVM networks",
             desc: "Build payment flows that can follow users across Ethereum, Base, and compatible networks.",
             icon: "ri-links-line",
           },
@@ -799,23 +788,23 @@ export const solutions: SolutionContent[] = [
     icon: "ri-store-2-line",
     group: "useCase",
     description: "Batch buyer payouts",
-    headline: "Net settlement for two-sided markets.",
+    headline: "Net settlement for marketplaces.",
     intro:
-      "Replace thousands of individual transfers with one net settlement per cycle. Buyers spend on credit, sellers get guaranteed payouts, and the on-chain footprint stays tiny.",
+      "Replace many individual transfers with net settlement per cycle. Buyers spend against collateral-backed credit, and sellers receive auditable payment guarantees.",
     points: [
       {
         title: "Batch settlement",
-        desc: "Aggregate a full cycle of payments into a single on-chain transaction.",
+        desc: "Aggregate a cycle of payments into fewer on-chain transactions.",
         icon: "ri-stack-line",
       },
       {
-        title: "Guaranteed payouts",
-        desc: "Signed guarantees make every seller payment auditable and recoverable.",
+        title: "Backed seller payments",
+        desc: "Signed guarantees make seller payments auditable and enforceable.",
         icon: "ri-hand-coin-line",
       },
       {
         title: "Lower fees",
-        desc: "Cut gas overhead that makes micro-transactions uneconomical.",
+        desc: "Reduce the gas cost that makes small payments impractical.",
         icon: "ri-coins-line",
       },
     ],
@@ -918,13 +907,13 @@ export const solutions: SolutionContent[] = [
     icon: "ri-stack-line",
     group: "useCase",
     description: "Built-in usage billing",
-    headline: "Billing infrastructure for platforms.",
+    headline: "Usage-based payments for platforms.",
     intro:
-      "Give every builder on your platform credit-backed, usage-based payments out of the box. One integration adds metered settlement for all of your tenants.",
+      "Add credit-backed, usage-based payments to your platform once and make them available to every tenant.",
     points: [
       {
-        title: "Embed once",
-        desc: "Add the middleware once and expose credit payments to every tenant.",
+        title: "Integrate once",
+        desc: "Add the middleware to your shared infrastructure and make credit payments available to every tenant.",
         icon: "ri-puzzle-line",
       },
       {
@@ -933,8 +922,8 @@ export const solutions: SolutionContent[] = [
         icon: "ri-settings-3-line",
       },
       {
-        title: "Composable",
-        desc: "Works with any service that accepts crypto, on-chain or off.",
+        title: "Works with existing services",
+        desc: "Use it with services that accept crypto payments on-chain or off-chain.",
         icon: "ri-links-line",
       },
     ],
@@ -948,8 +937,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-layout-grid-line",
           },
           {
-            title: "Standardize billing primitives",
-            desc: "Give teams the same credit, guarantee, and settlement model across many products.",
+            title: "Use one payment model",
+            desc: "Give teams the same credit, guarantee, and settlement model across products.",
             icon: "ri-instance-line",
           },
           {
@@ -968,8 +957,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-rocket-2-line",
           },
           {
-            title: "Keep the native workflow",
-            desc: "Charge inside the product experience without sending users to a separate checkout.",
+            title: "Keep users in the product",
+            desc: "Charge within the product instead of sending users to a separate checkout.",
             icon: "ri-window-line",
           },
         ],
@@ -1036,13 +1025,13 @@ export const solutions: SolutionContent[] = [
     icon: "ri-building-2-line",
     group: "useCase",
     description: "Credit rails at scale",
-    headline: "Credit rails for serious volume.",
+    headline: "Credit-backed payments at high volume.",
     intro:
-      "Run high-volume payments with auditable settlement, clear failure modes, and configurable SLAs. Every guarantee is enforceable on-chain and recoverable by design.",
+      "Run high-volume payments with auditable settlement, clear failure states, and configurable SLAs. Each guarantee has an on-chain claim path.",
     points: [
       {
-        title: "Auditable by default",
-        desc: "Every guarantee, clearing cycle, and settlement is verifiable end to end.",
+        title: "Auditable payment records",
+        desc: "Trace each guarantee through its clearing cycle and settlement.",
         icon: "ri-file-shield-2-line",
       },
       {
@@ -1052,7 +1041,7 @@ export const solutions: SolutionContent[] = [
       },
       {
         title: "Operational tooling",
-        desc: "Clear failure modes and monitoring from day one.",
+        desc: "Monitor payment states, failures, and settlement activity.",
         icon: "ri-dashboard-3-line",
       },
     ],
@@ -1066,8 +1055,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-dashboard-3-line",
           },
           {
-            title: "Define enforceable rules",
-            desc: "Use explicit settlement windows, dispute periods, and withdrawal timing instead of informal credit.",
+            title: "Set clear settlement rules",
+            desc: "Set settlement windows, dispute periods, and withdrawal timing in advance.",
             icon: "ri-file-shield-2-line",
           },
           {
@@ -1086,7 +1075,7 @@ export const solutions: SolutionContent[] = [
             icon: "ri-search-eye-line",
           },
           {
-            title: "Set clear failure modes",
+            title: "Handle failures clearly",
             desc: "Know what happens when a payer delays, disputes, settles, or withdraws collateral.",
             icon: "ri-alarm-warning-line",
           },
@@ -1153,14 +1142,14 @@ export const solutions: SolutionContent[] = [
     label: "Startups",
     icon: "ri-rocket-2-line",
     group: "useCase",
-    description: "Live in three lines",
-    headline: "Payments that scale with you.",
+    description: "Start with a small integration",
+    headline: "Start small and add payments as you grow.",
     intro:
-      "Add credit-based payments in three lines and scale without rebuilding. Start on testnets, move to production, and keep the same integration the whole way.",
+      "Add credit-backed payments to your existing HTTP flow. Start on testnets, move to production, and keep the same integration.",
     points: [
       {
-        title: "Three lines to integrate",
-        desc: "Wrap your existing fetch or middleware and you're live.",
+        title: "A small integration",
+        desc: "Wrap your existing fetch client or middleware to add payments.",
         icon: "ri-code-s-slash-line",
       },
       {
@@ -1169,8 +1158,8 @@ export const solutions: SolutionContent[] = [
         icon: "ri-wallet-3-line",
       },
       {
-        title: "Grow without limits",
-        desc: "The same rails handle your first call and your millionth.",
+        title: "Use the same flow as you grow",
+        desc: "Keep the same payment flow as request volume increases.",
         icon: "ri-line-chart-line",
       },
     ],
@@ -1179,8 +1168,8 @@ export const solutions: SolutionContent[] = [
         label: "For founders",
         cards: [
           {
-            title: "Ship paid APIs early",
-            desc: "Start charging for useful endpoints before building a full billing department.",
+            title: "Charge for APIs early",
+            desc: "Charge for useful endpoints without building a full billing system first.",
             icon: "ri-rocket-line",
           },
           {
@@ -1189,8 +1178,8 @@ export const solutions: SolutionContent[] = [
             icon: "ri-wallet-line",
           },
           {
-            title: "Keep the integration portable",
-            desc: "Use the same x402-compatible flow from prototype to production.",
+            title: "Keep the integration consistent",
+            desc: "Use the same x402-compatible flow from testing to production.",
             icon: "ri-git-branch-line",
           },
         ],
@@ -1273,10 +1262,8 @@ export const solutionSlugs = solutions.map((s) => s.slug);
 export const getSolution = (slug: string): SolutionContent | undefined =>
   solutions.find((s) => s.slug === slug);
 
-/** Audience pages, in customer priority order: facilitators lead. */
 export const customerSolutions = solutions.filter(
   (s) => s.group === "customer",
 );
 
-/** Market and scenario pages, reachable from any audience. */
 export const useCaseSolutions = solutions.filter((s) => s.group === "useCase");

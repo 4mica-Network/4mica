@@ -83,7 +83,7 @@ export const en = {
       titleLine1: "The clearing house for",
       titleLine2: "the agentic economy",
       subtitle:
-        "4Mica is the credit and clearing layer for x402: agents pay for APIs with stablecoin-backed credit, earn yield on collateral, and settle net on-chain instead of clearing every request.",
+        "4Mica gives agents one place to pay on credit, earn yield, and settle transactions without clearing every request on-chain.",
       supportedOn: "Supported on",
       supportedNetworks: {
         base: "Base Mainnet",
@@ -95,7 +95,7 @@ export const en = {
       {
         question: "Does 4Mica work with existing x402 clients?",
         answer:
-          "Yes, as long as the client and server can register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use; sellers configure their x402 middleware to advertise and verify it. No change to your HTTP logic.",
+          "Yes, as long as the client and server can register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use; sellers configure their x402 middleware to advertise and verify it. You do not need to change your HTTP logic.",
       },
       {
         question: "What assets does 4Mica support?",
@@ -110,12 +110,12 @@ export const en = {
       {
         question: "What is a clearing layer?",
         answer:
-          "It is the layer between authorizing a payment and moving money. Instead of a transfer per request, buyers sign collateral-backed guarantees that are batched into clearing cycles. A cycle accepts guarantees, closes, computes net positions, and commits those positions on-chain — the same job a clearing house does for traditional payments.",
+          "It is the layer between authorising a payment and moving money. Instead of a transfer per request, buyers sign collateral-backed guarantees that are batched into clearing cycles. A cycle accepts guarantees, closes, computes net positions, and commits those positions on-chain — the same job a clearing house does for traditional payments.",
       },
       {
         question: "How is 4Mica different from standard x402?",
         answer:
-          "Standard x402 turns every request into its own on-chain transfer. 4Mica's 4mica-credit scheme authorizes the request against collateral-backed credit and settles later, so requests clear off-chain in one round trip and only net positions ever move on-chain.",
+          "Standard x402 turns every request into its own on-chain transfer. 4Mica's 4mica-credit scheme authorises the request against collateral-backed credit and settles later, so requests clear off-chain in one round trip and only net positions ever move on-chain.",
       },
       {
         question: "Who should integrate 4Mica?",
@@ -125,12 +125,12 @@ export const en = {
       {
         question: "Are individual AI agents 4Mica customers?",
         answer:
-          "No — an agent is the end user, not the counterparty. The customer is whoever operates it: the facilitator, platform, framework, or team that holds the collateral, sets the spending limits, and carries the commercial relationship. Agents spend inside those limits, which is why there is no signup aimed at agents themselves.",
+          "No — an agent is an end user, not the counterparty. The customer is whoever operates it: the facilitator, platform, framework, or team that holds the collateral, sets the spending limits, and carries the commercial relationship. Agents spend inside those limits, which is why there is no sign-up process for agents themselves.",
       },
       {
         question: "How does 4Mica reduce settlement costs?",
         answer:
-          "Authorization is separated from settlement. Per request there is an off-chain signature and a Core verification — no chain write, no gas. Payable guarantees then enter a clearing cycle and settle as net positions: 40 outgoing and 27 incoming guarantees become a single net debit of 13, so one movement replaces 67. Netting changes settlement movement, not payment history — every individual record stays intact.",
+          "Authorisation is separated from settlement. For each request, there is an off-chain signature and a Core verification — no chain write, no gas. Payable guarantees then enter a clearing cycle and settle as net positions: 40 outgoing and 27 incoming guarantees become a single net debit of 13, so one movement replaces 67. Netting changes settlement movement, not payment history — every individual record stays intact.",
       },
       {
         question: "Is 4Mica live on mainnet?",
@@ -180,16 +180,16 @@ export const en = {
       },
       {
         icon: "ri-code-box-line",
-        kicker: "API Monetization",
+        kicker: "API Monetisation",
         title: "Accept payments with one line of code",
-        desc: "Add 4Mica middleware and charge per HTTP request. Works with any x402-compatible client. No SDK on the client side, no KYC, no credits to manage. Money moves at the speed of the internet.",
+        desc: "Add 4Mica middleware and charge per HTTP request. It works with any x402-compatible client. No SDK on the client side, no KYC, no credits to manage. Money moves at the speed of the internet.",
         tags: ["x402-compatible", "Any HTTP client", "Zero friction"],
       },
       {
         icon: "ri-bank-line",
         kicker: "Financial Infrastructure",
-        title: "Clearinghouse for on-chain apps",
-        desc: "Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive that banks use, but permissionless.",
+        title: "Clearing house for on-chain apps",
+        desc: "Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. It uses the same primitive as banks, but without requiring permission.",
         tags: ["Yield on float", "Programmable disputes", "Non-custodial"],
       },
     ],
@@ -229,12 +229,12 @@ Alice → Bob:  800 USDC  (40 guarantees)
 Bob → Alice:  300 USDC  (15 guarantees)
 // net_debit[Alice]  = max(800 - 300, 0) = 500 USDC
 // net_credit[Bob]   = 500 USDC
-// 55 guarantees turns into 1 net position per participant`,
+// 55 guarantees turn into 1 net position per participant`,
       },
       {
         num: "04",
         badge: "Settle",
-        title: "Settle on-chain, one net payment",
+        title: "Settle on-chain with one net payment",
         desc: "Net debtors pay once. Creditors claim once. Defaults are covered by vault collateral.",
         code: `// Debtor pays net position to ClearingHouse
 await clearingHouse.payNetDebit(
@@ -262,13 +262,13 @@ await clearingHouse.claimNetCredit(
       {
         name: "x402",
         role: "Payment protocol",
-        desc: "The HTTP payment standard 4Mica extends with a credit layer. Any x402-compatible client works out of the box.",
+        desc: "4Mica adds a credit layer to the x402 HTTP payment standard. Any x402-compatible client works out of the box.",
         icon: "ri-global-line",
       },
       {
         name: "Aave",
         role: "Yield layer",
-        desc: "All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates returns.",
+        desc: "All collateral routes directly to Aave. Deposits continuously earn a variable APY, allowing your payment infrastructure to generate returns.",
         icon: "ri-plant-line",
       },
       {
@@ -342,7 +342,7 @@ await clearingHouse.claimNetCredit(
       realCostTitle: "Agentic payments break at scale.",
       realCostLead: "1M API calls, 10k USDC volume, 1 year.",
       howItWorksKicker: "How it works",
-      howItWorksTitle: "Separate payment authorization from settlement",
+      howItWorksTitle: "Separate payment authorisation from settlement",
       howItWorksLead:
         "Pay with programmable cryptographic credit. Payment clearing runs off-chain, so thousands of API payments settle in one on-chain transaction.",
       howItWorksProtocolNote:
@@ -394,17 +394,17 @@ await clearingHouse.claimNetCredit(
       howItWorks: {
         kicker: "How it works",
         title: "Three steps to instant spend",
-        lead: "Plain flow first, cryptographic guarantees underneath",
+        lead: "Plain flow first, with cryptographic guarantees underneath",
       },
       about: {
-        kicker: "About Us",
+        kicker: "About us",
         title: "The credit layer for instant, on-chain commerce",
-        lead: "4Mica is the credit and clearing layer for x402 payments: agents pay on credit against collateral, requests clear instantly, and balances settle net on-chain. We help teams monetize APIs and agentic commerce without forcing users to pre-fund every request.",
+        lead: "4Mica is the credit and clearing layer for x402 payments: agents pay on credit against collateral, requests clear instantly, and balances settle net on-chain. We help teams monetise APIs and agentic commerce without forcing users to pre-fund every request.",
         learnMore: "Learn more",
       },
       team: {
-        title: "Meet Our Team",
-        lead: "Leading experts in Cryptography, blockchain, and payment infrastructure",
+        title: "Meet our team",
+        lead: "Leading experts in cryptography, blockchain, and payment infrastructure",
       },
       useCases: {
         kicker: "Use cases",
@@ -421,7 +421,7 @@ await clearingHouse.claimNetCredit(
       "Users spend now and settle after 7 days",
       "No prefunding or prepaid balances for customers",
       "Every charge is backed by on-chain collateral",
-      "BLS-signed guarantees prevent replay and double spend",
+      "BLS-signed guarantees prevent replay and double-spending",
       "Default assets: ETH, USDC, USDT with versioned guarantees",
     ],
     companyLinks: {
@@ -465,7 +465,7 @@ await clearingHouse.claimNetCredit(
       {
         icon: "ri-fingerprint-line",
         label: "BLS-signed guarantees",
-        desc: "Every payment is backed by an EIP-712 signed guarantee with domain separation. Cryptographic proof exists for every spend.",
+        desc: "Every payment is backed by an EIP-712-signed guarantee with domain separation. Cryptographic proof exists for every spend.",
         color: "rgb(var(--brand))",
       },
       {
@@ -494,14 +494,14 @@ await clearingHouse.claimNetCredit(
         role: "CTO & Co-Founder",
         image: "/assets/mairon.jpg",
         imagePosition: "50% 20%",
-        bio: "Everyone talks about AI and web3. Few understand money. 4mica exists because I grew tired of watching the web3 community claiming it had solved payments. It didn't. So I decided to.",
+        bio: "Everyone talks about AI and Web3. Few understand money. 4Mica exists because I grew tired of watching the Web3 community claim it had solved payments. It didn't. So I decided to.",
       },
       {
         name: "Tomer Ashur",
         role: "Co-Founder",
         image: "/assets/tomer.png",
         imagePosition: "50% 15%",
-        bio: "Cryptography-savant, ex-professor, ex-captain, now leading the instant transaction layer for commerce 2.0",
+        bio: "Cryptography savant, former professor, former captain, now leading the instant transaction layer for Commerce 2.0",
       },
     ],
     steps: [
@@ -555,7 +555,7 @@ await clearingHouse.claimNetCredit(
     benefitsKicker: "Benefits",
     benefitsTitle: "Perks & benefits",
     benefitsLead:
-      "The support and the resources to do your best work — wherever in the world you happen to be.",
+      "The support and resources to do your best work — wherever in the world you happen to be.",
     cultureKicker: "Team notes",
     cultureTitle: "Voices from the team",
     cultureLead: "Notes from the team on what it's like to build here.",
@@ -606,7 +606,7 @@ await clearingHouse.claimNetCredit(
         desc: "You get a laptop, of course, plus an additional $1,000 USD to upgrade your home office.",
       },
       {
-        title: "Flexible time-off",
+        title: "Flexible time off",
         icon: "ri-time-fill",
         color: "text-green-400",
         desc: "Unlimited PTO and sick leave. When you work, we pay. When you don't work, we still pay.",
@@ -648,7 +648,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "daniel-backend",
         quote:
-          "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
+          "I shipped to mainnet in my first month. There's real trust here, and you can own big problems from day one.",
         name: "Daniel V.",
         role: "Backend Engineer",
         avatar: "DV",
@@ -656,7 +656,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "lena-research",
         quote:
-          "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
+          "Research and product sit at the same table. Ideas move quickly from a whiteboard proof to production.",
         name: "Lena K.",
         role: "Cryptography Researcher",
         avatar: "LK",
@@ -664,7 +664,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "marco-product",
         quote:
-          "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
+          "Remote-first, but tight-knit. We disagree openly, decide quickly, and keep building.",
         name: "Marco T.",
         role: "Product",
         avatar: "MT",
@@ -710,7 +710,7 @@ await clearingHouse.claimNetCredit(
     audience: {
       kicker: "Who this is for",
       title: "Who pays, and for what",
-      lead: "The rate follows the volume. Whoever settles it, holds it.",
+      lead: "The rate follows the volume. Whoever settles it pays it.",
       primaryBadge: "Primary",
       cards: [
         {
@@ -726,7 +726,7 @@ await clearingHouse.claimNetCredit(
           icon: "ri-plug-line",
           label: "API providers",
           title: "You price the route",
-          desc: "You set what a request costs and get paid in stablecoins each cycle. Clear directly and the rate is yours; clear through a facilitator and it is theirs.",
+          desc: "You set what a request costs and get paid in stablecoins each cycle. Clear directly, and you pay the rate; clear through a facilitator, and the facilitator pays it.",
           driver: "Rate on volume you clear directly",
           href: "/solutions/api-providers",
         },
@@ -756,12 +756,12 @@ await clearingHouse.claimNetCredit(
         {
           icon: "ri-percent-line",
           title: "A rate on settled volume",
-          desc: "Charged on volume that clears, not requests you authorize. Retries and rejected guarantees cost nothing.",
+          desc: "Charged on volume that clears, not requests you authorise. Retries and rejected guarantees cost nothing.",
         },
         {
           icon: "ri-gas-station-line",
           title: "Gas per cycle",
-          desc: "Authorization stays off-chain, so your gas bill follows settlement cadence. Add traffic and it barely moves.",
+          desc: "Authorisation stays off-chain, so your gas bill follows settlement cadence. Add traffic and it barely moves.",
         },
         {
           icon: "ri-seedling-line",
@@ -774,13 +774,13 @@ await clearingHouse.claimNetCredit(
     fee: {
       kicker: "The fee",
       title: "How the fee is calculated",
-      lead: "One line, once per cycle.",
+      lead: "One calculation, once per cycle.",
       formula: "fee = net settled volume × your rate",
       steps: [
         {
           order: "01",
           title: "Guarantees pile up",
-          desc: "Each authorized request adds a signed guarantee to the open cycle. Nothing is charged and nothing hits the chain.",
+          desc: "Each authorised request adds a signed guarantee to the open cycle. Nothing is charged and nothing hits the chain.",
         },
         {
           order: "02",
@@ -790,7 +790,7 @@ await clearingHouse.claimNetCredit(
         {
           order: "03",
           title: "The rate applies",
-          desc: "Your rate hits that net figure, and the settlement commits on-chain with its records attached.",
+          desc: "Your rate applies to that net figure, and the settlement is committed on-chain with its records attached.",
         },
       ],
       notes: [
@@ -858,7 +858,7 @@ await clearingHouse.claimNetCredit(
         {
           icon: "ri-git-merge-line",
           title: "Gas tracks cycles, not calls",
-          desc: "Double the requests through your facilitator and your settlement cost stays where it was. Cadence sets the number of writes.",
+          desc: "Double the requests through your facilitator, and your settlement cost remains the same. Cadence sets the number of writes.",
         },
         {
           icon: "ri-scales-3-line",
@@ -868,7 +868,7 @@ await clearingHouse.claimNetCredit(
         {
           icon: "ri-server-line",
           title: "No clearing stack to run",
-          desc: "You add a scheme instead of building collateral accounting, netting, and settlement — and paying to keep them up.",
+          desc: "You add a scheme instead of building and maintaining collateral accounting, netting, and settlement infrastructure.",
         },
       ],
     },
@@ -904,7 +904,7 @@ await clearingHouse.claimNetCredit(
     volume: {
       kicker: "Large volume",
       title: "Custom pricing at volume",
-      lead: "Facilitators, marketplaces, and networks clearing real volume are priced individually, not off a table.",
+      lead: "Facilitators, marketplaces, and networks clearing meaningful volume receive individual pricing rather than standard table rates.",
       points: [
         "A rate that steps down as settled volume grows",
         "Volume commitments in exchange for a lower rate",
@@ -926,7 +926,7 @@ await clearingHouse.claimNetCredit(
       {
         question: "Am I charged per request?",
         answer:
-          "No. Authorizing a request is off-chain, with no gas and no fee. The rate applies to the net volume that settles when a cycle closes.",
+          "No. Authorising a request is off-chain, with no gas and no fee. The rate applies to the net volume that settles when a cycle closes.",
       },
       {
         question: "What if a cycle nets to zero?",
@@ -946,7 +946,7 @@ await clearingHouse.claimNetCredit(
       {
         question: "Is there a free tier for production?",
         answer:
-          "Testnets are free and unmetered. Mainnet volume is priced — if you are still validating, we would rather agree something small than have you rebuild later.",
+          "Testnets are free and unmetered. Mainnet volume is priced — if you are still validating, we would rather agree on a small initial arrangement than have you rebuild later.",
       },
     ],
 
@@ -985,12 +985,13 @@ await clearingHouse.claimNetCredit(
       "4Mica is a lightweight overlay that enables services to extend cryptographically backed lines of credit across any blockchain.",
     missionBody:
       "Acting as a credit layer for instant, low-friction settlements and guaranteed fair exchange, 4Mica fixes Web3's inefficient pre-funded model and makes programmable credit accessible to all.",
-    companyInfoTitle: "Company Info",
+    companyInfoTitle: "Company information",
     founderTitle: "A few words from the founders",
     founderLead: "Why we started 4Mica and what we believe in.",
     founderQuote:
       "We started 4Mica to make programmable credit effortless. Just like APIs connect the web, we believe value should flow with the same clarity between agents.",
-    careersTitle: "Help us build the future of coordination",
+    careersTitle:
+      "Help us build the payment infrastructure for the agentic economy",
     highlights: [
       {
         title: "Credit-backed UX",
@@ -1042,47 +1043,47 @@ await clearingHouse.claimNetCredit(
     roadmap: {
       kicker: "Roadmap",
       title: "Product roadmap",
-      lead: "Our journey to revolutionize web3 commerce.",
+      lead: "Our journey to transform Web3 commerce.",
       pathTitle: "Roadmap path",
       milestones: [
         {
           quarter: "Q2 2025",
-          title: "PoC Release",
+          title: "PoC release",
           description:
             "Initial proof of concept with basic transaction capabilities and single-chain support",
           done: true,
         },
         {
           quarter: "Q3 2025",
-          title: "Alpha Release",
+          title: "Alpha release",
           description:
-            "Alpha Release to Ethereum and Solana with credit capabilities for Agents and APIs",
+            "Alpha release on Ethereum and Solana with credit capabilities for agents and APIs",
           done: true,
         },
         {
           quarter: "Q4 2025",
-          title: "Strategic Partnerships",
+          title: "Strategic partnerships",
           description:
             "Partnerships with AI platforms and DeFi companies to enhance ecosystem integration",
           done: true,
         },
         {
           quarter: "Q1 2026",
-          title: "Beta Release",
+          title: "Beta release",
           description:
-            "Beta release to Ethereum and Solana and support for retail payments",
+            "Beta release on Ethereum and Solana, with support for retail payments",
           done: true,
         },
         {
           quarter: "Q2 2026",
-          title: "Regularity Compliance",
+          title: "Regulatory compliance",
           description:
-            "Achieving compliance with financial regulations and prepare for mainnet launch",
+            "Achieve compliance with financial regulations and prepare for the mainnet launch",
           done: false,
         },
         {
           quarter: "Q3 2026",
-          title: "Mainnet Launch",
+          title: "Mainnet launch",
           description:
             "Full mainnet launch with multi-chain support, cross-chain credit, and off-ramping to fiat",
           done: false,
@@ -1093,7 +1094,7 @@ await clearingHouse.claimNetCredit(
   team: {
     kicker: "Team",
     title: "Meet the team",
-    lead: "4Mica is led by founders who have shipped payment infrastructure across finance, AI, and cryptography. We are focused on bringing production-grade credit rails to web3 commerce.",
+    lead: "4Mica is led by founders who have shipped payment infrastructure across finance, AI, and cryptography. We are focused on bringing production-grade credit rails to Web3 commerce.",
     howWeWorkTitle: "How we work",
     howWeWorkLead:
       "We build with a security-first mindset and keep every protocol component auditable. The team ships with a focus on production reliability, clear integration paths, and measurable outcomes for partners.",
@@ -1182,10 +1183,10 @@ await clearingHouse.claimNetCredit(
     careers: {
       title: "Careers | Build x402 Settlement Infrastructure | 4Mica",
       description:
-        "Explore collaboration and contribution opportunities with 4Mica as we build credit-backed payment infrastructure for web3 commerce.",
+        "Explore collaboration and contribution opportunities with 4Mica as we build credit-backed payment infrastructure for Web3 commerce.",
       keywords: [
         "4Mica careers",
-        "web3 jobs",
+        "Web3 jobs",
         "agent payment jobs",
         "payment infrastructure careers",
         "blockchain engineering",
