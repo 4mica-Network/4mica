@@ -1,0 +1,39 @@
+# Deployment compose file for the facilitator server.
+#
+# Default is to pull a published image built by .github/workflows/release.yml:
+#   docker compose pull && docker compose up -d
+#
+# To build from the local checkout instead (development):
+#   docker compose up -d --build
+services:
+  facilitator:
+    image: ${FACILITATOR_IMAGE:-ghcr.io/4mica-network/facilitator-4mica:latest}
+    build:
+      context: .
+    container_name: facilitator-4mica
+    restart: unless-stopped
+
+    # Runtime configuration comes from .env — see .env.example for the full set.
+    # Values under `environment` intentionally win over .env so the container's
+    # internal listen address stays fixed regardless of host configuration.
+    #
+    # NOTE: env_file (like `docker run --env-file`) does not support quoted or
+    # multi-line values. X402_NETWORKS must be a single unquoted line, or the
+    # JSON reaches the process truncated at the first newline.
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+
+    # Only the host-side port is configurable; the container always listens on 8080.
+    ports:
+      - "${FACILITATOR_HOST_PORT:-8080}:8080"
+
+    # HEALTHCHECK is defined in the Dockerfile and inherited here.
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

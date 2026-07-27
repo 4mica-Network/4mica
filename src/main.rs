@@ -29,22 +29,20 @@ async fn main() -> anyhow::Result<()> {
         ServiceConfig::from_env().context("failed to load facilitator configuration")?;
     let mut four_mica_handlers = Vec::new();
     for network in service_cfg.networks.iter() {
-        let auth_session = match &network.auth {
-            Some(auth_cfg) => Some(Arc::new(
-                AuthSession::try_new(
-                    auth_cfg.auth_url.clone(),
-                    &auth_cfg.wallet_private_key,
-                    auth_cfg.refresh_margin_secs,
+        let auth_cfg = &network.auth;
+        let auth_session = Some(Arc::new(
+            AuthSession::try_new(
+                auth_cfg.auth_url.clone(),
+                &auth_cfg.wallet_private_key,
+                auth_cfg.refresh_margin_secs,
+            )
+            .with_context(|| {
+                format!(
+                    "failed to initialize auth session for network {}",
+                    network.id
                 )
-                .with_context(|| {
-                    format!(
-                        "failed to initialize auth session for network {}",
-                        network.id
-                    )
-                })?,
-            )),
-            None => None,
-        };
+            })?,
+        ));
         let public_params = load_public_params(&network.core_api_base_url)
             .await
             .with_context(|| {

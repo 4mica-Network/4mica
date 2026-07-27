@@ -7,7 +7,6 @@ use rpc::{CorePublicParameters, VALIDATION_REQUEST_BINDING_DOMAIN_V2};
 use sdk_4mica::Address;
 use serde::Deserialize;
 
-const DEFAULT_CORE_API_URL: &str = "https://api.4mica.xyz/";
 const ENV_SCHEME: &str = "X402_SCHEME";
 const ENV_NETWORK: &str = "X402_NETWORK";
 const ENV_NETWORKS: &str = "X402_NETWORKS";
@@ -36,7 +35,7 @@ pub struct ServiceConfig {
 pub struct NetworkConfig {
     pub id: String,
     pub core_api_base_url: Url,
-    pub auth: Option<NetworkAuthConfig>,
+    pub auth: NetworkAuthConfig,
 }
 
 #[derive(Clone)]
@@ -168,7 +167,17 @@ fn load_networks_from_env() -> Result<Vec<NetworkConfig>> {
     validate_caip2_network(&network).with_context(|| {
         format!("{ENV_NETWORK} must be a CAIP-2 identifier like \"eip155:11155111\"")
     })?;
-    let api_url = std::env::var(ENV_CORE_API_URL).unwrap_or_else(|_| DEFAULT_CORE_API_URL.into());
+    // No default: pointing an unconfigured deployment at a live core API is worse
+    // than refusing to start.
+    let Some(api_url) = std::env::var(ENV_CORE_API_URL)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    else {
+        bail!(
+            "{ENV_CORE_API_URL} must be set, or provide {ENV_NETWORKS} with a `coreApiUrl` per network"
+        );
+    };
     let api_base_url = normalize_url(&api_url)?;
     let auth = resolve_auth_config(None, None, None, &auth_fallback, &api_base_url, &network)?;
 
@@ -199,7 +208,11 @@ fn parse_network_list(raw: &str, auth_fallback: &AuthFallback) -> Result<Vec<Net
         validate_caip2_network(network).with_context(|| {
             format!("{ENV_NETWORKS} entry network must be CAIP-2 (e.g., \"eip155:11155111\")")
         })?;
-        let url = normalize_url(entry.core_api_url.trim())
+        let core_api_url = entry.core_api_url.trim();
+        if core_api_url.is_empty() {
+            bail!("{ENV_NETWORKS} entry for {network} requires a non-empty `coreApiUrl`");
+        }
+        let url = normalize_url(core_api_url)
             .with_context(|| format!("failed to parse coreApiUrl for network {}", entry.network))?;
         let auth = resolve_auth_config(
             entry.auth_wallet_private_key.as_deref(),
@@ -265,7 +278,7 @@ fn resolve_auth_config(
     fallback: &AuthFallback,
     core_api_base_url: &Url,
     network: &str,
-) -> Result<Option<NetworkAuthConfig>> {
+) -> Result<NetworkAuthConfig> {
     let wallet_private_key = entry_wallet_private_key
         .or(fallback.wallet_private_key.as_deref())
         .map(str::trim)
@@ -284,8 +297,13 @@ fn resolve_auth_config(
         );
     }
 
+    // Required: an unauthenticated facilitator would start cleanly and then fail
+    // every guarantee request against the core API.
     let Some(wallet_private_key) = wallet_private_key else {
-        return Ok(None);
+        bail!(
+            "network {network} has no auth wallet private key; set {ENV_AUTH_WALLET_PRIVATE_KEY} \
+             or provide `authWalletPrivateKey` in the {ENV_NETWORKS} entry"
+        );
     };
 
     let auth_url = match auth_url {
@@ -293,11 +311,11 @@ fn resolve_auth_config(
         None => core_api_base_url.clone(),
     };
 
-    Ok(Some(NetworkAuthConfig {
+    Ok(NetworkAuthConfig {
         wallet_private_key: wallet_private_key.to_string(),
         auth_url,
         refresh_margin_secs: refresh_margin_secs.unwrap_or(DEFAULT_AUTH_REFRESH_MARGIN_SECS),
-    }))
+    })
 }
 
 fn bind_addr_from_env() -> Result<SocketAddr> {
@@ -509,7 +527,7 @@ mod tests {
         unsafe {
             env::set_var(
                 ENV_NETWORKS,
-                r#"[{"network":"eip155:1","coreApiUrl":"http://localhost:1234"}]"#,
+                r#"[{"network":"eip155:1","coreApiUrl":"http://localhost:1234","authWalletPrivateKey":"0xabc"}]"#,
             );
         }
 
@@ -520,7 +538,57 @@ mod tests {
             networks[0].core_api_base_url.as_str(),
             "http://localhost:1234/"
         );
-        assert!(networks[0].auth.is_none());
+        assert_eq!(networks[0].auth.wallet_private_key, "0xabc");
+        // authUrl defaults to the network's own core API URL.
+        assert_eq!(networks[0].auth.auth_url.as_str(), "http://localhost:1234/");
+
+        clear_network_env();
+    }
+
+    #[test]
+    #[serial]
+    fn rejects_network_entry_without_auth_wallet_private_key() {
+        clear_network_env();
+        unsafe {
+            env::set_var(
+                ENV_NETWORKS,
+                r#"[{"network":"eip155:1","coreApiUrl":"http://localhost:1234"}]"#,
+            );
+        }
+
+        // `.err().expect(...)` rather than `expect_err`: the latter needs Debug on
+        // NetworkConfig, and NetworkAuthConfig holds the wallet private key.
+        let err = load_networks_from_env()
+            .err()
+            .expect("missing private key must fail");
+        assert!(
+            err.to_string().contains(ENV_AUTH_WALLET_PRIVATE_KEY),
+            "unexpected error: {err}"
+        );
+
+        clear_network_env();
+    }
+
+    #[test]
+    #[serial]
+    fn rejects_network_entry_with_empty_core_api_url() {
+        clear_network_env();
+        unsafe {
+            env::set_var(
+                ENV_NETWORKS,
+                r#"[{"network":"eip155:1","coreApiUrl":"  ","authWalletPrivateKey":"0xabc"}]"#,
+            );
+        }
+
+        // `.err().expect(...)` rather than `expect_err`: the latter needs Debug on
+        // NetworkConfig, and NetworkAuthConfig holds the wallet private key.
+        let err = load_networks_from_env()
+            .err()
+            .expect("empty coreApiUrl must fail");
+        assert!(
+            err.to_string().contains("coreApiUrl"),
+            "unexpected error: {err}"
+        );
 
         clear_network_env();
     }
@@ -532,6 +600,7 @@ mod tests {
         unsafe {
             env::set_var(ENV_NETWORK, "eip155:11155111");
             env::set_var(ENV_CORE_API_URL, "http://example.com");
+            env::set_var(ENV_AUTH_WALLET_PRIVATE_KEY, "0xabc");
         }
 
         let networks = load_networks_from_env().expect("networks parsed");
@@ -541,7 +610,51 @@ mod tests {
             networks[0].core_api_base_url.as_str(),
             "http://example.com/"
         );
-        assert!(networks[0].auth.is_none());
+        assert_eq!(networks[0].auth.wallet_private_key, "0xabc");
+
+        clear_network_env();
+    }
+
+    #[test]
+    #[serial]
+    fn rejects_missing_core_api_url_without_networks_env() {
+        clear_network_env();
+        unsafe {
+            env::set_var(ENV_NETWORK, "eip155:11155111");
+            env::set_var(ENV_AUTH_WALLET_PRIVATE_KEY, "0xabc");
+        }
+
+        // `.err().expect(...)` rather than `expect_err`: the latter needs Debug on
+        // NetworkConfig, and NetworkAuthConfig holds the wallet private key.
+        let err = load_networks_from_env()
+            .err()
+            .expect("missing core api url must fail");
+        assert!(
+            err.to_string().contains(ENV_CORE_API_URL),
+            "unexpected error: {err}"
+        );
+
+        clear_network_env();
+    }
+
+    #[test]
+    #[serial]
+    fn rejects_missing_auth_wallet_private_key_without_networks_env() {
+        clear_network_env();
+        unsafe {
+            env::set_var(ENV_NETWORK, "eip155:11155111");
+            env::set_var(ENV_CORE_API_URL, "http://example.com");
+        }
+
+        // `.err().expect(...)` rather than `expect_err`: the latter needs Debug on
+        // NetworkConfig, and NetworkAuthConfig holds the wallet private key.
+        let err = load_networks_from_env()
+            .err()
+            .expect("missing private key must fail");
+        assert!(
+            err.to_string().contains(ENV_AUTH_WALLET_PRIVATE_KEY),
+            "unexpected error: {err}"
+        );
 
         clear_network_env();
     }
