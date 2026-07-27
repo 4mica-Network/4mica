@@ -213,7 +213,9 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
       }, // Base Sepolia USDC
       'eip155:8453': {
         address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        name: 'USDC',
+        // Base mainnet USDC reports "USD Coin" from name(), unlike the testnet deployments.
+        // Clients build their EIP-712 domain from this, so it must match the token exactly.
+        name: 'USD Coin',
         version: '2',
         decimals: 6,
       }, // Base mainnet USDC
