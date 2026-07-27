@@ -15,9 +15,7 @@ use crate::config::{ServiceConfig, load_public_params};
 use crate::exact::ExactService;
 use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
-use crate::server::state::{
-    AppState, CoreTabService, FourMicaHandler, NetworkTabService, TabService,
-};
+use crate::server::state::{AppState, FourMicaHandler};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
 
 #[tokio::main]
@@ -30,9 +28,7 @@ async fn main() -> anyhow::Result<()> {
     let service_cfg =
         ServiceConfig::from_env().context("failed to load facilitator configuration")?;
     let mut four_mica_handlers = Vec::new();
-    let mut tab_services = Vec::new();
-    let mut default_tab_network = None;
-    for (idx, network) in service_cfg.networks.iter().enumerate() {
+    for network in service_cfg.networks.iter() {
         let auth_session = match &network.auth {
             Some(auth_cfg) => Some(Arc::new(
                 AuthSession::try_new(
@@ -49,10 +45,6 @@ async fn main() -> anyhow::Result<()> {
             )),
             None => None,
         };
-        if idx == 0 {
-            default_tab_network = Some(network.id.clone());
-        }
-
         let public_params = load_public_params(&network.core_api_base_url)
             .await
             .with_context(|| {
@@ -85,26 +77,11 @@ async fn main() -> anyhow::Result<()> {
             public_params.accepted_guarantee_versions.clone(),
             public_params.trusted_validation_registries.clone(),
         ));
-
-        let tab_service = Arc::new(CoreTabService::new(
-            network.core_api_base_url.clone(),
-            service_cfg.asset_address.clone(),
-            auth_session.clone(),
-        )) as Arc<dyn TabService>;
-        tab_services.push(NetworkTabService {
-            network: network.id.clone(),
-            service: tab_service,
-        });
     }
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
-    let state = AppState::new(
-        four_mica_handlers,
-        tab_services,
-        default_tab_network,
-        exact_service,
-    );
+    let state = AppState::new(four_mica_handlers, exact_service);
 
     server::run(service_cfg, state).await
 }

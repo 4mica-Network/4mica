@@ -81,7 +81,6 @@ mod tests {
         let user_address = "0x0000000000000000000000000000000000000001";
         let recipient_address = "0x0000000000000000000000000000000000000002";
         let asset_address = "0x0000000000000000000000000000000000000003";
-        let tab_id = U256::from(1u8);
         let req_id = U256::from(1u8);
         let amount = U256::from(10u8);
         let timestamp = 123;
@@ -90,7 +89,6 @@ mod tests {
             let subject_hash = compute_validation_subject_hash(
                 user_address,
                 recipient_address,
-                tab_id,
                 req_id,
                 amount,
                 asset_address,
@@ -120,10 +118,9 @@ mod tests {
             domain,
             user_address: user_address.into(),
             recipient_address: recipient_address.into(),
-            tab_id,
+            cycle_id: U256::from(1u8),
             req_id,
             amount,
-            total_amount: amount,
             asset_address: asset_address.into(),
             timestamp,
             version,

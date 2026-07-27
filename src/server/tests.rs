@@ -1,8 +1,5 @@
-use std::sync::Mutex;
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use axum::{
@@ -25,13 +22,10 @@ use crypto::bls::KeyMaterial;
 
 use super::handlers::build_router;
 use super::model::{
-    CreateTabRequest, CreateTabResponse, PaymentRequirements, SettleRequest, SettleResponse,
-    SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
+    PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
+    VerifyResponse, X402PaymentPayload,
 };
-use super::state::{
-    AppState, FourMicaHandler, NetworkTabService, SharedState, TabError, TabService,
-    ValidationError,
-};
+use super::state::{AppState, FourMicaHandler, SharedState, ValidationError};
 
 #[tokio::test]
 async fn verify_endpoint_accepts_valid_payload() {
@@ -315,12 +309,7 @@ async fn supported_includes_exact_when_available() {
         vec!["0x3333333333333333333333333333333333333333".into()],
     );
     let exact = Arc::new(MockExact::new());
-    let state = AppState::new(
-        vec![handler],
-        Vec::new(),
-        None,
-        Some(exact.clone() as Arc<dyn ExactService>),
-    );
+    let state = AppState::new(vec![handler], Some(exact.clone() as Arc<dyn ExactService>));
     let router = build_router(Arc::new(state));
 
     let response = router
@@ -423,238 +412,6 @@ async fn health_endpoint_returns_ok() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["status"], "ok");
-}
-
-#[tokio::test]
-async fn tabs_endpoint_returns_response_from_service() {
-    let tab_response = CreateTabResponse {
-        tab_id: "0x1".into(),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        asset_address: "0xeee".into(),
-        start_timestamp: 123,
-        ttl_seconds: 60,
-        next_req_id: "0x0".into(),
-    };
-    let service = Arc::new(MockTabService::success(tab_response.clone()));
-    let state = Arc::new(AppState::new(
-        Vec::new(),
-        vec![NetworkTabService {
-            network: "eip155:11155111".into(),
-            service: service.clone() as Arc<dyn TabService>,
-        }],
-        Some("eip155:11155111".into()),
-        None,
-    ));
-    let router = build_router(state);
-
-    let request = CreateTabRequest {
-        network: None,
-        guarantee_version: Some(2),
-        x402_version: Some(2),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        erc20_token: Some("0xeee".into()),
-        ttl_seconds: Some(60),
-    };
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: CreateTabResponse = serde_json::from_slice(&body).unwrap();
-    assert_eq!(payload.tab_id, "0x1");
-    assert_eq!(payload.start_timestamp, 123);
-    assert_eq!(payload.next_req_id, "0x0");
-    assert_eq!(service.last_request_guarantee_version(), Some(Some(2)));
-}
-
-#[tokio::test]
-async fn tabs_endpoint_returns_not_implemented_when_disabled() {
-    let state = Arc::new(AppState::new(Vec::new(), Vec::new(), None, None));
-    let router = build_router(state);
-
-    let request = CreateTabRequest {
-        network: None,
-        guarantee_version: Some(1),
-        x402_version: Some(1),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        erc20_token: Some("0xeee".into()),
-        ttl_seconds: None,
-    };
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert!(
-        payload["error"]
-            .as_str()
-            .unwrap()
-            .contains("tab provisioning")
-    );
-}
-
-#[tokio::test]
-async fn tabs_endpoint_propagates_upstream_errors() {
-    let service = Arc::new(MockTabService::failing(TabError::Upstream {
-        status: StatusCode::BAD_REQUEST,
-        message: "user not registered".into(),
-    }));
-    let state = Arc::new(AppState::new(
-        Vec::new(),
-        vec![NetworkTabService {
-            network: "eip155:11155111".into(),
-            service: service as Arc<dyn TabService>,
-        }],
-        Some("eip155:11155111".into()),
-        None,
-    ));
-    let router = build_router(state);
-
-    let request = CreateTabRequest {
-        network: None,
-        guarantee_version: Some(2),
-        x402_version: Some(2),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        erc20_token: Some("0xeee".into()),
-        ttl_seconds: Some(60),
-    };
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert!(
-        payload["error"]
-            .as_str()
-            .unwrap()
-            .contains("user not registered")
-    );
-}
-
-#[tokio::test]
-async fn tabs_endpoint_defaults_guarantee_version_to_v1_when_omitted() {
-    let tab_response = CreateTabResponse {
-        tab_id: "0x1".into(),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        asset_address: "0xeee".into(),
-        start_timestamp: 123,
-        ttl_seconds: 60,
-        next_req_id: "0x0".into(),
-    };
-    let service = Arc::new(MockTabService::success(tab_response));
-    let state = Arc::new(AppState::new(
-        Vec::new(),
-        vec![NetworkTabService {
-            network: "eip155:11155111".into(),
-            service: service.clone() as Arc<dyn TabService>,
-        }],
-        Some("eip155:11155111".into()),
-        None,
-    ));
-    let router = build_router(state);
-
-    let request = CreateTabRequest {
-        network: None,
-        guarantee_version: None,
-        x402_version: None,
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        erc20_token: Some("0xeee".into()),
-        ttl_seconds: Some(60),
-    };
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(service.last_request_guarantee_version(), Some(None));
-}
-
-#[tokio::test]
-async fn tabs_endpoint_derives_guarantee_version_from_x402_version() {
-    let tab_response = CreateTabResponse {
-        tab_id: "0x1".into(),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        asset_address: "0xeee".into(),
-        start_timestamp: 123,
-        ttl_seconds: 60,
-        next_req_id: "0x0".into(),
-    };
-    let service = Arc::new(MockTabService::success(tab_response));
-    let state = Arc::new(AppState::new(
-        Vec::new(),
-        vec![NetworkTabService {
-            network: "eip155:11155111".into(),
-            service: service.clone() as Arc<dyn TabService>,
-        }],
-        Some("eip155:11155111".into()),
-        None,
-    ));
-    let router = build_router(state);
-
-    let request = serde_json::json!({
-        "userAddress": "0xabc",
-        "recipientAddress": "0xdef",
-        "erc20Token": "0xeee",
-        "ttlSeconds": 60,
-        "x402Version": 2
-    });
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(service.last_request_guarantee_version(), Some(None));
-    assert_eq!(service.last_request_x402_version(), Some(Some(2)));
-}
-
-#[tokio::test]
-async fn tabs_endpoint_rejects_mismatched_guarantee_and_x402_versions() {
-    let tab_response = CreateTabResponse {
-        tab_id: "0x1".into(),
-        user_address: "0xabc".into(),
-        recipient_address: "0xdef".into(),
-        asset_address: "0xeee".into(),
-        start_timestamp: 123,
-        ttl_seconds: 60,
-        next_req_id: "0x0".into(),
-    };
-    let service = Arc::new(MockTabService::success(tab_response));
-    let state = Arc::new(AppState::new(
-        Vec::new(),
-        vec![NetworkTabService {
-            network: "eip155:11155111".into(),
-            service: service as Arc<dyn TabService>,
-        }],
-        Some("eip155:11155111".into()),
-        None,
-    ));
-    let router = build_router(state);
-
-    let request = serde_json::json!({
-        "userAddress": "0xabc",
-        "recipientAddress": "0xdef",
-        "erc20Token": "0xeee",
-        "ttlSeconds": 60,
-        "guaranteeVersion": 1,
-        "x402Version": 2
-    });
-
-    let response = router.oneshot(post_json("/tabs", &request)).await.unwrap();
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        payload["error"].as_str(),
-        Some("guaranteeVersion 1 does not match x402Version 2")
-    );
 }
 
 #[tokio::test]
@@ -980,17 +737,12 @@ fn test_state_with_versions(
         versions,
         vec!["0x3333333333333333333333333333333333333333".into()],
     );
-    Arc::new(AppState::new(vec![handler], Vec::new(), None, None))
+    Arc::new(AppState::new(vec![handler], None))
 }
 
 fn exact_state(exact: Arc<MockExact>) -> SharedState {
     let exact_service: Arc<dyn ExactService> = exact;
-    Arc::new(AppState::new(
-        Vec::new(),
-        Vec::new(),
-        None,
-        Some(exact_service),
-    ))
+    Arc::new(AppState::new(Vec::new(), Some(exact_service)))
 }
 
 fn sample_requirements() -> PaymentRequirements {
@@ -1053,7 +805,6 @@ fn payment_payload_v1_with_scheme(scheme: &str, network: &str, amount: &str) -> 
                 "version": "v1",
                 "user_address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "recipient_address": recipient,
-                "tab_id": "0x1",
                 "req_id": "0x0",
                 "amount": amount,
                 "asset_address": asset,
@@ -1072,16 +823,9 @@ fn payment_payload_v2(amount: &str) -> X402PaymentPayload {
     let recipient = format!("{:#x}", recipient_address());
     let asset = format!("{:#x}", asset_address());
     let user = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    let subject_hash = compute_validation_subject_hash(
-        user,
-        &recipient,
-        U256::from(1u8),
-        U256::ZERO,
-        amount_u256,
-        &asset,
-        1,
-    )
-    .expect("subject hash");
+    let subject_hash =
+        compute_validation_subject_hash(user, &recipient, U256::ZERO, amount_u256, &asset, 1)
+            .expect("subject hash");
     let request_hash = compute_validation_request_hash(&PaymentGuaranteeValidationPolicyV2 {
         validation_registry_address: Address::from_slice(&[0x33; 20]),
         validation_request_hash: alloy::primitives::B256::ZERO,
@@ -1108,7 +852,6 @@ fn payment_payload_v2(amount: &str) -> X402PaymentPayload {
                 "version": "v2",
                 "user_address": user,
                 "recipient_address": recipient,
-                "tab_id": "0x1",
                 "req_id": "0x0",
                 "amount": amount,
                 "asset_address": asset,
@@ -1153,10 +896,9 @@ fn sample_claims() -> PaymentGuaranteeClaims {
         domain: [0u8; 32],
         user_address: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
         recipient_address: format!("{:#x}", recipient_address()),
-        tab_id: U256::from(1),
+        cycle_id: U256::from(1),
         req_id: U256::ZERO,
         amount: U256::from(10),
-        total_amount: U256::from(10),
         asset_address: format!("{:#x}", asset_address()),
         timestamp: 1,
         version: 1,
@@ -1168,16 +910,9 @@ fn sample_claims_v2() -> PaymentGuaranteeClaims {
     let recipient = format!("{:#x}", recipient_address());
     let asset = format!("{:#x}", asset_address());
     let user = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    let subject_hash = compute_validation_subject_hash(
-        user,
-        &recipient,
-        U256::from(1u8),
-        U256::ZERO,
-        U256::from(10u8),
-        &asset,
-        1,
-    )
-    .expect("subject hash");
+    let subject_hash =
+        compute_validation_subject_hash(user, &recipient, U256::ZERO, U256::from(10u8), &asset, 1)
+            .expect("subject hash");
     let mut policy = PaymentGuaranteeValidationPolicyV2 {
         validation_registry_address: Address::from_slice(&[0x33; 20]),
         validation_request_hash: alloy::primitives::B256::ZERO,
@@ -1197,10 +932,9 @@ fn sample_claims_v2() -> PaymentGuaranteeClaims {
         domain: [0u8; 32],
         user_address: user.into(),
         recipient_address: recipient,
-        tab_id: U256::from(1u8),
+        cycle_id: U256::from(1u8),
         req_id: U256::ZERO,
         amount: U256::from(10u8),
-        total_amount: U256::from(10u8),
         asset_address: asset,
         timestamp: 1,
         version: 2,
@@ -1266,75 +1000,6 @@ impl ExactService for MockExact {
             x402_version: Some(1),
             extra: None,
         }])
-    }
-}
-
-struct MockTabService {
-    result: Result<CreateTabResponse, TabError>,
-    calls: AtomicUsize,
-    last_request: Mutex<Option<CreateTabRequest>>,
-}
-
-impl MockTabService {
-    fn success(response: CreateTabResponse) -> Self {
-        Self {
-            result: Ok(response),
-            calls: AtomicUsize::new(0),
-            last_request: Mutex::new(None),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn failing(error: TabError) -> Self {
-        Self {
-            result: Err(error),
-            calls: AtomicUsize::new(0),
-            last_request: Mutex::new(None),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn calls(&self) -> usize {
-        self.calls.load(Ordering::SeqCst)
-    }
-
-    fn last_request_guarantee_version(&self) -> Option<Option<u64>> {
-        self.last_request
-            .lock()
-            .expect("lock request")
-            .as_ref()
-            .map(|request| request.guarantee_version)
-    }
-
-    fn last_request_x402_version(&self) -> Option<Option<u8>> {
-        self.last_request
-            .lock()
-            .expect("lock request")
-            .as_ref()
-            .map(|request| request.x402_version)
-    }
-}
-
-#[async_trait]
-impl TabService for MockTabService {
-    async fn create_tab(&self, request: &CreateTabRequest) -> Result<CreateTabResponse, TabError> {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        *self.last_request.lock().expect("lock request") = Some(request.clone());
-        match &self.result {
-            Ok(response) => Ok(response.clone()),
-            Err(err) => Err(clone_tab_error(err)),
-        }
-    }
-}
-
-fn clone_tab_error(err: &TabError) -> TabError {
-    match err {
-        TabError::Unsupported => TabError::Unsupported,
-        TabError::Invalid(message) => TabError::Invalid(message.clone()),
-        TabError::Upstream { status, message } => TabError::Upstream {
-            status: *status,
-            message: message.clone(),
-        },
     }
 }
 

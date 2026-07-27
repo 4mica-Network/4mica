@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
 
     println!("--- x402 / 4mica flow ---");
     println!("1) Discover 402 + accepted requirements from the resource");
-    println!("2) Request tab and sign claims locally");
+    println!("2) Sign payment claims locally");
     println!(
         "3) Retry the resource with X-PAYMENT using the header below (server will handle verify/settle)\n"
     );
@@ -126,16 +126,16 @@ async fn main() -> Result<()> {
         .await
         .context("failed to prepare payment")?;
 
-    let (payment_asset, payment_tab_id, actual_amount) = match &payment.payload.claims {
+    let (payment_asset, payment_req_id, actual_amount) = match &payment.payload.claims {
         RpcPaymentGuaranteeRequestClaims::V1(claims) => {
-            (claims.asset_address.as_str(), claims.tab_id, claims.amount)
+            (claims.asset_address.as_str(), claims.req_id, claims.amount)
         }
         RpcPaymentGuaranteeRequestClaims::V2(claims) => {
-            (claims.asset_address.as_str(), claims.tab_id, claims.amount)
+            (claims.asset_address.as_str(), claims.req_id, claims.amount)
         }
     };
     println!("Payment asset address: {payment_asset}");
-    println!("Payment tabId: {:#x}", payment_tab_id);
+    println!("Payment reqId: {:#x}", payment_req_id);
 
     // Sanity checks against the desired USDC flow.
     if !payment_asset.eq_ignore_ascii_case(&asset_address) {

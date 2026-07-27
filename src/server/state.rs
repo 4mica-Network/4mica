@@ -1,63 +1,32 @@
-use std::{
-    str::FromStr,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::str::FromStr;
+use std::sync::Arc;
 
 use alloy::primitives::B256;
-use async_trait::async_trait;
-use axum::http::StatusCode;
-use reqwest::{Client, Url};
 use rpc::{
     PaymentGuaranteeClaims, PaymentGuaranteeRequest, PaymentGuaranteeRequestClaims,
     PaymentGuaranteeRequestClaimsV1, PaymentGuaranteeRequestClaimsV2,
 };
 use sdk_4mica::{Address, U256};
-use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use thiserror::Error;
-use tracing::error;
 
-use crate::auth::AuthSession;
-use crate::config::validate_caip2_network;
 use crate::server::model::{
-    CoreCreateTabRequest, CoreCreateTabResponse, CreateTabRequest, CreateTabResponse,
     PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
     VerifyResponse, X402PaymentPayload,
 };
 use crate::verifier::CertificateValidator;
-use crate::{
-    exact::ExactService,
-    issuer::{GuaranteeIssuer, parse_error_message},
-};
+use crate::{exact::ExactService, issuer::GuaranteeIssuer};
 
 pub(super) type SharedState = Arc<AppState>;
 
-pub(crate) struct NetworkTabService {
-    pub network: String,
-    pub service: Arc<dyn TabService>,
-}
-
 pub(crate) struct AppState {
     four_mica: Vec<FourMicaHandler>,
-    tab_services: Vec<NetworkTabService>,
-    default_tab_network: Option<String>,
     exact: Option<Arc<dyn ExactService>>,
 }
 
 impl AppState {
-    pub fn new(
-        four_mica: Vec<FourMicaHandler>,
-        tab_services: Vec<NetworkTabService>,
-        default_tab_network: Option<String>,
-        exact: Option<Arc<dyn ExactService>>,
-    ) -> Self {
-        Self {
-            four_mica,
-            tab_services,
-            default_tab_network,
-            exact,
-        }
+    pub fn new(four_mica: Vec<FourMicaHandler>, exact: Option<Arc<dyn ExactService>>) -> Self {
+        Self { four_mica, exact }
     }
 
     pub fn network(&self) -> &str {
@@ -179,44 +148,6 @@ impl AppState {
 
         Err(ValidationError::UnsupportedScheme(scheme.clone()))
     }
-
-    pub async fn create_tab(
-        &self,
-        request: &CreateTabRequest,
-    ) -> Result<CreateTabResponse, TabError> {
-        if self.tab_services.is_empty() {
-            return Err(TabError::Unsupported);
-        }
-
-        let guarantee_version = request
-            .resolved_guarantee_version()
-            .map_err(TabError::Invalid)?;
-        u8::try_from(guarantee_version).map_err(|_| {
-            TabError::Invalid(format!("unsupported guaranteeVersion {guarantee_version}"))
-        })?;
-
-        let requested_network = request
-            .network
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty());
-        if let Some(network) = requested_network {
-            validate_caip2_network(network).map_err(|err| TabError::Invalid(err.to_string()))?;
-        }
-
-        let requested = requested_network.or(self.default_tab_network.as_deref());
-        let Some(network) = requested else {
-            return Err(TabError::Unsupported);
-        };
-
-        let service = self
-            .tab_services
-            .iter()
-            .find(|entry| entry.network == network)
-            .map(|entry| entry.service.as_ref())
-            .ok_or_else(|| TabError::Invalid(format!("unsupported network {network}")))?;
-        service.create_tab(request).await
-    }
 }
 
 pub(crate) struct FourMicaHandler {
@@ -335,7 +266,7 @@ impl FourMicaHandler {
         }
 
         tracing::info!(
-            tab_id = format!("{:#x}", claims.tab_id),
+            cycle_id = format!("{:#x}", claims.cycle_id),
             req_id = format!("{:#x}", claims.req_id),
             amount = format!("{:#x}", claims.amount),
             "4mica guarantee issued during settlement"
@@ -411,7 +342,6 @@ impl FourMicaHandler {
         match &payload.claims {
             PaymentGuaranteeRequestClaims::V1(claims) => {
                 tracing::debug!(
-                    tab_id = format!("{:#x}", claims.tab_id),
                     req_id = format!("{:#x}", claims.req_id),
                     amount = format!("{:#x}", claims.amount),
                     "Decoded 4mica claims"
@@ -420,7 +350,6 @@ impl FourMicaHandler {
             }
             PaymentGuaranteeRequestClaims::V2(claims) => {
                 tracing::debug!(
-                    tab_id = format!("{:#x}", claims.tab_id),
                     req_id = format!("{:#x}", claims.req_id),
                     amount = format!("{:#x}", claims.amount),
                     validation_request_hash = %claims.validation_policy.validation_request_hash,
@@ -513,8 +442,7 @@ impl FourMicaHandler {
             ValidationError::InvalidCertificate("invalid user address in issued certificate".into())
         })?;
 
-        if issued.tab_id != request.tab_id
-            || issued.req_id != request.req_id
+        if issued.req_id != request.req_id
             || issued.amount != request.amount
             || issued_recipient != request_recipient
             || issued_asset != request_asset
@@ -540,7 +468,6 @@ impl FourMicaHandler {
         let base = PaymentGuaranteeRequestClaimsV1 {
             user_address: claims.user_address.clone(),
             recipient_address: claims.recipient_address.clone(),
-            tab_id: claims.tab_id,
             req_id: claims.req_id,
             amount: claims.amount,
             asset_address: claims.asset_address.clone(),
@@ -639,7 +566,6 @@ impl FourMicaHandler {
             &PaymentGuaranteeRequestClaimsV1 {
                 user_address: request.user_address.clone(),
                 recipient_address: request.recipient_address.clone(),
-                tab_id: request.tab_id,
                 req_id: request.req_id,
                 amount: request.amount,
                 asset_address: request.asset_address.clone(),
@@ -660,157 +586,6 @@ impl FourMicaHandler {
 
         Ok(())
     }
-}
-
-#[async_trait]
-pub(crate) trait TabService: Send + Sync {
-    async fn create_tab(&self, request: &CreateTabRequest) -> Result<CreateTabResponse, TabError>;
-}
-
-#[derive(Clone)]
-pub(crate) struct CoreTabService {
-    client: Client,
-    base_url: Url,
-    default_asset_address: Option<String>,
-    auth: Option<Arc<AuthSession>>,
-}
-
-impl CoreTabService {
-    pub fn new(
-        base_url: Url,
-        default_asset_address: Option<String>,
-        auth: Option<Arc<AuthSession>>,
-    ) -> Self {
-        Self {
-            client: Client::new(),
-            base_url,
-            default_asset_address,
-            auth,
-        }
-    }
-
-    fn url(&self, path: &str) -> Result<Url, TabError> {
-        self.base_url
-            .join(path)
-            .map_err(|err| TabError::Invalid(err.to_string()))
-    }
-
-    async fn post<Req, Resp>(&self, path: &str, payload: &Req) -> Result<Resp, TabError>
-    where
-        Req: Serialize + ?Sized,
-        Resp: for<'de> Deserialize<'de>,
-    {
-        let url = self.url(path)?;
-        let mut request = self.client.post(url).json(payload);
-        if let Some(auth) = &self.auth {
-            let token = auth
-                .access_token()
-                .await
-                .map_err(|err| TabError::Upstream {
-                    status: StatusCode::BAD_GATEWAY,
-                    message: err.to_string(),
-                })?;
-            request = request.bearer_auth(token);
-        }
-
-        let response = request
-            .send()
-            .await
-            .inspect_err(|err| error!(reason = %err, "failed to POST to tab service"))
-            .map_err(|err| TabError::Upstream {
-                status: StatusCode::BAD_GATEWAY,
-                message: err.to_string(),
-            })?;
-
-        Self::decode_response(response).await
-    }
-
-    async fn decode_response<T>(response: reqwest::Response) -> Result<T, TabError>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let status = response.status();
-        let bytes = response.bytes().await.map_err(|err| TabError::Upstream {
-            status,
-            message: err.to_string(),
-        })?;
-        if status.is_success() {
-            serde_json::from_slice(&bytes).map_err(|err| TabError::Upstream {
-                status,
-                message: err.to_string(),
-            })
-        } else {
-            let message = parse_error_message(&bytes);
-            Err(TabError::Upstream { status, message })
-        }
-    }
-}
-
-#[async_trait]
-impl TabService for CoreTabService {
-    async fn create_tab(&self, request: &CreateTabRequest) -> Result<CreateTabResponse, TabError> {
-        let asset_address = self.resolve_asset_address(request)?;
-        let guarantee_version = request
-            .resolved_guarantee_version()
-            .map_err(TabError::Invalid)?;
-        let payload = CoreCreateTabRequest {
-            user_address: request.user_address.clone(),
-            recipient_address: request.recipient_address.clone(),
-            erc20_token: Some(asset_address.clone()),
-            ttl: request.ttl_seconds,
-            guarantee_version,
-        };
-
-        let result: CoreCreateTabResponse = self.post("core/payment-tabs", &payload).await?;
-        let tab_id = canonical_u256(&result.id);
-        let next_req_id = canonical_u256(&result.next_req_id.unwrap_or(U256::ZERO));
-        let asset_address = result
-            .erc20_token
-            .clone()
-            .or(result.asset_address.clone())
-            .unwrap_or_else(|| asset_address.clone());
-        let start_timestamp = current_timestamp();
-        let ttl_seconds = request
-            .ttl_seconds
-            .map(|value| value as i64)
-            .unwrap_or_default();
-
-        Ok(CreateTabResponse {
-            tab_id,
-            user_address: request.user_address.clone(),
-            recipient_address: request.recipient_address.clone(),
-            asset_address: asset_address.clone(),
-            start_timestamp,
-            ttl_seconds,
-            next_req_id,
-        })
-    }
-}
-
-impl CoreTabService {
-    fn resolve_asset_address(&self, request: &CreateTabRequest) -> Result<String, TabError> {
-        let value = request
-            .erc20_token
-            .as_deref()
-            .or(self.default_asset_address.as_deref())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| {
-                TabError::Invalid("erc20Token is required (or set ASSET_ADDRESS env)".into())
-            })?;
-        Ok(value.to_string())
-    }
-}
-
-fn canonical_u256(value: &U256) -> String {
-    format!("{:#x}", value)
-}
-
-fn current_timestamp() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or_default()
 }
 
 pub fn resolve_x402_version(
@@ -999,16 +774,6 @@ pub enum ValidationError {
 
     #[error(transparent)]
     Other(anyhow::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum TabError {
-    #[error("4mica tab provisioning is disabled")]
-    Unsupported,
-    #[error("{0}")]
-    Invalid(String),
-    #[error("{message}")]
-    Upstream { status: StatusCode, message: String },
 }
 
 #[cfg(test)]
