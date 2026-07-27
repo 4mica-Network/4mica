@@ -1,5 +1,6 @@
 import SectionBackdrop from "@components/SectionBackdrop";
 import { highlight } from "@lib/shiki";
+import Image from "next/image";
 import { messages } from "@/i18n";
 import { STEPS } from "../data";
 
@@ -11,18 +12,26 @@ export default async function DocsCalloutSection() {
   return (
     <section
       id="how-it-works"
-      className="section-gloss relative isolate mt-32 overflow-hidden pt-80 pb-24"
+      className="section-gloss relative isolate mt-32 overflow-hidden pt-16 pb-24"
     >
       <SectionBackdrop src="/bg/aerial-rail-yard.avif" position="right" />
-      <SectionBackdrop
-        src="/bg/aerial-intersection.avif"
-        position="top"
-        className="h-80 opacity-90 dark:opacity-100"
-        mask={null}
-        overlay="bg-gradient-to-b from-transparent to-surface-deep"
-      />
       <div className="mx-auto w-full max-w-300">
-        <div className="w-full overflow-hidden rounded-md border border-overlay/10 bg-surface">
+        <div className="w-full overflow-hidden rounded-t-md rounded-b-md border border-overlay/10 bg-surface">
+          <div className="relative h-80 w-full">
+            <Image
+              src="/bg/aerial-intersection.avif"
+              alt=""
+              fill
+              sizes="(max-width: 1024px) 100vw, 75rem"
+              className="object-cover opacity-90 dark:opacity-100"
+              style={{
+                maskImage:
+                  "linear-gradient(to bottom, #000 45%, rgba(0,0,0,0.1) 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to bottom, #000 45%, rgba(0,0,0,0.1) 100%)",
+              }}
+            />
+          </div>
           <div className="border-overlay/10 border-b px-6 py-8 text-left sm:px-8">
             <p className="section-kicker">
               {messages.home.sections.howItWorksKicker}

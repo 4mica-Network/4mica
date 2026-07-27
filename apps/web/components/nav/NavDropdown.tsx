@@ -3,13 +3,6 @@ import type { NavLinkItem, NavSection } from "./navData";
 
 const MAX_PER_COLUMN = 4;
 
-/**
- * Split a section into balanced columns of at most `MAX_PER_COLUMN` rows.
- *
- * Balancing matters more than filling: five developer links become 3 + 2 rather
- * than 4 + 1, and the seven use cases become 4 + 3 — a second use-case column
- * that sits third in the menu, next to the customer column.
- */
 function columnsFor(items: NavLinkItem[]): NavLinkItem[][] {
   const columnCount = Math.ceil(items.length / MAX_PER_COLUMN);
   if (columnCount <= 1) return [items];
@@ -31,8 +24,6 @@ export default function NavDropdown({
 }) {
   return (
     <div className="w-max max-w-[min(96vw,72rem)] rounded-xl border border-overlay/10 bg-surface-deep/95 p-4 shadow-2xl backdrop-blur-sm">
-      {/* Sections sit side by side, divided by a hairline. The first section is
-          the one we lead with (customers), so it reads left-to-right. */}
       <div className="flex flex-wrap items-stretch gap-x-3 gap-y-4">
         {sections.map((section, index) => (
           <div
