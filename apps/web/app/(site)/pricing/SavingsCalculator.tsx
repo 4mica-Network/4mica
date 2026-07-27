@@ -310,7 +310,7 @@ export default function SavingsCalculator() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-md border border-overlay/10 bg-overlay/[0.03] p-6">
+          <div className="mt-8 rounded-md border border-overlay/10 bg-overlay/3 p-6">
             <p className="text-ink-muted text-md">
               {positive
                 ? content.results.savingTitle

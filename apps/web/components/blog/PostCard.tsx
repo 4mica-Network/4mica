@@ -34,7 +34,7 @@ export default function PostCard({ post }: { post: BlogPostMeta }) {
 
         <div className="mt-5 flex h-7 items-center gap-3 text-md">
           {post.category ? (
-            <span className="max-w-40 truncate rounded-md bg-overlay/[0.06] px-2.5 py-1 text-ink-body text-md">
+            <span className="max-w-40 truncate rounded-md bg-overlay/6 px-2.5 py-1 text-ink-body text-md">
               {post.category}
             </span>
           ) : null}

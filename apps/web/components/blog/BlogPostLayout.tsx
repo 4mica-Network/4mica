@@ -55,7 +55,7 @@ export default function BlogPostLayout({
               {post.tags.map((tag) => (
                 <li
                   key={tag}
-                  className="wrap-break-word max-w-full rounded-full bg-overlay/[0.06] px-3 py-1 text-2xs text-ink-muted uppercase tracking-wider"
+                  className="wrap-break-word max-w-full rounded-full bg-overlay/6 px-3 py-1 text-2xs text-ink-muted uppercase tracking-wider"
                 >
                   {tag}
                 </li>

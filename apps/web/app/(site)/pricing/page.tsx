@@ -244,7 +244,7 @@ function FacilitatorSavings() {
           </p>
 
           <div className="mt-6 space-y-3">
-            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/10 bg-overlay/[0.03] px-4 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/10 bg-overlay/3 px-4 py-3">
               <span className="text-ink-muted text-md">
                 {content.facilitators.example.outgoing}
               </span>
@@ -252,7 +252,7 @@ function FacilitatorSavings() {
                 40
               </span>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/10 bg-overlay/[0.03] px-4 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/10 bg-overlay/3 px-4 py-3">
               <span className="text-ink-muted text-md">
                 {content.facilitators.example.incoming}
               </span>
@@ -260,7 +260,7 @@ function FacilitatorSavings() {
                 27
               </span>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/25 bg-overlay/[0.06] px-4 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/25 bg-overlay/6 px-4 py-3">
               <span className="text-ink-strong text-md">
                 {content.facilitators.example.net}
               </span>
