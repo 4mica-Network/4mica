@@ -469,14 +469,22 @@ Environment variables (defaults shown):
 export HOST=0.0.0.0
 export PORT=8080
 export X402_SCHEME=4mica-credit
-# List of supported networks (JSON). Each entry must include `{ "network", "coreApiUrl" }`
-# where `network` is a CAIP-2 identifier (e.g., `eip155:80002`).
-export X402_NETWORKS='[{"network":"eip155:80002","coreApiUrl":"https://api.4mica.xyz/"}]'
+# List of supported networks (JSON). Each entry must include
+# `{ "network", "coreApiUrl", "authWalletPrivateKey" }` where `network` is a
+# CAIP-2 identifier (e.g., `eip155:80002`).
+export X402_NETWORKS='[{"network":"eip155:80002","coreApiUrl":"https://api.4mica.xyz/","authWalletPrivateKey":"0x..."}]'
 # Legacy single-network fallback if X402_NETWORKS is unset
 export X402_NETWORK=eip155:80002
 
-# 4mica public API – used to fetch operator parameters
+# 4mica public API – used to fetch operator parameters. REQUIRED: there is no
+# default, so an unconfigured facilitator refuses to start rather than pointing
+# itself at a live core API.
 export X402_CORE_API_URL=https://api.4mica.xyz/
+# SIWE key used to authenticate against the core API. REQUIRED, per network.
+export X402_AUTH_WALLET_PRIVATE_KEY=0x...
+# Optional: defaults to the network's own coreApiUrl, and 60s respectively.
+export X402_AUTH_URL=https://api.4mica.xyz/
+export X402_AUTH_REFRESH_MARGIN_SECS=60
 # Default asset address to apply when callers omit assetAddress in /tabs requests
 export ASSET_ADDRESS=0x...
 
@@ -498,6 +506,12 @@ When `X402_NETWORKS` is present it overrides the legacy `X402_NETWORK` / `X402_C
 environment variables and enables multi-network support. Each configured network gets its own 4mica
 Core API base URL so the facilitator can fetch operator parameters and issue guarantees for that
 network independently.
+
+The core API URL and the auth wallet private key are both **required**, whichever form you use —
+there are no defaults for either. A missing value fails configuration loading with a message naming
+the variable, so a misconfigured deployment cannot start up pointed at production or running
+unauthenticated. Note that startup is all-or-nothing across networks: if any configured network
+fails to load its parameters, the process exits rather than serving the remaining ones.
 
 On startup the facilitator loads the public parameters described above and, if the optional x402
 variables are present, initialises the upstream `exact` ERC-3009 facilitator as well. Any schemes

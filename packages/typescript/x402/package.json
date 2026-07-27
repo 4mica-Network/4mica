@@ -36,8 +36,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "lint": "eslint . --ext .ts",
-    "fmt": "prettier --check \"{src,tests}/**/*.{ts,js,json}\"",
+    "lint": "biome check .",
+    "lint:write": "biome check --write --diagnostic-level=error .",
+    "fmt": "biome format .",
+    "fmt:write": "biome format --write .",
     "demo:server": "pnpm --filter @4mica/x402-demo server",
     "demo:client": "pnpm --filter @4mica/x402-demo client",
     "demo:dev": "pnpm --filter @4mica/x402-demo dev"
@@ -50,18 +52,11 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",
-    "@eslint/js": "catalog:",
+    "@biomejs/biome": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
-    "@typescript-eslint/eslint-plugin": "catalog:",
-    "@typescript-eslint/parser": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
     "express": "catalog:",
-    "globals": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {

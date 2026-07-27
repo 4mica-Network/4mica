@@ -1,0 +1,35 @@
+# Build artifacts — target/ is by far the largest thing in the context.
+target/
+**/target/
+
+# JS/TS workspace: not part of the facilitator binary.
+node_modules/
+**/node_modules/
+packages/
+examples/
+dist/
+**/dist/
+*.tsbuildinfo
+
+# VCS and CI
+.git/
+.github/
+.gitignore
+.dockerignore
+
+# Local tooling
+.husky/
+.claude/
+.vscode/
+.idea/
+skills/
+
+# Secrets and local env — never bake these into an image.
+.env
+.env.*
+!.env.example
+
+# Docs and editor noise
+*.md
+!README.md
+.DS_Store

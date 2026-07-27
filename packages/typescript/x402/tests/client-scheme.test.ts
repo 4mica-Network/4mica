@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { privateKeyToAccount } from 'viem/accounts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FourMicaEvmScheme } from '../src/client/scheme.js'
 

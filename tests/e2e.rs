@@ -127,7 +127,7 @@ async fn core_reachable(core_url: &str) -> bool {
 }
 
 fn spawn_facilitator(env: &TestEnv, port: u16) -> Child {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_x402-4mica"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_facilitator-4mica"));
     // Run from a scratch dir so a repo-local `.env` is never picked up.
     cmd.current_dir(std::env::temp_dir())
         .env("HOST", "127.0.0.1")

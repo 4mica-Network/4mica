@@ -1,6 +1,6 @@
 import 'dotenv/config'
-import express from 'express'
 import { paymentMiddlewareFromConfig } from '@4mica/x402/server/express'
+import express from 'express'
 
 const app = express()
 app.use(express.json())
