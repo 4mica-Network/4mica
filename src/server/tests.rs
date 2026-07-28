@@ -305,7 +305,11 @@ async fn supported_includes_exact_when_available() {
         vec![TEST_VALIDATOR.into()],
     );
     let exact = Arc::new(MockExact::new());
-    let state = AppState::new(vec![handler], Some(exact.clone() as Arc<dyn ExactService>));
+    let state = AppState::new(
+        vec![handler],
+        Some(exact.clone() as Arc<dyn ExactService>),
+        Vec::new(),
+    );
     let router = build_router(Arc::new(state));
 
     let response = router
@@ -851,7 +855,125 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    Arc::new(AppState::new(vec![handler], None))
+    Arc::new(AppState::new(vec![handler], None, Vec::new()))
+}
+
+// ── gasless deposit ─────────────────────────────────────────────────────────
+//
+// These cover the paths that resolve before any chain access. Everything past that point —
+// signature recovery, balance, simulation — needs a live node and belongs in the anvil-backed
+// e2e suite; `deposit.rs`'s own unit tests cover the digest and recovery arithmetic.
+
+fn deposit_body(asset_transfer_method: Option<&str>) -> Value {
+    let mut body = json!({
+        "asset": "0x2222222222222222222222222222222222222222",
+        "amount": "1000000",
+        "authorization": {
+            "from": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "validAfter": "0x0",
+            "validBefore": "0x77359400",
+            "nonce": "0x4242424242424242424242424242424242424242424242424242424242424242",
+            "v": 27,
+            "r": "0x1111111111111111111111111111111111111111111111111111111111111111",
+            "s": "0x2222222222222222222222222222222222222222222222222222222222222222"
+        }
+    });
+    if let Some(method) = asset_transfer_method {
+        body["assetTransferMethod"] = json!(method);
+    }
+    body
+}
+
+/// A facilitator with no relayer is a supported deployment, so `/deposit` must answer with a clear
+/// code rather than 404 or a panic.
+#[tokio::test]
+async fn deposit_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER");
+}
+
+#[tokio::test]
+async fn deposit_verify_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(post_json("/deposit/verify", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["isValid"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER");
+}
+
+/// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
+#[tokio::test]
+async fn deposit_rejects_a_malformed_authorization() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let mut body = deposit_body(None);
+    body["authorization"]["nonce"] = json!("not-a-bytes32");
+
+    let response = router.oneshot(post_json("/deposit", &body)).await.unwrap();
+    assert!(
+        response.status().is_client_error(),
+        "expected a client error, got {}",
+        response.status()
+    );
+}
+
+/// The wire contract accepts a `ReceiveAuthorization` exactly as `sdk-4mica` serializes it, so the
+/// SDK can post the struct it signed without an intermediate DTO. Guards against a field-name or
+/// hex-encoding drift between the two crates.
+#[test]
+fn deposit_request_accepts_an_sdk_serialized_authorization() {
+    use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
+
+    let authorization = ReceiveAuthorization {
+        from: Address::from_slice(&[0xbb; 20]),
+        validAfter: U256::ZERO,
+        validBefore: U256::from(2_000_000_000u64),
+        nonce: alloy::primitives::B256::repeat_byte(0x42),
+        v: 27,
+        r: alloy::primitives::B256::repeat_byte(0x11),
+        s: alloy::primitives::B256::repeat_byte(0x22),
+    };
+
+    let body = json!({
+        "asset": "0x2222222222222222222222222222222222222222",
+        "amount": "1000000",
+        "authorization": serde_json::to_value(&authorization).expect("serialize authorization"),
+    });
+
+    let parsed: super::model::DepositRequest =
+        serde_json::from_value(body).expect("SDK-serialized authorization must round-trip");
+    assert_eq!(parsed.authorization.from, authorization.from);
+    assert_eq!(parsed.authorization.nonce, authorization.nonce);
+    assert_eq!(parsed.authorization.validBefore, authorization.validBefore);
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.
@@ -891,7 +1013,7 @@ fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
 
 fn exact_state(exact: Arc<MockExact>) -> SharedState {
     let exact_service: Arc<dyn ExactService> = exact;
-    Arc::new(AppState::new(Vec::new(), Some(exact_service)))
+    Arc::new(AppState::new(Vec::new(), Some(exact_service), Vec::new()))
 }
 
 fn sample_requirements() -> PaymentRequirements {

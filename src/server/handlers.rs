@@ -10,11 +10,12 @@ use tracing::{info, warn};
 
 use super::{
     model::{
-        HealthResponse, SettleRequest, SettleResponse, SupportedKind, SupportedResponse,
-        VerifyRequest, VerifyResponse,
+        DepositRequest, DepositResponse, DepositVerifyResponse, HealthResponse, SettleRequest,
+        SettleResponse, SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
     },
     state::SharedState,
 };
+use crate::deposit::{self, DepositError, DepositIntent};
 
 pub(super) fn build_router(state: SharedState) -> Router {
     Router::new()
@@ -22,9 +23,109 @@ pub(super) fn build_router(state: SharedState) -> Router {
         .route("/supported", get(supported_handler))
         .route("/verify", post(verify_handler))
         .route("/settle", post(settle_handler))
+        .route("/deposit", post(deposit_handler))
+        .route("/deposit/verify", post(deposit_verify_handler))
         .route("/health", get(health_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Preflight for [`deposit_handler`]. Runs every check without broadcasting, so a client can find
+/// out an authorization is unusable before anyone spends gas on it.
+async fn deposit_verify_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<DepositRequest>,
+) -> impl IntoResponse {
+    match run_deposit_verify(&state, request).await {
+        Ok(()) => Json(DepositVerifyResponse::valid()),
+        Err(err) => {
+            warn!(reason = %err, code = err.code(), "deposit verification failed");
+            Json(DepositVerifyResponse::invalid(err.to_string(), err.code()))
+        }
+    }
+}
+
+async fn run_deposit_verify(
+    state: &SharedState,
+    request: DepositRequest,
+) -> Result<(), DepositError> {
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent = DepositIntent::parse(
+        &request.asset,
+        &request.amount,
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+    )?;
+    deposit::verify(relayer, &intent, now_secs()).await
+}
+
+/// Submits a gasless deposit, with the relayer paying gas.
+///
+/// The collateral is credited to `authorization.from`, never to the relayer — the token binds the
+/// destination and amount inside the signature, so this service cannot alter either.
+async fn deposit_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<DepositRequest>,
+) -> impl IntoResponse {
+    let network = request.network.clone();
+    let asset = request.asset.clone();
+    let amount = request.amount.clone();
+    let from = request.authorization.from;
+
+    let relayer = match state.relayer_for(network.as_deref()) {
+        Ok(relayer) => relayer,
+        Err(err) => {
+            warn!(reason = %err, "deposit rejected");
+            return Json(DepositResponse::failure(err.to_string(), err.code()));
+        }
+    };
+
+    let intent = match DepositIntent::parse(
+        &asset,
+        &amount,
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+    ) {
+        Ok(intent) => intent,
+        Err(err) => {
+            warn!(reason = %err, "deposit rejected");
+            return Json(DepositResponse::failure(err.to_string(), err.code()));
+        }
+    };
+
+    match deposit::submit(relayer, &intent, now_secs()).await {
+        Ok(tx_hash) => {
+            info!(
+                tx_hash = %tx_hash,
+                from = %from,
+                asset = %intent.asset,
+                amount = %intent.amount,
+                network = relayer.network(),
+                "gasless deposit submitted"
+            );
+            Json(DepositResponse {
+                success: true,
+                tx_hash: Some(format!("{tx_hash:#x}")),
+                network: Some(relayer.network().to_string()),
+                from: Some(format!("{from:#x}")),
+                asset: Some(format!("{:#x}", intent.asset)),
+                amount: Some(intent.amount.to_string()),
+                error: None,
+                error_code: None,
+            })
+        }
+        Err(err) => {
+            warn!(reason = %err, code = err.code(), "gasless deposit failed");
+            Json(DepositResponse::failure(err.to_string(), err.code()))
+        }
+    }
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or_default()
 }
 
 async fn supported_handler(State(state): State<SharedState>) -> impl IntoResponse {

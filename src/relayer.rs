@@ -9,17 +9,21 @@
 //! Core4Mica credits collateral to `auth.from`, the relayer cannot redirect funds or alter the
 //! amount — the worst a compromised relayer can do is decline to submit, or waste its own gas.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use alloy::network::EthereumWallet;
+use alloy::primitives::B256;
 use alloy::providers::fillers::{CachedNonceManager, NonceFiller};
 use alloy::providers::{DynProvider, Provider, ProviderBuilder};
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{Context, Result};
 use sdk_4mica::Address;
 use sdk_4mica::contract::Core4Mica::{self, Core4MicaInstance};
+use tokio::sync::RwLock;
 
 use crate::config::{NetworkConfig, PublicParameters};
+use crate::deposit::{DepositError, DepositToken};
 
 /// A funded signer bound to one network's chain, able to submit Core4Mica transactions.
 #[derive(Clone)]
@@ -32,6 +36,9 @@ struct RelayerInner {
     address: Address,
     contract_address: Address,
     provider: DynProvider,
+    /// Token EIP-712 domain separators, memoised. Immutable per token per chain, so a hit can
+    /// never go stale and every deposit after the first avoids an `eth_call`.
+    token_domain_separators: RwLock<HashMap<Address, B256>>,
 }
 
 impl Relayer {
@@ -100,6 +107,7 @@ impl Relayer {
                 address,
                 contract_address: public_params.contract_address,
                 provider,
+                token_domain_separators: RwLock::new(HashMap::new()),
             }),
         }))
     }
@@ -113,9 +121,44 @@ impl Relayer {
         &self.inner.network
     }
 
-    #[allow(dead_code)] // Consumed by the deposit endpoints (B4/B5).
     pub fn contract(&self) -> Core4MicaInstance<DynProvider> {
         Core4Mica::new(self.inner.contract_address, self.inner.provider.clone())
+    }
+
+    pub fn contract_address(&self) -> Address {
+        self.inner.contract_address
+    }
+
+    pub fn provider(&self) -> DynProvider {
+        self.inner.provider.clone()
+    }
+
+    /// A token's EIP-712 domain separator, read once and cached.
+    ///
+    /// Read from the token itself rather than reconstructed from name/version/chainId: a wrong
+    /// reconstruction yields a well-formed separator that no token will ever verify against, which
+    /// would surface as a confusing signature mismatch rather than a clear failure.
+    pub async fn token_domain_separator(&self, token: Address) -> Result<B256, DepositError> {
+        if let Some(cached) = self.inner.token_domain_separators.read().await.get(&token) {
+            return Ok(*cached);
+        }
+
+        let separator = DepositToken::new(token, self.provider())
+            .DOMAIN_SEPARATOR()
+            .call()
+            .await
+            .map_err(|err| {
+                DepositError::Chain(format!(
+                    "token {token} does not expose DOMAIN_SEPARATOR (not an EIP-3009 token?): {err}"
+                ))
+            })?;
+
+        self.inner
+            .token_domain_separators
+            .write()
+            .await
+            .insert(token, separator);
+        Ok(separator)
     }
 
     /// Native balance of the relayer account, in wei. A relayer that cannot pay gas is useless,

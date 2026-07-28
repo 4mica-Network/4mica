@@ -10,6 +10,8 @@ use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
 
+use crate::deposit::DepositError;
+use crate::relayer::Relayer;
 use crate::server::model::{
     PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
     VerifyResponse, X402PaymentPayload,
@@ -34,11 +36,38 @@ pub(super) type SharedState = Arc<AppState>;
 pub(crate) struct AppState {
     four_mica: Vec<FourMicaHandler>,
     exact: Option<Arc<dyn ExactService>>,
+    /// Networks that opted into gas sponsorship. Empty means `/deposit` is unavailable, which is a
+    /// valid deployment — the facilitator still serves `/verify` and `/settle`.
+    relayers: Vec<Relayer>,
 }
 
 impl AppState {
-    pub fn new(four_mica: Vec<FourMicaHandler>, exact: Option<Arc<dyn ExactService>>) -> Self {
-        Self { four_mica, exact }
+    pub fn new(
+        four_mica: Vec<FourMicaHandler>,
+        exact: Option<Arc<dyn ExactService>>,
+        relayers: Vec<Relayer>,
+    ) -> Self {
+        Self {
+            four_mica,
+            exact,
+            relayers,
+        }
+    }
+
+    /// Resolves the relayer for `network`, defaulting to the first configured one when the caller
+    /// omits it — the single-network case, which is most deployments.
+    pub fn relayer_for(&self, network: Option<&str>) -> Result<&Relayer, DepositError> {
+        match network {
+            Some(network) => self
+                .relayers
+                .iter()
+                .find(|relayer| relayer.network() == network)
+                .ok_or_else(|| DepositError::NoRelayer(network.to_string())),
+            None => self
+                .relayers
+                .first()
+                .ok_or_else(|| DepositError::NoRelayer("<default>".into())),
+        }
     }
 
     pub fn network(&self) -> &str {

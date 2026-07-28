@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use rpc::PaymentGuaranteeRequest;
 use sdk_4mica::BLSCert;
+use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -171,6 +172,89 @@ pub struct VerifyResponse {
 pub struct CertificateResponse {
     pub claims: String,
     pub signature: String,
+}
+
+/// A gasless deposit: the payer's EIP-3009 authorization plus the amount and asset it was signed
+/// over. Both must match the signature exactly or the token's `ecrecover` fails on-chain.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositRequest {
+    /// CAIP-2 network. Omitted uses the facilitator's default (first configured) network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    pub asset: String,
+    /// Decimal or `0x`-prefixed hex, in the token's own decimals.
+    pub amount: String,
+    /// Defaults to `eip3009`, matching x402's `scheme_exact_evm`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_transfer_method: Option<String>,
+    pub authorization: ReceiveAuthorization,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositVerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+    /// Stable code so clients branch on this rather than parsing `invalidReason`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+impl DepositVerifyResponse {
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            invalid_reason: None,
+            error_code: None,
+        }
+    }
+
+    pub fn invalid(reason: String, code: &str) -> Self {
+        Self {
+            is_valid: false,
+            invalid_reason: Some(reason),
+            error_code: Some(code.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// Echoed back so a caller can reconcile without re-parsing its own request. Collateral is
+    /// always credited to `from` — the relayer cannot redirect it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+impl DepositResponse {
+    pub fn failure(error: String, code: &str) -> Self {
+        Self {
+            success: false,
+            tx_hash: None,
+            network: None,
+            from: None,
+            asset: None,
+            amount: None,
+            error: Some(error),
+            error_code: Some(code.to_string()),
+        }
+    }
 }
 
 impl From<BLSCert> for CertificateResponse {

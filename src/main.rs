@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod deposit;
 mod exact;
 mod issuer;
 mod relayer;
@@ -119,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
-    let state = AppState::new(four_mica_handlers, exact_service);
+    let state = AppState::new(four_mica_handlers, exact_service, relayers);
 
     server::run(service_cfg, state).await
 }
