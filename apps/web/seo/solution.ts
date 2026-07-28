@@ -2,16 +2,18 @@ import type { PageSeo } from "./shared";
 
 export const SOLUTION_SEO: PageSeo = {
   path: "/solution",
-  title: "4Mica Solution | Credit-Backed, Instant Payments",
+  title: "x402 Credit and Settlement Infrastructure | 4Mica",
   description:
-    "How 4Mica delivers credit-backed, capital-efficient, and instant payments for any service — web3 or traditional.",
+    "How 4Mica clears and settles x402 payments: collateral-backed payment credit, instant off-chain authorization, and net stablecoin settlement per clearing cycle.",
   keywords: [
     "4Mica solution",
+    "x402",
+    "payment clearing",
+    "settlement infrastructure",
+    "payment credit",
     "credit-backed payments",
-    "instant payments",
-    "capital efficient",
-    "x402 credit",
+    "stablecoin payments",
     "agentic commerce",
   ],
-  imageAlt: "4Mica solution overview",
+  imageAlt: "4Mica x402 credit and settlement infrastructure overview",
 };

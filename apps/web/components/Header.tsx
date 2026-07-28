@@ -86,7 +86,7 @@ export default function Header() {
             intent="soft"
             className="hidden h-9 whitespace-nowrap md:inline-flex"
           >
-            <a href={links.mailto.contact}>
+            <a href={links.mailto.sales}>
               {messages.common.actions.talkToSales}
             </a>
           </Button>
@@ -96,7 +96,7 @@ export default function Header() {
             intent="invert"
             className="hidden h-9 whitespace-nowrap hover:transform-none md:inline-flex"
           >
-            <Link href="/pricing">{messages.common.actions.tryForFree}</Link>
+            <Link href={links.docs}>{messages.common.actions.tryForFree}</Link>
           </Button>
 
           <button

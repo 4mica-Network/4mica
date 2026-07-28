@@ -44,16 +44,25 @@ export default function MobileNav({ onNavigate }: { onNavigate: () => void }) {
                   : "max-h-0 opacity-0"
               }`}
             >
-              <div className="space-y-0.5 py-1">
-                {item.children
-                  .flatMap((section) => section.items)
-                  .map((subItem) => (
-                    <DropdownMenuItem
-                      key={subItem.title}
-                      item={subItem}
-                      onClick={onNavigate}
-                    />
-                  ))}
+              <div className="space-y-3 py-1">
+                {item.children.map((section) => (
+                  <div key={section.title ?? "section"}>
+                    {section.title && (
+                      <p className="mb-1 px-3 text-ink-subtle text-md uppercase tracking-wider">
+                        {section.title}
+                      </p>
+                    )}
+                    <div className="space-y-0.5">
+                      {section.items.map((subItem) => (
+                        <DropdownMenuItem
+                          key={subItem.title}
+                          item={subItem}
+                          onClick={onNavigate}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
