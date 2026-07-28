@@ -55,7 +55,6 @@ async fn main() -> anyhow::Result<()> {
         let verifier = Arc::new(CertificateVerifier::new(
             public_params.operator_public_key,
             public_params.guarantee_domain,
-            public_params.legacy_v1_guarantee_domain,
         )) as Arc<dyn CertificateValidator>;
         let issuer = Arc::new(
             LiveGuaranteeIssuer::try_new(network.core_api_base_url.clone(), auth_session.clone())
@@ -72,8 +71,7 @@ async fn main() -> anyhow::Result<()> {
             network.id.clone(),
             verifier,
             issuer,
-            public_params.accepted_guarantee_versions.clone(),
-            public_params.trusted_validation_registries.clone(),
+            public_params.validators.clone(),
         ));
     }
 

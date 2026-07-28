@@ -233,11 +233,11 @@ impl SettleResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto::bls::KeyMaterial;
+    use crypto::bls::{KeyMaterial, Zeroizing};
 
     #[test]
     fn certificate_response_from_bls_cert_preserves_hex_fields() {
-        let key = KeyMaterial::from_bytes(&[7u8; 32]).expect("secret key");
+        let key = KeyMaterial::from_bytes(Zeroizing::new(vec![7u8; 32])).expect("secret key");
         let cert = BLSCert::sign(&key, vec![0xab, 0xcd].into()).expect("sign cert");
 
         let response = CertificateResponse::from(cert);

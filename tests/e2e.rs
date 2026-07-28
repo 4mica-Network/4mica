@@ -357,28 +357,36 @@ async fn e2e_facilitator_endpoints() {
         env.network
     );
 
-    // The facilitator derives its advertised x402 versions from core's
-    // public-params; assert it reflects exactly what core accepts.
+    // The advertised x402 versions are a property of the facilitator build, NOT of core's
+    // guarantee versions — the two are deliberately decoupled. Assert both halves separately.
     let public_params = fetch_public_params(&client, &env.core_url).await;
-    let accepted_versions: Vec<u64> = public_params["accepted_guarantee_versions"]
-        .as_array()
-        .map(|a| a.iter().filter_map(Value::as_u64).collect())
-        .unwrap_or_default();
-    assert!(
-        !accepted_versions.is_empty(),
-        "core public-params missing accepted_guarantee_versions: {public_params}"
-    );
-    for version in &accepted_versions {
+
+    for version in [1u64, 2] {
         assert!(
             kinds.iter().any(|k| {
                 k["scheme"] == env.scheme.as_str()
                     && k["network"] == env.network.as_str()
-                    && k["x402Version"].as_u64() == Some(*version)
+                    && k["x402Version"].as_u64() == Some(version)
             }),
-            "supported should advertise x402Version {version} (core accepts {accepted_versions:?}): {supported_body}"
+            "supported should advertise x402Version {version}: {supported_body}"
         );
     }
-    eprintln!("[e2e] /supported reflects core accepted versions {accepted_versions:?}");
+
+    // Separately: core must be able to decode the guarantee version the facilitator issues at,
+    // or every /settle would be rejected downstream.
+    let guarantee_versions: Vec<u64> = public_params["supported_guarantee_versions"]
+        .as_array()
+        .map(|a| a.iter().filter_map(Value::as_u64).collect())
+        .unwrap_or_default();
+    assert!(
+        guarantee_versions.contains(&rpc::GUARANTEE_CLAIMS_VERSION),
+        "core supports guarantee versions {guarantee_versions:?}, which excludes the v{} this \
+         facilitator issues: {public_params}",
+        rpc::GUARANTEE_CLAIMS_VERSION
+    );
+    eprintln!(
+        "[e2e] /supported advertises x402 v1+v2; core decodes guarantee {guarantee_versions:?}"
+    );
 
     // --- /verify: self-consistent payload passes preflight (no core call) ---
     let body = unfunded_settle_body(&env.scheme, &env.network);
@@ -438,7 +446,7 @@ async fn e2e_facilitator_endpoints() {
     // --- V2 /verify: exercises the validation-policy branch against core's real
     // trusted validation registry (verify makes no core call, so this runs
     // without any seeding). ---
-    verify_v2_against_trusted_registry(&client, &base, &env, &public_params).await;
+    verify_validation_gated_payment(&client, &base, &env, &public_params).await;
 
     // --- happy path (opt-in): a real SDK-signed payment that mints a certificate ---
     run_happy_path(&client, &base, &env, happy).await;
@@ -462,42 +470,40 @@ async fn assert_verify_rejected(client: &reqwest::Client, base: &str, body: &Val
     );
 }
 
-/// Signs a real V2 payment (validation policy bound to core's actual trusted
-/// registry + chain) via the SDK and asserts `/verify` accepts it. This drives
-/// the facilitator's full V2 validation-policy matching against live core
-/// metadata; it needs no funded account since `/verify` never calls core.
-async fn verify_v2_against_trusted_registry(
+/// Signs a real validation-gated payment via the SDK and asserts `/verify` accepts it.
+///
+/// This is the only e2e coverage of the facilitator's validation matching against *live* core
+/// metadata: the validator is taken from core's own allowlist, so a facilitator that checked the
+/// wrong field or dropped the allowlist check would fail here. Needs no funded account, since
+/// `/verify` never calls core.
+async fn verify_validation_gated_payment(
     client: &reqwest::Client,
     base: &str,
     env: &TestEnv,
     public_params: &Value,
 ) {
-    let Some(registry) = public_params["trusted_validation_registries"]
+    let Some(validator) = public_params["validators"]
         .as_array()
         .and_then(|a| a.first())
         .and_then(Value::as_str)
     else {
-        eprintln!("[e2e] V2 verify skipped: core advertises no trusted_validation_registries");
+        eprintln!(
+            "[e2e] validation-gated verify skipped: core advertises no validators. Seed core's \
+             validator allowlist to exercise this path."
+        );
         return;
     };
-    let chain_id: u64 = env
-        .network
-        .rsplit(':')
-        .next()
-        .and_then(|c| c.parse().ok())
-        .expect("network chain id");
 
     let (flow, tab_endpoint, stub_handle) = build_sdk_flow(&env.core_url, ANVIL_ACCT1_KEY).await;
 
+    // Validation now travels as a nested `extra.validation` object; the SDK reads it here and
+    // attaches a matching ValidationRequirement to the signed claims.
     let extra = json!({
         "tabEndpoint": tab_endpoint,
-        "validationRegistryAddress": registry,
-        "validationChainId": chain_id,
-        "validatorAddress": ANVIL_ACCT2_ADDR,
-        "validatorAgentId": "77",
-        "minValidationScore": 80,
-        "jobHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
-        "requiredValidationTag": "hard-finality",
+        "validation": {
+            "validator": validator,
+            "subject": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        },
     });
     let accepted = sdk_4mica::x402::PaymentRequirementsV2 {
         scheme: env.scheme.clone(),
@@ -505,7 +511,7 @@ async fn verify_v2_against_trusted_registry(
         asset: ETH_ASSET.into(),
         amount: DEFAULT_AMOUNT.into(),
         pay_to: ANVIL_ACCT2_ADDR.into(),
-        max_timeout_seconds: Some(300),
+        max_timeout_seconds: 300,
         extra: Some(extra.clone()),
     };
     let payment_required = sdk_4mica::x402::X402PaymentRequiredV2 {
@@ -513,8 +519,8 @@ async fn verify_v2_against_trusted_registry(
         error: None,
         resource: sdk_4mica::x402::X402ResourceInfo {
             url: format!("{base}/resource"),
-            description: "e2e v2 verify".into(),
-            mime_type: "application/json".into(),
+            description: Some("e2e v2 verify".into()),
+            mime_type: Some("application/json".into()),
         },
         accepts: vec![accepted.clone()],
         extensions: None,
@@ -549,9 +555,10 @@ async fn verify_v2_against_trusted_registry(
     assert!(status.is_success(), "v2 /verify HTTP status {status}");
     assert_eq!(
         resp["isValid"], true,
-        "v2 /verify should accept a policy bound to core's trusted registry {registry}: {resp}"
+        "v2 /verify should accept a validation requirement naming core's validator \
+         {validator}: {resp}"
     );
-    eprintln!("[e2e] V2 /verify accepted a policy bound to trusted registry {registry}");
+    eprintln!("[e2e] V2 /verify accepted a payment gated on validator {validator}");
 }
 
 /// When opted in (`E2E_RUN_HAPPY=1`), sign a real payment via the 4mica SDK and
@@ -583,12 +590,12 @@ async fn run_happy_path(client: &reqwest::Client, base: &str, env: &TestEnv, hap
         scheme: env.scheme.clone(),
         network: env.network.clone(),
         max_amount_required: amount.clone(),
-        resource: None,
-        description: None,
+        resource: String::new(),
+        description: String::new(),
         mime_type: None,
         output_schema: None,
         pay_to: pay_to.clone(),
-        max_timeout_seconds: None,
+        max_timeout_seconds: 0,
         asset: asset.clone(),
         extra: Some(json!({ "tabEndpoint": tab_endpoint })),
     };

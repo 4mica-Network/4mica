@@ -1,10 +1,10 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use alloy::primitives::B256;
+use alloy::primitives::{B256, Bytes};
 use rpc::{
     PaymentGuaranteeClaims, PaymentGuaranteeRequest, PaymentGuaranteeRequestClaims,
-    PaymentGuaranteeRequestClaimsV1, PaymentGuaranteeRequestClaimsV2,
+    PaymentGuaranteeRequestClaimsV1, ValidationRequirement,
 };
 use sdk_4mica::{Address, U256};
 use serde_json::Map;
@@ -16,6 +16,14 @@ use crate::server::model::{
 };
 use crate::verifier::CertificateValidator;
 use crate::{exact::ExactService, issuer::GuaranteeIssuer};
+
+/// x402 protocol versions this facilitator speaks.
+///
+/// Deliberately independent of the *guarantee* claims version: x402 v1 and v2 differ only in the
+/// envelope and requirements shape, and both carry the same guarantee claims underneath. Before
+/// guarantee v2 was dropped the two were conflated, which meant retiring a guarantee version would
+/// silently stop the facilitator answering an x402 version.
+pub const SUPPORTED_X402_VERSIONS: [u8; 2] = [1, 2];
 
 pub(super) type SharedState = Arc<AppState>;
 
@@ -156,7 +164,9 @@ pub(crate) struct FourMicaHandler {
     verifier: Arc<dyn CertificateValidator>,
     issuer: Arc<dyn GuaranteeIssuer>,
     supported_versions: Vec<u8>,
-    trusted_validation_registries: Vec<Address>,
+    /// Validator identities core whitelisted. A signed validation requirement naming anything else
+    /// is rejected before we ask core to issue, since core would reject it anyway.
+    validators: Vec<String>,
 }
 
 impl FourMicaHandler {
@@ -165,19 +175,15 @@ impl FourMicaHandler {
         network: String,
         verifier: Arc<dyn CertificateValidator>,
         issuer: Arc<dyn GuaranteeIssuer>,
-        supported_versions: Vec<u8>,
-        trusted_validation_registries: Vec<String>,
+        validators: Vec<String>,
     ) -> Self {
         Self {
             scheme,
             network,
             verifier,
             issuer,
-            supported_versions,
-            trusted_validation_registries: trusted_validation_registries
-                .into_iter()
-                .filter_map(|value| Address::from_str(&value).ok())
-                .collect(),
+            supported_versions: SUPPORTED_X402_VERSIONS.to_vec(),
+            validators,
         }
     }
 
@@ -260,9 +266,6 @@ impl FourMicaHandler {
             PaymentGuaranteeRequestClaims::V1(claims_request) => {
                 self.ensure_certificate_matches_claims_v1(claims_request, &claims)?;
             }
-            PaymentGuaranteeRequestClaims::V2(claims_request) => {
-                self.ensure_certificate_matches_claims_v2(claims_request, &claims)?;
-            }
         }
 
         tracing::info!(
@@ -344,20 +347,78 @@ impl FourMicaHandler {
                 tracing::debug!(
                     req_id = format!("{:#x}", claims.req_id),
                     amount = format!("{:#x}", claims.amount),
+                    validated = claims.validation.is_some(),
                     "Decoded 4mica claims"
                 );
                 self.ensure_claims_v1_match_requirements(claims, reqs, version)?;
-            }
-            PaymentGuaranteeRequestClaims::V2(claims) => {
-                tracing::debug!(
-                    req_id = format!("{:#x}", claims.req_id),
-                    amount = format!("{:#x}", claims.amount),
-                    validation_request_hash = %claims.validation_policy.validation_request_hash,
-                    "Decoded 4mica V2 claims"
-                );
-                self.ensure_claims_v2_match_requirements(claims, reqs, version)?;
+                self.ensure_validation_matches_requirements(claims.validation.as_ref(), reqs)?;
             }
         }
+        Ok(())
+    }
+
+    /// Cross-checks the signed validation requirement against the one the resource server
+    /// advertised in `extra.validation`.
+    ///
+    /// Presence must agree in both directions. A payer who signs a validation the server never
+    /// asked for would hand it a guarantee that is not payable until some validator approves it;
+    /// a payer who omits one the server did ask for would get an immediately-payable guarantee the
+    /// server did not agree to.
+    fn ensure_validation_matches_requirements(
+        &self,
+        signed: Option<&ValidationRequirement>,
+        reqs: &PaymentRequirements,
+    ) -> Result<(), ValidationError> {
+        let required = requirements_validation(reqs)?;
+
+        let (signed, required) = match (signed, required) {
+            (None, None) => return Ok(()),
+            (Some(signed), None) => {
+                return Err(ValidationError::Mismatch(format!(
+                    "claims are gated on validator {} but the requirements ask for no validation",
+                    signed.validator
+                )));
+            }
+            (None, Some(required)) => {
+                return Err(ValidationError::Mismatch(format!(
+                    "requirements ask for validation by {} but the claims carry none",
+                    required.validator
+                )));
+            }
+            (Some(signed), Some(required)) => (signed, required),
+        };
+
+        if signed.validator != required.validator {
+            return Err(ValidationError::Mismatch(format!(
+                "claim validator '{}' does not match requirement '{}'",
+                signed.validator, required.validator
+            )));
+        }
+        if signed.subject != required.subject {
+            return Err(ValidationError::Mismatch(format!(
+                "claim validation subject {} does not match requirement {}",
+                signed.subject, required.subject
+            )));
+        }
+        if signed.deadline != required.deadline {
+            return Err(ValidationError::Mismatch(format!(
+                "claim validation deadline {:?} does not match requirement {:?}",
+                signed.deadline, required.deadline
+            )));
+        }
+        if signed.params != required.params {
+            return Err(ValidationError::Mismatch(
+                "claim validation params do not match requirement".into(),
+            ));
+        }
+
+        if !self.validators.iter().any(|v| v == &signed.validator) {
+            return Err(ValidationError::Mismatch(format!(
+                "validator '{}' is not whitelisted by core",
+                signed.validator
+            )));
+        }
+
         Ok(())
     }
 
@@ -454,138 +515,6 @@ impl FourMicaHandler {
         }
         Ok(())
     }
-
-    fn ensure_claims_v2_match_requirements(
-        &self,
-        claims: &PaymentGuaranteeRequestClaimsV2,
-        reqs: &PaymentRequirements,
-        version: u8,
-    ) -> Result<(), ValidationError> {
-        claims
-            .validate()
-            .map_err(|err| ValidationError::InvalidClaims(err.to_string()))?;
-
-        let base = PaymentGuaranteeRequestClaimsV1 {
-            user_address: claims.user_address.clone(),
-            recipient_address: claims.recipient_address.clone(),
-            req_id: claims.req_id,
-            amount: claims.amount,
-            asset_address: claims.asset_address.clone(),
-            timestamp: claims.timestamp,
-        };
-        self.ensure_claims_v1_match_requirements(&base, reqs, version)?;
-
-        let reqs_extra = requirements_extra(reqs)?;
-        let validation_registry = parse_required_address_field(
-            reqs_extra,
-            "validationRegistryAddress",
-            "validation_registry_address",
-        )?;
-        if claims.validation_policy.validation_registry_address != validation_registry {
-            return Err(ValidationError::Mismatch(format!(
-                "validation registry {} does not match requirement {}",
-                claims.validation_policy.validation_registry_address, validation_registry
-            )));
-        }
-        if !self
-            .trusted_validation_registries
-            .contains(&claims.validation_policy.validation_registry_address)
-        {
-            return Err(ValidationError::Mismatch(format!(
-                "validation registry {} is not trusted by core metadata",
-                claims.validation_policy.validation_registry_address
-            )));
-        }
-
-        let expected_network_chain_id =
-            caip2_chain_id(&reqs.network).map_err(ValidationError::InvalidRequirements)?;
-        if claims.validation_policy.validation_chain_id != expected_network_chain_id {
-            return Err(ValidationError::Mismatch(format!(
-                "validation chain id {} does not match payment network {}",
-                claims.validation_policy.validation_chain_id, reqs.network
-            )));
-        }
-
-        let validator_address =
-            parse_required_address_field(reqs_extra, "validatorAddress", "validator_address")?;
-        if claims.validation_policy.validator_address != validator_address {
-            return Err(ValidationError::Mismatch(format!(
-                "validator address {} does not match requirement {}",
-                claims.validation_policy.validator_address, validator_address
-            )));
-        }
-
-        let validator_agent_id =
-            parse_required_u256_field(reqs_extra, "validatorAgentId", "validator_agent_id")?;
-        if claims.validation_policy.validator_agent_id != validator_agent_id {
-            return Err(ValidationError::Mismatch(format!(
-                "validator agent id {} does not match requirement {}",
-                claims.validation_policy.validator_agent_id, validator_agent_id
-            )));
-        }
-
-        let min_validation_score =
-            parse_required_u8_field(reqs_extra, "minValidationScore", "min_validation_score")?;
-        if claims.validation_policy.min_validation_score != min_validation_score {
-            return Err(ValidationError::Mismatch(format!(
-                "min validation score {} does not match requirement {}",
-                claims.validation_policy.min_validation_score, min_validation_score
-            )));
-        }
-
-        let job_hash = parse_required_b256_field(reqs_extra, "jobHash", "job_hash")?;
-        if claims.validation_policy.job_hash != job_hash {
-            return Err(ValidationError::Mismatch(format!(
-                "job hash '{}' does not match requirement '{}'",
-                claims.validation_policy.job_hash, job_hash
-            )));
-        }
-
-        let required_validation_tag = parse_optional_string_field(
-            reqs_extra,
-            "requiredValidationTag",
-            "required_validation_tag",
-        )
-        .unwrap_or_default();
-        if claims.validation_policy.required_validation_tag != required_validation_tag {
-            return Err(ValidationError::Mismatch(format!(
-                "required validation tag '{}' does not match requirement '{}'",
-                claims.validation_policy.required_validation_tag, required_validation_tag
-            )));
-        }
-
-        Ok(())
-    }
-
-    fn ensure_certificate_matches_claims_v2(
-        &self,
-        request: &PaymentGuaranteeRequestClaimsV2,
-        issued: &PaymentGuaranteeClaims,
-    ) -> Result<(), ValidationError> {
-        self.ensure_certificate_matches_claims_v1(
-            &PaymentGuaranteeRequestClaimsV1 {
-                user_address: request.user_address.clone(),
-                recipient_address: request.recipient_address.clone(),
-                req_id: request.req_id,
-                amount: request.amount,
-                asset_address: request.asset_address.clone(),
-                timestamp: request.timestamp,
-            },
-            issued,
-        )?;
-
-        let issued_policy = issued.validation_policy.as_ref().ok_or_else(|| {
-            ValidationError::Mismatch("issued certificate is missing V2 validation policy".into())
-        })?;
-
-        if issued_policy != &request.validation_policy {
-            return Err(ValidationError::Mismatch(
-                "certificate validation policy differs from requested claims".into(),
-            ));
-        }
-
-        Ok(())
-    }
 }
 
 pub fn resolve_x402_version(
@@ -634,119 +563,74 @@ fn required_amount(reqs: &PaymentRequirements, version: u8) -> Result<U256, Vali
     }
 }
 
-fn requirements_extra(
+/// Reads the optional `extra.validation` object a resource server uses to gate a payment.
+///
+/// Absent `extra`, or an `extra` without `validation`, means an ungated payment — not an error.
+/// A malformed `validation` object is an error, so a server typo cannot silently downgrade a
+/// payment to ungated.
+fn requirements_validation(
     reqs: &PaymentRequirements,
-) -> Result<&Map<String, serde_json::Value>, ValidationError> {
-    reqs.extra
-        .as_ref()
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| {
+) -> Result<Option<ValidationRequirement>, ValidationError> {
+    let Some(extra) = reqs.extra.as_ref().and_then(serde_json::Value::as_object) else {
+        return Ok(None);
+    };
+    let Some(raw) = extra.get("validation") else {
+        return Ok(None);
+    };
+    if raw.is_null() {
+        return Ok(None);
+    }
+
+    let object = raw.as_object().ok_or_else(|| {
+        ValidationError::InvalidRequirements("extra.validation must be an object".into())
+    })?;
+
+    let validator = required_str(object, "validator")?.to_string();
+    let subject = B256::from_str(required_str(object, "subject")?).map_err(|_| {
+        ValidationError::InvalidRequirements("extra.validation.subject must be a bytes32".into())
+    })?;
+    let deadline = match object.get("deadline") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => Some(value.as_u64().ok_or_else(|| {
             ValidationError::InvalidRequirements(
-                "extra is required and must be an object for x402Version 2".into(),
+                "extra.validation.deadline must be a unix timestamp".into(),
             )
+        })?),
+    };
+    let params = match object.get("params") {
+        None | Some(serde_json::Value::Null) => Bytes::new(),
+        Some(value) => {
+            let raw = value.as_str().ok_or_else(|| {
+                ValidationError::InvalidRequirements(
+                    "extra.validation.params must be a 0x-prefixed hex string".into(),
+                )
+            })?;
+            Bytes::from_str(raw).map_err(|_| {
+                ValidationError::InvalidRequirements(
+                    "extra.validation.params must be a 0x-prefixed hex string".into(),
+                )
+            })?
+        }
+    };
+
+    Ok(Some(ValidationRequirement {
+        validator,
+        subject,
+        deadline,
+        params,
+    }))
+}
+
+fn required_str<'a>(
+    object: &'a Map<String, serde_json::Value>,
+    field: &str,
+) -> Result<&'a str, ValidationError> {
+    object
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            ValidationError::InvalidRequirements(format!("extra.validation.{field} is required"))
         })
-}
-
-fn extra_value<'a>(
-    extra: &'a Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Option<&'a serde_json::Value> {
-    extra.get(camel).or_else(|| extra.get(snake))
-}
-
-fn parse_required_address_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Result<Address, ValidationError> {
-    let value = extra_value(extra, camel, snake)
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            ValidationError::InvalidRequirements(format!("{camel} is required for x402Version 2"))
-        })?;
-    Address::from_str(value)
-        .map_err(|_| ValidationError::InvalidRequirements(format!("invalid {camel} address")))
-}
-
-fn parse_required_u64_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Result<u64, ValidationError> {
-    let value = extra_value(extra, camel, snake).ok_or_else(|| {
-        ValidationError::InvalidRequirements(format!("{camel} is required for x402Version 2"))
-    })?;
-    if let Some(number) = value.as_u64() {
-        return Ok(number);
-    }
-    let raw = value
-        .as_str()
-        .ok_or_else(|| ValidationError::InvalidRequirements(format!("invalid {camel}")))?;
-    raw.parse::<u64>()
-        .map_err(|_| ValidationError::InvalidRequirements(format!("invalid {camel}")))
-}
-
-fn parse_required_u8_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Result<u8, ValidationError> {
-    let value = parse_required_u64_field(extra, camel, snake)?;
-    u8::try_from(value)
-        .map_err(|_| ValidationError::InvalidRequirements(format!("invalid {camel}")))
-}
-
-fn parse_required_u256_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Result<U256, ValidationError> {
-    let value = extra_value(extra, camel, snake).ok_or_else(|| {
-        ValidationError::InvalidRequirements(format!("{camel} is required for x402Version 2"))
-    })?;
-    if let Some(raw) = value.as_str() {
-        return parse_u256_field(raw, camel).map_err(ValidationError::InvalidRequirements);
-    }
-    if let Some(number) = value.as_u64() {
-        return Ok(U256::from(number));
-    }
-    Err(ValidationError::InvalidRequirements(format!(
-        "invalid {camel}"
-    )))
-}
-
-fn parse_required_b256_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Result<B256, ValidationError> {
-    let value = extra_value(extra, camel, snake)
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            ValidationError::InvalidRequirements(format!("{camel} is required for x402Version 2"))
-        })?;
-    B256::from_str(value)
-        .map_err(|_| ValidationError::InvalidRequirements(format!("invalid {camel}")))
-}
-
-fn parse_optional_string_field(
-    extra: &Map<String, serde_json::Value>,
-    camel: &str,
-    snake: &str,
-) -> Option<String> {
-    extra_value(extra, camel, snake)
-        .and_then(serde_json::Value::as_str)
-        .map(ToOwned::to_owned)
-}
-
-fn caip2_chain_id(network: &str) -> Result<u64, String> {
-    let (_, chain_id) = network
-        .split_once(':')
-        .ok_or_else(|| format!("invalid CAIP-2 network identifier: {network}"))?;
-    chain_id
-        .parse::<u64>()
-        .map_err(|_| format!("invalid CAIP-2 chain id in network {network}"))
 }
 
 #[derive(Debug, Error)]

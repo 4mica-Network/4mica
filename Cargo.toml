@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
-rpc-4mica = "=2.0.0-alpha.1"
-sdk-4mica = "=2.0.0-alpha.1"
-crypto-4mica = "=2.0.0-alpha.1"
+# Path deps while the post-#151 (drop-v2) changes are unreleased. Swap back to pinned
+# crates.io versions once 4mica-core publishes the next alpha.
+rpc-4mica = { path = "../4mica-core/crates/rpc" }
+sdk-4mica = { path = "../4mica-core/sdk" }
+crypto-4mica = { path = "../4mica-core/crates/crypto" }
 axum = { version = "0.8.9", features = ["macros", "json"] }
 base64 = "0.23"
 dotenvy = "0.15"

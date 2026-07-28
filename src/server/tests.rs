@@ -6,10 +6,7 @@ use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
-use rpc::{
-    PaymentGuaranteeValidationPolicyV2, compute_validation_request_hash,
-    compute_validation_subject_hash,
-};
+use rpc::GUARANTEE_CLAIMS_VERSION;
 use sdk_4mica::{Address, BLSCert, PaymentGuaranteeClaims, U256};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -121,7 +118,7 @@ async fn verify_accepts_duplicate_payloads() {
 
 #[tokio::test]
 async fn verify_endpoint_accepts_v2_payload() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
@@ -177,7 +174,7 @@ async fn settle_endpoint_returns_certificate() {
 
 #[tokio::test]
 async fn settle_accepts_payload_without_top_level_version() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
@@ -206,7 +203,7 @@ async fn settle_accepts_payload_without_top_level_version() {
 
 #[tokio::test]
 async fn settle_endpoint_accepts_v2_payload() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
@@ -235,7 +232,7 @@ async fn settle_endpoint_accepts_v2_payload() {
 
 #[tokio::test]
 async fn settle_endpoint_accepts_v2_payload_with_checksum_addresses() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
@@ -305,8 +302,7 @@ async fn supported_includes_exact_when_available() {
         "eip155:11155111".into(),
         verifier as Arc<dyn CertificateValidator>,
         issuer as Arc<dyn GuaranteeIssuer>,
-        vec![1, 2],
-        vec!["0x3333333333333333333333333333333333333333".into()],
+        vec![TEST_VALIDATOR.into()],
     );
     let exact = Arc::new(MockExact::new());
     let state = AppState::new(vec![handler], Some(exact.clone() as Arc<dyn ExactService>));
@@ -356,36 +352,6 @@ async fn supported_includes_v2_kind() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     let kinds = payload["kinds"].as_array().expect("kinds array");
     assert!(kinds.iter().any(|k| {
-        k["scheme"] == "4mica-credit" && k["network"] == "eip155:11155111" && k["x402Version"] == 2
-    }));
-}
-
-#[tokio::test]
-async fn supported_omits_v2_when_handler_only_accepts_v1() {
-    let verifier = Arc::new(MockVerifier::success());
-    let issuer = Arc::new(MockIssuer::success());
-    let state = test_state_with_versions(verifier, issuer, vec![1]);
-    let router = build_router(state);
-
-    let response = router
-        .oneshot(
-            Request::builder()
-                .method("GET")
-                .uri("/supported")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: Value = serde_json::from_slice(&body).unwrap();
-    let kinds = payload["kinds"].as_array().expect("kinds array");
-    assert!(kinds.iter().any(|k| {
-        k["scheme"] == "4mica-credit" && k["network"] == "eip155:11155111" && k["x402Version"] == 1
-    }));
-    assert!(!kinds.iter().any(|k| {
         k["scheme"] == "4mica-credit" && k["network"] == "eip155:11155111" && k["x402Version"] == 2
     }));
 }
@@ -475,7 +441,7 @@ async fn verify_rejects_mismatched_amount() {
 
 #[tokio::test]
 async fn verify_rejects_v2_mismatched_amount() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
@@ -501,91 +467,19 @@ async fn verify_rejects_v2_mismatched_amount() {
     assert_eq!(issuer.issue_calls(), 0);
 }
 
+/// A payer must not be able to hand a resource server a validation-gated guarantee when the
+/// server asked for an ungated one — the server would be holding credit that is not payable until
+/// some validator it never named approves it.
 #[tokio::test]
-async fn verify_rejects_v2_missing_validation_policy_requirements() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+async fn verify_rejects_validation_the_requirements_did_not_ask_for() {
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
 
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validationRegistryAddress": "0x3333333333333333333333333333333333333333",
-        "validatorAddress": "0x4444444444444444444444444444444444444444",
-        "validatorAgentId": "0x7",
-        "minValidationScore": 80,
-        "requiredValidationTag": "hard-finality"
-    }));
-
     let request_body = VerifyRequest {
         x402_version: Some(2),
-        payment_payload: payment_payload_v2("10"),
-        payment_requirements: requirements,
-    };
-
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("jobHash"));
-    assert_eq!(verifier.verify_calls(), 0);
-    assert_eq!(issuer.issue_calls(), 0);
-}
-
-#[tokio::test]
-async fn verify_rejects_v2_mismatched_validator() {
-    let verifier = Arc::new(MockVerifier::success_v2());
-    let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
-
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validationRegistryAddress": "0x3333333333333333333333333333333333333333",
-        "validatorAddress": "0x5555555555555555555555555555555555555555",
-        "validatorAgentId": "0x7",
-        "minValidationScore": 80,
-        "requiredValidationTag": "hard-finality",
-        "jobHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    }));
-
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2("10"),
-        payment_requirements: requirements,
-    };
-
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("validator address"));
-    assert_eq!(verifier.verify_calls(), 0);
-    assert_eq!(issuer.issue_calls(), 0);
-}
-
-#[tokio::test]
-async fn verify_rejects_v2_when_handler_only_accepts_v1() {
-    let verifier = Arc::new(MockVerifier::success_v2());
-    let issuer = Arc::new(MockIssuer::success());
-    let state = test_state_with_versions(verifier.clone(), issuer.clone(), vec![1]);
-    let router = build_router(state);
-
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2("10"),
+        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
         payment_requirements: sample_requirements_v2("10"),
     };
 
@@ -598,12 +492,150 @@ async fn verify_rejects_v2_when_handler_only_accepts_v1() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    assert_eq!(
-        payload.invalid_reason.as_deref(),
-        Some("unsupported x402Version 2")
+    let reason = payload.invalid_reason.expect("reason");
+    assert!(
+        reason.contains("requirements ask for no validation"),
+        "unexpected reason: {reason}"
     );
-    assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
+}
+
+/// The mirror case: the server gated the payment, the payer signed an ungated claim.
+#[tokio::test]
+async fn verify_rejects_missing_validation_the_requirements_asked_for() {
+    let verifier = Arc::new(MockVerifier::success());
+    let issuer = Arc::new(MockIssuer::success());
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let mut requirements = sample_requirements_v2("10");
+    requirements.extra = Some(json!({
+        "validation": { "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT }
+    }));
+
+    let request_body = VerifyRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2("10"),
+        payment_requirements: requirements,
+    };
+
+    let response = router
+        .oneshot(post_json("/verify", &request_body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
+    assert!(!payload.is_valid);
+    let reason = payload.invalid_reason.expect("reason");
+    assert!(
+        reason.contains("claims carry none"),
+        "unexpected reason: {reason}"
+    );
+    assert_eq!(issuer.issue_calls(), 0);
+}
+
+#[tokio::test]
+async fn verify_rejects_mismatched_validator() {
+    let verifier = Arc::new(MockVerifier::success());
+    let issuer = Arc::new(MockIssuer::success());
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let mut requirements = sample_requirements_v2("10");
+    requirements.extra = Some(json!({
+        "validation": { "validator": "https://other-validator.example", "subject": TEST_SUBJECT }
+    }));
+
+    let request_body = VerifyRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
+        payment_requirements: requirements,
+    };
+
+    let response = router
+        .oneshot(post_json("/verify", &request_body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
+    assert!(!payload.is_valid);
+    let reason = payload.invalid_reason.expect("reason");
+    assert!(
+        reason.contains("claim validator"),
+        "unexpected reason: {reason}"
+    );
+    assert_eq!(issuer.issue_calls(), 0);
+}
+
+/// Core rejects guarantees naming a validator outside its allowlist, so the facilitator declines
+/// before spending a round trip on it.
+#[tokio::test]
+async fn verify_rejects_a_validator_core_has_not_whitelisted() {
+    let verifier = Arc::new(MockVerifier::success());
+    let issuer = Arc::new(MockIssuer::success());
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let rogue = "https://rogue-validator.example";
+    let mut requirements = sample_requirements_v2("10");
+    requirements.extra = Some(json!({
+        "validation": { "validator": rogue, "subject": TEST_SUBJECT }
+    }));
+
+    let request_body = VerifyRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2_validated("10", rogue),
+        payment_requirements: requirements,
+    };
+
+    let response = router
+        .oneshot(post_json("/verify", &request_body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
+    assert!(!payload.is_valid);
+    let reason = payload.invalid_reason.expect("reason");
+    assert!(
+        reason.contains("not whitelisted by core"),
+        "unexpected reason: {reason}"
+    );
+    assert_eq!(issuer.issue_calls(), 0);
+}
+
+#[tokio::test]
+async fn verify_accepts_validation_matching_the_requirements() {
+    let verifier = Arc::new(MockVerifier::success());
+    let issuer = Arc::new(MockIssuer::success());
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let mut requirements = sample_requirements_v2("10");
+    requirements.extra = Some(json!({
+        "validation": { "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT }
+    }));
+
+    let request_body = VerifyRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
+        payment_requirements: requirements,
+    };
+
+    let response = router
+        .oneshot(post_json("/verify", &request_body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
+    assert!(payload.is_valid, "reason: {:?}", payload.invalid_reason);
 }
 
 #[tokio::test]
@@ -693,49 +725,41 @@ async fn settle_rejects_mismatched_versions() {
     assert_eq!(issuer.issue_calls(), 0);
 }
 
+/// x402Version lives in the payload's type (`X402Version<N>`), so a version outside {1, 2} cannot
+/// even be deserialized — it is rejected before any handler sees it.
 #[tokio::test]
-async fn settle_rejects_v2_when_handler_only_accepts_v1() {
-    let verifier = Arc::new(MockVerifier::success_v2());
+async fn settle_rejects_an_out_of_range_x402_version() {
+    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
-    let state = test_state_with_versions(verifier.clone(), issuer.clone(), vec![1]);
+    let state = test_state(verifier.clone(), issuer.clone());
     let router = build_router(state);
 
-    let request_body = SettleRequest {
+    let mut body = serde_json::to_value(SettleRequest {
         x402_version: Some(2),
         payment_payload: payment_payload_v2("10"),
         payment_requirements: sample_requirements_v2("10"),
-    };
+    })
+    .expect("serialize settle request");
+    body["paymentPayload"]["x402Version"] = json!(3);
 
-    let response = router
-        .oneshot(post_json("/settle", &request_body))
-        .await
-        .unwrap();
+    let response = router.oneshot(post_json("/settle", &body)).await.unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(payload["success"], false);
-    assert_eq!(payload["error"].as_str(), Some("unsupported x402Version 2"));
+    assert!(
+        response.status().is_client_error(),
+        "expected a client error, got {}",
+        response.status()
+    );
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedState {
-    test_state_with_versions(verifier, issuer, vec![1, 2])
-}
-
-fn test_state_with_versions(
-    verifier: Arc<MockVerifier>,
-    issuer: Arc<MockIssuer>,
-    versions: Vec<u8>,
-) -> SharedState {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
         verifier.clone() as Arc<dyn CertificateValidator>,
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
-        versions,
-        vec!["0x3333333333333333333333333333333333333333".into()],
+        vec![TEST_VALIDATOR.into()],
     );
     Arc::new(AppState::new(vec![handler], None))
 }
@@ -818,26 +842,43 @@ fn payment_payload_v1_with_scheme(scheme: &str, network: &str, amount: &str) -> 
     serde_json::from_value(value).expect("failed to deserialize payment payload v1")
 }
 
+/// Validator identity used across the validation-gated fixtures. A URL rather than an address —
+/// core whitelists validators by identity string, not by contract address.
+const TEST_VALIDATOR: &str = "https://validator.example";
+const TEST_SUBJECT: &str = "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
 fn payment_payload_v2(amount: &str) -> X402PaymentPayload {
-    let amount_u256 = parse_amount(amount);
+    payment_payload_v2_inner(amount, None)
+}
+
+/// x402 v2 envelope whose claims are gated on a validation requirement.
+fn payment_payload_v2_validated(amount: &str, validator: &str) -> X402PaymentPayload {
+    payment_payload_v2_inner(
+        amount,
+        Some(json!({ "validator": validator, "subject": TEST_SUBJECT })),
+    )
+}
+
+/// The x402 version lives in the envelope; the claims inside are always at the current guarantee
+/// claims version, with validation an optional field rather than a separate claims variant.
+fn payment_payload_v2_inner(amount: &str, validation: Option<Value>) -> X402PaymentPayload {
     let recipient = format!("{:#x}", recipient_address());
     let asset = format!("{:#x}", asset_address());
     let user = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    let subject_hash =
-        compute_validation_subject_hash(user, &recipient, U256::ZERO, amount_u256, &asset, 1)
-            .expect("subject hash");
-    let request_hash = compute_validation_request_hash(&PaymentGuaranteeValidationPolicyV2 {
-        validation_registry_address: Address::from_slice(&[0x33; 20]),
-        validation_request_hash: alloy::primitives::B256::ZERO,
-        validation_chain_id: 11155111,
-        validator_address: Address::from_slice(&[0x44; 20]),
-        validator_agent_id: U256::from(7u8),
-        min_validation_score: 80,
-        validation_subject_hash: alloy::primitives::B256::from(subject_hash),
-        required_validation_tag: "hard-finality".into(),
-        job_hash: alloy::primitives::B256::repeat_byte(0xAA),
-    })
-    .expect("request hash");
+
+    let mut claims = json!({
+        "version": "v1",
+        "user_address": user,
+        "recipient_address": recipient,
+        "req_id": "0x0",
+        "amount": amount,
+        "asset_address": asset,
+        "timestamp": 1
+    });
+    if let Some(validation) = validation {
+        claims["validation"] = validation;
+    }
+
     let value = json!({
         "x402Version": 2,
         "accepted": {
@@ -848,24 +889,7 @@ fn payment_payload_v2(amount: &str) -> X402PaymentPayload {
             "asset": asset
         },
         "payload": {
-            "claims": {
-                "version": "v2",
-                "user_address": user,
-                "recipient_address": recipient,
-                "req_id": "0x0",
-                "amount": amount,
-                "asset_address": asset,
-                "timestamp": 1,
-                "validation_registry_address": "0x3333333333333333333333333333333333333333",
-                "validation_request_hash": format!("0x{}", hex::encode(request_hash)),
-                "validation_chain_id": 11155111,
-                "validator_address": "0x4444444444444444444444444444444444444444",
-                "validator_agent_id": "0x7",
-                "min_validation_score": 80,
-                "validation_subject_hash": format!("0x{}", hex::encode(subject_hash)),
-                "required_validation_tag": "hard-finality",
-                "job_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            },
+            "claims": claims,
             "signature": "0x1111",
             "scheme": "eip712"
         }
@@ -901,52 +925,7 @@ fn sample_claims() -> PaymentGuaranteeClaims {
         amount: U256::from(10),
         asset_address: format!("{:#x}", asset_address()),
         timestamp: 1,
-        version: 1,
-        validation_policy: None,
-    }
-}
-
-fn sample_claims_v2() -> PaymentGuaranteeClaims {
-    let recipient = format!("{:#x}", recipient_address());
-    let asset = format!("{:#x}", asset_address());
-    let user = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    let subject_hash =
-        compute_validation_subject_hash(user, &recipient, U256::ZERO, U256::from(10u8), &asset, 1)
-            .expect("subject hash");
-    let mut policy = PaymentGuaranteeValidationPolicyV2 {
-        validation_registry_address: Address::from_slice(&[0x33; 20]),
-        validation_request_hash: alloy::primitives::B256::ZERO,
-        validation_chain_id: 11155111,
-        validator_address: Address::from_slice(&[0x44; 20]),
-        validator_agent_id: U256::from(7u8),
-        min_validation_score: 80,
-        validation_subject_hash: alloy::primitives::B256::from(subject_hash),
-        required_validation_tag: "hard-finality".into(),
-        job_hash: alloy::primitives::B256::repeat_byte(0xAA),
-    };
-    policy.validation_request_hash = alloy::primitives::B256::from(
-        compute_validation_request_hash(&policy).expect("request hash"),
-    );
-
-    PaymentGuaranteeClaims {
-        domain: [0u8; 32],
-        user_address: user.into(),
-        recipient_address: recipient,
-        cycle_id: U256::from(1u8),
-        req_id: U256::ZERO,
-        amount: U256::from(10u8),
-        asset_address: asset,
-        timestamp: 1,
-        version: 2,
-        validation_policy: Some(policy),
-    }
-}
-
-fn parse_amount(amount: &str) -> U256 {
-    if let Some(hex) = amount.strip_prefix("0x") {
-        U256::from_str_radix(hex, 16).expect("hex amount")
-    } else {
-        U256::from_str_radix(amount, 10).expect("decimal amount")
+        version: GUARANTEE_CLAIMS_VERSION,
     }
 }
 
@@ -1091,10 +1070,6 @@ impl MockVerifier {
         Self::with_claims(sample_claims())
     }
 
-    fn success_v2() -> Self {
-        Self::with_claims(sample_claims_v2())
-    }
-
     fn with_claims(claims: PaymentGuaranteeClaims) -> Self {
         Self {
             claims,
@@ -1134,7 +1109,8 @@ struct MockIssuer {
 }
 
 fn dummy_cert() -> BLSCert {
-    let key = KeyMaterial::from_bytes(&[1u8; 32]).expect("secret key");
+    let key =
+        KeyMaterial::from_bytes(crypto::bls::Zeroizing::new(vec![1u8; 32])).expect("secret key");
     BLSCert::sign(&key, vec![0u8].into()).expect("sign cert")
 }
 
