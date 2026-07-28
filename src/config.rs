@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
+use sdk_4mica::Address;
 use serde::Deserialize;
 
 const ENV_SCHEME: &str = "X402_SCHEME";
@@ -12,6 +14,8 @@ const ENV_CORE_API_URL: &str = "X402_CORE_API_URL";
 const ENV_AUTH_WALLET_PRIVATE_KEY: &str = "X402_AUTH_WALLET_PRIVATE_KEY";
 const ENV_AUTH_URL: &str = "X402_AUTH_URL";
 const ENV_AUTH_REFRESH_MARGIN_SECS: &str = "X402_AUTH_REFRESH_MARGIN_SECS";
+const ENV_RELAYER_PRIVATE_KEY: &str = "X402_RELAYER_PRIVATE_KEY";
+const ENV_RELAYER_RPC_URL: &str = "X402_RELAYER_RPC_URL";
 const ENV_HOST: &str = "HOST";
 const ENV_PORT: &str = "PORT";
 const ENV_GUARANTEE_DOMAIN_VARIANTS: [&str; 3] = [
@@ -34,6 +38,9 @@ pub struct NetworkConfig {
     pub id: String,
     pub core_api_base_url: Url,
     pub auth: NetworkAuthConfig,
+    /// Present only when this network is configured to sponsor gas. Absent leaves the facilitator
+    /// a pure HTTP relay for that network — `/verify` and `/settle` are unaffected.
+    pub relayer: Option<NetworkRelayerConfig>,
 }
 
 #[derive(Clone)]
@@ -41,6 +48,32 @@ pub struct NetworkAuthConfig {
     pub wallet_private_key: String,
     pub auth_url: Url,
     pub refresh_margin_secs: u64,
+}
+
+/// Credentials for submitting sponsored transactions (e.g. gasless deposits) on a network.
+///
+/// Deliberately separate from [`NetworkAuthConfig`]: that key is an *identity* used to sign SIWE
+/// logins against core and needs no balance, whereas this one signs real transactions and must
+/// hold native gas. Sharing one key would silently couple the two, and draining the gas account
+/// would take authentication down with it.
+#[derive(Clone)]
+pub struct NetworkRelayerConfig {
+    pub private_key: String,
+    /// `None` means "use the `ethereum_http_rpc_url` core advertises", resolved once public params
+    /// are fetched, so a single-chain deployment needs only a key. Config load happens before that
+    /// fetch, which is why this cannot already be a concrete `Url`.
+    pub rpc_url: Option<Url>,
+}
+
+/// Hand-written so the key is never printed. Derived `Debug` would leak it into any log line,
+/// panic message, or `expect_err` output that formats a config value.
+impl std::fmt::Debug for NetworkRelayerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkRelayerConfig")
+            .field("private_key", &"<redacted>")
+            .field("rpc_url", &self.rpc_url)
+            .finish()
+    }
 }
 
 impl ServiceConfig {
@@ -69,6 +102,11 @@ pub struct PublicParameters {
     /// Validator identities this operator whitelisted. A signed validation requirement may only
     /// name one of these. By convention a URL or CAIP-10 account id, not an address.
     pub validators: Vec<String>,
+    /// The Core4Mica deployment, taken from core rather than configured locally so a facilitator
+    /// can never be pointed at a contract the operator it trusts does not use.
+    pub contract_address: Address,
+    /// Chain RPC endpoint core itself uses. Serves as the relayer's default endpoint.
+    pub ethereum_http_rpc_url: Option<Url>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,6 +117,8 @@ struct NetworkEnvConfig {
     auth_wallet_private_key: Option<String>,
     auth_url: Option<String>,
     auth_refresh_margin_secs: Option<u64>,
+    relayer_private_key: Option<String>,
+    relayer_rpc_url: Option<String>,
 }
 
 pub async fn load_public_params(api_base: &Url) -> Result<PublicParameters> {
@@ -102,11 +142,29 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
         resolve_guarantee_domain(configured_guarantee_domain, active_guarantee_domain);
     let validators = normalize_validators(&params.validators)?;
 
+    let contract_address =
+        Address::from_str(params.contract_address.trim()).with_context(|| {
+            format!(
+                "invalid contract_address in core public params: {}",
+                params.contract_address
+            )
+        })?;
+
+    // Optional: a facilitator that never sponsors gas has no use for it, and core may omit it.
+    let ethereum_http_rpc_url = match params.ethereum_http_rpc_url.trim() {
+        "" => None,
+        raw => Some(
+            normalize_url(raw).context("invalid ethereum_http_rpc_url in core public params")?,
+        ),
+    };
+
     Ok(PublicParameters {
         operator_public_key,
         guarantee_domain,
         active_guarantee_domain,
         validators,
+        contract_address,
+        ethereum_http_rpc_url,
     })
 }
 
@@ -126,8 +184,9 @@ fn normalize_validators(raw: &[String]) -> Result<Vec<String>> {
 
 fn load_networks_from_env() -> Result<Vec<NetworkConfig>> {
     let auth_fallback = load_auth_fallback()?;
+    let relayer_fallback = load_relayer_fallback()?;
     if let Ok(raw) = std::env::var(ENV_NETWORKS) {
-        return parse_network_list(&raw, &auth_fallback);
+        return parse_network_list(&raw, &auth_fallback, &relayer_fallback);
     }
 
     let network = std::env::var(ENV_NETWORK).unwrap_or_else(|_| DEFAULT_NETWORK_ID.into());
@@ -147,15 +206,21 @@ fn load_networks_from_env() -> Result<Vec<NetworkConfig>> {
     };
     let api_base_url = normalize_url(&api_url)?;
     let auth = resolve_auth_config(None, None, None, &auth_fallback, &api_base_url, &network)?;
+    let relayer = resolve_relayer_config(None, None, &relayer_fallback, &network)?;
 
     Ok(vec![NetworkConfig {
         id: network,
         core_api_base_url: api_base_url,
         auth,
+        relayer,
     }])
 }
 
-fn parse_network_list(raw: &str, auth_fallback: &AuthFallback) -> Result<Vec<NetworkConfig>> {
+fn parse_network_list(
+    raw: &str,
+    auth_fallback: &AuthFallback,
+    relayer_fallback: &RelayerFallback,
+) -> Result<Vec<NetworkConfig>> {
     let entries: Vec<NetworkEnvConfig> = serde_json::from_str(raw).with_context(|| {
         format!(
             "{ENV_NETWORKS} must be JSON like \
@@ -189,10 +254,17 @@ fn parse_network_list(raw: &str, auth_fallback: &AuthFallback) -> Result<Vec<Net
             &url,
             network,
         )?;
+        let relayer = resolve_relayer_config(
+            entry.relayer_private_key.as_deref(),
+            entry.relayer_rpc_url.as_deref(),
+            relayer_fallback,
+            network,
+        )?;
         configs.push(NetworkConfig {
             id: network.to_owned(),
             core_api_base_url: url,
             auth,
+            relayer,
         });
     }
 
@@ -203,6 +275,79 @@ struct AuthFallback {
     wallet_private_key: Option<String>,
     auth_url: Option<String>,
     refresh_margin_secs: Option<u64>,
+}
+
+/// Process-wide relayer defaults, applied to any network that does not set its own.
+struct RelayerFallback {
+    private_key: Option<String>,
+    rpc_url: Option<String>,
+}
+
+fn load_relayer_fallback() -> Result<RelayerFallback> {
+    let private_key = trimmed_env(ENV_RELAYER_PRIVATE_KEY);
+    let rpc_url = trimmed_env(ENV_RELAYER_RPC_URL);
+
+    // An RPC endpoint alone sponsors nothing. Failing here beats starting up looking configured
+    // and rejecting every deposit at runtime.
+    if private_key.is_none() && rpc_url.is_some() {
+        bail!("{ENV_RELAYER_RPC_URL} is set without {ENV_RELAYER_PRIVATE_KEY}");
+    }
+
+    Ok(RelayerFallback {
+        private_key,
+        rpc_url,
+    })
+}
+
+fn resolve_relayer_config(
+    entry_private_key: Option<&str>,
+    entry_rpc_url: Option<&str>,
+    fallback: &RelayerFallback,
+    network: &str,
+) -> Result<Option<NetworkRelayerConfig>> {
+    let private_key = entry_private_key
+        .or(fallback.private_key.as_deref())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let rpc_url = entry_rpc_url
+        .or(fallback.rpc_url.as_deref())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    let Some(private_key) = private_key else {
+        if rpc_url.is_some() {
+            bail!(
+                "network {network} provides a relayer RPC URL without a relayer private key; set \
+                 {ENV_RELAYER_PRIVATE_KEY} or `relayerPrivateKey` in the {ENV_NETWORKS} entry"
+            );
+        }
+        // Gas sponsorship is opt-in; a facilitator without it still serves /verify and /settle.
+        return Ok(None);
+    };
+
+    // Parse eagerly so a malformed key fails at startup rather than on the first deposit.
+    private_key
+        .parse::<alloy::signers::local::PrivateKeySigner>()
+        .with_context(|| format!("invalid relayer private key for network {network}"))?;
+
+    let rpc_url = rpc_url
+        .map(|value| {
+            normalize_url(value)
+                .with_context(|| format!("invalid relayer RPC URL for network {network}"))
+        })
+        .transpose()?;
+
+    Ok(Some(NetworkRelayerConfig {
+        private_key: private_key.to_string(),
+        rpc_url,
+    }))
+}
+
+fn trimmed_env(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 fn load_auth_fallback() -> Result<AuthFallback> {
@@ -432,7 +577,145 @@ mod tests {
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[0]);
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[1]);
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[2]);
+            env::remove_var(ENV_RELAYER_PRIVATE_KEY);
+            env::remove_var(ENV_RELAYER_RPC_URL);
         }
+    }
+
+    /// Anvil account 0. Any well-formed secp256k1 key works; this one is recognisable.
+    const TEST_RELAYER_KEY: &str =
+        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+    fn no_relayer_fallback() -> RelayerFallback {
+        RelayerFallback {
+            private_key: None,
+            rpc_url: None,
+        }
+    }
+
+    #[test]
+    fn relayer_is_absent_when_nothing_is_configured() {
+        let relayer =
+            resolve_relayer_config(None, None, &no_relayer_fallback(), "eip155:84532").unwrap();
+        assert!(
+            relayer.is_none(),
+            "gas sponsorship must stay opt-in so existing deployments are unaffected"
+        );
+    }
+
+    #[test]
+    fn relayer_rpc_url_defaults_to_cores_when_unset() {
+        let relayer = resolve_relayer_config(
+            Some(TEST_RELAYER_KEY),
+            None,
+            &no_relayer_fallback(),
+            "eip155:84532",
+        )
+        .unwrap()
+        .expect("relayer configured");
+        assert!(
+            relayer.rpc_url.is_none(),
+            "an unset RPC URL defers to core's ethereum_http_rpc_url"
+        );
+    }
+
+    #[test]
+    fn relayer_entry_overrides_the_process_fallback() {
+        let fallback = RelayerFallback {
+            private_key: Some(TEST_RELAYER_KEY.into()),
+            rpc_url: Some("https://fallback.example".into()),
+        };
+        let relayer = resolve_relayer_config(
+            None,
+            Some("https://per-network.example"),
+            &fallback,
+            "eip155:84532",
+        )
+        .unwrap()
+        .expect("relayer configured");
+        assert_eq!(
+            relayer.rpc_url.as_ref().map(Url::as_str),
+            Some("https://per-network.example/")
+        );
+    }
+
+    /// An RPC endpoint with no key sponsors nothing; starting up "configured" would mean every
+    /// deposit fails at runtime instead.
+    #[test]
+    fn relayer_rejects_an_rpc_url_without_a_key() {
+        let err = resolve_relayer_config(
+            None,
+            Some("https://rpc.example"),
+            &no_relayer_fallback(),
+            "eip155:84532",
+        )
+        .expect_err("expected missing-key rejection");
+        assert!(
+            err.to_string().contains("without a relayer private key"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn relayer_rejects_a_malformed_private_key() {
+        let err = resolve_relayer_config(
+            Some("not-a-key"),
+            None,
+            &no_relayer_fallback(),
+            "eip155:84532",
+        )
+        .expect_err("expected key parse failure");
+        assert!(
+            err.to_string().contains("invalid relayer private key"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_keeps_the_contract_address_and_rpc_url() {
+        clear_network_env();
+        let params = sample_core_params();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert_eq!(
+            public_params.contract_address,
+            Address::from_str("0x0000000000000000000000000000000000000001").unwrap()
+        );
+        assert_eq!(
+            public_params
+                .ethereum_http_rpc_url
+                .as_ref()
+                .map(Url::as_str),
+            Some("https://rpc.example/")
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_rejects_a_malformed_contract_address() {
+        clear_network_env();
+        let mut params = sample_core_params();
+        params.contract_address = "0xnot-an-address".into();
+
+        let err = public_parameters_from_core(params).unwrap_err();
+        assert!(
+            err.to_string().contains("invalid contract_address"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Core may omit the RPC URL; only a facilitator that sponsors gas needs one, and it fails
+    /// later with a message naming the network.
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_tolerates_a_missing_rpc_url() {
+        clear_network_env();
+        let mut params = sample_core_params();
+        params.ethereum_http_rpc_url = String::new();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert!(public_params.ethereum_http_rpc_url.is_none());
     }
 
     #[test]

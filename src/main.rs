@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod exact;
 mod issuer;
+mod relayer;
 mod server;
 mod telemetry;
 mod verifier;
@@ -15,8 +16,10 @@ use crate::config::{ServiceConfig, load_public_params};
 use crate::exact::ExactService;
 use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
+use crate::relayer::Relayer;
 use crate::server::state::{AppState, FourMicaHandler};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let service_cfg =
         ServiceConfig::from_env().context("failed to load facilitator configuration")?;
     let mut four_mica_handlers = Vec::new();
+    let mut relayers: Vec<Relayer> = Vec::new();
     for network in service_cfg.networks.iter() {
         let auth_cfg = &network.auth;
         let auth_session = Some(Arc::new(
@@ -74,6 +78,35 @@ async fn main() -> anyhow::Result<()> {
                 )
             })?,
         ) as Arc<dyn GuaranteeIssuer>;
+
+        // Gas sponsorship is opt-in per network. When configured, connecting is part of startup:
+        // a relayer that cannot reach its chain, or sits on the wrong one, should stop the process
+        // rather than surface as a failed deposit later.
+        match Relayer::try_new(network, &public_params).await? {
+            Some(relayer) => {
+                let balance = relayer.balance().await?;
+                if balance.is_zero() {
+                    warn!(
+                        network = %relayer.network(),
+                        relayer = %relayer.address(),
+                        "relayer account has no native balance; sponsored transactions will fail \
+                         until it is funded"
+                    );
+                } else {
+                    info!(
+                        network = %relayer.network(),
+                        relayer = %relayer.address(),
+                        balance_wei = %balance,
+                        "relayer ready to sponsor transactions"
+                    );
+                }
+                relayers.push(relayer);
+            }
+            None => info!(
+                network = %network.id,
+                "no relayer configured; gas sponsorship disabled for this network"
+            ),
+        }
 
         four_mica_handlers.push(FourMicaHandler::new(
             service_cfg.scheme.clone(),
