@@ -54,6 +54,43 @@ function SectionHeader({
   );
 }
 
+// The one thing a reader comes to this page for is the number, so it goes
+// above the fold with nothing competing for attention. No SECTION_GAP here —
+// the hero sits directly under the header.
+function PricingHero() {
+  return (
+    <section className="mx-auto max-w-3xl pt-10 text-center sm:pt-14 lg:pt-16">
+      <p className="section-kicker">{content.kicker}</p>
+      {/* Hero scale, not section scale: font-sans and larger than the
+          section-title h2s below, matching the home page hero. */}
+      <h1 className="mt-4 font-sans text-4xl text-ink-strong leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+        {content.title}
+      </h1>
+      <p className="mx-auto mt-6 max-w-2xl text-ink-body/80 text-lg leading-relaxed md:text-xl">
+        {content.lead}
+      </p>
+
+      <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <a
+          href={links.docs}
+          className="btn btn-primary btn-lg btn-no-lift whitespace-nowrap font-semibold"
+        >
+          {content.cta.primary}
+          <i className="ri-arrow-right-line text-md" />
+        </a>
+        <a
+          href={links.mailto.contact}
+          className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-overlay/10"
+        >
+          {content.cta.secondary}
+        </a>
+      </div>
+
+      <p className="mt-8 text-ink-muted text-md">{content.cta.note}</p>
+    </section>
+  );
+}
+
 function AudienceSection() {
   return (
     <section className={SECTION_GAP}>
@@ -249,7 +286,7 @@ function FacilitatorSavings() {
                 {content.facilitators.example.outgoing}
               </span>
               <span className="font-medium text-ink-strong tabular-nums">
-                40
+                {content.facilitators.example.outgoingValue}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/10 bg-overlay/3 px-4 py-3">
@@ -257,7 +294,7 @@ function FacilitatorSavings() {
                 {content.facilitators.example.incoming}
               </span>
               <span className="font-medium text-ink-strong tabular-nums">
-                27
+                {content.facilitators.example.incomingValue}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4 rounded-md border border-overlay/25 bg-overlay/6 px-4 py-3">
@@ -265,7 +302,7 @@ function FacilitatorSavings() {
                 {content.facilitators.example.net}
               </span>
               <span className="font-semibold text-ink-strong text-lg tabular-nums">
-                13
+                {content.facilitators.example.netValue}
               </span>
             </div>
           </div>
@@ -340,7 +377,7 @@ function YieldSection() {
 function VolumePricing() {
   return (
     <section className={SECTION_GAP}>
-      <div className="grid gap-8 rounded-md border border-overlay/10 bg-surface-deep/25 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+      <div className="grid gap-8 bg-surface-deep/25 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
         <div>
           <p className="section-kicker">{content.volume.kicker}</p>
           <h2 className="section-title font-normal">{content.volume.title}</h2>
@@ -415,10 +452,13 @@ export default function PricingPage() {
       <Header />
       <div className="pt-18 pb-32">
         <section className="w-full">
-          <AudienceSection />
-          <FacilitatorSavings />
+          {/* Problem → outcome → explanation → proof → action: the price and
+              the model land before the netting example argues for them. */}
+          <PricingHero />
           <PricingModel />
           <FeeBreakdown />
+          <AudienceSection />
+          <FacilitatorSavings />
 
           <section className={cn(SECTION_GAP, "px-4 pt-6 sm:px-6 lg:px-8")}>
             <SectionHeader
