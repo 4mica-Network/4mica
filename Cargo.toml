@@ -5,11 +5,9 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
-# Path deps while the post-#151 (drop-v2) changes are unreleased. Swap back to pinned
-# crates.io versions once 4mica-core publishes the next alpha.
-rpc-4mica = { path = "../4mica-core/crates/rpc" }
-sdk-4mica = { path = "../4mica-core/sdk" }
-crypto-4mica = { path = "../4mica-core/crates/crypto" }
+rpc-4mica = { version = "2.0.0-alpha.2" }
+sdk-4mica = { version = "2.0.0-alpha.2" }
+crypto-4mica = { version = "2.0.0-alpha.2" }
 axum = { version = "0.8.9", features = ["macros", "json"] }
 base64 = "0.23"
 dotenvy = "0.15"
@@ -17,17 +15,17 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0.18"
 tokio = { version = "1.53.0", features = [
-    "macros",
-    "rt-multi-thread",
-    "signal",
-    "sync",
+  "macros",
+  "rt-multi-thread",
+  "signal",
+  "sync",
 ] }
 tower-http = { version = "0.7.0", features = ["trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 reqwest = { version = "0.13.1", default-features = false, features = [
-    "json",
-    "default-tls",
+  "json",
+  "default-tls",
 ] }
 hex = "0.4"
 async-trait = "0.1.91"
