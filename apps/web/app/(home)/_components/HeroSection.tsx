@@ -1,70 +1,148 @@
 "use client";
 
 import { links } from "@4mica/url";
-import SectionBackdrop from "@components/SectionBackdrop";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { messages } from "@/i18n";
+import MilkyWay from "./MilkyWay";
+
+const { titlePrefix, rotatingWords, titleConnector, titleLine2 } =
+  messages.home.hero;
 
 export default function HeroSection() {
+  const reduceMotion = useReducedMotion();
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const id = setInterval(() => {
+      setIndex((prev) => (prev + 1) % rotatingWords.length);
+    }, 2800);
+    return () => clearInterval(id);
+  }, [reduceMotion]);
+
+  const container = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+  };
+  const item = {
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 18 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.55, ease: "easeOut" as const },
+    },
+  };
+
   return (
     <section className="section-gloss relative isolate overflow-hidden">
-      <SectionBackdrop
-        src="/bg/abstract-aurora.avif"
-        position="top"
-        mask="radial-gradient(68% 85% at 50% 25%, #000 0%, transparent 68%)"
-        className="opacity-20 dark:opacity-40"
-      />
       <div className="relative z-10 w-full">
-        <div className="w-full pt-32 pb-20 lg:pt-36 lg:pb-32">
-          <div className="flex flex-col items-center text-center">
-            {/* Headline */}
-            <h1 className="mt-4 max-w-5xl select-none font-sans text-5xl text-ink-strong leading-tight tracking-[0.01em] md:text-7xl lg:text-[5.25rem]">
-              {messages.home.hero.titleLine1}
-              <br />
-              {messages.home.hero.titleLine2}
-            </h1>
-
-            {/* Subheadline */}
-            <p className="mt-5 max-w-xl select-none text-ink-body/80 text-lg leading-relaxed md:text-xl">
-              {messages.home.hero.subtitle}
-            </p>
-
-            {/* CTAs */}
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <a
-                href={links.docs}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
+        <div className="mx-auto w-full max-w-7xl px-6 pt-32 pb-20 lg:pt-36 lg:pb-32">
+          <div className="flex flex-col items-center gap-12 text-center lg:flex-row lg:items-center lg:justify-between lg:gap-12 lg:text-left">
+            <motion.div
+              className="flex flex-1 flex-col items-center lg:items-start"
+              variants={container}
+              initial="hidden"
+              animate="show"
+            >
+              <motion.h1
+                variants={item}
+                className="select-none font-sans text-4xl text-ink-strong leading-tight tracking-[0.01em] sm:text-5xl lg:text-6xl"
               >
-                <span>{messages.common.actions.startBuilding}</span>
-              </a>
-              <a
-                href="#how-it-works"
-                className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-surface-deep"
-              >
-                <i className="ri-play-fill relative z-10 text-lg leading-none" />
-                <span className="relative z-10">
-                  {messages.common.actions.seeHowItWorks}
+                <span className="sr-only">
+                  {titlePrefix} {rotatingWords[0]} {titleConnector} {titleLine2}
                 </span>
-              </a>
-            </div>
+                <span aria-hidden>
+                  <span className="block whitespace-nowrap">
+                    {titlePrefix}{" "}
+                    <span className="relative inline-grid text-left align-bottom">
+                      {rotatingWords.map((word) => (
+                        <span
+                          key={word}
+                          className="invisible col-start-1 row-start-1"
+                        >
+                          {word}
+                        </span>
+                      ))}
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={index}
+                          className="col-start-1 row-start-1"
+                          initial={{ opacity: 0, filter: "blur(10px)" }}
+                          animate={{ opacity: 1, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, filter: "blur(10px)" }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                        >
+                          {rotatingWords[index]}
+                        </motion.span>
+                      </AnimatePresence>
+                    </span>
+                  </span>
+                  <span className="block">
+                    {titleConnector} {titleLine2}
+                  </span>
+                </span>
+              </motion.h1>
 
-            <p className="mt-12 font-light text-ink-muted text-md">
-              {messages.home.hero.supportedOn}{" "}
-              <a
-                href={links.api.base}
-                className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+              <motion.p
+                variants={item}
+                className="mt-6 max-w-xl select-none text-ink-body/80 text-lg leading-relaxed md:text-xl"
               >
-                {messages.home.hero.supportedNetworks.base}
-              </a>
-              ,{" "}
-              <a
-                href={links.api.ethereumSepolia}
-                className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+                {messages.home.hero.subtitle}
+              </motion.p>
+
+              <motion.div
+                variants={item}
+                className="mt-8 flex flex-col gap-3 sm:flex-row"
               >
-                {messages.home.hero.supportedNetworks.ethereumSepolia}
-              </a>
-            </p>
+                <a
+                  href={links.docs}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
+                >
+                  <span>{messages.common.actions.startBuilding}</span>
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-surface-deep"
+                >
+                  <i className="ri-play-fill relative z-10 text-lg leading-none" />
+                  <span className="relative z-10">
+                    {messages.common.actions.seeHowItWorks}
+                  </span>
+                </a>
+              </motion.div>
+
+              <motion.p
+                variants={item}
+                className="mt-10 font-light text-ink-muted text-md"
+              >
+                {messages.home.hero.supportedOn}{" "}
+                <a
+                  href={links.api.base}
+                  className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+                >
+                  {messages.home.hero.supportedNetworks.base}
+                </a>
+                ,{" "}
+                <a
+                  href={links.api.ethereumSepolia}
+                  className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+                >
+                  {messages.home.hero.supportedNetworks.ethereumSepolia}
+                </a>
+              </motion.p>
+            </motion.div>
+
+            <motion.div
+              className="shrink-0"
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
+            >
+              <MilkyWay />
+            </motion.div>
           </div>
         </div>
       </div>

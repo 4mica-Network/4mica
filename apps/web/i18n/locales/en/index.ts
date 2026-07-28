@@ -80,7 +80,13 @@ export const en = {
   },
   home: {
     hero: {
-      titleLine1: "The clearing house for",
+      titlePrefix: "The",
+      rotatingWords: [
+        "clearing house",
+        "payment infrastructure",
+        "transaction layer",
+      ],
+      titleConnector: "for",
       titleLine2: "the agentic economy",
       subtitle:
         "4Mica gives agents one place to pay on credit, earn yield, and settle transactions without clearing every request on-chain.",
@@ -121,11 +127,6 @@ export const en = {
         question: "Who should integrate 4Mica?",
         answer:
           "x402 facilitators first: adding the 4mica-credit scheme lets every seller behind your endpoint take credit-backed payments, with 4Mica running as the clearing layer behind your brand. Then API and service providers who want to charge per request without accounts, invoices, or prepaid balances, and agent frameworks that want paid tool use built in. The fit is high-volume, low-value payments where checkout and invoicing infrastructure is the bottleneck.",
-      },
-      {
-        question: "Are individual AI agents 4Mica customers?",
-        answer:
-          "No — an agent is an end user, not the counterparty. The customer is whoever operates it: the facilitator, platform, framework, or team that holds the collateral, sets the spending limits, and carries the commercial relationship. Agents spend inside those limits, which is why there is no sign-up process for agents themselves.",
       },
       {
         question: "How does 4Mica reduce settlement costs?",
@@ -409,7 +410,7 @@ await clearingHouse.claimNetCredit(
       useCases: {
         kicker: "Use cases",
         title: "Built for the scale you need",
-        lead: "Built first for x402 facilitators, then for the API providers and agent frameworks behind them. 4Mica handles the credit and clearing layer so you don't have to.",
+        lead: "Built for x402 facilitators first, then the API providers and agent frameworks behind them. 4Mica runs the credit and clearing layer.",
       },
       ecosystem: {
         kicker: "Ecosystem",
