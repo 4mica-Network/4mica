@@ -200,6 +200,10 @@ pub struct DepositVerifyResponse {
     /// Stable code so clients branch on this rather than parsing `invalidReason`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
+    /// True when retrying the identical request may succeed — throttling and transient chain
+    /// errors. A bad signature or an expired authorization will never become valid.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
 }
 
 impl DepositVerifyResponse {
@@ -208,14 +212,16 @@ impl DepositVerifyResponse {
             is_valid: true,
             invalid_reason: None,
             error_code: None,
+            retryable: None,
         }
     }
 
-    pub fn invalid(reason: String, code: &str) -> Self {
+    pub fn invalid(reason: String, code: &str, retryable: bool) -> Self {
         Self {
             is_valid: false,
             invalid_reason: Some(reason),
             error_code: Some(code.to_string()),
+            retryable: Some(retryable),
         }
     }
 }
@@ -240,10 +246,13 @@ pub struct DepositResponse {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
+    /// See [`DepositVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
 }
 
 impl DepositResponse {
-    pub fn failure(error: String, code: &str) -> Self {
+    pub fn failure(error: String, code: &str, retryable: bool) -> Self {
         Self {
             success: false,
             tx_hash: None,
@@ -253,6 +262,7 @@ impl DepositResponse {
             amount: None,
             error: Some(error),
             error_code: Some(code.to_string()),
+            retryable: Some(retryable),
         }
     }
 }

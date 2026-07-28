@@ -1,0 +1,364 @@
+//! Rate limiting and concurrency control for sponsored deposits.
+//!
+//! `/deposit` spends the relayer's ETH on behalf of an unauthenticated caller. The signature binds
+//! the amount and destination, so nobody can *steal* a deposit — but nothing in the protocol stops
+//! someone submitting a stream of legitimate, worthless deposits and burning gas. These are the
+//! controls that must live in-process because they depend on state only this service has: which
+//! address a signature actually recovered to, how many submissions are in flight, and what the
+//! relayer's balance is.
+//!
+//! Controls better handled upstream (an API gateway or WAF) are deliberately absent: IP-based
+//! limiting, API keys, and TLS termination all belong to a layer that can see the real client.
+//!
+//! # Ordering
+//!
+//! The two tiers apply at different points, for different reasons:
+//!
+//! * **Global** limits run *before* verification. `from` is attacker-controlled at that stage, so
+//!   the only meaningful defence is one that ignores claimed identity and just bounds volume.
+//! * **Per-address** limits run *after* signature recovery, once `from` is proven. Applying them
+//!   earlier would be trivially bypassed by varying `from` on every request.
+
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use alloy::primitives::{Address, B256, U256};
+
+use crate::deposit::DepositError;
+
+/// Tunables, all with defaults chosen to be permissive enough for normal use and tight enough that
+/// a single misbehaving client cannot monopolise the relayer.
+#[derive(Clone, Debug)]
+pub struct DepositLimits {
+    /// Concurrent submissions across all callers. Bounds how much damage a burst can do before the
+    /// rate limiter observes it.
+    pub max_in_flight: usize,
+    /// Submissions per verified address per [`window`](Self::window).
+    pub per_address_limit: usize,
+    /// Requests per window across all callers, applied pre-verification.
+    pub global_limit: usize,
+    pub window: Duration,
+    /// Refuse to submit when the relayer's native balance is at or below this. Zero disables the
+    /// check. Stops the relayer emitting transactions it cannot pay for.
+    pub min_relayer_balance_wei: U256,
+    /// Ceiling on distinct addresses tracked at once. Without it, spamming fresh `from` values
+    /// would grow the rate-limit map unboundedly — a memory attack in place of a gas one.
+    pub max_tracked_addresses: usize,
+}
+
+impl Default for DepositLimits {
+    fn default() -> Self {
+        Self {
+            max_in_flight: 16,
+            per_address_limit: 5,
+            global_limit: 60,
+            window: Duration::from_secs(60),
+            min_relayer_balance_wei: U256::ZERO,
+            max_tracked_addresses: 10_000,
+        }
+    }
+}
+
+#[derive(Default)]
+struct GuardState {
+    /// Submission times per verified address, pruned to the window on access.
+    per_address: HashMap<Address, VecDeque<Instant>>,
+    /// Request times across all callers, pre-verification.
+    global: VecDeque<Instant>,
+    /// Authorizations currently being submitted, so the same one cannot be broadcast twice
+    /// concurrently. The on-chain nonce guard catches sequential replays; this catches the race.
+    in_flight: HashSet<(Address, B256)>,
+}
+
+pub struct DepositGuard {
+    limits: DepositLimits,
+    state: Mutex<GuardState>,
+}
+
+impl DepositGuard {
+    pub fn new(limits: DepositLimits) -> Arc<Self> {
+        Arc::new(Self {
+            limits,
+            state: Mutex::new(GuardState::default()),
+        })
+    }
+
+    pub fn limits(&self) -> &DepositLimits {
+        &self.limits
+    }
+
+    /// Pre-verification admission check. Bounds total volume without trusting any field in the
+    /// request, since none of them are proven yet.
+    pub fn check_global(&self) -> Result<(), DepositError> {
+        let now = Instant::now();
+        let mut state = self.state.lock().expect("deposit guard poisoned");
+
+        prune(&mut state.global, now, self.limits.window);
+        if state.global.len() >= self.limits.global_limit {
+            return Err(DepositError::RateLimited);
+        }
+        state.global.push_back(now);
+        Ok(())
+    }
+
+    /// Post-verification reservation, taken once `from` is known to have signed.
+    ///
+    /// The returned permit releases its in-flight slot on drop, so an early return or a panic in
+    /// the submit path cannot leak capacity.
+    pub fn reserve(
+        self: &Arc<Self>,
+        from: Address,
+        nonce: B256,
+    ) -> Result<DepositPermit, DepositError> {
+        let now = Instant::now();
+        let mut state = self.state.lock().expect("deposit guard poisoned");
+
+        if state.in_flight.len() >= self.limits.max_in_flight {
+            return Err(DepositError::TooManyInFlight);
+        }
+        if !state.in_flight.insert((from, nonce)) {
+            return Err(DepositError::DuplicateInFlight);
+        }
+
+        // Sweep before inserting a new address so the map tracks only genuinely-active callers.
+        if state.per_address.len() >= self.limits.max_tracked_addresses
+            && !state.per_address.contains_key(&from)
+        {
+            let window = self.limits.window;
+            state.per_address.retain(|_, seen| {
+                prune(seen, now, window);
+                !seen.is_empty()
+            });
+            // Still full after sweeping: fail closed rather than grow without bound.
+            if state.per_address.len() >= self.limits.max_tracked_addresses {
+                state.in_flight.remove(&(from, nonce));
+                return Err(DepositError::RateLimited);
+            }
+        }
+
+        let seen = state.per_address.entry(from).or_default();
+        prune(seen, now, self.limits.window);
+        if seen.len() >= self.limits.per_address_limit {
+            state.in_flight.remove(&(from, nonce));
+            return Err(DepositError::AddressRateLimited { address: from });
+        }
+        seen.push_back(now);
+
+        Ok(DepositPermit {
+            guard: Arc::clone(self),
+            from,
+            nonce,
+        })
+    }
+
+    pub fn check_relayer_balance(&self, balance: U256) -> Result<(), DepositError> {
+        if !self.limits.min_relayer_balance_wei.is_zero()
+            && balance <= self.limits.min_relayer_balance_wei
+        {
+            return Err(DepositError::RelayerBalanceTooLow {
+                balance,
+                floor: self.limits.min_relayer_balance_wei,
+            });
+        }
+        Ok(())
+    }
+
+    fn release(&self, from: Address, nonce: B256) {
+        if let Ok(mut state) = self.state.lock() {
+            state.in_flight.remove(&(from, nonce));
+        }
+    }
+
+    #[cfg(test)]
+    fn in_flight_len(&self) -> usize {
+        self.state.lock().expect("poisoned").in_flight.len()
+    }
+}
+
+/// Holds an in-flight slot for one authorization. Releasing on drop rather than at the end of the
+/// submit path means a `?` return or a panic cannot strand capacity.
+pub struct DepositPermit {
+    guard: Arc<DepositGuard>,
+    from: Address,
+    nonce: B256,
+}
+
+impl std::fmt::Debug for DepositPermit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DepositPermit")
+            .field("from", &self.from)
+            .field("nonce", &self.nonce)
+            .finish()
+    }
+}
+
+impl Drop for DepositPermit {
+    fn drop(&mut self) {
+        self.guard.release(self.from, self.nonce);
+    }
+}
+
+fn prune(times: &mut VecDeque<Instant>, now: Instant, window: Duration) {
+    while let Some(oldest) = times.front() {
+        if now.duration_since(*oldest) >= window {
+            times.pop_front();
+        } else {
+            break;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn addr(byte: u8) -> Address {
+        Address::from_slice(&[byte; 20])
+    }
+
+    /// Deliberately roomy. Each test tightens the single limit it exercises, so a failure names
+    /// the constraint that actually bound — the checks run in order, and a too-small unrelated
+    /// limit would mask the one under test.
+    fn limits() -> DepositLimits {
+        DepositLimits {
+            max_in_flight: 32,
+            per_address_limit: 32,
+            global_limit: 32,
+            window: Duration::from_secs(60),
+            min_relayer_balance_wei: U256::ZERO,
+            max_tracked_addresses: 32,
+        }
+    }
+
+    #[test]
+    fn global_limit_bounds_requests_before_verification() {
+        let guard = DepositGuard::new(DepositLimits {
+            global_limit: 3,
+            ..limits()
+        });
+        for _ in 0..3 {
+            guard.check_global().expect("within limit");
+        }
+        let err = guard.check_global().expect_err("expected rate limit");
+        assert_eq!(err.code(), "RATE_LIMITED");
+    }
+
+    #[test]
+    fn per_address_limit_applies_to_a_verified_signer() {
+        let guard = DepositGuard::new(DepositLimits {
+            per_address_limit: 2,
+            ..limits()
+        });
+        // Permits must outlive the loop, or dropping them would free the in-flight slots and the
+        // per-address counter is what we mean to exercise.
+        let _first = guard.reserve(addr(1), B256::repeat_byte(1)).expect("first");
+        let _second = guard
+            .reserve(addr(1), B256::repeat_byte(2))
+            .expect("second");
+        let err = guard
+            .reserve(addr(1), B256::repeat_byte(3))
+            .expect_err("expected per-address limit");
+        assert_eq!(err.code(), "ADDRESS_RATE_LIMITED");
+    }
+
+    #[test]
+    fn in_flight_slots_are_released_on_drop() {
+        let guard = DepositGuard::new(limits());
+        {
+            let _permit = guard
+                .reserve(addr(1), B256::repeat_byte(1))
+                .expect("permit");
+            assert_eq!(guard.in_flight_len(), 1);
+        }
+        assert_eq!(guard.in_flight_len(), 0);
+    }
+
+    #[test]
+    fn max_in_flight_bounds_concurrent_submissions() {
+        let guard = DepositGuard::new(DepositLimits {
+            max_in_flight: 2,
+            ..limits()
+        });
+        let _a = guard.reserve(addr(1), B256::repeat_byte(1)).expect("a");
+        let _b = guard.reserve(addr(2), B256::repeat_byte(2)).expect("b");
+        let err = guard
+            .reserve(addr(3), B256::repeat_byte(3))
+            .expect_err("expected in-flight cap");
+        assert_eq!(err.code(), "TOO_MANY_IN_FLIGHT");
+    }
+
+    /// The on-chain nonce guard rejects a *sequential* replay; this covers the concurrent case,
+    /// where both submissions would otherwise be broadcast and one would revert after paying gas.
+    #[test]
+    fn the_same_authorization_cannot_be_submitted_twice_concurrently() {
+        let guard = DepositGuard::new(limits());
+        let _first = guard.reserve(addr(1), B256::repeat_byte(9)).expect("first");
+        let err = guard
+            .reserve(addr(1), B256::repeat_byte(9))
+            .expect_err("expected duplicate rejection");
+        assert_eq!(err.code(), "DUPLICATE_IN_FLIGHT");
+    }
+
+    /// A rejected reservation must not consume the slot it was denied.
+    #[test]
+    fn a_denied_reservation_leaves_no_in_flight_slot_behind() {
+        let guard = DepositGuard::new(DepositLimits {
+            per_address_limit: 2,
+            ..limits()
+        });
+        let _a = guard.reserve(addr(1), B256::repeat_byte(1)).expect("a");
+        let _b = guard.reserve(addr(1), B256::repeat_byte(2)).expect("b");
+        assert_eq!(guard.in_flight_len(), 2);
+
+        guard
+            .reserve(addr(1), B256::repeat_byte(3))
+            .expect_err("per-address limit");
+        assert_eq!(
+            guard.in_flight_len(),
+            2,
+            "a denied reservation must release the slot it speculatively took"
+        );
+    }
+
+    /// Spamming fresh addresses must not grow the tracking map without bound.
+    #[test]
+    fn tracked_addresses_are_capped() {
+        let guard = DepositGuard::new(DepositLimits {
+            max_tracked_addresses: 2,
+            ..limits()
+        });
+        let _a = guard.reserve(addr(1), B256::repeat_byte(1)).expect("a");
+        let _b = guard.reserve(addr(2), B256::repeat_byte(2)).expect("b");
+        // A third distinct address exceeds the cap. The sweep frees nothing because both entries
+        // are inside the window, so it fails closed rather than growing the map.
+        let err = guard
+            .reserve(addr(3), B256::repeat_byte(3))
+            .expect_err("expected rejection");
+        assert_eq!(err.code(), "RATE_LIMITED");
+    }
+
+    #[test]
+    fn relayer_balance_floor_is_enforced_when_set() {
+        let guard = DepositGuard::new(DepositLimits {
+            min_relayer_balance_wei: U256::from(1_000u64),
+            ..limits()
+        });
+
+        guard
+            .check_relayer_balance(U256::from(1_001u64))
+            .expect("above floor");
+        let err = guard
+            .check_relayer_balance(U256::from(1_000u64))
+            .expect_err("at floor is not above it");
+        assert_eq!(err.code(), "RELAYER_BALANCE_TOO_LOW");
+    }
+
+    #[test]
+    fn relayer_balance_floor_is_disabled_by_default() {
+        let guard = DepositGuard::new(limits());
+        guard
+            .check_relayer_balance(U256::ZERO)
+            .expect("zero floor disables the check");
+    }
+}

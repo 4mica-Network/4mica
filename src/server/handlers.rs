@@ -40,7 +40,11 @@ async fn deposit_verify_handler(
         Ok(()) => Json(DepositVerifyResponse::valid()),
         Err(err) => {
             warn!(reason = %err, code = err.code(), "deposit verification failed");
-            Json(DepositVerifyResponse::invalid(err.to_string(), err.code()))
+            Json(DepositVerifyResponse::invalid(
+                err.to_string(),
+                err.code(),
+                err.is_retryable(),
+            ))
         }
     }
 }
@@ -49,6 +53,9 @@ async fn run_deposit_verify(
     state: &SharedState,
     request: DepositRequest,
 ) -> Result<(), DepositError> {
+    // Before any RPC work: /deposit/verify makes several eth_calls per request, so an unbounded
+    // caller could exhaust the node quota without ever submitting anything.
+    state.deposit_guard().check_global()?;
     let relayer = state.relayer_for(request.network.as_deref())?;
     let intent = DepositIntent::parse(
         &request.asset,
@@ -72,11 +79,24 @@ async fn deposit_handler(
     let amount = request.amount.clone();
     let from = request.authorization.from;
 
+    if let Err(err) = state.deposit_guard().check_global() {
+        warn!(reason = %err, code = err.code(), "deposit rejected");
+        return Json(DepositResponse::failure(
+            err.to_string(),
+            err.code(),
+            err.is_retryable(),
+        ));
+    }
+
     let relayer = match state.relayer_for(network.as_deref()) {
         Ok(relayer) => relayer,
         Err(err) => {
             warn!(reason = %err, "deposit rejected");
-            return Json(DepositResponse::failure(err.to_string(), err.code()));
+            return Json(DepositResponse::failure(
+                err.to_string(),
+                err.code(),
+                err.is_retryable(),
+            ));
         }
     };
 
@@ -89,11 +109,15 @@ async fn deposit_handler(
         Ok(intent) => intent,
         Err(err) => {
             warn!(reason = %err, "deposit rejected");
-            return Json(DepositResponse::failure(err.to_string(), err.code()));
+            return Json(DepositResponse::failure(
+                err.to_string(),
+                err.code(),
+                err.is_retryable(),
+            ));
         }
     };
 
-    match deposit::submit(relayer, &intent, now_secs()).await {
+    match deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await {
         Ok(tx_hash) => {
             info!(
                 tx_hash = %tx_hash,
@@ -112,11 +136,16 @@ async fn deposit_handler(
                 amount: Some(intent.amount.to_string()),
                 error: None,
                 error_code: None,
+                retryable: None,
             })
         }
         Err(err) => {
             warn!(reason = %err, code = err.code(), "gasless deposit failed");
-            Json(DepositResponse::failure(err.to_string(), err.code()))
+            Json(DepositResponse::failure(
+                err.to_string(),
+                err.code(),
+                err.is_retryable(),
+            ))
         }
     }
 }

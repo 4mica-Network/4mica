@@ -11,6 +11,7 @@ use serde_json::Map;
 use thiserror::Error;
 
 use crate::deposit::DepositError;
+use crate::limits::DepositGuard;
 use crate::relayer::Relayer;
 use crate::server::model::{
     PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
@@ -39,6 +40,9 @@ pub(crate) struct AppState {
     /// Networks that opted into gas sponsorship. Empty means `/deposit` is unavailable, which is a
     /// valid deployment — the facilitator still serves `/verify` and `/settle`.
     relayers: Vec<Relayer>,
+    /// Throttling shared across networks: the relayer's gas budget and this process's capacity are
+    /// global resources, so limiting per-network would let N networks multiply the exposure.
+    deposit_guard: Arc<DepositGuard>,
 }
 
 impl AppState {
@@ -46,12 +50,18 @@ impl AppState {
         four_mica: Vec<FourMicaHandler>,
         exact: Option<Arc<dyn ExactService>>,
         relayers: Vec<Relayer>,
+        deposit_guard: Arc<DepositGuard>,
     ) -> Self {
         Self {
             four_mica,
             exact,
             relayers,
+            deposit_guard,
         }
+    }
+
+    pub fn deposit_guard(&self) -> &Arc<DepositGuard> {
+        &self.deposit_guard
     }
 
     /// Resolves the relayer for `network`, defaulting to the first configured one when the caller

@@ -1,11 +1,15 @@
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration;
 
+use alloy::primitives::U256;
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
 use sdk_4mica::Address;
 use serde::Deserialize;
+
+use crate::limits::DepositLimits;
 
 const ENV_SCHEME: &str = "X402_SCHEME";
 const ENV_NETWORK: &str = "X402_NETWORK";
@@ -16,6 +20,11 @@ const ENV_AUTH_URL: &str = "X402_AUTH_URL";
 const ENV_AUTH_REFRESH_MARGIN_SECS: &str = "X402_AUTH_REFRESH_MARGIN_SECS";
 const ENV_RELAYER_PRIVATE_KEY: &str = "X402_RELAYER_PRIVATE_KEY";
 const ENV_RELAYER_RPC_URL: &str = "X402_RELAYER_RPC_URL";
+const ENV_DEPOSIT_MAX_IN_FLIGHT: &str = "X402_DEPOSIT_MAX_IN_FLIGHT";
+const ENV_DEPOSIT_PER_ADDRESS_LIMIT: &str = "X402_DEPOSIT_PER_ADDRESS_LIMIT";
+const ENV_DEPOSIT_GLOBAL_LIMIT: &str = "X402_DEPOSIT_GLOBAL_LIMIT";
+const ENV_DEPOSIT_WINDOW_SECS: &str = "X402_DEPOSIT_WINDOW_SECS";
+const ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI: &str = "X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI";
 const ENV_HOST: &str = "HOST";
 const ENV_PORT: &str = "PORT";
 const ENV_GUARANTEE_DOMAIN_VARIANTS: [&str; 3] = [
@@ -31,6 +40,7 @@ pub struct ServiceConfig {
     pub bind_addr: SocketAddr,
     pub scheme: String,
     pub networks: Vec<NetworkConfig>,
+    pub deposit_limits: DepositLimits,
 }
 
 #[derive(Clone)]
@@ -81,11 +91,67 @@ impl ServiceConfig {
         let bind_addr = bind_addr_from_env()?;
         let scheme = std::env::var(ENV_SCHEME).unwrap_or_else(|_| "4mica-credit".into());
         let networks = load_networks_from_env()?;
+        let deposit_limits = deposit_limits_from_env()?;
         Ok(Self {
             bind_addr,
             scheme,
             networks,
+            deposit_limits,
         })
+    }
+}
+
+/// Deposit throttling, defaulting to [`DepositLimits::default`] so an existing deployment picks up
+/// protection without a config change.
+fn deposit_limits_from_env() -> Result<DepositLimits> {
+    let defaults = DepositLimits::default();
+
+    let max_in_flight = parse_env_usize(ENV_DEPOSIT_MAX_IN_FLIGHT, defaults.max_in_flight)?;
+    let per_address_limit =
+        parse_env_usize(ENV_DEPOSIT_PER_ADDRESS_LIMIT, defaults.per_address_limit)?;
+    let global_limit = parse_env_usize(ENV_DEPOSIT_GLOBAL_LIMIT, defaults.global_limit)?;
+    let window_secs = parse_env_u64(ENV_DEPOSIT_WINDOW_SECS, defaults.window.as_secs())?;
+
+    // Zero would disable the limit entirely, which is never what someone setting it explicitly
+    // means — they would unset the variable instead.
+    if max_in_flight == 0 || per_address_limit == 0 || global_limit == 0 || window_secs == 0 {
+        bail!("deposit limit values must be greater than zero; unset the variable to use defaults");
+    }
+
+    let min_relayer_balance_wei = match trimmed_env(ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI) {
+        Some(raw) => U256::from_str_radix(
+            raw.trim_start_matches("0x"),
+            if raw.starts_with("0x") { 16 } else { 10 },
+        )
+        .with_context(|| format!("{ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI} must be a uint256"))?,
+        None => defaults.min_relayer_balance_wei,
+    };
+
+    Ok(DepositLimits {
+        max_in_flight,
+        per_address_limit,
+        global_limit,
+        window: Duration::from_secs(window_secs),
+        min_relayer_balance_wei,
+        max_tracked_addresses: defaults.max_tracked_addresses,
+    })
+}
+
+fn parse_env_usize(key: &str, default: usize) -> Result<usize> {
+    match trimmed_env(key) {
+        Some(raw) => raw
+            .parse::<usize>()
+            .with_context(|| format!("{key} must be a non-negative integer")),
+        None => Ok(default),
+    }
+}
+
+fn parse_env_u64(key: &str, default: u64) -> Result<u64> {
+    match trimmed_env(key) {
+        Some(raw) => raw
+            .parse::<u64>()
+            .with_context(|| format!("{key} must be a non-negative integer")),
+        None => Ok(default),
     }
 }
 

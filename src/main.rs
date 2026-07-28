@@ -3,6 +3,7 @@ mod config;
 mod deposit;
 mod exact;
 mod issuer;
+mod limits;
 mod relayer;
 mod server;
 mod telemetry;
@@ -17,6 +18,7 @@ use crate::config::{ServiceConfig, load_public_params};
 use crate::exact::ExactService;
 use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
+use crate::limits::DepositGuard;
 use crate::relayer::Relayer;
 use crate::server::state::{AppState, FourMicaHandler};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
@@ -118,9 +120,24 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    let deposit_guard = DepositGuard::new(service_cfg.deposit_limits.clone());
+    if relayers.is_empty() {
+        info!("no relayers configured; /deposit is unavailable");
+    } else {
+        let limits = deposit_guard.limits();
+        info!(
+            max_in_flight = limits.max_in_flight,
+            per_address_limit = limits.per_address_limit,
+            global_limit = limits.global_limit,
+            window_secs = limits.window.as_secs(),
+            min_relayer_balance_wei = %limits.min_relayer_balance_wei,
+            "deposit throttling active"
+        );
+    }
+
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
-    let state = AppState::new(four_mica_handlers, exact_service, relayers);
+    let state = AppState::new(four_mica_handlers, exact_service, relayers, deposit_guard);
 
     server::run(service_cfg, state).await
 }

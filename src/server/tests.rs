@@ -14,6 +14,7 @@ use tower::ServiceExt;
 
 use crate::exact::ExactService;
 use crate::issuer::GuaranteeIssuer;
+use crate::limits::{DepositGuard, DepositLimits};
 use crate::verifier::CertificateValidator;
 use crypto::bls::KeyMaterial;
 
@@ -309,6 +310,7 @@ async fn supported_includes_exact_when_available() {
         vec![handler],
         Some(exact.clone() as Arc<dyn ExactService>),
         Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
     );
     let router = build_router(Arc::new(state));
 
@@ -855,7 +857,12 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    Arc::new(AppState::new(vec![handler], None, Vec::new()))
+    Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
+    ))
 }
 
 // ── gasless deposit ─────────────────────────────────────────────────────────
@@ -924,6 +931,90 @@ async fn deposit_verify_reports_a_missing_relayer() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["isValid"], false);
     assert_eq!(payload["errorCode"], "NO_RELAYER");
+}
+
+/// The global limit must engage before any relayer or chain work, so it protects a facilitator
+/// that has no relayer at all — and, more importantly, protects the RPC quota of one that does.
+#[tokio::test]
+async fn deposit_is_rate_limited_globally() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let limits = DepositLimits {
+        global_limit: 2,
+        ..DepositLimits::default()
+    };
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(limits),
+    ));
+    let router = build_router(state);
+
+    let mut codes = Vec::new();
+    for _ in 0..3 {
+        let response = router
+            .clone()
+            .oneshot(post_json("/deposit", &deposit_body(None)))
+            .await
+            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
+        codes.push(
+            payload["errorCode"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+        );
+    }
+
+    // First two get as far as the relayer lookup; the third is turned away by the limiter.
+    assert_eq!(codes[0], "NO_RELAYER");
+    assert_eq!(codes[1], "NO_RELAYER");
+    assert_eq!(codes[2], "RATE_LIMITED");
+}
+
+/// Throttling is transient and a client should retry; a malformed request never becomes valid.
+#[tokio::test]
+async fn deposit_marks_throttling_as_retryable() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let limits = DepositLimits {
+        global_limit: 1,
+        ..DepositLimits::default()
+    };
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(limits),
+    ));
+    let router = build_router(state);
+
+    let _first = router
+        .clone()
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+    let response = router
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["errorCode"], "RATE_LIMITED");
+    assert_eq!(payload["retryable"], true);
 }
 
 /// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
@@ -1013,7 +1104,12 @@ fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
 
 fn exact_state(exact: Arc<MockExact>) -> SharedState {
     let exact_service: Arc<dyn ExactService> = exact;
-    Arc::new(AppState::new(Vec::new(), Some(exact_service), Vec::new()))
+    Arc::new(AppState::new(
+        Vec::new(),
+        Some(exact_service),
+        Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
+    ))
 }
 
 fn sample_requirements() -> PaymentRequirements {

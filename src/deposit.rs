@@ -16,6 +16,7 @@
 //! re-enforced on-chain.
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use alloy::primitives::{Address, B256, Signature, U256};
 use alloy::sol;
@@ -23,6 +24,7 @@ use alloy::sol_types::SolStruct;
 use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
 use thiserror::Error;
 
+use crate::limits::DepositGuard;
 use crate::relayer::Relayer;
 
 sol! {
@@ -92,6 +94,16 @@ pub enum DepositError {
     Chain(String),
     #[error("failed to broadcast deposit: {0}")]
     Broadcast(String),
+    #[error("too many deposit requests; retry shortly")]
+    RateLimited,
+    #[error("address {address} has exceeded its deposit rate limit; retry shortly")]
+    AddressRateLimited { address: Address },
+    #[error("too many deposits in flight; retry shortly")]
+    TooManyInFlight,
+    #[error("this authorization is already being submitted")]
+    DuplicateInFlight,
+    #[error("relayer balance {balance} is at or below the configured floor {floor}")]
+    RelayerBalanceTooLow { balance: U256, floor: U256 },
 }
 
 impl DepositError {
@@ -110,7 +122,26 @@ impl DepositError {
             Self::SimulationReverted(_) => "SIMULATION_REVERTED",
             Self::Chain(_) => "CHAIN_ERROR",
             Self::Broadcast(_) => "BROADCAST_FAILED",
+            Self::RateLimited => "RATE_LIMITED",
+            Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
+            Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
+            Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
+            Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
         }
+    }
+
+    /// Whether the caller should retry the same request later, as opposed to changing it.
+    /// Throttling is transient; a bad signature is not.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimited
+                | Self::AddressRateLimited { .. }
+                | Self::TooManyInFlight
+                | Self::DuplicateInFlight
+                | Self::RelayerBalanceTooLow { .. }
+                | Self::Chain(_)
+        )
     }
 }
 
@@ -232,16 +263,30 @@ pub async fn verify(
     Ok(())
 }
 
-/// Verifies, then broadcasts and waits for the receipt.
+/// Verifies, reserves capacity, then broadcasts and waits for the receipt.
 ///
 /// Re-verifies rather than trusting an earlier `/deposit/verify`: the two are separate requests,
 /// and state can change in between (nonce consumed, balance spent, authorization expired).
+///
+/// The rate-limit reservation deliberately happens *after* verification. `authorization.from` is
+/// just a claim until the signature recovers to it, so reserving earlier would let a caller evade
+/// per-address limits by varying `from` on every request.
 pub async fn submit(
     relayer: &Relayer,
+    guard: &Arc<DepositGuard>,
     intent: &DepositIntent,
     now: u64,
 ) -> Result<B256, DepositError> {
     verify(relayer, intent, now).await?;
+
+    // `from` is proven from here on. Held until this function returns, then released on drop.
+    let _permit = guard.reserve(intent.authorization.from, intent.authorization.nonce)?;
+
+    let balance = relayer
+        .balance()
+        .await
+        .map_err(|err| DepositError::Chain(err.to_string()))?;
+    guard.check_relayer_balance(balance)?;
 
     let pending = relayer
         .contract()
