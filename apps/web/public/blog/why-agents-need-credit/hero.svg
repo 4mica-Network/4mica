@@ -1,60 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="Many prefunded balances versus one credit line">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="Abstract impasto painting in magenta, orange, and cream">
   <defs>
-    <radialGradient id="spotCredit" cx="72%" cy="42%" r="58%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18" />
-      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.05" />
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
-    </radialGradient>
-    <linearGradient id="fill" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28" />
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.08" />
+    <linearGradient id="groundCredit" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a2b52" />
+      <stop offset="48%" stop-color="#5f3450" />
+      <stop offset="100%" stop-color="#6e3c46" />
     </linearGradient>
-    <linearGradient id="ruleCredit" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75" />
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
-    </linearGradient>
-    <pattern id="gridCredit" width="60" height="60" patternUnits="userSpaceOnUse">
-      <path d="M60 0H0V60" fill="none" stroke="#ffffff" stroke-opacity="0.045" stroke-width="1" />
-    </pattern>
+
+    <!--
+      Same three-pass impasto as the sibling post — displacement frays the
+      stroke edges, then a fine directional noise field is lit twice (diffuse
+      for the troughs, specular for the crests) and clipped to the paint's own
+      alpha. Different seeds and light angle so the two paintings do not share
+      a visible texture. See how-4mica-works/hero.svg for the full rationale.
+    -->
+    <filter id="impastoCredit" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022 0.05" numOctaves="4" seed="21" result="warp" />
+      <feDisplacementMap in="SourceGraphic" in2="warp" scale="19" xChannelSelector="R" yChannelSelector="G" result="paint" />
+
+      <feTurbulence type="fractalNoise" baseFrequency="0.13 0.48" numOctaves="3" seed="34" result="tooth" />
+      <feDiffuseLighting in="tooth" surfaceScale="1.8" diffuseConstant="1" lighting-color="#ffffff" result="shade">
+        <feDistantLight azimuth="212" elevation="44" />
+      </feDiffuseLighting>
+      <feSpecularLighting in="tooth" surfaceScale="2.5" specularConstant="0.8" specularExponent="24" lighting-color="#fff2e0" result="gloss">
+        <feDistantLight azimuth="212" elevation="60" />
+      </feSpecularLighting>
+
+      <feComposite in="shade" in2="paint" operator="arithmetic" k1="1.1" k2="0" k3="0" k4="-0.04" result="modelled" />
+      <feComposite in="gloss" in2="modelled" operator="in" result="crests" />
+      <feComposite in="crests" in2="modelled" operator="arithmetic" k1="0" k2="0.5" k3="1" k4="0" result="lit" />
+      <feComposite in="lit" in2="paint" operator="in" />
+    </filter>
   </defs>
 
-  <rect width="1200" height="600" fill="#000000" />
-  <rect width="1200" height="600" fill="url(#gridCredit)" />
-  <rect width="1200" height="600" fill="url(#spotCredit)" />
+  <g filter="url(#impastoCredit)">
+    <!-- Oversized: displacement pulls neighbouring pixels inward, so the
+         artwork must run past the viewBox or the frame edge scallops. -->
+    <rect x="-90" y="-90" width="1380" height="780" fill="url(#groundCredit)" />
 
-  <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
-    <text x="90" y="120" fill="#ffffff" fill-opacity="0.4" font-size="17" letter-spacing="4">PREFUNDING</text>
-    <g fill="#0a0a0a" stroke="#ffffff" stroke-opacity="0.12">
-      <rect x="90" y="150" width="90" height="90" rx="8" />
-      <rect x="200" y="150" width="90" height="90" rx="8" />
-      <rect x="310" y="150" width="90" height="90" rx="8" />
-      <rect x="420" y="150" width="90" height="90" rx="8" />
-      <rect x="90" y="260" width="90" height="90" rx="8" />
-      <rect x="200" y="260" width="90" height="90" rx="8" />
-      <rect x="310" y="260" width="90" height="90" rx="8" />
-      <rect x="420" y="260" width="90" height="90" rx="8" />
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Underpainting -->
+      <path d="M-90 180C120 60 300 220 480 130s330-190 540-80 230 190 340 150" stroke="#8a3358" stroke-width="185" opacity="0.85" />
+      <path d="M-90 490C120 590 300 400 490 500s320 190 530 90 230-170 340-140" stroke="#96503a" stroke-width="160" opacity="0.7" />
+
+      <!-- Magenta leads, running up to the right -->
+      <path d="M-40 430C150 280 320 470 500 330S770 60 990 160s160 170 290 120" stroke="#ff3d8b" stroke-width="100" opacity="0.95" />
+      <path d="M100 660C250 500 340 610 490 460s120-280 280-350" stroke="#ff3d8b" stroke-width="60" opacity="0.8" />
+      <path d="M700 -60C780 100 660 220 750 360s230 170 360 130" stroke="#ff3d8b" stroke-width="46" opacity="0.7" />
+
+      <!-- Tangerine crossing it the other way -->
+      <path d="M-60 250C130 380 260 200 440 290s260 280 470 180 200-240 380-200" stroke="#ff8a3d" stroke-width="106" opacity="0.9" />
+      <path d="M200 640C330 490 420 600 570 470s110-260 280-280" stroke="#ff8a3d" stroke-width="64" opacity="0.75" />
+      <path d="M1090 -50C1020 130 1130 250 1070 410" stroke="#ff8a3d" stroke-width="44" opacity="0.7" />
+
+      <!-- Amber -->
+      <path d="M-60 530C110 440 230 560 390 470s200-110 340-60 190 130 340 60" stroke="#ffc93d" stroke-width="68" opacity="0.92" />
+      <path d="M420 140C530 50 640 160 770 90s150-110 290-70" stroke="#ffc93d" stroke-width="42" opacity="0.7" />
+      <path d="M70 320C160 260 220 340 310 290" stroke="#ffc93d" stroke-width="34" opacity="0.8" />
+
+      <!-- Cyan keeps the all-warm palette from going flat -->
+      <path d="M600 400C730 300 850 420 980 330s110-170 260-160" stroke="#35e0e6" stroke-width="70" opacity="0.88" />
+      <path d="M-40 80C110 10 250 120 400 60" stroke="#35e0e6" stroke-width="40" opacity="0.7" />
+      <path d="M280 630C380 550 460 640 570 580" stroke="#35e0e6" stroke-width="36" opacity="0.75" />
+
+      <!-- Cream: the topmost, thickest paint -->
+      <path d="M160 380C290 300 400 410 530 340" stroke="#ffe9c4" stroke-width="30" opacity="0.95" />
+      <path d="M620 490C730 430 830 510 950 450" stroke="#ffe9c4" stroke-width="24" opacity="0.85" />
+      <path d="M820 150C890 100 980 160 1080 110" stroke="#ffe9c4" stroke-width="26" opacity="0.8" />
+      <path d="M340 220C400 180 460 230 530 190" stroke="#ffe9c4" stroke-width="18" opacity="0.7" />
+
+      <!-- Loaded-brush dabs -->
+      <path d="M330 200h60" stroke="#ffc93d" stroke-width="60" opacity="0.95" />
+      <path d="M760 290h44" stroke="#ffe9c4" stroke-width="44" />
+      <path d="M500 510h70" stroke="#ff3d8b" stroke-width="54" />
+      <path d="M1030 450h50" stroke="#35e0e6" stroke-width="46" />
+      <path d="M620 70h40" stroke="#ff8a3d" stroke-width="42" opacity="0.9" />
     </g>
-    <g fill="#ffffff" fill-opacity="0.16">
-      <rect x="98" y="210" width="74" height="22" rx="4" />
-      <rect x="208" y="198" width="74" height="34" rx="4" />
-      <rect x="318" y="220" width="74" height="12" rx="4" />
-      <rect x="428" y="204" width="74" height="28" rx="4" />
-      <rect x="98" y="316" width="74" height="26" rx="4" />
-      <rect x="208" y="326" width="74" height="16" rx="4" />
-      <rect x="318" y="308" width="74" height="34" rx="4" />
-      <rect x="428" y="320" width="74" height="22" rx="4" />
-    </g>
-    <text x="90" y="400" fill="#ffffff" fill-opacity="0.32" font-size="16">Capital split across every counterparty, mostly idle.</text>
-
-    <path d="M600 150v260" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1" />
-
-    <text x="690" y="120" fill="#ffffff" fill-opacity="0.4" font-size="17" letter-spacing="4">CREDIT</text>
-    <rect x="690" y="150" width="420" height="200" rx="10" fill="#101010" stroke="#ffffff" stroke-opacity="0.45" />
-    <rect x="714" y="286" width="372" height="40" rx="6" fill="url(#fill)" />
-    <text x="714" y="216" fill="#ffffff" font-size="26" font-weight="600">One line</text>
-    <text x="714" y="252" fill="#ffffff" fill-opacity="0.55" font-size="18">backs the payer, not each service</text>
-    <text x="690" y="400" fill="#ffffff" fill-opacity="0.32" font-size="16">Adding a counterparty costs nothing up front.</text>
-
-    <rect x="90" y="470" width="160" height="3" rx="1.5" fill="url(#ruleCredit)" />
   </g>
 </svg>
