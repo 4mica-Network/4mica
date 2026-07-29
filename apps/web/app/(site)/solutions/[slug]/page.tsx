@@ -298,7 +298,6 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">
-          {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">Solutions</p>
             <h1 className="section-title text-balance font-normal">
@@ -307,7 +306,6 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
             <p className="section-lead mx-auto max-w-2xl">{solution.intro}</p>
           </div>
 
-          {/* Points — connected block */}
           <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
             <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {solution.points.map((point) => (
@@ -337,7 +335,6 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
           <SolutionResources solution={solution} />
           <SolutionFaq solution={solution} />
 
-          {/* CTA */}
           <div className="mt-24 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
               Ready to build for {solution.label.toLowerCase()}?

@@ -15,12 +15,6 @@ export type Theme = "dark" | "light";
 export const THEME_STORAGE_KEY = "theme";
 export const DEFAULT_THEME: Theme = "dark";
 
-/**
- * Inline script applied before first paint to prevent a flash of the wrong
- * theme. It mirrors the provider logic: read the stored choice (falling back to
- * the dark brand default) and set the `dark` class + color-scheme on <html>.
- * Injected in the document <head> from the root layout.
- */
 export const themeInitScript = `(function(){try{var t=localStorage.getItem("${THEME_STORAGE_KEY}");if(t!=="light"&&t!=="dark"){t="${DEFAULT_THEME}";}var r=document.documentElement;r.classList.toggle("dark",t==="dark");r.style.colorScheme=t;}catch(e){document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark";}})();`;
 
 type ThemeContextValue = {
@@ -40,7 +34,6 @@ function applyTheme(theme: Theme) {
 export default function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME);
 
-  // Sync React state with whatever the pre-paint script already applied.
   useEffect(() => {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark") {
@@ -52,9 +45,7 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(next);
     try {
       localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch {
-      // ignore storage failures (private mode, etc.)
-    }
+    } catch {}
     applyTheme(next);
   }, []);
 
@@ -63,9 +54,7 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
       const next: Theme = prev === "dark" ? "light" : "dark";
       try {
         localStorage.setItem(THEME_STORAGE_KEY, next);
-      } catch {
-        // ignore
-      }
+      } catch {}
       applyTheme(next);
       return next;
     });

@@ -15,9 +15,6 @@ const { base } = new LinkConfig({
 });
 const metadataBase = new URL(base);
 
-// Search-engine ownership verification. Set the tokens as build-time env vars
-// (GitHub repo variables -> apps/web/.env) and the meta tags appear on every
-// page; unset, nothing is emitted.
 const verification = {
   google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
   other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
@@ -43,7 +40,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head>
-        {/* Sets the theme class before paint to avoid a flash of the wrong theme. */}
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap script with no user input. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

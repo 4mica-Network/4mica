@@ -1,10 +1,6 @@
 import ViewOpenRolesButton from "@components/ViewOpenRolesButton";
 import { messages } from "@/i18n";
 
-// Concentric rings that fade out on all four edges, so the pattern dissolves
-// into the page rather than ending on a hard line. The fades use surface-deep —
-// the same token the page background uses — so they blend in both themes.
-// `isolate` keeps the -z-10 layers inside this section's stacking context.
 export default function OpenRolesSection() {
   return (
     <section className="relative isolate mt-24 w-full overflow-hidden rounded-xl px-2 py-24 lg:px-0">

@@ -37,10 +37,6 @@ const config = {
   flashFade: 2.8,
 };
 
-// Theme-aware canvas colors. `line`/`accent` are bare "r, g, b" triples so we
-// can compose arbitrary alpha stops; `node` is a full rgba. In dark mode we use
-// additive ("lighter") blending for glowing pulses on black; in light mode we
-// switch to normal blending with darker slate inks so they read on white.
 const CANVAS_PALETTES = {
   dark: {
     line: "109, 109, 109",
@@ -50,8 +46,6 @@ const CANVAS_PALETTES = {
     pulseComposite: "lighter" as GlobalCompositeOperation,
   },
   light: {
-    // Very soft, light slate so the network reads as a faint texture on light
-    // surfaces rather than obvious dark specks.
     line: "203, 213, 225",
     accent: "203, 213, 225",
     node: "rgba(203, 213, 225, 0.4)",
@@ -83,15 +77,9 @@ export default function GlobalNetworkBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const reduceMotionRef = useRef(false);
   const { theme } = useTheme();
-  // Current theme, read inside the animation loop so a theme toggle updates the
-  // palette without tearing down and rebuilding the whole node graph / RAF loop.
   const themeRef = useRef(theme);
-  // One-shot redraw exposed by the setup effect, used to repaint immediately on
-  // theme change when the loop is paused (reduced motion / hidden tab).
   const redrawRef = useRef<(() => void) | null>(null);
 
-  // Keep the palette in sync on theme change and repaint once, without re-running
-  // the heavy setup effect below.
   useEffect(() => {
     themeRef.current = theme;
     redrawRef.current?.();
@@ -422,7 +410,6 @@ export default function GlobalNetworkBackground() {
     };
 
     const renderFrame = (dtMs: number) => {
-      // Re-read the palette each frame so theme changes apply without rebuilding.
       palette = CANVAS_PALETTES[themeRef.current];
       ctx.clearRect(0, 0, width, height);
       const offsetX = 0;
@@ -461,9 +448,6 @@ export default function GlobalNetworkBackground() {
       }
     };
 
-    // Coalesce resize bursts into a single rebuild per frame — `resize`
-    // regenerates the O(n²) neighbor graph, so running it on every raw resize
-    // event thrashes during a drag-resize.
     let resizeFrame = 0;
     const handleResize = () => {
       if (resizeFrame) return;
@@ -473,8 +457,6 @@ export default function GlobalNetworkBackground() {
       });
     };
 
-    // Expose a one-shot redraw so the theme-sync effect can repaint immediately
-    // when the animation loop is paused (reduced motion / hidden tab).
     redrawRef.current = () => renderFrame(0);
 
     window.addEventListener("resize", handleResize);
@@ -495,8 +477,6 @@ export default function GlobalNetworkBackground() {
         prefersReducedMotion.removeListener(updateReducedMotion);
       }
     };
-    // Setup runs once; theme changes are handled via themeRef + the sync effect
-    // above so we never rebuild the node graph / RAF loop on a theme toggle.
   }, []);
 
   return (

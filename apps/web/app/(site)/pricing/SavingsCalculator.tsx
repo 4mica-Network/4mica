@@ -3,16 +3,8 @@
 import { useId, useMemo, useState } from "react";
 import { messages } from "@/i18n";
 
-/**
- * Compares settling every x402 request on-chain against clearing the same
- * traffic through 4Mica. Every assumption is an input the visitor controls —
- * we publish no fixed rate, so the model is only as good as the numbers put
- * into it, which the disclaimer says plainly.
- */
-
 const content = messages.pricing.calculator;
 
-// Discrete steps keep the slider on round numbers instead of 3,271,884.
 const REQUEST_STEPS = [
   10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000,
   50_000_000, 100_000_000,
@@ -125,10 +117,10 @@ function Row({
 }
 
 export default function SavingsCalculator() {
-  const [requestIndex, setRequestIndex] = useState(4); // 1M requests
-  const [priceIndex, setPriceIndex] = useState(2); // $0.01
-  const [cadenceIndex, setCadenceIndex] = useState(2); // daily
-  const [collateralIndex, setCollateralIndex] = useState(2); // $10k
+  const [requestIndex, setRequestIndex] = useState(4);
+  const [priceIndex, setPriceIndex] = useState(2);
+  const [cadenceIndex, setCadenceIndex] = useState(2);
+  const [collateralIndex, setCollateralIndex] = useState(2);
   const [ratePercent, setRatePercent] = useState(0.5);
   const [gasPerSettlement, setGasPerSettlement] = useState(0.01);
   const [apyPercent, setApyPercent] = useState(5);
@@ -141,11 +133,8 @@ export default function SavingsCalculator() {
 
     const volume = requests * price;
 
-    // Baseline: standard x402 puts one transfer on-chain per paid request.
     const baselineGas = requests * gasPerSettlement;
 
-    // 4Mica: gas is paid once per clearing cycle, plus the agreed rate on what
-    // actually settles. Yield accrues to the collateral position separately.
     const micaGas = settlements * gasPerSettlement;
     const clearingFee = volume * (ratePercent / 100);
     const monthlyYield = (collateral * (apyPercent / 100)) / 12;
@@ -154,7 +143,6 @@ export default function SavingsCalculator() {
     const micaCost = micaGas + clearingFee - monthlyYield;
     const saving = baselineCost - micaCost;
 
-    // Volume where the two curves cross, holding every other input fixed.
     const perRequestCost = gasPerSettlement;
     const marginalMicaCost = price * (ratePercent / 100);
     const fixed = micaGas - monthlyYield;
@@ -195,7 +183,6 @@ export default function SavingsCalculator() {
   return (
     <div className="overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
       <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:divide-x lg:divide-overlay/10">
-        {/* Inputs */}
         <div className="space-y-6 p-8">
           <Slider
             label={content.inputs.requests}
@@ -258,7 +245,6 @@ export default function SavingsCalculator() {
           />
         </div>
 
-        {/* Comparison */}
         <div className="p-8">
           <div className="grid gap-8 sm:grid-cols-2">
             <div>
