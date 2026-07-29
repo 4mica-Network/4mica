@@ -65,6 +65,7 @@ async fn run_deposit_verify(
         &request.amount,
         request.asset_transfer_method.as_deref(),
         request.authorization,
+        request.permit2_authorization,
     )?;
     deposit::verify(relayer, state.deposit_guard().limits(), &intent, now_secs()).await
 }
@@ -113,6 +114,7 @@ async fn run_deposit(
         &request.amount,
         request.asset_transfer_method.as_deref(),
         request.authorization,
+        request.permit2_authorization,
     )?;
 
     let tx_hash = deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await?;

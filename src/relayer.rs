@@ -34,6 +34,9 @@ sol! {
     contract DepositToken {
         function DOMAIN_SEPARATOR() external view returns (bytes32);
         function balanceOf(address account) external view returns (uint256);
+        /// Permit2 needs a prior approval from the payer; the facilitator checks it so the client
+        /// gets a fixable error rather than an opaque revert.
+        function allowance(address owner, address spender) external view returns (uint256);
         /// EIP-3009 replay guard. `true` once an authorization has been redeemed or cancelled.
         function authorizationState(address authorizer, bytes32 nonce) external view returns (bool);
     }
@@ -47,6 +50,7 @@ pub struct Relayer {
 
 struct RelayerInner {
     network: String,
+    chain_id: u64,
     address: Address,
     contract_address: Address,
     provider: DynProvider,
@@ -122,6 +126,7 @@ impl Relayer {
         Ok(Some(Self {
             inner: Arc::new(RelayerInner {
                 network: network.id.clone(),
+                chain_id,
                 address,
                 contract_address: public_params.contract_address,
                 provider,
@@ -138,6 +143,11 @@ impl Relayer {
 
     pub fn network(&self) -> &str {
         &self.inner.network
+    }
+
+    /// Verified against the CAIP-2 network at startup, so Permit2's domain can be derived offline.
+    pub fn chain_id(&self) -> u64 {
+        self.inner.chain_id
     }
 
     pub fn contract(&self) -> Core4MicaInstance<DynProvider> {

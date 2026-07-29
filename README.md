@@ -234,9 +234,15 @@ A payer with tokens but no native gas cannot post collateral. These endpoints le
 EIP-3009 `receiveWithAuthorization` off-chain while the facilitator broadcasts
 `depositStablecoinWithAuthorization` and pays the gas.
 
-Both endpoints take the same body. `assetTransferMethod` defaults to `eip3009`; `permit2` is
-recognised but rejected with `PERMIT2_UNSUPPORTED`, because `depositStablecoinWithPermit2` requires
-a prior on-chain `approve(PERMIT2, …)` from the payer and so is not gasless end to end.
+Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactly one** of
+`authorization` or `permit2Authorization`; the shape identifies the scheme, and
+`assetTransferMethod` is an optional cross-check that is rejected if it contradicts the payload.
+
+| | `eip3009` | `permit2` |
+| --- | --- | --- |
+| Tokens | those implementing EIP-3009 (USDC and similar) | any ERC-20 |
+| Payer pays gas | never | **once**, for `approve(PERMIT2, …)` |
+| Prerequisite | none | that approval, or `PERMIT2_ALLOWANCE_REQUIRED` |
 
 ```jsonc
 {
@@ -244,12 +250,27 @@ a prior on-chain `approve(PERMIT2, …)` from the payer and so is not gasless en
   "asset": "0x…",
   "amount": "1000000",             // decimal or 0x-hex, in the token's own decimals
   "assetTransferMethod": "eip3009",
-  "authorization": {               // exactly as sdk-4mica serialises ReceiveAuthorization
+
+  // EIP-3009 — exactly as sdk-4mica serialises ReceiveAuthorization
+  "authorization": {
     "from": "0x…", "validAfter": "0x0", "validBefore": "0x…",
     "nonce": "0x…", "v": 28, "r": "0x…", "s": "0x…"
   }
+
+  // …or Permit2 — as sdk-4mica serialises Permit2Authorization
+  // "permit2Authorization": { "from": "0x…", "nonce": "0x…", "deadline": "0x…", "signature": "0x…" }
 }
 ```
+
+Only `eip3009` is gasless end to end. Permit2 buys *token coverage*, not *no gas*: the payer must
+have made a one-time on-chain `approve(PERMIT2, …)` themselves, and `/deposit/verify` reports
+`PERMIT2_ALLOWANCE_REQUIRED` when they have not — the client's cue to submit that approval and
+retry, mirroring x402's precondition of the same name.
+
+Note this facilitator does **not** use x402's `x402ExactPermit2Proxy` or its `Witness`. Those exist
+because `exact` pays an arbitrary payee and Permit2's signature binds `spender` but not the
+destination. A deposit has no free destination — Core4Mica pulls into itself and credits the signer
+— so binding `spender` to Core4Mica already constrains it completely.
 
 `POST /deposit/verify` is a preflight that spends no gas: it checks expiry, recovers the signature,
 confirms the nonce is unused and the balance sufficient, then simulates the deposit and rejects it
@@ -270,15 +291,20 @@ chain errors); a bad signature or an expired authorization will never become val
 
 | `errorCode` | Meaning |
 | --- | --- |
-| `NO_RELAYER` | No relayer configured for that network |
+| `NO_RELAYER_CONFIGURED` | Gas sponsorship is not enabled on this facilitator |
+| `NO_RELAYER` | No relayer configured for the requested network |
 | `INVALID_REQUEST` | Malformed address, amount, or signature `v` |
-| `PERMIT2_UNSUPPORTED` / `UNSUPPORTED_TRANSFER_METHOD` | Unsupported `assetTransferMethod` |
+| `UNSUPPORTED_TRANSFER_METHOD` | `assetTransferMethod` is neither `eip3009` nor `permit2` |
+| `PERMIT2_ALLOWANCE_REQUIRED` | Payer must submit a one-time `approve(PERMIT2, …)` first |
 | `EXPIRED` / `NOT_YET_VALID` | Outside the authorization's validity window |
-| `SIGNATURE_MISMATCH` | Signature does not recover to `authorization.from` |
+| `SIGNATURE_MISMATCH` | Signature does not recover to the declared `from` |
+| `MALFORMED_SIGNATURE` | Signature is structurally invalid (bad `v`, unrecoverable) |
 | `NONCE_ALREADY_USED` | Authorization already redeemed |
 | `INSUFFICIENT_BALANCE` | Payer does not hold `amount` |
 | `GAS_CEILING_EXCEEDED` | Estimated gas above `X402_DEPOSIT_MAX_GAS` |
-| `SIMULATION_REVERTED` | Deposit would revert on-chain |
+| `SIMULATION_REVERTED` | Deposit would revert; carries the decoded Core4Mica error |
+| `RECEIPT_UNAVAILABLE` | Broadcast, outcome unknown — poll `txHash`, do **not** retry |
+| `REVERTED_ON_CHAIN` | Mined and reverted, so gas was spent |
 | `RATE_LIMITED` / `ADDRESS_RATE_LIMITED` / `TOO_MANY_IN_FLIGHT` / `DUPLICATE_IN_FLIGHT` | Throttled |
 | `RELAYER_BALANCE_TOO_LOW` | Relayer at or below its configured floor |
 

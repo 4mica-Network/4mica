@@ -1132,9 +1132,10 @@ fn deposit_request_accepts_an_sdk_serialized_authorization() {
 
     let parsed: super::model::DepositRequest =
         serde_json::from_value(body).expect("SDK-serialized authorization must round-trip");
-    assert_eq!(parsed.authorization.from, authorization.from);
-    assert_eq!(parsed.authorization.nonce, authorization.nonce);
-    assert_eq!(parsed.authorization.validBefore, authorization.validBefore);
+    let parsed_auth = parsed.authorization.expect("eip3009 authorization");
+    assert_eq!(parsed_auth.from, authorization.from);
+    assert_eq!(parsed_auth.nonce, authorization.nonce);
+    assert_eq!(parsed_auth.validBefore, authorization.validBefore);
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.

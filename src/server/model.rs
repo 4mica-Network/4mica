@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rpc::PaymentGuaranteeRequest;
 use sdk_4mica::BLSCert;
-use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
+use sdk_4mica::contract::Core4Mica::{Permit2Authorization, ReceiveAuthorization};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -213,10 +213,19 @@ pub struct DepositRequest {
     pub asset: String,
     /// Decimal or `0x`-prefixed hex, in the token's own decimals.
     pub amount: String,
-    /// Defaults to `eip3009`, matching x402's `scheme_exact_evm`.
+    /// `eip3009` (default) or `permit2`, matching x402's `scheme_exact_evm`. Optional — the
+    /// authorization field that is present already identifies the scheme — but a mismatch is
+    /// rejected rather than silently ignored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_transfer_method: Option<String>,
-    pub authorization: ReceiveAuthorization,
+    /// EIP-3009 `receiveWithAuthorization`. Exactly one of this and `permit2Authorization` must be
+    /// present, mirroring how x402's `exact` scheme names the two shapes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<ReceiveAuthorization>,
+    /// Permit2 `PermitTransferFrom`, for tokens without EIP-3009. Requires the payer to have made
+    /// a one-time on-chain `approve(PERMIT2, ...)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permit2_authorization: Option<Permit2Authorization>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -285,7 +294,7 @@ impl DepositResponse {
             success: true,
             tx_hash: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
-            from: Some(format!("{:#x}", intent.authorization.from)),
+            from: Some(format!("{:#x}", intent.authorization.from())),
             asset: Some(format!("{:#x}", intent.asset)),
             amount: Some(intent.amount.to_string()),
             error: None,
