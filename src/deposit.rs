@@ -138,18 +138,44 @@ pub enum DepositError {
     GasCeilingExceeded { estimated: u64, ceiling: u64 },
     /// Permit2's one-time on-chain approval is missing. Distinct because the payer can fix it —
     /// mirrors x402's `PERMIT2_ALLOWANCE_REQUIRED` precondition.
+    ///
+    /// Carries `eip2612_nonce` when the token supports EIP-2612, so a client can sign a sponsored
+    /// permit and retry **without an Ethereum RPC of its own** — the nonce is the only input it
+    /// could not otherwise obtain. `None` means the token has no EIP-2612 surface and the payer
+    /// must submit the approval themselves.
+    ///
+    /// Boxed: it is the largest variant by some margin, and inlining it would widen every
+    /// `Result<_, DepositError>` on the hot path.
     #[error(
-        "{from} has approved {allowance} of {asset} to Permit2 but {required} is required;          submit a one-time approve(PERMIT2, ...) and retry"
+        "{} has approved {} of {} to Permit2 but {} is required; sign an EIP-2612 permit or \
+         submit a one-time approve(PERMIT2, ...) and retry",
+        .0.from, .0.allowance, .0.asset, .0.required
     )]
-    Permit2AllowanceRequired {
-        from: Address,
-        asset: Address,
-        allowance: U256,
-        required: U256,
-    },
+    Permit2AllowanceRequired(Box<Permit2AllowanceDetails>),
+}
+
+/// Everything a client needs to fix a missing Permit2 approval without reading the chain.
+#[derive(Debug, Clone)]
+pub struct Permit2AllowanceDetails {
+    pub from: Address,
+    pub asset: Address,
+    pub spender: Address,
+    pub allowance: U256,
+    pub required: U256,
+    /// Present when the token supports EIP-2612, i.e. when the approval can be sponsored.
+    pub eip2612_nonce: Option<U256>,
 }
 
 impl DepositError {
+    /// Structured detail for [`Self::Permit2AllowanceRequired`], so the fix does not have to be
+    /// parsed out of the message.
+    pub fn permit2_allowance_details(&self) -> Option<&Permit2AllowanceDetails> {
+        match self {
+            Self::Permit2AllowanceRequired(details) => Some(details),
+            _ => None,
+        }
+    }
+
     /// Stable, machine-readable code so clients can branch without string matching.
     pub fn code(&self) -> &'static str {
         match self {
@@ -174,7 +200,7 @@ impl DepositError {
             Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
             Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
             Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
-            Self::Permit2AllowanceRequired { .. } => "PERMIT2_ALLOWANCE_REQUIRED",
+            Self::Permit2AllowanceRequired(_) => "PERMIT2_ALLOWANCE_REQUIRED",
         }
     }
 
@@ -521,12 +547,19 @@ async fn verify_permit2(
         // x402's `eip2612GasSponsoring`: a signed permit stands in for the missing approval, and
         // the relayer submits it. Without one there is nothing we can do for the payer.
         let Some(permit) = permit else {
-            return Err(DepositError::Permit2AllowanceRequired {
-                from: auth.from,
-                asset: intent.asset,
-                allowance,
-                required: intent.amount,
-            });
+            // Hand back the one value a chain-free client cannot compute for itself. Best-effort:
+            // a token without EIP-2612 simply has no nonce to report, which is itself the answer.
+            let eip2612_nonce = token.nonces(auth.from).call().await.ok();
+            return Err(DepositError::Permit2AllowanceRequired(Box::new(
+                Permit2AllowanceDetails {
+                    from: auth.from,
+                    asset: intent.asset,
+                    spender: PERMIT2_ADDRESS,
+                    allowance,
+                    required: intent.amount,
+                    eip2612_nonce,
+                },
+            )));
         };
         verify_eip2612_permit(relayer, token, intent, auth.from, permit, now).await?;
     }
@@ -555,12 +588,16 @@ async fn verify_eip2612_permit(
         });
     }
     if permit.value < intent.amount {
-        return Err(DepositError::Permit2AllowanceRequired {
-            from: owner,
-            asset: intent.asset,
-            allowance: permit.value,
-            required: intent.amount,
-        });
+        return Err(DepositError::Permit2AllowanceRequired(Box::new(
+            Permit2AllowanceDetails {
+                from: owner,
+                asset: intent.asset,
+                spender: PERMIT2_ADDRESS,
+                allowance: permit.value,
+                required: intent.amount,
+                eip2612_nonce: None,
+            },
+        )));
     }
 
     // EIP-2612 binds the owner's *current* nonce, so this also rejects a replayed permit.

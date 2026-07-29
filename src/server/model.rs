@@ -277,6 +277,37 @@ pub struct DepositVerifyResponse {
     /// errors. A bad signature or an expired authorization will never become valid.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+}
+
+/// What a client needs to satisfy a missing Permit2 approval, so it need not read the chain.
+///
+/// `eip2612Nonce` is the only value a chain-free client cannot derive: the token's domain
+/// separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2.
+/// Present means the approval can be sponsored — sign an `eip2612Permit` and retry. Absent means
+/// the token has no EIP-2612 surface, so the payer must submit `approve(PERMIT2, …)` themselves.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Permit2AllowanceResponse {
+    pub spender: String,
+    pub allowance: String,
+    pub required: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eip2612_nonce: Option<String>,
+}
+
+impl Permit2AllowanceResponse {
+    fn from_error(error: &DepositError) -> Option<Self> {
+        let details = error.permit2_allowance_details()?;
+        Some(Self {
+            spender: format!("{:#x}", details.spender),
+            allowance: details.allowance.to_string(),
+            required: details.required.to_string(),
+            eip2612_nonce: details.eip2612_nonce.map(|nonce| nonce.to_string()),
+        })
+    }
 }
 
 impl DepositVerifyResponse {
@@ -286,15 +317,17 @@ impl DepositVerifyResponse {
             invalid_reason: None,
             error_code: None,
             retryable: None,
+            permit2_allowance: None,
         }
     }
 
-    pub fn invalid(reason: String, code: &str, retryable: bool) -> Self {
+    pub fn invalid(error: &DepositError) -> Self {
         Self {
             is_valid: false,
-            invalid_reason: Some(reason),
-            error_code: Some(code.to_string()),
-            retryable: Some(retryable),
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_error(error),
         }
     }
 }
@@ -322,6 +355,9 @@ pub struct DepositResponse {
     /// See [`DepositVerifyResponse::retryable`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
 }
 
 impl DepositResponse {
@@ -336,10 +372,11 @@ impl DepositResponse {
             error: None,
             error_code: None,
             retryable: None,
+            permit2_allowance: None,
         }
     }
 
-    pub fn failure(error: String, code: &str, retryable: bool) -> Self {
+    pub fn failure(error: &DepositError) -> Self {
         Self {
             success: false,
             tx_hash: None,
@@ -347,9 +384,10 @@ impl DepositResponse {
             from: None,
             asset: None,
             amount: None,
-            error: Some(error),
-            error_code: Some(code.to_string()),
-            retryable: Some(retryable),
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_error(error),
         }
     }
 }

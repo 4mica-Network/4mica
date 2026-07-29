@@ -43,11 +43,7 @@ async fn deposit_verify_handler(
             // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
             state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "deposit verification failed");
-            Json(DepositVerifyResponse::invalid(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ))
+            Json(DepositVerifyResponse::invalid(&err))
         }
     }
 }
@@ -95,11 +91,7 @@ async fn deposit_handler(
         Err(err) => {
             state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "gasless deposit failed");
-            Json(DepositResponse::failure(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ))
+            Json(DepositResponse::failure(&err))
         }
     }
 }

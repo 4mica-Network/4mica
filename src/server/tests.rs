@@ -1087,6 +1087,73 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
     );
 }
 
+/// A missing Permit2 approval must come back with enough structure to act on. The EIP-2612 nonce
+/// is the only value a chain-free client cannot derive for itself, so omitting it would force
+/// every SDK into an `eth_call` — defeating the point of the facilitator.
+#[tokio::test]
+async fn permit2_allowance_error_carries_the_fix() {
+    use crate::deposit::DepositError;
+
+    let err =
+        DepositError::Permit2AllowanceRequired(Box::new(crate::deposit::Permit2AllowanceDetails {
+            from: Address::repeat_byte(0xbb),
+            asset: Address::repeat_byte(0x22),
+            spender: sdk_4mica::contract::PERMIT2_ADDRESS,
+            allowance: U256::ZERO,
+            required: U256::from(1_000u64),
+            eip2612_nonce: Some(U256::from(7u64)),
+        }));
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
+        .expect("serialize failure");
+    assert_eq!(response["errorCode"], "PERMIT2_ALLOWANCE_REQUIRED");
+    assert_eq!(
+        response["permit2Allowance"]["spender"],
+        "0x000000000022d473030f116ddee9f6b43ac78ba3"
+    );
+    assert_eq!(response["permit2Allowance"]["allowance"], "0");
+    assert_eq!(response["permit2Allowance"]["required"], "1000");
+    assert_eq!(response["permit2Allowance"]["eip2612Nonce"], "7");
+}
+
+/// A token without EIP-2612 cannot have its approval sponsored, and the absent nonce is how a
+/// client learns that — it must fall back to an on-chain approve rather than signing a permit.
+#[tokio::test]
+async fn permit2_allowance_error_omits_the_nonce_for_a_non_2612_token() {
+    use crate::deposit::DepositError;
+
+    let err =
+        DepositError::Permit2AllowanceRequired(Box::new(crate::deposit::Permit2AllowanceDetails {
+            from: Address::repeat_byte(0xbb),
+            asset: Address::repeat_byte(0x22),
+            spender: sdk_4mica::contract::PERMIT2_ADDRESS,
+            allowance: U256::ZERO,
+            required: U256::from(1_000u64),
+            eip2612_nonce: None,
+        }));
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
+        .expect("serialize failure");
+    assert!(response["permit2Allowance"].is_object());
+    assert!(
+        response["permit2Allowance"].get("eip2612Nonce").is_none(),
+        "an absent nonce must be omitted, not null: {response}"
+    );
+}
+
+/// Errors with no structured detail must not grow an empty object.
+#[tokio::test]
+async fn other_errors_carry_no_permit2_detail() {
+    use crate::deposit::DepositError;
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(
+        &DepositError::RateLimited,
+    ))
+    .expect("serialize failure");
+    assert_eq!(response["errorCode"], "RATE_LIMITED");
+    assert!(response.get("permit2Allowance").is_none());
+}
+
 /// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
 #[tokio::test]
 async fn deposit_rejects_a_malformed_authorization() {

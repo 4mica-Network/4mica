@@ -264,7 +264,28 @@ Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactl
 
 Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`, and
 `/deposit/verify` reports `PERMIT2_ALLOWANCE_REQUIRED` when the payer has not made it — mirroring
-x402's precondition of the same name.
+x402's precondition of the same name. That response carries everything needed to fix it:
+
+```jsonc
+{
+  "isValid": false,
+  "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
+  "permit2Allowance": {
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "allowance": "0",
+    "required": "1000",
+    "eip2612Nonce": "7"        // omitted when the token has no EIP-2612 surface
+  }
+}
+```
+
+`eip2612Nonce` is the only value a chain-free client cannot derive for itself — the token's domain
+separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2. Its
+**presence means the approval can be sponsored**: sign an `eip2612Permit` and retry. Its **absence
+means it cannot**, and the payer must submit `approve(PERMIT2, …)` themselves.
+
+So a client with no Ethereum RPC can attempt a Permit2 deposit, be told exactly what is missing,
+and complete it on the retry.
 
 #### Sponsored approvals (`eip2612Permit`)
 
