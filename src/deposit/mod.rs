@@ -15,62 +15,26 @@
 //! facilitator does not pay for transactions that were always going to revert. Every check here is
 //! re-enforced on-chain.
 
+mod eip712;
+mod error;
+
 use std::str::FromStr;
 use std::sync::Arc;
 
-use alloy::primitives::{Address, B256, Signature, U256, normalize_v};
-use alloy::sol;
-use alloy::sol_types::SolStruct;
-use sdk_4mica::contract::Core4Mica::{Core4MicaErrors, Permit2Authorization, ReceiveAuthorization};
+use alloy::primitives::{Address, B256, U256};
+use sdk_4mica::contract::Core4Mica::{Permit2Authorization, ReceiveAuthorization};
 use sdk_4mica::contract::PERMIT2_ADDRESS;
-use thiserror::Error;
 
 use crate::limits::{DepositGuard, DepositLimits};
 use crate::relayer::{DepositToken, Relayer};
 
-sol! {
-    /// EIP-3009's signed struct, declared here rather than imported: `sdk-4mica` keeps its digest
-    /// module private, and an independently written verifier is preferable anyway — a bug in the
-    /// SDK's construction should fail this check, not cancel out against it. The type string is
-    /// fixed by EIP-3009, so there is nothing to drift against.
-    struct ReceiveWithAuthorization {
-        address from;
-        address to;
-        uint256 value;
-        uint256 validAfter;
-        uint256 validBefore;
-        bytes32 nonce;
-    }
+pub use error::{DepositError, Permit2AllowanceDetails};
 
-    /// Permit2 `SignatureTransfer` token permission.
-    struct TokenPermissions {
-        address token;
-        uint256 amount;
-    }
-
-    /// EIP-2612's signed struct, used to grant Permit2 its allowance without the payer paying gas.
-    struct Permit {
-        address owner;
-        address spender;
-        uint256 value;
-        uint256 nonce;
-        uint256 deadline;
-    }
-
-    /// Permit2's signed struct.
-    ///
-    /// Note the absence of x402's `Witness`: that exists because `exact` pays an arbitrary payee
-    /// and `PermitTransferFrom` binds `spender` but not the destination, so a facilitator could
-    /// otherwise redirect funds. A deposit has no free destination — Core4Mica pulls into itself
-    /// and credits `from` — so binding `spender` to Core4Mica already constrains it fully, and the
-    /// canonical `x402ExactPermit2Proxy` is unnecessary here.
-    struct PermitTransferFrom {
-        TokenPermissions permitted;
-        address spender;
-        uint256 nonce;
-        uint256 deadline;
-    }
-}
+use eip712::{
+    permit_digest, permit_transfer_from_digest, permit2_domain_separator,
+    receive_authorization_digest, require_signer, require_signer_from_bytes,
+};
+use error::classify_call_error;
 
 /// Asset transfer methods this facilitator can service, matching x402's `scheme_exact_evm` names.
 ///
@@ -78,153 +42,6 @@ sol! {
 /// `approve(PERMIT2, ...)` from the payer, so the payer still pays gas once.
 const ASSET_TRANSFER_METHOD_EIP3009: &str = "eip3009";
 const ASSET_TRANSFER_METHOD_PERMIT2: &str = "permit2";
-
-#[derive(Debug, Error)]
-pub enum DepositError {
-    #[error("{0}")]
-    InvalidRequest(String),
-    #[error("malformed signature: {0}")]
-    MalformedSignature(String),
-    #[error("unsupported assetTransferMethod {0}")]
-    UnsupportedTransferMethod(String),
-    #[error("gas sponsorship is not enabled on this facilitator")]
-    NoRelayerConfigured,
-    #[error("no relayer is configured for network {0}")]
-    NoRelayer(String),
-    #[error("authorization expired at {valid_before} (now {now})")]
-    Expired { valid_before: u64, now: u64 },
-    #[error("authorization is not valid until {valid_after} (now {now})")]
-    NotYetValid { valid_after: u64, now: u64 },
-    #[error("signature recovers to {recovered}, not the declared from {declared}")]
-    SignatureMismatch {
-        recovered: Address,
-        declared: Address,
-    },
-    #[error("authorization nonce has already been used")]
-    NonceAlreadyUsed,
-    #[error("{from} holds {balance} of {asset}, needs {amount}")]
-    InsufficientBalance {
-        from: Address,
-        asset: Address,
-        balance: U256,
-        amount: U256,
-    },
-    #[error("deposit would revert: {0}")]
-    SimulationReverted(String),
-    #[error("chain error: {0:#}")]
-    Chain(#[from] anyhow::Error),
-    /// Nothing was submitted — safe to retry with the same authorization.
-    #[error("failed to broadcast deposit: {0}")]
-    Broadcast(String),
-    /// The transaction *was* broadcast but its outcome is unknown. Distinct from [`Self::Broadcast`]
-    /// because retrying risks a double submission; poll `tx_hash` instead.
-    #[error("deposit {tx_hash} was broadcast but its receipt could not be read: {reason}")]
-    ReceiptUnavailable { tx_hash: B256, reason: String },
-    /// Mined and reverted, so gas *was* spent. Distinct from [`Self::SimulationReverted`], which
-    /// means we declined before spending anything.
-    #[error("deposit {tx_hash} reverted on-chain")]
-    RevertedOnChain { tx_hash: B256 },
-    #[error("too many deposit requests; retry shortly")]
-    RateLimited,
-    #[error("address {address} has exceeded its deposit rate limit; retry shortly")]
-    AddressRateLimited { address: Address },
-    #[error("too many deposits in flight; retry shortly")]
-    TooManyInFlight,
-    #[error("this authorization is already being submitted")]
-    DuplicateInFlight,
-    #[error("relayer balance {balance} is at or below the configured floor {floor}")]
-    RelayerBalanceTooLow { balance: U256, floor: U256 },
-    #[error("deposit needs {estimated} gas, above the sponsored ceiling of {ceiling}")]
-    GasCeilingExceeded { estimated: u64, ceiling: u64 },
-    /// Permit2's one-time on-chain approval is missing. Distinct because the payer can fix it —
-    /// mirrors x402's `PERMIT2_ALLOWANCE_REQUIRED` precondition.
-    ///
-    /// Carries `eip2612_nonce` when the token supports EIP-2612, so a client can sign a sponsored
-    /// permit and retry **without an Ethereum RPC of its own** — the nonce is the only input it
-    /// could not otherwise obtain. `None` means the token has no EIP-2612 surface and the payer
-    /// must submit the approval themselves.
-    ///
-    /// Boxed: it is the largest variant by some margin, and inlining it would widen every
-    /// `Result<_, DepositError>` on the hot path.
-    #[error(
-        "{} has approved {} of {} to Permit2 but {} is required; sign an EIP-2612 permit or \
-         submit a one-time approve(PERMIT2, ...) and retry",
-        .0.from, .0.allowance, .0.asset, .0.required
-    )]
-    Permit2AllowanceRequired(Box<Permit2AllowanceDetails>),
-}
-
-/// Everything a client needs to fix a missing Permit2 approval without reading the chain.
-#[derive(Debug, Clone)]
-pub struct Permit2AllowanceDetails {
-    pub from: Address,
-    pub asset: Address,
-    pub spender: Address,
-    pub allowance: U256,
-    pub required: U256,
-    /// Present when the token supports EIP-2612, i.e. when the approval can be sponsored.
-    pub eip2612_nonce: Option<U256>,
-}
-
-impl DepositError {
-    /// Structured detail for [`Self::Permit2AllowanceRequired`], so the fix does not have to be
-    /// parsed out of the message.
-    pub fn permit2_allowance_details(&self) -> Option<&Permit2AllowanceDetails> {
-        match self {
-            Self::Permit2AllowanceRequired(details) => Some(details),
-            _ => None,
-        }
-    }
-
-    /// Stable, machine-readable code so clients can branch without string matching.
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::InvalidRequest(_) => "INVALID_REQUEST",
-            Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
-            Self::UnsupportedTransferMethod(_) => "UNSUPPORTED_TRANSFER_METHOD",
-            Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
-            Self::NoRelayer(_) => "NO_RELAYER",
-            Self::Expired { .. } => "EXPIRED",
-            Self::NotYetValid { .. } => "NOT_YET_VALID",
-            Self::SignatureMismatch { .. } => "SIGNATURE_MISMATCH",
-            Self::NonceAlreadyUsed => "NONCE_ALREADY_USED",
-            Self::InsufficientBalance { .. } => "INSUFFICIENT_BALANCE",
-            Self::SimulationReverted(_) => "SIMULATION_REVERTED",
-            Self::Chain(_) => "CHAIN_ERROR",
-            Self::Broadcast(_) => "BROADCAST_FAILED",
-            Self::ReceiptUnavailable { .. } => "RECEIPT_UNAVAILABLE",
-            Self::RevertedOnChain { .. } => "REVERTED_ON_CHAIN",
-            Self::RateLimited => "RATE_LIMITED",
-            Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
-            Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
-            Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
-            Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
-            Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
-            Self::Permit2AllowanceRequired(_) => "PERMIT2_ALLOWANCE_REQUIRED",
-        }
-    }
-
-    /// Whether this rejection came from throttling rather than the request itself. The single
-    /// source of truth for both [`Self::is_retryable`] and the abuse counters.
-    pub fn is_throttling(&self) -> bool {
-        matches!(
-            self,
-            Self::RateLimited
-                | Self::AddressRateLimited { .. }
-                | Self::TooManyInFlight
-                | Self::DuplicateInFlight
-        )
-    }
-
-    /// Whether the caller should retry the same request later, as opposed to changing it.
-    /// Throttling and chain trouble are transient; a bad signature is not.
-    ///
-    /// Deliberately excludes [`Self::ReceiptUnavailable`]: that transaction may still land, so a
-    /// retry risks depositing twice.
-    pub fn is_retryable(&self) -> bool {
-        self.is_throttling() || matches!(self, Self::RelayerBalanceTooLow { .. } | Self::Chain(_))
-    }
-}
 
 /// An EIP-2612 permit authorising Permit2 to spend the payer's tokens.
 ///
@@ -520,20 +337,7 @@ async fn verify_permit2(
         auth.nonce,
         auth.deadline,
     );
-    let signature = Signature::try_from(auth.signature.as_ref()).map_err(|err| {
-        DepositError::MalformedSignature(format!("invalid permit2 signature: {err}"))
-    })?;
-    let recovered = signature
-        .recover_address_from_prehash(&digest)
-        .map_err(|err| {
-            DepositError::MalformedSignature(format!("unrecoverable signature: {err}"))
-        })?;
-    if recovered != auth.from {
-        return Err(DepositError::SignatureMismatch {
-            recovered,
-            declared: auth.from,
-        });
-    }
+    require_signer_from_bytes(&digest, auth.signature.as_ref(), auth.from)?;
 
     // The one precondition unique to Permit2, and the reason x402 gives it a dedicated status:
     // the payer must have made a one-time on-chain `approve(PERMIT2, ...)` themselves. Without a
@@ -607,16 +411,13 @@ async fn verify_eip2612_permit(
         .await
         .map_err(classify_call_error)?;
     let domain_separator = relayer.token_domain_separator(intent.asset).await?;
-    let digest = eip712_digest(
+    let digest = permit_digest(
         domain_separator,
-        Permit {
-            owner,
-            spender: PERMIT2_ADDRESS,
-            value: permit.value,
-            nonce,
-            deadline: permit.deadline,
-        }
-        .eip712_hash_struct(),
+        owner,
+        PERMIT2_ADDRESS,
+        permit.value,
+        nonce,
+        permit.deadline,
     );
     require_signer(&digest, permit.r, permit.s, permit.v, owner)
 }
@@ -785,159 +586,6 @@ pub async fn submit(
     Ok(receipt.transaction_hash)
 }
 
-/// Names the Core4Mica reverts a deposit can realistically hit. Anything else falls back to its
-/// selector, which is still more useful than an opaque `execution reverted`.
-fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
-    use alloy::sol_types::SolInterface;
-
-    match decoded {
-        Core4MicaErrors::AaveNotConfigured(_) => {
-            "AaveNotConfigured: the deployment has no Aave pool, so stablecoin deposits are \
-             unavailable"
-                .to_string()
-        }
-        Core4MicaErrors::UnsupportedAsset(err) => {
-            format!(
-                "UnsupportedAsset: {} is not a registered stablecoin",
-                err.asset
-            )
-        }
-        Core4MicaErrors::InvalidAsset(err) => format!("InvalidAsset: {}", err.asset),
-        Core4MicaErrors::AmountZero(_) => "AmountZero".to_string(),
-        Core4MicaErrors::InvalidSignature(_) => {
-            "InvalidSignature: the token rejected the authorization".to_string()
-        }
-        Core4MicaErrors::ValueMismatch(err) => format!(
-            "ValueMismatch: expected {} but received {} (fee-on-transfer token?)",
-            err.expected, err.actual
-        ),
-        Core4MicaErrors::ZeroCollateralCredit(err) => format!(
-            "ZeroCollateralCredit: {} of {} is too small to mint any collateral",
-            err.amount, err.asset
-        ),
-        other => format!("revert with selector 0x{}", hex::encode(other.selector())),
-    }
-}
-
-/// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
-///
-/// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
-/// revert. Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so
-/// clients see `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
-fn classify_call_error(err: alloy::contract::Error) -> DepositError {
-    // Order matters. A node reports a revert *through* the transport as JSON-RPC error 3, so
-    // matching on `TransportError` first would misfile every plain `require(...)` failure as a
-    // retryable outage. Revert data is the reliable discriminator: present means the EVM ran and
-    // rejected, absent means we never got an answer.
-    if let Some(data) = err.as_revert_data() {
-        if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
-            return DepositError::SimulationReverted(describe_core4mica_error(&decoded));
-        }
-        // Not a Core4Mica error — a plain `require` string from the token or Permit2, or an
-        // unknown selector. `decode_revert_reason` recovers the former.
-        let reason = alloy::sol_types::decode_revert_reason(&data)
-            .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data)));
-        return DepositError::SimulationReverted(reason);
-    }
-
-    DepositError::Chain(anyhow::Error::new(err).context("deposit simulation"))
-}
-
-/// `keccak256(0x19 0x01 ‖ domainSeparator ‖ hashStruct(ReceiveWithAuthorization))`.
-fn receive_authorization_digest(
-    domain_separator: B256,
-    from: Address,
-    to: Address,
-    value: U256,
-    valid_after: U256,
-    valid_before: U256,
-    nonce: B256,
-) -> B256 {
-    let message = ReceiveWithAuthorization {
-        from,
-        to,
-        value,
-        validAfter: valid_after,
-        validBefore: valid_before,
-        nonce,
-    };
-    eip712_digest(domain_separator, message.eip712_hash_struct())
-}
-
-/// `keccak256(0x19 0x01 ‖ domainSeparator ‖ structHash)`.
-fn eip712_digest(domain_separator: B256, struct_hash: B256) -> B256 {
-    let mut buf = [0u8; 66];
-    buf[0] = 0x19;
-    buf[1] = 0x01;
-    buf[2..34].copy_from_slice(domain_separator.as_slice());
-    buf[34..66].copy_from_slice(struct_hash.as_slice());
-    alloy::primitives::keccak256(buf)
-}
-
-/// Recovers `(r, s, v)` and asserts it matches the declared signer.
-fn require_signer(
-    digest: &B256,
-    r: B256,
-    s: B256,
-    v: u8,
-    declared: Address,
-) -> Result<(), DepositError> {
-    let recovered = recover_signer(digest, r, s, v)?;
-    if recovered != declared {
-        return Err(DepositError::SignatureMismatch {
-            recovered,
-            declared,
-        });
-    }
-    Ok(())
-}
-
-/// Permit2's EIP-712 domain separator for `chain_id`.
-///
-/// Needs neither a chain read nor server-advertised metadata: Permit2 is deployed at one canonical
-/// address on every chain and its domain has a fixed name and no version.
-fn permit2_domain_separator(chain_id: u64) -> B256 {
-    let type_hash = alloy::primitives::keccak256(
-        b"EIP712Domain(string name,uint256 chainId,address verifyingContract)".as_slice(),
-    );
-    let mut encoded = Vec::with_capacity(32 * 4);
-    encoded.extend_from_slice(type_hash.as_slice());
-    encoded.extend_from_slice(alloy::primitives::keccak256(b"Permit2".as_slice()).as_slice());
-    encoded.extend_from_slice(&U256::from(chain_id).to_be_bytes::<32>());
-    encoded.extend_from_slice(PERMIT2_ADDRESS.into_word().as_slice());
-    alloy::primitives::keccak256(encoded)
-}
-
-/// Permit2 `PermitTransferFrom` signing hash, with the nested `TokenPermissions` hashed first.
-fn permit_transfer_from_digest(
-    domain_separator: B256,
-    token: Address,
-    amount: U256,
-    spender: Address,
-    nonce: U256,
-    deadline: U256,
-) -> B256 {
-    let message = PermitTransferFrom {
-        permitted: TokenPermissions { token, amount },
-        spender,
-        nonce,
-        deadline,
-    };
-    eip712_digest(domain_separator, message.eip712_hash_struct())
-}
-
-/// Recovers the signer, accepting `v` in either Electrum (27/28) or raw parity (0/1) form —
-/// EIP-3009 tokens expect the former, but signers differ and rejecting 0/1 would be gratuitous.
-fn recover_signer(digest: &B256, r: B256, s: B256, v: u8) -> Result<Address, DepositError> {
-    let parity = normalize_v(v as u64).ok_or_else(|| {
-        DepositError::MalformedSignature(format!("invalid signature v: {v}, expected 27/28"))
-    })?;
-
-    Signature::from_scalars_and_parity(r, s, parity)
-        .recover_address_from_prehash(digest)
-        .map_err(|err| DepositError::MalformedSignature(format!("unrecoverable signature: {err}")))
-}
-
 /// Accepts decimal or `0x`-prefixed hex, matching how amounts travel elsewhere in x402.
 /// `U256`'s `FromStr` already dispatches on the prefix, so there is nothing to hand-roll.
 fn parse_u256(value: &str) -> Result<U256, String> {
@@ -951,13 +599,9 @@ fn parse_u256(value: &str) -> Result<U256, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::primitives::{address, b256};
-    use alloy::signers::SignerSync;
-    use alloy::signers::local::PrivateKeySigner;
+    use alloy::primitives::address;
 
     const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
-    const CONTRACT: Address = address!("00000000000000000000000000000000c04e4a1c");
-    const DOMAIN: B256 = b256!("1111111111111111111111111111111111111111111111111111111111111111");
 
     fn auth(from: Address) -> ReceiveAuthorization {
         ReceiveAuthorization {
@@ -1088,49 +732,6 @@ mod tests {
         assert_eq!(err.code(), "INVALID_REQUEST");
     }
 
-    /// The EIP-2612 digest must match what the token's own `permit` will check; computed here from
-    /// the literal type string so a swapped field fails rather than cancelling out.
-    #[test]
-    fn eip2612_digest_matches_an_independently_computed_hash() {
-        use alloy::primitives::keccak256;
-
-        let owner = address!("00000000000000000000000000000000000000a1");
-        let value = U256::from(1_000u64);
-        let nonce = U256::from(3u64);
-        let deadline = U256::from(2_000_000_000u64);
-
-        let type_hash = keccak256(
-            b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                .as_slice(),
-        );
-        let word = |a: Address| {
-            let mut w = [0u8; 32];
-            w[12..].copy_from_slice(a.as_slice());
-            w
-        };
-        let mut encoded = Vec::with_capacity(32 * 6);
-        encoded.extend_from_slice(type_hash.as_slice());
-        encoded.extend_from_slice(&word(owner));
-        encoded.extend_from_slice(&word(PERMIT2_ADDRESS));
-        encoded.extend_from_slice(&value.to_be_bytes::<32>());
-        encoded.extend_from_slice(&nonce.to_be_bytes::<32>());
-        encoded.extend_from_slice(&deadline.to_be_bytes::<32>());
-
-        let expected = eip712_digest(DOMAIN, keccak256(encoded));
-        let actual = eip712_digest(
-            DOMAIN,
-            Permit {
-                owner,
-                spender: PERMIT2_ADDRESS,
-                value,
-                nonce,
-                deadline,
-            }
-            .eip712_hash_struct(),
-        );
-        assert_eq!(actual, expected);
-    }
-
     /// The payload shape and the discriminator must agree, or the caller is confused about what it
     /// sent and we would silently verify under the wrong scheme.
     #[test]
@@ -1172,27 +773,6 @@ mod tests {
         assert_eq!(both.code(), "INVALID_REQUEST");
     }
 
-    /// Permit2's domain is fixed per chain, so a wrong derivation would silently produce
-    /// signatures no deposit can ever redeem. Computed here from the literal type string.
-    #[test]
-    fn permit2_domain_matches_an_independently_computed_separator() {
-        use alloy::primitives::keccak256;
-
-        let chain_id = 1337u64;
-        let type_hash = keccak256(
-            b"EIP712Domain(string name,uint256 chainId,address verifyingContract)".as_slice(),
-        );
-        let mut encoded = Vec::with_capacity(32 * 4);
-        encoded.extend_from_slice(type_hash.as_slice());
-        encoded.extend_from_slice(keccak256(b"Permit2".as_slice()).as_slice());
-        encoded.extend_from_slice(&U256::from(chain_id).to_be_bytes::<32>());
-        let mut word = [0u8; 32];
-        word[12..].copy_from_slice(PERMIT2_ADDRESS.as_slice());
-        encoded.extend_from_slice(&word);
-
-        assert_eq!(permit2_domain_separator(chain_id), keccak256(encoded));
-    }
-
     #[test]
     fn parse_rejects_an_unknown_transfer_method() {
         let err = DepositIntent::parse(
@@ -1205,103 +785,5 @@ mod tests {
         )
         .expect_err("expected unknown-method rejection");
         assert_eq!(err.code(), "UNSUPPORTED_TRANSFER_METHOD");
-    }
-
-    /// The digest must match what the token's own `ecrecover` will check. Computed here from the
-    /// literal EIP-3009 type string rather than via `eip712_hash_struct`, so a wrong field order
-    /// fails instead of cancelling out on both sides.
-    #[test]
-    fn digest_matches_an_independently_computed_eip3009_hash() {
-        use alloy::primitives::keccak256;
-
-        let from = address!("00000000000000000000000000000000000000a1");
-        let value = U256::from(1_000_000u64);
-        let valid_after = U256::ZERO;
-        let valid_before = U256::from(2_000_000_000u64);
-        let nonce = B256::repeat_byte(0x42);
-
-        let type_hash = keccak256(
-            b"ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
-                .as_slice(),
-        );
-        let word = |a: Address| {
-            let mut w = [0u8; 32];
-            w[12..].copy_from_slice(a.as_slice());
-            w
-        };
-        let mut encoded = Vec::with_capacity(32 * 7);
-        encoded.extend_from_slice(type_hash.as_slice());
-        encoded.extend_from_slice(&word(from));
-        encoded.extend_from_slice(&word(CONTRACT));
-        encoded.extend_from_slice(&value.to_be_bytes::<32>());
-        encoded.extend_from_slice(&valid_after.to_be_bytes::<32>());
-        encoded.extend_from_slice(&valid_before.to_be_bytes::<32>());
-        encoded.extend_from_slice(nonce.as_slice());
-
-        let mut buf = Vec::with_capacity(66);
-        buf.push(0x19);
-        buf.push(0x01);
-        buf.extend_from_slice(DOMAIN.as_slice());
-        buf.extend_from_slice(keccak256(encoded).as_slice());
-        let expected = keccak256(buf);
-
-        let actual = receive_authorization_digest(
-            DOMAIN,
-            from,
-            CONTRACT,
-            value,
-            valid_after,
-            valid_before,
-            nonce,
-        );
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn recover_signer_round_trips_a_real_signature() {
-        let signer = PrivateKeySigner::random();
-        let from = signer.address();
-        let value = U256::from(1_000_000u64);
-        let valid_before = U256::from(2_000_000_000u64);
-        let nonce = B256::repeat_byte(0x42);
-
-        let digest = receive_authorization_digest(
-            DOMAIN,
-            from,
-            CONTRACT,
-            value,
-            U256::ZERO,
-            valid_before,
-            nonce,
-        );
-        let sig = signer.sign_hash_sync(&digest).expect("sign");
-
-        let authorization = ReceiveAuthorization {
-            from,
-            validAfter: U256::ZERO,
-            validBefore: valid_before,
-            nonce,
-            v: 27 + sig.v() as u8,
-            r: sig.r().into(),
-            s: sig.s().into(),
-        };
-
-        let recovered = recover_signer(&digest, authorization.r, authorization.s, authorization.v)
-            .expect("recover");
-        assert_eq!(recovered, from);
-    }
-
-    #[test]
-    fn recover_signer_rejects_an_invalid_v() {
-        let mut authorization = auth(Address::ZERO);
-        authorization.v = 42;
-        let err = recover_signer(
-            &B256::ZERO,
-            authorization.r,
-            authorization.s,
-            authorization.v,
-        )
-        .expect_err("expected v rejection");
-        assert_eq!(err.code(), "MALFORMED_SIGNATURE");
     }
 }
