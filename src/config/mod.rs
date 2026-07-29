@@ -1,9 +1,22 @@
+//! Facilitator configuration: environment variables in, validated structs out.
+//!
+//! Everything here runs once at startup and is expected to `bail!` rather than degrade — a
+//! misconfigured facilitator that starts anyway just fails later, further from the cause.
+//!
+//! Split by subsystem, since each is opt-in independently:
+//!
+//! * [`relayer`] — the key and endpoint that sponsor gas. Absent ⇒ `/deposit` is unavailable.
+//! * [`deposit`] — throttling for those sponsored deposits.
+//!
+//! Shared env helpers ([`trimmed_env`], [`normalize_url`]) stay here so both submodules read the
+//! environment the same way.
+
+mod deposit;
+mod relayer;
+
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::time::Duration;
 
-use alloy::primitives::U256;
-use alloy::signers::local::PrivateKeySigner;
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
@@ -11,22 +24,18 @@ use sdk_4mica::Address;
 use serde::Deserialize;
 
 use crate::limits::DepositLimits;
+use deposit::deposit_limits_from_env;
+use relayer::{RelayerFallback, load_relayer_fallback, resolve_relayer_config};
+
+pub use relayer::NetworkRelayerConfig;
 
 const ENV_SCHEME: &str = "X402_SCHEME";
 const ENV_NETWORK: &str = "X402_NETWORK";
-const ENV_NETWORKS: &str = "X402_NETWORKS";
+pub(super) const ENV_NETWORKS: &str = "X402_NETWORKS";
 const ENV_CORE_API_URL: &str = "X402_CORE_API_URL";
 const ENV_AUTH_WALLET_PRIVATE_KEY: &str = "X402_AUTH_WALLET_PRIVATE_KEY";
 const ENV_AUTH_URL: &str = "X402_AUTH_URL";
 const ENV_AUTH_REFRESH_MARGIN_SECS: &str = "X402_AUTH_REFRESH_MARGIN_SECS";
-const ENV_RELAYER_PRIVATE_KEY: &str = "X402_RELAYER_PRIVATE_KEY";
-const ENV_RELAYER_RPC_URL: &str = "X402_RELAYER_RPC_URL";
-const ENV_DEPOSIT_MAX_IN_FLIGHT: &str = "X402_DEPOSIT_MAX_IN_FLIGHT";
-const ENV_DEPOSIT_PER_ADDRESS_LIMIT: &str = "X402_DEPOSIT_PER_ADDRESS_LIMIT";
-const ENV_DEPOSIT_GLOBAL_LIMIT: &str = "X402_DEPOSIT_GLOBAL_LIMIT";
-const ENV_DEPOSIT_WINDOW_SECS: &str = "X402_DEPOSIT_WINDOW_SECS";
-const ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI: &str = "X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI";
-const ENV_DEPOSIT_MAX_GAS: &str = "X402_DEPOSIT_MAX_GAS";
 const ENV_HOST: &str = "HOST";
 const ENV_PORT: &str = "PORT";
 const ENV_GUARANTEE_DOMAIN_VARIANTS: [&str; 3] = [
@@ -62,23 +71,6 @@ pub struct NetworkAuthConfig {
     pub refresh_margin_secs: u64,
 }
 
-/// Credentials for submitting sponsored transactions (e.g. gasless deposits) on a network.
-///
-/// Deliberately separate from [`NetworkAuthConfig`]: that key is an *identity* used to sign SIWE
-/// logins against core and needs no balance, whereas this one signs real transactions and must
-/// hold native gas. Sharing one key would silently couple the two, and draining the gas account
-/// would take authentication down with it.
-#[derive(Clone, Debug)]
-pub struct NetworkRelayerConfig {
-    /// Parsed at config load so a malformed key fails at startup, and so the raw string is never
-    /// stored. `PrivateKeySigner`'s own `Debug` redacts the key.
-    pub signer: PrivateKeySigner,
-    /// `None` means "use the `ethereum_http_rpc_url` core advertises", resolved once public params
-    /// are fetched, so a single-chain deployment needs only a key. Config load happens before that
-    /// fetch, which is why this cannot already be a concrete `Url`.
-    pub rpc_url: Option<Url>,
-}
-
 impl ServiceConfig {
     pub fn from_env() -> Result<Self> {
         let bind_addr = bind_addr_from_env()?;
@@ -91,61 +83,6 @@ impl ServiceConfig {
             networks,
             deposit_limits,
         })
-    }
-}
-
-/// Deposit throttling, defaulting to [`DepositLimits::default`] so an existing deployment picks up
-/// protection without a config change.
-fn deposit_limits_from_env() -> Result<DepositLimits> {
-    let defaults = DepositLimits::default();
-
-    let max_in_flight = parse_env(ENV_DEPOSIT_MAX_IN_FLIGHT, defaults.max_in_flight)?;
-    let per_address_limit = parse_env(ENV_DEPOSIT_PER_ADDRESS_LIMIT, defaults.per_address_limit)?;
-    let global_limit = parse_env(ENV_DEPOSIT_GLOBAL_LIMIT, defaults.global_limit)?;
-    let window_secs = parse_env(ENV_DEPOSIT_WINDOW_SECS, defaults.window.as_secs())?;
-    let max_gas = parse_env(ENV_DEPOSIT_MAX_GAS, defaults.max_gas)?;
-
-    // Zero would disable the limit entirely, which is never what someone setting it explicitly
-    // means — they would unset the variable instead.
-    for (key, value) in [
-        (ENV_DEPOSIT_MAX_IN_FLIGHT, max_in_flight as u64),
-        (ENV_DEPOSIT_PER_ADDRESS_LIMIT, per_address_limit as u64),
-        (ENV_DEPOSIT_GLOBAL_LIMIT, global_limit as u64),
-        (ENV_DEPOSIT_WINDOW_SECS, window_secs),
-        (ENV_DEPOSIT_MAX_GAS, max_gas),
-    ] {
-        if value == 0 {
-            bail!("{key} must be greater than zero; unset it to use the default");
-        }
-    }
-
-    let min_relayer_balance_wei = match trimmed_env(ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI) {
-        Some(raw) => U256::from_str(&raw)
-            .with_context(|| format!("{ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI} must be a uint256"))?,
-        None => defaults.min_relayer_balance_wei,
-    };
-
-    Ok(DepositLimits {
-        max_in_flight,
-        per_address_limit,
-        global_limit,
-        window: Duration::from_secs(window_secs),
-        min_relayer_balance_wei,
-        max_gas,
-        ..defaults
-    })
-}
-
-fn parse_env<T>(key: &str, default: T) -> Result<T>
-where
-    T: FromStr,
-    T::Err: std::error::Error + Send + Sync + 'static,
-{
-    match trimmed_env(key) {
-        Some(raw) => raw
-            .parse::<T>()
-            .with_context(|| format!("{key} must be a non-negative integer")),
-        None => Ok(default),
     }
 }
 
@@ -337,69 +274,7 @@ struct AuthFallback {
     refresh_margin_secs: Option<u64>,
 }
 
-/// Process-wide relayer defaults, applied to any network that does not set its own.
-struct RelayerFallback {
-    private_key: Option<String>,
-    rpc_url: Option<String>,
-}
-
-fn load_relayer_fallback() -> Result<RelayerFallback> {
-    let private_key = trimmed_env(ENV_RELAYER_PRIVATE_KEY);
-    let rpc_url = trimmed_env(ENV_RELAYER_RPC_URL);
-
-    // An RPC endpoint alone sponsors nothing. Failing here beats starting up looking configured
-    // and rejecting every deposit at runtime.
-    if private_key.is_none() && rpc_url.is_some() {
-        bail!("{ENV_RELAYER_RPC_URL} is set without {ENV_RELAYER_PRIVATE_KEY}");
-    }
-
-    Ok(RelayerFallback {
-        private_key,
-        rpc_url,
-    })
-}
-
-fn resolve_relayer_config(
-    entry_private_key: Option<&str>,
-    entry_rpc_url: Option<&str>,
-    fallback: &RelayerFallback,
-    network: &str,
-) -> Result<Option<NetworkRelayerConfig>> {
-    let private_key = entry_private_key
-        .or(fallback.private_key.as_deref())
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let rpc_url = entry_rpc_url
-        .or(fallback.rpc_url.as_deref())
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-
-    let Some(private_key) = private_key else {
-        if rpc_url.is_some() {
-            bail!(
-                "network {network} provides a relayer RPC URL without a relayer private key; set \
-                 {ENV_RELAYER_PRIVATE_KEY} or `relayerPrivateKey` in the {ENV_NETWORKS} entry"
-            );
-        }
-        // Gas sponsorship is opt-in; a facilitator without it still serves /verify and /settle.
-        return Ok(None);
-    };
-
-    let signer = private_key
-        .parse::<PrivateKeySigner>()
-        .with_context(|| format!("invalid relayer private key for network {network}"))?;
-
-    let rpc_url = rpc_url
-        .map(|value| {
-            normalize_url(value)
-                .with_context(|| format!("invalid relayer RPC URL for network {network}"))
-        })
-        .transpose()?;
-
-    Ok(Some(NetworkRelayerConfig { signer, rpc_url }))
-}
-
-fn trimmed_env(key: &str) -> Option<String> {
+pub(super) fn trimmed_env(key: &str) -> Option<String> {
     std::env::var(key)
         .ok()
         .map(|value| value.trim().to_owned())
@@ -498,7 +373,7 @@ fn first_env_value(names: &[&str]) -> Option<String> {
     })
 }
 
-fn normalize_url(input: &str) -> Result<Url> {
+pub(super) fn normalize_url(input: &str) -> Result<Url> {
     let mut url = Url::parse(input).or_else(|_| Url::parse(&format!("{input}/")))?;
     if url.path().is_empty() {
         url.set_path("/");
@@ -595,6 +470,7 @@ fn resolve_guarantee_domain(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use relayer::{ENV_RELAYER_PRIVATE_KEY, ENV_RELAYER_RPC_URL};
     use rpc::CorePublicParameters;
     use serial_test::serial;
     use std::env;
@@ -627,95 +503,6 @@ mod tests {
             env::remove_var(ENV_RELAYER_PRIVATE_KEY);
             env::remove_var(ENV_RELAYER_RPC_URL);
         }
-    }
-
-    /// Anvil account 0. Any well-formed secp256k1 key works; this one is recognisable.
-    const TEST_RELAYER_KEY: &str =
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-
-    fn no_relayer_fallback() -> RelayerFallback {
-        RelayerFallback {
-            private_key: None,
-            rpc_url: None,
-        }
-    }
-
-    #[test]
-    fn relayer_is_absent_when_nothing_is_configured() {
-        let relayer =
-            resolve_relayer_config(None, None, &no_relayer_fallback(), "eip155:84532").unwrap();
-        assert!(
-            relayer.is_none(),
-            "gas sponsorship must stay opt-in so existing deployments are unaffected"
-        );
-    }
-
-    #[test]
-    fn relayer_rpc_url_defaults_to_cores_when_unset() {
-        let relayer = resolve_relayer_config(
-            Some(TEST_RELAYER_KEY),
-            None,
-            &no_relayer_fallback(),
-            "eip155:84532",
-        )
-        .unwrap()
-        .expect("relayer configured");
-        assert!(
-            relayer.rpc_url.is_none(),
-            "an unset RPC URL defers to core's ethereum_http_rpc_url"
-        );
-    }
-
-    #[test]
-    fn relayer_entry_overrides_the_process_fallback() {
-        let fallback = RelayerFallback {
-            private_key: Some(TEST_RELAYER_KEY.into()),
-            rpc_url: Some("https://fallback.example".into()),
-        };
-        let relayer = resolve_relayer_config(
-            None,
-            Some("https://per-network.example"),
-            &fallback,
-            "eip155:84532",
-        )
-        .unwrap()
-        .expect("relayer configured");
-        assert_eq!(
-            relayer.rpc_url.as_ref().map(Url::as_str),
-            Some("https://per-network.example/")
-        );
-    }
-
-    /// An RPC endpoint with no key sponsors nothing; starting up "configured" would mean every
-    /// deposit fails at runtime instead.
-    #[test]
-    fn relayer_rejects_an_rpc_url_without_a_key() {
-        let err = resolve_relayer_config(
-            None,
-            Some("https://rpc.example"),
-            &no_relayer_fallback(),
-            "eip155:84532",
-        )
-        .expect_err("expected missing-key rejection");
-        assert!(
-            err.to_string().contains("without a relayer private key"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn relayer_rejects_a_malformed_private_key() {
-        let err = resolve_relayer_config(
-            Some("not-a-key"),
-            None,
-            &no_relayer_fallback(),
-            "eip155:84532",
-        )
-        .expect_err("expected key parse failure");
-        assert!(
-            err.to_string().contains("invalid relayer private key"),
-            "unexpected error: {err}"
-        );
     }
 
     #[test]
