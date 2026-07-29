@@ -48,6 +48,15 @@ sol! {
         uint256 amount;
     }
 
+    /// EIP-2612's signed struct, used to grant Permit2 its allowance without the payer paying gas.
+    struct Permit {
+        address owner;
+        address spender;
+        uint256 value;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
     /// Permit2's signed struct.
     ///
     /// Note the absence of x402's `Witness`: that exists because `exact` pays an arbitrary payee
@@ -102,7 +111,7 @@ pub enum DepositError {
     },
     #[error("deposit would revert: {0}")]
     SimulationReverted(String),
-    #[error("chain error: {0}")]
+    #[error("chain error: {0:#}")]
     Chain(#[from] anyhow::Error),
     /// Nothing was submitted — safe to retry with the same authorization.
     #[error("failed to broadcast deposit: {0}")]
@@ -191,14 +200,38 @@ impl DepositError {
     }
 }
 
+/// An EIP-2612 permit authorising Permit2 to spend the payer's tokens.
+///
+/// This is x402's `eip2612GasSponsoring` extension: Permit2 needs a one-time on-chain approval,
+/// which normally costs the payer gas and breaks the gasless promise. When the token implements
+/// EIP-2612 the payer can sign that approval instead, and the relayer submits it.
+///
+/// Unlike x402's `erc20ApprovalGasSponsoring`, this needs no atomic batch. That extension has the
+/// facilitator send ETH to the payer's wallet, which a front-runner could steal between funding
+/// and settlement. Here the permit only grants an allowance to Permit2, and Permit2 will not move
+/// anything without a `PermitTransferFrom` signature naming Core4Mica as spender — so a dangling
+/// allowance is not exploitable and the two transactions need not be atomic.
+#[derive(Debug, Clone)]
+pub struct Eip2612Permit {
+    pub value: U256,
+    pub deadline: U256,
+    pub v: u8,
+    pub r: B256,
+    pub s: B256,
+}
+
 /// Which signature scheme moves the tokens.
 #[derive(Debug, Clone)]
 pub enum DepositAuthorization {
     /// The token itself verifies the signature and enforces the nonce. Truly gasless.
     Eip3009(ReceiveAuthorization),
     /// Routed through the canonical Permit2 contract, so it works for any ERC-20 — at the cost of
-    /// a one-time on-chain `approve(PERMIT2, ...)` the payer must have made themselves.
-    Permit2(Permit2Authorization),
+    /// a one-time `approve(PERMIT2, ...)`, which `permit` sponsors when the token supports
+    /// EIP-2612 and the payer has not approved already.
+    Permit2 {
+        authorization: Permit2Authorization,
+        permit: Option<Eip2612Permit>,
+    },
 }
 
 impl DepositAuthorization {
@@ -207,7 +240,7 @@ impl DepositAuthorization {
     pub fn from(&self) -> Address {
         match self {
             Self::Eip3009(auth) => auth.from,
-            Self::Permit2(auth) => auth.from,
+            Self::Permit2 { authorization, .. } => authorization.from,
         }
     }
 
@@ -216,14 +249,16 @@ impl DepositAuthorization {
     pub fn nonce(&self) -> B256 {
         match self {
             Self::Eip3009(auth) => auth.nonce,
-            Self::Permit2(auth) => B256::from(auth.nonce.to_be_bytes::<32>()),
+            Self::Permit2 { authorization, .. } => {
+                B256::from(authorization.nonce.to_be_bytes::<32>())
+            }
         }
     }
 
     fn method(&self) -> &'static str {
         match self {
             Self::Eip3009(_) => ASSET_TRANSFER_METHOD_EIP3009,
-            Self::Permit2(_) => ASSET_TRANSFER_METHOD_PERMIT2,
+            Self::Permit2 { .. } => ASSET_TRANSFER_METHOD_PERMIT2,
         }
     }
 }
@@ -243,12 +278,22 @@ impl DepositIntent {
         asset_transfer_method: Option<&str>,
         eip3009: Option<ReceiveAuthorization>,
         permit2: Option<Permit2Authorization>,
+        permit: Option<Eip2612Permit>,
     ) -> Result<Self, DepositError> {
+        if permit.is_some() && permit2.is_none() {
+            return Err(DepositError::InvalidRequest(
+                "`eip2612Permit` only applies to a permit2 deposit".into(),
+            ));
+        }
+
         // Exactly one authorization, mirroring x402's "exactly one of erc3009Authorization or
         // permit2Authorization must be present".
         let authorization = match (eip3009, permit2) {
             (Some(auth), None) => DepositAuthorization::Eip3009(auth),
-            (None, Some(auth)) => DepositAuthorization::Permit2(auth),
+            (None, Some(authorization)) => DepositAuthorization::Permit2 {
+                authorization,
+                permit,
+            },
             (None, None) => {
                 return Err(DepositError::InvalidRequest(
                     "one of `authorization` or `permit2Authorization` is required".into(),
@@ -314,9 +359,10 @@ pub async fn verify(
         DepositAuthorization::Eip3009(auth) => {
             verify_eip3009(relayer, &token, intent, auth, now).await?
         }
-        DepositAuthorization::Permit2(auth) => {
-            verify_permit2(relayer, &token, intent, auth, now).await?
-        }
+        DepositAuthorization::Permit2 {
+            authorization,
+            permit,
+        } => verify_permit2(relayer, &token, intent, authorization, permit.as_ref(), now).await?,
     }
 
     let from = intent.authorization.from();
@@ -334,6 +380,18 @@ pub async fn verify(
         });
     }
 
+    // A sponsored permit has not been submitted yet at verification time, so Permit2 still has no
+    // allowance and simulating the deposit would revert with `TRANSFER_FROM_FAILED` — a guaranteed
+    // false negative rather than a useful signal. Everything cheap has already been checked; the
+    // explicit `.gas(max_gas)` on the send still bounds the cost.
+    if sponsored_permit_pending(intent) {
+        tracing::debug!(
+            asset = %intent.asset,
+            "skipping simulation: the sponsored permit lands before the deposit"
+        );
+        return Ok(());
+    }
+
     // `eth_estimateGas` executes the deposit against current state, so it both proves the call
     // succeeds and prices it — no separate `eth_call` needed. It also bounds the cost: a token
     // whose transfer hook burns gas deliberately passes every check above and would still drain
@@ -348,6 +406,17 @@ pub async fn verify(
     }
 
     Ok(())
+}
+
+/// Whether this deposit depends on an approval that has not been granted yet.
+fn sponsored_permit_pending(intent: &DepositIntent) -> bool {
+    matches!(
+        &intent.authorization,
+        DepositAuthorization::Permit2 {
+            permit: Some(_),
+            ..
+        }
+    )
 }
 
 async fn verify_eip3009(
@@ -404,6 +473,7 @@ async fn verify_permit2(
     token: &DepositToken::DepositTokenInstance<alloy::providers::DynProvider>,
     intent: &DepositIntent,
     auth: &Permit2Authorization,
+    permit: Option<&Eip2612Permit>,
     now: u64,
 ) -> Result<(), DepositError> {
     let deadline = auth.deadline.saturating_to::<u64>();
@@ -448,16 +518,125 @@ async fn verify_permit2(
         .await
         .map_err(classify_call_error)?;
     if allowance < intent.amount {
-        return Err(DepositError::Permit2AllowanceRequired {
-            from: auth.from,
-            asset: intent.asset,
-            allowance,
-            required: intent.amount,
-        });
+        // x402's `eip2612GasSponsoring`: a signed permit stands in for the missing approval, and
+        // the relayer submits it. Without one there is nothing we can do for the payer.
+        let Some(permit) = permit else {
+            return Err(DepositError::Permit2AllowanceRequired {
+                from: auth.from,
+                asset: intent.asset,
+                allowance,
+                required: intent.amount,
+            });
+        };
+        verify_eip2612_permit(relayer, token, intent, auth.from, permit, now).await?;
     }
 
     // Permit2 tracks nonces in a bitmap rather than a boolean map; the simulation catches a reused
     // nonce, so there is no cheap pre-check worth the extra round trip.
+    Ok(())
+}
+
+/// Checks a sponsored EIP-2612 permit before the relayer pays to submit it.
+///
+/// The permit is verified against the token's own domain and current nonce, so a stale or forged
+/// signature is rejected here rather than costing a reverted transaction.
+async fn verify_eip2612_permit(
+    relayer: &Relayer,
+    token: &DepositToken::DepositTokenInstance<alloy::providers::DynProvider>,
+    intent: &DepositIntent,
+    owner: Address,
+    permit: &Eip2612Permit,
+    now: u64,
+) -> Result<(), DepositError> {
+    if permit.deadline.saturating_to::<u64>() <= now {
+        return Err(DepositError::Expired {
+            valid_before: permit.deadline.saturating_to::<u64>(),
+            now,
+        });
+    }
+    if permit.value < intent.amount {
+        return Err(DepositError::Permit2AllowanceRequired {
+            from: owner,
+            asset: intent.asset,
+            allowance: permit.value,
+            required: intent.amount,
+        });
+    }
+
+    // EIP-2612 binds the owner's *current* nonce, so this also rejects a replayed permit.
+    let nonce = token
+        .nonces(owner)
+        .call()
+        .await
+        .map_err(classify_call_error)?;
+    let domain_separator = relayer.token_domain_separator(intent.asset).await?;
+    let digest = eip712_digest(
+        domain_separator,
+        Permit {
+            owner,
+            spender: PERMIT2_ADDRESS,
+            value: permit.value,
+            nonce,
+            deadline: permit.deadline,
+        }
+        .eip712_hash_struct(),
+    );
+    require_signer(&digest, permit.r, permit.s, permit.v, owner)
+}
+
+/// Whether Permit2's allowance is still short, re-read immediately before submitting. The payer
+/// may have approved between `/deposit/verify` and now, in which case sponsoring is wasted gas.
+async fn needs_permit2_allowance(
+    relayer: &Relayer,
+    intent: &DepositIntent,
+    owner: Address,
+) -> Result<bool, DepositError> {
+    let allowance = DepositToken::new(intent.asset, relayer.provider())
+        .allowance(owner, PERMIT2_ADDRESS)
+        .call()
+        .await
+        .map_err(classify_call_error)?;
+    Ok(allowance < intent.amount)
+}
+
+/// Broadcasts the payer's EIP-2612 permit so Permit2 gains its allowance, with the relayer paying.
+async fn submit_permit(
+    relayer: &Relayer,
+    intent: &DepositIntent,
+    owner: Address,
+    permit: &Eip2612Permit,
+    gas: u64,
+) -> Result<(), DepositError> {
+    let receipt = DepositToken::new(intent.asset, relayer.provider())
+        .permit(
+            owner,
+            PERMIT2_ADDRESS,
+            permit.value,
+            permit.deadline,
+            permit.v,
+            permit.r,
+            permit.s,
+        )
+        .gas(gas)
+        .send()
+        .await
+        .map_err(|err| DepositError::Broadcast(format!("sponsored permit: {err}")))?
+        .get_receipt()
+        .await
+        .map_err(|err| DepositError::Broadcast(format!("sponsored permit receipt: {err}")))?;
+
+    if !receipt.status() {
+        return Err(DepositError::RevertedOnChain {
+            tx_hash: receipt.transaction_hash,
+        });
+    }
+
+    tracing::info!(
+        tx_hash = %receipt.transaction_hash,
+        owner = %owner,
+        asset = %intent.asset,
+        "sponsored EIP-2612 permit so Permit2 can pull the deposit"
+    );
     Ok(())
 }
 
@@ -477,9 +656,9 @@ async fn estimate_deposit_gas(
                 .estimate_gas()
                 .await
         }
-        DepositAuthorization::Permit2(auth) => {
+        DepositAuthorization::Permit2 { authorization, .. } => {
             contract
-                .depositStablecoinWithPermit2(intent.asset, intent.amount, auth.clone())
+                .depositStablecoinWithPermit2(intent.asset, intent.amount, authorization.clone())
                 .from(from)
                 .estimate_gas()
                 .await
@@ -510,6 +689,24 @@ pub async fn submit(
     let balance = relayer.cached_balance().await?;
     guard.check_relayer_balance(balance)?;
 
+    // Submit the sponsored approval first, if one is needed. Deliberately a separate transaction:
+    // see `Eip2612Permit` for why atomicity is not required here.
+    if let DepositAuthorization::Permit2 {
+        authorization,
+        permit: Some(permit),
+    } = &intent.authorization
+        && needs_permit2_allowance(relayer, intent, authorization.from).await?
+    {
+        submit_permit(
+            relayer,
+            intent,
+            authorization.from,
+            permit,
+            guard.limits().max_gas,
+        )
+        .await?;
+    }
+
     let contract = relayer.contract();
     // Explicit gas rather than estimated: an estimate is advisory, a limit is enforced. Unused gas
     // is refunded, so this caps the worst case without costing anything normally.
@@ -522,9 +719,9 @@ pub async fn submit(
                 .send()
                 .await
         }
-        DepositAuthorization::Permit2(auth) => {
+        DepositAuthorization::Permit2 { authorization, .. } => {
             contract
-                .depositStablecoinWithPermit2(intent.asset, intent.amount, auth.clone())
+                .depositStablecoinWithPermit2(intent.asset, intent.amount, authorization.clone())
                 .gas(gas)
                 .send()
                 .await
@@ -591,15 +788,22 @@ fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
 /// revert. Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so
 /// clients see `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
 fn classify_call_error(err: alloy::contract::Error) -> DepositError {
-    if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
-        return DepositError::SimulationReverted(describe_core4mica_error(&decoded));
-    }
-    match err {
-        alloy::contract::Error::TransportError(err) => {
-            DepositError::Chain(anyhow::Error::new(err).context("deposit simulation"))
+    // Order matters. A node reports a revert *through* the transport as JSON-RPC error 3, so
+    // matching on `TransportError` first would misfile every plain `require(...)` failure as a
+    // retryable outage. Revert data is the reliable discriminator: present means the EVM ran and
+    // rejected, absent means we never got an answer.
+    if let Some(data) = err.as_revert_data() {
+        if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
+            return DepositError::SimulationReverted(describe_core4mica_error(&decoded));
         }
-        other => DepositError::SimulationReverted(other.to_string()),
+        // Not a Core4Mica error — a plain `require` string from the token or Permit2, or an
+        // unknown selector. `decode_revert_reason` recovers the former.
+        let reason = alloy::sol_types::decode_revert_reason(&data)
+            .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data)));
+        return DepositError::SimulationReverted(reason);
     }
+
+    DepositError::Chain(anyhow::Error::new(err).context("deposit simulation"))
 }
 
 /// `keccak256(0x19 0x01 ‖ domainSeparator ‖ hashStruct(ReceiveWithAuthorization))`.
@@ -738,6 +942,7 @@ mod tests {
             None,
             Some(auth(Address::ZERO)),
             None,
+            None,
         )
         .expect("intent");
         assert_eq!(intent.amount, U256::from(1_000_000u64));
@@ -752,6 +957,7 @@ mod tests {
             None,
             Some(auth(Address::ZERO)),
             None,
+            None,
         )
         .expect("intent");
         assert_eq!(intent.amount, U256::from(10u64));
@@ -764,6 +970,7 @@ mod tests {
             "0",
             None,
             Some(auth(Address::ZERO)),
+            None,
             None,
         )
         .expect_err("expected zero rejection");
@@ -789,12 +996,102 @@ mod tests {
             Some("permit2"),
             None,
             Some(permit2_auth(Address::ZERO)),
+            None,
         )
         .expect("intent");
         assert!(matches!(
             intent.authorization,
-            DepositAuthorization::Permit2(_)
+            DepositAuthorization::Permit2 { permit: None, .. }
         ));
+    }
+
+    fn eip2612_permit() -> Eip2612Permit {
+        Eip2612Permit {
+            value: U256::MAX,
+            deadline: U256::from(2_000_000_000u64),
+            v: 27,
+            r: B256::repeat_byte(0x11),
+            s: B256::repeat_byte(0x22),
+        }
+    }
+
+    #[test]
+    fn parse_accepts_a_sponsored_permit_alongside_permit2() {
+        let intent = DepositIntent::parse(
+            "0x000000000000000000000000000000000000d0c5",
+            "1000",
+            None,
+            None,
+            Some(permit2_auth(Address::ZERO)),
+            Some(eip2612_permit()),
+        )
+        .expect("intent");
+        assert!(matches!(
+            intent.authorization,
+            DepositAuthorization::Permit2 {
+                permit: Some(_),
+                ..
+            }
+        ));
+    }
+
+    /// An EIP-3009 deposit never needs an approval, so a permit alongside one means the caller has
+    /// misunderstood the flow — better to say so than to ignore a signature they paid to produce.
+    #[test]
+    fn parse_rejects_a_permit_without_permit2() {
+        let err = DepositIntent::parse(
+            "0x000000000000000000000000000000000000d0c5",
+            "1000",
+            None,
+            Some(auth(Address::ZERO)),
+            None,
+            Some(eip2612_permit()),
+        )
+        .expect_err("expected rejection");
+        assert_eq!(err.code(), "INVALID_REQUEST");
+    }
+
+    /// The EIP-2612 digest must match what the token's own `permit` will check; computed here from
+    /// the literal type string so a swapped field fails rather than cancelling out.
+    #[test]
+    fn eip2612_digest_matches_an_independently_computed_hash() {
+        use alloy::primitives::keccak256;
+
+        let owner = address!("00000000000000000000000000000000000000a1");
+        let value = U256::from(1_000u64);
+        let nonce = U256::from(3u64);
+        let deadline = U256::from(2_000_000_000u64);
+
+        let type_hash = keccak256(
+            b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                .as_slice(),
+        );
+        let word = |a: Address| {
+            let mut w = [0u8; 32];
+            w[12..].copy_from_slice(a.as_slice());
+            w
+        };
+        let mut encoded = Vec::with_capacity(32 * 6);
+        encoded.extend_from_slice(type_hash.as_slice());
+        encoded.extend_from_slice(&word(owner));
+        encoded.extend_from_slice(&word(PERMIT2_ADDRESS));
+        encoded.extend_from_slice(&value.to_be_bytes::<32>());
+        encoded.extend_from_slice(&nonce.to_be_bytes::<32>());
+        encoded.extend_from_slice(&deadline.to_be_bytes::<32>());
+
+        let expected = eip712_digest(DOMAIN, keccak256(encoded));
+        let actual = eip712_digest(
+            DOMAIN,
+            Permit {
+                owner,
+                spender: PERMIT2_ADDRESS,
+                value,
+                nonce,
+                deadline,
+            }
+            .eip712_hash_struct(),
+        );
+        assert_eq!(actual, expected);
     }
 
     /// The payload shape and the discriminator must agree, or the caller is confused about what it
@@ -806,6 +1103,7 @@ mod tests {
             "1000",
             Some("permit2"),
             Some(auth(Address::ZERO)),
+            None,
             None,
         )
         .expect_err("expected mismatch rejection");
@@ -820,6 +1118,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect_err("expected missing-authorization rejection");
         assert_eq!(none.code(), "INVALID_REQUEST");
@@ -830,6 +1129,7 @@ mod tests {
             None,
             Some(auth(Address::ZERO)),
             Some(permit2_auth(Address::ZERO)),
+            None,
         )
         .expect_err("expected both-authorizations rejection");
         assert_eq!(both.code(), "INVALID_REQUEST");
@@ -863,6 +1163,7 @@ mod tests {
             "1",
             Some("erc7710"),
             Some(auth(Address::ZERO)),
+            None,
             None,
         )
         .expect_err("expected unknown-method rejection");

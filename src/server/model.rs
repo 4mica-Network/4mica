@@ -7,9 +7,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::state::ValidationError;
-use alloy::primitives::B256;
+use std::str::FromStr;
 
-use crate::deposit::DepositIntent;
+use alloy::primitives::{B256, U256};
+
+use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
 use crate::limits::DepositCounters;
 
 #[derive(Clone, Copy, Debug)]
@@ -226,6 +228,40 @@ pub struct DepositRequest {
     /// a one-time on-chain `approve(PERMIT2, ...)`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permit2_authorization: Option<Permit2Authorization>,
+    /// Optional EIP-2612 permit granting Permit2 its allowance, so the payer never needs gas.
+    /// Only meaningful alongside `permit2Authorization`; x402 calls this `eip2612GasSponsoring`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eip2612_permit: Option<Eip2612PermitRequest>,
+}
+
+/// Wire form of an EIP-2612 permit. `owner` and `spender` are implied — the payer and the
+/// canonical Permit2 — so only the signed values travel.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Eip2612PermitRequest {
+    /// Approval amount. Typically `MaxUint256` so one permit covers future deposits too.
+    pub value: String,
+    pub deadline: String,
+    pub v: u8,
+    pub r: B256,
+    pub s: B256,
+}
+
+impl Eip2612PermitRequest {
+    pub fn parse(self) -> Result<Eip2612Permit, DepositError> {
+        Ok(Eip2612Permit {
+            value: parse_amount(&self.value, "eip2612Permit.value")?,
+            deadline: parse_amount(&self.deadline, "eip2612Permit.deadline")?,
+            v: self.v,
+            r: self.r,
+            s: self.s,
+        })
+    }
+}
+
+fn parse_amount(value: &str, field: &str) -> Result<U256, DepositError> {
+    U256::from_str(value.trim())
+        .map_err(|err| DepositError::InvalidRequest(format!("invalid {field}: {err}")))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

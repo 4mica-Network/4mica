@@ -262,10 +262,44 @@ Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactl
 }
 ```
 
-Only `eip3009` is gasless end to end. Permit2 buys *token coverage*, not *no gas*: the payer must
-have made a one-time on-chain `approve(PERMIT2, …)` themselves, and `/deposit/verify` reports
-`PERMIT2_ALLOWANCE_REQUIRED` when they have not — the client's cue to submit that approval and
-retry, mirroring x402's precondition of the same name.
+Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`, and
+`/deposit/verify` reports `PERMIT2_ALLOWANCE_REQUIRED` when the payer has not made it — mirroring
+x402's precondition of the same name.
+
+#### Sponsored approvals (`eip2612Permit`)
+
+When the token also implements **EIP-2612**, the payer can sign that approval instead of paying for
+it, and the facilitator submits it. This is x402's `eip2612GasSponsoring` extension, and it makes
+Permit2 deposits gasless for the payer end to end:
+
+```jsonc
+{
+  "asset": "0x…",
+  "amount": "1000",
+  "assetTransferMethod": "permit2",
+  "permit2Authorization": { … },
+  "eip2612Permit": {
+    "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "deadline": "4000000000",
+    "v": 28, "r": "0x…", "s": "0x…"
+  }
+}
+```
+
+`owner` and `spender` are implied — the payer and the canonical Permit2 — so only the signed values
+travel. The permit is verified against the token's own domain and *current* nonce before the
+relayer pays to submit it, so a stale or forged signature costs nothing. It is only submitted when
+the allowance is actually short, re-checked immediately before sending in case the payer approved
+in the meantime.
+
+The sweet spot is tokens with EIP-2612 but **not** EIP-3009. A token with both (real USDC) should
+use `eip3009`, which needs one transaction rather than two.
+
+Unlike x402's other sponsoring extension (`erc20ApprovalGasSponsoring`), this needs no atomic
+batch. That one has the facilitator send ETH to the payer's wallet, which a front-runner could
+steal between funding and settlement. Here the permit only grants an allowance to Permit2, and
+Permit2 moves nothing without a `PermitTransferFrom` signature naming Core4Mica as spender — so a
+dangling allowance is not exploitable and the two transactions need not be atomic.
 
 Note this facilitator does **not** use x402's `x402ExactPermit2Proxy` or its `Witness`. Those exist
 because `exact` pays an arbitrary payee and Permit2's signature binds `spender` but not the
