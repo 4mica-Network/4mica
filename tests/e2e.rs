@@ -76,6 +76,9 @@ struct TestEnv {
     scheme: String,
     auth_key: Option<String>,
     auth_url: Option<String>,
+    /// Enables `/deposit`. Absent leaves the facilitator without gas sponsorship, which is a
+    /// supported deployment — the deposit case then skips rather than fails.
+    relayer_key: Option<String>,
 }
 
 /// Kills the spawned facilitator process on drop so a panicking assertion never
@@ -142,6 +145,16 @@ fn spawn_facilitator(env: &TestEnv, port: u16) -> Child {
         .env_remove("SIGNER_TYPE")
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
+
+    match &env.relayer_key {
+        Some(key) => {
+            cmd.env("X402_RELAYER_PRIVATE_KEY", key);
+        }
+        None => {
+            cmd.env_remove("X402_RELAYER_PRIVATE_KEY");
+        }
+    }
+    cmd.env_remove("X402_RELAYER_RPC_URL");
 
     match (&env.auth_key, &env.auth_url) {
         (Some(key), Some(url)) => {
@@ -293,6 +306,11 @@ async fn e2e_facilitator_endpoints() {
         scheme: env_opt("E2E_SCHEME").unwrap_or_else(|| DEFAULT_SCHEME.to_string()),
         auth_key,
         auth_url,
+        // Defaults to anvil acct 0, which the dev stack funds. Deposits still need an EIP-3009
+        // token, so the case is gated on E2E_DEPOSIT_TOKEN regardless.
+        relayer_key: Some(
+            env_opt("E2E_RELAYER_PRIVATE_KEY").unwrap_or_else(|| ANVIL_ACCT0_KEY.to_string()),
+        ),
     };
 
     if !core_reachable(&env.core_url).await {
@@ -450,6 +468,115 @@ async fn e2e_facilitator_endpoints() {
 
     // --- happy path (opt-in): a real SDK-signed payment that mints a certificate ---
     run_happy_path(&client, &base, &env, happy).await;
+
+    // --- gasless deposit (opt-in): SDK signs, facilitator pays the gas ---
+    run_gasless_deposit(&client, &base, &env).await;
+}
+
+/// End-to-end gasless deposit: the SDK signs an EIP-3009 authorization, the facilitator submits it
+/// and pays the gas, and collateral lands on the *signer* — never the relayer.
+///
+/// Deliberately signs via `sdk-4mica` rather than hand-rolling the digest: this is the only test
+/// that proves the SDK and the facilitator agree on the payload, which is the contract the whole
+/// gasless flow rests on. A hand-built authorization would pass even if the two had drifted.
+///
+/// Requires `E2E_DEPOSIT_TOKEN` — an EIP-3009 token registered with core (so core advertises its
+/// domain separator) and holding a balance for the payer.
+async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv) {
+    let Some(token) = env_opt("E2E_DEPOSIT_TOKEN") else {
+        eprintln!(
+            "[e2e] gasless deposit skipped: set E2E_DEPOSIT_TOKEN to an EIP-3009 token registered \
+             with core and funded for the payer"
+        );
+        return;
+    };
+    let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
+    let amount: u64 = env_opt("E2E_DEPOSIT_AMOUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000);
+
+    let signer: alloy::signers::local::PrivateKeySigner =
+        payer_key.parse().expect("invalid payer key");
+    let config = sdk_4mica::ConfigBuilder::default()
+        .signer(signer)
+        .rpc_url(env.core_url.clone())
+        .build()
+        .expect("build SDK config");
+    let sdk = sdk_4mica::Client::new(config).await.expect("init SDK client");
+
+    let before = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+
+    // Signing is chain-free: the SDK takes the token's domain separator from core over HTTP.
+    let authorization = match sdk
+        .user
+        .sign_deposit_authorization(token.clone(), sdk_4mica::U256::from(amount))
+        .await
+    {
+        Ok(authorization) => authorization,
+        Err(err) => {
+            eprintln!(
+                "[e2e] gasless deposit skipped: SDK could not sign for {token} ({err}). Core must \
+                 advertise the token's EIP-712 domain separator via /core/tokens."
+            );
+            return;
+        }
+    };
+
+    let body = json!({
+        "network": env.network,
+        "asset": token,
+        "amount": amount.to_string(),
+        "authorization": serde_json::to_value(&authorization).expect("serialize authorization"),
+    });
+
+    // Preflight first: it must agree with the submit path, and it spends no gas.
+    let (status, verify) = post_json(client, &format!("{base}/deposit/verify"), &body).await;
+    assert!(status.is_success(), "/deposit/verify HTTP status {status}");
+    if verify["errorCode"] == "NO_RELAYER" {
+        eprintln!("[e2e] gasless deposit skipped: facilitator has no relayer configured");
+        return;
+    }
+    assert_eq!(
+        verify["isValid"], true,
+        "/deposit/verify rejected an SDK-signed authorization: {verify}"
+    );
+
+    let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert!(status.is_success(), "/deposit HTTP status {status}");
+    assert_eq!(settle["success"], true, "/deposit failed: {settle}");
+    let tx_hash = settle["txHash"].as_str().expect("txHash in response");
+    assert!(tx_hash.starts_with("0x"), "unexpected txHash {tx_hash}");
+
+    // The payload binds `to` and `value`, so a facilitator cannot redirect the funds. Assert the
+    // signer was credited — reading on-chain, which has no indexer lag.
+    let after = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+    assert_eq!(
+        after - before,
+        sdk_4mica::U256::from(amount),
+        "collateral must be credited to the signer, not the relayer"
+    );
+
+    // Replaying the same authorization must fail: the nonce is consumed on-chain, and the
+    // facilitator should catch it before spending gas a second time.
+    let (_, replay) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert_eq!(replay["success"], false, "replay should be refused: {replay}");
+    // NONCE_ALREADY_USED when the token exposes `authorizationState`, SIMULATION_REVERTED when it
+    // does not — either way the replay is caught before any gas is spent.
+    let replay_code = replay["errorCode"].as_str().unwrap_or_default();
+    assert!(
+        matches!(replay_code, "NONCE_ALREADY_USED" | "SIMULATION_REVERTED"),
+        "replay must be refused before broadcast, got {replay_code}: {replay}"
+    );
+
+    eprintln!("[e2e] gasless deposit credited {amount} to the signer via {tx_hash} ✔");
 }
 
 /// Posts to `/verify` and asserts the facilitator rejected it (`isValid: false`

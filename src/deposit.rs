@@ -233,13 +233,20 @@ pub async fn verify(
     }
 
     // Cheap and decisive: a used nonce always reverts, so paying gas to discover that is pure loss.
-    let used = token
-        .authorizationState(auth.from, auth.nonce)
-        .call()
-        .await
-        .map_err(|err| DepositError::Chain(err.to_string()))?;
-    if used {
-        return Err(DepositError::NonceAlreadyUsed);
+    //
+    // Best-effort rather than required. EIP-3009 mandates `authorizationState`, but tokens exist
+    // that expose `DOMAIN_SEPARATOR` (EIP-2612) without the EIP-3009 surface, and treating a
+    // missing accessor as fatal would report "chain error" for what is really an unsupported
+    // token. The simulation below is authoritative either way — `receiveWithAuthorization` reverts
+    // on a consumed nonce — so skipping this only costs a clearer error code.
+    match token.authorizationState(auth.from, auth.nonce).call().await {
+        Ok(true) => return Err(DepositError::NonceAlreadyUsed),
+        Ok(false) => {}
+        Err(err) => tracing::debug!(
+            asset = %intent.asset,
+            error = %err,
+            "token does not expose authorizationState; relying on simulation for replay detection"
+        ),
     }
 
     let balance = token
