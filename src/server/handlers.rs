@@ -10,8 +10,8 @@ use tracing::{info, warn};
 
 use super::{
     model::{
-        DepositRequest, DepositResponse, DepositVerifyResponse, HealthResponse, SettleRequest,
-        SettleResponse, SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
+        DepositRequest, DepositResponse, DepositVerifyResponse, SettleRequest, SettleResponse,
+        SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
     },
     state::SharedState,
 };
@@ -63,7 +63,7 @@ async fn run_deposit_verify(
         request.asset_transfer_method.as_deref(),
         request.authorization,
     )?;
-    deposit::verify(relayer, &intent, now_secs()).await
+    deposit::verify(relayer, state.deposit_guard(), &intent, now_secs()).await
 }
 
 /// Submits a gasless deposit, with the relayer paying gas.
@@ -80,6 +80,7 @@ async fn deposit_handler(
     let from = request.authorization.from;
 
     if let Err(err) = state.deposit_guard().check_global() {
+        state.deposit_guard().record_rejected(&err);
         warn!(reason = %err, code = err.code(), "deposit rejected");
         return Json(DepositResponse::failure(
             err.to_string(),
@@ -91,6 +92,7 @@ async fn deposit_handler(
     let relayer = match state.relayer_for(network.as_deref()) {
         Ok(relayer) => relayer,
         Err(err) => {
+            state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, "deposit rejected");
             return Json(DepositResponse::failure(
                 err.to_string(),
@@ -108,6 +110,7 @@ async fn deposit_handler(
     ) {
         Ok(intent) => intent,
         Err(err) => {
+            state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, "deposit rejected");
             return Json(DepositResponse::failure(
                 err.to_string(),
@@ -119,6 +122,7 @@ async fn deposit_handler(
 
     match deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await {
         Ok(tx_hash) => {
+            state.deposit_guard().record_sponsored();
             info!(
                 tx_hash = %tx_hash,
                 from = %from,
@@ -140,6 +144,7 @@ async fn deposit_handler(
             })
         }
         Err(err) => {
+            state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "gasless deposit failed");
             Json(DepositResponse::failure(
                 err.to_string(),
@@ -172,8 +177,8 @@ async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
     })
 }
 
-async fn health_handler() -> impl IntoResponse {
-    Json(HealthResponse { status: "ok" })
+async fn health_handler(State(state): State<SharedState>) -> impl IntoResponse {
+    Json(state.health().await)
 }
 
 async fn verify_handler(

@@ -20,6 +20,7 @@
 //!   earlier would be trivially bypassed by varying `from` on every request.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -45,6 +46,14 @@ pub struct DepositLimits {
     /// Ceiling on distinct addresses tracked at once. Without it, spamming fresh `from` values
     /// would grow the rate-limit map unboundedly — a memory attack in place of a gas one.
     pub max_tracked_addresses: usize,
+    /// Hard cap on gas for one sponsored deposit, used both as the pre-flight estimate ceiling and
+    /// as the explicit limit on the broadcast transaction.
+    ///
+    /// Without it the token decides what a deposit costs us: a hostile or merely expensive
+    /// `receiveWithAuthorization` sets the bill. x402 names an unbounded gas limit as the
+    /// "trap door" vector for draining a facilitator. Unused gas is refunded, so setting this at
+    /// the ceiling costs nothing in the normal case and bounds the worst one.
+    pub max_gas: u64,
 }
 
 impl Default for DepositLimits {
@@ -56,6 +65,9 @@ impl Default for DepositLimits {
             window: Duration::from_secs(60),
             min_relayer_balance_wei: U256::ZERO,
             max_tracked_addresses: 10_000,
+            // Generous for an EIP-3009 deposit that also supplies into Aave (~250k observed),
+            // tight enough that a pathological token is rejected rather than sponsored.
+            max_gas: 600_000,
         }
     }
 }
@@ -71,9 +83,26 @@ struct GuardState {
     in_flight: HashSet<(Address, B256)>,
 }
 
+/// Running totals since process start. Griefing is only actionable if someone can see it, and
+/// until now the service emitted no signal at all — a slow drain would have gone unnoticed.
+#[derive(Debug, Default, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositCounters {
+    /// Deposits broadcast and mined successfully.
+    pub sponsored: u64,
+    /// Requests refused for any reason — bad signature, throttling, gas ceiling.
+    pub rejected: u64,
+    /// Subset of `rejected` refused by throttling specifically. A rising number here is the
+    /// signature of an abuse attempt rather than a misconfigured client.
+    pub throttled: u64,
+}
+
 pub struct DepositGuard {
     limits: DepositLimits,
     state: Mutex<GuardState>,
+    sponsored: AtomicU64,
+    rejected: AtomicU64,
+    throttled: AtomicU64,
 }
 
 impl DepositGuard {
@@ -81,7 +110,35 @@ impl DepositGuard {
         Arc::new(Self {
             limits,
             state: Mutex::new(GuardState::default()),
+            sponsored: AtomicU64::new(0),
+            rejected: AtomicU64::new(0),
+            throttled: AtomicU64::new(0),
         })
+    }
+
+    pub fn record_sponsored(&self) {
+        self.sponsored.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_rejected(&self, error: &DepositError) {
+        self.rejected.fetch_add(1, Ordering::Relaxed);
+        if matches!(
+            error,
+            DepositError::RateLimited
+                | DepositError::AddressRateLimited { .. }
+                | DepositError::TooManyInFlight
+                | DepositError::DuplicateInFlight
+        ) {
+            self.throttled.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub fn counters(&self) -> DepositCounters {
+        DepositCounters {
+            sponsored: self.sponsored.load(Ordering::Relaxed),
+            rejected: self.rejected.load(Ordering::Relaxed),
+            throttled: self.throttled.load(Ordering::Relaxed),
+        }
     }
 
     pub fn limits(&self) -> &DepositLimits {
@@ -228,6 +285,7 @@ mod tests {
             window: Duration::from_secs(60),
             min_relayer_balance_wei: U256::ZERO,
             max_tracked_addresses: 32,
+            max_gas: 600_000,
         }
     }
 

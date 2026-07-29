@@ -25,6 +25,7 @@ const ENV_DEPOSIT_PER_ADDRESS_LIMIT: &str = "X402_DEPOSIT_PER_ADDRESS_LIMIT";
 const ENV_DEPOSIT_GLOBAL_LIMIT: &str = "X402_DEPOSIT_GLOBAL_LIMIT";
 const ENV_DEPOSIT_WINDOW_SECS: &str = "X402_DEPOSIT_WINDOW_SECS";
 const ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI: &str = "X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI";
+const ENV_DEPOSIT_MAX_GAS: &str = "X402_DEPOSIT_MAX_GAS";
 const ENV_HOST: &str = "HOST";
 const ENV_PORT: &str = "PORT";
 const ENV_GUARANTEE_DOMAIN_VARIANTS: [&str; 3] = [
@@ -111,10 +112,16 @@ fn deposit_limits_from_env() -> Result<DepositLimits> {
         parse_env_usize(ENV_DEPOSIT_PER_ADDRESS_LIMIT, defaults.per_address_limit)?;
     let global_limit = parse_env_usize(ENV_DEPOSIT_GLOBAL_LIMIT, defaults.global_limit)?;
     let window_secs = parse_env_u64(ENV_DEPOSIT_WINDOW_SECS, defaults.window.as_secs())?;
+    let max_gas = parse_env_u64(ENV_DEPOSIT_MAX_GAS, defaults.max_gas)?;
 
     // Zero would disable the limit entirely, which is never what someone setting it explicitly
     // means — they would unset the variable instead.
-    if max_in_flight == 0 || per_address_limit == 0 || global_limit == 0 || window_secs == 0 {
+    if max_in_flight == 0
+        || per_address_limit == 0
+        || global_limit == 0
+        || window_secs == 0
+        || max_gas == 0
+    {
         bail!("deposit limit values must be greater than zero; unset the variable to use defaults");
     }
 
@@ -134,6 +141,7 @@ fn deposit_limits_from_env() -> Result<DepositLimits> {
         window: Duration::from_secs(window_secs),
         min_relayer_balance_wei,
         max_tracked_addresses: defaults.max_tracked_addresses,
+        max_gas,
     })
 }
 

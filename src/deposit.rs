@@ -104,6 +104,8 @@ pub enum DepositError {
     DuplicateInFlight,
     #[error("relayer balance {balance} is at or below the configured floor {floor}")]
     RelayerBalanceTooLow { balance: U256, floor: U256 },
+    #[error("deposit needs {estimated} gas, above the sponsored ceiling of {ceiling}")]
+    GasCeilingExceeded { estimated: u64, ceiling: u64 },
 }
 
 impl DepositError {
@@ -127,6 +129,7 @@ impl DepositError {
             Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
             Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
             Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
+            Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
         }
     }
 
@@ -194,6 +197,7 @@ impl DepositIntent {
 /// see — a paused contract, an asset disabled on-chain, an unsupported token.
 pub async fn verify(
     relayer: &Relayer,
+    guard: &DepositGuard,
     intent: &DepositIntent,
     now: u64,
 ) -> Result<(), DepositError> {
@@ -252,13 +256,26 @@ pub async fn verify(
         });
     }
 
-    relayer
-        .contract()
+    let contract = relayer.contract();
+    let call = contract
         .depositStablecoinWithAuthorization(intent.asset, intent.amount, auth.clone())
-        .from(relayer.address())
-        .call()
+        .from(relayer.address());
+
+    call.call()
         .await
         .map_err(|err| DepositError::SimulationReverted(err.to_string()))?;
+
+    // Simulation proves the deposit *succeeds*; it says nothing about what it costs. A token whose
+    // `receiveWithAuthorization` burns gas deliberately would pass every check above and still
+    // drain the relayer, so the cost is bounded explicitly.
+    let ceiling = guard.limits().max_gas;
+    let estimated = call
+        .estimate_gas()
+        .await
+        .map_err(|err| DepositError::Chain(err.to_string()))?;
+    if estimated > ceiling {
+        return Err(DepositError::GasCeilingExceeded { estimated, ceiling });
+    }
 
     Ok(())
 }
@@ -277,13 +294,13 @@ pub async fn submit(
     intent: &DepositIntent,
     now: u64,
 ) -> Result<B256, DepositError> {
-    verify(relayer, intent, now).await?;
+    verify(relayer, guard, intent, now).await?;
 
     // `from` is proven from here on. Held until this function returns, then released on drop.
     let _permit = guard.reserve(intent.authorization.from, intent.authorization.nonce)?;
 
     let balance = relayer
-        .balance()
+        .cached_balance()
         .await
         .map_err(|err| DepositError::Chain(err.to_string()))?;
     guard.check_relayer_balance(balance)?;
@@ -295,6 +312,9 @@ pub async fn submit(
             intent.amount,
             intent.authorization.clone(),
         )
+        // Explicit rather than estimated: an estimate is advisory, a limit is enforced. Unused gas
+        // is refunded, so this caps the worst case without costing anything normally.
+        .gas(guard.limits().max_gas)
         .send()
         .await
         .map_err(|err| DepositError::Broadcast(err.to_string()))?;

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::state::ValidationError;
+use crate::limits::DepositCounters;
 
 #[derive(Clone, Copy, Debug)]
 pub struct X402Version<const N: u8>;
@@ -100,9 +101,33 @@ impl SupportedResponse {
     }
 }
 
+/// Health, with enough operational detail to alert on.
+///
+/// A bare `{"status":"ok"}` cannot distinguish a working facilitator from one whose relayer ran dry
+/// hours ago, so the relayer's balance and the deposit counters are surfaced here. `status` is
+/// `degraded` when any relayer has fallen to or below its configured floor, so a plain HTTP check
+/// is enough to page on.
 #[derive(Serialize)]
-pub struct HealthResponse<'a> {
-    pub status: &'a str,
+pub struct HealthResponse {
+    pub status: &'static str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub relayers: Vec<RelayerHealth>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deposits: Option<DepositCounters>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayerHealth {
+    pub network: String,
+    pub address: String,
+    /// `None` when the balance could not be read — itself worth alerting on, and distinct from a
+    /// balance of zero.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balance_wei: Option<String>,
+    /// True when at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, i.e. deposits are being
+    /// refused. Always false when no floor is configured.
+    pub below_floor: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

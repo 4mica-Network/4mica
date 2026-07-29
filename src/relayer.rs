@@ -11,9 +11,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use alloy::network::EthereumWallet;
-use alloy::primitives::B256;
+use alloy::primitives::{B256, U256};
 use alloy::providers::fillers::{CachedNonceManager, NonceFiller};
 use alloy::providers::{DynProvider, Provider, ProviderBuilder};
 use alloy::signers::local::PrivateKeySigner;
@@ -39,7 +40,14 @@ struct RelayerInner {
     /// Token EIP-712 domain separators, memoised. Immutable per token per chain, so a hit can
     /// never go stale and every deposit after the first avoids an `eth_call`.
     token_domain_separators: RwLock<HashMap<Address, B256>>,
+    /// Native balance with a short TTL. Read on every deposit and every health check, so an
+    /// uncached read would turn `/health` into an RPC amplifier. Staleness is harmless: the floor
+    /// is a coarse safety limit, not an accounting figure.
+    cached_balance: RwLock<Option<(U256, Instant)>>,
 }
+
+/// How long a cached balance is served before refetching.
+const BALANCE_TTL: Duration = Duration::from_secs(15);
 
 impl Relayer {
     /// Builds a relayer for `network`, or `None` when that network did not configure one.
@@ -108,6 +116,7 @@ impl Relayer {
                 contract_address: public_params.contract_address,
                 provider,
                 token_domain_separators: RwLock::new(HashMap::new()),
+                cached_balance: RwLock::new(None),
             }),
         }))
     }
@@ -163,12 +172,28 @@ impl Relayer {
 
     /// Native balance of the relayer account, in wei. A relayer that cannot pay gas is useless,
     /// so this is surfaced at startup rather than discovered on the first failed deposit.
-    pub async fn balance(&self) -> Result<alloy::primitives::U256> {
-        self.inner
+    pub async fn balance(&self) -> Result<U256> {
+        let balance = self
+            .inner
             .provider
             .get_balance(self.inner.address)
             .await
-            .with_context(|| format!("failed to read relayer balance for {}", self.inner.network))
+            .with_context(|| {
+                format!("failed to read relayer balance for {}", self.inner.network)
+            })?;
+        *self.inner.cached_balance.write().await = Some((balance, Instant::now()));
+        Ok(balance)
+    }
+
+    /// Balance from cache when fresh, otherwise refetched. Used on the deposit hot path and by
+    /// `/health`, neither of which needs a to-the-block figure.
+    pub async fn cached_balance(&self) -> Result<U256> {
+        if let Some((balance, fetched_at)) = *self.inner.cached_balance.read().await
+            && fetched_at.elapsed() < BALANCE_TTL
+        {
+            return Ok(balance);
+        }
+        self.balance().await
     }
 }
 

@@ -14,8 +14,8 @@ use crate::deposit::DepositError;
 use crate::limits::DepositGuard;
 use crate::relayer::Relayer;
 use crate::server::model::{
-    PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
-    VerifyResponse, X402PaymentPayload,
+    HealthResponse, PaymentRequirements, RelayerHealth, SettleRequest, SettleResponse,
+    SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
 };
 use crate::verifier::CertificateValidator;
 use crate::{exact::ExactService, issuer::GuaranteeIssuer};
@@ -62,6 +62,39 @@ impl AppState {
 
     pub fn deposit_guard(&self) -> &Arc<DepositGuard> {
         &self.deposit_guard
+    }
+
+    /// Health plus the operational signals worth paging on.
+    ///
+    /// Balances come from the relayer's TTL cache, so polling this endpoint cannot amplify into
+    /// RPC load.
+    pub async fn health(&self) -> HealthResponse {
+        let floor = self.deposit_guard.limits().min_relayer_balance_wei;
+        let mut relayers = Vec::with_capacity(self.relayers.len());
+        let mut degraded = false;
+
+        for relayer in &self.relayers {
+            let balance = relayer.cached_balance().await.ok();
+            // An unreadable balance is a degraded state too: we cannot tell whether the relayer can
+            // pay, and reporting "ok" would be a lie.
+            let below_floor = match balance {
+                Some(balance) => !floor.is_zero() && balance <= floor,
+                None => true,
+            };
+            degraded |= below_floor;
+            relayers.push(RelayerHealth {
+                network: relayer.network().to_string(),
+                address: format!("{:#x}", relayer.address()),
+                balance_wei: balance.map(|b| b.to_string()),
+                below_floor,
+            });
+        }
+
+        HealthResponse {
+            status: if degraded { "degraded" } else { "ok" },
+            deposits: (!self.relayers.is_empty()).then(|| self.deposit_guard.counters()),
+            relayers,
+        }
     }
 
     /// Resolves the relayer for `network`, defaulting to the first configured one when the caller

@@ -1017,6 +1017,76 @@ async fn deposit_marks_throttling_as_retryable() {
     assert_eq!(payload["retryable"], true);
 }
 
+/// Existing monitoring checks `status == "ok"`, so the enriched payload must stay a superset of
+/// the old one. With no relayer there is nothing to report and the extra fields are omitted.
+#[tokio::test]
+async fn health_stays_backward_compatible_without_a_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["status"], "ok");
+    assert!(payload.get("relayers").is_none());
+    assert!(payload.get("deposits").is_none());
+}
+
+/// Rejections must be counted, and throttling counted twice — once as a rejection, once as
+/// throttling. `throttled` rising on its own is what distinguishes abuse from a broken client.
+#[tokio::test]
+async fn throttled_deposits_are_counted_separately_from_other_rejections() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let guard = DepositGuard::new(DepositLimits {
+        global_limit: 2,
+        ..DepositLimits::default()
+    });
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        Arc::clone(&guard),
+    ));
+    let router = build_router(state);
+
+    // Two get through the global limit and fail on the missing relayer; the third is throttled.
+    for _ in 0..3 {
+        let _ = router
+            .clone()
+            .oneshot(post_json("/deposit", &deposit_body(None)))
+            .await
+            .unwrap();
+    }
+
+    let counters = guard.counters();
+    assert_eq!(counters.sponsored, 0);
+    assert_eq!(counters.rejected, 3, "every refusal counts as a rejection");
+    assert_eq!(
+        counters.throttled, 1,
+        "only the rate-limited one counts as throttled"
+    );
+}
+
 /// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
 #[tokio::test]
 async fn deposit_rejects_a_malformed_authorization() {

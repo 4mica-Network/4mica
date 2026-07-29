@@ -131,8 +131,15 @@ async fn main() -> anyhow::Result<()> {
             global_limit = limits.global_limit,
             window_secs = limits.window.as_secs(),
             min_relayer_balance_wei = %limits.min_relayer_balance_wei,
+            max_gas = limits.max_gas,
             "deposit throttling active"
         );
+        if limits.min_relayer_balance_wei.is_zero() {
+            warn!(
+                "X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI is unset; deposits will keep being submitted \
+                 until the relayer is fully drained"
+            );
+        }
     }
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
