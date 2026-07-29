@@ -18,14 +18,14 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use alloy::primitives::{Address, B256, Signature, U256};
+use alloy::primitives::{Address, B256, Signature, U256, normalize_v};
 use alloy::sol;
 use alloy::sol_types::SolStruct;
-use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
+use sdk_4mica::contract::Core4Mica::{Core4MicaErrors, ReceiveAuthorization};
 use thiserror::Error;
 
-use crate::limits::DepositGuard;
-use crate::relayer::Relayer;
+use crate::limits::{DepositGuard, DepositLimits};
+use crate::relayer::{DepositToken, Relayer};
 
 sol! {
     /// EIP-3009's signed struct, declared here rather than imported: `sdk-4mica` keeps its digest
@@ -42,32 +42,26 @@ sol! {
     }
 }
 
-sol! {
-    #[sol(rpc)]
-    contract DepositToken {
-        function DOMAIN_SEPARATOR() external view returns (bytes32);
-        function balanceOf(address account) external view returns (uint256);
-        /// EIP-3009 replay guard. `true` once an authorization has been redeemed or cancelled.
-        function authorizationState(address authorizer, bytes32 nonce) external view returns (bool);
-    }
-}
-
 /// Asset transfer methods this facilitator can service.
 ///
 /// Permit2 is deliberately absent: `depositStablecoinWithPermit2` requires a prior on-chain
 /// `approve(PERMIT2, ...)` from the payer, so it is not gasless end-to-end. It is recognised and
 /// rejected with a distinct code rather than treated as an unknown value.
-pub const ASSET_TRANSFER_METHOD_EIP3009: &str = "eip3009";
-pub const ASSET_TRANSFER_METHOD_PERMIT2: &str = "permit2";
+const ASSET_TRANSFER_METHOD_EIP3009: &str = "eip3009";
+const ASSET_TRANSFER_METHOD_PERMIT2: &str = "permit2";
 
 #[derive(Debug, Error)]
 pub enum DepositError {
     #[error("{0}")]
     InvalidRequest(String),
+    #[error("malformed signature: {0}")]
+    MalformedSignature(String),
     #[error("unsupported assetTransferMethod {0}")]
     UnsupportedTransferMethod(String),
     #[error("permit2 deposits require a prior on-chain approve(PERMIT2) and are not yet supported")]
     Permit2Unsupported,
+    #[error("gas sponsorship is not enabled on this facilitator")]
+    NoRelayerConfigured,
     #[error("no relayer is configured for network {0}")]
     NoRelayer(String),
     #[error("authorization expired at {valid_before} (now {now})")]
@@ -88,12 +82,21 @@ pub enum DepositError {
         balance: U256,
         amount: U256,
     },
-    #[error("deposit simulation reverted: {0}")]
+    #[error("deposit would revert: {0}")]
     SimulationReverted(String),
     #[error("chain error: {0}")]
-    Chain(String),
+    Chain(#[from] anyhow::Error),
+    /// Nothing was submitted — safe to retry with the same authorization.
     #[error("failed to broadcast deposit: {0}")]
     Broadcast(String),
+    /// The transaction *was* broadcast but its outcome is unknown. Distinct from [`Self::Broadcast`]
+    /// because retrying risks a double submission; poll `tx_hash` instead.
+    #[error("deposit {tx_hash} was broadcast but its receipt could not be read: {reason}")]
+    ReceiptUnavailable { tx_hash: B256, reason: String },
+    /// Mined and reverted, so gas *was* spent. Distinct from [`Self::SimulationReverted`], which
+    /// means we declined before spending anything.
+    #[error("deposit {tx_hash} reverted on-chain")]
+    RevertedOnChain { tx_hash: B256 },
     #[error("too many deposit requests; retry shortly")]
     RateLimited,
     #[error("address {address} has exceeded its deposit rate limit; retry shortly")]
@@ -113,8 +116,10 @@ impl DepositError {
     pub fn code(&self) -> &'static str {
         match self {
             Self::InvalidRequest(_) => "INVALID_REQUEST",
+            Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
             Self::UnsupportedTransferMethod(_) => "UNSUPPORTED_TRANSFER_METHOD",
             Self::Permit2Unsupported => "PERMIT2_UNSUPPORTED",
+            Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
             Self::NoRelayer(_) => "NO_RELAYER",
             Self::Expired { .. } => "EXPIRED",
             Self::NotYetValid { .. } => "NOT_YET_VALID",
@@ -124,6 +129,8 @@ impl DepositError {
             Self::SimulationReverted(_) => "SIMULATION_REVERTED",
             Self::Chain(_) => "CHAIN_ERROR",
             Self::Broadcast(_) => "BROADCAST_FAILED",
+            Self::ReceiptUnavailable { .. } => "RECEIPT_UNAVAILABLE",
+            Self::RevertedOnChain { .. } => "REVERTED_ON_CHAIN",
             Self::RateLimited => "RATE_LIMITED",
             Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
             Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
@@ -133,18 +140,25 @@ impl DepositError {
         }
     }
 
-    /// Whether the caller should retry the same request later, as opposed to changing it.
-    /// Throttling is transient; a bad signature is not.
-    pub fn is_retryable(&self) -> bool {
+    /// Whether this rejection came from throttling rather than the request itself. The single
+    /// source of truth for both [`Self::is_retryable`] and the abuse counters.
+    pub fn is_throttling(&self) -> bool {
         matches!(
             self,
             Self::RateLimited
                 | Self::AddressRateLimited { .. }
                 | Self::TooManyInFlight
                 | Self::DuplicateInFlight
-                | Self::RelayerBalanceTooLow { .. }
-                | Self::Chain(_)
         )
+    }
+
+    /// Whether the caller should retry the same request later, as opposed to changing it.
+    /// Throttling and chain trouble are transient; a bad signature is not.
+    ///
+    /// Deliberately excludes [`Self::ReceiptUnavailable`]: that transaction may still land, so a
+    /// retry risks depositing twice.
+    pub fn is_retryable(&self) -> bool {
+        self.is_throttling() || matches!(self, Self::RelayerBalanceTooLow { .. } | Self::Chain(_))
     }
 }
 
@@ -197,7 +211,7 @@ impl DepositIntent {
 /// see — a paused contract, an asset disabled on-chain, an unsupported token.
 pub async fn verify(
     relayer: &Relayer,
-    guard: &DepositGuard,
+    limits: &DepositLimits,
     intent: &DepositIntent,
     now: u64,
 ) -> Result<(), DepositError> {
@@ -253,7 +267,7 @@ pub async fn verify(
         .balanceOf(auth.from)
         .call()
         .await
-        .map_err(|err| DepositError::Chain(err.to_string()))?;
+        .map_err(classify_call_error)?;
     if balance < intent.amount {
         return Err(DepositError::InsufficientBalance {
             from: auth.from,
@@ -263,28 +277,77 @@ pub async fn verify(
         });
     }
 
+    // `eth_estimateGas` executes the deposit against current state, so it both proves the call
+    // succeeds and prices it — no separate `eth_call` needed. It also bounds the cost: a token
+    // whose `receiveWithAuthorization` burns gas deliberately passes every check above and would
+    // still drain the relayer.
     let contract = relayer.contract();
-    let call = contract
+    let estimated = contract
         .depositStablecoinWithAuthorization(intent.asset, intent.amount, auth.clone())
-        .from(relayer.address());
-
-    call.call()
-        .await
-        .map_err(|err| DepositError::SimulationReverted(err.to_string()))?;
-
-    // Simulation proves the deposit *succeeds*; it says nothing about what it costs. A token whose
-    // `receiveWithAuthorization` burns gas deliberately would pass every check above and still
-    // drain the relayer, so the cost is bounded explicitly.
-    let ceiling = guard.limits().max_gas;
-    let estimated = call
+        .from(relayer.address())
         .estimate_gas()
         .await
-        .map_err(|err| DepositError::Chain(err.to_string()))?;
-    if estimated > ceiling {
-        return Err(DepositError::GasCeilingExceeded { estimated, ceiling });
+        .map_err(classify_call_error)?;
+
+    if estimated > limits.max_gas {
+        return Err(DepositError::GasCeilingExceeded {
+            estimated,
+            ceiling: limits.max_gas,
+        });
     }
 
     Ok(())
+}
+
+/// Names the Core4Mica reverts a deposit can realistically hit. Anything else falls back to its
+/// selector, which is still more useful than an opaque `execution reverted`.
+fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
+    use alloy::sol_types::SolInterface;
+
+    match decoded {
+        Core4MicaErrors::AaveNotConfigured(_) => {
+            "AaveNotConfigured: the deployment has no Aave pool, so stablecoin deposits are \
+             unavailable"
+                .to_string()
+        }
+        Core4MicaErrors::UnsupportedAsset(err) => {
+            format!(
+                "UnsupportedAsset: {} is not a registered stablecoin",
+                err.asset
+            )
+        }
+        Core4MicaErrors::InvalidAsset(err) => format!("InvalidAsset: {}", err.asset),
+        Core4MicaErrors::AmountZero(_) => "AmountZero".to_string(),
+        Core4MicaErrors::InvalidSignature(_) => {
+            "InvalidSignature: the token rejected the EIP-3009 authorization".to_string()
+        }
+        Core4MicaErrors::ValueMismatch(err) => format!(
+            "ValueMismatch: expected {} but received {} (fee-on-transfer token?)",
+            err.expected, err.actual
+        ),
+        Core4MicaErrors::ZeroCollateralCredit(err) => format!(
+            "ZeroCollateralCredit: {} of {} is too small to mint any collateral",
+            err.amount, err.asset
+        ),
+        other => format!("revert with selector 0x{}", hex::encode(other.selector())),
+    }
+}
+
+/// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
+///
+/// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
+/// revert. Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so
+/// clients see `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
+fn classify_call_error(err: alloy::contract::Error) -> DepositError {
+    if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
+        return DepositError::SimulationReverted(describe_core4mica_error(&decoded));
+    }
+    match err {
+        alloy::contract::Error::TransportError(err) => {
+            DepositError::Chain(anyhow::Error::new(err).context("deposit simulation"))
+        }
+        other => DepositError::SimulationReverted(other.to_string()),
+    }
 }
 
 /// Verifies, reserves capacity, then broadcasts and waits for the receipt.
@@ -301,15 +364,12 @@ pub async fn submit(
     intent: &DepositIntent,
     now: u64,
 ) -> Result<B256, DepositError> {
-    verify(relayer, guard, intent, now).await?;
+    verify(relayer, guard.limits(), intent, now).await?;
 
     // `from` is proven from here on. Held until this function returns, then released on drop.
     let _permit = guard.reserve(intent.authorization.from, intent.authorization.nonce)?;
 
-    let balance = relayer
-        .cached_balance()
-        .await
-        .map_err(|err| DepositError::Chain(err.to_string()))?;
+    let balance = relayer.cached_balance().await?;
     guard.check_relayer_balance(balance)?;
 
     let pending = relayer
@@ -326,16 +386,20 @@ pub async fn submit(
         .await
         .map_err(|err| DepositError::Broadcast(err.to_string()))?;
 
+    // Past this point the transaction is on the wire, so a failure is no longer safe to retry.
+    let tx_hash = *pending.tx_hash();
     let receipt = pending
         .get_receipt()
         .await
-        .map_err(|err| DepositError::Broadcast(err.to_string()))?;
+        .map_err(|err| DepositError::ReceiptUnavailable {
+            tx_hash,
+            reason: err.to_string(),
+        })?;
 
     if !receipt.status() {
-        return Err(DepositError::SimulationReverted(format!(
-            "transaction {} reverted on-chain",
-            receipt.transaction_hash
-        )));
+        return Err(DepositError::RevertedOnChain {
+            tx_hash: receipt.transaction_hash,
+        });
     }
 
     Ok(receipt.transaction_hash)
@@ -372,32 +436,23 @@ fn receive_authorization_digest(
 /// Recovers the signer, accepting `v` in either Electrum (27/28) or raw parity (0/1) form —
 /// EIP-3009 tokens expect the former, but signers differ and rejecting 0/1 would be gratuitous.
 fn recover_signer(digest: &B256, auth: &ReceiveAuthorization) -> Result<Address, DepositError> {
-    let parity = match auth.v {
-        27 | 0 => false,
-        28 | 1 => true,
-        other => {
-            return Err(DepositError::InvalidRequest(format!(
-                "invalid signature v: {other}, expected 27/28"
-            )));
-        }
-    };
+    let parity = normalize_v(auth.v as u64).ok_or_else(|| {
+        DepositError::MalformedSignature(format!("invalid signature v: {}, expected 27/28", auth.v))
+    })?;
 
-    let signature = Signature::from_scalars_and_parity(auth.r, auth.s, parity);
-    signature
+    Signature::from_scalars_and_parity(auth.r, auth.s, parity)
         .recover_address_from_prehash(digest)
-        .map_err(|err| DepositError::InvalidRequest(format!("unrecoverable signature: {err}")))
+        .map_err(|err| DepositError::MalformedSignature(format!("unrecoverable signature: {err}")))
 }
 
 /// Accepts decimal or `0x`-prefixed hex, matching how amounts travel elsewhere in x402.
+/// `U256`'s `FromStr` already dispatches on the prefix, so there is nothing to hand-roll.
 fn parse_u256(value: &str) -> Result<U256, String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Err("cannot be empty".into());
     }
-    match trimmed.strip_prefix("0x") {
-        Some(hex) => U256::from_str_radix(hex, 16).map_err(|err| err.to_string()),
-        None => U256::from_str_radix(trimmed, 10).map_err(|err| err.to_string()),
-    }
+    U256::from_str(trimmed).map_err(|err| err.to_string())
 }
 
 #[cfg(test)]
@@ -574,6 +629,6 @@ mod tests {
         let mut authorization = auth(Address::ZERO);
         authorization.v = 42;
         let err = recover_signer(&B256::ZERO, &authorization).expect_err("expected v rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), "MALFORMED_SIGNATURE");
     }
 }

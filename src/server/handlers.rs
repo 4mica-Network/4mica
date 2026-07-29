@@ -39,6 +39,9 @@ async fn deposit_verify_handler(
     match run_deposit_verify(&state, request).await {
         Ok(()) => Json(DepositVerifyResponse::valid()),
         Err(err) => {
+            // Counted like a submit rejection: this endpoint consumes a global rate-limit slot and
+            // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
+            state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "deposit verification failed");
             Json(DepositVerifyResponse::invalid(
                 err.to_string(),
@@ -63,7 +66,7 @@ async fn run_deposit_verify(
         request.asset_transfer_method.as_deref(),
         request.authorization,
     )?;
-    deposit::verify(relayer, state.deposit_guard(), &intent, now_secs()).await
+    deposit::verify(relayer, state.deposit_guard().limits(), &intent, now_secs()).await
 }
 
 /// Submits a gasless deposit, with the relayer paying gas.
@@ -74,74 +77,18 @@ async fn deposit_handler(
     State(state): State<SharedState>,
     Json(request): Json<DepositRequest>,
 ) -> impl IntoResponse {
-    let network = request.network.clone();
-    let asset = request.asset.clone();
-    let amount = request.amount.clone();
-    let from = request.authorization.from;
-
-    if let Err(err) = state.deposit_guard().check_global() {
-        state.deposit_guard().record_rejected(&err);
-        warn!(reason = %err, code = err.code(), "deposit rejected");
-        return Json(DepositResponse::failure(
-            err.to_string(),
-            err.code(),
-            err.is_retryable(),
-        ));
-    }
-
-    let relayer = match state.relayer_for(network.as_deref()) {
-        Ok(relayer) => relayer,
-        Err(err) => {
-            state.deposit_guard().record_rejected(&err);
-            warn!(reason = %err, "deposit rejected");
-            return Json(DepositResponse::failure(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ));
-        }
-    };
-
-    let intent = match DepositIntent::parse(
-        &asset,
-        &amount,
-        request.asset_transfer_method.as_deref(),
-        request.authorization,
-    ) {
-        Ok(intent) => intent,
-        Err(err) => {
-            state.deposit_guard().record_rejected(&err);
-            warn!(reason = %err, "deposit rejected");
-            return Json(DepositResponse::failure(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ));
-        }
-    };
-
-    match deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await {
-        Ok(tx_hash) => {
+    match run_deposit(&state, request).await {
+        Ok(response) => {
             state.deposit_guard().record_sponsored();
             info!(
-                tx_hash = %tx_hash,
-                from = %from,
-                asset = %intent.asset,
-                amount = %intent.amount,
-                network = relayer.network(),
+                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                from = response.from.as_deref().unwrap_or_default(),
+                asset = response.asset.as_deref().unwrap_or_default(),
+                amount = response.amount.as_deref().unwrap_or_default(),
+                network = response.network.as_deref().unwrap_or_default(),
                 "gasless deposit submitted"
             );
-            Json(DepositResponse {
-                success: true,
-                tx_hash: Some(format!("{tx_hash:#x}")),
-                network: Some(relayer.network().to_string()),
-                from: Some(format!("{from:#x}")),
-                asset: Some(format!("{:#x}", intent.asset)),
-                amount: Some(intent.amount.to_string()),
-                error: None,
-                error_code: None,
-                retryable: None,
-            })
+            Json(response)
         }
         Err(err) => {
             state.deposit_guard().record_rejected(&err);
@@ -155,11 +102,31 @@ async fn deposit_handler(
     }
 }
 
+async fn run_deposit(
+    state: &SharedState,
+    request: DepositRequest,
+) -> Result<DepositResponse, DepositError> {
+    state.deposit_guard().check_global()?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent = DepositIntent::parse(
+        &request.asset,
+        &request.amount,
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+    )?;
+
+    let tx_hash = deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await?;
+    Ok(DepositResponse::success(
+        tx_hash,
+        relayer.network(),
+        &intent,
+    ))
+}
+
 fn now_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or_default()
+        .map_or(0, |d| d.as_secs())
 }
 
 async fn supported_handler(State(state): State<SharedState>) -> impl IntoResponse {

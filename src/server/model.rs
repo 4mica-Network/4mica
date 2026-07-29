@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::state::ValidationError;
+use alloy::primitives::B256;
+
+use crate::deposit::DepositIntent;
 use crate::limits::DepositCounters;
 
 #[derive(Clone, Copy, Debug)]
@@ -277,6 +280,20 @@ pub struct DepositResponse {
 }
 
 impl DepositResponse {
+    pub fn success(tx_hash: B256, network: &str, intent: &DepositIntent) -> Self {
+        Self {
+            success: true,
+            tx_hash: Some(format!("{tx_hash:#x}")),
+            network: Some(network.to_string()),
+            from: Some(format!("{:#x}", intent.authorization.from)),
+            asset: Some(format!("{:#x}", intent.asset)),
+            amount: Some(intent.amount.to_string()),
+            error: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
     pub fn failure(error: String, code: &str, retryable: bool) -> Self {
         Self {
             success: false,

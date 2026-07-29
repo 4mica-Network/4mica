@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use alloy::primitives::U256;
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
@@ -67,24 +68,15 @@ pub struct NetworkAuthConfig {
 /// logins against core and needs no balance, whereas this one signs real transactions and must
 /// hold native gas. Sharing one key would silently couple the two, and draining the gas account
 /// would take authentication down with it.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NetworkRelayerConfig {
-    pub private_key: String,
+    /// Parsed at config load so a malformed key fails at startup, and so the raw string is never
+    /// stored. `PrivateKeySigner`'s own `Debug` redacts the key.
+    pub signer: PrivateKeySigner,
     /// `None` means "use the `ethereum_http_rpc_url` core advertises", resolved once public params
     /// are fetched, so a single-chain deployment needs only a key. Config load happens before that
     /// fetch, which is why this cannot already be a concrete `Url`.
     pub rpc_url: Option<Url>,
-}
-
-/// Hand-written so the key is never printed. Derived `Debug` would leak it into any log line,
-/// panic message, or `expect_err` output that formats a config value.
-impl std::fmt::Debug for NetworkRelayerConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NetworkRelayerConfig")
-            .field("private_key", &"<redacted>")
-            .field("rpc_url", &self.rpc_url)
-            .finish()
-    }
 }
 
 impl ServiceConfig {
@@ -107,30 +99,29 @@ impl ServiceConfig {
 fn deposit_limits_from_env() -> Result<DepositLimits> {
     let defaults = DepositLimits::default();
 
-    let max_in_flight = parse_env_usize(ENV_DEPOSIT_MAX_IN_FLIGHT, defaults.max_in_flight)?;
-    let per_address_limit =
-        parse_env_usize(ENV_DEPOSIT_PER_ADDRESS_LIMIT, defaults.per_address_limit)?;
-    let global_limit = parse_env_usize(ENV_DEPOSIT_GLOBAL_LIMIT, defaults.global_limit)?;
-    let window_secs = parse_env_u64(ENV_DEPOSIT_WINDOW_SECS, defaults.window.as_secs())?;
-    let max_gas = parse_env_u64(ENV_DEPOSIT_MAX_GAS, defaults.max_gas)?;
+    let max_in_flight = parse_env(ENV_DEPOSIT_MAX_IN_FLIGHT, defaults.max_in_flight)?;
+    let per_address_limit = parse_env(ENV_DEPOSIT_PER_ADDRESS_LIMIT, defaults.per_address_limit)?;
+    let global_limit = parse_env(ENV_DEPOSIT_GLOBAL_LIMIT, defaults.global_limit)?;
+    let window_secs = parse_env(ENV_DEPOSIT_WINDOW_SECS, defaults.window.as_secs())?;
+    let max_gas = parse_env(ENV_DEPOSIT_MAX_GAS, defaults.max_gas)?;
 
     // Zero would disable the limit entirely, which is never what someone setting it explicitly
     // means — they would unset the variable instead.
-    if max_in_flight == 0
-        || per_address_limit == 0
-        || global_limit == 0
-        || window_secs == 0
-        || max_gas == 0
-    {
-        bail!("deposit limit values must be greater than zero; unset the variable to use defaults");
+    for (key, value) in [
+        (ENV_DEPOSIT_MAX_IN_FLIGHT, max_in_flight as u64),
+        (ENV_DEPOSIT_PER_ADDRESS_LIMIT, per_address_limit as u64),
+        (ENV_DEPOSIT_GLOBAL_LIMIT, global_limit as u64),
+        (ENV_DEPOSIT_WINDOW_SECS, window_secs),
+        (ENV_DEPOSIT_MAX_GAS, max_gas),
+    ] {
+        if value == 0 {
+            bail!("{key} must be greater than zero; unset it to use the default");
+        }
     }
 
     let min_relayer_balance_wei = match trimmed_env(ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI) {
-        Some(raw) => U256::from_str_radix(
-            raw.trim_start_matches("0x"),
-            if raw.starts_with("0x") { 16 } else { 10 },
-        )
-        .with_context(|| format!("{ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI} must be a uint256"))?,
+        Some(raw) => U256::from_str(&raw)
+            .with_context(|| format!("{ENV_DEPOSIT_MIN_RELAYER_BALANCE_WEI} must be a uint256"))?,
         None => defaults.min_relayer_balance_wei,
     };
 
@@ -140,24 +131,19 @@ fn deposit_limits_from_env() -> Result<DepositLimits> {
         global_limit,
         window: Duration::from_secs(window_secs),
         min_relayer_balance_wei,
-        max_tracked_addresses: defaults.max_tracked_addresses,
         max_gas,
+        ..defaults
     })
 }
 
-fn parse_env_usize(key: &str, default: usize) -> Result<usize> {
+fn parse_env<T>(key: &str, default: T) -> Result<T>
+where
+    T: FromStr,
+    T::Err: std::error::Error + Send + Sync + 'static,
+{
     match trimmed_env(key) {
         Some(raw) => raw
-            .parse::<usize>()
-            .with_context(|| format!("{key} must be a non-negative integer")),
-        None => Ok(default),
-    }
-}
-
-fn parse_env_u64(key: &str, default: u64) -> Result<u64> {
-    match trimmed_env(key) {
-        Some(raw) => raw
-            .parse::<u64>()
+            .parse::<T>()
             .with_context(|| format!("{key} must be a non-negative integer")),
         None => Ok(default),
     }
@@ -399,9 +385,8 @@ fn resolve_relayer_config(
         return Ok(None);
     };
 
-    // Parse eagerly so a malformed key fails at startup rather than on the first deposit.
-    private_key
-        .parse::<alloy::signers::local::PrivateKeySigner>()
+    let signer = private_key
+        .parse::<PrivateKeySigner>()
         .with_context(|| format!("invalid relayer private key for network {network}"))?;
 
     let rpc_url = rpc_url
@@ -411,10 +396,7 @@ fn resolve_relayer_config(
         })
         .transpose()?;
 
-    Ok(Some(NetworkRelayerConfig {
-        private_key: private_key.to_string(),
-        rpc_url,
-    }))
+    Ok(Some(NetworkRelayerConfig { signer, rpc_url }))
 }
 
 fn trimmed_env(key: &str) -> Option<String> {
@@ -425,18 +407,9 @@ fn trimmed_env(key: &str) -> Option<String> {
 }
 
 fn load_auth_fallback() -> Result<AuthFallback> {
-    let wallet_private_key = std::env::var(ENV_AUTH_WALLET_PRIVATE_KEY)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty());
-    let auth_url = std::env::var(ENV_AUTH_URL)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty());
-    let refresh_margin_secs = std::env::var(ENV_AUTH_REFRESH_MARGIN_SECS)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
+    let wallet_private_key = trimmed_env(ENV_AUTH_WALLET_PRIVATE_KEY);
+    let auth_url = trimmed_env(ENV_AUTH_URL);
+    let refresh_margin_secs = trimmed_env(ENV_AUTH_REFRESH_MARGIN_SECS)
         .map(|value| {
             value.parse::<u64>().with_context(|| {
                 format!("{ENV_AUTH_REFRESH_MARGIN_SECS} must be a positive integer")

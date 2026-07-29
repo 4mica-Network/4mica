@@ -17,14 +17,27 @@ use alloy::network::EthereumWallet;
 use alloy::primitives::{B256, U256};
 use alloy::providers::fillers::{CachedNonceManager, NonceFiller};
 use alloy::providers::{DynProvider, Provider, ProviderBuilder};
-use alloy::signers::local::PrivateKeySigner;
+use alloy::sol;
 use anyhow::{Context, Result};
 use sdk_4mica::Address;
 use sdk_4mica::contract::Core4Mica::{self, Core4MicaInstance};
 use tokio::sync::RwLock;
 
 use crate::config::{NetworkConfig, PublicParameters};
-use crate::deposit::{DepositError, DepositToken};
+use crate::deposit::DepositError;
+
+sol! {
+    /// The slice of an EIP-3009 token this facilitator reads. Declared here rather than in
+    /// `deposit.rs` so the transport layer does not depend on the domain layer; `sdk-4mica`'s own
+    /// `ERC20` binding has `DOMAIN_SEPARATOR` but neither `balanceOf` nor `authorizationState`.
+    #[sol(rpc)]
+    contract DepositToken {
+        function DOMAIN_SEPARATOR() external view returns (bytes32);
+        function balanceOf(address account) external view returns (uint256);
+        /// EIP-3009 replay guard. `true` once an authorization has been redeemed or cancelled.
+        function authorizationState(address authorizer, bytes32 nonce) external view returns (bool);
+    }
+}
 
 /// A funded signer bound to one network's chain, able to submit Core4Mica transactions.
 #[derive(Clone)]
@@ -75,10 +88,7 @@ impl Relayer {
                 )
             })?;
 
-        let signer: PrivateKeySigner = relayer_cfg
-            .private_key
-            .parse()
-            .with_context(|| format!("invalid relayer private key for network {}", network.id))?;
+        let signer = relayer_cfg.signer.clone();
         let address = signer.address();
 
         // CachedNonceManager keeps the next nonce in-process instead of asking the node per
@@ -157,9 +167,9 @@ impl Relayer {
             .call()
             .await
             .map_err(|err| {
-                DepositError::Chain(format!(
-                    "token {token} does not expose DOMAIN_SEPARATOR (not an EIP-3009 token?): {err}"
-                ))
+                DepositError::Chain(anyhow::Error::new(err).context(format!(
+                    "token {token} does not expose DOMAIN_SEPARATOR (not an EIP-3009 token?)"
+                )))
             })?;
 
         self.inner

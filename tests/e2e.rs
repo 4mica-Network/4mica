@@ -581,13 +581,13 @@ async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv
         eprintln!("[e2e] gasless deposit skipped: facilitator has no relayer configured");
         return;
     }
-    // `AaveNotConfigured()`. Stablecoin deposits route collateral into Aave, so a deployment
-    // without it cannot service them at all — an environment gap like a missing relayer, not a
-    // facilitator defect, so it skips rather than failing forever.
-    const AAVE_NOT_CONFIGURED: &str = "0x3a76e42a";
+    // Stablecoin deposits route collateral into Aave, so a deployment without it cannot service
+    // them at all — an environment gap like a missing relayer, not a facilitator defect, so it
+    // skips rather than failing forever. The facilitator decodes the revert against the Core4Mica
+    // error ABI, so this matches a name rather than a raw selector.
     if verify["invalidReason"]
         .as_str()
-        .is_some_and(|reason| reason.contains(AAVE_NOT_CONFIGURED))
+        .is_some_and(|reason| reason.contains("AaveNotConfigured"))
     {
         eprintln!(
             "[e2e] gasless deposit skipped: Core4Mica reverts with AaveNotConfigured(). Configure \
@@ -600,9 +600,9 @@ async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv
     assert_eq!(
         verify["isValid"], true,
         "/deposit/verify rejected an SDK-signed authorization for {token}: {verify}\n  \
-         If this is SIMULATION_REVERTED, decode the custom error before assuming a facilitator \
-         bug — a token advertising DOMAIN_SEPARATOR (EIP-2612) without EIP-3009 \
-         `receiveWithAuthorization`, or an unregistered asset, both land here."
+         SIMULATION_REVERTED carries the decoded Core4Mica error — a token advertising \
+         DOMAIN_SEPARATOR (EIP-2612) without EIP-3009 `receiveWithAuthorization`, or an \
+         unregistered asset, both land here."
     );
 
     let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;

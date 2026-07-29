@@ -910,7 +910,7 @@ async fn deposit_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER");
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
 }
 
 #[tokio::test]
@@ -930,7 +930,7 @@ async fn deposit_verify_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER");
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
 }
 
 /// The global limit must engage before any relayer or chain work, so it protects a facilitator
@@ -974,8 +974,8 @@ async fn deposit_is_rate_limited_globally() {
     }
 
     // First two get as far as the relayer lookup; the third is turned away by the limiter.
-    assert_eq!(codes[0], "NO_RELAYER");
-    assert_eq!(codes[1], "NO_RELAYER");
+    assert_eq!(codes[0], "NO_RELAYER_CONFIGURED");
+    assert_eq!(codes[1], "NO_RELAYER_CONFIGURED");
     assert_eq!(codes[2], "RATE_LIMITED");
 }
 

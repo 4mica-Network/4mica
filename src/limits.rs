@@ -21,7 +21,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use alloy::primitives::{Address, B256, U256};
@@ -81,6 +81,8 @@ struct GuardState {
     /// Authorizations currently being submitted, so the same one cannot be broadcast twice
     /// concurrently. The on-chain nonce guard catches sequential replays; this catches the race.
     in_flight: HashSet<(Address, B256)>,
+    /// When `per_address` was last swept, so a full map does not re-scan on every request.
+    last_sweep: Option<Instant>,
 }
 
 /// Running totals since process start. Griefing is only actionable if someone can see it, and
@@ -122,13 +124,7 @@ impl DepositGuard {
 
     pub fn record_rejected(&self, error: &DepositError) {
         self.rejected.fetch_add(1, Ordering::Relaxed);
-        if matches!(
-            error,
-            DepositError::RateLimited
-                | DepositError::AddressRateLimited { .. }
-                | DepositError::TooManyInFlight
-                | DepositError::DuplicateInFlight
-        ) {
+        if error.is_throttling() {
             self.throttled.fetch_add(1, Ordering::Relaxed);
         }
     }
@@ -149,7 +145,7 @@ impl DepositGuard {
     /// request, since none of them are proven yet.
     pub fn check_global(&self) -> Result<(), DepositError> {
         let now = Instant::now();
-        let mut state = self.state.lock().expect("deposit guard poisoned");
+        let mut state = self.lock();
 
         prune(&mut state.global, now, self.limits.window);
         if state.global.len() >= self.limits.global_limit {
@@ -169,27 +165,34 @@ impl DepositGuard {
         nonce: B256,
     ) -> Result<DepositPermit, DepositError> {
         let now = Instant::now();
-        let mut state = self.state.lock().expect("deposit guard poisoned");
+        let mut state = self.lock();
 
         if state.in_flight.len() >= self.limits.max_in_flight {
             return Err(DepositError::TooManyInFlight);
         }
-        if !state.in_flight.insert((from, nonce)) {
+        if state.in_flight.contains(&(from, nonce)) {
             return Err(DepositError::DuplicateInFlight);
         }
 
-        // Sweep before inserting a new address so the map tracks only genuinely-active callers.
+        // Sweep before tracking a new address so the map holds only genuinely-active callers.
+        // Rate-limited so address spam cannot make every request re-scan the whole map under the
+        // lock — that would amplify exactly the attack the cap defends against.
         if state.per_address.len() >= self.limits.max_tracked_addresses
             && !state.per_address.contains_key(&from)
         {
             let window = self.limits.window;
-            state.per_address.retain(|_, seen| {
-                prune(seen, now, window);
-                !seen.is_empty()
-            });
-            // Still full after sweeping: fail closed rather than grow without bound.
+            let due = state
+                .last_sweep
+                .is_none_or(|last| now.duration_since(last) >= window / 4);
+            if due {
+                state.last_sweep = Some(now);
+                state.per_address.retain(|_, seen| {
+                    prune(seen, now, window);
+                    !seen.is_empty()
+                });
+            }
+            // Still full: fail closed rather than grow without bound.
             if state.per_address.len() >= self.limits.max_tracked_addresses {
-                state.in_flight.remove(&(from, nonce));
                 return Err(DepositError::RateLimited);
             }
         }
@@ -197,10 +200,12 @@ impl DepositGuard {
         let seen = state.per_address.entry(from).or_default();
         prune(seen, now, self.limits.window);
         if seen.len() >= self.limits.per_address_limit {
-            state.in_flight.remove(&(from, nonce));
             return Err(DepositError::AddressRateLimited { address: from });
         }
         seen.push_back(now);
+        // Inserted last: every failure path above returns before reserving, so there is nothing to
+        // roll back and no way to leak a slot.
+        state.in_flight.insert((from, nonce));
 
         Ok(DepositPermit {
             guard: Arc::clone(self),
@@ -221,15 +226,20 @@ impl DepositGuard {
         Ok(())
     }
 
+    /// Recovers rather than panicking: the guarded state is only timestamps and an in-flight set,
+    /// so a poisoned lock cannot mean a broken invariant — but refusing to take it would strand
+    /// in-flight capacity forever and take `/deposit` down permanently.
+    fn lock(&self) -> std::sync::MutexGuard<'_, GuardState> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn release(&self, from: Address, nonce: B256) {
-        if let Ok(mut state) = self.state.lock() {
-            state.in_flight.remove(&(from, nonce));
-        }
+        self.lock().in_flight.remove(&(from, nonce));
     }
 
     #[cfg(test)]
     fn in_flight_len(&self) -> usize {
-        self.state.lock().expect("poisoned").in_flight.len()
+        self.lock().in_flight.len()
     }
 }
 
@@ -257,12 +267,11 @@ impl Drop for DepositPermit {
 }
 
 fn prune(times: &mut VecDeque<Instant>, now: Instant, window: Duration) {
-    while let Some(oldest) = times.front() {
-        if now.duration_since(*oldest) >= window {
-            times.pop_front();
-        } else {
-            break;
-        }
+    while times
+        .front()
+        .is_some_and(|oldest| now.duration_since(*oldest) >= window)
+    {
+        times.pop_front();
     }
 }
 

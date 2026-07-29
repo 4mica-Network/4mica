@@ -74,7 +74,17 @@ impl AppState {
         let mut degraded = false;
 
         for relayer in &self.relayers {
-            let balance = relayer.cached_balance().await.ok();
+            let balance = match relayer.cached_balance().await {
+                Ok(balance) => Some(balance),
+                Err(err) => {
+                    tracing::warn!(
+                        network = relayer.network(),
+                        error = ?err,
+                        "failed to read relayer balance; reporting degraded"
+                    );
+                    None
+                }
+            };
             // An unreadable balance is a degraded state too: we cannot tell whether the relayer can
             // pay, and reporting "ok" would be a lie.
             let below_floor = match balance {
@@ -109,7 +119,7 @@ impl AppState {
             None => self
                 .relayers
                 .first()
-                .ok_or_else(|| DepositError::NoRelayer("<default>".into())),
+                .ok_or(DepositError::NoRelayerConfigured),
         }
     }
 
