@@ -27,6 +27,25 @@
     },
     "clean": {
       "cache": false
+    },
+    "seed": {
+      "cache": false,
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/db#build": {
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts", "package.json"],
+      "outputs": ["src/generated/**"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/db#typecheck": {
+      "dependsOn": ["@4mica/db#build"]
+    },
+    "@4mica/be#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
     }
   }
 }

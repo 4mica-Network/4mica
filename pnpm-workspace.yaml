@@ -5,10 +5,12 @@ packages:
   - '!**/.next/**'
 
 allowBuilds:
+  '@prisma/engines': true
   '@reown/appkit': false
   bufferutil: false
   esbuild: true
   keccak: false
+  prisma: true
   sharp: false
   unrs-resolver: false
   utf-8-validate: false
@@ -19,7 +21,12 @@ catalog:
   '@changesets/cli': ^2.29.7
   '@clack/prompts': ^1.7.0
   '@coinbase/cdp-sdk': ^1.49.2
+  '@fastify/cors': ^11.3.0
+  '@fastify/swagger': ^9.8.1
+  '@fastify/swagger-ui': ^6.1.1
   '@noble/curves': ^2.2.0
+  '@prisma/adapter-pg': 7.9.1
+  '@prisma/client': 7.9.1
   '@quillai-network/wachai-validation-sdk': ^0.1.0
   '@radix-ui/react-scroll-area': ^1.2.10
   '@radix-ui/react-slot': ^1.2.4
@@ -52,9 +59,11 @@ catalog:
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   cross-env: 10.1.0
+  dotenv: ^17.4.2
   esbuild: ^0.28.0
   execa: ^9.6.1
   express: ^5.1.0
+  fastify: ^5.10.0
   find-up: ^8.0.0
   gray-matter: ^4.0.3
   framer-motion: ^12.40.0
@@ -71,6 +80,7 @@ catalog:
   ora: ^9.4.0
   picocolors: ^1.1.1
   postcss: ^8.5.15
+  prisma: 7.9.1
   publint: ^0.3.14
   react: ^19.2.7
   react-dom: ^19.2.7
@@ -91,10 +101,13 @@ catalog:
   tsx: ^4.22.4
   turbo: latest
   typescript: ^5.9.0
+  valibot: ^1.4.2
   viem: 2.x
   vite: ^8.1.4
   vitest: ^4.1.8
   wagmi: ^3.6.16
+  winston: ^3.19.0
+  winston-daily-rotate-file: ^5.0.0
   yargs: ^18.0.0
 
 catalogs:

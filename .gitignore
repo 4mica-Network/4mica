@@ -154,3 +154,6 @@ vite.config.ts.timestamp-*
 # Turborepo / Monorepo
 **/.turbo
 **/.vercel
+
+# Prisma generated client (run `pnpm db:generate`)
+packages/db/src/generated/

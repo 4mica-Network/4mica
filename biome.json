@@ -28,7 +28,8 @@
       "!apps/**/cypress",
       "!apps/**/test-results",
       "!apps/**/dev-dist",
-      "!apps/web/out"
+      "!apps/web/out",
+      "!packages/db/src/generated"
     ]
   },
   "linter": {

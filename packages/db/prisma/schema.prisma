@@ -1,0 +1,31 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AgentStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+model Agent {
+  id            String      @id @default(uuid(7))
+  name          String
+  walletAddress String      @unique @map("wallet_address")
+  status        AgentStatus @default(PENDING)
+  creditLimit   Decimal     @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("agents")
+}
