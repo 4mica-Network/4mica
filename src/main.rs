@@ -52,10 +52,19 @@ async fn main() -> anyhow::Result<()> {
                 )
             })?;
 
-        let verifier = Arc::new(CertificateVerifier::new(
-            public_params.operator_public_key,
-            public_params.guarantee_domain,
-        )) as Arc<dyn CertificateValidator>;
+        let verifier = Arc::new(
+            CertificateVerifier::try_new(
+                public_params.operator_public_key,
+                public_params.guarantee_domain,
+            )
+            .map_err(anyhow::Error::msg)
+            .with_context(|| {
+                format!(
+                    "failed to build 4mica certificate verifier for network {}",
+                    network.id
+                )
+            })?,
+        ) as Arc<dyn CertificateValidator>;
         let issuer = Arc::new(
             LiveGuaranteeIssuer::try_new(network.core_api_base_url.clone(), auth_session.clone())
                 .with_context(|| {

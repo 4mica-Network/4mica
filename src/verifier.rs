@@ -1,5 +1,3 @@
-use std::fmt::Write;
-
 use crypto::bls::BlsPublicKey;
 use sdk_4mica::{BLSCert, PaymentGuaranteeClaims};
 
@@ -13,12 +11,21 @@ pub struct CertificateVerifier {
 }
 
 impl CertificateVerifier {
-    pub fn new(operator_public_key: [u8; 48], guarantee_domain: Option<[u8; 32]>) -> Self {
-        Self {
-            operator_public_key: BlsPublicKey::from_bytes(&operator_public_key)
-                .expect("validated operator public key"),
+    /// Fails if core's advertised operator key is not a valid BLS public key.
+    ///
+    /// Config only checks that the key is 48 bytes long; 48 bytes of the wrong thing is still not
+    /// a curve point. Returning an error keeps a malformed public-params response a startup
+    /// failure with a readable message rather than a panic in a constructor.
+    pub fn try_new(
+        operator_public_key: [u8; 48],
+        guarantee_domain: Option<[u8; 32]>,
+    ) -> Result<Self, String> {
+        let operator_public_key = BlsPublicKey::from_bytes(&operator_public_key)
+            .map_err(|err| format!("core advertised an invalid operator public key: {err}"))?;
+        Ok(Self {
+            operator_public_key,
             guarantee_domain,
-        }
+        })
     }
 }
 
@@ -33,24 +40,16 @@ impl CertificateValidator for CertificateVerifier {
         if let Some(expected_domain) = self.guarantee_domain
             && claims.domain != expected_domain
         {
-            let got = format_domain_hex(claims.domain);
-            let expected = format_domain_hex(expected_domain);
             return Err(format!(
-                "guarantee domain mismatch: got {got}, expected {expected} for version {}",
+                "guarantee domain mismatch: got 0x{}, expected 0x{} for version {}",
+                hex::encode(claims.domain),
+                hex::encode(expected_domain),
                 claims.version
             ));
         }
 
         Ok(claims)
     }
-}
-
-fn format_domain_hex(domain: [u8; 32]) -> String {
-    let mut domain_hex = String::from("0x");
-    for byte in domain {
-        write!(&mut domain_hex, "{byte:02x}").unwrap();
-    }
-    domain_hex
 }
 
 #[cfg(test)]
@@ -91,7 +90,7 @@ mod tests {
     #[test]
     fn accepts_certificate_matching_the_active_domain() {
         let (cert, pubkey) = build_cert([2u8; 32]);
-        let verifier = CertificateVerifier::new(pubkey, Some([2u8; 32]));
+        let verifier = CertificateVerifier::try_new(pubkey, Some([2u8; 32])).expect("valid key");
         let claims = verifier.verify_certificate(&cert).expect("valid cert");
         assert_eq!(claims.version, GUARANTEE_CLAIMS_VERSION);
     }
@@ -101,15 +100,28 @@ mod tests {
     #[test]
     fn accepts_certificate_when_no_domain_is_configured() {
         let (cert, pubkey) = build_cert([0u8; 32]);
-        let verifier = CertificateVerifier::new(pubkey, None);
+        let verifier = CertificateVerifier::try_new(pubkey, None).expect("valid key");
         let claims = verifier.verify_certificate(&cert).expect("valid cert");
         assert_eq!(claims.version, GUARANTEE_CLAIMS_VERSION);
+    }
+
+    /// Config only length-checks the operator key, so a core serving 48 bytes of anything reaches
+    /// this constructor. It must surface as a startup error, not a panic.
+    #[test]
+    fn rejects_a_key_that_is_48_bytes_of_garbage() {
+        let Err(err) = CertificateVerifier::try_new([0xAB; 48], None) else {
+            panic!("0xAB repeated is not a curve point, so this must not construct");
+        };
+        assert!(
+            err.contains("invalid operator public key"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
     fn rejects_domain_mismatch() {
         let (cert, pubkey) = build_cert([0u8; 32]);
-        let verifier = CertificateVerifier::new(pubkey, Some([1u8; 32]));
+        let verifier = CertificateVerifier::try_new(pubkey, Some([1u8; 32])).expect("valid key");
         let err = verifier
             .verify_certificate(&cert)
             .expect_err("expected mismatch");

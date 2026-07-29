@@ -23,6 +23,10 @@ use crate::{exact::ExactService, issuer::GuaranteeIssuer};
 /// envelope and requirements shape, and both carry the same guarantee claims underneath. Before
 /// guarantee v2 was dropped the two were conflated, which meant retiring a guarantee version would
 /// silently stop the facilitator answering an x402 version.
+///
+/// Must stay in step with the `X402Version<N>` envelopes in [`crate::server::model`], which are
+/// what actually constrain deserialization: a payload outside this set is rejected before any
+/// handler sees it, so the checks below are a defensive backstop rather than the real gate.
 pub const SUPPORTED_X402_VERSIONS: [u8; 2] = [1, 2];
 
 pub(super) type SharedState = Arc<AppState>;
@@ -163,7 +167,6 @@ pub(crate) struct FourMicaHandler {
     network: String,
     verifier: Arc<dyn CertificateValidator>,
     issuer: Arc<dyn GuaranteeIssuer>,
-    supported_versions: Vec<u8>,
     /// Validator identities core whitelisted. A signed validation requirement naming anything else
     /// is rejected before we ask core to issue, since core would reject it anyway.
     validators: Vec<String>,
@@ -182,7 +185,6 @@ impl FourMicaHandler {
             network,
             verifier,
             issuer,
-            supported_versions: SUPPORTED_X402_VERSIONS.to_vec(),
             validators,
         }
     }
@@ -196,11 +198,11 @@ impl FourMicaHandler {
     }
 
     fn supports_version(&self, version: u8) -> bool {
-        self.supported_versions.contains(&version)
+        SUPPORTED_X402_VERSIONS.contains(&version)
     }
 
     fn supported_kinds(&self) -> Vec<SupportedKind> {
-        self.supported_versions
+        SUPPORTED_X402_VERSIONS
             .iter()
             .copied()
             .map(|version| SupportedKind {
@@ -428,11 +430,16 @@ impl FourMicaHandler {
         reqs: &PaymentRequirements,
         version: u8,
     ) -> Result<(), ValidationError> {
-        let required_pay_to = Address::from_str(&reqs.pay_to)
-            .map_err(|_| ValidationError::InvalidRequirements("invalid payTo address".into()))?;
-        let claim_recipient = Address::from_str(&claims.recipient_address).map_err(|_| {
-            ValidationError::InvalidClaims("invalid recipient address in claims".into())
-        })?;
+        let required_pay_to = parse_address(
+            &reqs.pay_to,
+            "payTo address",
+            ValidationError::InvalidRequirements,
+        )?;
+        let claim_recipient = parse_address(
+            &claims.recipient_address,
+            "recipient address in claims",
+            ValidationError::InvalidClaims,
+        )?;
 
         if claim_recipient != required_pay_to {
             return Err(ValidationError::Mismatch(format!(
@@ -441,11 +448,16 @@ impl FourMicaHandler {
             )));
         }
 
-        let required_asset = Address::from_str(&reqs.asset)
-            .map_err(|_| ValidationError::InvalidRequirements("invalid asset address".into()))?;
-        let claim_asset = Address::from_str(&claims.asset_address).map_err(|_| {
-            ValidationError::InvalidClaims("invalid asset address in claims".into())
-        })?;
+        let required_asset = parse_address(
+            &reqs.asset,
+            "asset address",
+            ValidationError::InvalidRequirements,
+        )?;
+        let claim_asset = parse_address(
+            &claims.asset_address,
+            "asset address in claims",
+            ValidationError::InvalidClaims,
+        )?;
 
         if claim_asset != required_asset {
             return Err(ValidationError::Mismatch(format!(
@@ -480,38 +492,50 @@ impl FourMicaHandler {
         request: &PaymentGuaranteeRequestClaimsV1,
         issued: &PaymentGuaranteeClaims,
     ) -> Result<(), ValidationError> {
-        let request_recipient = Address::from_str(&request.recipient_address).map_err(|_| {
-            ValidationError::InvalidClaims("invalid recipient address in requested claims".into())
-        })?;
-        let issued_recipient = Address::from_str(&issued.recipient_address).map_err(|_| {
-            ValidationError::InvalidCertificate(
-                "invalid recipient address in issued certificate".into(),
-            )
-        })?;
-        let request_asset = Address::from_str(&request.asset_address).map_err(|_| {
-            ValidationError::InvalidClaims("invalid asset address in requested claims".into())
-        })?;
-        let issued_asset = Address::from_str(&issued.asset_address).map_err(|_| {
-            ValidationError::InvalidCertificate(
-                "invalid asset address in issued certificate".into(),
-            )
-        })?;
-        let request_user = Address::from_str(&request.user_address).map_err(|_| {
-            ValidationError::InvalidClaims("invalid user address in requested claims".into())
-        })?;
-        let issued_user = Address::from_str(&issued.user_address).map_err(|_| {
-            ValidationError::InvalidCertificate("invalid user address in issued certificate".into())
-        })?;
+        // Addresses are compared parsed rather than as strings so a checksummed certificate still
+        // matches lowercase requested claims.
+        let address_pairs = [
+            (
+                "recipient address",
+                &request.recipient_address,
+                &issued.recipient_address,
+            ),
+            (
+                "asset address",
+                &request.asset_address,
+                &issued.asset_address,
+            ),
+            ("user address", &request.user_address, &issued.user_address),
+        ];
+        for (field, requested, issued) in address_pairs {
+            let requested = parse_address(
+                requested,
+                &format!("{field} in requested claims"),
+                ValidationError::InvalidClaims,
+            )?;
+            let issued = parse_address(
+                issued,
+                &format!("{field} in issued certificate"),
+                ValidationError::InvalidCertificate,
+            )?;
+            if requested != issued {
+                return Err(ValidationError::Mismatch(format!(
+                    "certificate {field} {issued} differs from requested {requested}"
+                )));
+            }
+        }
 
-        if issued.req_id != request.req_id
-            || issued.amount != request.amount
-            || issued_recipient != request_recipient
-            || issued_asset != request_asset
-            || issued_user != request_user
-        {
-            return Err(ValidationError::Mismatch(
-                "certificate values differ from requested claims".into(),
-            ));
+        if issued.req_id != request.req_id {
+            return Err(ValidationError::Mismatch(format!(
+                "certificate req_id {:#x} differs from requested {:#x}",
+                issued.req_id, request.req_id
+            )));
+        }
+        if issued.amount != request.amount {
+            return Err(ValidationError::Mismatch(format!(
+                "certificate amount {} differs from requested {}",
+                issued.amount, request.amount
+            )));
         }
         Ok(())
     }
@@ -535,24 +559,33 @@ pub fn resolve_x402_version(
     Ok(payload_version)
 }
 
+/// Parses an address, tagging the failure with the field it came from and the variant that says
+/// *whose* input was wrong — a bad `payTo` is the resource server's fault, a bad claim address is
+/// the payer's, and a bad issued address is core's. The underlying parse error is kept: "invalid
+/// checksum" and "wrong length" are very different operator problems.
+fn parse_address(
+    value: &str,
+    field: &str,
+    kind: fn(String) -> ValidationError,
+) -> Result<Address, ValidationError> {
+    Address::from_str(value).map_err(|err| kind(format!("invalid {field}: {err}")))
+}
+
 fn parse_u256_field(value: &str, field: &str) -> Result<U256, String> {
     if value.is_empty() {
         return Err(format!("{field} cannot be empty"));
     }
     if let Some(rest) = value.strip_prefix("0x") {
-        U256::from_str_radix(rest, 16).map_err(|err| format!("invalid hex amount: {err}"))
+        U256::from_str_radix(rest, 16).map_err(|err| format!("invalid hex {field}: {err}"))
     } else {
-        U256::from_str_radix(value, 10).map_err(|err| format!("invalid decimal amount: {err}"))
+        U256::from_str_radix(value, 10).map_err(|err| format!("invalid decimal {field}: {err}"))
     }
-}
-
-fn parse_u256(value: &str) -> Result<U256, String> {
-    parse_u256_field(value, "maxAmountRequired")
 }
 
 fn required_amount(reqs: &PaymentRequirements, version: u8) -> Result<U256, ValidationError> {
     match version {
-        1 => parse_u256(&reqs.max_amount_required).map_err(ValidationError::InvalidRequirements),
+        1 => parse_u256_field(&reqs.max_amount_required, "maxAmountRequired")
+            .map_err(ValidationError::InvalidRequirements),
         2 => {
             let amount = reqs.amount.as_deref().ok_or_else(|| {
                 ValidationError::InvalidRequirements("amount is required for x402Version 2".into())
@@ -586,8 +619,10 @@ fn requirements_validation(
     })?;
 
     let validator = required_str(object, "validator")?.to_string();
-    let subject = B256::from_str(required_str(object, "subject")?).map_err(|_| {
-        ValidationError::InvalidRequirements("extra.validation.subject must be a bytes32".into())
+    let subject = B256::from_str(required_str(object, "subject")?).map_err(|err| {
+        ValidationError::InvalidRequirements(format!(
+            "extra.validation.subject must be a bytes32: {err}"
+        ))
     })?;
     let deadline = match object.get("deadline") {
         None | Some(serde_json::Value::Null) => None,
@@ -602,13 +637,13 @@ fn requirements_validation(
         Some(value) => {
             let raw = value.as_str().ok_or_else(|| {
                 ValidationError::InvalidRequirements(
-                    "extra.validation.params must be a 0x-prefixed hex string".into(),
+                    "extra.validation.params must be a hex string".into(),
                 )
             })?;
-            Bytes::from_str(raw).map_err(|_| {
-                ValidationError::InvalidRequirements(
-                    "extra.validation.params must be a 0x-prefixed hex string".into(),
-                )
+            Bytes::from_str(raw).map_err(|err| {
+                ValidationError::InvalidRequirements(format!(
+                    "extra.validation.params must be a hex string: {err}"
+                ))
             })?
         }
     };

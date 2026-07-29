@@ -57,14 +57,15 @@ impl ServiceConfig {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct PublicParameters {
     pub operator_public_key: [u8; 48],
     pub guarantee_domain: Option<[u8; 32]>,
+    /// Core's own domain, before any `X402_GUARANTEE_DOMAIN` override is applied. Kept for
+    /// diagnostics and asserted in tests; [`Self::guarantee_domain`] is what verification uses.
+    // Scoped to this field rather than the struct: a blanket allow is how a stale field survives
+    // a migration unnoticed.
+    #[allow(dead_code)]
     pub active_guarantee_domain: Option<[u8; 32]>,
-    /// Guarantee claims versions core can decode. Distinct from the x402 protocol version — see
-    /// [`crate::server::state::SUPPORTED_X402_VERSIONS`].
-    pub supported_guarantee_versions: Vec<u64>,
     /// Validator identities this operator whitelisted. A signed validation requirement may only
     /// name one of these. By convention a URL or CAIP-10 account id, not an address.
     pub validators: Vec<String>,
@@ -86,8 +87,7 @@ pub async fn load_public_params(api_base: &Url) -> Result<PublicParameters> {
 }
 
 fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicParameters> {
-    let supported_guarantee_versions =
-        normalize_supported_guarantee_versions(&params.supported_guarantee_versions)?;
+    ensure_core_decodes_our_guarantee_version(&params.supported_guarantee_versions)?;
     let active_guarantee_domain =
         parse_optional_hex_array::<32>(&params.guarantee_domain_separator)
             .context("invalid guarantee_domain_separator in core public params")?;
@@ -106,7 +106,6 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
         operator_public_key,
         guarantee_domain,
         active_guarantee_domain,
-        supported_guarantee_versions,
         validators,
     })
 }
@@ -352,6 +351,7 @@ async fn fetch_public_params(base: &Url) -> Result<CorePublicParameters> {
     let response = response.error_for_status()?;
     Ok(response.json::<CorePublicParameters>().await?)
 }
+
 fn parse_hex_array<const N: usize>(value: &str) -> Result<[u8; N]> {
     let trimmed = value.strip_prefix("0x").unwrap_or(value);
     let decoded = hex::decode(trimmed)?;
@@ -371,24 +371,26 @@ fn parse_optional_hex_array<const N: usize>(value: &str) -> Result<Option<[u8; N
     parse_hex_array::<N>(trimmed).map(Some)
 }
 
-/// Guarantee versions core can decode, narrowed to what this build knows how to sign.
+/// Fails startup unless core can decode the guarantee version this build signs at.
 ///
 /// The facilitator always requests guarantees at [`GUARANTEE_CLAIMS_VERSION`], so a core that
-/// cannot decode that version is unusable and startup fails rather than issuing requests core
-/// will reject.
-fn normalize_supported_guarantee_versions(raw_versions: &[u64]) -> Result<Vec<u64>> {
+/// cannot decode that version is unusable — better to refuse to start than to accept payments and
+/// have core reject every issuance. The set is only sorted to keep the error message stable; the
+/// facilitator has no use for the other versions core happens to accept, since it never signs at
+/// them. That is deliberately unrelated to the *x402* versions we serve — see
+/// [`crate::server::state::SUPPORTED_X402_VERSIONS`].
+fn ensure_core_decodes_our_guarantee_version(raw_versions: &[u64]) -> Result<()> {
+    if raw_versions.contains(&GUARANTEE_CLAIMS_VERSION) {
+        return Ok(());
+    }
+
     let mut supported: Vec<u64> = raw_versions.to_vec();
     supported.sort_unstable();
     supported.dedup();
-
-    if !supported.contains(&GUARANTEE_CLAIMS_VERSION) {
-        bail!(
-            "core supports guarantee versions {supported:?} but this facilitator issues \
-             v{GUARANTEE_CLAIMS_VERSION}; upgrade core or downgrade the facilitator"
-        );
-    }
-
-    Ok(supported)
+    bail!(
+        "core supports guarantee versions {supported:?} but this facilitator issues \
+         v{GUARANTEE_CLAIMS_VERSION}; upgrade core or downgrade the facilitator"
+    );
 }
 
 fn resolve_guarantee_domain(
@@ -621,21 +623,37 @@ mod tests {
         assert_eq!(url.as_str(), "http://example.com/");
     }
 
+    /// Core accepting versions beyond ours is normal and must not fail startup — it only means
+    /// core still serves older clients.
     #[test]
-    fn normalize_supported_guarantee_versions_sorts_and_dedupes() {
-        let supported =
-            normalize_supported_guarantee_versions(&[2, 1, 1]).expect("supported versions");
-        assert_eq!(supported, vec![1, 2]);
+    fn ensure_core_decodes_our_guarantee_version_accepts_a_wider_core() {
+        ensure_core_decodes_our_guarantee_version(&[
+            GUARANTEE_CLAIMS_VERSION,
+            GUARANTEE_CLAIMS_VERSION + 1,
+        ])
+        .expect("a core that decodes our version is usable");
     }
 
     /// The facilitator only ever asks core to issue at `GUARANTEE_CLAIMS_VERSION`; a core that
     /// cannot decode it would reject every request, so startup must fail loudly instead.
     #[test]
-    fn normalize_supported_guarantee_versions_rejects_a_core_without_our_version() {
-        let err = normalize_supported_guarantee_versions(&[GUARANTEE_CLAIMS_VERSION + 1])
+    fn ensure_core_decodes_our_guarantee_version_rejects_a_core_without_our_version() {
+        let err = ensure_core_decodes_our_guarantee_version(&[GUARANTEE_CLAIMS_VERSION + 1])
             .expect_err("expected version mismatch");
         assert!(
             err.to_string().contains("this facilitator issues"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// The reported set is sorted and deduped so the operator-facing error is stable regardless of
+    /// the order core happens to serialize it in.
+    #[test]
+    fn ensure_core_decodes_our_guarantee_version_reports_a_sorted_deduped_set() {
+        let err = ensure_core_decodes_our_guarantee_version(&[9, 7, 9])
+            .expect_err("expected version mismatch");
+        assert!(
+            err.to_string().contains("[7, 9]"),
             "unexpected error: {err}"
         );
     }

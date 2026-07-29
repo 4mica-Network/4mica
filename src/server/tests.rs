@@ -466,176 +466,266 @@ async fn verify_rejects_v2_mismatched_amount() {
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
-
 /// A payer must not be able to hand a resource server a validation-gated guarantee when the
 /// server asked for an ungated one — the server would be holding credit that is not payable until
 /// some validator it never named approves it.
 #[tokio::test]
 async fn verify_rejects_validation_the_requirements_did_not_ask_for() {
-    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
+    let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
 
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
-        payment_requirements: sample_requirements_v2("10"),
-    };
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
+            payment_requirements: sample_requirements_v2("10"),
+        },
+    )
+    .await;
 
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(
-        reason.contains("requirements ask for no validation"),
-        "unexpected reason: {reason}"
-    );
+    assert_rejected_because(&response, "requirements ask for no validation");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 /// The mirror case: the server gated the payment, the payer signed an ungated claim.
 #[tokio::test]
 async fn verify_rejects_missing_validation_the_requirements_asked_for() {
-    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
+    let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
 
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validation": { "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT }
-    }));
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2("10"),
+            payment_requirements: requirements_gated_on(json!({
+                "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT
+            })),
+        },
+    )
+    .await;
 
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2("10"),
-        payment_requirements: requirements,
-    };
-
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(
-        reason.contains("claims carry none"),
-        "unexpected reason: {reason}"
-    );
+    assert_rejected_because(&response, "claims carry none");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 #[tokio::test]
 async fn verify_rejects_mismatched_validator() {
-    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
+    let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
 
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validation": { "validator": "https://other-validator.example", "subject": TEST_SUBJECT }
-    }));
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
+            payment_requirements: requirements_gated_on(json!({
+                "validator": "https://other-validator.example", "subject": TEST_SUBJECT
+            })),
+        },
+    )
+    .await;
 
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
-        payment_requirements: requirements,
-    };
-
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(
-        reason.contains("claim validator"),
-        "unexpected reason: {reason}"
-    );
+    assert_rejected_because(&response, "claim validator");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 /// Core rejects guarantees naming a validator outside its allowlist, so the facilitator declines
-/// before spending a round trip on it.
+/// before spending a round trip on it. Requirement and claim agree here — only core disagrees.
 #[tokio::test]
 async fn verify_rejects_a_validator_core_has_not_whitelisted() {
-    let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
-
+    let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
     let rogue = "https://rogue-validator.example";
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validation": { "validator": rogue, "subject": TEST_SUBJECT }
-    }));
 
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2_validated("10", rogue),
-        payment_requirements: requirements,
-    };
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2_validated("10", rogue),
+            payment_requirements: requirements_gated_on(
+                json!({ "validator": rogue, "subject": TEST_SUBJECT }),
+            ),
+        },
+    )
+    .await;
 
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(
-        reason.contains("not whitelisted by core"),
-        "unexpected reason: {reason}"
-    );
+    assert_rejected_because(&response, "not whitelisted by core");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 #[tokio::test]
 async fn verify_accepts_validation_matching_the_requirements() {
-    let verifier = Arc::new(MockVerifier::success());
-    let issuer = Arc::new(MockIssuer::success());
-    let state = test_state(verifier.clone(), issuer.clone());
-    let router = build_router(state);
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
 
-    let mut requirements = sample_requirements_v2("10");
-    requirements.extra = Some(json!({
-        "validation": { "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT }
-    }));
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
+            payment_requirements: requirements_gated_on(json!({
+                "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT
+            })),
+        },
+    )
+    .await;
 
-    let request_body = VerifyRequest {
-        x402_version: Some(2),
-        payment_payload: payment_payload_v2_validated("10", TEST_VALIDATOR),
-        payment_requirements: requirements,
-    };
+    assert!(response.is_valid, "reason: {:?}", response.invalid_reason);
+}
 
-    let response = router
-        .oneshot(post_json("/verify", &request_body))
-        .await
-        .unwrap();
+/// A malformed `extra.validation` must be an error, never a fall-through to "ungated".
+///
+/// Every case here is paired with an *ungated* payload, so a parser that swallowed the error
+/// would answer `isValid: true` — the silent downgrade this guards against. A server typo would
+/// then hand out immediately-payable credit it meant to gate.
+#[tokio::test]
+async fn verify_rejects_malformed_validation_requirements() {
+    let cases = [
+        (json!(5), "extra.validation must be an object"),
+        (
+            json!({ "subject": TEST_SUBJECT }),
+            "extra.validation.validator is required",
+        ),
+        (
+            json!({ "validator": TEST_VALIDATOR }),
+            "extra.validation.subject is required",
+        ),
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": "0xdeadbeef" }),
+            "subject must be a bytes32",
+        ),
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "deadline": "soon" }),
+            "deadline must be a unix timestamp",
+        ),
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "params": 7 }),
+            "params must be a hex string",
+        ),
+    ];
 
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
-    assert!(payload.is_valid, "reason: {:?}", payload.invalid_reason);
+    for (validation, expected) in cases {
+        let issuer = Arc::new(MockIssuer::success());
+        let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
+
+        let response = post_verify(
+            state,
+            &VerifyRequest {
+                x402_version: Some(2),
+                payment_payload: payment_payload_v2("10"),
+                payment_requirements: requirements_gated_on(validation.clone()),
+            },
+        )
+        .await;
+
+        assert!(
+            !response.is_valid,
+            "malformed validation {validation} was silently accepted as ungated"
+        );
+        assert_rejected_because(&response, expected);
+        assert_eq!(issuer.issue_calls(), 0);
+    }
+}
+
+/// An explicit `null` is the one non-object `validation` that means "ungated" rather than
+/// "malformed", so a server may null the field out without tripping the check above.
+#[tokio::test]
+async fn verify_treats_a_null_validation_requirement_as_ungated() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2("10"),
+            payment_requirements: requirements_gated_on(Value::Null),
+        },
+    )
+    .await;
+
+    assert!(response.is_valid, "reason: {:?}", response.invalid_reason);
+}
+
+/// `deadline` and `params` are as much a part of the gate as the validator is: a payer who signs
+/// a later deadline, or acceptance params the server never set, has agreed to different terms.
+#[tokio::test]
+async fn verify_rejects_a_validation_differing_only_in_deadline_or_params() {
+    let cases = [
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "deadline": 1_800_000_000u64 }),
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "deadline": 1_900_000_000u64 }),
+            "deadline",
+        ),
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "params": "0xabcd" }),
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "params": "0xbeef" }),
+            "params do not match",
+        ),
+        // A signed requirement that simply omits what the server asked for must fail too.
+        (
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT, "deadline": 1_800_000_000u64 }),
+            json!({ "validator": TEST_VALIDATOR, "subject": TEST_SUBJECT }),
+            "deadline",
+        ),
+    ];
+
+    for (required, signed, expected) in cases {
+        let issuer = Arc::new(MockIssuer::success());
+        let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
+
+        let response = post_verify(
+            state,
+            &VerifyRequest {
+                x402_version: Some(2),
+                payment_payload: payment_payload_v2_inner("10", Some(signed.clone())),
+                payment_requirements: requirements_gated_on(required.clone()),
+            },
+        )
+        .await;
+
+        assert!(
+            !response.is_valid,
+            "signed {signed} was accepted against required {required}"
+        );
+        assert_rejected_because(&response, expected);
+        assert_eq!(issuer.issue_calls(), 0);
+    }
+}
+
+/// The positive counterpart to the two tests above: with every optional field populated and
+/// matching, verification passes — so those rejections are the comparison working, not the
+/// fixture failing to parse.
+#[tokio::test]
+async fn verify_accepts_a_validation_matching_on_every_optional_field() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let validation = json!({
+        "validator": TEST_VALIDATOR,
+        "subject": TEST_SUBJECT,
+        "deadline": 1_800_000_000u64,
+        "params": "0xabcd"
+    });
+
+    let response = post_verify(
+        state,
+        &VerifyRequest {
+            x402_version: Some(2),
+            payment_payload: payment_payload_v2_inner("10", Some(validation.clone())),
+            payment_requirements: requirements_gated_on(validation),
+        },
+    )
+    .await;
+
+    assert!(response.is_valid, "reason: {:?}", response.invalid_reason);
 }
 
 #[tokio::test]
@@ -764,6 +854,41 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
     Arc::new(AppState::new(vec![handler], None))
 }
 
+/// POSTs a `/verify` request against a fresh router and decodes the response.
+///
+/// `/verify` answers `200 OK` with `isValid: false` for business-rule rejections, so almost every
+/// test here asserts on the body rather than the status. Collapsing that into one helper keeps the
+/// interesting part of a test — the fixture and the expected reason — on screen.
+async fn post_verify(state: SharedState, request: &VerifyRequest) -> VerifyResponse {
+    let response = build_router(state)
+        .oneshot(post_json("/verify", request))
+        .await
+        .expect("router response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("read body");
+    serde_json::from_slice(&body).expect("decode VerifyResponse")
+}
+
+/// Asserts `/verify` rejected the request, and that the reason names the actual cause rather than
+/// some unrelated earlier check firing first.
+#[track_caller]
+fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
+    assert!(
+        !response.is_valid,
+        "expected a rejection mentioning {expected:?}, but the request was accepted"
+    );
+    let reason = response
+        .invalid_reason
+        .as_deref()
+        .expect("a rejection must carry a reason");
+    assert!(
+        reason.contains(expected),
+        "expected reason to contain {expected:?}, got: {reason}"
+    );
+}
+
 fn exact_state(exact: Arc<MockExact>) -> SharedState {
     let exact_service: Arc<dyn ExactService> = exact;
     Arc::new(AppState::new(Vec::new(), Some(exact_service)))
@@ -789,6 +914,10 @@ fn sample_requirements() -> PaymentRequirements {
     }
 }
 
+/// x402 v2 requirements with no validation gate.
+///
+/// `extra` deliberately carries an unrelated key: "extra is present but has no `validation`" must
+/// read as ungated, not as malformed. Resource servers really do put other things here.
 fn sample_requirements_v2(amount: &str) -> PaymentRequirements {
     PaymentRequirements {
         scheme: "4mica-credit".into(),
@@ -802,15 +931,19 @@ fn sample_requirements_v2(amount: &str) -> PaymentRequirements {
         pay_to: format!("{:#x}", recipient_address()),
         max_timeout_seconds: None,
         asset: format!("{:#x}", asset_address()),
-        extra: Some(json!({
-            "validationRegistryAddress": "0x3333333333333333333333333333333333333333",
-            "validatorAddress": "0x4444444444444444444444444444444444444444",
-            "validatorAgentId": "0x7",
-            "minValidationScore": 80,
-            "requiredValidationTag": "hard-finality",
-            "jobHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        })),
+        extra: Some(json!({ "tabEndpoint": "https://core.example/tab" })),
     }
+}
+
+/// [`sample_requirements_v2`] for 10 units, gated on `validation` — which may be any JSON, so the
+/// malformed cases share this fixture with the well-formed ones.
+fn requirements_gated_on(validation: Value) -> PaymentRequirements {
+    let mut reqs = sample_requirements_v2("10");
+    reqs.extra = Some(json!({
+        "tabEndpoint": "https://core.example/tab",
+        "validation": validation,
+    }));
+    reqs
 }
 
 fn payment_payload_v1(amount: &str) -> X402PaymentPayload {
