@@ -10,11 +10,12 @@ use tracing::{info, warn};
 
 use super::{
     model::{
-        HealthResponse, SettleRequest, SettleResponse, SupportedKind, SupportedResponse,
-        VerifyRequest, VerifyResponse,
+        DepositRequest, DepositResponse, DepositVerifyResponse, SettleRequest, SettleResponse,
+        SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
     },
     state::SharedState,
 };
+use crate::deposit::{self, DepositError, DepositIntent};
 
 pub(super) fn build_router(state: SharedState) -> Router {
     Router::new()
@@ -22,9 +23,106 @@ pub(super) fn build_router(state: SharedState) -> Router {
         .route("/supported", get(supported_handler))
         .route("/verify", post(verify_handler))
         .route("/settle", post(settle_handler))
+        .route("/deposit", post(deposit_handler))
+        .route("/deposit/verify", post(deposit_verify_handler))
         .route("/health", get(health_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Preflight for [`deposit_handler`]. Runs every check without broadcasting, so a client can find
+/// out an authorization is unusable before anyone spends gas on it.
+async fn deposit_verify_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<DepositRequest>,
+) -> impl IntoResponse {
+    match run_deposit_verify(&state, request).await {
+        Ok(()) => Json(DepositVerifyResponse::valid()),
+        Err(err) => {
+            // Counted like a submit rejection: this endpoint consumes a global rate-limit slot and
+            // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
+            state.deposit_guard().record_rejected(&err);
+            warn!(reason = %err, code = err.code(), "deposit verification failed");
+            Json(DepositVerifyResponse::invalid(&err))
+        }
+    }
+}
+
+async fn run_deposit_verify(
+    state: &SharedState,
+    request: DepositRequest,
+) -> Result<(), DepositError> {
+    // Before any RPC work: /deposit/verify makes several eth_calls per request, so an unbounded
+    // caller could exhaust the node quota without ever submitting anything.
+    state.deposit_guard().check_global()?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent = DepositIntent::parse(
+        &request.asset,
+        &request.amount,
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+        request.permit2_authorization,
+        request.eip2612_permit.map(|p| p.parse()).transpose()?,
+    )?;
+    deposit::verify(relayer, state.deposit_guard().limits(), &intent, now_secs()).await
+}
+
+/// Submits a gasless deposit, with the relayer paying gas.
+///
+/// The collateral is credited to `authorization.from`, never to the relayer — the token binds the
+/// destination and amount inside the signature, so this service cannot alter either.
+async fn deposit_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<DepositRequest>,
+) -> impl IntoResponse {
+    match run_deposit(&state, request).await {
+        Ok(response) => {
+            state.deposit_guard().record_sponsored();
+            info!(
+                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                from = response.from.as_deref().unwrap_or_default(),
+                asset = response.asset.as_deref().unwrap_or_default(),
+                amount = response.amount.as_deref().unwrap_or_default(),
+                network = response.network.as_deref().unwrap_or_default(),
+                "gasless deposit submitted"
+            );
+            Json(response)
+        }
+        Err(err) => {
+            state.deposit_guard().record_rejected(&err);
+            warn!(reason = %err, code = err.code(), "gasless deposit failed");
+            Json(DepositResponse::failure(&err))
+        }
+    }
+}
+
+async fn run_deposit(
+    state: &SharedState,
+    request: DepositRequest,
+) -> Result<DepositResponse, DepositError> {
+    state.deposit_guard().check_global()?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent = DepositIntent::parse(
+        &request.asset,
+        &request.amount,
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+        request.permit2_authorization,
+        request.eip2612_permit.map(|p| p.parse()).transpose()?,
+    )?;
+
+    let tx_hash = deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await?;
+    Ok(DepositResponse::success(
+        tx_hash,
+        relayer.network(),
+        &intent,
+    ))
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 async fn supported_handler(State(state): State<SharedState>) -> impl IntoResponse {
@@ -42,8 +140,8 @@ async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
     })
 }
 
-async fn health_handler() -> impl IntoResponse {
-    Json(HealthResponse { status: "ok" })
+async fn health_handler(State(state): State<SharedState>) -> impl IntoResponse {
+    Json(state.health().await)
 }
 
 async fn verify_handler(

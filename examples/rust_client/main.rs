@@ -5,7 +5,6 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{Context, Result};
 use dotenvy::from_filename;
 use reqwest::StatusCode;
-use rpc::PaymentGuaranteeRequestClaims as RpcPaymentGuaranteeRequestClaims;
 use sdk_4mica::{ConfigBuilder, U256, X402Flow, x402::PaymentRequirements};
 use serde::Deserialize;
 
@@ -126,14 +125,11 @@ async fn main() -> Result<()> {
         .await
         .context("failed to prepare payment")?;
 
-    let (payment_asset, payment_req_id, actual_amount) = match &payment.payload.claims {
-        RpcPaymentGuaranteeRequestClaims::V1(claims) => {
-            (claims.asset_address.as_str(), claims.req_id, claims.amount)
-        }
-        RpcPaymentGuaranteeRequestClaims::V2(claims) => {
-            (claims.asset_address.as_str(), claims.req_id, claims.amount)
-        }
-    };
+    // Read through the version-agnostic accessors rather than matching on the claims variant, so
+    // this keeps compiling when a new version is added.
+    let claims = &payment.payload.claims;
+    let (payment_asset, payment_req_id, actual_amount) =
+        (claims.asset_address(), claims.req_id(), claims.amount());
     println!("Payment asset address: {payment_asset}");
     println!("Payment reqId: {:#x}", payment_req_id);
 

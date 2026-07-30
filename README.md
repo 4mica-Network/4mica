@@ -16,6 +16,7 @@ the BLS certificate to the recipient.
 
 **Contents**
 - [How to use the system](#how-to-use-the-system)
+- [Gasless deposits](#gasless-deposits)
 - [Integrate from x402](#integrate-from-x402)
 - [Run your own facilitator](#run-your-own-facilitator)
 
@@ -199,20 +200,21 @@ The facilitator enforces that:
 
 - `GET /supported` – returns all `(scheme, network)` tuples the facilitator can service (4mica and,
   if configured, any additional `exact` flows).
-- `GET /health` – liveness probe that returns `{ "status": "ok" }`.
-- `POST /tabs`
-  - Request: `{ "userAddress", "recipientAddress", "x402Version"?, "guaranteeVersion"?, "network"?, "erc20Token"?, "ttlSeconds"? }`.
-    If `network` is omitted the facilitator uses its default network (the first entry in
-    `X402_NETWORKS`).
-    Networks use CAIP-2 identifiers (e.g., `eip155:80002`).
-    Use `erc20Token = null` (or omit it) for ETH tabs; otherwise pass the token contract address.
-    `x402Version` is the preferred field; the facilitator maps it to the core `guaranteeVersion`.
-    `guaranteeVersion` remains available for compatibility. If both are supplied they must match.
-    If neither is supplied, the facilitator defaults to version `1`.
-  - Response: `{ "tabId", "userAddress", "recipientAddress", "assetAddress", "startTimestamp", "ttlSeconds", "nextReqId" }`.
-    `tabId` is always emitted as a canonical hex string. Recipients call this after a user shares
-    their wallet; the facilitator reuses the existing tab for that exact version-scoped identity whenever possible.
-    `nextReqId` is the next sequential request id to include when signing a guarantee.
+- `GET /health` – liveness probe. Returns `{ "status": "ok" }`, plus relayer and deposit detail
+  when gas sponsorship is configured:
+  ```json
+  {
+    "status": "ok",
+    "relayers": [
+      { "network": "eip155:84532", "address": "0x…", "balanceWei": "…", "belowFloor": false }
+    ],
+    "deposits": { "sponsored": 12, "rejected": 3, "throttled": 1 }
+  }
+  ```
+  `status` is `degraded` when any relayer is at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, or
+  when its balance cannot be read — so a plain HTTP check is enough to alert on. A rising
+  `throttled` distinguishes an abuse attempt from a merely misconfigured client. Balances are
+  cached for 15s, so polling this endpoint does not amplify into RPC load.
 - `POST /verify`
   - Request: `{ "x402Version": 1|2, "paymentPayload": { ... }, "paymentRequirements": { ... } }`.
   - Response: `{ "isValid": true|false, "invalidReason"?, "certificate": null }`.
@@ -223,6 +225,163 @@ The facilitator enforces that:
     include `txHash`.
     If `X402_DEBIT_URL` is set, debit requests are proxied to the configured x402-rs
     facilitator, allowing clients to follow the x402 debit flow unchanged.
+- `POST /deposit` and `POST /deposit/verify` – gasless deposits; see below. Available only when a
+  relayer is configured, otherwise every request returns `errorCode: "NO_RELAYER"`.
+
+### Gasless deposits
+
+A payer with tokens but no native gas cannot post collateral. These endpoints let them sign an
+EIP-3009 `receiveWithAuthorization` off-chain while the facilitator broadcasts
+`depositStablecoinWithAuthorization` and pays the gas.
+
+Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactly one** of
+`authorization` or `permit2Authorization`; the shape identifies the scheme, and
+`assetTransferMethod` is an optional cross-check that is rejected if it contradicts the payload.
+
+| | `eip3009` | `permit2` |
+| --- | --- | --- |
+| Tokens | those implementing EIP-3009 (USDC and similar) | any ERC-20 |
+| Payer pays gas | never | **once**, for `approve(PERMIT2, …)` |
+| Prerequisite | none | that approval, or `PERMIT2_ALLOWANCE_REQUIRED` |
+
+```jsonc
+{
+  "network": "eip155:84532",       // optional; defaults to the first configured network
+  "asset": "0x…",
+  "amount": "1000000",             // decimal or 0x-hex, in the token's own decimals
+  "assetTransferMethod": "eip3009",
+
+  // EIP-3009 — exactly as sdk-4mica serialises ReceiveAuthorization
+  "authorization": {
+    "from": "0x…", "validAfter": "0x0", "validBefore": "0x…",
+    "nonce": "0x…", "v": 28, "r": "0x…", "s": "0x…"
+  }
+
+  // …or Permit2 — as sdk-4mica serialises Permit2Authorization
+  // "permit2Authorization": { "from": "0x…", "nonce": "0x…", "deadline": "0x…", "signature": "0x…" }
+}
+```
+
+Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`, and
+`/deposit/verify` reports `PERMIT2_ALLOWANCE_REQUIRED` when the payer has not made it — mirroring
+x402's precondition of the same name. That response carries everything needed to fix it:
+
+```jsonc
+{
+  "isValid": false,
+  "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
+  "permit2Allowance": {
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "allowance": "0",
+    "required": "1000",
+    "eip2612Nonce": "7"        // omitted when the token has no EIP-2612 surface
+  }
+}
+```
+
+`eip2612Nonce` is the only value a chain-free client cannot derive for itself — the token's domain
+separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2. Its
+**presence means the approval can be sponsored**: sign an `eip2612Permit` and retry. Its **absence
+means it cannot**, and the payer must submit `approve(PERMIT2, …)` themselves.
+
+So a client with no Ethereum RPC can attempt a Permit2 deposit, be told exactly what is missing,
+and complete it on the retry.
+
+#### Sponsored approvals (`eip2612Permit`)
+
+When the token also implements **EIP-2612**, the payer can sign that approval instead of paying for
+it, and the facilitator submits it. This is x402's `eip2612GasSponsoring` extension, and it makes
+Permit2 deposits gasless for the payer end to end:
+
+```jsonc
+{
+  "asset": "0x…",
+  "amount": "1000",
+  "assetTransferMethod": "permit2",
+  "permit2Authorization": { … },
+  "eip2612Permit": {
+    "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "deadline": "4000000000",
+    "v": 28, "r": "0x…", "s": "0x…"
+  }
+}
+```
+
+`owner` and `spender` are implied — the payer and the canonical Permit2 — so only the signed values
+travel. The permit is verified against the token's own domain and *current* nonce before the
+relayer pays to submit it, so a stale or forged signature costs nothing. It is only submitted when
+the allowance is actually short, re-checked immediately before sending in case the payer approved
+in the meantime.
+
+The sweet spot is tokens with EIP-2612 but **not** EIP-3009. A token with both (real USDC) should
+use `eip3009`, which needs one transaction rather than two.
+
+Unlike x402's other sponsoring extension (`erc20ApprovalGasSponsoring`), this needs no atomic
+batch. That one has the facilitator send ETH to the payer's wallet, which a front-runner could
+steal between funding and settlement. Here the permit only grants an allowance to Permit2, and
+Permit2 moves nothing without a `PermitTransferFrom` signature naming Core4Mica as spender — so a
+dangling allowance is not exploitable and the two transactions need not be atomic.
+
+Note this facilitator does **not** use x402's `x402ExactPermit2Proxy` or its `Witness`. Those exist
+because `exact` pays an arbitrary payee and Permit2's signature binds `spender` but not the
+destination. A deposit has no free destination — Core4Mica pulls into itself and credits the signer
+— so binding `spender` to Core4Mica already constrains it completely.
+
+`POST /deposit/verify` is a preflight that spends no gas: it checks expiry, recovers the signature,
+confirms the nonce is unused and the balance sufficient, then simulates the deposit and rejects it
+if the estimated gas exceeds `X402_DEPOSIT_MAX_GAS`. It returns
+`{ "isValid": true }` or `{ "isValid": false, "invalidReason", "errorCode", "retryable" }`.
+
+`POST /deposit` re-runs every check — the two are separate requests and state can change between
+them — then broadcasts and waits for the receipt:
+
+```json
+{ "success": true, "txHash": "0x…", "network": "eip155:84532",
+  "from": "0x…", "asset": "0x…", "amount": "1000000" }
+```
+
+On failure it returns `{ "success": false, "error", "errorCode", "retryable" }`. Branch on
+`errorCode`, not on the message. `retryable` is true only for transient conditions (throttling,
+chain errors); a bad signature or an expired authorization will never become valid.
+
+| `errorCode` | Meaning |
+| --- | --- |
+| `NO_RELAYER_CONFIGURED` | Gas sponsorship is not enabled on this facilitator |
+| `NO_RELAYER` | No relayer configured for the requested network |
+| `INVALID_REQUEST` | Malformed address, amount, or signature `v` |
+| `UNSUPPORTED_TRANSFER_METHOD` | `assetTransferMethod` is neither `eip3009` nor `permit2` |
+| `PERMIT2_ALLOWANCE_REQUIRED` | Payer must submit a one-time `approve(PERMIT2, …)` first |
+| `EXPIRED` / `NOT_YET_VALID` | Outside the authorization's validity window |
+| `SIGNATURE_MISMATCH` | Signature does not recover to the declared `from` |
+| `MALFORMED_SIGNATURE` | Signature is structurally invalid (bad `v`, unrecoverable) |
+| `NONCE_ALREADY_USED` | Authorization already redeemed |
+| `INSUFFICIENT_BALANCE` | Payer does not hold `amount` |
+| `GAS_CEILING_EXCEEDED` | Estimated gas above `X402_DEPOSIT_MAX_GAS` |
+| `SIMULATION_REVERTED` | Deposit would revert; carries the decoded Core4Mica error |
+| `RECEIPT_UNAVAILABLE` | Broadcast, outcome unknown — poll `txHash`, do **not** retry |
+| `REVERTED_ON_CHAIN` | Mined and reverted, so gas was spent |
+| `RATE_LIMITED` / `ADDRESS_RATE_LIMITED` / `TOO_MANY_IN_FLIGHT` / `DUPLICATE_IN_FLIGHT` | Throttled |
+| `RELAYER_BALANCE_TOO_LOW` | Relayer at or below its configured floor |
+
+#### Trust model
+
+The signed EIP-3009 digest binds both `to` (the Core4Mica contract) and `value`, and Core4Mica
+credits collateral to `authorization.from` rather than `msg.sender`. A facilitator that altered the
+amount or the destination would produce a signature that no longer recovers, and the transaction
+would revert. **The worst a malicious facilitator can do is refuse to submit.**
+
+Verification is therefore a gas optimisation, not a security boundary — it exists so the facilitator
+does not pay for transactions that were always going to revert. Every check is re-enforced on-chain.
+
+#### Operating one
+
+`/deposit` spends your ETH on behalf of the caller. Nobody can steal a deposit, but a stream of
+legitimate, worthless deposits will burn gas. The built-in limits below bound the rate and the
+per-transaction cost; they do not make griefing uneconomic.
+
+**Authenticate `/deposit` at your gateway before exposing it publicly.** Rate limiting is a floor,
+not a fix — an attacker with one funded address can still drain the relayer slowly. Set
+`X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI` so the loss is bounded, and alert on `status: "degraded"`.
 
 ### End-to-end credit flow
 
@@ -488,6 +647,23 @@ export X402_AUTH_REFRESH_MARGIN_SECS=60
 # Default asset address to apply when callers omit assetAddress in /tabs requests
 export ASSET_ADDRESS=0x...
 
+# Gasless deposits (optional). Without a relayer key, /deposit returns NO_RELAYER and the rest of
+# the facilitator is unaffected. Keep this key separate from the auth wallet above: that one is an
+# identity and needs no balance, this one pays gas and must be funded.
+export X402_RELAYER_PRIVATE_KEY=0x...
+# Defaults to the ethereum_http_rpc_url core advertises.
+export X402_RELAYER_RPC_URL=http://127.0.0.1:8545
+
+# Deposit throttling (all optional; defaults shown). See "Operating one" above — these bound the
+# damage from abuse, they do not prevent it.
+export X402_DEPOSIT_MAX_IN_FLIGHT=16        # concurrent submissions across all callers
+export X402_DEPOSIT_PER_ADDRESS_LIMIT=5     # per verified signer, per window
+export X402_DEPOSIT_GLOBAL_LIMIT=60         # per window, pre-verification
+export X402_DEPOSIT_WINDOW_SECS=60
+export X402_DEPOSIT_MAX_GAS=600000          # ceiling on estimate AND explicit tx gas limit
+# Strongly recommended: refuse deposits below this, so a drain cannot run to zero. Unset = disabled.
+export X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI=100000000000000000
+
 # Optional: pin the expected domain separator (32-byte hex, 0x-prefixed)
 export X402_GUARANTEE_DOMAIN=0x...
 # legacy: FOUR_MICA_GUARANTEE_DOMAIN / 4MICA_GUARANTEE_DOMAIN
@@ -546,9 +722,10 @@ keeping custody, settlement, and tab management under your own infrastructure.
   `X402_CORE_API_URL/core/public-params` (or the first `coreApiUrl` listed inside `X402_NETWORKS`) to
   fetch the operator's BLS public key, active guarantee domain, accepted guarantee versions, and
   related metadata. Those values are kept in memory and reused for later requests.
-- **Tab provisioning (`POST /tabs`)** – recipients can ask the facilitator to open a payment tab on
-  their behalf. The facilitator relays the request to `core/payment-tabs`, converts the 4mica
-  response into a plain JSON payload, and hands the tab metadata back to the resource server.
+- **Gasless deposit (`POST /deposit`)** – the only path where the facilitator acts on-chain. It
+  verifies the payer's EIP-3009 authorization, then signs and broadcasts
+  `depositStablecoinWithAuthorization` with its relayer key, paying the gas. Collateral is credited
+  to the signer. `POST /deposit/verify` runs the same checks without broadcasting.
 - **Verification (`POST /verify`)** – recipients send the `paymentPayload` plus the
   `paymentRequirements` they issued to the client. The facilitator validates the claims against the
   requirements and mirrors the upstream x402 error semantics. No 4mica network call is made in this
