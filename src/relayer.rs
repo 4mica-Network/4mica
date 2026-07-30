@@ -17,7 +17,6 @@ use alloy::network::EthereumWallet;
 use alloy::primitives::{B256, U256};
 use alloy::providers::fillers::{CachedNonceManager, NonceFiller};
 use alloy::providers::{DynProvider, Provider, ProviderBuilder};
-use alloy::sol;
 use anyhow::{Context, Result};
 use sdk_4mica::Address;
 use sdk_4mica::contract::Core4Mica::{self, Core4MicaInstance};
@@ -26,7 +25,11 @@ use tokio::sync::RwLock;
 use crate::config::{NetworkConfig, PublicParameters};
 use crate::deposit::DepositError;
 
-sol! {
+// EIP-2612's `permit` takes seven parameters; the signature is fixed by the standard, so the
+// generated binding cannot be narrowed.
+#[allow(clippy::too_many_arguments)]
+mod token {
+    alloy::sol! {
     /// The slice of an EIP-3009 token this facilitator reads. Declared here rather than in
     /// `deposit.rs` so the transport layer does not depend on the domain layer; `sdk-4mica`'s own
     /// `ERC20` binding has `DOMAIN_SEPARATOR` but neither `balanceOf` nor `authorizationState`.
@@ -34,10 +37,28 @@ sol! {
     contract DepositToken {
         function DOMAIN_SEPARATOR() external view returns (bytes32);
         function balanceOf(address account) external view returns (uint256);
+        /// Permit2 needs a prior approval from the payer; the facilitator checks it so the client
+        /// gets a fixable error rather than an opaque revert.
+        function allowance(address owner, address spender) external view returns (uint256);
+        /// EIP-2612. Present on many modern ERC-20s that lack EIP-3009, and the basis of the
+        /// sponsored-approval path: the payer signs a permit, the relayer submits it.
+        function nonces(address owner) external view returns (uint256);
+        function permit(
+            address owner,
+            address spender,
+            uint256 value,
+            uint256 deadline,
+            uint8 v,
+            bytes32 r,
+            bytes32 s
+        ) external;
         /// EIP-3009 replay guard. `true` once an authorization has been redeemed or cancelled.
         function authorizationState(address authorizer, bytes32 nonce) external view returns (bool);
     }
+    }
 }
+
+pub use token::DepositToken;
 
 /// A funded signer bound to one network's chain, able to submit Core4Mica transactions.
 #[derive(Clone)]
@@ -47,6 +68,7 @@ pub struct Relayer {
 
 struct RelayerInner {
     network: String,
+    chain_id: u64,
     address: Address,
     contract_address: Address,
     provider: DynProvider,
@@ -122,6 +144,7 @@ impl Relayer {
         Ok(Some(Self {
             inner: Arc::new(RelayerInner {
                 network: network.id.clone(),
+                chain_id,
                 address,
                 contract_address: public_params.contract_address,
                 provider,
@@ -138,6 +161,11 @@ impl Relayer {
 
     pub fn network(&self) -> &str {
         &self.inner.network
+    }
+
+    /// Verified against the CAIP-2 network at startup, so Permit2's domain can be derived offline.
+    pub fn chain_id(&self) -> u64 {
+        self.inner.chain_id
     }
 
     pub fn contract(&self) -> Core4MicaInstance<DynProvider> {

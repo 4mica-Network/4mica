@@ -43,11 +43,7 @@ async fn deposit_verify_handler(
             // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
             state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "deposit verification failed");
-            Json(DepositVerifyResponse::invalid(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ))
+            Json(DepositVerifyResponse::invalid(&err))
         }
     }
 }
@@ -65,6 +61,8 @@ async fn run_deposit_verify(
         &request.amount,
         request.asset_transfer_method.as_deref(),
         request.authorization,
+        request.permit2_authorization,
+        request.eip2612_permit.map(|p| p.parse()).transpose()?,
     )?;
     deposit::verify(relayer, state.deposit_guard().limits(), &intent, now_secs()).await
 }
@@ -93,11 +91,7 @@ async fn deposit_handler(
         Err(err) => {
             state.deposit_guard().record_rejected(&err);
             warn!(reason = %err, code = err.code(), "gasless deposit failed");
-            Json(DepositResponse::failure(
-                err.to_string(),
-                err.code(),
-                err.is_retryable(),
-            ))
+            Json(DepositResponse::failure(&err))
         }
     }
 }
@@ -113,6 +107,8 @@ async fn run_deposit(
         &request.amount,
         request.asset_transfer_method.as_deref(),
         request.authorization,
+        request.permit2_authorization,
+        request.eip2612_permit.map(|p| p.parse()).transpose()?,
     )?;
 
     let tx_hash = deposit::submit(relayer, state.deposit_guard(), &intent, now_secs()).await?;

@@ -2,14 +2,16 @@ use std::collections::HashMap;
 
 use rpc::PaymentGuaranteeRequest;
 use sdk_4mica::BLSCert;
-use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
+use sdk_4mica::contract::Core4Mica::{Permit2Authorization, ReceiveAuthorization};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::state::ValidationError;
-use alloy::primitives::B256;
+use std::str::FromStr;
 
-use crate::deposit::DepositIntent;
+use alloy::primitives::{B256, U256};
+
+use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
 use crate::limits::DepositCounters;
 
 #[derive(Clone, Copy, Debug)]
@@ -213,10 +215,53 @@ pub struct DepositRequest {
     pub asset: String,
     /// Decimal or `0x`-prefixed hex, in the token's own decimals.
     pub amount: String,
-    /// Defaults to `eip3009`, matching x402's `scheme_exact_evm`.
+    /// `eip3009` (default) or `permit2`, matching x402's `scheme_exact_evm`. Optional — the
+    /// authorization field that is present already identifies the scheme — but a mismatch is
+    /// rejected rather than silently ignored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_transfer_method: Option<String>,
-    pub authorization: ReceiveAuthorization,
+    /// EIP-3009 `receiveWithAuthorization`. Exactly one of this and `permit2Authorization` must be
+    /// present, mirroring how x402's `exact` scheme names the two shapes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<ReceiveAuthorization>,
+    /// Permit2 `PermitTransferFrom`, for tokens without EIP-3009. Requires the payer to have made
+    /// a one-time on-chain `approve(PERMIT2, ...)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permit2_authorization: Option<Permit2Authorization>,
+    /// Optional EIP-2612 permit granting Permit2 its allowance, so the payer never needs gas.
+    /// Only meaningful alongside `permit2Authorization`; x402 calls this `eip2612GasSponsoring`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eip2612_permit: Option<Eip2612PermitRequest>,
+}
+
+/// Wire form of an EIP-2612 permit. `owner` and `spender` are implied — the payer and the
+/// canonical Permit2 — so only the signed values travel.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Eip2612PermitRequest {
+    /// Approval amount. Typically `MaxUint256` so one permit covers future deposits too.
+    pub value: String,
+    pub deadline: String,
+    pub v: u8,
+    pub r: B256,
+    pub s: B256,
+}
+
+impl Eip2612PermitRequest {
+    pub fn parse(self) -> Result<Eip2612Permit, DepositError> {
+        Ok(Eip2612Permit {
+            value: parse_amount(&self.value, "eip2612Permit.value")?,
+            deadline: parse_amount(&self.deadline, "eip2612Permit.deadline")?,
+            v: self.v,
+            r: self.r,
+            s: self.s,
+        })
+    }
+}
+
+fn parse_amount(value: &str, field: &str) -> Result<U256, DepositError> {
+    U256::from_str(value.trim())
+        .map_err(|err| DepositError::InvalidRequest(format!("invalid {field}: {err}")))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -232,6 +277,37 @@ pub struct DepositVerifyResponse {
     /// errors. A bad signature or an expired authorization will never become valid.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+}
+
+/// What a client needs to satisfy a missing Permit2 approval, so it need not read the chain.
+///
+/// `eip2612Nonce` is the only value a chain-free client cannot derive: the token's domain
+/// separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2.
+/// Present means the approval can be sponsored — sign an `eip2612Permit` and retry. Absent means
+/// the token has no EIP-2612 surface, so the payer must submit `approve(PERMIT2, …)` themselves.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Permit2AllowanceResponse {
+    pub spender: String,
+    pub allowance: String,
+    pub required: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eip2612_nonce: Option<String>,
+}
+
+impl Permit2AllowanceResponse {
+    fn from_error(error: &DepositError) -> Option<Self> {
+        let details = error.permit2_allowance_details()?;
+        Some(Self {
+            spender: format!("{:#x}", details.spender),
+            allowance: details.allowance.to_string(),
+            required: details.required.to_string(),
+            eip2612_nonce: details.eip2612_nonce.map(|nonce| nonce.to_string()),
+        })
+    }
 }
 
 impl DepositVerifyResponse {
@@ -241,15 +317,17 @@ impl DepositVerifyResponse {
             invalid_reason: None,
             error_code: None,
             retryable: None,
+            permit2_allowance: None,
         }
     }
 
-    pub fn invalid(reason: String, code: &str, retryable: bool) -> Self {
+    pub fn invalid(error: &DepositError) -> Self {
         Self {
             is_valid: false,
-            invalid_reason: Some(reason),
-            error_code: Some(code.to_string()),
-            retryable: Some(retryable),
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_error(error),
         }
     }
 }
@@ -277,6 +355,9 @@ pub struct DepositResponse {
     /// See [`DepositVerifyResponse::retryable`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
 }
 
 impl DepositResponse {
@@ -285,16 +366,17 @@ impl DepositResponse {
             success: true,
             tx_hash: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
-            from: Some(format!("{:#x}", intent.authorization.from)),
+            from: Some(format!("{:#x}", intent.authorization.from())),
             asset: Some(format!("{:#x}", intent.asset)),
             amount: Some(intent.amount.to_string()),
             error: None,
             error_code: None,
             retryable: None,
+            permit2_allowance: None,
         }
     }
 
-    pub fn failure(error: String, code: &str, retryable: bool) -> Self {
+    pub fn failure(error: &DepositError) -> Self {
         Self {
             success: false,
             tx_hash: None,
@@ -302,9 +384,10 @@ impl DepositResponse {
             from: None,
             asset: None,
             amount: None,
-            error: Some(error),
-            error_code: Some(code.to_string()),
-            retryable: Some(retryable),
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_error(error),
         }
     }
 }

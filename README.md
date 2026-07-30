@@ -234,9 +234,15 @@ A payer with tokens but no native gas cannot post collateral. These endpoints le
 EIP-3009 `receiveWithAuthorization` off-chain while the facilitator broadcasts
 `depositStablecoinWithAuthorization` and pays the gas.
 
-Both endpoints take the same body. `assetTransferMethod` defaults to `eip3009`; `permit2` is
-recognised but rejected with `PERMIT2_UNSUPPORTED`, because `depositStablecoinWithPermit2` requires
-a prior on-chain `approve(PERMIT2, …)` from the payer and so is not gasless end to end.
+Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactly one** of
+`authorization` or `permit2Authorization`; the shape identifies the scheme, and
+`assetTransferMethod` is an optional cross-check that is rejected if it contradicts the payload.
+
+| | `eip3009` | `permit2` |
+| --- | --- | --- |
+| Tokens | those implementing EIP-3009 (USDC and similar) | any ERC-20 |
+| Payer pays gas | never | **once**, for `approve(PERMIT2, …)` |
+| Prerequisite | none | that approval, or `PERMIT2_ALLOWANCE_REQUIRED` |
 
 ```jsonc
 {
@@ -244,12 +250,82 @@ a prior on-chain `approve(PERMIT2, …)` from the payer and so is not gasless en
   "asset": "0x…",
   "amount": "1000000",             // decimal or 0x-hex, in the token's own decimals
   "assetTransferMethod": "eip3009",
-  "authorization": {               // exactly as sdk-4mica serialises ReceiveAuthorization
+
+  // EIP-3009 — exactly as sdk-4mica serialises ReceiveAuthorization
+  "authorization": {
     "from": "0x…", "validAfter": "0x0", "validBefore": "0x…",
     "nonce": "0x…", "v": 28, "r": "0x…", "s": "0x…"
   }
+
+  // …or Permit2 — as sdk-4mica serialises Permit2Authorization
+  // "permit2Authorization": { "from": "0x…", "nonce": "0x…", "deadline": "0x…", "signature": "0x…" }
 }
 ```
+
+Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`, and
+`/deposit/verify` reports `PERMIT2_ALLOWANCE_REQUIRED` when the payer has not made it — mirroring
+x402's precondition of the same name. That response carries everything needed to fix it:
+
+```jsonc
+{
+  "isValid": false,
+  "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
+  "permit2Allowance": {
+    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+    "allowance": "0",
+    "required": "1000",
+    "eip2612Nonce": "7"        // omitted when the token has no EIP-2612 surface
+  }
+}
+```
+
+`eip2612Nonce` is the only value a chain-free client cannot derive for itself — the token's domain
+separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2. Its
+**presence means the approval can be sponsored**: sign an `eip2612Permit` and retry. Its **absence
+means it cannot**, and the payer must submit `approve(PERMIT2, …)` themselves.
+
+So a client with no Ethereum RPC can attempt a Permit2 deposit, be told exactly what is missing,
+and complete it on the retry.
+
+#### Sponsored approvals (`eip2612Permit`)
+
+When the token also implements **EIP-2612**, the payer can sign that approval instead of paying for
+it, and the facilitator submits it. This is x402's `eip2612GasSponsoring` extension, and it makes
+Permit2 deposits gasless for the payer end to end:
+
+```jsonc
+{
+  "asset": "0x…",
+  "amount": "1000",
+  "assetTransferMethod": "permit2",
+  "permit2Authorization": { … },
+  "eip2612Permit": {
+    "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+    "deadline": "4000000000",
+    "v": 28, "r": "0x…", "s": "0x…"
+  }
+}
+```
+
+`owner` and `spender` are implied — the payer and the canonical Permit2 — so only the signed values
+travel. The permit is verified against the token's own domain and *current* nonce before the
+relayer pays to submit it, so a stale or forged signature costs nothing. It is only submitted when
+the allowance is actually short, re-checked immediately before sending in case the payer approved
+in the meantime.
+
+The sweet spot is tokens with EIP-2612 but **not** EIP-3009. A token with both (real USDC) should
+use `eip3009`, which needs one transaction rather than two.
+
+Unlike x402's other sponsoring extension (`erc20ApprovalGasSponsoring`), this needs no atomic
+batch. That one has the facilitator send ETH to the payer's wallet, which a front-runner could
+steal between funding and settlement. Here the permit only grants an allowance to Permit2, and
+Permit2 moves nothing without a `PermitTransferFrom` signature naming Core4Mica as spender — so a
+dangling allowance is not exploitable and the two transactions need not be atomic.
+
+Note this facilitator does **not** use x402's `x402ExactPermit2Proxy` or its `Witness`. Those exist
+because `exact` pays an arbitrary payee and Permit2's signature binds `spender` but not the
+destination. A deposit has no free destination — Core4Mica pulls into itself and credits the signer
+— so binding `spender` to Core4Mica already constrains it completely.
 
 `POST /deposit/verify` is a preflight that spends no gas: it checks expiry, recovers the signature,
 confirms the nonce is unused and the balance sufficient, then simulates the deposit and rejects it
@@ -270,15 +346,20 @@ chain errors); a bad signature or an expired authorization will never become val
 
 | `errorCode` | Meaning |
 | --- | --- |
-| `NO_RELAYER` | No relayer configured for that network |
+| `NO_RELAYER_CONFIGURED` | Gas sponsorship is not enabled on this facilitator |
+| `NO_RELAYER` | No relayer configured for the requested network |
 | `INVALID_REQUEST` | Malformed address, amount, or signature `v` |
-| `PERMIT2_UNSUPPORTED` / `UNSUPPORTED_TRANSFER_METHOD` | Unsupported `assetTransferMethod` |
+| `UNSUPPORTED_TRANSFER_METHOD` | `assetTransferMethod` is neither `eip3009` nor `permit2` |
+| `PERMIT2_ALLOWANCE_REQUIRED` | Payer must submit a one-time `approve(PERMIT2, …)` first |
 | `EXPIRED` / `NOT_YET_VALID` | Outside the authorization's validity window |
-| `SIGNATURE_MISMATCH` | Signature does not recover to `authorization.from` |
+| `SIGNATURE_MISMATCH` | Signature does not recover to the declared `from` |
+| `MALFORMED_SIGNATURE` | Signature is structurally invalid (bad `v`, unrecoverable) |
 | `NONCE_ALREADY_USED` | Authorization already redeemed |
 | `INSUFFICIENT_BALANCE` | Payer does not hold `amount` |
 | `GAS_CEILING_EXCEEDED` | Estimated gas above `X402_DEPOSIT_MAX_GAS` |
-| `SIMULATION_REVERTED` | Deposit would revert on-chain |
+| `SIMULATION_REVERTED` | Deposit would revert; carries the decoded Core4Mica error |
+| `RECEIPT_UNAVAILABLE` | Broadcast, outcome unknown — poll `txHash`, do **not** retry |
+| `REVERTED_ON_CHAIN` | Mined and reverted, so gas was spent |
 | `RATE_LIMITED` / `ADDRESS_RATE_LIMITED` / `TOO_MANY_IN_FLIGHT` / `DUPLICATE_IN_FLIGHT` | Throttled |
 | `RELAYER_BALANCE_TOO_LOW` | Relayer at or below its configured floor |
 

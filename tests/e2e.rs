@@ -493,6 +493,9 @@ async fn e2e_facilitator_endpoints() {
     // --- gasless deposit: SDK signs, facilitator pays the gas ---
     run_gasless_deposit(&client, &base, &env).await;
 
+    // --- sponsored-permit deposit: gasless for a token that has EIP-2612 but not EIP-3009 ---
+    run_sponsored_permit_deposit(&client, &base, &env).await;
+
     // Leave the chain past confirmation depth so the deposit just made is indexed, rather than
     // sitting invisible until the next run happens to mine.
     advance_chain(&client, &public_params).await;
@@ -986,6 +989,175 @@ async fn advance_chain(client: &reqwest::Client, public_params: &Value) -> bool 
     tokio::time::sleep(Duration::from_secs(2)).await;
     eprintln!("[e2e] mined a block so pending deposits reach confirmation depth");
     true
+}
+
+/// Deposits a token that supports EIP-2612 but *not* EIP-3009, with the payer paying no gas at all.
+///
+/// Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`. This exercises
+/// x402's `eip2612GasSponsoring` answer to that — the payer signs a permit, the facilitator submits
+/// it, and only then pulls the deposit. Two relayer transactions, zero payer transactions.
+///
+/// Opt in with `E2E_PERMIT2_TOKEN`; there is no sensible default, since the token must be the
+/// awkward 2612-without-3009 shape for this path to be the one under test.
+async fn run_sponsored_permit_deposit(client: &reqwest::Client, base: &str, env: &TestEnv) {
+    let Some(token) = env_opt("E2E_PERMIT2_TOKEN") else {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: set E2E_PERMIT2_TOKEN to an EIP-2612 token \
+             registered with core and funded for the payer"
+        );
+        return;
+    };
+    let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
+    let amount: u64 = env_opt("E2E_DEPOSIT_AMOUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000);
+
+    let signer: alloy::signers::local::PrivateKeySigner =
+        payer_key.parse().expect("invalid payer key");
+    let payer = signer.address();
+    let config = sdk_4mica::ConfigBuilder::default()
+        .signer(signer.clone())
+        .rpc_url(env.core_url.clone())
+        .build()
+        .expect("build SDK config");
+    let sdk = sdk_4mica::Client::new(config)
+        .await
+        .expect("init SDK client");
+
+    let before = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .unwrap_or_default();
+
+    // The Permit2 half comes from the SDK, exactly as a real client would produce it.
+    let permit2 = match sdk
+        .user
+        .sign_deposit_permit2(token.clone(), sdk_4mica::U256::from(amount))
+        .await
+    {
+        Ok(auth) => auth,
+        Err(err) => {
+            eprintln!("[e2e] sponsored-permit deposit skipped: SDK could not sign permit2 ({err})");
+            return;
+        }
+    };
+
+    // The EIP-2612 half is signed here: it authorises Permit2 rather than 4mica, so it is not
+    // something the 4mica SDK produces.
+    let Some(permit) = sign_eip2612_permit(&signer, &token, payer).await else {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: {token} does not expose EIP-2612 permit/nonces"
+        );
+        return;
+    };
+
+    let body = json!({
+        "network": env.network,
+        "asset": token,
+        "amount": amount.to_string(),
+        "assetTransferMethod": "permit2",
+        "permit2Authorization": serde_json::to_value(&permit2).expect("serialize permit2"),
+        "eip2612Permit": permit,
+    });
+
+    let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert!(status.is_success(), "/deposit HTTP status {status}");
+    if settle["errorCode"] == "NO_RELAYER_CONFIGURED" {
+        eprintln!("[e2e] sponsored-permit deposit skipped: facilitator has no relayer configured");
+        return;
+    }
+    if settle["errorCode"] == "SIMULATION_REVERTED" {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: {}",
+            settle["error"]
+        );
+        return;
+    }
+    assert_eq!(settle["success"], true, "/deposit failed: {settle}");
+
+    let after = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+    assert_eq!(
+        after - before,
+        sdk_4mica::U256::from(amount),
+        "collateral must be credited to the signer"
+    );
+    eprintln!("[e2e] sponsored-permit deposit credited {amount} of {token} with no payer gas ✔");
+}
+
+/// Signs an EIP-2612 permit authorising Permit2 to spend `amount` of `token` on the payer's behalf.
+/// Returns `None` when the token has no `nonces`/`DOMAIN_SEPARATOR`, i.e. is not EIP-2612.
+async fn sign_eip2612_permit(
+    signer: &alloy::signers::local::PrivateKeySigner,
+    token: &str,
+    owner: alloy::primitives::Address,
+) -> Option<Value> {
+    use alloy::primitives::{Address, B256, U256, keccak256};
+    use alloy::providers::{Provider, ProviderBuilder};
+    use alloy::signers::SignerSync;
+    use alloy::sol;
+
+    sol! {
+        #[sol(rpc)]
+        contract Eip2612 {
+            function nonces(address owner) external view returns (uint256);
+            function DOMAIN_SEPARATOR() external view returns (bytes32);
+        }
+    }
+
+    let rpc_url = env_opt("E2E_ETH_RPC_URL").unwrap_or_else(|| "http://127.0.0.1:8545".to_string());
+    let provider = ProviderBuilder::new()
+        .connect(&rpc_url)
+        .await
+        .ok()?
+        .erased();
+    let token_addr: Address = token.parse().ok()?;
+    let contract = Eip2612::new(token_addr, provider);
+
+    let nonce = contract.nonces(owner).call().await.ok()?;
+    let domain_separator = contract.DOMAIN_SEPARATOR().call().await.ok()?;
+
+    // Canonical Permit2, the spender the deposit contract will pull through.
+    let permit2: Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3".parse().ok()?;
+    let deadline = U256::from(4_000_000_000u64);
+    let value = U256::MAX;
+
+    let type_hash = keccak256(
+        b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+            .as_slice(),
+    );
+    let word = |a: Address| {
+        let mut w = [0u8; 32];
+        w[12..].copy_from_slice(a.as_slice());
+        w
+    };
+    let mut encoded = Vec::with_capacity(32 * 6);
+    encoded.extend_from_slice(type_hash.as_slice());
+    encoded.extend_from_slice(&word(owner));
+    encoded.extend_from_slice(&word(permit2));
+    encoded.extend_from_slice(&value.to_be_bytes::<32>());
+    encoded.extend_from_slice(&nonce.to_be_bytes::<32>());
+    encoded.extend_from_slice(&deadline.to_be_bytes::<32>());
+
+    let mut buf = Vec::with_capacity(66);
+    buf.push(0x19);
+    buf.push(0x01);
+    buf.extend_from_slice(domain_separator.as_slice());
+    buf.extend_from_slice(keccak256(encoded).as_slice());
+    let digest: B256 = keccak256(buf);
+
+    let sig = signer.sign_hash_sync(&digest).ok()?;
+    Some(json!({
+        "value": value.to_string(),
+        "deadline": deadline.to_string(),
+        "v": 27 + sig.v() as u8,
+        "r": format!("{:#x}", sig.r()),
+        "s": format!("{:#x}", sig.s()),
+    }))
 }
 
 /// First token core advertises with a domain separator, i.e. one it considers gasless-depositable.
