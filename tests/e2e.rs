@@ -20,28 +20,41 @@
 //!   cargo test --test e2e -- --nocapture
 //! ```
 //!
-//! The "always" path covers `/health`, `/supported`, `/verify`, and a *negative*
-//! `/settle` (a locally-signed, unfunded payload that core rejects — proving the
-//! `core/guarantees` call path executes).
+//! Everything runs by default against a reachable core — there is no opt-in flag. That is
+//! deliberate: an end-to-end test that silently skips is indistinguishable from one that passes,
+//! and both of the interesting paths (settlement and gasless deposit) spent time in that state.
 //!
-//! The full happy path (a real SDK-signed payment that mints a BLS certificate) is
-//! opt-in via `E2E_RUN_HAPPY=1`. It defaults every value to the anvil accounts the
-//! `4mica-core` dev stack uses (facilitator auth wallet = acct 0, payer = acct 1,
-//! recipient = acct 2, ETH collateral), so against a seeded local stack it is just:
+//! Coverage:
+//!
+//!   * **Always** — `/health`, `/supported`, `/verify`, and a *negative* `/settle` (a
+//!     locally-signed, unfunded payload core rejects, proving the `core/guarantees` path executes).
+//!   * **Happy path** — a real SDK-signed payment that mints a BLS certificate.
+//!   * **Gasless deposit** — the SDK signs an EIP-3009 authorization, the facilitator pays the gas,
+//!     and collateral lands on the signer. The token is discovered from `/core/tokens`.
+//!
+//! Values default to the anvil accounts the `4mica-core` dev stack uses (facilitator auth wallet =
+//! acct 0, payer = acct 1, recipient = acct 2), so against a seeded stack it is just:
 //!
 //! ```sh
-//! E2E_RUN_HAPPY=1 cargo test --test e2e -- --nocapture
+//! cargo test --test e2e -- --nocapture
 //! ```
 //!
-//! Override any value with `E2E_PAYER_KEY` / `E2E_USER_ADDRESS` /
-//! `E2E_ASSET_ADDRESS` / `E2E_PAY_TO` / `E2E_AMOUNT` /
-//! `E2E_AUTH_WALLET_PRIVATE_KEY` / `E2E_AUTH_URL`.
+//! # Prerequisites, and what happens without them
 //!
-//! The happy path requires core-side state this test does NOT set up (it lives in
-//! core's DB / on-chain): the facilitator's auth wallet must be granted
-//! `guarantee:issue`, and the payer must hold ETH collateral. Seed those with the
-//! core dev harness first; otherwise `/settle` fails at core (401 / insufficient
-//! collateral / invalid signature) and the assertion reports it.
+//! Core unreachable → the whole test skips. No relayer or no depositable token → the deposit case
+//! skips, since there is nothing to exercise. **Anything else fails**, including an unseeded core.
+//!
+//! The happy path needs state this test does not create: the facilitator's auth wallet granted
+//! `guarantee:issue`, and collateral for the payer. The deposit needs a token that genuinely
+//! implements EIP-3009 — core advertising a `domain_separator` only proves EIP-712, so a token can
+//! be advertised and still be undepositable.
+//!
+//! Escape hatches: `E2E_SKIP_HAPPY=1`, `E2E_SKIP_DEPOSIT=1`.
+//!
+//! Overrides: `E2E_CORE_API_URL` / `E2E_NETWORK` / `E2E_SCHEME` / `E2E_PAYER_KEY` /
+//! `E2E_USER_ADDRESS` / `E2E_ASSET_ADDRESS` / `E2E_PAY_TO` / `E2E_AMOUNT` /
+//! `E2E_AUTH_WALLET_PRIVATE_KEY` / `E2E_AUTH_URL` / `E2E_RELAYER_PRIVATE_KEY` /
+//! `E2E_DEPOSIT_TOKEN` / `E2E_DEPOSIT_AMOUNT`.
 
 use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
@@ -76,6 +89,9 @@ struct TestEnv {
     scheme: String,
     auth_key: Option<String>,
     auth_url: Option<String>,
+    /// Enables `/deposit`. Absent leaves the facilitator without gas sponsorship, which is a
+    /// supported deployment — the deposit case then skips rather than fails.
+    relayer_key: Option<String>,
 }
 
 /// Kills the spawned facilitator process on drop so a panicking assertion never
@@ -142,6 +158,16 @@ fn spawn_facilitator(env: &TestEnv, port: u16) -> Child {
         .env_remove("SIGNER_TYPE")
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
+
+    match &env.relayer_key {
+        Some(key) => {
+            cmd.env("X402_RELAYER_PRIVATE_KEY", key);
+        }
+        None => {
+            cmd.env_remove("X402_RELAYER_PRIVATE_KEY");
+        }
+    }
+    cmd.env_remove("X402_RELAYER_RPC_URL");
 
     match (&env.auth_key, &env.auth_url) {
         (Some(key), Some(url)) => {
@@ -276,9 +302,9 @@ fn unfunded_settle_body(scheme: &str, network: &str) -> Value {
 async fn e2e_facilitator_endpoints() {
     let core_url = env_opt("E2E_CORE_API_URL").unwrap_or_else(|| DEFAULT_CORE_API_URL.to_string());
 
-    // Opt into the funded happy path with `E2E_RUN_HAPPY=1` (or by supplying a
-    // payer key).
-    let happy = env_opt("E2E_RUN_HAPPY").is_some() || env_opt("E2E_PAYER_KEY").is_some();
+    // On by default whenever core is reachable. `E2E_SKIP_HAPPY=1` opts out for a core that has
+    // not been seeded; `E2E_RUN_HAPPY` is still honoured so older invocations keep working.
+    let happy = env_opt("E2E_SKIP_HAPPY").is_none();
 
     // Always give the facilitator an auth wallet (default: anvil acct 0) so its
     // SIWE flow (`/auth/nonce` + `/auth/verify`) is exercised on `/settle` even in
@@ -293,6 +319,11 @@ async fn e2e_facilitator_endpoints() {
         scheme: env_opt("E2E_SCHEME").unwrap_or_else(|| DEFAULT_SCHEME.to_string()),
         auth_key,
         auth_url,
+        // Defaults to anvil acct 0, which the dev stack funds. Deposits still need an EIP-3009
+        // token, so the case is gated on E2E_DEPOSIT_TOKEN regardless.
+        relayer_key: Some(
+            env_opt("E2E_RELAYER_PRIVATE_KEY").unwrap_or_else(|| ANVIL_ACCT0_KEY.to_string()),
+        ),
     };
 
     if !core_reachable(&env.core_url).await {
@@ -448,8 +479,170 @@ async fn e2e_facilitator_endpoints() {
     // without any seeding). ---
     verify_validation_gated_payment(&client, &base, &env, &public_params).await;
 
-    // --- happy path (opt-in): a real SDK-signed payment that mints a certificate ---
-    run_happy_path(&client, &base, &env, happy).await;
+    // Confirm anything already deposited but still unconfirmed. See `advance_chain`.
+    let local_anvil = advance_chain(&client, &public_params).await;
+
+    // Seed the payer's collateral if the chain is a local anvil. See `ensure_payer_collateral`.
+    if happy {
+        ensure_payer_collateral(&client, &env, &public_params, local_anvil).await;
+    }
+
+    // --- happy path: a real SDK-signed payment that mints a certificate ---
+    run_happy_path(&client, &base, &env, happy, &public_params).await;
+
+    // --- gasless deposit: SDK signs, facilitator pays the gas ---
+    run_gasless_deposit(&client, &base, &env).await;
+
+    // --- sponsored-permit deposit: gasless for a token that has EIP-2612 but not EIP-3009 ---
+    run_sponsored_permit_deposit(&client, &base, &env).await;
+
+    // Leave the chain past confirmation depth so the deposit just made is indexed, rather than
+    // sitting invisible until the next run happens to mine.
+    advance_chain(&client, &public_params).await;
+}
+
+/// End-to-end gasless deposit: the SDK signs an EIP-3009 authorization, the facilitator submits it
+/// and pays the gas, and collateral lands on the *signer* — never the relayer.
+///
+/// Deliberately signs via `sdk-4mica` rather than hand-rolling the digest: this is the only test
+/// that proves the SDK and the facilitator agree on the payload, which is the contract the whole
+/// gasless flow rests on. A hand-built authorization would pass even if the two had drifted.
+///
+/// Runs by default. The token is discovered from core's `/core/tokens` — the first entry
+/// advertising a domain separator — so a correctly configured stack needs no test configuration.
+/// Override with `E2E_DEPOSIT_TOKEN`, or skip with `E2E_SKIP_DEPOSIT=1`.
+///
+/// Skips only when there is genuinely nothing to exercise (no relayer, no depositable token).
+/// Anything else fails, because a silent pass here is indistinguishable from a working deposit.
+async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv) {
+    if env_opt("E2E_SKIP_DEPOSIT").is_some() {
+        eprintln!("[e2e] gasless deposit skipped: E2E_SKIP_DEPOSIT is set");
+        return;
+    }
+
+    let token = match env_opt("E2E_DEPOSIT_TOKEN") {
+        Some(token) => token,
+        None => match discover_depositable_token(client, &env.core_url).await {
+            Some(token) => {
+                eprintln!("[e2e] gasless deposit using core-advertised token {token}");
+                token
+            }
+            None => {
+                eprintln!(
+                    "[e2e] gasless deposit skipped: core advertises no token with an EIP-712 \
+                     domain separator. Register an EIP-3009 token, or set E2E_DEPOSIT_TOKEN."
+                );
+                return;
+            }
+        },
+    };
+    let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
+    let amount: u64 = env_opt("E2E_DEPOSIT_AMOUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000);
+
+    let signer: alloy::signers::local::PrivateKeySigner =
+        payer_key.parse().expect("invalid payer key");
+    let config = sdk_4mica::ConfigBuilder::default()
+        .signer(signer)
+        .rpc_url(env.core_url.clone())
+        .build()
+        .expect("build SDK config");
+    let sdk = sdk_4mica::Client::new(config)
+        .await
+        .expect("init SDK client");
+
+    let before = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+
+    // Signing is chain-free: the SDK takes the token's domain separator from core over HTTP.
+    let authorization = sdk
+        .user
+        .sign_deposit_authorization(token.clone(), sdk_4mica::U256::from(amount))
+        .await
+        .unwrap_or_else(|err| {
+            panic!(
+                "SDK could not sign a deposit for {token}: {err}. Core advertised this token, so \
+                 it must also advertise its EIP-712 domain separator via /core/tokens."
+            )
+        });
+
+    let body = json!({
+        "network": env.network,
+        "asset": token,
+        "amount": amount.to_string(),
+        "authorization": serde_json::to_value(&authorization).expect("serialize authorization"),
+    });
+
+    // Preflight first: it must agree with the submit path, and it spends no gas.
+    let (status, verify) = post_json(client, &format!("{base}/deposit/verify"), &body).await;
+    assert!(status.is_success(), "/deposit/verify HTTP status {status}");
+    if verify["errorCode"] == "NO_RELAYER" {
+        eprintln!("[e2e] gasless deposit skipped: facilitator has no relayer configured");
+        return;
+    }
+    // Stablecoin deposits route collateral into Aave, so a deployment without it cannot service
+    // them at all — an environment gap like a missing relayer, not a facilitator defect, so it
+    // skips rather than failing forever. The facilitator decodes the revert against the Core4Mica
+    // error ABI, so this matches a name rather than a raw selector.
+    if verify["invalidReason"]
+        .as_str()
+        .is_some_and(|reason| reason.contains("AaveNotConfigured"))
+    {
+        eprintln!(
+            "[e2e] gasless deposit skipped: Core4Mica reverts with AaveNotConfigured(). Configure \
+             Aave on the deployment (CONFIGURE_AAVE + AAVE_POOL_ADDRESSES_PROVIDER) to exercise \
+             stablecoin deposits."
+        );
+        return;
+    }
+
+    assert_eq!(
+        verify["isValid"], true,
+        "/deposit/verify rejected an SDK-signed authorization for {token}: {verify}\n  \
+         SIMULATION_REVERTED carries the decoded Core4Mica error — a token advertising \
+         DOMAIN_SEPARATOR (EIP-2612) without EIP-3009 `receiveWithAuthorization`, or an \
+         unregistered asset, both land here."
+    );
+
+    let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert!(status.is_success(), "/deposit HTTP status {status}");
+    assert_eq!(settle["success"], true, "/deposit failed: {settle}");
+    let tx_hash = settle["txHash"].as_str().expect("txHash in response");
+    assert!(tx_hash.starts_with("0x"), "unexpected txHash {tx_hash}");
+
+    // The payload binds `to` and `value`, so a facilitator cannot redirect the funds. Assert the
+    // signer was credited — reading on-chain, which has no indexer lag.
+    let after = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+    assert_eq!(
+        after - before,
+        sdk_4mica::U256::from(amount),
+        "collateral must be credited to the signer, not the relayer"
+    );
+
+    // Replaying the same authorization must fail: the nonce is consumed on-chain, and the
+    // facilitator should catch it before spending gas a second time.
+    let (_, replay) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert_eq!(
+        replay["success"], false,
+        "replay should be refused: {replay}"
+    );
+    // NONCE_ALREADY_USED when the token exposes `authorizationState`, SIMULATION_REVERTED when it
+    // does not — either way the replay is caught before any gas is spent.
+    let replay_code = replay["errorCode"].as_str().unwrap_or_default();
+    assert!(
+        matches!(replay_code, "NONCE_ALREADY_USED" | "SIMULATION_REVERTED"),
+        "replay must be refused before broadcast, got {replay_code}: {replay}"
+    );
+
+    eprintln!("[e2e] gasless deposit credited {amount} to the signer via {tx_hash} ✔");
 }
 
 /// Posts to `/verify` and asserts the facilitator rejected it (`isValid: false`
@@ -571,11 +764,15 @@ async fn verify_validation_gated_payment(
 /// as they require core DB / on-chain state):
 ///   * the facilitator's auth wallet (anvil acct 0) granted `guarantee:issue`,
 ///   * the payer (anvil acct 1) holding ETH collateral in core.
-async fn run_happy_path(client: &reqwest::Client, base: &str, env: &TestEnv, happy: bool) {
+async fn run_happy_path(
+    client: &reqwest::Client,
+    base: &str,
+    env: &TestEnv,
+    happy: bool,
+    public_params: &Value,
+) {
     if !happy {
-        eprintln!(
-            "[e2e] happy path skipped: set E2E_RUN_HAPPY=1 to run the funded flow against the local anvil stack"
-        );
+        eprintln!("[e2e] happy path skipped: E2E_SKIP_HAPPY is set");
         return;
     }
     let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
@@ -623,8 +820,28 @@ async fn run_happy_path(client: &reqwest::Client, base: &str, env: &TestEnv, hap
         }
     });
 
-    let (status, settle_body_resp) =
-        post_json(client, &format!("{base}/settle"), &settle_body).await;
+    // Collateral seeded moments ago is on-chain but not yet in core's database: the event scanner
+    // confirms at a block depth and then indexes. Retrying absorbs that lag, so a freshly seeded
+    // stack passes on the first run instead of only on the second.
+    let mut status;
+    let mut settle_body_resp;
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        (status, settle_body_resp) =
+            post_json(client, &format!("{base}/settle"), &settle_body).await;
+
+        let indexing_lag = !settle_body_resp["success"].as_bool().unwrap_or(false)
+            && settle_body_resp["error"]
+                .as_str()
+                .map(str::to_lowercase)
+                .is_some_and(|err| err.contains("not registered") || err.contains("collateral"));
+        if !indexing_lag || std::time::Instant::now() >= deadline {
+            break;
+        }
+
+        eprintln!("[e2e] waiting for core to index the payer's collateral…");
+        advance_chain(client, public_params).await;
+    }
     stub_handle.abort();
 
     assert!(status.is_success(), "happy /settle HTTP status: {status}");
@@ -657,17 +874,316 @@ async fn run_happy_path(client: &reqwest::Client, base: &str, env: &TestEnv, hap
     .iter()
     .any(|m| err.contains(m));
     if seeding_gap {
-        eprintln!(
-            "[e2e] happy path stopped at a core seeding gap: {}",
+        panic!(
+            "happy path failed on unseeded core: {}\n  \
+             Grant the facilitator auth wallet (anvil acct 0) the `guarantee:issue` scope, and \
+             deposit collateral for the payer (anvil acct 1).\n  \
+             Set E2E_SKIP_HAPPY=1 to skip this deliberately.",
             settle_body_resp["error"]
         );
-        eprintln!(
-            "[e2e]   seed the local core, then re-run: grant the facilitator auth wallet (anvil acct 0) the `guarantee:issue` scope, and deposit ETH collateral for the payer (anvil acct 1)."
-        );
-        return;
     }
 
     panic!("unexpected /settle failure in happy path: {settle_body_resp}");
+}
+
+/// Deposits native collateral for the payer when it has none, so the happy path is self-seeding.
+///
+/// Guarantee issuance needs a `User` row and spendable collateral, both of which core derives from
+/// a confirmed `CollateralDeposited` event — there is no API to create them. Requiring an operator
+/// to remember a manual `cast send` is what made this path skip silently for so long.
+///
+/// **Only runs against a local anvil**, detected by whether `anvil_mine` is supported. On a real
+/// network this would spend real funds, so it returns and lets the assertion report the gap.
+async fn ensure_payer_collateral(
+    client: &reqwest::Client,
+    env: &TestEnv,
+    public_params: &Value,
+    local_anvil: bool,
+) {
+    if !local_anvil {
+        eprintln!("[e2e] not a local anvil; leaving collateral seeding to the operator");
+        return;
+    }
+
+    let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
+    let signer: alloy::signers::local::PrivateKeySigner =
+        payer_key.parse().expect("invalid payer key");
+    let config = sdk_4mica::ConfigBuilder::default()
+        .signer(signer)
+        .rpc_url(env.core_url.clone())
+        .build()
+        .expect("build SDK config");
+    let sdk = match sdk_4mica::Client::new(config).await {
+        Ok(sdk) => sdk,
+        Err(err) => {
+            eprintln!("[e2e] could not build an SDK client to seed collateral: {err}");
+            return;
+        }
+    };
+
+    // `getUserAllAssets` rather than `principalBalance`: the latter is stablecoin-only and rejects
+    // the zero address, while the happy path settles against native ETH collateral.
+    let existing = match sdk.user.get_user().await {
+        Ok(assets) => assets
+            .into_iter()
+            .find(|asset| asset.asset.eq_ignore_ascii_case(ETH_ASSET))
+            .map(|asset| asset.collateral)
+            .unwrap_or_else(sdk_4mica::U256::default),
+        Err(err) => {
+            eprintln!("[e2e] could not read payer collateral: {err}");
+            return;
+        }
+    };
+    if !existing.is_zero() {
+        eprintln!("[e2e] payer already holds {existing} wei of collateral");
+        return;
+    }
+
+    // Generously more than the 1-wei payments the happy path makes, so one seed covers many runs.
+    let seed = sdk_4mica::U256::from(1_000_000_000_000_000_000u64);
+    match sdk.user.deposit(seed, None).await {
+        Ok(_) => {
+            eprintln!("[e2e] seeded {seed} wei of collateral for the payer");
+            // The deposit is mined but not yet at confirmation depth; advance past it.
+            advance_chain(client, public_params).await;
+        }
+        Err(err) => eprintln!("[e2e] could not seed payer collateral: {err}"),
+    }
+}
+
+/// Mines a block on the chain core watches, then gives its indexer a moment to catch up.
+///
+/// Core confirms on-chain events at a block depth (`NUMBER_OF_BLOCKS_TO_CONFIRM`), so a deposit is
+/// mined into block N but only becomes spendable collateral once block N+1 exists. A local anvil
+/// mines on demand, so with no other traffic that next block never arrives and the deposit stays
+/// invisible to core indefinitely — surfacing much later as `user not registered` or
+/// `InsufficientCollateral`, which look like seeding mistakes rather than a stalled chain.
+///
+/// Best-effort: `anvil_mine` is unavailable on a real node, and there the chain advances anyway.
+/// Returns whether mining succeeded, which doubles as "this is a local development chain".
+async fn advance_chain(client: &reqwest::Client, public_params: &Value) -> bool {
+    let Some(rpc_url) = public_params["ethereum_http_rpc_url"]
+        .as_str()
+        .filter(|url| !url.is_empty())
+    else {
+        return false;
+    };
+
+    let mined = client
+        .post(rpc_url)
+        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": "anvil_mine", "params": [1] }))
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+        .map(|response| response.status().is_success())
+        .unwrap_or(false);
+
+    if !mined {
+        eprintln!(
+            "[e2e] anvil_mine unavailable at {rpc_url}; assuming the chain advances on its own"
+        );
+        return false;
+    }
+
+    // The scanner polls; without a beat the block we just mined may not be indexed yet.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    eprintln!("[e2e] mined a block so pending deposits reach confirmation depth");
+    true
+}
+
+/// Deposits a token that supports EIP-2612 but *not* EIP-3009, with the payer paying no gas at all.
+///
+/// Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`. This exercises
+/// x402's `eip2612GasSponsoring` answer to that — the payer signs a permit, the facilitator submits
+/// it, and only then pulls the deposit. Two relayer transactions, zero payer transactions.
+///
+/// Opt in with `E2E_PERMIT2_TOKEN`; there is no sensible default, since the token must be the
+/// awkward 2612-without-3009 shape for this path to be the one under test.
+async fn run_sponsored_permit_deposit(client: &reqwest::Client, base: &str, env: &TestEnv) {
+    let Some(token) = env_opt("E2E_PERMIT2_TOKEN") else {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: set E2E_PERMIT2_TOKEN to an EIP-2612 token \
+             registered with core and funded for the payer"
+        );
+        return;
+    };
+    let payer_key = env_opt("E2E_PAYER_KEY").unwrap_or_else(|| ANVIL_ACCT1_KEY.to_string());
+    let amount: u64 = env_opt("E2E_DEPOSIT_AMOUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1_000);
+
+    let signer: alloy::signers::local::PrivateKeySigner =
+        payer_key.parse().expect("invalid payer key");
+    let payer = signer.address();
+    let config = sdk_4mica::ConfigBuilder::default()
+        .signer(signer.clone())
+        .rpc_url(env.core_url.clone())
+        .build()
+        .expect("build SDK config");
+    let sdk = sdk_4mica::Client::new(config)
+        .await
+        .expect("init SDK client");
+
+    let before = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .unwrap_or_default();
+
+    // The Permit2 half comes from the SDK, exactly as a real client would produce it.
+    let permit2 = match sdk
+        .user
+        .sign_deposit_permit2(token.clone(), sdk_4mica::U256::from(amount))
+        .await
+    {
+        Ok(auth) => auth,
+        Err(err) => {
+            eprintln!("[e2e] sponsored-permit deposit skipped: SDK could not sign permit2 ({err})");
+            return;
+        }
+    };
+
+    // The EIP-2612 half is signed here: it authorises Permit2 rather than 4mica, so it is not
+    // something the 4mica SDK produces.
+    let Some(permit) = sign_eip2612_permit(&signer, &token, payer).await else {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: {token} does not expose EIP-2612 permit/nonces"
+        );
+        return;
+    };
+
+    let body = json!({
+        "network": env.network,
+        "asset": token,
+        "amount": amount.to_string(),
+        "assetTransferMethod": "permit2",
+        "permit2Authorization": serde_json::to_value(&permit2).expect("serialize permit2"),
+        "eip2612Permit": permit,
+    });
+
+    let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
+    assert!(status.is_success(), "/deposit HTTP status {status}");
+    if settle["errorCode"] == "NO_RELAYER_CONFIGURED" {
+        eprintln!("[e2e] sponsored-permit deposit skipped: facilitator has no relayer configured");
+        return;
+    }
+    if settle["errorCode"] == "SIMULATION_REVERTED" {
+        eprintln!(
+            "[e2e] sponsored-permit deposit skipped: {}",
+            settle["error"]
+        );
+        return;
+    }
+    assert_eq!(settle["success"], true, "/deposit failed: {settle}");
+
+    let after = sdk
+        .user
+        .get_principal_balance(token.clone())
+        .await
+        .expect("read principal balance");
+    assert_eq!(
+        after - before,
+        sdk_4mica::U256::from(amount),
+        "collateral must be credited to the signer"
+    );
+    eprintln!("[e2e] sponsored-permit deposit credited {amount} of {token} with no payer gas ✔");
+}
+
+/// Signs an EIP-2612 permit authorising Permit2 to spend `amount` of `token` on the payer's behalf.
+/// Returns `None` when the token has no `nonces`/`DOMAIN_SEPARATOR`, i.e. is not EIP-2612.
+async fn sign_eip2612_permit(
+    signer: &alloy::signers::local::PrivateKeySigner,
+    token: &str,
+    owner: alloy::primitives::Address,
+) -> Option<Value> {
+    use alloy::primitives::{Address, B256, U256, keccak256};
+    use alloy::providers::{Provider, ProviderBuilder};
+    use alloy::signers::SignerSync;
+    use alloy::sol;
+
+    sol! {
+        #[sol(rpc)]
+        contract Eip2612 {
+            function nonces(address owner) external view returns (uint256);
+            function DOMAIN_SEPARATOR() external view returns (bytes32);
+        }
+    }
+
+    let rpc_url = env_opt("E2E_ETH_RPC_URL").unwrap_or_else(|| "http://127.0.0.1:8545".to_string());
+    let provider = ProviderBuilder::new()
+        .connect(&rpc_url)
+        .await
+        .ok()?
+        .erased();
+    let token_addr: Address = token.parse().ok()?;
+    let contract = Eip2612::new(token_addr, provider);
+
+    let nonce = contract.nonces(owner).call().await.ok()?;
+    let domain_separator = contract.DOMAIN_SEPARATOR().call().await.ok()?;
+
+    // Canonical Permit2, the spender the deposit contract will pull through.
+    let permit2: Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3".parse().ok()?;
+    let deadline = U256::from(4_000_000_000u64);
+    let value = U256::MAX;
+
+    let type_hash = keccak256(
+        b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+            .as_slice(),
+    );
+    let word = |a: Address| {
+        let mut w = [0u8; 32];
+        w[12..].copy_from_slice(a.as_slice());
+        w
+    };
+    let mut encoded = Vec::with_capacity(32 * 6);
+    encoded.extend_from_slice(type_hash.as_slice());
+    encoded.extend_from_slice(&word(owner));
+    encoded.extend_from_slice(&word(permit2));
+    encoded.extend_from_slice(&value.to_be_bytes::<32>());
+    encoded.extend_from_slice(&nonce.to_be_bytes::<32>());
+    encoded.extend_from_slice(&deadline.to_be_bytes::<32>());
+
+    let mut buf = Vec::with_capacity(66);
+    buf.push(0x19);
+    buf.push(0x01);
+    buf.extend_from_slice(domain_separator.as_slice());
+    buf.extend_from_slice(keccak256(encoded).as_slice());
+    let digest: B256 = keccak256(buf);
+
+    let sig = signer.sign_hash_sync(&digest).ok()?;
+    Some(json!({
+        "value": value.to_string(),
+        "deadline": deadline.to_string(),
+        "v": 27 + sig.v() as u8,
+        "r": format!("{:#x}", sig.r()),
+        "s": format!("{:#x}", sig.s()),
+    }))
+}
+
+/// First token core advertises with a domain separator, i.e. one it considers gasless-depositable.
+///
+/// Note the field only proves the token implements EIP-712, not EIP-3009 — a token can advertise a
+/// separator and still lack `receiveWithAuthorization`. That mismatch surfaces as a failing
+/// `/deposit/verify` rather than a skip, which is deliberate: it is a real gap in core's token
+/// registration, not a reason to pass quietly.
+async fn discover_depositable_token(client: &reqwest::Client, core_url: &str) -> Option<String> {
+    let url = format!("{}/core/tokens", core_url.trim_end_matches('/'));
+    let body = client
+        .get(url)
+        .send()
+        .await
+        .ok()?
+        .json::<Value>()
+        .await
+        .ok()?;
+    body["tokens"].as_array()?.iter().find_map(|token| {
+        token
+            .get("domain_separator")
+            .and_then(Value::as_str)
+            .filter(|separator| !separator.is_empty())
+            .and_then(|_| token.get("address").and_then(Value::as_str))
+            .map(ToOwned::to_owned)
+    })
 }
 
 /// Minimal stand-in for the removed `/tabs` endpoint: hands the SDK a unique

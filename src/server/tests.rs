@@ -14,6 +14,7 @@ use tower::ServiceExt;
 
 use crate::exact::ExactService;
 use crate::issuer::GuaranteeIssuer;
+use crate::limits::{DepositGuard, DepositLimits};
 use crate::verifier::CertificateValidator;
 use crypto::bls::KeyMaterial;
 
@@ -305,7 +306,12 @@ async fn supported_includes_exact_when_available() {
         vec![TEST_VALIDATOR.into()],
     );
     let exact = Arc::new(MockExact::new());
-    let state = AppState::new(vec![handler], Some(exact.clone() as Arc<dyn ExactService>));
+    let state = AppState::new(
+        vec![handler],
+        Some(exact.clone() as Arc<dyn ExactService>),
+        Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
+    );
     let router = build_router(Arc::new(state));
 
     let response = router
@@ -851,7 +857,352 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    Arc::new(AppState::new(vec![handler], None))
+    Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
+    ))
+}
+
+// ── gasless deposit ─────────────────────────────────────────────────────────
+//
+// These cover the paths that resolve before any chain access. Everything past that point —
+// signature recovery, balance, simulation — needs a live node and belongs in the anvil-backed
+// e2e suite; `deposit.rs`'s own unit tests cover the digest and recovery arithmetic.
+
+fn deposit_body(asset_transfer_method: Option<&str>) -> Value {
+    let mut body = json!({
+        "asset": "0x2222222222222222222222222222222222222222",
+        "amount": "1000000",
+        "authorization": {
+            "from": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "validAfter": "0x0",
+            "validBefore": "0x77359400",
+            "nonce": "0x4242424242424242424242424242424242424242424242424242424242424242",
+            "v": 27,
+            "r": "0x1111111111111111111111111111111111111111111111111111111111111111",
+            "s": "0x2222222222222222222222222222222222222222222222222222222222222222"
+        }
+    });
+    if let Some(method) = asset_transfer_method {
+        body["assetTransferMethod"] = json!(method);
+    }
+    body
+}
+
+/// A facilitator with no relayer is a supported deployment, so `/deposit` must answer with a clear
+/// code rather than 404 or a panic.
+#[tokio::test]
+async fn deposit_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+#[tokio::test]
+async fn deposit_verify_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(post_json("/deposit/verify", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["isValid"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+/// The global limit must engage before any relayer or chain work, so it protects a facilitator
+/// that has no relayer at all — and, more importantly, protects the RPC quota of one that does.
+#[tokio::test]
+async fn deposit_is_rate_limited_globally() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let limits = DepositLimits {
+        global_limit: 2,
+        ..DepositLimits::default()
+    };
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(limits),
+    ));
+    let router = build_router(state);
+
+    let mut codes = Vec::new();
+    for _ in 0..3 {
+        let response = router
+            .clone()
+            .oneshot(post_json("/deposit", &deposit_body(None)))
+            .await
+            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
+        codes.push(
+            payload["errorCode"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+        );
+    }
+
+    // First two get as far as the relayer lookup; the third is turned away by the limiter.
+    assert_eq!(codes[0], "NO_RELAYER_CONFIGURED");
+    assert_eq!(codes[1], "NO_RELAYER_CONFIGURED");
+    assert_eq!(codes[2], "RATE_LIMITED");
+}
+
+/// Throttling is transient and a client should retry; a malformed request never becomes valid.
+#[tokio::test]
+async fn deposit_marks_throttling_as_retryable() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let limits = DepositLimits {
+        global_limit: 1,
+        ..DepositLimits::default()
+    };
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        DepositGuard::new(limits),
+    ));
+    let router = build_router(state);
+
+    let _first = router
+        .clone()
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+    let response = router
+        .oneshot(post_json("/deposit", &deposit_body(None)))
+        .await
+        .unwrap();
+
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["errorCode"], "RATE_LIMITED");
+    assert_eq!(payload["retryable"], true);
+}
+
+/// Existing monitoring checks `status == "ok"`, so the enriched payload must stay a superset of
+/// the old one. With no relayer there is nothing to report and the extra fields are omitted.
+#[tokio::test]
+async fn health_stays_backward_compatible_without_a_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["status"], "ok");
+    assert!(payload.get("relayers").is_none());
+    assert!(payload.get("deposits").is_none());
+}
+
+/// Rejections must be counted, and throttling counted twice — once as a rejection, once as
+/// throttling. `throttled` rising on its own is what distinguishes abuse from a broken client.
+#[tokio::test]
+async fn throttled_deposits_are_counted_separately_from_other_rejections() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        vec![TEST_VALIDATOR.into()],
+    );
+    let guard = DepositGuard::new(DepositLimits {
+        global_limit: 2,
+        ..DepositLimits::default()
+    });
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        Arc::clone(&guard),
+    ));
+    let router = build_router(state);
+
+    // Two get through the global limit and fail on the missing relayer; the third is throttled.
+    for _ in 0..3 {
+        let _ = router
+            .clone()
+            .oneshot(post_json("/deposit", &deposit_body(None)))
+            .await
+            .unwrap();
+    }
+
+    let counters = guard.counters();
+    assert_eq!(counters.sponsored, 0);
+    assert_eq!(counters.rejected, 3, "every refusal counts as a rejection");
+    assert_eq!(
+        counters.throttled, 1,
+        "only the rate-limited one counts as throttled"
+    );
+}
+
+/// A missing Permit2 approval must come back with enough structure to act on. The EIP-2612 nonce
+/// is the only value a chain-free client cannot derive for itself, so omitting it would force
+/// every SDK into an `eth_call` — defeating the point of the facilitator.
+#[tokio::test]
+async fn permit2_allowance_error_carries_the_fix() {
+    use crate::deposit::DepositError;
+
+    let err =
+        DepositError::Permit2AllowanceRequired(Box::new(crate::deposit::Permit2AllowanceDetails {
+            from: Address::repeat_byte(0xbb),
+            asset: Address::repeat_byte(0x22),
+            spender: sdk_4mica::contract::PERMIT2_ADDRESS,
+            allowance: U256::ZERO,
+            required: U256::from(1_000u64),
+            eip2612_nonce: Some(U256::from(7u64)),
+        }));
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
+        .expect("serialize failure");
+    assert_eq!(response["errorCode"], "PERMIT2_ALLOWANCE_REQUIRED");
+    assert_eq!(
+        response["permit2Allowance"]["spender"],
+        "0x000000000022d473030f116ddee9f6b43ac78ba3"
+    );
+    assert_eq!(response["permit2Allowance"]["allowance"], "0");
+    assert_eq!(response["permit2Allowance"]["required"], "1000");
+    assert_eq!(response["permit2Allowance"]["eip2612Nonce"], "7");
+}
+
+/// A token without EIP-2612 cannot have its approval sponsored, and the absent nonce is how a
+/// client learns that — it must fall back to an on-chain approve rather than signing a permit.
+#[tokio::test]
+async fn permit2_allowance_error_omits_the_nonce_for_a_non_2612_token() {
+    use crate::deposit::DepositError;
+
+    let err =
+        DepositError::Permit2AllowanceRequired(Box::new(crate::deposit::Permit2AllowanceDetails {
+            from: Address::repeat_byte(0xbb),
+            asset: Address::repeat_byte(0x22),
+            spender: sdk_4mica::contract::PERMIT2_ADDRESS,
+            allowance: U256::ZERO,
+            required: U256::from(1_000u64),
+            eip2612_nonce: None,
+        }));
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
+        .expect("serialize failure");
+    assert!(response["permit2Allowance"].is_object());
+    assert!(
+        response["permit2Allowance"].get("eip2612Nonce").is_none(),
+        "an absent nonce must be omitted, not null: {response}"
+    );
+}
+
+/// Errors with no structured detail must not grow an empty object.
+#[tokio::test]
+async fn other_errors_carry_no_permit2_detail() {
+    use crate::deposit::DepositError;
+
+    let response = serde_json::to_value(super::model::DepositResponse::failure(
+        &DepositError::RateLimited,
+    ))
+    .expect("serialize failure");
+    assert_eq!(response["errorCode"], "RATE_LIMITED");
+    assert!(response.get("permit2Allowance").is_none());
+}
+
+/// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
+#[tokio::test]
+async fn deposit_rejects_a_malformed_authorization() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let router = build_router(state);
+
+    let mut body = deposit_body(None);
+    body["authorization"]["nonce"] = json!("not-a-bytes32");
+
+    let response = router.oneshot(post_json("/deposit", &body)).await.unwrap();
+    assert!(
+        response.status().is_client_error(),
+        "expected a client error, got {}",
+        response.status()
+    );
+}
+
+/// The wire contract accepts a `ReceiveAuthorization` exactly as `sdk-4mica` serializes it, so the
+/// SDK can post the struct it signed without an intermediate DTO. Guards against a field-name or
+/// hex-encoding drift between the two crates.
+#[test]
+fn deposit_request_accepts_an_sdk_serialized_authorization() {
+    use sdk_4mica::contract::Core4Mica::ReceiveAuthorization;
+
+    let authorization = ReceiveAuthorization {
+        from: Address::from_slice(&[0xbb; 20]),
+        validAfter: U256::ZERO,
+        validBefore: U256::from(2_000_000_000u64),
+        nonce: alloy::primitives::B256::repeat_byte(0x42),
+        v: 27,
+        r: alloy::primitives::B256::repeat_byte(0x11),
+        s: alloy::primitives::B256::repeat_byte(0x22),
+    };
+
+    let body = json!({
+        "asset": "0x2222222222222222222222222222222222222222",
+        "amount": "1000000",
+        "authorization": serde_json::to_value(&authorization).expect("serialize authorization"),
+    });
+
+    let parsed: super::model::DepositRequest =
+        serde_json::from_value(body).expect("SDK-serialized authorization must round-trip");
+    let parsed_auth = parsed.authorization.expect("eip3009 authorization");
+    assert_eq!(parsed_auth.from, authorization.from);
+    assert_eq!(parsed_auth.nonce, authorization.nonce);
+    assert_eq!(parsed_auth.validBefore, authorization.validBefore);
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.
@@ -891,7 +1242,12 @@ fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
 
 fn exact_state(exact: Arc<MockExact>) -> SharedState {
     let exact_service: Arc<dyn ExactService> = exact;
-    Arc::new(AppState::new(Vec::new(), Some(exact_service)))
+    Arc::new(AppState::new(
+        Vec::new(),
+        Some(exact_service),
+        Vec::new(),
+        DepositGuard::new(DepositLimits::default()),
+    ))
 }
 
 fn sample_requirements() -> PaymentRequirements {

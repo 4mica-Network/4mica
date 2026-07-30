@@ -10,9 +10,12 @@ use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
 
+use crate::deposit::DepositError;
+use crate::limits::DepositGuard;
+use crate::relayer::Relayer;
 use crate::server::model::{
-    PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
-    VerifyResponse, X402PaymentPayload,
+    HealthResponse, PaymentRequirements, RelayerHealth, SettleRequest, SettleResponse,
+    SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
 };
 use crate::verifier::CertificateValidator;
 use crate::{exact::ExactService, issuer::GuaranteeIssuer};
@@ -34,11 +37,90 @@ pub(super) type SharedState = Arc<AppState>;
 pub(crate) struct AppState {
     four_mica: Vec<FourMicaHandler>,
     exact: Option<Arc<dyn ExactService>>,
+    /// Networks that opted into gas sponsorship. Empty means `/deposit` is unavailable, which is a
+    /// valid deployment — the facilitator still serves `/verify` and `/settle`.
+    relayers: Vec<Relayer>,
+    /// Throttling shared across networks: the relayer's gas budget and this process's capacity are
+    /// global resources, so limiting per-network would let N networks multiply the exposure.
+    deposit_guard: Arc<DepositGuard>,
 }
 
 impl AppState {
-    pub fn new(four_mica: Vec<FourMicaHandler>, exact: Option<Arc<dyn ExactService>>) -> Self {
-        Self { four_mica, exact }
+    pub fn new(
+        four_mica: Vec<FourMicaHandler>,
+        exact: Option<Arc<dyn ExactService>>,
+        relayers: Vec<Relayer>,
+        deposit_guard: Arc<DepositGuard>,
+    ) -> Self {
+        Self {
+            four_mica,
+            exact,
+            relayers,
+            deposit_guard,
+        }
+    }
+
+    pub fn deposit_guard(&self) -> &Arc<DepositGuard> {
+        &self.deposit_guard
+    }
+
+    /// Health plus the operational signals worth paging on.
+    ///
+    /// Balances come from the relayer's TTL cache, so polling this endpoint cannot amplify into
+    /// RPC load.
+    pub async fn health(&self) -> HealthResponse {
+        let floor = self.deposit_guard.limits().min_relayer_balance_wei;
+        let mut relayers = Vec::with_capacity(self.relayers.len());
+        let mut degraded = false;
+
+        for relayer in &self.relayers {
+            let balance = match relayer.cached_balance().await {
+                Ok(balance) => Some(balance),
+                Err(err) => {
+                    tracing::warn!(
+                        network = relayer.network(),
+                        error = ?err,
+                        "failed to read relayer balance; reporting degraded"
+                    );
+                    None
+                }
+            };
+            // An unreadable balance is a degraded state too: we cannot tell whether the relayer can
+            // pay, and reporting "ok" would be a lie.
+            let below_floor = match balance {
+                Some(balance) => !floor.is_zero() && balance <= floor,
+                None => true,
+            };
+            degraded |= below_floor;
+            relayers.push(RelayerHealth {
+                network: relayer.network().to_string(),
+                address: format!("{:#x}", relayer.address()),
+                balance_wei: balance.map(|b| b.to_string()),
+                below_floor,
+            });
+        }
+
+        HealthResponse {
+            status: if degraded { "degraded" } else { "ok" },
+            deposits: (!self.relayers.is_empty()).then(|| self.deposit_guard.counters()),
+            relayers,
+        }
+    }
+
+    /// Resolves the relayer for `network`, defaulting to the first configured one when the caller
+    /// omits it — the single-network case, which is most deployments.
+    pub fn relayer_for(&self, network: Option<&str>) -> Result<&Relayer, DepositError> {
+        match network {
+            Some(network) => self
+                .relayers
+                .iter()
+                .find(|relayer| relayer.network() == network)
+                .ok_or_else(|| DepositError::NoRelayer(network.to_string())),
+            None => self
+                .relayers
+                .first()
+                .ok_or(DepositError::NoRelayerConfigured),
+        }
     }
 
     pub fn network(&self) -> &str {

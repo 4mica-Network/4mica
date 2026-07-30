@@ -1,13 +1,37 @@
+//! Facilitator configuration: environment variables in, validated structs out.
+//!
+//! Everything here runs once at startup and is expected to `bail!` rather than degrade — a
+//! misconfigured facilitator that starts anyway just fails later, further from the cause.
+//!
+//! Split by subsystem, since each is opt-in independently:
+//!
+//! * [`relayer`] — the key and endpoint that sponsor gas. Absent ⇒ `/deposit` is unavailable.
+//! * [`deposit`] — throttling for those sponsored deposits.
+//!
+//! Shared env helpers ([`trimmed_env`], [`normalize_url`]) stay here so both submodules read the
+//! environment the same way.
+
+mod deposit;
+mod relayer;
+
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
 use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
+use sdk_4mica::Address;
 use serde::Deserialize;
+
+use crate::limits::DepositLimits;
+use deposit::deposit_limits_from_env;
+use relayer::{RelayerFallback, load_relayer_fallback, resolve_relayer_config};
+
+pub use relayer::NetworkRelayerConfig;
 
 const ENV_SCHEME: &str = "X402_SCHEME";
 const ENV_NETWORK: &str = "X402_NETWORK";
-const ENV_NETWORKS: &str = "X402_NETWORKS";
+pub(super) const ENV_NETWORKS: &str = "X402_NETWORKS";
 const ENV_CORE_API_URL: &str = "X402_CORE_API_URL";
 const ENV_AUTH_WALLET_PRIVATE_KEY: &str = "X402_AUTH_WALLET_PRIVATE_KEY";
 const ENV_AUTH_URL: &str = "X402_AUTH_URL";
@@ -27,6 +51,7 @@ pub struct ServiceConfig {
     pub bind_addr: SocketAddr,
     pub scheme: String,
     pub networks: Vec<NetworkConfig>,
+    pub deposit_limits: DepositLimits,
 }
 
 #[derive(Clone)]
@@ -34,6 +59,9 @@ pub struct NetworkConfig {
     pub id: String,
     pub core_api_base_url: Url,
     pub auth: NetworkAuthConfig,
+    /// Present only when this network is configured to sponsor gas. Absent leaves the facilitator
+    /// a pure HTTP relay for that network — `/verify` and `/settle` are unaffected.
+    pub relayer: Option<NetworkRelayerConfig>,
 }
 
 #[derive(Clone)]
@@ -48,10 +76,12 @@ impl ServiceConfig {
         let bind_addr = bind_addr_from_env()?;
         let scheme = std::env::var(ENV_SCHEME).unwrap_or_else(|_| "4mica-credit".into());
         let networks = load_networks_from_env()?;
+        let deposit_limits = deposit_limits_from_env()?;
         Ok(Self {
             bind_addr,
             scheme,
             networks,
+            deposit_limits,
         })
     }
 }
@@ -69,6 +99,11 @@ pub struct PublicParameters {
     /// Validator identities this operator whitelisted. A signed validation requirement may only
     /// name one of these. By convention a URL or CAIP-10 account id, not an address.
     pub validators: Vec<String>,
+    /// The Core4Mica deployment, taken from core rather than configured locally so a facilitator
+    /// can never be pointed at a contract the operator it trusts does not use.
+    pub contract_address: Address,
+    /// Chain RPC endpoint core itself uses. Serves as the relayer's default endpoint.
+    pub ethereum_http_rpc_url: Option<Url>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,6 +114,8 @@ struct NetworkEnvConfig {
     auth_wallet_private_key: Option<String>,
     auth_url: Option<String>,
     auth_refresh_margin_secs: Option<u64>,
+    relayer_private_key: Option<String>,
+    relayer_rpc_url: Option<String>,
 }
 
 pub async fn load_public_params(api_base: &Url) -> Result<PublicParameters> {
@@ -102,11 +139,29 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
         resolve_guarantee_domain(configured_guarantee_domain, active_guarantee_domain);
     let validators = normalize_validators(&params.validators)?;
 
+    let contract_address =
+        Address::from_str(params.contract_address.trim()).with_context(|| {
+            format!(
+                "invalid contract_address in core public params: {}",
+                params.contract_address
+            )
+        })?;
+
+    // Optional: a facilitator that never sponsors gas has no use for it, and core may omit it.
+    let ethereum_http_rpc_url = match params.ethereum_http_rpc_url.trim() {
+        "" => None,
+        raw => Some(
+            normalize_url(raw).context("invalid ethereum_http_rpc_url in core public params")?,
+        ),
+    };
+
     Ok(PublicParameters {
         operator_public_key,
         guarantee_domain,
         active_guarantee_domain,
         validators,
+        contract_address,
+        ethereum_http_rpc_url,
     })
 }
 
@@ -126,8 +181,9 @@ fn normalize_validators(raw: &[String]) -> Result<Vec<String>> {
 
 fn load_networks_from_env() -> Result<Vec<NetworkConfig>> {
     let auth_fallback = load_auth_fallback()?;
+    let relayer_fallback = load_relayer_fallback()?;
     if let Ok(raw) = std::env::var(ENV_NETWORKS) {
-        return parse_network_list(&raw, &auth_fallback);
+        return parse_network_list(&raw, &auth_fallback, &relayer_fallback);
     }
 
     let network = std::env::var(ENV_NETWORK).unwrap_or_else(|_| DEFAULT_NETWORK_ID.into());
@@ -147,15 +203,21 @@ fn load_networks_from_env() -> Result<Vec<NetworkConfig>> {
     };
     let api_base_url = normalize_url(&api_url)?;
     let auth = resolve_auth_config(None, None, None, &auth_fallback, &api_base_url, &network)?;
+    let relayer = resolve_relayer_config(None, None, &relayer_fallback, &network)?;
 
     Ok(vec![NetworkConfig {
         id: network,
         core_api_base_url: api_base_url,
         auth,
+        relayer,
     }])
 }
 
-fn parse_network_list(raw: &str, auth_fallback: &AuthFallback) -> Result<Vec<NetworkConfig>> {
+fn parse_network_list(
+    raw: &str,
+    auth_fallback: &AuthFallback,
+    relayer_fallback: &RelayerFallback,
+) -> Result<Vec<NetworkConfig>> {
     let entries: Vec<NetworkEnvConfig> = serde_json::from_str(raw).with_context(|| {
         format!(
             "{ENV_NETWORKS} must be JSON like \
@@ -189,10 +251,17 @@ fn parse_network_list(raw: &str, auth_fallback: &AuthFallback) -> Result<Vec<Net
             &url,
             network,
         )?;
+        let relayer = resolve_relayer_config(
+            entry.relayer_private_key.as_deref(),
+            entry.relayer_rpc_url.as_deref(),
+            relayer_fallback,
+            network,
+        )?;
         configs.push(NetworkConfig {
             id: network.to_owned(),
             core_api_base_url: url,
             auth,
+            relayer,
         });
     }
 
@@ -205,19 +274,17 @@ struct AuthFallback {
     refresh_margin_secs: Option<u64>,
 }
 
-fn load_auth_fallback() -> Result<AuthFallback> {
-    let wallet_private_key = std::env::var(ENV_AUTH_WALLET_PRIVATE_KEY)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty());
-    let auth_url = std::env::var(ENV_AUTH_URL)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty());
-    let refresh_margin_secs = std::env::var(ENV_AUTH_REFRESH_MARGIN_SECS)
+pub(super) fn trimmed_env(key: &str) -> Option<String> {
+    std::env::var(key)
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
+}
+
+fn load_auth_fallback() -> Result<AuthFallback> {
+    let wallet_private_key = trimmed_env(ENV_AUTH_WALLET_PRIVATE_KEY);
+    let auth_url = trimmed_env(ENV_AUTH_URL);
+    let refresh_margin_secs = trimmed_env(ENV_AUTH_REFRESH_MARGIN_SECS)
         .map(|value| {
             value.parse::<u64>().with_context(|| {
                 format!("{ENV_AUTH_REFRESH_MARGIN_SECS} must be a positive integer")
@@ -306,7 +373,7 @@ fn first_env_value(names: &[&str]) -> Option<String> {
     })
 }
 
-fn normalize_url(input: &str) -> Result<Url> {
+pub(super) fn normalize_url(input: &str) -> Result<Url> {
     let mut url = Url::parse(input).or_else(|_| Url::parse(&format!("{input}/")))?;
     if url.path().is_empty() {
         url.set_path("/");
@@ -403,6 +470,7 @@ fn resolve_guarantee_domain(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use relayer::{ENV_RELAYER_PRIVATE_KEY, ENV_RELAYER_RPC_URL};
     use rpc::CorePublicParameters;
     use serial_test::serial;
     use std::env;
@@ -432,7 +500,56 @@ mod tests {
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[0]);
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[1]);
             env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[2]);
+            env::remove_var(ENV_RELAYER_PRIVATE_KEY);
+            env::remove_var(ENV_RELAYER_RPC_URL);
         }
+    }
+
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_keeps_the_contract_address_and_rpc_url() {
+        clear_network_env();
+        let params = sample_core_params();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert_eq!(
+            public_params.contract_address,
+            Address::from_str("0x0000000000000000000000000000000000000001").unwrap()
+        );
+        assert_eq!(
+            public_params
+                .ethereum_http_rpc_url
+                .as_ref()
+                .map(Url::as_str),
+            Some("https://rpc.example/")
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_rejects_a_malformed_contract_address() {
+        clear_network_env();
+        let mut params = sample_core_params();
+        params.contract_address = "0xnot-an-address".into();
+
+        let err = public_parameters_from_core(params).unwrap_err();
+        assert!(
+            err.to_string().contains("invalid contract_address"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Core may omit the RPC URL; only a facilitator that sponsors gas needs one, and it fails
+    /// later with a message naming the network.
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_tolerates_a_missing_rpc_url() {
+        clear_network_env();
+        let mut params = sample_core_params();
+        params.ethereum_http_rpc_url = String::new();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert!(public_params.ethereum_http_rpc_url.is_none());
     }
 
     #[test]
