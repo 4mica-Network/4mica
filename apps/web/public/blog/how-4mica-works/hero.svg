@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="Abstract impasto painting in cyan, violet, and lime">
+  <defs>
+    <linearGradient id="groundWorks" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#26355c" />
+      <stop offset="52%" stop-color="#2f5170" />
+      <stop offset="100%" stop-color="#3a6470" />
+    </linearGradient>
+
+    <!--
+      Impasto in three passes:
+        1. displacement frays every stroke edge into bristle marks;
+        2. a high-frequency, horizontally-stretched noise field is lit twice —
+           diffuse for the shadowed troughs, specular for the raised crests —
+           so the paint has thickness across the whole stroke, not just at its
+           outline;
+        3. both lighting passes are clipped to the paint's own alpha and
+           recombined arithmetically. Arithmetic rather than feBlend: screen
+           blending lifts the whole canvas toward grey and kills the chroma.
+      color-interpolation-filters="sRGB" is required — the linearRGB default
+      desaturates the result badly.
+    -->
+    <filter id="impastoWorks" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.055" numOctaves="4" seed="7" result="warp" />
+      <feDisplacementMap in="SourceGraphic" in2="warp" scale="17" xChannelSelector="R" yChannelSelector="G" result="paint" />
+
+      <feTurbulence type="fractalNoise" baseFrequency="0.14 0.45" numOctaves="3" seed="19" result="tooth" />
+      <feDiffuseLighting in="tooth" surfaceScale="1.7" diffuseConstant="1" lighting-color="#ffffff" result="shade">
+        <feDistantLight azimuth="238" elevation="46" />
+      </feDiffuseLighting>
+      <feSpecularLighting in="tooth" surfaceScale="2.4" specularConstant="0.8" specularExponent="26" lighting-color="#fff6e8" result="gloss">
+        <feDistantLight azimuth="238" elevation="62" />
+      </feSpecularLighting>
+
+      <!-- paint x shade, lifted so the troughs darken without going muddy -->
+      <feComposite in="shade" in2="paint" operator="arithmetic" k1="1.1" k2="0" k3="0" k4="-0.04" result="modelled" />
+      <feComposite in="gloss" in2="modelled" operator="in" result="crests" />
+      <feComposite in="crests" in2="modelled" operator="arithmetic" k1="0" k2="0.5" k3="1" k4="0" result="lit" />
+      <feComposite in="lit" in2="paint" operator="in" />
+    </filter>
+  </defs>
+
+  <g filter="url(#impastoWorks)">
+    <!-- Everything is drawn oversize: displacement pulls neighbouring pixels
+         inward, so the artwork must extend past the viewBox or the frame edge
+         gets scalloped with transparency. -->
+    <rect x="-90" y="-90" width="1380" height="780" fill="url(#groundWorks)" />
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Underpainting: broad diagonals establish the light -->
+      <path d="M-90 520C120 380 260 470 430 350S700 120 900 200s250 130 390 60" stroke="#1d5f7e" stroke-width="190" opacity="0.85" />
+      <path d="M-90 120C120 250 300 60 500 150s330 250 540 150 240-180 340-210" stroke="#3a3f7d" stroke-width="165" opacity="0.7" />
+
+      <!-- Cyan, the dominant colour, laid across the diagonal -->
+      <path d="M-40 470C140 300 300 500 480 380S760 120 980 210s180 140 300 90" stroke="#35e0e6" stroke-width="96" opacity="0.95" />
+      <path d="M120 690C260 520 330 620 470 470s150-260 300-330" stroke="#35e0e6" stroke-width="58" opacity="0.8" />
+      <path d="M760 -60C830 90 720 210 800 350s220 180 350 150" stroke="#35e0e6" stroke-width="44" opacity="0.7" />
+
+      <!-- Violet crossing the cyan the other way -->
+      <path d="M-60 200C120 330 240 140 420 230s250 290 460 190 210-230 380-190" stroke="#7c5cfa" stroke-width="104" opacity="0.9" />
+      <path d="M240 660C360 500 430 610 590 480s130-250 290-260" stroke="#7c5cfa" stroke-width="62" opacity="0.75" />
+      <path d="M1080 -50C1010 120 1120 240 1060 400" stroke="#7c5cfa" stroke-width="46" opacity="0.7" />
+
+      <!-- Lime accents, short and high -->
+      <path d="M-60 560C110 470 220 590 380 500s200-120 340-70 190 130 330 60" stroke="#b6ff4d" stroke-width="66" opacity="0.92" />
+      <path d="M430 120C540 30 640 140 760 70s150-110 280-70" stroke="#b6ff4d" stroke-width="42" opacity="0.7" />
+      <path d="M60 300C150 240 210 320 300 270" stroke="#b6ff4d" stroke-width="34" opacity="0.8" />
+
+      <!-- Tangerine keeps the cool palette from flattening -->
+      <path d="M620 420C740 320 860 430 990 350s110-160 250-150" stroke="#ff7a3d" stroke-width="72" opacity="0.88" />
+      <path d="M-40 60C110 -10 250 100 400 40" stroke="#ff7a3d" stroke-width="40" opacity="0.7" />
+      <path d="M300 640C400 560 470 650 580 590" stroke="#ff7a3d" stroke-width="36" opacity="0.75" />
+
+      <!-- Cream: the topmost, thickest paint -->
+      <path d="M140 400C270 320 380 430 510 360" stroke="#ffe9c4" stroke-width="30" opacity="0.95" />
+      <path d="M600 500C710 440 810 520 930 460" stroke="#ffe9c4" stroke-width="24" opacity="0.85" />
+      <path d="M840 130C910 80 1000 140 1090 90" stroke="#ffe9c4" stroke-width="26" opacity="0.8" />
+      <path d="M330 230C390 190 450 240 520 200" stroke="#ffe9c4" stroke-width="18" opacity="0.7" />
+
+      <!-- Loaded-brush dabs -->
+      <path d="M270 180h56" stroke="#b6ff4d" stroke-width="58" opacity="0.95" />
+      <path d="M790 270h42" stroke="#ffe9c4" stroke-width="44" />
+      <path d="M470 520h68" stroke="#35e0e6" stroke-width="52" />
+      <path d="M1020 470h48" stroke="#ff7a3d" stroke-width="46" />
+      <path d="M640 60h40" stroke="#7c5cfa" stroke-width="42" opacity="0.9" />
+    </g>
+  </g>
+</svg>

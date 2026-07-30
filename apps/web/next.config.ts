@@ -16,6 +16,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-const withMDX = createMDX();
+// Plugins are named as strings, not imported: `@next/mdx` forwards `options`
+// to the MDX loader, and under Turbopack (the default in Next 16) loader
+// options must be JSON-serializable. Shiki therefore runs at build time only —
+// no highlighter ships to the browser, matching `lib/shiki.ts`.
+const withMDX = createMDX({
+  options: {
+    remarkPlugins: [
+      ["remark-frontmatter", { type: "yaml", marker: "-" }],
+      ["remark-gfm", {}],
+    ],
+    rehypePlugins: [["@shikijs/rehype", { theme: "vesper" }]],
+  },
+});
 
 export default withMDX(nextConfig);

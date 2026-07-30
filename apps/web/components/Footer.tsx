@@ -4,7 +4,7 @@ import { links, routes } from "@4mica/url";
 import ThemeToggle from "@components/ThemeToggle";
 import Link from "next/link";
 import { messages } from "@/i18n";
-import { solutions } from "../app/solutions/data";
+import { solutions } from "../app/(site)/solutions/data";
 
 const footerLinkClass = "text-ink-body transition-colors hover:text-ink-strong";
 
@@ -100,6 +100,9 @@ export default function Footer() {
             <Link href={routes.team} className={footerLinkClass}>
               {messages.footer.company.team}
             </Link>
+            <Link href={routes.partners} className={footerLinkClass}>
+              {messages.footer.company.partners}
+            </Link>
             <Link href={`${routes.about}#roadmap`} className={footerLinkClass}>
               {messages.footer.company.roadmap}
             </Link>
@@ -124,6 +127,9 @@ export default function Footer() {
             <div className="mb-2 font-medium text-ink-strong">
               {messages.footer.sections.resources}
             </div>
+            <Link href={routes.blog} className={footerLinkClass}>
+              {messages.footer.resources.blog}
+            </Link>
             <Link href={routes.terms} className={footerLinkClass}>
               {messages.footer.resources.licences}
             </Link>

@@ -1,9 +1,12 @@
+import { partners } from "./partners";
+
 export const en = {
+  partners,
   common: {
     brandName: "4Mica",
     logoAlt: "4Mica logo",
     actions: {
-      talkToSales: "Talk to sales",
+      talkToSales: "Talk to our team",
       tryForFree: "Try for free",
       startBuilding: "Start building",
       seeHowItWorks: "See how it works",
@@ -25,6 +28,7 @@ export const en = {
     solutions: "Solutions",
     developers: "Developers",
     pricing: "Pricing",
+    byCustomer: "By customer",
     byUseCase: "By use case",
     documentation: "Documentation",
     documentationDescription: "Guides, SDKs, and API reference",
@@ -34,6 +38,9 @@ export const en = {
     apiChangelogDescription: "Releases and updates",
     librariesAndSdks: "Libraries and SDKs",
     librariesAndSdksDescription: "TypeScript and Python",
+    blog: "Blog",
+    blogDescription: "Engineering notes and product updates",
+    partners: "Partners",
   },
   footer: {
     sections: {
@@ -53,6 +60,7 @@ export const en = {
       about: "About",
       jobs: "Jobs",
       team: "Team",
+      partners: "Partners",
       roadmap: "Roadmap",
       contactSales: "Contact sales",
     },
@@ -61,6 +69,7 @@ export const en = {
       managedSupportPlans: "Managed support plans",
     },
     resources: {
+      blog: "Blog",
       licences: "Licences",
       restrictedBusinesses: "Prohibited and restricted businesses",
       sitemap: "Sitemap",
@@ -71,62 +80,88 @@ export const en = {
   },
   home: {
     hero: {
-      titleLine1: "The clearing house for",
+      titlePrefix: "The",
+      rotatingWords: [
+        "clearing house",
+        "payment infrastructure",
+        "transaction layer",
+      ],
+      titleConnector: "for",
       titleLine2: "the agentic economy",
       subtitle:
         "4Mica gives agents one place to pay on credit, earn yield, and settle transactions without clearing every request on-chain.",
       supportedOn: "Supported on",
       supportedNetworks: {
-        base: "Base",
-        ethereumSepolia: "Ethereum Sepolia",
+        base: "Base Mainnet",
+        ethereumSepolia: "Base/Ethereum Sepolia Testnets",
         baseSepolia: "Base Sepolia",
       },
     },
     faqs: [
       {
-        question: "What exactly is a credit layer for x402?",
+        question: "Does 4Mica work with existing x402 clients?",
         answer:
-          "Standard x402 settles every payment on-chain, one transaction per request. 4Mica adds a credit layer: agents sign off-chain guarantees and spend against pooled collateral. Settlements are batched and happen once per window, resulting in orders of magnitude fewer transactions.",
+          "Yes, as long as the client and server can register the 4mica-credit scheme. Buyers add the scheme adapter to the fetch wrapper they already use; sellers configure their x402 middleware to advertise and verify it. You do not need to change your HTTP logic.",
       },
       {
-        question: "What is a payment tab?",
+        question: "What assets does 4Mica support?",
         answer:
-          "A tab is a credit session opened by the recipient (POST /tabs). It has a tabId, TTL, and version. Individual spends within the tab are identified by a reqId that increments with each signed guarantee.",
-      },
-      {
-        question: "What is a payment guarantee?",
-        answer:
-          "A payment guarantee is an EIP-712 signed claim that the payer attaches as an X-PAYMENT header. It commits to tabId, reqId, amounts, addresses, and timestamp. The facilitator verifies the signature and issues a BLS-signed certificate for on-chain settlement.",
+          "ETH and the ERC-20 tokens enabled by the active Core deployment. USDC and USDT are the defaults where enabled, and operators can configure others. A route only accepts the asset it advertises, so check the deployment's token list before going live.",
       },
       {
         question: "How does yield work?",
         answer:
-          "Stablecoin deposits route through Aave via depositStablecoin(). The protocol holds aTokens on your behalf. APY accrues continuously and offsets the cost of payments.",
+          "Configured stablecoin collateral is supplied to Aave, and the protocol holds the interest-bearing aTokens. Collateral keeps accruing while capacity is reserved for guarantees, and the yield belongs to the collateral position — the payer — not the seller. Yield is variable and not guaranteed, so verify the current deployment configuration before depositing production funds.",
       },
       {
-        question: "When do users settle?",
+        question: "What is a clearing layer?",
         answer:
-          "Users call payTabInERC20Token() after 7 days. If they don't, the recipient's on-chain claim window opens at day 14 (remunerationGracePeriod) and closes at day 21 (tabExpirationTime).",
+          "It is the layer between authorising a payment and moving money. Instead of a transfer per request, buyers sign collateral-backed guarantees that are batched into clearing cycles. A cycle accepts guarantees, closes, computes net positions, and commits those positions on-chain — the same job a clearing house does for traditional payments.",
+      },
+      {
+        question: "How is 4Mica different from standard x402?",
+        answer:
+          "Standard x402 turns every request into its own on-chain transfer. 4Mica's 4mica-credit scheme authorises the request against collateral-backed credit and settles later, so requests clear off-chain in one round trip and only net positions ever move on-chain.",
+      },
+      {
+        question: "Who should integrate 4Mica?",
+        answer:
+          "x402 facilitators first: adding the 4mica-credit scheme lets every seller behind your endpoint take credit-backed payments, with 4Mica running as the clearing layer behind your brand. Then API and service providers who want to charge per request without accounts, invoices, or prepaid balances, and agent frameworks that want paid tool use built in. The fit is high-volume, low-value payments where checkout and invoicing infrastructure is the bottleneck.",
+      },
+      {
+        question: "How does 4Mica reduce settlement costs?",
+        answer:
+          "Authorisation is separated from settlement. For each request, there is an off-chain signature and a Core verification — no chain write, no gas. Payable guarantees then enter a clearing cycle and settle as net positions: 40 outgoing and 27 incoming guarantees become a single net debit of 13, so one movement replaces 67. Netting changes settlement movement, not payment history — every individual record stays intact.",
+      },
+      {
+        question: "Is 4Mica live on mainnet?",
+        answer:
+          "Yes. Base (eip155:8453) is the production network. Base Sepolia (eip155:84532) is the development network and Ethereum Sepolia (eip155:11155111) is there for cross-network compatibility testing. We recommend building against Base Sepolia first and moving to mainnet once your flows are tested.",
+      },
+      {
+        question: "How can facilitators integrate 4Mica?",
+        answer:
+          "Existing x402 facilitators add the 4mica-credit scheme to their /supported response, call Core from their settle logic to submit guarantees and return the BLS certificate, validate both V1 and V2 guarantee structures, and use CAIP-2 network identifiers. You can also point sellers at the hosted facilitator instead of running your own.",
+      },
+      {
+        question: "What is a payment guarantee?",
+        answer:
+          "The buyer's signed commitment to pay a specific amount to a specific recipient. It binds payer, recipient, amount, asset, request ID, and timestamp, and travels with the request. Core verifies the signature and available collateral, then issues a BLS certificate — that certificate is what proves the guarantee was accepted.",
+      },
+      {
+        question: "When does settlement happen?",
+        answer:
+          "Guarantees enter clearing cycles configured per deployment. A cycle accepts guarantees, closes, computes net positions, commits them on-chain, and opens the payment and finality windows. Check your deployment's parameters rather than assuming a fixed schedule.",
       },
       {
         question: "How are disputes handled?",
         answer:
-          "V2 guarantees use ERC-8004's ValidationRegistry. The payer signs a guarantee committing to a specific validator, agent, score threshold, and job hash. If the validation fails on-chain, remunerate() reverts and collateral stays locked. Validators post a 0–100 score on-chain.",
+          "V1 guarantees become payable once Core verifies them. V2 guarantees wait on a validation condition — a registry, validator, score threshold, and job hash committed in the signature — so payment is bound to an objectively verifiable outcome. 4Mica records signatures, certificates, lifecycle state, and settlement evidence; subjective quality, retries, and refunds stay a product policy decision.",
       },
       {
         question: "How do withdrawals work?",
         answer:
-          "Call requestWithdrawal() to start the timelock, then finalizeWithdrawal() after the withdrawalGracePeriod (default 22 days). A 6-hour synchronizationDelay prevents race conditions with open tabs.",
-      },
-      {
-        question: "Which assets are supported?",
-        answer:
-          "ETH and stablecoins. USDC and USDT are enabled by default. Other ERC-20s can be configured by the operator.",
-      },
-      {
-        question: "Does it work with existing x402 clients?",
-        answer:
-          "Yes. 4Mica is x402-compatible. Wrap your existing fetch or requests client with the 4Mica scheme adapter. One line of code. No changes to your server or HTTP logic.",
+          "Withdrawals are request-and-finalize with a delay in between. Finalization requires the configured grace period to pass and no obligations preventing it, so check open guarantees before withdrawing collateral. Durations are deployment parameters, not fixed constants.",
       },
     ],
     useCases: [
@@ -146,16 +181,16 @@ export const en = {
       },
       {
         icon: "ri-code-box-line",
-        kicker: "API Monetization",
+        kicker: "API Monetisation",
         title: "Accept payments with one line of code",
-        desc: "Add 4Mica middleware and charge per HTTP request. Works with any x402-compatible client. No SDK on the client side, no KYC, no credits to manage. Money moves at the speed of the internet.",
+        desc: "Add 4Mica middleware and charge per HTTP request. It works with any x402-compatible client. No SDK on the client side, no KYC, no credits to manage. Money moves at the speed of the internet.",
         tags: ["x402-compatible", "Any HTTP client", "Zero friction"],
       },
       {
         icon: "ri-bank-line",
         kicker: "Financial Infrastructure",
-        title: "Clearinghouse for on-chain apps",
-        desc: "Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. The same primitive that banks use, but permissionless.",
+        title: "Clearing house for on-chain apps",
+        desc: "Build a payment rail that aggregates millions of micro-transfers, earns yield on float, and settles net positions on-chain. It uses the same primitive as banks, but without requiring permission.",
         tags: ["Yield on float", "Programmable disputes", "Non-custodial"],
       },
     ],
@@ -195,12 +230,12 @@ Alice → Bob:  800 USDC  (40 guarantees)
 Bob → Alice:  300 USDC  (15 guarantees)
 // net_debit[Alice]  = max(800 - 300, 0) = 500 USDC
 // net_credit[Bob]   = 500 USDC
-// 55 guarantees turns into 1 net position per participant`,
+// 55 guarantees turn into 1 net position per participant`,
       },
       {
         num: "04",
         badge: "Settle",
-        title: "Settle on-chain, one net payment",
+        title: "Settle on-chain with one net payment",
         desc: "Net debtors pay once. Creditors claim once. Defaults are covered by vault collateral.",
         code: `// Debtor pays net position to ClearingHouse
 await clearingHouse.payNetDebit(
@@ -228,13 +263,13 @@ await clearingHouse.claimNetCredit(
       {
         name: "x402",
         role: "Payment protocol",
-        desc: "The HTTP payment standard 4Mica extends with a credit layer. Any x402-compatible client works out of the box.",
+        desc: "4Mica adds a credit layer to the x402 HTTP payment standard. Any x402-compatible client works out of the box.",
         icon: "ri-global-line",
       },
       {
         name: "Aave",
         role: "Yield layer",
-        desc: "All collateral routes directly to Aave. Deposits earn APY continuously. Your payment infrastructure generates returns.",
+        desc: "All collateral routes directly to Aave. Deposits continuously earn a variable APY, allowing your payment infrastructure to generate returns.",
         icon: "ri-plant-line",
       },
       {
@@ -305,13 +340,14 @@ await clearingHouse.claimNetCredit(
     },
     sections: {
       realCostKicker: "The real cost",
-      realCostTitle: "Agentic economy breaks at scale.",
+      realCostTitle: "Agentic payments break at scale.",
       realCostLead: "1M API calls, 10k USDC volume, 1 year.",
       howItWorksKicker: "How it works",
-      howItWorksTitle: "Separate payment authorization from settlement",
+      howItWorksTitle: "Separate payment authorisation from settlement",
       howItWorksLead:
-        "Pay with programmable cryptographic credit. Settle thousands of payments in one on-chain transaction.",
-      howItWorksProtocolNote: "Same x402 protocol. Same HTTP clients.",
+        "Pay with programmable cryptographic credit. Payment clearing runs off-chain, so thousands of API payments settle in one on-chain transaction.",
+      howItWorksProtocolNote:
+        "Same x402 protocol. Same HTTP clients. Works with any x402 facilitator.",
       replaceTransactions: "Replace thousands of transactions",
       oneSettlement: "one net settlement per cycle",
       includedKicker: "Included",
@@ -339,7 +375,7 @@ await clearingHouse.claimNetCredit(
     sections: {
       community: {
         kicker: "Community",
-        title: "Build the payment tab standard",
+        title: "Build the agentic payments standard",
         lead: "We are building in public with developers who ship infra. Join the discussion, open issues, and help shape the protocol.",
         joinCommunity: "Join Community",
       },
@@ -359,22 +395,22 @@ await clearingHouse.claimNetCredit(
       howItWorks: {
         kicker: "How it works",
         title: "Three steps to instant spend",
-        lead: "Plain flow first, cryptographic guarantees underneath",
+        lead: "Plain flow first, with cryptographic guarantees underneath",
       },
       about: {
-        kicker: "About Us",
+        kicker: "About us",
         title: "The credit layer for instant, on-chain commerce",
-        lead: "4Mica issues cryptographic payment tabs that keep capital productive while delivering real-time UX. We help teams monetize APIs and on-chain commerce without forcing users to pre-fund every request.",
+        lead: "4Mica is the credit and clearing layer for x402 payments: agents pay on credit against collateral, requests clear instantly, and balances settle net on-chain. We help teams monetise APIs and agentic commerce without forcing users to pre-fund every request.",
         learnMore: "Learn more",
       },
       team: {
-        title: "Meet Our Team",
-        lead: "Leading experts in Cryptography, blockchain, and payment infrastructure",
+        title: "Meet our team",
+        lead: "Leading experts in cryptography, blockchain, and payment infrastructure",
       },
       useCases: {
         kicker: "Use cases",
         title: "Built for the scale you need",
-        lead: "API monetization, agentic commerce, paywalled content. 4Mica handles the payment layer so you don't have to.",
+        lead: "Built for x402 facilitators first, then the API providers and agent frameworks behind them. 4Mica runs the credit and clearing layer.",
       },
       ecosystem: {
         kicker: "Ecosystem",
@@ -386,7 +422,7 @@ await clearingHouse.claimNetCredit(
       "Users spend now and settle after 7 days",
       "No prefunding or prepaid balances for customers",
       "Every charge is backed by on-chain collateral",
-      "BLS-signed guarantees prevent replay and double spend",
+      "BLS-signed guarantees prevent replay and double-spending",
       "Default assets: ETH, USDC, USDT with versioned guarantees",
     ],
     companyLinks: {
@@ -430,7 +466,7 @@ await clearingHouse.claimNetCredit(
       {
         icon: "ri-fingerprint-line",
         label: "BLS-signed guarantees",
-        desc: "Every payment is backed by an EIP-712 signed guarantee with domain separation. Cryptographic proof exists for every spend.",
+        desc: "Every payment is backed by an EIP-712-signed guarantee with domain separation. Cryptographic proof exists for every spend.",
         color: "rgb(var(--brand))",
       },
       {
@@ -459,21 +495,22 @@ await clearingHouse.claimNetCredit(
         role: "CTO & Co-Founder",
         image: "/assets/mairon.jpg",
         imagePosition: "50% 20%",
-        bio: "Everyone talks about AI and web3. Few understand money. 4mica exists because I grew tired of watching the web3 community claiming it had solved payments. It didn't. So I decided to.",
+        bio: "Everyone talks about AI and Web3. Few understand money. 4Mica exists because I grew tired of watching the Web3 community claim it had solved payments. It didn't. So I decided to.",
       },
       {
         name: "Tomer Ashur",
         role: "Co-Founder",
         image: "/assets/tomer.png",
         imagePosition: "50% 15%",
-        bio: "Cryptography-savant, ex-professor, ex-captain, now leading the instant transaction layer for commerce 2.0",
+        bio: "Cryptography savant, former professor, former captain, now leading the instant transaction layer for Commerce 2.0",
       },
     ],
     steps: [
       {
         step: "01",
-        title: "Recipient opens a tab",
-        description: "Create a tab_id with asset and limits for a user",
+        title: "Deposit collateral once",
+        description:
+          "One collateral position backs credit across every service an agent pays",
       },
       {
         step: "02",
@@ -482,9 +519,9 @@ await clearingHouse.claimNetCredit(
       },
       {
         step: "03",
-        title: "User settles after 7 days",
+        title: "Settle net, once per cycle",
         description:
-          "Settle later, or claim collateral after the on-chain grace period",
+          "Payable guarantees enter a clearing cycle and settle as net positions on-chain",
       },
     ],
   },
@@ -513,230 +550,15 @@ await clearingHouse.claimNetCredit(
     ctaTitle: "Let's chat",
     ctaLead:
       "If you want to contribute, share research, or explore a partnership, reach out and we'll get back quickly.",
-  },
-  pricing: {
-    seo: {
-      title: "4Mica Pricing | Usage-Based Credit Payments",
-      description:
-        "Simple, usage-based pricing for 4Mica's credit-backed payment rails. Start free on testnets and pay as you settle.",
-      keywords: [
-        "4Mica pricing",
-        "usage-based pricing",
-        "payment infrastructure pricing",
-        "x402 pricing",
-        "credit payments",
-      ],
-      imageAlt: "4Mica pricing",
-    },
-    kicker: "Pricing",
-    title: "Pricing that scales with settlement volume",
-    lead: "Build free on testnets, then move to volume-based pricing when payments clear on mainnet. No per-request gas billing, no surprise settlement line items.",
-    collateralNote:
-      "Collateral stays in your control and earns yield — 4Mica never holds funds.",
-    includedKicker: "Included",
-    includedTitle: "Core rails across every plan",
-    includedLead:
-      "The plan changes how you go live and operate at scale. The core payment model stays consistent from sandbox to production.",
-    tiers: [
-      {
-        name: "Build",
-        price: "Free",
-        tagline: "Ship your integration on testnets with full SDK access.",
-        features: [
-          "All supported testnets",
-          "TypeScript & Python SDKs",
-          "x402 facilitator access",
-          "Community support",
-          "Protocol docs and examples",
-          "Basic settlement sandbox",
-        ],
-        ctaLabel: "Start building",
-      },
-      {
-        name: "Scale",
-        eyebrow: "Most popular",
-        price: "Volume-based",
-        tagline:
-          "Pay a percentage of cleared transaction volume. Settlement costs included.",
-        features: [
-          "Mainnet across chains",
-          "% fee on cleared volume",
-          "Settlement costs covered",
-          "Yield passed through",
-          "Production facilitator access",
-          "Usage and settlement reporting",
-          "Email support",
-        ],
-        ctaLabel: "Talk to sales",
-      },
-      {
-        name: "Enterprise",
-        price: "Custom",
-        tagline:
-          "Custom terms for high volume networks, facilitators, and marketplaces.",
-        features: [
-          "Custom clearing fee",
-          "Volume commitments",
-          "Priority settlement",
-          "Yield-sharing options",
-          "Dedicated support",
-          "Custom SLAs and terms",
-          "Security review",
-        ],
-        ctaLabel: "Contact sales",
-      },
-    ],
-    included: [
-      {
-        icon: "ri-bank-line",
-        title: "Non-custodial collateral",
-        desc: "Collateral remains controlled by protocol contracts and backs open payment obligations.",
-      },
-      {
-        icon: "ri-exchange-dollar-line",
-        title: "Batched settlement",
-        desc: "Many off-chain guarantees collapse into fewer on-chain settlement actions.",
-      },
-      {
-        icon: "ri-seedling-line",
-        title: "Yield-aware design",
-        desc: "Supported collateral can earn yield while it backs credit-based payment activity.",
-      },
-      {
-        icon: "ri-code-box-line",
-        title: "SDK-first integration",
-        desc: "Use TypeScript and Python clients with x402-compatible HTTP payment flows.",
-      },
-    ],
-  },
-  about: {
-    kicker: "Company",
-    title: "Our mission",
-    whyWeExist: "Why we exist",
-    missionStrong:
-      "4Mica is a lightweight overlay that enables services to extend cryptographically backed lines of credit across any blockchain.",
-    missionBody:
-      "Acting as a credit layer for instant, low-friction settlements and guaranteed fair exchange, 4Mica fixes Web3's inefficient pre-funded model and makes programmable credit accessible to all.",
-    companyInfoTitle: "Company Info",
-    founderTitle: "A few words from the founders",
-    founderLead: "Why we started 4Mica and what we believe in.",
-    founderQuote:
-      "We started 4Mica to make programmable credit effortless. Just like APIs connect the web, we believe value should flow with the same clarity between agents.",
-    careersTitle: "Help us build the future of coordination",
-    highlights: [
-      {
-        title: "Credit-backed UX",
-        icon: "ri-bank-card-line",
-        description:
-          "Issue cryptographic tabs so users can pay instantly without prefunding each call.",
-      },
-      {
-        title: "Guaranteed settlement",
-        icon: "ri-shield-check-line",
-        description:
-          "BLS guarantees and enforceable claims keep every tab auditable and recoverable.",
-      },
-      {
-        title: "Cross-chain ready",
-        icon: "ri-links-line",
-        description:
-          "Support Ethereum, Solana, and emerging rollups with the same credit rails.",
-      },
-      {
-        title: "Built for production",
-        icon: "ri-rocket-2-line",
-        description:
-          "SDKs, clear failure modes, and operational tooling from day one.",
-      },
-    ],
-    companyInfo: [
-      {
-        label: "Focus",
-        icon: "ri-focus-3-line",
-        value: "Credit-backed payment rails",
-      },
-      {
-        label: "Core product",
-        icon: "ri-stack-line",
-        value: "Tabs, guarantees, settlement APIs",
-      },
-      {
-        label: "Integrations",
-        icon: "ri-plug-line",
-        value: "SDKs, x402 facilitator, on-chain contracts",
-      },
-      {
-        label: "Status",
-        icon: "ri-pulse-line",
-        value: "Production-ready pilot deployments",
-      },
-    ],
-    roadmap: {
-      kicker: "Roadmap",
-      title: "Product roadmap",
-      lead: "Our journey to revolutionize web3 commerce.",
-      pathTitle: "Roadmap path",
-      milestones: [
-        {
-          quarter: "Q2 2025",
-          title: "PoC Release",
-          description:
-            "Initial proof of concept with basic transaction capabilities and single-chain support",
-          done: true,
-        },
-        {
-          quarter: "Q3 2025",
-          title: "Alpha Release",
-          description:
-            "Alpha Release to Ethereum and Solana with credit capabilities for Agents and APIs",
-          done: true,
-        },
-        {
-          quarter: "Q4 2025",
-          title: "Strategic Partnerships",
-          description:
-            "Partnerships with AI platforms and DeFi companies to enhance ecosystem integration",
-          done: true,
-        },
-        {
-          quarter: "Q1 2026",
-          title: "Beta Release",
-          description:
-            "Beta release to Ethereum and Solana and support for retail payments",
-          done: true,
-        },
-        {
-          quarter: "Q2 2026",
-          title: "Regularity Compliance",
-          description:
-            "Achieving compliance with financial regulations and prepare for mainnet launch",
-          done: false,
-        },
-        {
-          quarter: "Q3 2026",
-          title: "Mainnet Launch",
-          description:
-            "Full mainnet launch with multi-chain support, cross-chain credit, and off-ramping to fiat",
-          done: false,
-        },
-      ],
-    },
-  },
-  team: {
-    kicker: "Team",
-    title: "Meet the team",
-    lead: "4Mica is led by founders who have shipped payment infrastructure across finance, AI, and cryptography. We are focused on bringing production-grade credit rails to web3 commerce.",
-    howWeWorkTitle: "How we work",
-    howWeWorkLead:
-      "We build with a security-first mindset and keep every protocol component auditable. The team ships with a focus on production reliability, clear integration paths, and measurable outcomes for partners.",
-    readMission: "Read our mission",
     valuesKicker: "Values",
     valuesTitle: "Our values",
     valuesLead: "The principles that guide how we build and work together.",
     benefitsKicker: "Benefits",
     benefitsTitle: "Perks & benefits",
-    cultureKicker: "Culture",
-    cultureTitle: "Life at 4Mica",
+    benefitsLead:
+      "The support and resources to do your best work — wherever in the world you happen to be.",
+    cultureKicker: "Team notes",
+    cultureTitle: "Voices from the team",
     cultureLead: "Notes from the team on what it's like to build here.",
     values: [
       {
@@ -785,7 +607,7 @@ await clearingHouse.claimNetCredit(
         desc: "You get a laptop, of course, plus an additional $1,000 USD to upgrade your home office.",
       },
       {
-        title: "Flexible time-off",
+        title: "Flexible time off",
         icon: "ri-time-fill",
         color: "text-green-400",
         desc: "Unlimited PTO and sick leave. When you work, we pay. When you don't work, we still pay.",
@@ -827,7 +649,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "daniel-backend",
         quote:
-          "I shipped to mainnet in my first month. There's real trust to own big problems from day one.",
+          "I shipped to mainnet in my first month. There's real trust here, and you can own big problems from day one.",
         name: "Daniel V.",
         role: "Backend Engineer",
         avatar: "DV",
@@ -835,7 +657,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "lena-research",
         quote:
-          "Research and product sit at the same table. Ideas go from a whiteboard proof to production fast.",
+          "Research and product sit at the same table. Ideas move quickly from a whiteboard proof to production.",
         name: "Lena K.",
         role: "Cryptography Researcher",
         avatar: "LK",
@@ -843,7 +665,7 @@ await clearingHouse.claimNetCredit(
       {
         id: "marco-product",
         quote:
-          "Remote-first but tight-knit. We disagree openly, decide quickly, and keep building.",
+          "Remote-first, but tight-knit. We disagree openly, decide quickly, and keep building.",
         name: "Marco T.",
         role: "Product",
         avatar: "MT",
@@ -858,41 +680,559 @@ await clearingHouse.claimNetCredit(
       },
     ],
   },
+  pricing: {
+    seo: {
+      title: "Pricing for x402 API Payments | 4Mica",
+      description:
+        "4Mica costs from 0.5% of settled volume. Build free on testnets, pay only when a cycle settles, and keep the yield your collateral earns.",
+      keywords: [
+        "4Mica pricing",
+        "x402 pricing",
+        "x402 fees",
+        "API payments",
+        "stablecoin payments",
+        "usage-based pricing",
+        "payment credit",
+        "settlement infrastructure",
+      ],
+      imageAlt: "4Mica pricing for x402 API payments",
+    },
+    kicker: "Pricing",
+    title: "From 0.5% of what settles",
+    lead: "You are not charged per request, per retry, or per guarantee that never settles. Build free on testnets, pay when a cycle settles on mainnet, and keep the yield your collateral earns.",
+    collateralNote:
+      "Your collateral stays under protocol control and keeps earning while it backs payments. 4Mica never holds your funds.",
+
+    cta: {
+      primary: "Start building",
+      secondary: "Talk to our team",
+      note: "Free on testnets. Your rate drops as your volume grows.",
+    },
+
+    audience: {
+      kicker: "Who this is for",
+      title: "Who pays the rate",
+      lead: "Whoever settles the volume pays the rate.",
+      primaryBadge: "Primary",
+      cards: [
+        {
+          icon: "ri-cloud-line",
+          label: "Facilitators",
+          primary: true,
+          title: "You clear the volume",
+          desc: "Every seller behind your endpoint nets into your cycles. You pay the rate on what settles, and gas once per cycle instead of once per call.",
+          driver: "0.5% of settled volume · gas per cycle",
+          href: "/solutions/facilitators",
+        },
+        {
+          icon: "ri-plug-line",
+          label: "API providers",
+          title: "You set the price",
+          desc: "Charge what you like per request and get paid in stablecoins each cycle. Clear directly and you pay the rate. Clear through a facilitator and they pay it.",
+          driver: "0.5% of what you clear directly",
+          href: "/solutions/api-providers",
+        },
+        {
+          icon: "ri-flow-chart",
+          label: "Agent frameworks",
+          title: "You fund the credit",
+          desc: "Post the collateral and set each agent's limits. Your cost tracks what you hold and what your agents clear.",
+          driver: "Collateral held · volume cleared",
+          href: "/solutions/agent-frameworks",
+        },
+      ],
+      agentsNote:
+        "Agents never pay. An agent spends against its operator's collateral, inside the limits the operator sets, so the bill goes to the operator.",
+    },
+
+    model: {
+      kicker: "How it works",
+      title: "Four things decide what you pay",
+      lead: "Only one of them is a fee.",
+      cards: [
+        {
+          icon: "ri-flask-line",
+          title: "Build for free",
+          desc: "Use the full SDK, facilitator, and testnets at no cost. Nothing meters until you settle on mainnet.",
+        },
+        {
+          icon: "ri-percent-line",
+          title: "Pay 0.5% of what settles",
+          desc: "Your rate applies to the volume a cycle settles, not to the requests you authorise. Retries and rejected guarantees cost nothing.",
+        },
+        {
+          icon: "ri-gas-station-line",
+          title: "Pay gas once per cycle",
+          desc: "Authorisation stays off-chain. Double your traffic and your gas bill barely moves, because cadence sets the number of writes.",
+        },
+        {
+          icon: "ri-seedling-line",
+          title: "Keep the yield",
+          desc: "Your stablecoin collateral earns while it backs open guarantees, and that yield accrues to your position.",
+        },
+      ],
+    },
+
+    fee: {
+      kicker: "The fee",
+      title: "How we calculate the fee",
+      lead: "One calculation, once per cycle.",
+      formula: "fee = net settled volume × your rate",
+      steps: [
+        {
+          order: "01",
+          title: "Guarantees stack up",
+          desc: "Each authorised request adds a signed guarantee to the open cycle. You pay nothing and nothing touches the chain.",
+        },
+        {
+          order: "02",
+          title: "The cycle nets",
+          desc: "When the cycle closes, what you and your counterparty owe each other cancels out. One net position remains.",
+        },
+        {
+          order: "03",
+          title: "Your rate applies",
+          desc: "We apply your rate to that net figure and commit the settlement on-chain, with every guarantee still on record.",
+        },
+      ],
+      notes: [
+        "Netting shrinks the fee base. Offsetting flows cancel before anything moves.",
+        "0.5% is the starting rate. It steps down as your settled volume grows, and we confirm your rate in writing before you go live.",
+        "Network gas is separate. You pay it once per cycle.",
+      ],
+    },
+
+    calculator: {
+      kicker: "Calculator",
+      title: "Check the maths against your volume",
+      lead: "Set your own numbers. The baseline is settling every x402 request on-chain, which is what per-request payment costs today.",
+      baselineLabel: "One settlement per request",
+      micaLabel: "With 4Mica",
+      inputs: {
+        requests: "Paid requests per month",
+        price: "Average price per request",
+        cadence: "Settlement cadence",
+        rate: "Your rate",
+        gas: "Gas per on-chain settlement",
+        collateral: "Collateral deposited",
+        apy: "Collateral yield (APY)",
+      },
+      cadenceOptions: {
+        monthly: "Monthly",
+        weekly: "Weekly",
+        daily: "Daily",
+        hourly: "Hourly",
+      },
+      rows: {
+        volume: "Payment volume",
+        onchain: "On-chain settlements",
+        gas: "Network gas",
+        fee: "Fee",
+        yield: "Yield on collateral",
+        total: "Net monthly cost",
+      },
+      results: {
+        savingTitle: "Saved per month",
+        savingNegative: "At this volume, per-request settlement is cheaper",
+        savingNegativeHint:
+          "Raise the volume or stretch the cycle to find the crossover.",
+        txAvoided: "Transactions avoided",
+        reduction: "Lower settlement cost",
+        breakeven: "Break-even volume",
+      },
+      disclaimer:
+        "Illustrative, not a quote. You control the rate, gas, and yield here. Gas moves with the chain, yield is variable, and we confirm your rate before you go live.",
+    },
+
+    facilitators: {
+      kicker: "Facilitators first",
+      title: "Settle in cycles, not per request",
+      lead: "Settle every request on-chain and you pay for every call. Settle in cycles and you pay for cycles.",
+      example: {
+        title: "One cycle, two counterparties",
+        outgoing: "You owe them",
+        outgoingValue: "$40,000",
+        incoming: "They owe you",
+        incomingValue: "$27,000",
+        net: "One payment settles",
+        netValue: "$13,000",
+        note: "Two balances, one movement. Your rate applies to the $13,000 that settles, not the $67,000 that changed hands. Netting changes what moves, not what is recorded — every guarantee stays auditable.",
+      },
+      points: [
+        {
+          icon: "ri-git-merge-line",
+          title: "Gas tracks cycles, not calls",
+          desc: "Double the requests through your facilitator and your settlement cost stays the same. Your cadence sets the number of writes.",
+        },
+        {
+          icon: "ri-scales-3-line",
+          title: "Offsetting flows cancel",
+          desc: "When the parties behind your endpoint pay each other, those obligations net out before anything settles. Your fee base shrinks with them.",
+        },
+        {
+          icon: "ri-server-line",
+          title: "No clearing stack to run",
+          desc: "Add a scheme instead of building collateral accounting, netting, and settlement infrastructure yourself.",
+        },
+      ],
+    },
+
+    yieldSection: {
+      kicker: "Yield",
+      title: "Your collateral earns while it works",
+      lead: "Backing payments does not mean sitting idle.",
+      points: [
+        {
+          icon: "ri-bank-line",
+          title: "Supplied to Aave",
+          desc: "Your configured stablecoin collateral goes into Aave's lending markets, and the protocol holds the interest-bearing aTokens.",
+        },
+        {
+          icon: "ri-lock-unlock-line",
+          title: "Earns while reserved",
+          desc: "Reserving capacity for a guarantee locks the capacity, not the accrual. Your stablecoin keeps earning through the cycle.",
+        },
+        {
+          icon: "ri-user-star-line",
+          title: "The yield is yours",
+          desc: "Yield accrues to your collateral position, not to the seller you pay. It offsets the cost of holding the capital.",
+        },
+        {
+          icon: "ri-error-warning-line",
+          title: "Variable, not guaranteed",
+          desc: "Supply rates move with the market, and your principal carries smart-contract, depeg, and liquidity risk. Check the deployment before you deposit.",
+        },
+      ],
+    },
+
+    volume: {
+      kicker: "Large volume",
+      title: "Your rate drops as you grow",
+      lead: "Facilitators, marketplaces, and networks settling at scale get an individual rate rather than the standard 0.5%.",
+      points: [
+        "A rate below 0.5% that steps down as your settled volume grows",
+        "A lower rate in exchange for a volume commitment",
+        "Yield-sharing on the collateral you post",
+        "Cadence and cycle windows tuned to your flow",
+        "Dedicated support, custom SLAs, and a security review",
+      ],
+      cta: "Talk about volume pricing",
+    },
+
+    faqKicker: "FAQ",
+    faqTitle: "Questions about the fee",
+    faqs: [
+      {
+        question: "What does 4Mica cost?",
+        answer:
+          "0.5% of the volume that settles in a cycle, plus network gas on the settlement transaction. Testnets are free. Your rate drops as your settled volume grows.",
+      },
+      {
+        question: "Who pays the fee?",
+        answer:
+          "Whoever holds the clearing relationship: the facilitator for volume routed through their endpoint, or the provider clearing directly. We put it in writing before you go live. Agents never carry it — their operator does.",
+      },
+      {
+        question: "Am I charged per request?",
+        answer:
+          "No. Authorising a request happens off-chain, with no gas and no fee. Your rate applies to the net volume that settles when a cycle closes.",
+      },
+      {
+        question: "What if a cycle nets to zero?",
+        answer:
+          "Nothing settles, so you pay nothing. That is the point of netting.",
+      },
+      {
+        question: "Who pays the gas?",
+        answer:
+          "You do, on the settlement transaction and on collateral actions like deposits and withdrawals. Because you settle once per cycle, gas stops scaling with your traffic.",
+      },
+      {
+        question: "Does yield reduce my fee?",
+        answer:
+          "No, they are separate. Yield accrues to your collateral and offsets the cost of holding capital. The fee applies to settled volume. The calculator shows both, so you can see the net.",
+      },
+      {
+        question: "Is there a free tier for production?",
+        answer:
+          "Testnets are free and unmetered. Mainnet volume is priced. If you are still validating, we would rather agree a small initial arrangement than have you rebuild later.",
+      },
+    ],
+
+    includedKicker: "Included",
+    includedTitle: "Every integration gets the same rails",
+    includedLead:
+      "Your rate changes with volume. The payment model does not — the same rails run from your first sandbox request to production.",
+    included: [
+      {
+        icon: "ri-bank-line",
+        title: "Non-custodial collateral",
+        desc: "Your collateral stays in protocol contracts and backs your open obligations.",
+      },
+      {
+        icon: "ri-exchange-dollar-line",
+        title: "Batched settlement",
+        desc: "Thousands of off-chain guarantees collapse into one on-chain settlement.",
+      },
+      {
+        icon: "ri-seedling-line",
+        title: "Yield-aware design",
+        desc: "Supported collateral earns while it backs credit-based payments.",
+      },
+      {
+        icon: "ri-code-box-line",
+        title: "SDK-first integration",
+        desc: "TypeScript and Python clients over x402-compatible HTTP flows.",
+      },
+    ],
+  },
+  about: {
+    kicker: "Company",
+    title: "Our mission",
+    whyWeExist: "Why we exist",
+    missionStrong:
+      "4Mica is a lightweight overlay that enables services to extend cryptographically backed lines of credit across any blockchain.",
+    missionBody:
+      "Acting as a credit layer for instant, low-friction settlements and guaranteed fair exchange, 4Mica fixes Web3's inefficient pre-funded model and makes programmable credit accessible to all.",
+    companyInfoTitle: "Company information",
+    founderTitle: "A few words from the founders",
+    founderLead: "Why we started 4Mica and what we believe in.",
+    founderQuote:
+      "We started 4Mica to make programmable credit effortless. Just like APIs connect the web, we believe value should flow with the same clarity between agents.",
+    careersTitle:
+      "Help us build the payment infrastructure for the agentic economy",
+    highlights: [
+      {
+        title: "Credit-backed UX",
+        icon: "ri-bank-card-line",
+        description:
+          "Agents pay on credit against collateral, so no one prefunds a balance for every API call.",
+      },
+      {
+        title: "Guaranteed settlement",
+        icon: "ri-shield-check-line",
+        description:
+          "BLS-certified guarantees and enforceable claims keep every payment auditable and recoverable.",
+      },
+      {
+        title: "Cross-chain ready",
+        icon: "ri-links-line",
+        description:
+          "Support Ethereum, Solana, and emerging rollups with the same credit rails.",
+      },
+      {
+        title: "Built for production",
+        icon: "ri-rocket-2-line",
+        description:
+          "SDKs, clear failure modes, and operational tooling from day one.",
+      },
+    ],
+    companyInfo: [
+      {
+        label: "Focus",
+        icon: "ri-focus-3-line",
+        value: "Credit-backed payment rails",
+      },
+      {
+        label: "Core product",
+        icon: "ri-stack-line",
+        value: "Guarantees, clearing cycles, settlement APIs",
+      },
+      {
+        label: "Integrations",
+        icon: "ri-plug-line",
+        value: "SDKs, x402 facilitator, on-chain contracts",
+      },
+      {
+        label: "Status",
+        icon: "ri-pulse-line",
+        value: "Production-ready pilot deployments",
+      },
+    ],
+    roadmap: {
+      kicker: "Roadmap",
+      title: "Product roadmap",
+      lead: "Our journey to transform Web3 commerce.",
+      pathTitle: "Roadmap path",
+      milestones: [
+        {
+          quarter: "Q2 2025",
+          title: "PoC release",
+          description:
+            "Initial proof of concept with basic transaction capabilities and single-chain support",
+          done: true,
+        },
+        {
+          quarter: "Q3 2025",
+          title: "Alpha release",
+          description:
+            "Alpha release on Ethereum and Solana with credit capabilities for agents and APIs",
+          done: true,
+        },
+        {
+          quarter: "Q4 2025",
+          title: "Strategic partnerships",
+          description:
+            "Partnerships with AI platforms and DeFi companies to enhance ecosystem integration",
+          done: true,
+        },
+        {
+          quarter: "Q1 2026",
+          title: "Beta release",
+          description:
+            "Beta release on Ethereum and Solana, with support for retail payments",
+          done: true,
+        },
+        {
+          quarter: "Q2 2026",
+          title: "Regulatory compliance",
+          description:
+            "Achieve compliance with financial regulations and prepare for the mainnet launch",
+          done: false,
+        },
+        {
+          quarter: "Q3 2026",
+          title: "Mainnet launch",
+          description:
+            "Full mainnet launch with multi-chain support, cross-chain credit, and off-ramping to fiat",
+          done: false,
+        },
+      ],
+    },
+  },
+  team: {
+    kicker: "Team",
+    title: "Meet the team",
+    lead: "4Mica is led by founders who have shipped payment infrastructure across finance, AI, and cryptography. We are focused on bringing production-grade credit rails to Web3 commerce.",
+    howWeWorkTitle: "How we work",
+    howWeWorkLead:
+      "We build with a security-first mindset and keep every protocol component auditable. The team ships with a focus on production reliability, clear integration paths, and measurable outcomes for partners.",
+    readMission: "Read our mission",
+    openRolesTitle: "Help us build the future of agentic commerce",
+    galleryKicker: "Culture",
+    galleryTitle: "Life at 4Mica",
+    galleryLead:
+      "We're builders from all corners of the world who care deeply about our work, but we also know when to step back and enjoy life. Some of our best ideas come when we're not staring at screens.",
+    gallery: [
+      {
+        src: "/team/team_2.avif",
+        alt: "The 4Mica team and fellow builders gathered outside the Base Batches venue.",
+        width: 1600,
+        height: 1200,
+      },
+      {
+        src: "/team/team_3.avif",
+        alt: "Two 4Mica teammates at a Base community event.",
+        width: 1200,
+        height: 1600,
+      },
+      {
+        src: "/team/team_1.avif",
+        alt: "A 4Mica founder presenting the protocol on stage at Base Batches.",
+        width: 1600,
+        height: 890,
+      },
+      {
+        src: "/team/team_4.avif",
+        alt: "Two teammates in front of a fountain on a team offsite.",
+        width: 1200,
+        height: 1600,
+      },
+      {
+        src: "/team/team_5.avif",
+        alt: "A teammate in front of a wall of brightly coloured lava lamps.",
+        width: 1600,
+        height: 1200,
+      },
+      {
+        src: "/team/team_6.avif",
+        alt: "A teammate out in a snowy city street during a winter conference trip.",
+        width: 960,
+        height: 1280,
+      },
+    ],
+  },
   legal: {
     defaultKicker: "Legal",
     lastUpdated: "Last updated:",
     tableOfContents: "Table of contents",
   },
+  blog: {
+    heading: "The 4Mica blog: x402, agentic payments, and settlement",
+    allArticles: "All articles",
+    minRead: "min read",
+    empty: "No posts yet — check back soon.",
+    emptyCategory: "No posts in this category yet.",
+    backToBlog: "All posts",
+    author: "Written by",
+    published: "Published",
+    tags: "Tags",
+    readPost: "Read post",
+  },
   seo: {
     home: {
-      title: "4Mica | Credit Layer for x402 Agent Payments",
+      title: "4Mica | x402 Credit and Clearing Layer for Agent Payments",
       description:
-        "4Mica is the clearinghouse for the agentic economy, enabling x402-compatible agents and APIs to pay on credit, net transactions, and settle on-chain.",
+        "4Mica is the credit and clearing layer for x402: AI agents pay for APIs with stablecoin-backed credit, clear requests instantly, and settle net on-chain.",
       keywords: [
         "4Mica",
+        "x402",
         "x402 credit layer",
-        "agent payments",
+        "agentic payments",
+        "agentic commerce",
+        "payment clearing",
+        "settlement infrastructure",
+        "payment credit",
+        "API payments",
+        "stablecoin payments",
         "AI agent payments",
-        "on-chain credit",
-        "web3 payment infrastructure",
-        "micropayments",
-        "agentic economy",
       ],
-      imageAlt: "4Mica credit layer for x402 payments",
+      imageAlt: "4Mica x402 credit and clearing layer for agentic payments",
     },
     careers: {
-      title: "Careers | Build Agent Payment Infrastructure",
+      title: "Careers | Build x402 Settlement Infrastructure | 4Mica",
       description:
-        "Explore collaboration and contribution opportunities with 4Mica as we build credit-backed payment infrastructure for web3 commerce.",
+        "Explore collaboration and contribution opportunities with 4Mica as we build credit-backed payment infrastructure for Web3 commerce.",
       keywords: [
         "4Mica careers",
-        "web3 jobs",
+        "Web3 jobs",
         "agent payment jobs",
         "payment infrastructure careers",
         "blockchain engineering",
         "open source collaboration",
       ],
       imageAlt: "4Mica careers",
+    },
+    partners: {
+      title: "x402 Facilitator and Integration Partners | 4Mica",
+      description:
+        "Partner with 4Mica: integrate credit-backed x402 payments, run facilitator infrastructure on the clearing layer, or refer the teams building agentic commerce.",
+      keywords: [
+        "4Mica partners",
+        "x402 facilitators",
+        "facilitator infrastructure",
+        "x402 integration",
+        "agentic payments",
+        "settlement infrastructure",
+        "partner program",
+        "referral partner",
+      ],
+      imageAlt: "4Mica x402 facilitator and integration partner program",
+    },
+    blog: {
+      title: "Blog | x402 and Agentic Payments | 4Mica",
+      description:
+        "Engineering deep dives on x402, payment clearing, credit-backed settlement, and the infrastructure behind agentic commerce, from the team building 4Mica.",
+      keywords: [
+        "4Mica blog",
+        "x402",
+        "agentic payments",
+        "payment clearing",
+        "settlement infrastructure",
+        "payment credit",
+        "engineering blog",
+      ],
+      imageAlt: "4Mica blog on x402 and agentic payments",
     },
   },
 } as const;
