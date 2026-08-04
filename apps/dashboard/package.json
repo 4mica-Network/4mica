@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@4mica/http": "workspace:*",
     "@4mica/ui": "workspace:*",
     "@clerk/clerk-react": "catalog:",
     "ahooks": "catalog:",
@@ -20,7 +21,10 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:",
-    "react-router-dom": "catalog:"
+    "react-redux": "catalog:",
+    "react-router-dom": "catalog:",
+    "redux": "catalog:",
+    "redux-saga": "catalog:"
   },
   "devDependencies": {
     "@4mica/tailwind-config": "workspace:*",

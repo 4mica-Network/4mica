@@ -30,16 +30,112 @@ model Agent {
   @@map("agents")
 }
 
+enum KybStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum BusinessType {
+  SOLE_TRADER
+  PARTNERSHIP
+  LLC
+  CORPORATION
+  NON_PROFIT
+}
+
+enum NotificationPlacement {
+  topLeft
+  topRight
+  bottomLeft
+  bottomRight
+}
+
 model User {
-  id          String   @id @default(uuid(7))
-  clerkUserId String   @unique @map("clerk_user_id")
-  email       String?
-  name        String?
-  avatarUrl   String?  @map("avatar_url")
-  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                             String                @id @default(uuid(7))
+  clerkUserId                    String                @unique @map("clerk_user_id")
+  username                       String?               @unique @db.VarChar(64)
+  name                           String                @default("")
+  email                          String?               @unique @db.VarChar(255)
+  emailVerified                  Boolean               @default(false) @map("email_verified")
+  phoneNumber                    String?               @unique @map("phone_number") @db.VarChar(20)
+  phoneNumberVerified            Boolean               @default(false) @map("phone_number_verified")
+  avatarUrl                      String?               @map("avatar_url")
+  description                    String?
+  bio                            String?
+  private                        Boolean               @default(true)
+  hidden                         Boolean               @default(false)
+  verified                       Boolean               @default(false)
+  locked                         Boolean               @default(false)
+  banned                         Boolean               @default(false)
+  theme                          String                @default("dark")
+  appTheme                       String                @default("dark") @map("app_theme")
+  language                       String                @default("en")
+  timeZone                       String                @default("UTC") @map("time_zone")
+  privacyMode                    Boolean               @default(false) @map("privacy_mode")
+  twoFactorEnabled               Boolean               @default(false) @map("two_factor_enabled")
+  defaultHome                    String                @default("overview") @map("default_home")
+  disableBranding                Boolean               @default(false) @map("disable_branding")
+  allowCustomBrandColor          Boolean               @default(false) @map("allow_custom_brand_color")
+  primaryBrandColor              String                @default("") @map("primary_brand_color")
+  secondaryBrandColor            String                @default("") @map("secondary_brand_color")
+  allowSEOIndexing               Boolean               @default(false) @map("allow_seo_indexing")
+  allowNotification              Boolean               @default(true) @map("allow_notification")
+  allowSMS                       Boolean               @default(false) @map("allow_sms")
+  notificationPlacement          NotificationPlacement @default(bottomRight) @map("notification_placement")
+  allowMonthlyEmails             Boolean               @default(true) @map("allow_monthly_emails")
+  allowInviteAcceptedEmails      Boolean               @default(true) @map("allow_invite_accepted_emails")
+  allowChangelogNewsletterEmails Boolean               @default(true) @map("allow_changelog_newsletter_emails")
+  allowMarketingOnboardingEmails Boolean               @default(true) @map("allow_marketing_onboarding_emails")
+  allowPrivacyLegalEmails        Boolean               @default(true) @map("allow_privacy_legal_emails")
+  allowDpaEmails                 Boolean               @default(true) @map("allow_dpa_emails")
+  allowEmailVisibility           Boolean               @default(true) @map("allow_email_visibility")
+  allowPhoneNumberVisibility     Boolean               @default(true) @map("allow_phone_number_visibility")
+  completeOnboarding             Boolean               @default(false) @map("complete_onboarding")
+  isSeeded                       Boolean               @default(false) @map("is_seeded")
+  lastViewed                     String?               @map("last_viewed")
+  lastLogin                      DateTime              @default(now()) @map("last_login")
+  lastSeenAt                     DateTime              @default(now()) @map("last_seen_at")
+  usageTime                      Int                   @default(0) @map("usage_time")
+  createdAt                      DateTime              @default(now()) @map("created_at")
+  updatedAt                      DateTime              @updatedAt @map("updated_at")
+  deletedAt                      DateTime?             @map("deleted_at")
+  business                       Business?
 
   @@index([email])
   @@map("users")
+}
+
+model Business {
+  id                  String        @id @default(uuid(7))
+  ownerId             String        @unique @map("owner_id")
+  legalName           String        @default("") @map("legal_name") @db.VarChar(255)
+  tradingName         String?       @map("trading_name") @db.VarChar(255)
+  businessType        BusinessType? @map("business_type")
+  registrationNumber  String?       @map("registration_number") @db.VarChar(64)
+  taxId               String?       @map("tax_id") @db.VarChar(64)
+  vatNumber           String?       @map("vat_number") @db.VarChar(64)
+  industry            String?       @db.VarChar(128)
+  website             String?       @db.VarChar(255)
+  description         String?
+  supportEmail        String?       @map("support_email") @db.VarChar(255)
+  supportPhone        String?       @map("support_phone") @db.VarChar(20)
+  addressLine1        String?       @map("address_line1") @db.VarChar(255)
+  addressLine2        String?       @map("address_line2") @db.VarChar(255)
+  city                String?       @db.VarChar(128)
+  region              String?       @db.VarChar(128)
+  postalCode          String?       @map("postal_code") @db.VarChar(32)
+  country             String?       @db.VarChar(2)
+  statementDescriptor String?       @map("statement_descriptor") @db.VarChar(22)
+  payoutCurrency      String        @default("USD") @map("payout_currency") @db.VarChar(3)
+  kybStatus           KybStatus     @default(UNVERIFIED) @map("kyb_status")
+  kybVerifiedAt       DateTime?     @map("kyb_verified_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  deletedAt           DateTime?     @map("deleted_at")
+  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([kybStatus])
+  @@map("businesses")
 }

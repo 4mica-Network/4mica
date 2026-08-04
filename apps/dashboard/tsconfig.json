@@ -15,7 +15,11 @@
     "verbatimModuleSyntax": true,
     "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@api/*": ["./src/api/*"],
+      "@stores/*": ["./src/stores/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@i18n": ["./src/i18n/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts", "tailwind.config.ts"]

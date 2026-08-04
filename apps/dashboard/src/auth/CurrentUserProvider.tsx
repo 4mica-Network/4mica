@@ -1,80 +1,30 @@
+import { setAuthTokenProvider } from "@api/client";
 import { useAuth } from "@clerk/clerk-react";
-import {
-  createContext,
-  type ReactNode,
-  use,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { useApi } from "@/lib/api";
-
-export interface CurrentUser {
-  id: string;
-  clerkUserId: string;
-  email: string | null;
-  name: string | null;
-  avatarUrl: string | null;
-}
-
-interface CurrentUserState {
-  user: CurrentUser | null;
-  isLoading: boolean;
-  error: Error | null;
-}
-
-const CurrentUserContext = createContext<CurrentUserState>({
-  user: null,
-  isLoading: false,
-  error: null,
-});
+import { useAppDispatch } from "@stores/hooks";
+import { fetchUser } from "@stores/user/actions";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const { isSignedIn, userId } = useAuth();
-  const api = useApi();
-  const apiRef = useRef(api);
-  apiRef.current = api;
+  const { isSignedIn, userId, getToken } = useAuth();
+  const dispatch = useAppDispatch();
+  const [tokenReady, setTokenReady] = useState(false);
 
-  const [state, setState] = useState<CurrentUserState>({
-    user: null,
-    isLoading: true,
-    error: null,
-  });
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   useEffect(() => {
-    if (!isSignedIn || !userId) {
-      setState({ user: null, isLoading: false, error: null });
-      return;
-    }
-
-    let cancelled = false;
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    apiRef
-      .current<CurrentUser>("/me")
-      .then((user) => {
-        if (!cancelled) {
-          setState({ user, isLoading: false, error: null });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setState({
-            user: null,
-            isLoading: false,
-            error: error instanceof Error ? error : new Error(String(error)),
-          });
-        }
-      });
-
+    setAuthTokenProvider(() => getTokenRef.current());
+    setTokenReady(true);
     return () => {
-      cancelled = true;
+      setAuthTokenProvider(null);
     };
-  }, [isSignedIn, userId]);
+  }, []);
 
-  return <CurrentUserContext value={state}>{children}</CurrentUserContext>;
-}
+  useEffect(() => {
+    if (tokenReady && isSignedIn && userId) {
+      dispatch(fetchUser());
+    }
+  }, [dispatch, isSignedIn, tokenReady, userId]);
 
-export function useCurrentUser(): CurrentUserState {
-  return use(CurrentUserContext);
+  return <>{children}</>;
 }

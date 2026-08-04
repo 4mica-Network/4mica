@@ -49,23 +49,54 @@ const fetchProfile = async (identity: AuthIdentity): Promise<AuthIdentity> => {
   }
 };
 
-const upsert = async (identity: AuthIdentity): Promise<AuthUser> =>
+const isUniqueViolation = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  (error as { code?: string }).code === "P2002";
+
+const runUpsert = async (
+  identity: AuthIdentity,
+  withEmail: boolean,
+): Promise<AuthUser> =>
   prisma.user.upsert({
     where: { clerkUserId: identity.clerkUserId },
     create: {
       clerkUserId: identity.clerkUserId,
-      email: identity.email,
-      name: identity.name,
-      avatarUrl: identity.avatarUrl,
+      ...(withEmail && identity.email !== null
+        ? { email: identity.email }
+        : {}),
+      ...(identity.name !== null ? { name: identity.name } : {}),
+      ...(identity.avatarUrl !== null ? { avatarUrl: identity.avatarUrl } : {}),
     },
     update: {
-      ...(identity.email !== null ? { email: identity.email } : {}),
+      ...(withEmail && identity.email !== null
+        ? { email: identity.email }
+        : {}),
       ...(identity.name !== null ? { name: identity.name } : {}),
       ...(identity.avatarUrl !== null ? { avatarUrl: identity.avatarUrl } : {}),
       lastSeenAt: new Date(),
+      lastLogin: new Date(),
     },
     select: USER_FIELDS,
   });
+
+const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
+  try {
+    return await runUpsert(identity, true);
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw error;
+    }
+
+    // users.email is unique. Another row already holds this address, so write
+    // everything except the email rather than failing the whole session.
+    appLogger.warn("Email already claimed by another user, skipping it", {
+      clerkUserId: identity.clerkUserId,
+    });
+
+    return runUpsert(identity, false);
+  }
+};
 
 export const loadUser = async (identity: AuthIdentity): Promise<AuthUser> => {
   const cached = cache.get(identity.clerkUserId);
