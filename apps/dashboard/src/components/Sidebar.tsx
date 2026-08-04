@@ -14,6 +14,7 @@ import {
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useCurrentUser } from "@/auth/CurrentUserProvider";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
 const EXPANDED_WIDTH = 256;
@@ -145,11 +146,16 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const { signOut } = useClerk();
   const { user } = useUser();
+  const { user: currentUser } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
 
   const displayName =
-    user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? t("org");
+    currentUser?.name ??
+    currentUser?.email ??
+    user?.fullName ??
+    user?.primaryEmailAddress?.emailAddress ??
+    t("org");
 
   return (
     <>

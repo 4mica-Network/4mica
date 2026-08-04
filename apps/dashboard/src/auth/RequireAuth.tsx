@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { CurrentUserProvider } from "@/auth/CurrentUserProvider";
 import { FullScreenLoader } from "@/auth/FullScreenLoader";
 
 export function RequireAuth() {
@@ -20,5 +21,9 @@ export function RequireAuth() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <CurrentUserProvider>
+      <Outlet />
+    </CurrentUserProvider>
+  );
 }

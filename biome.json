@@ -23,6 +23,7 @@
       "!**/dev-dist",
       "!**/.all-contributorsrc",
       "!**/.turbo",
+      "!**/.claude",
       "!packages/cli/templates",
       "!apps/**/coverage",
       "!apps/**/cypress",
