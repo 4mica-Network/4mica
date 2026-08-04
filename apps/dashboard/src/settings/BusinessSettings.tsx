@@ -2,21 +2,23 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateBusiness } from "@stores/user/actions";
 import {
   selectBusiness,
-  selectIsBusinessUpdating,
+  selectIsSectionSaving,
   selectValidationIssues,
 } from "@stores/user/selector";
+import type { BusinessType } from "@stores/user/type";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Field,
-  FormSection,
+  Card,
   Select,
+  SettingRow,
   TextArea,
   TextInput,
   VerifiedBadge,
 } from "@/components/form";
-import { SettingsForm } from "./SettingsForm";
-import { useSettingsForm } from "./useSettingsForm";
+import { EditableCard, InstantCard } from "./EditableCard";
+import { SettingsPage } from "./SettingsPage";
+import { useDraft } from "./useDraft";
 
 const BUSINESS_TYPES = [
   { label: "—", value: "" },
@@ -31,315 +33,391 @@ const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
   (code) => ({ label: code, value: code }),
 );
 
+/** Empty strings mean "clear this optional field"; the API expects null. */
+const blankToNull = (changes: Record<string, unknown>, keep: string[] = []) =>
+  Object.fromEntries(
+    Object.entries(changes).map(([key, value]) => [
+      key,
+      value === "" && !keep.includes(key) ? null : value,
+    ]),
+  );
+
 export function BusinessSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const business = useAppSelector(selectBusiness);
-  const isSaving = useAppSelector(selectIsBusinessUpdating);
   const issues = useAppSelector(selectValidationIssues);
+  const savingEntity = useAppSelector(selectIsSectionSaving("entity"));
+  const savingRegistration = useAppSelector(
+    selectIsSectionSaving("registration"),
+  );
+  const savingContact = useAppSelector(selectIsSectionSaving("contact"));
+  const savingAddress = useAppSelector(selectIsSectionSaving("address"));
+  const savingPayouts = useAppSelector(selectIsSectionSaving("payouts"));
 
-  const initial = useMemo(
+  const entityInitial = useMemo(
     () => ({
       legalName: business?.legalName ?? "",
       tradingName: business?.tradingName ?? "",
-      businessType: business?.businessType ?? "",
+      industry: business?.industry ?? "",
+      description: business?.description ?? "",
+    }),
+    [business],
+  );
+
+  const registrationInitial = useMemo(
+    () => ({
       registrationNumber: business?.registrationNumber ?? "",
       taxId: business?.taxId ?? "",
       vatNumber: business?.vatNumber ?? "",
-      industry: business?.industry ?? "",
+    }),
+    [business],
+  );
+
+  const contactInitial = useMemo(
+    () => ({
       website: business?.website ?? "",
-      description: business?.description ?? "",
       supportEmail: business?.supportEmail ?? "",
       supportPhone: business?.supportPhone ?? "",
+    }),
+    [business],
+  );
+
+  const addressInitial = useMemo(
+    () => ({
       addressLine1: business?.addressLine1 ?? "",
       addressLine2: business?.addressLine2 ?? "",
       city: business?.city ?? "",
       region: business?.region ?? "",
       postalCode: business?.postalCode ?? "",
       country: business?.country ?? "",
-      statementDescriptor: business?.statementDescriptor ?? "",
-      payoutCurrency: business?.payoutCurrency ?? "USD",
     }),
     [business],
   );
 
-  const { draft, set, isDirty, changes, reset } = useSettingsForm(initial);
+  const descriptorInitial = useMemo(
+    () => ({ statementDescriptor: business?.statementDescriptor ?? "" }),
+    [business],
+  );
 
-  const submit = () => {
-    // The API treats null as "clear this field"; empty strings from text
-    // inputs must be converted or valibot rejects them as too-short.
-    const payload = Object.fromEntries(
-      Object.entries(changes).map(([key, value]) => [
-        key,
-        value === "" && key !== "legalName" && key !== "payoutCurrency"
-          ? null
-          : value,
-      ]),
-    );
-    dispatch(updateBusiness(payload));
-  };
+  const entity = useDraft(entityInitial);
+  const registration = useDraft(registrationInitial);
+  const contact = useDraft(contactInitial);
+  const address = useDraft(addressInitial);
+  const descriptor = useDraft(descriptorInitial);
 
-  if (!draft) {
-    return null;
-  }
+  const save = (
+    changes: Record<string, unknown>,
+    section: string,
+    keep: string[] = [],
+  ) => dispatch(updateBusiness(blankToNull(changes, keep), section));
 
   return (
-    <SettingsForm
+    <SettingsPage
       titleKey="page.settings.business.title"
       descriptionKey="page.settings.business.description"
-      isDirty={isDirty}
-      isSaving={isSaving}
-      onSubmit={submit}
-      onReset={reset}
     >
-      <FormSection
+      <Card className="flex items-center justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-ink-strong text-sm">
+            {t("settings.business.kyb")}
+          </h3>
+          <p className="mt-0.5 text-ink-muted text-xs">
+            {t("settings.business.kybHint")}
+          </p>
+        </div>
+        <VerifiedBadge
+          verified={business?.kybStatus === "VERIFIED"}
+          labels={{ yes: t("settings.verified"), no: t("settings.unverified") }}
+        />
+      </Card>
+
+      <EditableCard
         title={t("settings.business.entity")}
         description={t("settings.business.entityHint")}
+        isDirty={entity.isDirty}
+        isSaving={savingEntity}
+        onSave={() => save(entity.changes, "entity", ["legalName"])}
+        onReset={entity.reset}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-ink-muted text-sm">
-            {t("settings.business.kyb")}
-          </span>
-          <VerifiedBadge verified={business?.kybStatus === "VERIFIED"} />
-        </div>
-
-        <Field
-          label={t("settings.business.legalName")}
+        <SettingRow
+          title={t("settings.business.legalName")}
           htmlFor="business-legal-name"
           error={issues.legalName}
         >
           <TextInput
             id="business-legal-name"
-            value={draft.legalName}
+            value={entity.draft.legalName}
             invalid={Boolean(issues.legalName)}
-            onChange={(v) => set("legalName", v)}
+            onChange={(v) => entity.set("legalName", v)}
           />
-        </Field>
-
-        <Field
-          label={t("settings.business.tradingName")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.tradingName")}
           htmlFor="business-trading-name"
           error={issues.tradingName}
         >
           <TextInput
             id="business-trading-name"
-            value={draft.tradingName}
-            onChange={(v) => set("tradingName", v)}
+            value={entity.draft.tradingName}
+            onChange={(v) => entity.set("tradingName", v)}
           />
-        </Field>
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.industry")}
+          htmlFor="business-industry"
+        >
+          <TextInput
+            id="business-industry"
+            value={entity.draft.industry}
+            onChange={(v) => entity.set("industry", v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.description")}
+          htmlFor="business-description"
+        >
+          <TextArea
+            id="business-description"
+            value={entity.draft.description}
+            onChange={(v) => entity.set("description", v)}
+          />
+        </SettingRow>
+      </EditableCard>
 
-        <Field
-          label={t("settings.business.type")}
+      <InstantCard
+        title={t("settings.business.type")}
+        description={t("settings.business.typeHint")}
+        isSaving={savingEntity}
+      >
+        <SettingRow
+          title={t("settings.business.type")}
           htmlFor="business-type"
           error={issues.businessType}
         >
           <Select
             id="business-type"
-            value={draft.businessType}
+            value={business?.businessType ?? ""}
             options={BUSINESS_TYPES}
-            onChange={(v) => set("businessType", v)}
+            onChange={(v) =>
+              dispatch(
+                updateBusiness(
+                  { businessType: (v || null) as BusinessType | null },
+                  "entity",
+                ),
+              )
+            }
           />
-        </Field>
+        </SettingRow>
+      </InstantCard>
 
-        <Field
-          label={t("settings.business.industry")}
-          htmlFor="business-industry"
-        >
-          <TextInput
-            id="business-industry"
-            value={draft.industry}
-            onChange={(v) => set("industry", v)}
-          />
-        </Field>
-
-        <Field
-          label={t("settings.business.description")}
-          htmlFor="business-description"
-        >
-          <TextArea
-            id="business-description"
-            rows={3}
-            value={draft.description}
-            onChange={(v) => set("description", v)}
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection
+      <EditableCard
         title={t("settings.business.registration")}
         description={t("settings.business.registrationHint")}
+        isDirty={registration.isDirty}
+        isSaving={savingRegistration}
+        onSave={() => save(registration.changes, "registration")}
+        onReset={registration.reset}
       >
-        <Field
-          label={t("settings.business.registrationNumber")}
+        <SettingRow
+          title={t("settings.business.registrationNumber")}
           htmlFor="business-reg-no"
           error={issues.registrationNumber}
         >
           <TextInput
             id="business-reg-no"
-            value={draft.registrationNumber}
-            onChange={(v) => set("registrationNumber", v)}
+            value={registration.draft.registrationNumber}
+            onChange={(v) => registration.set("registrationNumber", v)}
           />
-        </Field>
-        <Field
-          label={t("settings.business.taxId")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.taxId")}
           htmlFor="business-tax-id"
           error={issues.taxId}
         >
           <TextInput
             id="business-tax-id"
-            value={draft.taxId}
-            onChange={(v) => set("taxId", v)}
+            value={registration.draft.taxId}
+            onChange={(v) => registration.set("taxId", v)}
           />
-        </Field>
-        <Field
-          label={t("settings.business.vatNumber")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.vatNumber")}
           htmlFor="business-vat"
           error={issues.vatNumber}
         >
           <TextInput
             id="business-vat"
-            value={draft.vatNumber}
-            onChange={(v) => set("vatNumber", v)}
+            value={registration.draft.vatNumber}
+            onChange={(v) => registration.set("vatNumber", v)}
           />
-        </Field>
-      </FormSection>
+        </SettingRow>
+      </EditableCard>
 
-      <FormSection title={t("settings.business.contact")}>
-        <Field
-          label={t("settings.business.website")}
+      <EditableCard
+        title={t("settings.business.contact")}
+        description={t("settings.business.contactHint")}
+        isDirty={contact.isDirty}
+        isSaving={savingContact}
+        onSave={() => save(contact.changes, "contact")}
+        onReset={contact.reset}
+      >
+        <SettingRow
+          title={t("settings.business.website")}
           htmlFor="business-website"
           error={issues.website}
         >
           <TextInput
             id="business-website"
-            value={draft.website}
+            value={contact.draft.website}
             placeholder="https://example.com"
             invalid={Boolean(issues.website)}
-            onChange={(v) => set("website", v)}
+            onChange={(v) => contact.set("website", v)}
           />
-        </Field>
-        <Field
-          label={t("settings.business.supportEmail")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.supportEmail")}
           htmlFor="business-support-email"
           error={issues.supportEmail}
         >
           <TextInput
             id="business-support-email"
             type="email"
-            value={draft.supportEmail}
+            value={contact.draft.supportEmail}
             invalid={Boolean(issues.supportEmail)}
-            onChange={(v) => set("supportEmail", v)}
+            onChange={(v) => contact.set("supportEmail", v)}
           />
-        </Field>
-        <Field
-          label={t("settings.business.supportPhone")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.supportPhone")}
           htmlFor="business-support-phone"
           error={issues.supportPhone}
         >
           <TextInput
             id="business-support-phone"
-            value={draft.supportPhone}
-            onChange={(v) => set("supportPhone", v)}
+            value={contact.draft.supportPhone}
+            onChange={(v) => contact.set("supportPhone", v)}
           />
-        </Field>
-      </FormSection>
+        </SettingRow>
+      </EditableCard>
 
-      <FormSection title={t("settings.business.address")}>
-        <Field
-          label={t("settings.business.addressLine1")}
+      <EditableCard
+        title={t("settings.business.address")}
+        description={t("settings.business.addressHint")}
+        isDirty={address.isDirty}
+        isSaving={savingAddress}
+        onSave={() => save(address.changes, "address")}
+        onReset={address.reset}
+      >
+        <SettingRow
+          title={t("settings.business.addressLine1")}
           htmlFor="business-address1"
         >
           <TextInput
             id="business-address1"
-            value={draft.addressLine1}
-            onChange={(v) => set("addressLine1", v)}
+            value={address.draft.addressLine1}
+            onChange={(v) => address.set("addressLine1", v)}
           />
-        </Field>
-        <Field
-          label={t("settings.business.addressLine2")}
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.addressLine2")}
           htmlFor="business-address2"
         >
           <TextInput
             id="business-address2"
-            value={draft.addressLine2}
-            onChange={(v) => set("addressLine2", v)}
+            value={address.draft.addressLine2}
+            onChange={(v) => address.set("addressLine2", v)}
           />
-        </Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label={t("settings.business.city")} htmlFor="business-city">
-            <TextInput
-              id="business-city"
-              value={draft.city}
-              onChange={(v) => set("city", v)}
-            />
-          </Field>
-          <Field
-            label={t("settings.business.region")}
-            htmlFor="business-region"
-          >
-            <TextInput
-              id="business-region"
-              value={draft.region}
-              onChange={(v) => set("region", v)}
-            />
-          </Field>
-          <Field
-            label={t("settings.business.postalCode")}
-            htmlFor="business-postal"
-          >
-            <TextInput
-              id="business-postal"
-              value={draft.postalCode}
-              onChange={(v) => set("postalCode", v)}
-            />
-          </Field>
-          <Field
-            label={t("settings.business.country")}
-            htmlFor="business-country"
-            hint={t("settings.business.countryHint")}
-            error={issues.country}
-          >
-            <TextInput
-              id="business-country"
-              value={draft.country}
-              placeholder="US"
-              invalid={Boolean(issues.country)}
-              onChange={(v) => set("country", v.toUpperCase().slice(0, 2))}
-            />
-          </Field>
-        </div>
-      </FormSection>
+        </SettingRow>
+        <SettingRow title={t("settings.business.city")} htmlFor="business-city">
+          <TextInput
+            id="business-city"
+            value={address.draft.city}
+            onChange={(v) => address.set("city", v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.region")}
+          htmlFor="business-region"
+        >
+          <TextInput
+            id="business-region"
+            value={address.draft.region}
+            onChange={(v) => address.set("region", v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.postalCode")}
+          htmlFor="business-postal"
+        >
+          <TextInput
+            id="business-postal"
+            value={address.draft.postalCode}
+            onChange={(v) => address.set("postalCode", v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.business.country")}
+          description={t("settings.business.countryHint")}
+          htmlFor="business-country"
+          error={issues.country}
+        >
+          <TextInput
+            id="business-country"
+            value={address.draft.country}
+            placeholder="US"
+            invalid={Boolean(issues.country)}
+            onChange={(v) =>
+              address.set("country", v.toUpperCase().slice(0, 2))
+            }
+          />
+        </SettingRow>
+      </EditableCard>
 
-      <FormSection
+      <InstantCard
         title={t("settings.business.payouts")}
         description={t("settings.business.payoutsHint")}
+        isSaving={savingPayouts}
       >
-        <Field
-          label={t("settings.business.payoutCurrency")}
+        <SettingRow
+          title={t("settings.business.payoutCurrency")}
           htmlFor="business-currency"
           error={issues.payoutCurrency}
         >
           <Select
             id="business-currency"
-            value={draft.payoutCurrency}
+            value={business?.payoutCurrency ?? "USD"}
             options={CURRENCIES}
-            onChange={(v) => set("payoutCurrency", v)}
+            onChange={(v) =>
+              dispatch(updateBusiness({ payoutCurrency: v }, "payouts"))
+            }
           />
-        </Field>
-        <Field
-          label={t("settings.business.statementDescriptor")}
+        </SettingRow>
+      </InstantCard>
+
+      <EditableCard
+        title={t("settings.business.statementDescriptor")}
+        description={t("settings.business.statementDescriptorHint")}
+        isDirty={descriptor.isDirty}
+        isSaving={savingPayouts}
+        onSave={() => save(descriptor.changes, "payouts")}
+        onReset={descriptor.reset}
+      >
+        <SettingRow
+          title={t("settings.business.statementDescriptor")}
           htmlFor="business-descriptor"
-          hint={t("settings.business.statementDescriptorHint")}
           error={issues.statementDescriptor}
         >
           <TextInput
             id="business-descriptor"
-            value={draft.statementDescriptor}
+            value={descriptor.draft.statementDescriptor}
             invalid={Boolean(issues.statementDescriptor)}
-            onChange={(v) => set("statementDescriptor", v.slice(0, 22))}
+            onChange={(v) =>
+              descriptor.set("statementDescriptor", v.slice(0, 22))
+            }
           />
-        </Field>
-      </FormSection>
-    </SettingsForm>
+        </SettingRow>
+      </EditableCard>
+    </SettingsPage>
   );
 }

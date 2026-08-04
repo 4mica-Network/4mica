@@ -31,6 +31,11 @@ import {
   userResponseSchema,
 } from "./schema-fragments";
 
+/**
+ * The only source of the acting user's id is the verified session token, via
+ * getUserData. No route accepts an id from the path, query or body, so a
+ * caller cannot address anyone else's record.
+ */
 const requireUserId = (
   request: FastifyRequest,
   reply: FastifyReply,
@@ -42,6 +47,15 @@ const requireUserId = (
     });
     return null;
   }
+
+  if (request.user.disabled) {
+    reply.code(403).send({
+      error: "account_disabled",
+      message: "This account cannot be modified.",
+    });
+    return null;
+  }
+
   return request.user.id;
 };
 

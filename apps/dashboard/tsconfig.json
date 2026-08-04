@@ -22,5 +22,5 @@
       "@i18n": ["./src/i18n/index.ts"]
     }
   },
-  "include": ["src", "vite.config.ts", "tailwind.config.ts"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "tailwind.config.ts"]
 }

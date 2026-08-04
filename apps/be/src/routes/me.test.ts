@@ -43,10 +43,19 @@ const AUTH_USER = {
   email: "ada@example.com",
   name: "Ada Lovelace",
   avatarUrl: null,
+  banned: false,
+  locked: false,
+  deletedAt: null,
 };
 
+const OTHER_USER_ID = "019fce62-9999-7000-8000-999999999999";
+
 const FULL_USER = {
-  ...AUTH_USER,
+  id: AUTH_USER.id,
+  clerkUserId: AUTH_USER.clerkUserId,
+  email: AUTH_USER.email,
+  name: AUTH_USER.name,
+  avatarUrl: AUTH_USER.avatarUrl,
   username: "ada",
   emailVerified: true,
   phoneNumber: null,
@@ -322,6 +331,115 @@ describe("account routes", () => {
     expect(businessUpsert).not.toHaveBeenCalled();
 
     await app.close();
+  });
+
+  describe("authorization", () => {
+    const MUTATIONS = [
+      ["PATCH", "/me/profile"],
+      ["PATCH", "/me/account"],
+      ["PATCH", "/me/notifications"],
+      ["PUT", "/me/business"],
+    ] as const;
+
+    it("always scopes writes to the token's user, never the request body", async () => {
+      const app = await initApp([{ plugin: meRoutes }]);
+
+      await app.inject({
+        method: "PATCH",
+        url: "/me/profile",
+        headers: AUTH,
+        payload: { id: OTHER_USER_ID, clerkUserId: "user_evil", bio: "hi" },
+      });
+
+      expect(update.mock.calls[0][0].where).toEqual({ id: AUTH_USER.id });
+      expect(update.mock.calls[0][0].data).toEqual({ bio: "hi" });
+
+      await app.inject({
+        method: "PUT",
+        url: "/me/business",
+        headers: AUTH,
+        payload: { ownerId: OTHER_USER_ID, legalName: "Evil Ltd" },
+      });
+
+      expect(businessUpsert.mock.calls[0][0].where).toEqual({
+        ownerId: AUTH_USER.id,
+      });
+      expect(businessUpsert.mock.calls[0][0].create.ownerId).toBe(AUTH_USER.id);
+      expect(businessUpsert.mock.calls[0][0].update).not.toHaveProperty(
+        "ownerId",
+      );
+
+      await app.close();
+    });
+
+    it("refuses privilege fields even from an authenticated owner", async () => {
+      const app = await initApp([{ plugin: meRoutes }]);
+
+      await app.inject({
+        method: "PATCH",
+        url: "/me/profile",
+        headers: AUTH,
+        payload: { verified: true, banned: false, locked: false, hidden: true },
+      });
+
+      const data = update.mock.calls[0][0].data;
+      expect(data).toEqual({ hidden: true });
+      for (const field of ["verified", "banned", "locked"]) {
+        expect(data).not.toHaveProperty(field);
+      }
+
+      await app.close();
+    });
+
+    it.each(
+      MUTATIONS,
+    )("%s %s is blocked for a banned account", async (method, url) => {
+      findUnique.mockResolvedValue({ ...FULL_USER });
+      upsert.mockResolvedValue({ ...AUTH_USER, banned: true });
+
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({ method, url, headers: AUTH, payload: {} });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("account_disabled");
+      expect(update).not.toHaveBeenCalled();
+      expect(businessUpsert).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+
+    it("blocks a locked account", async () => {
+      upsert.mockResolvedValue({ ...AUTH_USER, locked: true });
+
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/me/profile",
+        headers: AUTH,
+        payload: { bio: "x" },
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(update).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+
+    it("blocks a soft-deleted account", async () => {
+      upsert.mockResolvedValue({ ...AUTH_USER, deletedAt: new Date() });
+
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/me/profile",
+        headers: AUTH,
+        payload: { bio: "x" },
+      });
+
+      expect(res.statusCode).toBe(403);
+
+      await app.close();
+    });
   });
 
   it("every account route requires authentication", async () => {

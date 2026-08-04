@@ -36,6 +36,7 @@ const stubUser: AuthUser = {
   email: null,
   name: null,
   avatarUrl: null,
+  disabled: false,
 };
 
 const buildApp = async (

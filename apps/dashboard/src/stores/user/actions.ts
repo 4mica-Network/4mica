@@ -2,6 +2,10 @@ import type { MeResponse } from "@api/user";
 import actionTypes from "./actionTypes";
 import type { Business, User } from "./type";
 
+export interface UpdateMeta {
+  section: string;
+}
+
 export const fetchUser = () => ({
   type: actionTypes.FETCH_USER_REQUESTED,
 });
@@ -20,58 +24,66 @@ export const fetchUserFailed = (message: string) => ({
   payload: { message },
 });
 
-export const updateProfile = (payload: Partial<User>) => ({
+export const updateProfile = (payload: Partial<User>, section = "profile") => ({
   type: actionTypes.UPDATE_PROFILE_REQUESTED,
   payload,
+  meta: { section },
 });
 
-export const updateAccount = (payload: Partial<User>) => ({
+export const updateAccount = (payload: Partial<User>, section = "account") => ({
   type: actionTypes.UPDATE_ACCOUNT_REQUESTED,
   payload,
+  meta: { section },
 });
 
-export const updateNotifications = (payload: Partial<User>) => ({
+export const updateNotifications = (
+  payload: Partial<User>,
+  section = "notifications",
+) => ({
   type: actionTypes.UPDATE_NOTIFICATIONS_REQUESTED,
   payload,
+  meta: { section },
 });
 
-export const updateUserPending = () => ({
-  type: actionTypes.UPDATE_USER_PENDING,
-});
-
-export const updateUserSucceeded = (data: User) => ({
+export const updateUserSucceeded = (data: User, meta: UpdateMeta) => ({
   type: actionTypes.UPDATE_USER_SUCCEEDED,
   payload: data,
+  meta,
 });
 
 export const updateUserFailed = (
   message: string,
-  issues: Record<string, string> = {},
+  issues: Record<string, string>,
+  meta: UpdateMeta,
 ) => ({
   type: actionTypes.UPDATE_USER_FAILED,
   payload: { message, issues },
+  meta,
 });
 
-export const updateBusiness = (payload: Partial<Business>) => ({
+export const updateBusiness = (
+  payload: Partial<Business>,
+  section = "business",
+) => ({
   type: actionTypes.UPDATE_BUSINESS_REQUESTED,
   payload,
+  meta: { section },
 });
 
-export const updateBusinessPending = () => ({
-  type: actionTypes.UPDATE_BUSINESS_PENDING,
-});
-
-export const updateBusinessSucceeded = (data: Business) => ({
+export const updateBusinessSucceeded = (data: Business, meta: UpdateMeta) => ({
   type: actionTypes.UPDATE_BUSINESS_SUCCEEDED,
   payload: data,
+  meta,
 });
 
 export const updateBusinessFailed = (
   message: string,
-  issues: Record<string, string> = {},
+  issues: Record<string, string>,
+  meta: UpdateMeta,
 ) => ({
   type: actionTypes.UPDATE_BUSINESS_FAILED,
   payload: { message, issues },
+  meta,
 });
 
 export const clearValidationIssues = () => ({

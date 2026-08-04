@@ -14,6 +14,7 @@ export interface AuthUser {
   email: string | null;
   name: string | null;
   avatarUrl: string | null;
+  disabled: boolean;
 }
 
 export interface SessionAuthContext {

@@ -11,11 +11,17 @@ export const selectBusiness = (state: RootState): Business | null =>
 export const selectIsUserLoading = (state: RootState): boolean =>
   state.user.isLoading;
 
-export const selectIsUpdating = (state: RootState): boolean =>
-  state.user.isUpdateLoading;
+export const selectSavingSections = (
+  state: RootState,
+): Record<string, boolean> => state.user.savingSections;
 
-export const selectIsBusinessUpdating = (state: RootState): boolean =>
-  state.user.isBusinessUpdateLoading;
+export const selectIsSectionSaving =
+  (section: string) =>
+  (state: RootState): boolean =>
+    Boolean(state.user.savingSections[section]);
+
+export const selectIsAnySaving = (state: RootState): boolean =>
+  Object.keys(state.user.savingSections).length > 0;
 
 export const selectValidationIssues = (
   state: RootState,

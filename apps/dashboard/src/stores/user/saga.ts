@@ -7,17 +7,16 @@ import {
   upsertBusiness as upsertBusinessRequest,
 } from "@api/user";
 import i18n from "@i18n";
-import { notifyError, notifySuccess } from "@utils/notification";
+import { notifyError } from "@utils/notification";
 import { call, put, select, takeEvery } from "redux-saga/effects";
 import {
   fetchUserFailed,
   fetchUserPending,
   fetchUserSucceeded,
+  type UpdateMeta,
   updateBusinessFailed,
-  updateBusinessPending,
   updateBusinessSucceeded,
   updateUserFailed,
-  updateUserPending,
   updateUserSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -50,7 +49,7 @@ const toMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-function* notifyPlacement(): Generator<unknown, NotificationPlacement> {
+function* placement(): Generator<unknown, NotificationPlacement> {
   const user = (yield select(selectUser)) as User | null;
   return user?.notificationPlacement ?? "bottomRight";
 }
@@ -85,26 +84,12 @@ const updaters = {
 export function* updateUser(action: {
   type: keyof typeof updaters;
   payload: Partial<User>;
+  meta: UpdateMeta;
 }): Generator {
-  const placement = (yield* notifyPlacement()) as NotificationPlacement;
-
   try {
-    yield put(updateUserPending());
-
     const request = updaters[action.type];
     const response = yield call(() => request(action.payload));
-
-    yield put(updateUserSucceeded(response as User));
-
-    notifySuccess({
-      title: i18n.t("store.user.updatedTitle", {
-        defaultValue: "Changes saved",
-      }),
-      content: i18n.t("store.user.updatedBody", {
-        defaultValue: "Your settings have been updated.",
-      }),
-      placement,
-    });
+    yield put(updateUserSucceeded(response as User, action.meta));
   } catch (error) {
     const message = toMessage(
       error,
@@ -113,14 +98,14 @@ export function* updateUser(action: {
       }),
     );
 
-    yield put(updateUserFailed(message, toIssueMap(error)));
+    yield put(updateUserFailed(message, toIssueMap(error), action.meta));
 
     notifyError({
       title: i18n.t("store.user.updateFailedTitle", {
         defaultValue: "Update failed",
       }),
       content: message,
-      placement,
+      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -128,22 +113,11 @@ export function* updateUser(action: {
 export function* updateBusiness(action: {
   type: string;
   payload: Partial<Business>;
+  meta: UpdateMeta;
 }): Generator {
-  const placement = (yield* notifyPlacement()) as NotificationPlacement;
-
   try {
-    yield put(updateBusinessPending());
-
     const response = yield call(() => upsertBusinessRequest(action.payload));
-
-    yield put(updateBusinessSucceeded(response as Business));
-
-    notifySuccess({
-      title: i18n.t("store.business.updatedTitle", {
-        defaultValue: "Business details saved",
-      }),
-      placement,
-    });
+    yield put(updateBusinessSucceeded(response as Business, action.meta));
   } catch (error) {
     const message = toMessage(
       error,
@@ -152,14 +126,14 @@ export function* updateBusiness(action: {
       }),
     );
 
-    yield put(updateBusinessFailed(message, toIssueMap(error)));
+    yield put(updateBusinessFailed(message, toIssueMap(error), action.meta));
 
     notifyError({
       title: i18n.t("store.business.updateFailedTitle", {
         defaultValue: "Update failed",
       }),
       content: message,
-      placement,
+      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }

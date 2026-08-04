@@ -107,8 +107,10 @@ export type UserState = {
   user: User | null;
   business: Business | null;
   isLoading: boolean;
-  isUpdateLoading: boolean;
-  isBusinessUpdateLoading: boolean;
+  /** Keyed by card id, so each card shows its own spinner. */
+  savingSections: Record<string, boolean>;
+  rollback: Partial<User> | null;
+  businessRollback: Partial<Business> | null;
   error: string | null;
   validationIssues: Record<string, string>;
 };

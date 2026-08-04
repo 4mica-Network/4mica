@@ -5,22 +5,49 @@ export const INITIAL_STATE: UserState = {
   user: null,
   business: null,
   isLoading: false,
-  isUpdateLoading: false,
-  isBusinessUpdateLoading: false,
+  savingSections: {},
+  rollback: null,
+  businessRollback: null,
   error: null,
   validationIssues: {},
 };
 
 interface UserAction {
   type: string;
-  payload?: {
-    user?: User;
-    business?: Business | null;
-    message?: string;
-    issues?: Record<string, string>;
-  } & Partial<User> &
-    Partial<Business>;
+  payload?: unknown;
+  meta?: { section: string };
 }
+
+const setSaving = (
+  sections: Record<string, boolean>,
+  section: string | undefined,
+  value: boolean,
+): Record<string, boolean> => {
+  if (!section) {
+    return sections;
+  }
+  const next = { ...sections };
+  if (value) {
+    next[section] = true;
+  } else {
+    delete next[section];
+  }
+  return next;
+};
+
+/** Snapshot of the keys about to change, so a failed write can be undone. */
+const snapshot = <T extends object>(
+  source: T | null,
+  patch: Partial<T>,
+): Partial<T> | null => {
+  if (!source) {
+    return null;
+  }
+  const keys = Object.keys(patch) as (keyof T)[];
+  return Object.fromEntries(
+    keys.map((key) => [key, source[key]]),
+  ) as Partial<T>;
+};
 
 export default function userReducer(
   state: UserState = INITIAL_STATE,
@@ -30,71 +57,139 @@ export default function userReducer(
     case actionTypes.FETCH_USER_PENDING:
       return { ...state, isLoading: true, error: null };
 
-    case actionTypes.FETCH_USER_SUCCEEDED:
+    case actionTypes.FETCH_USER_SUCCEEDED: {
+      const payload = action.payload as {
+        user: User;
+        business: Business | null;
+      };
       return {
         ...state,
-        user: (action.payload?.user as User) ?? null,
-        business: (action.payload?.business as Business | null) ?? null,
+        user: payload.user,
+        business: payload.business,
         isLoading: false,
         error: null,
       };
+    }
 
     case actionTypes.FETCH_USER_FAILED:
       return {
         ...state,
         isLoading: false,
-        error: action.payload?.message ?? "Failed to load your account.",
+        error:
+          (action.payload as { message?: string })?.message ??
+          "Failed to load your account.",
       };
 
-    case actionTypes.UPDATE_USER_PENDING:
+    // Applied optimistically so toggles move the instant they are clicked.
+    case actionTypes.UPDATE_PROFILE_REQUESTED:
+    case actionTypes.UPDATE_ACCOUNT_REQUESTED:
+    case actionTypes.UPDATE_NOTIFICATIONS_REQUESTED: {
+      const patch = action.payload as Partial<User>;
       return {
         ...state,
-        isUpdateLoading: true,
+        user: state.user ? { ...state.user, ...patch } : state.user,
+        rollback: state.rollback ?? snapshot(state.user, patch),
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          true,
+        ),
         error: null,
         validationIssues: {},
       };
+    }
 
     case actionTypes.UPDATE_USER_SUCCEEDED:
       return {
         ...state,
-        user: action.payload as unknown as User,
-        isUpdateLoading: false,
+        user: action.payload as User,
+        rollback: null,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
         error: null,
         validationIssues: {},
       };
 
-    case actionTypes.UPDATE_USER_FAILED:
-      return {
-        ...state,
-        isUpdateLoading: false,
-        error: action.payload?.message ?? "Update failed.",
-        validationIssues: action.payload?.issues ?? {},
+    case actionTypes.UPDATE_USER_FAILED: {
+      const payload = action.payload as {
+        message?: string;
+        issues?: Record<string, string>;
       };
-
-    case actionTypes.UPDATE_BUSINESS_PENDING:
       return {
         ...state,
-        isBusinessUpdateLoading: true,
+        // Undo the optimistic patch so the UI matches the server again.
+        user:
+          state.user && state.rollback
+            ? { ...state.user, ...state.rollback }
+            : state.user,
+        rollback: null,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
+        error: payload?.message ?? "Update failed.",
+        validationIssues: payload?.issues ?? {},
+      };
+    }
+
+    case actionTypes.UPDATE_BUSINESS_REQUESTED: {
+      const patch = action.payload as Partial<Business>;
+      return {
+        ...state,
+        business: state.business
+          ? { ...state.business, ...patch }
+          : state.business,
+        businessRollback:
+          state.businessRollback ?? snapshot(state.business, patch),
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          true,
+        ),
         error: null,
         validationIssues: {},
       };
+    }
 
     case actionTypes.UPDATE_BUSINESS_SUCCEEDED:
       return {
         ...state,
-        business: action.payload as unknown as Business,
-        isBusinessUpdateLoading: false,
+        business: action.payload as Business,
+        businessRollback: null,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
         error: null,
         validationIssues: {},
       };
 
-    case actionTypes.UPDATE_BUSINESS_FAILED:
+    case actionTypes.UPDATE_BUSINESS_FAILED: {
+      const payload = action.payload as {
+        message?: string;
+        issues?: Record<string, string>;
+      };
       return {
         ...state,
-        isBusinessUpdateLoading: false,
-        error: action.payload?.message ?? "Update failed.",
-        validationIssues: action.payload?.issues ?? {},
+        business:
+          state.business && state.businessRollback
+            ? { ...state.business, ...state.businessRollback }
+            : state.business,
+        businessRollback: null,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
+        error: payload?.message ?? "Update failed.",
+        validationIssues: payload?.issues ?? {},
       };
+    }
 
     case actionTypes.CLEAR_VALIDATION_ISSUES:
       return { ...state, validationIssues: {}, error: null };

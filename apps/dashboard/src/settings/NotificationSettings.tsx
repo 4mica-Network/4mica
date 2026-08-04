@@ -1,16 +1,15 @@
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateNotifications } from "@stores/user/actions";
 import {
-  selectIsUpdating,
+  selectIsSectionSaving,
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
 import type { NotificationPlacement } from "@stores/user/type";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Field, FormSection, Select, Toggle } from "@/components/form";
-import { SettingsForm } from "./SettingsForm";
-import { useSettingsForm } from "./useSettingsForm";
+import { Select, SettingRow, SwitchRow } from "@/components/form";
+import { InstantCard } from "./EditableCard";
+import { SettingsPage } from "./SettingsPage";
 
 const PLACEMENTS = [
   { label: "Top left", value: "topLeft" },
@@ -23,120 +22,117 @@ export function NotificationSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
-  const isSaving = useAppSelector(selectIsUpdating);
   const issues = useAppSelector(selectValidationIssues);
+  const savingChannels = useAppSelector(selectIsSectionSaving("channels"));
+  const savingEmails = useAppSelector(selectIsSectionSaving("emails"));
+  const savingLegal = useAppSelector(selectIsSectionSaving("legal"));
 
-  const initial = useMemo(
-    () =>
-      user
-        ? {
-            allowNotification: user.allowNotification,
-            allowSMS: user.allowSMS,
-            notificationPlacement: user.notificationPlacement,
-            allowMonthlyEmails: user.allowMonthlyEmails,
-            allowInviteAcceptedEmails: user.allowInviteAcceptedEmails,
-            allowChangelogNewsletterEmails: user.allowChangelogNewsletterEmails,
-            allowMarketingOnboardingEmails: user.allowMarketingOnboardingEmails,
-            allowPrivacyLegalEmails: user.allowPrivacyLegalEmails,
-            allowDpaEmails: user.allowDpaEmails,
-          }
-        : null,
-    [user],
-  );
+  const set = (
+    key: string,
+    value: boolean | NotificationPlacement,
+    section: string,
+  ) => dispatch(updateNotifications({ [key]: value }, section));
 
-  const { draft, set, isDirty, changes, reset } = useSettingsForm(initial);
+  if (!user) {
+    return null;
+  }
 
   return (
-    <SettingsForm
+    <SettingsPage
       titleKey="page.settings.notifications.title"
       descriptionKey="page.settings.notifications.description"
-      isDirty={isDirty}
-      isSaving={isSaving}
-      onSubmit={() => dispatch(updateNotifications(changes))}
-      onReset={reset}
     >
-      {draft && (
-        <>
-          <FormSection title={t("settings.notifications.channels")}>
-            <Toggle
-              id="notif-enabled"
-              label={t("settings.notifications.inApp")}
-              description={t("settings.notifications.inAppHint")}
-              checked={draft.allowNotification}
-              onChange={(v) => set("allowNotification", v)}
-            />
-            <Toggle
-              id="notif-sms"
-              label={t("settings.notifications.sms")}
-              checked={draft.allowSMS}
-              onChange={(v) => set("allowSMS", v)}
-            />
-            <Field
-              label={t("settings.notifications.placement")}
-              htmlFor="notif-placement"
-              error={issues.notificationPlacement}
-            >
-              <Select
-                id="notif-placement"
-                value={draft.notificationPlacement}
-                options={PLACEMENTS}
-                disabled={!draft.allowNotification}
-                onChange={(v) =>
-                  set("notificationPlacement", v as NotificationPlacement)
-                }
-              />
-            </Field>
-          </FormSection>
+      <InstantCard
+        title={t("settings.notifications.channels")}
+        description={t("settings.notifications.channelsHint")}
+        isSaving={savingChannels}
+      >
+        <SwitchRow
+          id="notif-enabled"
+          title={t("settings.notifications.inApp")}
+          description={t("settings.notifications.inAppHint")}
+          checked={user.allowNotification}
+          onToggle={(v) => set("allowNotification", v, "channels")}
+        />
+        <SwitchRow
+          id="notif-sms"
+          title={t("settings.notifications.sms")}
+          description={t("settings.notifications.smsHint")}
+          checked={user.allowSMS}
+          onToggle={(v) => set("allowSMS", v, "channels")}
+        />
+        <SettingRow
+          title={t("settings.notifications.placement")}
+          description={t("settings.notifications.placementHint")}
+          htmlFor="notif-placement"
+          error={issues.notificationPlacement}
+        >
+          <Select
+            id="notif-placement"
+            value={user.notificationPlacement}
+            options={PLACEMENTS}
+            disabled={!user.allowNotification}
+            onChange={(v) =>
+              set(
+                "notificationPlacement",
+                v as NotificationPlacement,
+                "channels",
+              )
+            }
+          />
+        </SettingRow>
+      </InstantCard>
 
-          <FormSection
-            title={t("settings.notifications.emails")}
-            description={t("settings.notifications.emailsHint")}
-          >
-            <Toggle
-              id="notif-monthly"
-              label={t("settings.notifications.monthly")}
-              checked={draft.allowMonthlyEmails}
-              onChange={(v) => set("allowMonthlyEmails", v)}
-            />
-            <Toggle
-              id="notif-invite"
-              label={t("settings.notifications.invites")}
-              checked={draft.allowInviteAcceptedEmails}
-              onChange={(v) => set("allowInviteAcceptedEmails", v)}
-            />
-            <Toggle
-              id="notif-changelog"
-              label={t("settings.notifications.changelog")}
-              checked={draft.allowChangelogNewsletterEmails}
-              onChange={(v) => set("allowChangelogNewsletterEmails", v)}
-            />
-            <Toggle
-              id="notif-marketing"
-              label={t("settings.notifications.marketing")}
-              checked={draft.allowMarketingOnboardingEmails}
-              onChange={(v) => set("allowMarketingOnboardingEmails", v)}
-            />
-          </FormSection>
+      <InstantCard
+        title={t("settings.notifications.emails")}
+        description={t("settings.notifications.emailsHint")}
+        isSaving={savingEmails}
+      >
+        <SwitchRow
+          id="notif-monthly"
+          title={t("settings.notifications.monthly")}
+          description={t("settings.notifications.monthlyHint")}
+          checked={user.allowMonthlyEmails}
+          onToggle={(v) => set("allowMonthlyEmails", v, "emails")}
+        />
+        <SwitchRow
+          id="notif-invite"
+          title={t("settings.notifications.invites")}
+          checked={user.allowInviteAcceptedEmails}
+          onToggle={(v) => set("allowInviteAcceptedEmails", v, "emails")}
+        />
+        <SwitchRow
+          id="notif-changelog"
+          title={t("settings.notifications.changelog")}
+          checked={user.allowChangelogNewsletterEmails}
+          onToggle={(v) => set("allowChangelogNewsletterEmails", v, "emails")}
+        />
+        <SwitchRow
+          id="notif-marketing"
+          title={t("settings.notifications.marketing")}
+          checked={user.allowMarketingOnboardingEmails}
+          onToggle={(v) => set("allowMarketingOnboardingEmails", v, "emails")}
+        />
+      </InstantCard>
 
-          <FormSection
-            title={t("settings.notifications.legal")}
-            description={t("settings.notifications.legalHint")}
-          >
-            <Toggle
-              id="notif-privacy"
-              label={t("settings.notifications.privacy")}
-              checked={draft.allowPrivacyLegalEmails}
-              onChange={(v) => set("allowPrivacyLegalEmails", v)}
-            />
-            <Toggle
-              id="notif-dpa"
-              label={t("settings.notifications.dpa")}
-              checked={draft.allowDpaEmails}
-              onChange={(v) => set("allowDpaEmails", v)}
-            />
-          </FormSection>
-        </>
-      )}
-    </SettingsForm>
+      <InstantCard
+        title={t("settings.notifications.legal")}
+        description={t("settings.notifications.legalHint")}
+        isSaving={savingLegal}
+      >
+        <SwitchRow
+          id="notif-privacy"
+          title={t("settings.notifications.privacy")}
+          checked={user.allowPrivacyLegalEmails}
+          onToggle={(v) => set("allowPrivacyLegalEmails", v, "legal")}
+        />
+        <SwitchRow
+          id="notif-dpa"
+          title={t("settings.notifications.dpa")}
+          checked={user.allowDpaEmails}
+          onToggle={(v) => set("allowDpaEmails", v, "legal")}
+        />
+      </InstantCard>
+    </SettingsPage>
   );
 }

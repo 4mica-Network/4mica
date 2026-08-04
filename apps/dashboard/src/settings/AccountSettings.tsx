@@ -1,22 +1,22 @@
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateAccount } from "@stores/user/actions";
 import {
-  selectIsUpdating,
+  selectIsSectionSaving,
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Field,
-  FormSection,
   Select,
+  SettingRow,
+  SwitchRow,
   TextInput,
-  Toggle,
   VerifiedBadge,
 } from "@/components/form";
-import { SettingsForm } from "./SettingsForm";
-import { useSettingsForm } from "./useSettingsForm";
+import { EditableCard, InstantCard } from "./EditableCard";
+import { SettingsPage } from "./SettingsPage";
+import { useDraft } from "./useDraft";
 
 const THEMES = [
   { label: "Dark", value: "dark" },
@@ -54,162 +54,187 @@ export function AccountSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
-  const isSaving = useAppSelector(selectIsUpdating);
   const issues = useAppSelector(selectValidationIssues);
+  const savingContact = useAppSelector(selectIsSectionSaving("contact"));
+  const savingPreferences = useAppSelector(
+    selectIsSectionSaving("preferences"),
+  );
+  const savingSecurity = useAppSelector(selectIsSectionSaving("security"));
 
-  const initial = useMemo(
-    () =>
-      user
-        ? {
-            email: user.email ?? "",
-            phoneNumber: user.phoneNumber ?? "",
-            theme: user.theme,
-            appTheme: user.appTheme,
-            language: user.language,
-            timeZone: user.timeZone,
-            defaultHome: user.defaultHome,
-            privacyMode: user.privacyMode,
-            twoFactorEnabled: user.twoFactorEnabled,
-          }
-        : null,
+  const contactInitial = useMemo(
+    () => ({
+      email: user?.email ?? "",
+      phoneNumber: user?.phoneNumber ?? "",
+    }),
     [user],
   );
 
-  const { draft, set, isDirty, changes, reset } = useSettingsForm(initial);
+  const contact = useDraft(contactInitial);
 
-  const submit = () =>
+  const set = (key: string, value: string | boolean, section: string) =>
+    dispatch(updateAccount({ [key]: value }, section));
+
+  const saveContact = () =>
     dispatch(
-      updateAccount({
-        ...changes,
-        ...(changes.phoneNumber !== undefined
-          ? {
-              phoneNumber:
-                changes.phoneNumber === "" ? null : changes.phoneNumber,
-            }
-          : {}),
-      }),
+      updateAccount(
+        {
+          ...contact.changes,
+          ...(contact.changes.phoneNumber !== undefined
+            ? {
+                phoneNumber:
+                  contact.changes.phoneNumber === ""
+                    ? null
+                    : contact.changes.phoneNumber,
+              }
+            : {}),
+        },
+        "contact",
+      ),
     );
 
+  if (!user) {
+    return null;
+  }
+
   return (
-    <SettingsForm
+    <SettingsPage
       titleKey="page.settings.account.title"
       descriptionKey="page.settings.account.description"
-      isDirty={isDirty}
-      isSaving={isSaving}
-      onSubmit={submit}
-      onReset={reset}
     >
-      {draft && (
-        <>
-          <FormSection title={t("settings.account.credentials")}>
-            <Field
-              label={t("settings.account.email")}
-              htmlFor="account-email"
-              error={issues.email}
-            >
-              <div className="flex items-center gap-2">
-                <TextInput
-                  id="account-email"
-                  type="email"
-                  value={draft.email}
-                  invalid={Boolean(issues.email)}
-                  onChange={(v) => set("email", v)}
-                />
-                <VerifiedBadge verified={Boolean(user?.emailVerified)} />
-              </div>
-            </Field>
-
-            <Field
-              label={t("settings.account.phone")}
-              htmlFor="account-phone"
-              error={issues.phoneNumber}
-            >
-              <div className="flex items-center gap-2">
-                <TextInput
-                  id="account-phone"
-                  value={draft.phoneNumber}
-                  placeholder="+1 555 000 1234"
-                  invalid={Boolean(issues.phoneNumber)}
-                  onChange={(v) => set("phoneNumber", v)}
-                />
-                <VerifiedBadge verified={Boolean(user?.phoneNumberVerified)} />
-              </div>
-            </Field>
-          </FormSection>
-
-          <FormSection title={t("settings.account.preferences")}>
-            <Field label={t("settings.account.theme")} htmlFor="account-theme">
-              <Select
-                id="account-theme"
-                value={draft.theme}
-                options={THEMES}
-                onChange={(v) => set("theme", v)}
-              />
-            </Field>
-            <Field
-              label={t("settings.account.appTheme")}
-              htmlFor="account-app-theme"
-            >
-              <Select
-                id="account-app-theme"
-                value={draft.appTheme}
-                options={THEMES}
-                onChange={(v) => set("appTheme", v)}
-              />
-            </Field>
-            <Field
-              label={t("settings.account.language")}
-              htmlFor="account-language"
-            >
-              <Select
-                id="account-language"
-                value={draft.language}
-                options={LANGUAGES}
-                onChange={(v) => set("language", v)}
-              />
-            </Field>
-            <Field
-              label={t("settings.account.timeZone")}
-              htmlFor="account-timezone"
-            >
-              <Select
-                id="account-timezone"
-                value={draft.timeZone}
-                options={TIMEZONES}
-                onChange={(v) => set("timeZone", v)}
-              />
-            </Field>
-            <Field
-              label={t("settings.account.defaultHome")}
-              htmlFor="account-home"
-            >
-              <Select
-                id="account-home"
-                value={draft.defaultHome}
-                options={HOMES}
-                onChange={(v) => set("defaultHome", v)}
-              />
-            </Field>
-          </FormSection>
-
-          <FormSection title={t("settings.account.security")}>
-            <Toggle
-              id="account-privacy-mode"
-              label={t("settings.account.privacyMode")}
-              description={t("settings.account.privacyModeHint")}
-              checked={draft.privacyMode}
-              onChange={(v) => set("privacyMode", v)}
+      <EditableCard
+        title={t("settings.account.credentials")}
+        description={t("settings.account.credentialsHint")}
+        isDirty={contact.isDirty}
+        isSaving={savingContact}
+        onSave={saveContact}
+        onReset={contact.reset}
+      >
+        <SettingRow
+          title={t("settings.account.email")}
+          htmlFor="account-email"
+          error={issues.email}
+        >
+          <div className="flex items-center gap-2">
+            <TextInput
+              id="account-email"
+              type="email"
+              value={contact.draft.email}
+              invalid={Boolean(issues.email)}
+              onChange={(v) => contact.set("email", v)}
             />
-            <Toggle
-              id="account-2fa"
-              label={t("settings.account.twoFactor")}
-              description={t("settings.account.twoFactorHint")}
-              checked={draft.twoFactorEnabled}
-              onChange={(v) => set("twoFactorEnabled", v)}
+            <VerifiedBadge
+              verified={user.emailVerified}
+              labels={{
+                yes: t("settings.verified"),
+                no: t("settings.unverified"),
+              }}
             />
-          </FormSection>
-        </>
-      )}
-    </SettingsForm>
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          title={t("settings.account.phone")}
+          htmlFor="account-phone"
+          error={issues.phoneNumber}
+        >
+          <div className="flex items-center gap-2">
+            <TextInput
+              id="account-phone"
+              value={contact.draft.phoneNumber}
+              placeholder="+1 555 000 1234"
+              invalid={Boolean(issues.phoneNumber)}
+              onChange={(v) => contact.set("phoneNumber", v)}
+            />
+            <VerifiedBadge
+              verified={user.phoneNumberVerified}
+              labels={{
+                yes: t("settings.verified"),
+                no: t("settings.unverified"),
+              }}
+            />
+          </div>
+        </SettingRow>
+      </EditableCard>
+
+      <InstantCard
+        title={t("settings.account.preferences")}
+        description={t("settings.account.preferencesHint")}
+        isSaving={savingPreferences}
+      >
+        <SettingRow
+          title={t("settings.account.appTheme")}
+          htmlFor="account-app-theme"
+        >
+          <Select
+            id="account-app-theme"
+            value={user.appTheme}
+            options={THEMES}
+            onChange={(v) => set("appTheme", v, "preferences")}
+          />
+        </SettingRow>
+        <SettingRow title={t("settings.account.theme")} htmlFor="account-theme">
+          <Select
+            id="account-theme"
+            value={user.theme}
+            options={THEMES}
+            onChange={(v) => set("theme", v, "preferences")}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.account.language")}
+          htmlFor="account-language"
+        >
+          <Select
+            id="account-language"
+            value={user.language}
+            options={LANGUAGES}
+            onChange={(v) => set("language", v, "preferences")}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.account.timeZone")}
+          htmlFor="account-timezone"
+        >
+          <Select
+            id="account-timezone"
+            value={user.timeZone}
+            options={TIMEZONES}
+            onChange={(v) => set("timeZone", v, "preferences")}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.account.defaultHome")}
+          description={t("settings.account.defaultHomeHint")}
+          htmlFor="account-home"
+        >
+          <Select
+            id="account-home"
+            value={user.defaultHome}
+            options={HOMES}
+            onChange={(v) => set("defaultHome", v, "preferences")}
+          />
+        </SettingRow>
+      </InstantCard>
+
+      <InstantCard
+        title={t("settings.account.security")}
+        isSaving={savingSecurity}
+      >
+        <SwitchRow
+          id="account-privacy-mode"
+          title={t("settings.account.privacyMode")}
+          description={t("settings.account.privacyModeHint")}
+          checked={user.privacyMode}
+          onToggle={(v) => set("privacyMode", v, "security")}
+        />
+        <SwitchRow
+          id="account-2fa"
+          title={t("settings.account.twoFactor")}
+          description={t("settings.account.twoFactorHint")}
+          checked={user.twoFactorEnabled}
+          onToggle={(v) => set("twoFactorEnabled", v, "security")}
+        />
+      </InstantCard>
+    </SettingsPage>
   );
 }

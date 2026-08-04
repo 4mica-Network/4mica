@@ -107,7 +107,9 @@ export const upsertBusiness = async (
 ) =>
   prisma.business.upsert({
     where: { ownerId: userId },
-    create: { ownerId: userId, legalName: "", ...data },
+    // ownerId is written after the spread so a payload can never reassign the
+    // row to someone else, independently of what the schema happens to strip.
+    create: { legalName: "", ...data, ownerId: userId },
     update: data,
     select: BUSINESS_SELECT,
   });

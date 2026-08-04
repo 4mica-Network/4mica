@@ -24,7 +24,30 @@ const USER_FIELDS = {
   email: true,
   name: true,
   avatarUrl: true,
+  banned: true,
+  locked: true,
+  deletedAt: true,
 } as const;
+
+type UserRow = {
+  id: string;
+  clerkUserId: string;
+  email: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+  banned: boolean;
+  locked: boolean;
+  deletedAt: Date | null;
+};
+
+const toAuthUser = (row: UserRow): AuthUser => ({
+  id: row.id,
+  clerkUserId: row.clerkUserId,
+  email: row.email,
+  name: row.name,
+  avatarUrl: row.avatarUrl,
+  disabled: row.banned || row.locked || row.deletedAt !== null,
+});
 
 const fetchProfile = async (identity: AuthIdentity): Promise<AuthIdentity> => {
   try {
@@ -58,27 +81,33 @@ const runUpsert = async (
   identity: AuthIdentity,
   withEmail: boolean,
 ): Promise<AuthUser> =>
-  prisma.user.upsert({
-    where: { clerkUserId: identity.clerkUserId },
-    create: {
-      clerkUserId: identity.clerkUserId,
-      ...(withEmail && identity.email !== null
-        ? { email: identity.email }
-        : {}),
-      ...(identity.name !== null ? { name: identity.name } : {}),
-      ...(identity.avatarUrl !== null ? { avatarUrl: identity.avatarUrl } : {}),
-    },
-    update: {
-      ...(withEmail && identity.email !== null
-        ? { email: identity.email }
-        : {}),
-      ...(identity.name !== null ? { name: identity.name } : {}),
-      ...(identity.avatarUrl !== null ? { avatarUrl: identity.avatarUrl } : {}),
-      lastSeenAt: new Date(),
-      lastLogin: new Date(),
-    },
-    select: USER_FIELDS,
-  });
+  toAuthUser(
+    await prisma.user.upsert({
+      where: { clerkUserId: identity.clerkUserId },
+      create: {
+        clerkUserId: identity.clerkUserId,
+        ...(withEmail && identity.email !== null
+          ? { email: identity.email }
+          : {}),
+        ...(identity.name !== null ? { name: identity.name } : {}),
+        ...(identity.avatarUrl !== null
+          ? { avatarUrl: identity.avatarUrl }
+          : {}),
+      },
+      update: {
+        ...(withEmail && identity.email !== null
+          ? { email: identity.email }
+          : {}),
+        ...(identity.name !== null ? { name: identity.name } : {}),
+        ...(identity.avatarUrl !== null
+          ? { avatarUrl: identity.avatarUrl }
+          : {}),
+        lastSeenAt: new Date(),
+        lastLogin: new Date(),
+      },
+      select: USER_FIELDS,
+    }),
+  );
 
 const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
   try {
