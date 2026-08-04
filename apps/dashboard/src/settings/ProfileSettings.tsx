@@ -9,13 +9,14 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Card,
-  SettingRow,
-  SwitchRow,
+  FieldRow,
+  SettingsSection,
+  SwitchCard,
   TextArea,
   TextInput,
   VerifiedBadge,
 } from "@/components/form";
-import { EditableCard, InstantCard } from "./EditableCard";
+import { EditableCard } from "./EditableCard";
 import { SettingsPage } from "./SettingsPage";
 import { useDraft } from "./useDraft";
 
@@ -24,10 +25,24 @@ export function ProfileSettings() {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
   const issues = useAppSelector(selectValidationIssues);
+
   const savingIdentity = useAppSelector(selectIsSectionSaving("identity"));
-  const savingVisibility = useAppSelector(selectIsSectionSaving("visibility"));
-  const savingBranding = useAppSelector(selectIsSectionSaving("branding"));
   const savingColors = useAppSelector(selectIsSectionSaving("colors"));
+  const savingPrivate = useAppSelector(selectIsSectionSaving("private"));
+  const savingHidden = useAppSelector(selectIsSectionSaving("hidden"));
+  const savingSeo = useAppSelector(selectIsSectionSaving("allowSEOIndexing"));
+  const savingEmailVis = useAppSelector(
+    selectIsSectionSaving("allowEmailVisibility"),
+  );
+  const savingPhoneVis = useAppSelector(
+    selectIsSectionSaving("allowPhoneNumberVisibility"),
+  );
+  const savingCustomBrand = useAppSelector(
+    selectIsSectionSaving("allowCustomBrandColor"),
+  );
+  const savingDisableBranding = useAppSelector(
+    selectIsSectionSaving("disableBranding"),
+  );
 
   const identityInitial = useMemo(
     () => ({
@@ -50,8 +65,8 @@ export function ProfileSettings() {
   const identity = useDraft(identityInitial);
   const colors = useDraft(colorsInitial);
 
-  const toggle = (key: string, value: boolean, section: string) =>
-    dispatch(updateProfile({ [key]: value }, section));
+  const toggle = (key: string, value: boolean) =>
+    dispatch(updateProfile({ [key]: value }, key));
 
   const saveIdentity = () =>
     dispatch(
@@ -75,178 +90,192 @@ export function ProfileSettings() {
       titleKey="page.settings.profile.title"
       descriptionKey="page.settings.profile.description"
     >
-      <Card className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="font-semibold text-ink-strong text-sm">
-            {t("settings.profile.accountStatus")}
-          </h3>
-          <p className="mt-0.5 text-ink-muted text-xs">
-            {t("settings.profile.accountStatusHint")}
-          </p>
-        </div>
-        <VerifiedBadge
-          verified={user.verified}
-          labels={{ yes: t("settings.verified"), no: t("settings.unverified") }}
-        />
-      </Card>
-
-      <EditableCard
+      <SettingsSection
         title={t("settings.profile.identity")}
         description={t("settings.profile.identityHint")}
-        isDirty={identity.isDirty}
-        isSaving={savingIdentity}
-        onSave={saveIdentity}
-        onReset={identity.reset}
       >
-        <SettingRow
-          title={t("settings.profile.name")}
-          htmlFor="profile-name"
-          error={issues.name}
-        >
-          <TextInput
-            id="profile-name"
-            value={identity.draft.name}
-            invalid={Boolean(issues.name)}
-            onChange={(v) => identity.set("name", v)}
+        <Card className="flex items-center justify-between gap-4">
+          <div>
+            <span className="font-medium text-ink-strong text-sm">
+              {t("settings.profile.accountStatus")}
+            </span>
+            <p className="mt-0.5 text-ink-muted text-xs">
+              {t("settings.profile.accountStatusHint")}
+            </p>
+          </div>
+          <VerifiedBadge
+            verified={user.verified}
+            labels={{
+              yes: t("settings.verified"),
+              no: t("settings.unverified"),
+            }}
           />
-        </SettingRow>
+        </Card>
 
-        <SettingRow
-          title={t("settings.profile.username")}
-          description={t("settings.profile.usernameHint")}
-          htmlFor="profile-username"
-          error={issues.username}
+        <EditableCard
+          isDirty={identity.isDirty}
+          isSaving={savingIdentity}
+          onSave={saveIdentity}
+          onReset={identity.reset}
         >
-          <TextInput
-            id="profile-username"
-            value={identity.draft.username}
-            invalid={Boolean(issues.username)}
-            onChange={(v) => identity.set("username", v.toLowerCase())}
-          />
-        </SettingRow>
+          <FieldRow
+            title={t("settings.profile.name")}
+            description={t("settings.profile.nameHint")}
+            htmlFor="profile-name"
+          >
+            <TextInput
+              id="profile-name"
+              value={identity.draft.name}
+              error={issues.name}
+              onChange={(v) => identity.set("name", v)}
+            />
+          </FieldRow>
 
-        <SettingRow
-          title={t("settings.profile.bio")}
-          htmlFor="profile-bio"
-          error={issues.bio}
-        >
-          <TextArea
-            id="profile-bio"
-            value={identity.draft.bio}
-            invalid={Boolean(issues.bio)}
-            onChange={(v) => identity.set("bio", v)}
-          />
-        </SettingRow>
+          <FieldRow
+            title={t("settings.profile.username")}
+            description={t("settings.profile.usernameHint")}
+            htmlFor="profile-username"
+          >
+            <TextInput
+              id="profile-username"
+              value={identity.draft.username}
+              error={issues.username}
+              format="lowercase"
+              onChange={(v) => identity.set("username", v)}
+            />
+          </FieldRow>
 
-        <SettingRow
-          title={t("settings.profile.description")}
-          htmlFor="profile-description"
-          error={issues.description}
-        >
-          <TextArea
-            id="profile-description"
-            value={identity.draft.description}
-            invalid={Boolean(issues.description)}
-            onChange={(v) => identity.set("description", v)}
-          />
-        </SettingRow>
-      </EditableCard>
+          <FieldRow
+            title={t("settings.profile.bio")}
+            description={t("settings.profile.bioHint")}
+            htmlFor="profile-bio"
+          >
+            <TextArea
+              id="profile-bio"
+              value={identity.draft.bio}
+              error={issues.bio}
+              onChange={(v) => identity.set("bio", v)}
+            />
+          </FieldRow>
 
-      <InstantCard
+          <FieldRow
+            title={t("settings.profile.description")}
+            description={t("settings.profile.descriptionHint")}
+            htmlFor="profile-description"
+          >
+            <TextArea
+              id="profile-description"
+              value={identity.draft.description}
+              error={issues.description}
+              onChange={(v) => identity.set("description", v)}
+            />
+          </FieldRow>
+        </EditableCard>
+      </SettingsSection>
+
+      <SettingsSection
         title={t("settings.profile.visibility")}
         description={t("settings.profile.visibilityHint")}
-        isSaving={savingVisibility}
       >
-        <SwitchRow
+        <SwitchCard
           id="profile-private"
           title={t("settings.profile.private")}
           description={t("settings.profile.privateHint")}
           checked={user.private}
-          onToggle={(v) => toggle("private", v, "visibility")}
+          isSaving={savingPrivate}
+          onToggle={(v) => toggle("private", v)}
         />
-        <SwitchRow
+        <SwitchCard
           id="profile-hidden"
           title={t("settings.profile.hidden")}
+          description={t("settings.profile.hiddenHint")}
           checked={user.hidden}
-          onToggle={(v) => toggle("hidden", v, "visibility")}
+          isSaving={savingHidden}
+          onToggle={(v) => toggle("hidden", v)}
         />
-        <SwitchRow
+        <SwitchCard
           id="profile-seo"
           title={t("settings.profile.seo")}
+          description={t("settings.profile.seoHint")}
           checked={user.allowSEOIndexing}
-          onToggle={(v) => toggle("allowSEOIndexing", v, "visibility")}
+          isSaving={savingSeo}
+          onToggle={(v) => toggle("allowSEOIndexing", v)}
         />
-        <SwitchRow
+        <SwitchCard
           id="profile-email-visibility"
           title={t("settings.profile.emailVisibility")}
+          description={t("settings.profile.emailVisibilityHint")}
           checked={user.allowEmailVisibility}
-          onToggle={(v) => toggle("allowEmailVisibility", v, "visibility")}
+          isSaving={savingEmailVis}
+          onToggle={(v) => toggle("allowEmailVisibility", v)}
         />
-        <SwitchRow
+        <SwitchCard
           id="profile-phone-visibility"
           title={t("settings.profile.phoneVisibility")}
+          description={t("settings.profile.phoneVisibilityHint")}
           checked={user.allowPhoneNumberVisibility}
-          onToggle={(v) =>
-            toggle("allowPhoneNumberVisibility", v, "visibility")
-          }
+          isSaving={savingPhoneVis}
+          onToggle={(v) => toggle("allowPhoneNumberVisibility", v)}
         />
-      </InstantCard>
+      </SettingsSection>
 
-      <InstantCard
+      <SettingsSection
         title={t("settings.profile.branding")}
-        isSaving={savingBranding}
+        description={t("settings.profile.brandingHint")}
       >
-        <SwitchRow
+        <SwitchCard
           id="profile-custom-brand"
           title={t("settings.profile.customBrand")}
+          description={t("settings.profile.customBrandHint")}
           checked={user.allowCustomBrandColor}
-          onToggle={(v) => toggle("allowCustomBrandColor", v, "branding")}
+          isSaving={savingCustomBrand}
+          onToggle={(v) => toggle("allowCustomBrandColor", v)}
         />
-        <SwitchRow
+        <SwitchCard
           id="profile-disable-branding"
           title={t("settings.profile.disableBranding")}
+          description={t("settings.profile.disableBrandingHint")}
           checked={user.disableBranding}
-          onToggle={(v) => toggle("disableBranding", v, "branding")}
+          isSaving={savingDisableBranding}
+          onToggle={(v) => toggle("disableBranding", v)}
         />
-      </InstantCard>
 
-      {user.allowCustomBrandColor && (
-        <EditableCard
-          title={t("settings.profile.brandColors")}
-          description={t("settings.profile.colorHint")}
-          isDirty={colors.isDirty}
-          isSaving={savingColors}
-          onSave={() => dispatch(updateProfile(colors.changes, "colors"))}
-          onReset={colors.reset}
-        >
-          <SettingRow
-            title={t("settings.profile.primaryColor")}
-            htmlFor="profile-primary-color"
-            error={issues.primaryBrandColor}
+        {user.allowCustomBrandColor && (
+          <EditableCard
+            isDirty={colors.isDirty}
+            isSaving={savingColors}
+            onSave={() => dispatch(updateProfile(colors.changes, "colors"))}
+            onReset={colors.reset}
           >
-            <TextInput
-              id="profile-primary-color"
-              value={colors.draft.primaryBrandColor}
-              placeholder="#4f46e5"
-              invalid={Boolean(issues.primaryBrandColor)}
-              onChange={(v) => colors.set("primaryBrandColor", v)}
-            />
-          </SettingRow>
-          <SettingRow
-            title={t("settings.profile.secondaryColor")}
-            htmlFor="profile-secondary-color"
-            error={issues.secondaryBrandColor}
-          >
-            <TextInput
-              id="profile-secondary-color"
-              value={colors.draft.secondaryBrandColor}
-              placeholder="#0ea5e9"
-              invalid={Boolean(issues.secondaryBrandColor)}
-              onChange={(v) => colors.set("secondaryBrandColor", v)}
-            />
-          </SettingRow>
-        </EditableCard>
-      )}
+            <FieldRow
+              title={t("settings.profile.primaryColor")}
+              description={t("settings.profile.primaryColorHint")}
+              htmlFor="profile-primary-color"
+            >
+              <TextInput
+                id="profile-primary-color"
+                value={colors.draft.primaryBrandColor}
+                placeholder="#4f46e5"
+                error={issues.primaryBrandColor}
+                onChange={(v) => colors.set("primaryBrandColor", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              title={t("settings.profile.secondaryColor")}
+              description={t("settings.profile.secondaryColorHint")}
+              htmlFor="profile-secondary-color"
+            >
+              <TextInput
+                id="profile-secondary-color"
+                value={colors.draft.secondaryBrandColor}
+                placeholder="#0ea5e9"
+                error={issues.secondaryBrandColor}
+                onChange={(v) => colors.set("secondaryBrandColor", v)}
+              />
+            </FieldRow>
+          </EditableCard>
+        )}
+      </SettingsSection>
     </SettingsPage>
   );
 }

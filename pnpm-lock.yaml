@@ -198,6 +198,9 @@ catalogs:
     react-router-dom:
       specifier: ^7.18.1
       version: 7.18.1
+    react-toastify:
+      specifier: ^11.1.0
+      version: 11.1.0
     read-pkg:
       specifier: ^10.1.0
       version: 10.1.0
@@ -462,6 +465,9 @@ importers:
       react-router-dom:
         specifier: 'catalog:'
         version: 7.18.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react-toastify:
+        specifier: 'catalog:'
+        version: 11.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       redux:
         specifier: 'catalog:'
         version: 5.0.1
@@ -1215,6 +1221,9 @@ importers:
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.23.0(react@19.2.7)
       tailwind-merge:
         specifier: 'catalog:'
         version: 3.6.0
@@ -1258,9 +1267,6 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.16)
-      lucide-react:
-        specifier: 'catalog:'
-        version: 1.23.0(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -7037,6 +7043,12 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
+
+  react-toastify@11.1.0:
+    resolution: {integrity: sha512-e9h23x3phN0wbFeB6yovmWp7lobzV4CaCH0LO8nVP6H7Y+3GbcLpIzMm9dJhcp1RXbpyfvjgpfXqO80QAmn7sg==}
+    peerDependencies:
+      react: ^18 || ^19
+      react-dom: ^18 || ^19
 
   react@19.2.7:
     resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
@@ -14207,6 +14219,12 @@ snapshots:
       react: 19.2.7
       set-cookie-parser: 2.7.2
     optionalDependencies:
+      react-dom: 19.2.7(react@19.2.7)
+
+  react-toastify@11.1.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      clsx: 2.1.1
+      react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
   react@19.2.7: {}

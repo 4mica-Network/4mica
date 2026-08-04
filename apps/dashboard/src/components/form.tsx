@@ -1,6 +1,8 @@
-import { cn } from "@4mica/ui";
+import { cn, InputField, Switch } from "@4mica/ui";
 import { Check, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+
+export { Switch };
 
 export function Card({
   className,
@@ -12,12 +14,33 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-lg border border-overlay/10 bg-surface p-5",
+        "rounded-lg border border-overlay/10 bg-surface px-6 py-5",
         className,
       )}
     >
       {children}
     </div>
+  );
+}
+
+/** Heading and blurb that sit above a group of cards, outside their borders. */
+export function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col">
+      <h3 className="font-semibold text-base text-ink-strong">{title}</h3>
+      {description && (
+        <p className="mt-1 text-ink-muted text-sm">{description}</p>
+      )}
+      <div className="mt-4 flex flex-col gap-3">{children}</div>
+    </section>
   );
 }
 
@@ -35,19 +58,18 @@ export function CardHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h3 className="font-semibold text-ink-strong text-sm">{title}</h3>
+        <h4 className="font-semibold text-ink-strong text-sm">{title}</h4>
         {description && (
           <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {isSaving && (
-          <span
-            className="flex items-center gap-1.5 text-ink-subtle text-xs"
+          <Loader2
+            className="h-3.5 w-3.5 animate-spin text-ink-subtle"
             role="status"
-          >
-            <Loader2 className="h-3 w-3 animate-spin" />
-          </span>
+            aria-label="Saving"
+          />
         )}
         {action}
       </div>
@@ -55,7 +77,32 @@ export function CardHeader({
   );
 }
 
-/** Label + description on the left, control on the right. */
+/** Label and description stacked above a full-width control. */
+export function FieldRow({
+  title,
+  description,
+  htmlFor,
+  children,
+}: {
+  title: string;
+  description?: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col py-3 first:pt-0 last:pb-0">
+      <label htmlFor={htmlFor} className="font-medium text-ink-strong text-sm">
+        {title}
+      </label>
+      {description && (
+        <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
+      )}
+      <div className="mt-2">{children}</div>
+    </div>
+  );
+}
+
+/** Label and description on the left, compact control on the right. */
 export function SettingRow({
   title,
   description,
@@ -70,7 +117,7 @@ export function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-overlay/10 border-t py-4 first:border-t-0 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 sm:pr-6">
         <label
           htmlFor={htmlFor}
@@ -92,8 +139,51 @@ export function SettingRow({
   );
 }
 
-const controlClass =
-  "h-9 w-full rounded-md border border-overlay/15 bg-transparent px-3 text-ink-body text-sm outline-none transition-colors placeholder:text-ink-subtle focus:border-overlay/40 disabled:opacity-50";
+/** A single toggle in its own card. */
+export function SwitchCard({
+  id,
+  title,
+  description,
+  checked,
+  onToggle,
+  disabled,
+  isSaving,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  checked: boolean;
+  onToggle: (checked: boolean) => void;
+  disabled?: boolean;
+  isSaving?: boolean;
+}) {
+  return (
+    <Card className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <span className="font-medium text-ink-strong text-sm">{title}</span>
+        {description && (
+          <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {isSaving && (
+          <Loader2
+            className="h-3.5 w-3.5 animate-spin text-ink-subtle"
+            role="status"
+            aria-label="Saving"
+          />
+        )}
+        <Switch
+          data-testid={id}
+          aria-label={title}
+          initialState={checked}
+          onToggle={onToggle}
+          disabled={disabled}
+        />
+      </div>
+    </Card>
+  );
+}
 
 export function TextInput({
   id,
@@ -102,7 +192,10 @@ export function TextInput({
   placeholder,
   type = "text",
   disabled,
-  invalid,
+  error,
+  prefix,
+  format,
+  maxLength,
 }: {
   id: string;
   value: string;
@@ -110,18 +203,23 @@ export function TextInput({
   placeholder?: string;
   type?: string;
   disabled?: boolean;
-  invalid?: boolean;
+  error?: string;
+  prefix?: string;
+  format?: "lowercase" | "uppercase";
+  maxLength?: number;
 }) {
   return (
-    <input
+    <InputField
       id={id}
       type={type}
       value={value}
       disabled={disabled}
       placeholder={placeholder}
-      aria-invalid={invalid || undefined}
+      error={error}
+      prefix={prefix}
+      format={format}
+      maxLength={maxLength}
       onChange={(e) => onChange(e.target.value)}
-      className={cn(controlClass, invalid && "border-danger")}
     />
   );
 }
@@ -133,7 +231,7 @@ export function TextArea({
   rows = 3,
   placeholder,
   disabled,
-  invalid,
+  error,
 }: {
   id: string;
   value: string;
@@ -141,25 +239,25 @@ export function TextArea({
   rows?: number;
   placeholder?: string;
   disabled?: boolean;
-  invalid?: boolean;
+  error?: string;
 }) {
   return (
-    <textarea
+    <InputField
+      variant="textarea"
       id={id}
       rows={rows}
       value={value}
       disabled={disabled}
       placeholder={placeholder}
-      aria-invalid={invalid || undefined}
+      error={error}
+      allowResizing
       onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        controlClass,
-        "h-auto resize-y py-2",
-        invalid && "border-danger",
-      )}
     />
   );
 }
+
+const selectClass =
+  "w-full rounded-lg border border-overlay/15 bg-transparent px-3 py-2.5 text-ink-body text-sm outline-none transition hover:border-overlay/30 focus:border-overlay/50 focus:ring-1 focus:ring-overlay/40 disabled:opacity-50";
 
 export function Select({
   id,
@@ -183,7 +281,7 @@ export function Select({
       disabled={disabled}
       aria-invalid={invalid || undefined}
       onChange={(e) => onChange(e.target.value)}
-      className={cn(controlClass, invalid && "border-danger")}
+      className={cn(selectClass, invalid && "border-danger")}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -191,78 +289,6 @@ export function Select({
         </option>
       ))}
     </select>
-  );
-}
-
-export function Switch({
-  id,
-  checked,
-  onToggle,
-  label,
-  disabled,
-}: {
-  id: string;
-  checked: boolean;
-  onToggle: (checked: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onToggle(!checked)}
-      className={cn(
-        "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
-        checked ? "bg-ink-strong" : "bg-overlay/20",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 h-4 w-4 rounded-full bg-surface-deep transition-transform",
-          checked ? "translate-x-4.5" : "translate-x-0.5",
-        )}
-      />
-    </button>
-  );
-}
-
-/** Toggle rendered as a full row — the common case on these pages. */
-export function SwitchRow({
-  id,
-  title,
-  description,
-  checked,
-  onToggle,
-  disabled,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-  checked: boolean;
-  onToggle: (checked: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-overlay/10 border-t py-4 first:border-t-0 first:pt-0 last:pb-0">
-      <div className="min-w-0">
-        <span className="font-medium text-ink-strong text-sm">{title}</span>
-        {description && (
-          <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
-        )}
-      </div>
-      <Switch
-        id={id}
-        label={title}
-        checked={checked}
-        onToggle={onToggle}
-        disabled={disabled}
-      />
-    </div>
   );
 }
 
@@ -276,7 +302,7 @@ export function VerifiedBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs",
         verified
           ? "bg-emerald-500/15 text-emerald-500"
           : "bg-overlay/10 text-ink-muted",

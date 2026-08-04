@@ -25,6 +25,7 @@
     "react-i18next": "catalog:",
     "react-redux": "catalog:",
     "react-router-dom": "catalog:",
+    "react-toastify": "catalog:",
     "redux": "catalog:",
     "redux-saga": "catalog:"
   },

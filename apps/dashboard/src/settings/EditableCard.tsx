@@ -13,7 +13,7 @@ export function EditableCard({
   onReset,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   isDirty: boolean;
   isSaving: boolean;
@@ -31,9 +31,16 @@ export function EditableCard({
   return (
     <Card>
       <form onSubmit={handleSubmit}>
-        <CardHeader title={title} description={description} />
-        <div className="mt-4">{children}</div>
-        <div className="mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t pt-4">
+        {title && (
+          <div className="mb-4">
+            <CardHeader title={title} description={description} />
+          </div>
+        )}
+
+        {children}
+
+        {/* -mx-6 cancels the card padding so the rule spans the full width. */}
+        <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
           <Button
             type="button"
             intent="ghost"
@@ -52,22 +59,30 @@ export function EditableCard({
   );
 }
 
-/** A card of toggles and selects, each saved the moment it changes. */
+/** A card of controls that each save the moment they change. */
 export function InstantCard({
   title,
   description,
   isSaving,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   isSaving: boolean;
   children: ReactNode;
 }) {
   return (
     <Card>
-      <CardHeader title={title} description={description} isSaving={isSaving} />
-      <div className="mt-2">{children}</div>
+      {title && (
+        <div className="mb-4">
+          <CardHeader
+            title={title}
+            description={description}
+            isSaving={isSaving}
+          />
+        </div>
+      )}
+      {children}
     </Card>
   );
 }

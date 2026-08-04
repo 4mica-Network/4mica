@@ -5,7 +5,9 @@ import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "@/App";
 import { ClerkAuthProvider } from "@/auth/ClerkAuthProvider";
+import { Notifications } from "@/components/Notifications";
 import "@/i18n";
+import "react-toastify/dist/ReactToastify.css";
 import "@/styles.css";
 
 const root = document.getElementById("root");
@@ -17,6 +19,7 @@ createRoot(root).render(
       <BrowserRouter>
         <ClerkAuthProvider>
           <App />
+          <Notifications />
         </ClerkAuthProvider>
       </BrowserRouter>
     </Provider>
