@@ -39,7 +39,7 @@ pnpm --filter @4mica/web test -- -t "test name"
 Database (all Prisma commands run with cwd `packages/db`):
 
 ```bash
-pnpm db:up        # start local Postgres (apps/be/docker-compose.yml)
+pnpm db:up        # start only Postgres (apps/be/docker-compose.yml)
 pnpm db:down
 pnpm db:generate  # prisma generate
 pnpm db:migrate   # prisma migrate dev
@@ -47,6 +47,15 @@ pnpm db:reset     # drop, re-apply migrations, re-seed
 pnpm db:seed      # @4mica/seed
 pnpm db:studio
 ```
+
+Full containerised stack (`apps/be/docker-compose.yml` defines `postgres`, a one-shot `migrate`, and `be`):
+
+```bash
+pnpm be:up        # build + start all three; be gates on migrate exiting 0
+pnpm be:down
+```
+
+The `be` container runs `NODE_ENV=production`, so Swagger is off and the CORS allowlist excludes localhost — use `pnpm --filter @4mica/be dev` for dashboard work, or add origins via `CORS_ORIGINS`.
 
 The Husky pre-commit hook runs `pnpm run lint` and `pnpm run test`, so both must pass to commit.
 

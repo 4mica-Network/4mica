@@ -21,6 +21,48 @@ services:
       retries: 5
       start_period: 10s
 
+  migrate:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+      target: migrator
+    image: 4mica-be-migrate:latest
+    container_name: 4mica-be-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD:-4mica}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  be:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+    image: 4mica-be:latest
+    container_name: 4mica-be
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD:-4mica}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
+    ports:
+      - "127.0.0.1:${BE_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   postgres-data:
     name: 4mica-be-postgres-data
