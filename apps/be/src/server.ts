@@ -1,7 +1,9 @@
+import { clerkAuth } from "@4mica/auth";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyInstance } from "fastify";
+import { loadUser } from "./auth/user-store";
 import { config } from "./config/index";
 import { appLogger } from "./logger/index";
 import { type RouteRegistration, routes } from "./routes/index";
@@ -55,12 +57,37 @@ export const initApp = async (
     },
   });
 
+  await app.register(clerkAuth, {
+    secretKey: config.env.CLERK_SECRET_KEY,
+    publishableKey: config.env.CLERK_PUBLISHABLE_KEY,
+    jwtKey: config.clerkJwtKey,
+    authorizedParties: config.clerkAuthorizedParties,
+    loadUser,
+    logger: {
+      warn: (message, meta) => {
+        appLogger.warn(message, meta);
+      },
+    },
+  });
+
   if (config.isDev) {
     await app.register(swagger, {
       openapi: {
         info: { title: "4Mica Backend API", version: "0.1.0" },
         servers: [{ url: `http://localhost:${config.env.PORT}` }],
-        tags: [{ name: "system", description: "Health and diagnostics" }],
+        tags: [
+          { name: "system", description: "Health and diagnostics" },
+          { name: "account", description: "Authenticated user account" },
+        ],
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "JWT",
+            },
+          },
+        },
       },
     });
     await app.register(swaggerUi, { routePrefix: "/docs" });

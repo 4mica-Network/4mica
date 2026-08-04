@@ -23,11 +23,21 @@ const EnvSchema = v.object({
     v.startsWith("postgres", "DATABASE_URL must be a postgres:// URL"),
   ),
   CORS_ORIGINS: v.string(),
+  CLERK_PUBLISHABLE_KEY: v.pipe(
+    v.string(),
+    v.startsWith("pk_", "CLERK_PUBLISHABLE_KEY must start with pk_"),
+  ),
+  CLERK_SECRET_KEY: v.pipe(
+    v.string(),
+    v.startsWith("sk_", "CLERK_SECRET_KEY must start with sk_"),
+  ),
+  CLERK_JWT_KEY: v.string(),
+  CLERK_AUTHORIZED_PARTIES: v.string(),
 });
 
 export type Env = v.InferOutput<typeof EnvSchema>;
 
-const parseEnv = (source: NodeJS.ProcessEnv): Env => {
+export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
   const result = v.safeParse(EnvSchema, {
     NODE_ENV: source.NODE_ENV ?? "development",
     HOST: source.HOST ?? "0.0.0.0",
@@ -36,6 +46,10 @@ const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     LOG_DIR: source.LOG_DIR ?? "logs",
     DATABASE_URL: source.DATABASE_URL ?? "",
     CORS_ORIGINS: source.CORS_ORIGINS ?? "",
+    CLERK_PUBLISHABLE_KEY: source.CLERK_PUBLISHABLE_KEY ?? "",
+    CLERK_SECRET_KEY: source.CLERK_SECRET_KEY ?? "",
+    CLERK_JWT_KEY: source.CLERK_JWT_KEY ?? "",
+    CLERK_AUTHORIZED_PARTIES: source.CLERK_AUTHORIZED_PARTIES ?? "",
   });
 
   if (!result.success) {
@@ -60,5 +74,11 @@ export const config = {
   isProd: env.NODE_ENV === "production",
   extraCorsOrigins: env.CORS_ORIGINS.split(",")
     .map((origin) => origin.trim())
+    .filter(Boolean),
+  clerkJwtKey: env.CLERK_JWT_KEY
+    ? env.CLERK_JWT_KEY.replace(/\\n/g, "\n")
+    : undefined,
+  clerkAuthorizedParties: env.CLERK_AUTHORIZED_PARTIES.split(",")
+    .map((party) => party.trim())
     .filter(Boolean),
 } as const;

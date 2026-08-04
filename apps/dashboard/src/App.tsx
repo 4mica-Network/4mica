@@ -1,4 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { RequireAuth } from "@/auth/RequireAuth";
+import { SignInPage } from "@/auth/SignInPage";
+import { SsoCallbackPage } from "@/auth/SsoCallbackPage";
 import { AppShell } from "@/components/AppShell";
 import { SettingsLayout } from "@/components/SettingsLayout";
 import { SettingsPanel } from "@/components/SettingsPanel";
@@ -12,34 +15,39 @@ function Page({ titleKey, descriptionKey }: PageMeta) {
 export function App() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        {APP_PAGES.map((page) =>
-          page.index ? (
-            <Route key="index" index element={<Page {...page} />} />
-          ) : (
-            <Route
-              key={page.path}
-              path={page.path}
-              element={<Page {...page} />}
-            />
-          ),
-        )}
+      <Route path="/sign-in" element={<SignInPage />} />
+      <Route path="/sso-callback" element={<SsoCallbackPage />} />
 
-        <Route path="settings" element={<SettingsLayout />}>
-          <Route
-            index
-            element={<Navigate to={SETTINGS_PAGES[0].path} replace />}
-          />
-          {SETTINGS_PAGES.map((page) => (
+      <Route element={<RequireAuth />}>
+        <Route element={<AppShell />}>
+          {APP_PAGES.map((page) =>
+            page.index ? (
+              <Route key="index" index element={<Page {...page} />} />
+            ) : (
+              <Route
+                key={page.path}
+                path={page.path}
+                element={<Page {...page} />}
+              />
+            ),
+          )}
+
+          <Route path="settings" element={<SettingsLayout />}>
             <Route
-              key={page.path}
-              path={page.path}
-              element={<SettingsPanel {...page} />}
+              index
+              element={<Navigate to={SETTINGS_PAGES[0].path} replace />}
             />
-          ))}
+            {SETTINGS_PAGES.map((page) => (
+              <Route
+                key={page.path}
+                path={page.path}
+                element={<SettingsPanel {...page} />}
+              />
+            ))}
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

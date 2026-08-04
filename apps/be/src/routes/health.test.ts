@@ -43,4 +43,19 @@ describe("GET /health", () => {
 
     await app.close();
   });
+
+  it("stays reachable without any credentials", async () => {
+    count.mockResolvedValue(0);
+
+    const app = await initApp([{ plugin: healthRoutes }]);
+    const response = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: {},
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    await app.close();
+  });
 });

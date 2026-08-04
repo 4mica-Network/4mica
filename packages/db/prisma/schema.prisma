@@ -29,3 +29,17 @@ model Agent {
   @@index([status])
   @@map("agents")
 }
+
+model User {
+  id          String   @id @default(uuid(7))
+  clerkUserId String   @unique @map("clerk_user_id")
+  email       String?
+  name        String?
+  avatarUrl   String?  @map("avatar_url")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@map("users")
+}

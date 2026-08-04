@@ -20,7 +20,9 @@
     "be:down": "docker compose down"
   },
   "dependencies": {
+    "@4mica/auth": "workspace:*",
     "@4mica/db": "workspace:*",
+    "@clerk/backend": "catalog:",
     "@fastify/cors": "catalog:",
     "@fastify/swagger": "catalog:",
     "@fastify/swagger-ui": "catalog:",

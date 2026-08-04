@@ -1,4 +1,5 @@
 import { cn, Dropdown, Tooltip } from "@4mica/ui";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -60,6 +61,18 @@ function Label({
 
 function AvatarCircle() {
   const { t } = useTranslation();
+  const { user } = useUser();
+
+  if (user?.imageUrl) {
+    return (
+      <img
+        src={user.imageUrl}
+        alt=""
+        className="h-8 w-8 shrink-0 rounded-full object-cover"
+      />
+    );
+  }
+
   return (
     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/15 font-semibold text-sm text-white">
       {t("monogram")}
@@ -130,8 +143,13 @@ function ActionRow({
 
 function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
+  const { signOut } = useClerk();
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+
+  const displayName =
+    user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? t("org");
 
   return (
     <>
@@ -151,7 +169,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           )}
         >
           <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            {t("org")}
+            {displayName}
           </span>
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
@@ -181,7 +199,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         </NavLink>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setOpen(false);
+            void signOut({ redirectUrl: "/sign-in" });
+          }}
           className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
         >
           <LogOut className="h-4 w-4" />
