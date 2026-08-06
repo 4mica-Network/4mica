@@ -120,6 +120,68 @@ export const meResponseSchema = {
   },
 } as const;
 
+export const apiKeyResponseSchema = {
+  type: "object",
+  required: ["id", "name", "prefix"],
+  properties: {
+    id: str,
+    name: str,
+    prefix: str,
+    last4: str,
+    lastUsedAt: nullDate,
+    expiresAt: nullDate,
+    revokedAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const createdApiKeyResponseSchema = {
+  type: "object",
+  required: ["apiKey", "plaintext"],
+  properties: {
+    apiKey: apiKeyResponseSchema,
+    // Present in this one response and never retrievable again.
+    plaintext: str,
+  },
+} as const;
+
+export const webhookResponseSchema = {
+  type: "object",
+  required: ["id", "url", "events", "status"],
+  properties: {
+    id: str,
+    url: str,
+    description: nullStr,
+    events: { type: "array", items: str },
+    status: { type: "string", enum: ["ENABLED", "DISABLED"] },
+    secretPrefix: str,
+    lastDeliveryAt: nullDate,
+    lastDeliveryStatus: { type: "integer", nullable: true },
+    failureCount: int,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const createdWebhookResponseSchema = {
+  type: "object",
+  required: ["webhook", "plaintext"],
+  properties: {
+    webhook: webhookResponseSchema,
+    plaintext: str,
+  },
+} as const;
+
+export const webhookEventsResponseSchema = {
+  type: "array",
+  items: {
+    type: "object",
+    required: ["slug", "group", "description"],
+    properties: { slug: str, group: str, description: str },
+  },
+} as const;
+
 export const errorResponseSchema = {
   type: "object",
   required: ["error", "message"],

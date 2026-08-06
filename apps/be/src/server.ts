@@ -78,6 +78,7 @@ export const initApp = async (
         tags: [
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
+          { name: "developer", description: "API keys and webhooks" },
         ],
         components: {
           securitySchemes: {

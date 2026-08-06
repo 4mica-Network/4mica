@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui";
 import { APP_PAGES, type PageMeta, SETTINGS_PAGES } from "@/pages";
 import { AccountSettings } from "@/settings/AccountSettings";
 import { BusinessSettings } from "@/settings/BusinessSettings";
+import { DeveloperSettings } from "@/settings/DeveloperSettings";
 import { NotificationSettings } from "@/settings/NotificationSettings";
 import { ProfileSettings } from "@/settings/ProfileSettings";
 
@@ -22,6 +23,7 @@ const SETTINGS_ROUTES: Record<string, () => ReactNode> = {
   profile: ProfileSettings,
   business: BusinessSettings,
   notifications: NotificationSettings,
+  developer: DeveloperSettings,
 };
 
 export function App() {
