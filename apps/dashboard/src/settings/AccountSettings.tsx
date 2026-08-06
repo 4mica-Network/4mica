@@ -119,50 +119,46 @@ export function AccountSettings() {
             title={t("settings.account.email")}
             description={t("settings.account.emailHint")}
             htmlFor="account-email"
-          >
-            <div className="flex items-start gap-2">
-              <TextInput
-                id="account-email"
-                type="email"
-                value={contact.draft.email}
-                error={issues.email}
-                onChange={(v) => contact.set("email", v)}
+            action={
+              <VerifiedBadge
+                verified={user.emailVerified}
+                labels={{
+                  yes: t("settings.verified"),
+                  no: t("settings.unverified"),
+                }}
               />
-              <div className="pt-2.5">
-                <VerifiedBadge
-                  verified={user.emailVerified}
-                  labels={{
-                    yes: t("settings.verified"),
-                    no: t("settings.unverified"),
-                  }}
-                />
-              </div>
-            </div>
+            }
+          >
+            <TextInput
+              id="account-email"
+              type="email"
+              value={contact.draft.email}
+              error={issues.email}
+              onChange={(v) => contact.set("email", v)}
+            />
           </FieldRow>
 
           <FieldRow
             title={t("settings.account.phone")}
             description={t("settings.account.phoneHint")}
             htmlFor="account-phone"
-          >
-            <div className="flex items-start gap-2">
-              <TextInput
-                id="account-phone"
-                value={contact.draft.phoneNumber}
-                placeholder="+1 555 000 1234"
-                error={issues.phoneNumber}
-                onChange={(v) => contact.set("phoneNumber", v)}
+            action={
+              <VerifiedBadge
+                verified={user.phoneNumberVerified}
+                labels={{
+                  yes: t("settings.verified"),
+                  no: t("settings.unverified"),
+                }}
               />
-              <div className="pt-2.5">
-                <VerifiedBadge
-                  verified={user.phoneNumberVerified}
-                  labels={{
-                    yes: t("settings.verified"),
-                    no: t("settings.unverified"),
-                  }}
-                />
-              </div>
-            </div>
+            }
+          >
+            <TextInput
+              id="account-phone"
+              value={contact.draft.phoneNumber}
+              placeholder="+1 555 000 1234"
+              error={issues.phoneNumber}
+              onChange={(v) => contact.set("phoneNumber", v)}
+            />
           </FieldRow>
         </EditableCard>
       </SettingsSection>

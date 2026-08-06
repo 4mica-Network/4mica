@@ -3,6 +3,7 @@ import {
   InputField,
   type Option,
   Switch,
+  Tag,
   Select as UiSelect,
 } from "@4mica/ui";
 import { Check, Loader2 } from "lucide-react";
@@ -84,26 +85,41 @@ export function CardHeader({
   );
 }
 
-/** Label and description stacked above a full-width control. */
+/**
+ * Label and description stacked above a full-width control. `action` sits
+ * opposite the label so badges do not eat into the control's width.
+ */
 export function FieldRow({
   title,
   description,
   htmlFor,
+  action,
   children,
 }: {
   title: string;
   description?: string;
   htmlFor?: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex flex-col py-3 first:pt-0 last:pb-0">
-      <label htmlFor={htmlFor} className="font-medium text-ink-strong text-sm">
-        {title}
-      </label>
-      {description && (
-        <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
-      )}
+      {/* items-end keeps the action level with the bottom of the label block,
+          so it sits just above the control rather than up beside the title. */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <label
+            htmlFor={htmlFor}
+            className="font-medium text-ink-strong text-sm"
+          >
+            {title}
+          </label>
+          {description && (
+            <p className="mt-0.5 text-ink-muted text-xs">{description}</p>
+          )}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -300,6 +316,29 @@ export function Select({
   );
 }
 
+const KYB_VARIANT = {
+  VERIFIED: "success",
+  PENDING: "warning",
+  REJECTED: "error",
+  UNVERIFIED: "neutral",
+} as const;
+
+/** KYB has four states, so it gets its own tag rather than a yes/no badge. */
+export function KybTag({ status, label }: { status: string; label: string }) {
+  const variant = KYB_VARIANT[status as keyof typeof KYB_VARIANT] ?? "neutral";
+
+  return (
+    <Tag
+      size="sm"
+      variant={variant}
+      icon={status === "VERIFIED" ? <Check className="h-3 w-3" /> : undefined}
+      className="shrink-0"
+    >
+      {label}
+    </Tag>
+  );
+}
+
 export function VerifiedBadge({
   verified,
   labels,
@@ -308,16 +347,13 @@ export function VerifiedBadge({
   labels: { yes: string; no: string };
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs",
-        verified
-          ? "bg-emerald-500/15 text-emerald-500"
-          : "bg-overlay/10 text-ink-muted",
-      )}
+    <Tag
+      size="sm"
+      variant={verified ? "success" : "neutral"}
+      icon={verified ? <Check className="h-3 w-3" /> : undefined}
+      className="shrink-0"
     >
-      {verified && <Check className="h-3 w-3" />}
       {verified ? labels.yes : labels.no}
-    </span>
+    </Tag>
   );
 }

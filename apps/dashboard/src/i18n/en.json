@@ -223,5 +223,10 @@
   "settings.notifications.changelogHint": "Product updates and release notes",
   "settings.notifications.marketingHint": "Tips, onboarding guidance and offers",
   "settings.notifications.privacyHint": "Changes to our terms and privacy policy",
-  "settings.notifications.dpaHint": "Updates to data processing agreements"
+  "settings.notifications.dpaHint": "Updates to data processing agreements",
+  "settings.update": "Update",
+  "settings.kyb.UNVERIFIED": "Unverified",
+  "settings.kyb.PENDING": "In review",
+  "settings.kyb.VERIFIED": "Verified",
+  "settings.kyb.REJECTED": "Rejected"
 }

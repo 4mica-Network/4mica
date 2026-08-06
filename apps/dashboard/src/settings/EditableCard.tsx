@@ -1,4 +1,4 @@
-import { Button } from "@4mica/ui";
+import { Button, Spinner } from "@4mica/ui";
 import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardHeader } from "@/components/form";
@@ -50,8 +50,16 @@ export function EditableCard({
           >
             {t("settings.discard")}
           </Button>
-          <Button type="submit" size="sm" disabled={!isDirty || isSaving}>
-            {isSaving ? t("settings.saving") : t("settings.save")}
+          <Button
+            type="submit"
+            size="sm"
+            intent="invert"
+            className="btn-no-lift w-20"
+            disabled={!isDirty || isSaving}
+          >
+            <span className="flex w-full items-center justify-center text-sm">
+              {isSaving ? <Spinner size="sm" /> : t("settings.update")}
+            </span>
           </Button>
         </div>
       </form>

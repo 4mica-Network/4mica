@@ -11,12 +11,12 @@ import { useTranslation } from "react-i18next";
 import {
   Card,
   FieldRow,
+  KybTag,
   Select,
   SettingRow,
   SettingsSection,
   TextArea,
   TextInput,
-  VerifiedBadge,
 } from "@/components/form";
 import { EditableCard, InstantCard } from "./EditableCard";
 import { SettingsPage } from "./SettingsPage";
@@ -136,12 +136,9 @@ export function BusinessSettings() {
               {t("settings.business.kybHint")}
             </p>
           </div>
-          <VerifiedBadge
-            verified={business?.kybStatus === "VERIFIED"}
-            labels={{
-              yes: t("settings.verified"),
-              no: t("settings.unverified"),
-            }}
+          <KybTag
+            status={business?.kybStatus ?? "UNVERIFIED"}
+            label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
           />
         </Card>
 

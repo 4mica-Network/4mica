@@ -28,5 +28,8 @@ export {
   type SwitchColors,
   type SwitchProps,
 } from "./components/switch";
+export { Tag, type TagProps } from "./components/tag";
 export { Tooltip, type TooltipProps } from "./components/tooltip";
 export { cn } from "./lib/cn";
+export { type ComponentSize, getIconSize } from "./utils/getIconSize";
+export { hexToRGBA } from "./utils/hexToRGB";
