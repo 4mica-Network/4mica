@@ -1,5 +1,11 @@
 export { Button, type ButtonProps } from "./components/button";
 export { Card, type CardProps } from "./components/card";
+export { Checkbox, type CheckboxProps } from "./components/checkbox";
+export {
+  ComboBox,
+  type ComboBoxOption,
+  type ComboBoxProps,
+} from "./components/combo-box";
 export {
   Dropdown,
   type DropdownProps,
@@ -11,6 +17,12 @@ export {
   type RegisterLike,
 } from "./components/input-field";
 export { Link, type LinkProps } from "./components/link";
+export { type Option, Select, type SelectProps } from "./components/select";
+export {
+  Spinner,
+  type SpinnerProps,
+  type SpinnerSize,
+} from "./components/spinner";
 export {
   Switch,
   type SwitchColors,

@@ -21,24 +21,24 @@ import { SettingsPage } from "./SettingsPage";
 import { useDraft } from "./useDraft";
 
 const THEMES = [
-  { label: "Dark", value: "dark" },
-  { label: "Light", value: "light" },
-  { label: "System", value: "system" },
+  { title: "Dark", value: "dark" },
+  { title: "Light", value: "light" },
+  { title: "System", value: "system" },
 ];
 
 const LANGUAGES = [
-  { label: "English", value: "en" },
-  { label: "Deutsch", value: "de" },
-  { label: "Français", value: "fr" },
-  { label: "Español", value: "es" },
+  { title: "English", value: "en" },
+  { title: "Deutsch", value: "de" },
+  { title: "Français", value: "fr" },
+  { title: "Español", value: "es" },
 ];
 
 const HOMES = [
-  { label: "Overview", value: "overview" },
-  { label: "Balances", value: "balances" },
-  { label: "Transactions", value: "transactions" },
-  { label: "Payments", value: "payments" },
-  { label: "Agents", value: "agents" },
+  { title: "Overview", value: "overview" },
+  { title: "Balances", value: "balances" },
+  { title: "Transactions", value: "transactions" },
+  { title: "Payments", value: "payments" },
+  { title: "Agents", value: "agents" },
 ];
 
 const TIMEZONES = [
@@ -50,7 +50,7 @@ const TIMEZONES = [
   "Asia/Tokyo",
   "Asia/Singapore",
   "Australia/Sydney",
-].map((zone) => ({ label: zone, value: zone }));
+].map((zone) => ({ title: zone, value: zone }));
 
 export function AccountSettings() {
   const { t } = useTranslation();
@@ -194,6 +194,7 @@ export function AccountSettings() {
               id="account-timezone"
               value={user.timeZone}
               options={TIMEZONES}
+              hasSearch
               onChange={(v) => set("timeZone", v, "general")}
             />
           </FieldRow>

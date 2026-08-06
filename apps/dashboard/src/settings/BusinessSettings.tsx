@@ -23,16 +23,16 @@ import { SettingsPage } from "./SettingsPage";
 import { useDraft } from "./useDraft";
 
 const BUSINESS_TYPES = [
-  { label: "—", value: "" },
-  { label: "Sole trader", value: "SOLE_TRADER" },
-  { label: "Partnership", value: "PARTNERSHIP" },
-  { label: "LLC", value: "LLC" },
-  { label: "Corporation", value: "CORPORATION" },
-  { label: "Non-profit", value: "NON_PROFIT" },
+  { title: "—", value: "" },
+  { title: "Sole trader", value: "SOLE_TRADER" },
+  { title: "Partnership", value: "PARTNERSHIP" },
+  { title: "LLC", value: "LLC" },
+  { title: "Corporation", value: "CORPORATION" },
+  { title: "Non-profit", value: "NON_PROFIT" },
 ];
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
-  (code) => ({ label: code, value: code }),
+  (code) => ({ title: code, value: code }),
 );
 
 /** Empty strings mean "clear this optional field"; the API expects null. */
@@ -421,6 +421,7 @@ export function BusinessSettings() {
               id="business-currency"
               value={business?.payoutCurrency ?? "USD"}
               options={CURRENCIES}
+              hasSearch
               onChange={(v) =>
                 dispatch(
                   updateBusiness({ payoutCurrency: v }, "payoutCurrency"),

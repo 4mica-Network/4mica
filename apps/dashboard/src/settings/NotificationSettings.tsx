@@ -13,10 +13,10 @@ import { InstantCard } from "./EditableCard";
 import { SettingsPage } from "./SettingsPage";
 
 const PLACEMENTS = [
-  { label: "Top left", value: "topLeft" },
-  { label: "Top right", value: "topRight" },
-  { label: "Bottom left", value: "bottomLeft" },
-  { label: "Bottom right", value: "bottomRight" },
+  { title: "Top left", value: "topLeft" },
+  { title: "Top right", value: "topRight" },
+  { title: "Bottom left", value: "bottomLeft" },
+  { title: "Bottom right", value: "bottomRight" },
 ];
 
 export function NotificationSettings() {

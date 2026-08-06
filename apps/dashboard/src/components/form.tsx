@@ -1,7 +1,14 @@
-import { cn, InputField, Switch } from "@4mica/ui";
+import {
+  cn,
+  InputField,
+  type Option,
+  Switch,
+  Select as UiSelect,
+} from "@4mica/ui";
 import { Check, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+export type { Option };
 export { Switch };
 
 export function Card({
@@ -256,39 +263,40 @@ export function TextArea({
   );
 }
 
-const selectClass =
-  "w-full rounded-lg border border-overlay/15 bg-transparent px-3 py-2.5 text-ink-body text-sm outline-none transition hover:border-overlay/30 focus:border-overlay/50 focus:ring-1 focus:ring-overlay/40 disabled:opacity-50";
-
+/**
+ * Thin wrapper over the library Select so pages keep working with plain
+ * string values instead of Option objects.
+ */
 export function Select({
   id,
   value,
   onChange,
   options,
   disabled,
-  invalid,
+  error,
+  hasSearch,
+  placeholder,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
-  options: { label: string; value: string }[];
+  options: Option[];
   disabled?: boolean;
-  invalid?: boolean;
+  error?: string;
+  hasSearch?: boolean;
+  placeholder?: string;
 }) {
   return (
-    <select
-      id={id}
+    <UiSelect
+      data-testid={id}
       value={value}
+      options={options}
       disabled={disabled}
-      aria-invalid={invalid || undefined}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(selectClass, invalid && "border-danger")}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+      error={error}
+      hasSearch={hasSearch}
+      placeholder={placeholder}
+      onChange={(option) => option && onChange(String(option.value))}
+    />
   );
 }
 
