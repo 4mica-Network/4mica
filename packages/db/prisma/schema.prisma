@@ -17,16 +17,38 @@ enum AgentStatus {
   SUSPENDED
 }
 
-model Agent {
-  id            String      @id @default(uuid(7))
-  name          String
-  walletAddress String      @unique @map("wallet_address")
-  status        AgentStatus @default(PENDING)
-  creditLimit   Decimal     @default(0) @map("credit_limit") @db.Decimal(38, 18)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+/// Who may see a resource on a public profile. UNLISTED renders at its direct
+/// URL but is excluded from the profile index and from search indexing.
+enum PublicVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
 
+model Agent {
+  id      String  @id @default(uuid(7))
+  /// Nullable because agents predate ownership; `onDelete: SetNull` rather than
+  /// Cascade so deleting a user never destroys settlement records.
+  ownerId String? @map("owner_id")
+  /// URL segment for /<username>/agents/<slug>. Null falls back to the id.
+  slug    String? @db.VarChar(64)
+
+  name          String
+  headline      String?          @db.VarChar(160)
+  description   String?
+  avatarUrl     String?          @map("avatar_url")
+  walletAddress String           @unique @map("wallet_address")
+  status        AgentStatus      @default(PENDING)
+  visibility    PublicVisibility @default(PRIVATE)
+  creditLimit   Decimal          @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@unique([ownerId, slug])
   @@index([status])
+  @@index([ownerId, visibility])
   @@map("agents")
 }
 
@@ -109,6 +131,8 @@ model User {
   business                       Business?
   apiKeys                        ApiKey[]
   webhooks                       Webhook[]
+  agents                         Agent[]
+  apiListings                    ApiListing[]
 
   @@index([email])
   @@map("users")
@@ -133,6 +157,39 @@ model ApiKey {
 
   @@index([ownerId])
   @@map("api_keys")
+}
+
+/// A developer-published, publicly listable API. Purely descriptive metadata — it
+/// deliberately has no relation to `ApiKey`, which stores hashed credentials and
+/// must never be reachable from a public query.
+model ApiListing {
+  id      String @id @default(uuid(7))
+  ownerId String @map("owner_id")
+  /// URL segment for /<username>/api/<slug>. Unique per owner.
+  slug    String @db.VarChar(64)
+
+  name        String  @db.VarChar(120)
+  summary     String? @db.VarChar(280)
+  description String?
+  baseUrl     String? @map("base_url") @db.VarChar(2048)
+  docsUrl     String? @map("docs_url") @db.VarChar(2048)
+  category    String? @db.VarChar(64)
+  /// Free-form slugs validated by valibot rather than a Postgres enum, matching
+  /// the Webhook.events precedent.
+  tags        String[]
+  priceLabel  String? @map("price_label") @db.VarChar(64)
+
+  visibility  PublicVisibility @default(PRIVATE)
+  publishedAt DateTime?        @map("published_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  deletedAt   DateTime?        @map("deleted_at")
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, visibility])
+  @@map("api_listings")
 }
 
 model Webhook {

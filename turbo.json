@@ -46,6 +46,26 @@
       "persistent": true,
       "dependsOn": ["@4mica/db#build"],
       "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/playground#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@4mica/db#build", "@4mica/ui#build"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/playground#build": {
+      "dependsOn": ["^build", "@4mica/db#build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "passThroughEnv": ["DATABASE_URL"],
+      "env": [
+        "NEXT_PUBLIC_BASE_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_ASSET_PREFIX"
+      ]
+    },
+    "@4mica/playground#typecheck": {
+      "dependsOn": ["@4mica/db#build"]
     }
   }
 }

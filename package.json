@@ -31,6 +31,8 @@
     "db:down": "pnpm --filter @4mica/be run db:down",
     "be:up": "pnpm --filter @4mica/be run be:up",
     "be:down": "pnpm --filter @4mica/be run be:down",
+    "playground:up": "pnpm --filter @4mica/playground run playground:up",
+    "playground:down": "pnpm --filter @4mica/playground run playground:down",
     "db:generate": "pnpm --filter @4mica/db run generate",
     "db:migrate": "pnpm --filter @4mica/db run migrate",
     "db:reset": "pnpm --filter @4mica/db run migrate:reset",

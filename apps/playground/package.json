@@ -1,0 +1,61 @@
+{
+  "name": "@4mica/playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Public user-profile pages served at 4mica.io/<username>.",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "cross-env TEST=1 vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "knip": "knip",
+    "clean": "tsx ../../scripts/clean.ts",
+    "playground:up": "docker compose up -d --build",
+    "playground:down": "docker compose down"
+  },
+  "dependencies": {
+    "@4mica/db": "workspace:*",
+    "@4mica/tailwind-config": "workspace:*",
+    "@4mica/ui": "workspace:*",
+    "@4mica/url": "workspace:*",
+    "@clerk/nextjs": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "lucide-react": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "server-only": "catalog:",
+    "tailwindcss-animate": "catalog:",
+    "valibot": "catalog:",
+    "winston": "catalog:",
+    "winston-daily-rotate-file": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/node": "catalog:node24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "@vitest/ui": "catalog:",
+    "cross-env": "catalog:",
+    "jsdom": "catalog:",
+    "knip": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

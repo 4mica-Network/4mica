@@ -1,0 +1,39 @@
+/*
+ * The one thing the shared token layer cannot cover: a per-profile accent that
+ * comes from user data at request time. ProfileHeader sets --profile-brand
+ * inline (only when allowCustomBrandColor is on and the value re-passes the hex
+ * regex), and everything below falls back to the brand token when it is unset.
+ */
+
+.profile-scope {
+  --profile-brand: rgb(var(--brand));
+  --profile-brand-soft: rgb(var(--brand) / 0.12);
+}
+
+.profile-accent {
+  color: var(--profile-brand);
+}
+
+.profile-accent-bg {
+  background-color: var(--profile-brand-soft);
+}
+
+.profile-accent-ring {
+  box-shadow: 0 0 0 1px var(--profile-brand-soft);
+}
+
+/* Avatar ring that picks up the profile accent without a second element. */
+.profile-avatar {
+  background: linear-gradient(
+    135deg,
+    var(--profile-brand-soft),
+    rgb(var(--overlay) / 0.06)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-scope * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

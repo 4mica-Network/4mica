@@ -15,6 +15,7 @@
   "dependencies": {
     "@4mica/http": "workspace:*",
     "@4mica/ui": "workspace:*",
+    "@4mica/url": "workspace:*",
     "@clerk/clerk-react": "catalog:",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",

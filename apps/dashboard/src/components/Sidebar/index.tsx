@@ -1,4 +1,5 @@
 import { cn, Dropdown, Tooltip } from "@4mica/ui";
+import { links } from "@4mica/url";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
@@ -21,7 +22,6 @@ import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 const EXPANDED_WIDTH = 256;
 const COLLAPSED_WIDTH = 60;
 const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
-const PUBLIC_PROFILE_URL = "https://4mica.io/@4mica-workspace";
 
 const rowClass = (active: boolean) =>
   cn(
@@ -242,13 +242,33 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const inSettings = useLocation().pathname.startsWith("/settings");
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const currentUser = useAppSelector(selectUser);
+
+  // Null until the user loads and picks a handle in Settings → Profile. Both
+  // actions fall back to that page rather than linking to a profile that
+  // cannot exist.
+  const profileUrl = currentUser?.username
+    ? links.profile(currentUser.username)
+    : null;
 
   const copyProfile = async () => {
+    if (!profileUrl) {
+      navigate("/settings/profile");
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(PUBLIC_PROFILE_URL);
+      await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {}
+  };
+
+  const viewProfile = () => {
+    if (!profileUrl) {
+      navigate("/settings/profile");
+      return;
+    }
+    window.open(profileUrl, "_blank", "noopener,noreferrer");
   };
 
   const copyLabel = copied
@@ -314,7 +334,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           <ActionRow
             icon={Eye}
             label={t("sidebar.viewPublicProfile")}
-            onClick={() => navigate("/settings/profile")}
+            onClick={viewProfile}
             collapsed={collapsed}
           />
           <ActionRow

@@ -15,6 +15,7 @@
     "verbatimModuleSyntax": true,
     "types": ["node"],
     "paths": {
+      "@4mica/url": ["../../packages/url/src/index.ts"],
       "@/*": ["./src/*"],
       "@api/*": ["./src/api/*"],
       "@stores/*": ["./src/stores/*"],
