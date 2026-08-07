@@ -153,29 +153,3 @@ export type UpdateNotificationsInput = v.InferOutput<
   typeof UpdateNotificationsSchema
 >;
 export type UpsertBusinessInput = v.InferOutput<typeof UpsertBusinessSchema>;
-
-export interface ValidationIssue {
-  path: string;
-  message: string;
-}
-
-export const parseBody = <TSchema extends v.GenericSchema>(
-  schema: TSchema,
-  body: unknown,
-):
-  | { success: true; data: v.InferOutput<TSchema> }
-  | { success: false; issues: ValidationIssue[] } => {
-  const result = v.safeParse(schema, body ?? {});
-
-  if (result.success) {
-    return { success: true, data: result.output };
-  }
-
-  return {
-    success: false,
-    issues: result.issues.map((issue) => ({
-      path: v.getDotPath(issue) ?? "(root)",
-      message: issue.message,
-    })),
-  };
-};

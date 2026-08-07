@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { initApp } from "../server";
-import { healthRoutes } from "./health";
+import { healthRoutes } from "../../routes/health";
+import { initApp } from "../../server";
 
 const { count } = vi.hoisted(() => ({ count: vi.fn() }));
 

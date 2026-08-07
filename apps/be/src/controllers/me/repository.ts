@@ -4,7 +4,7 @@ import type {
   UpdateNotificationsInput,
   UpdateProfileInput,
   UpsertBusinessInput,
-} from "../schemas/profile";
+} from "./schema";
 
 export const USER_SELECT = {
   id: true,

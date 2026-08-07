@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { isKnownEvent } from "../services/webhook-events";
+import { isKnownEvent } from "../../services/webhook-events";
 
 const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
 

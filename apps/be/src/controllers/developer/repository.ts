@@ -1,11 +1,11 @@
 import { prisma } from "@4mica/db";
+import { generateApiKey, generateWebhookSecret } from "../../services/secrets";
 import type {
   CreateApiKeyInput,
   CreateWebhookInput,
   UpdateApiKeyInput,
   UpdateWebhookInput,
-} from "../schemas/developer";
-import { generateApiKey, generateWebhookSecret } from "./secrets";
+} from "./schema";
 
 /** hashedKey is deliberately absent so a key can never leak through the API. */
 export const API_KEY_SELECT = {
