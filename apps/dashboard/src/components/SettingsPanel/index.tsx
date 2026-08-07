@@ -12,7 +12,7 @@ export function SettingsPanel({
   const title = t(titleKey);
   useTitle(`${title} - ${t("org")}`);
   return (
-    <section>
+    <section className="mx-auto w-full lg:max-w-3xl">
       <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>
       <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
     </section>

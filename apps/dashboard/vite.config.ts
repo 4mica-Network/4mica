@@ -11,7 +11,15 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      // @4mica/url ships raw TS, so point Vite at the source directly.
+      "@4mica/url": fileURLToPath(
+        new URL("../../packages/url/src/index.ts", import.meta.url),
+      ),
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@api": fileURLToPath(new URL("./src/api", import.meta.url)),
+      "@stores": fileURLToPath(new URL("./src/stores", import.meta.url)),
+      "@utils": fileURLToPath(new URL("./src/utils", import.meta.url)),
+      "@i18n": fileURLToPath(new URL("./src/i18n", import.meta.url)),
     },
   },
   define: {

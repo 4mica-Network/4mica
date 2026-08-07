@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 
 export function SettingsLayout() {
   return (
-    <div className="max-w-2xl">
+    <div className="h-full w-full">
       <Outlet />
     </div>
   );

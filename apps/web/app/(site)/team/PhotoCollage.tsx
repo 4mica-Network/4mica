@@ -4,9 +4,6 @@ import { messages } from "@/i18n";
 
 const PHOTOS = messages.team.gallery;
 
-// Per-tile tilt, by position. Presentation rather than copy, so it lives here
-// and not in the message catalogue. Kept small and irregular — a uniform angle
-// reads as a mistake, while these read as photos dropped on a table.
 const TILTS = ["-2.5deg", "1.8deg", "-1.2deg", "2.4deg", "-1.9deg", "1.3deg"];
 
 export default function PhotoCollage() {
@@ -22,9 +19,6 @@ export default function PhotoCollage() {
         </p>
       </div>
 
-      {/* CSS multi-column keeps the masonry flow with no JS and no measuring, so
-          this stays a server component. The uneven column heights are what give
-          the wall its staggered look. */}
       <div className="photo-wall mx-auto mt-14 max-w-5xl gap-6 rounded-md px-4 py-8 sm:columns-2 sm:px-6 lg:columns-3">
         {PHOTOS.map((photo, index) => (
           <figure

@@ -8,10 +8,15 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@4mica/http": "workspace:*",
     "@4mica/ui": "workspace:*",
+    "@4mica/url": "workspace:*",
+    "@clerk/clerk-react": "catalog:",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",
     "i18next": "catalog:",
@@ -19,7 +24,11 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:",
-    "react-router-dom": "catalog:"
+    "react-redux": "catalog:",
+    "react-router-dom": "catalog:",
+    "react-toastify": "catalog:",
+    "redux": "catalog:",
+    "redux-saga": "catalog:"
   },
   "devDependencies": {
     "@4mica/tailwind-config": "workspace:*",
@@ -31,6 +40,7 @@
     "@vitejs/plugin-react": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:typescript-latest",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -64,7 +64,6 @@ export default async function DocsCalloutSection() {
                 }}
               />
               <div className="relative z-10 grid gap-0 lg:grid-cols-[1fr_1.2fr]">
-                {/* Left */}
                 <div className="flex min-w-0 flex-col justify-between border-overlay/10 border-b p-6 sm:p-8 lg:border-r lg:border-b-0">
                   <div>
                     <div className="mb-5 flex items-baseline gap-4">
@@ -84,7 +83,6 @@ export default async function DocsCalloutSection() {
                   </div>
                 </div>
 
-                {/* Right */}
                 <div className="min-w-0 bg-[#101010] p-5 transition-colors duration-500 group-hover:bg-[#141414] sm:p-6">
                   <div className="mb-4 flex items-center gap-1.5">
                     <div className="h-2 w-2 rounded-md bg-[#ff5555]/70" />

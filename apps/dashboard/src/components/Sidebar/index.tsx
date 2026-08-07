@@ -1,4 +1,8 @@
 import { cn, Dropdown, Tooltip } from "@4mica/ui";
+import { links } from "@4mica/url";
+import { useClerk, useUser } from "@clerk/clerk-react";
+import { useAppSelector } from "@stores/hooks";
+import { selectUser } from "@stores/user/selector";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -18,7 +22,6 @@ import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 const EXPANDED_WIDTH = 256;
 const COLLAPSED_WIDTH = 60;
 const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
-const PUBLIC_PROFILE_URL = "https://4mica.io/@4mica-workspace";
 
 const rowClass = (active: boolean) =>
   cn(
@@ -60,6 +63,18 @@ function Label({
 
 function AvatarCircle() {
   const { t } = useTranslation();
+  const { user } = useUser();
+
+  if (user?.imageUrl) {
+    return (
+      <img
+        src={user.imageUrl}
+        alt=""
+        className="h-8 w-8 shrink-0 rounded-full object-cover"
+      />
+    );
+  }
+
   return (
     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/15 font-semibold text-sm text-white">
       {t("monogram")}
@@ -130,8 +145,18 @@ function ActionRow({
 
 function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const currentUser = useAppSelector(selectUser);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+
+  const displayName =
+    currentUser?.name ??
+    currentUser?.email ??
+    user?.fullName ??
+    user?.primaryEmailAddress?.emailAddress ??
+    t("org");
 
   return (
     <>
@@ -151,7 +176,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           )}
         >
           <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            {t("org")}
+            {displayName}
           </span>
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
@@ -181,7 +206,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         </NavLink>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setOpen(false);
+            void signOut({ redirectUrl: "/sign-in" });
+          }}
           className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
         >
           <LogOut className="h-4 w-4" />
@@ -214,13 +242,33 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const inSettings = useLocation().pathname.startsWith("/settings");
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const currentUser = useAppSelector(selectUser);
+
+  // Null until the user loads and picks a handle in Settings → Profile. Both
+  // actions fall back to that page rather than linking to a profile that
+  // cannot exist.
+  const profileUrl = currentUser?.username
+    ? links.profile(currentUser.username)
+    : null;
 
   const copyProfile = async () => {
+    if (!profileUrl) {
+      navigate("/settings/profile");
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(PUBLIC_PROFILE_URL);
+      await navigator.clipboard.writeText(profileUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {}
+  };
+
+  const viewProfile = () => {
+    if (!profileUrl) {
+      navigate("/settings/profile");
+      return;
+    }
+    window.open(profileUrl, "_blank", "noopener,noreferrer");
   };
 
   const copyLabel = copied
@@ -286,7 +334,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           <ActionRow
             icon={Eye}
             label={t("sidebar.viewPublicProfile")}
-            onClick={() => navigate("/settings/profile")}
+            onClick={viewProfile}
             collapsed={collapsed}
           />
           <ActionRow

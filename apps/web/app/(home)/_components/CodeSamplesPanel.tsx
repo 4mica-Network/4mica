@@ -46,7 +46,6 @@ export default function CodeSamplesPanel({ html }: { html: CodeHtml }) {
                 WebkitMaskComposite: "xor",
               }}
             />
-            {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-white/10 border-b bg-white/3 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-md bg-red-500/80" />

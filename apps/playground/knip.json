@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/mdx-components.tsx"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignoreDependencies": ["@prisma/adapter-pg", "@prisma/client"],
+  "ignoreBinaries": ["biome"],
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["src/context/ThemeProvider.tsx"]
+}

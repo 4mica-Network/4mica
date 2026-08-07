@@ -2,11 +2,6 @@ import { type BlogPostMeta, formatPostDate } from "@lib/blogMeta";
 import Image from "next/image";
 import Link from "next/link";
 
-// Cards sit in a grid, so every optional field keeps its slot even when it is
-// empty: the thumbnail falls back to a monogram plate, the category/date row
-// always renders, and title and description clamp to a fixed number of lines.
-// That keeps titles, dates, and descriptions on the same baseline across the
-// whole grid.
 export default function PostCard({ post }: { post: BlogPostMeta }) {
   return (
     <article className="h-full">

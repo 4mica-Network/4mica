@@ -1,0 +1,6 @@
+.next
+.turbo
+logs
+next-env.d.ts
+*.tsbuildinfo
+coverage

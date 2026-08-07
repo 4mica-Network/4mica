@@ -71,6 +71,53 @@ const buildRoutes = () =>
     logo: "/assets/logo_transparent.png",
   }) as const;
 
+/**
+ * Root path segments that can never be a username.
+ *
+ * Public profiles are served bare (`4mica.io/<username>`) from the same apex
+ * domain as the marketing site, so every segment the marketing site owns has to
+ * be excluded from the handle namespace. The list is derived from `routes` so it
+ * cannot drift, plus the pages that exist only as files under `apps/web/app`.
+ *
+ * `apps/playground/nginx.conf` encodes the same list as proxy rules, and
+ * `apps/playground/src/main.test.ts` asserts the two stay in sync.
+ */
+export const reservedSegments: ReadonlySet<string> = new Set([
+  ...Object.values(buildRoutes())
+    .filter((route) => route.startsWith("/") && route !== "/")
+    .map((route) => route.slice(1).split("/")[0]),
+  // apps/web pages that have no entry in `routes`
+  "careers",
+  "dpa",
+  "legal",
+  "pricing",
+  "solution",
+  "solutions",
+  // auth and playground literals
+  "api",
+  "docs",
+  "sign-in",
+  "sign-up",
+  "sso-callback",
+  "status",
+  "waitlist",
+  // framework and static assets
+  "_next",
+  "assets",
+  "favicon.ico",
+  "icon.png",
+  "llms.txt",
+  "manifest.webmanifest",
+  "og",
+  "p",
+  "robots.txt",
+  "sitemap.xml",
+]);
+
+/** True when `segment` is claimable as a public profile handle. */
+export const isReservedSegment = (segment: string): boolean =>
+  reservedSegments.has(segment.toLowerCase());
+
 const buildLinks = ({ base, appBase, root }: Bases) => {
   const routes = buildRoutes();
 
@@ -79,6 +126,8 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     website: base,
     root,
     app: appBase,
+    /** The canonical public profile URL. Bare handle, no `@` prefix. */
+    profile: (username: string) => `${base}/${username}`,
     signin: `${appBase}/sign-in`,
     signup: `${appBase}/sign-up`,
     waitlist: `${appBase}/waitlist`,

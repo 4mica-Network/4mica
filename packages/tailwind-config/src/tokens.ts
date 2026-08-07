@@ -59,6 +59,12 @@ export const fourMicaRgbColors = {
   // Theme-aware contrast overlay: white in dark mode, dark slate in light mode.
   // Use for hairlines and glass fills, e.g. border-overlay/10, bg-overlay/5.
   overlay: "rgb(var(--overlay) / <alpha-value>)",
+  // The --color-* vars are plain RGB triplets in :root, so Tailwind does not
+  // turn them into utilities on its own. Mapping them here is what makes
+  // text-danger, bg-success/10 and friends actually emit CSS.
+  success: "rgb(var(--color-success) / <alpha-value>)",
+  warning: "rgb(var(--color-warning) / <alpha-value>)",
+  danger: "rgb(var(--color-danger) / <alpha-value>)",
 } as const;
 
 export const colors = {
