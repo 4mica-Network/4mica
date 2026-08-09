@@ -1,13 +1,13 @@
 import { Link as UiLink } from "@4mica/ui";
 import { Mail } from "lucide-react";
+import { Avatar } from "@/components/Avatar";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { Prose } from "@/components/Prose";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { messages, t } from "@/i18n";
 import type { PublicProfile } from "@/types";
 import { formatMonthYear } from "@/utils/formatDate";
 import { profileUrl } from "@/utils/profileUrl";
-import { Avatar } from "./Avatar";
-import { CopyLinkButton } from "./CopyLinkButton";
-import { Prose } from "./Prose";
-import { VerifiedBadge } from "./VerifiedBadge";
 
 export function ProfileHeader({ profile }: { profile: PublicProfile }) {
   return (

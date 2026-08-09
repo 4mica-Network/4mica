@@ -1,8 +1,8 @@
 import { Card, Tag } from "@4mica/ui";
 import Link from "next/link";
+import { VisibilityToggle } from "@/components/VisibilityToggle";
 import type { PublicApiListing } from "@/types";
 import { apiListingPath } from "@/utils/profileUrl";
-import { VisibilityToggle } from "./VisibilityToggle";
 
 export interface ApiListingCardProps {
   listing: PublicApiListing;

@@ -1,10 +1,10 @@
 import { Card, Tag } from "@4mica/ui";
 import Link from "next/link";
+import { Avatar } from "@/components/Avatar";
+import { VisibilityToggle } from "@/components/VisibilityToggle";
 import { messages } from "@/i18n";
 import type { PublicAgent } from "@/types";
 import { agentPath } from "@/utils/profileUrl";
-import { Avatar } from "./Avatar";
-import { VisibilityToggle } from "./VisibilityToggle";
 
 const STATUS_VARIANT = {
   ACTIVE: "success",

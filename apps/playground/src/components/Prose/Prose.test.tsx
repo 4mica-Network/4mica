@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Prose } from "./Prose";
+import { Prose } from ".";
 
 /**
  * Prose renders user-authored bio/description text, so the escaping behaviour
