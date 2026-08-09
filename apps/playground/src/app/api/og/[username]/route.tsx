@@ -4,14 +4,12 @@ import { getPublicProfile } from "@/services/profile";
 import { SITE_NAME } from "@/services/seo";
 import { initials } from "@/utils/initials";
 
-// Per-user, so it cannot be force-static like apps/web's OG route.
 export const revalidate = 3600;
 
 const OG_SIZE = { width: 1200, height: 630 };
 const NAME_LIMIT = 46;
 const BIO_LIMIT = 150;
 
-/** Same values as apps/web/app/og/[slug]/route.tsx, for visual consistency. */
 const COLORS = {
   surfaceDeep: "rgb(6, 9, 15)",
   inkStrong: "rgb(231, 241, 255)",
@@ -33,9 +31,6 @@ export async function GET(_request: Request, { params }: RouteContext) {
   const username = parseUsername((await params).username);
   const result = username ? await getPublicProfile(username) : null;
 
-  // A gated profile gets the generic 4Mica card. Rendering the real name here
-  // would leak it to anyone who can guess a handle, defeating the visibility
-  // gate that the page itself enforces.
   const isPublic = result?.profile.isPublished ?? false;
   const profile = isPublic ? result?.profile : undefined;
 

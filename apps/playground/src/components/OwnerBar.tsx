@@ -9,15 +9,9 @@ import { links } from "@/services/links";
 
 export interface OwnerBarProps {
   username: string;
-  /** False while the profile is still private — drives the preview warning. */
   isPublished: boolean;
 }
 
-/**
- * Shown only when the verified session owns this profile. Editing lives in the
- * dashboard against the already-validated PATCH /me/profile — duplicating it
- * here would create a second write path for the same fields.
- */
 export function OwnerBar({ username, isPublished }: OwnerBarProps) {
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);

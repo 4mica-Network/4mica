@@ -7,7 +7,6 @@ import { VisibilityToggle } from "./VisibilityToggle";
 export interface ApiListingCardProps {
   listing: PublicApiListing;
   username: string;
-  /** True only for the owner — adds the visibility controls. */
   isOwner: boolean;
 }
 
@@ -55,8 +54,6 @@ export function ApiListingCard({
         </Card>
       </Link>
 
-      {/* Outside the Link: a button nested in an anchor is invalid HTML and
-          breaks keyboard navigation. */}
       {isOwner && (
         <div className="px-6 pt-2">
           <VisibilityToggle

@@ -10,13 +10,6 @@ interface LayoutProps {
   params: Promise<{ username: string }>;
 }
 
-/**
- * The gate. Every page under /[username] renders inside this, so the visibility
- * check cannot be forgotten on a new route.
- *
- * getPublicProfile is React-cache()'d, so the page below reuses this query
- * rather than issuing a second one.
- */
 export default async function ProfileLayout({ children, params }: LayoutProps) {
   const username = parseUsername((await params).username);
 
@@ -32,8 +25,6 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
 
   const { profile } = result;
 
-  // Only applied when allowCustomBrandColor is on and the stored value
-  // re-passed the hex regex in the mapper.
   const brandStyle = profile.primaryBrandColor
     ? ({
         "--profile-brand": profile.primaryBrandColor,

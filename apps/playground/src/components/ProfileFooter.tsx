@@ -2,7 +2,6 @@ import { Link as UiLink } from "@4mica/ui";
 import { messages } from "@/i18n";
 import { links } from "@/services/links";
 
-/** Hidden entirely when the owner has disableBranding on. */
 export function ProfileFooter({ show }: { show: boolean }) {
   if (!show) {
     return null;

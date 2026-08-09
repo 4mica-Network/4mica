@@ -29,7 +29,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  // Already resolved and gated by the layout; cache() makes this free.
   const result = await getPublicProfile(username);
 
   if (!result) {
@@ -38,8 +37,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   const { ownerId, profile } = result;
 
-  // The owner sees UNLISTED and PRIVATE entries on their own index so the page
-  // doubles as a publish checklist. Everyone else sees PUBLIC only.
   const includeHidden = profile.isOwner;
 
   const [agents, listings] = await Promise.all([

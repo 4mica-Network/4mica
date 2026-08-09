@@ -5,10 +5,6 @@ import { Check, Link2 } from "lucide-react";
 import { useState } from "react";
 import { messages } from "@/i18n";
 
-/**
- * Purely local — no server action. Copying a string the page already knows
- * would be a needless network round-trip.
- */
 export function CopyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
 

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { messages } from "@/i18n";
 import { profilePath } from "@/utils/profileUrl";
 
-/** Breadcrumb back to the profile, used by the agent and API detail pages. */
 export function ProfileNav({
   username,
   displayName,

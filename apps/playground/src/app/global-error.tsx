@@ -2,13 +2,6 @@
 
 import { messages } from "@/i18n";
 
-/**
- * Replaces the root layout when it throws, so it must render its own <html>
- * and <body>.
- *
- * Client component: no winston, no service imports. Server-side errors are
- * already logged by the route that threw them.
- */
 export default function GlobalError({
   error,
   reset,

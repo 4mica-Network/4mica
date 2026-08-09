@@ -7,20 +7,12 @@ import { parseUsername } from "@/schema/params";
 
 export const dynamic = "force-dynamic";
 
-/** Constant-time compare so the secret cannot be recovered byte by byte. */
 const secretMatches = (provided: string, expected: string): boolean => {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
-/**
- * Machine invalidation hook, so apps/be can drop a cached profile after
- * PATCH /me/profile without the owner having to press Refresh.
- *
- * Disabled unless REVALIDATE_SECRET is set — an unset secret must not mean
- * "anyone may call this".
- */
 export async function POST(request: NextRequest) {
   const { REVALIDATE_SECRET } = serverEnv();
 
@@ -44,8 +36,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_username" }, { status: 400 });
   }
 
-  // A route handler is not a server action, so updateTag is unavailable here.
-  // "max" purges the entry regardless of the cache life it was written with.
   revalidateTag(profileTag(username), "max");
   revalidatePath(`/${username}`, "layout");
 

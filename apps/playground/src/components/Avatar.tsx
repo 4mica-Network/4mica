@@ -30,9 +30,6 @@ export function Avatar({
 
   if (src) {
     return (
-      // Avatars come from arbitrary user-supplied hosts, so next/image would
-      // need every one allow-listed. A plain img keeps the remote-pattern list
-      // from becoming a source of broken profiles.
       // biome-ignore lint/performance/noImgElement: arbitrary remote hosts.
       <img
         src={src}

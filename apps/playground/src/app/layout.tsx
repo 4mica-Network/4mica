@@ -30,8 +30,6 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <ClerkProvider publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
-      {/* `class="dark"` is set statically as well as by the init script, so the
-          palette is correct even with JavaScript disabled. */}
       <html className="dark" lang="en" suppressHydrationWarning={true}>
         <head>
           {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}

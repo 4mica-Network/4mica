@@ -13,12 +13,6 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-/**
- * In production nginx routes `/` to apps/web, so this page is only reachable in
- * local development and as a direct-container fallback. It stays useful rather
- * than being a stub: the handle box is the fastest way to jump to a profile
- * while developing.
- */
 async function goToProfile(formData: FormData) {
   "use server";
 

@@ -3,11 +3,6 @@ import { EyeOff, Lock } from "lucide-react";
 import { messages } from "@/i18n";
 import type { Visibility } from "@/types";
 
-/**
- * Only rendered for the owner. A public visitor never sees a resource whose
- * visibility is anything other than PUBLIC on the index, so labelling it would
- * be noise for them and a hint for everyone else.
- */
 export function VisibilityTag({ visibility }: { visibility: Visibility }) {
   if (visibility === "PUBLIC") {
     return null;

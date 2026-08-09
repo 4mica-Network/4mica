@@ -18,16 +18,10 @@ const OPTIONS = [
 
 export interface VisibilityToggleProps {
   kind: "agent" | "api";
-  /** The real row id — the server re-checks ownership against it. */
   id: string;
   current: Visibility;
 }
 
-/**
- * Rendered only on the owner's own profile. The server action re-loads the row
- * and compares its ownerId to the session before writing, so passing the id
- * from the client here is safe.
- */
 export function VisibilityToggle({ kind, id, current }: VisibilityToggleProps) {
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState<Visibility>(current);
