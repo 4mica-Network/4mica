@@ -8,6 +8,7 @@ import {
 import type { BusinessType } from "@stores/user/type";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
   Card,
   FieldRow,
@@ -18,9 +19,8 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form";
-import { EditableCard, InstantCard } from "./EditableCard";
-import { SettingsPage } from "./SettingsPage";
-import { useDraft } from "./useDraft";
+import { SettingsPage } from "@/components/SettingsPage";
+import { useDraft } from "@/hooks/useDraft";
 
 const BUSINESS_TYPES = [
   { title: "—", value: "" },

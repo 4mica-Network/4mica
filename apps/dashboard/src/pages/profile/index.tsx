@@ -7,6 +7,7 @@ import {
 } from "@stores/user/selector";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { EditableCard } from "@/components/EditableCard";
 import {
   Card,
   FieldRow,
@@ -16,9 +17,8 @@ import {
   TextInput,
   VerifiedBadge,
 } from "@/components/form";
-import { EditableCard } from "./EditableCard";
-import { SettingsPage } from "./SettingsPage";
-import { useDraft } from "./useDraft";
+import { SettingsPage } from "@/components/SettingsPage";
+import { useDraft } from "@/hooks/useDraft";
 
 export function ProfileSettings() {
   const { t } = useTranslation();

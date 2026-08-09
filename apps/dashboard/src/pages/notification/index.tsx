@@ -3,14 +3,14 @@ import { updateNotifications } from "@stores/user/actions";
 import { selectIsSectionSaving, selectUser } from "@stores/user/selector";
 import type { NotificationPlacement } from "@stores/user/type";
 import { useTranslation } from "react-i18next";
+import { InstantCard } from "@/components/EditableCard";
 import {
   Select,
   SettingRow,
   SettingsSection,
   SwitchCard,
 } from "@/components/form";
-import { InstantCard } from "./EditableCard";
-import { SettingsPage } from "./SettingsPage";
+import { SettingsPage } from "@/components/SettingsPage";
 
 const PLACEMENTS = [
   { title: "Top left", value: "topLeft" },
