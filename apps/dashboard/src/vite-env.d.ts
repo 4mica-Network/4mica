@@ -10,3 +10,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  /** Injected by the Redux DevTools extension. Only read in development. */
+  __REDUX_DEVTOOLS_EXTENSION_COMPOSE__?: typeof import("redux").compose;
+}

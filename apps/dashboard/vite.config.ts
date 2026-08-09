@@ -7,11 +7,15 @@ import { defineConfig } from "vite";
 const require = createRequire(import.meta.url);
 const pkg = require("./package.json") as { version: string };
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
+  build: {
+    sourcemap: false,
+    minify: "esbuild",
+  },
+  esbuild: command === "build" ? { drop: ["console", "debugger"] } : {},
   resolve: {
     alias: {
-      // @4mica/url ships raw TS, so point Vite at the source directly.
       "@4mica/url": fileURLToPath(
         new URL("../../packages/url/src/index.ts", import.meta.url),
       ),
@@ -27,4 +31,4 @@ export default defineConfig({
   },
   server: { port: 4173, strictPort: false },
   preview: { port: 4173 },
-});
+}));
