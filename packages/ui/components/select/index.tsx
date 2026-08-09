@@ -175,14 +175,14 @@ export const Select = ({
         >
           {loading ? (
             <div
-              className="flex min-h-[120px] items-center justify-center p-2"
+              className="flex min-h-30 items-center justify-center p-2"
               data-testid={`${prefix}-loading`}
             >
               <Spinner size="lg" className="text-ink-body" />
             </div>
           ) : (
             <div
-              className="max-h-[250px] w-full overflow-y-auto p-2 text-sm"
+              className="max-h-62.5 w-full overflow-y-auto p-2 text-sm"
               role="listbox"
               data-testid={`${prefix}-list`}
             >

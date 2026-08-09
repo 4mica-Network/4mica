@@ -118,7 +118,7 @@ export const ComboBox = ({
           />
 
           <div
-            className="flex max-h-[200px] flex-col overflow-y-auto overflow-x-hidden"
+            className="flex max-h-50 flex-col overflow-y-auto overflow-x-hidden"
             role="listbox"
             aria-multiselectable
           >
