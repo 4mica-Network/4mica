@@ -17,8 +17,6 @@ enum AgentStatus {
   SUSPENDED
 }
 
-/// Who may see a resource on a public profile. UNLISTED renders at its direct
-/// URL but is excluded from the profile index and from search indexing.
 enum PublicVisibility {
   PRIVATE
   UNLISTED
@@ -26,13 +24,9 @@ enum PublicVisibility {
 }
 
 model Agent {
-  id      String  @id @default(uuid(7))
-  /// Nullable because agents predate ownership; `onDelete: SetNull` rather than
-  /// Cascade so deleting a user never destroys settlement records.
-  ownerId String? @map("owner_id")
-  /// URL segment for /<username>/agents/<slug>. Null falls back to the id.
-  slug    String? @db.VarChar(64)
-
+  id            String           @id @default(uuid(7))
+  ownerId       String?          @map("owner_id")
+  slug          String?          @db.VarChar(64)
   name          String
   headline      String?          @db.VarChar(160)
   description   String?
@@ -138,12 +132,10 @@ model User {
   @@map("users")
 }
 
-/// Only the hash is stored; the plaintext key is shown once at creation.
 model ApiKey {
   id         String    @id @default(uuid(7))
   ownerId    String    @map("owner_id")
   name       String    @db.VarChar(120)
-  /// Leading segment kept for display, e.g. 4mica_sk_9f2c
   prefix     String    @db.VarChar(32)
   last4      String    @db.VarChar(4)
   hashedKey  String    @unique @map("hashed_key")
@@ -159,26 +151,18 @@ model ApiKey {
   @@map("api_keys")
 }
 
-/// A developer-published, publicly listable API. Purely descriptive metadata — it
-/// deliberately has no relation to `ApiKey`, which stores hashed credentials and
-/// must never be reachable from a public query.
 model ApiListing {
-  id      String @id @default(uuid(7))
-  ownerId String @map("owner_id")
-  /// URL segment for /<username>/api/<slug>. Unique per owner.
-  slug    String @db.VarChar(64)
-
-  name        String  @db.VarChar(120)
-  summary     String? @db.VarChar(280)
+  id          String           @id @default(uuid(7))
+  ownerId     String           @map("owner_id")
+  slug        String           @db.VarChar(64)
+  name        String           @db.VarChar(120)
+  summary     String?          @db.VarChar(280)
   description String?
-  baseUrl     String? @map("base_url") @db.VarChar(2048)
-  docsUrl     String? @map("docs_url") @db.VarChar(2048)
-  category    String? @db.VarChar(64)
-  /// Free-form slugs validated by valibot rather than a Postgres enum, matching
-  /// the Webhook.events precedent.
+  baseUrl     String?          @map("base_url") @db.VarChar(2048)
+  docsUrl     String?          @map("docs_url") @db.VarChar(2048)
+  category    String?          @db.VarChar(64)
   tags        String[]
-  priceLabel  String? @map("price_label") @db.VarChar(64)
-
+  priceLabel  String?          @map("price_label") @db.VarChar(64)
   visibility  PublicVisibility @default(PRIVATE)
   publishedAt DateTime?        @map("published_at")
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -193,26 +177,20 @@ model ApiListing {
 }
 
 model Webhook {
-  id          String        @id @default(uuid(7))
-  ownerId     String        @map("owner_id")
-  url         String        @db.VarChar(2048)
-  description String?       @db.VarChar(255)
-  /// Event slugs are validated by valibot rather than a Postgres enum, so
-  /// adding an event does not require a migration.
-  events      String[]
-  status      WebhookStatus @default(ENABLED)
-
-  secretHash   String @map("secret_hash")
-  secretPrefix String @map("secret_prefix") @db.VarChar(32)
-
-  lastDeliveryAt     DateTime? @map("last_delivery_at")
-  lastDeliveryStatus Int?      @map("last_delivery_status")
-  failureCount       Int       @default(0) @map("failure_count")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                 String        @id @default(uuid(7))
+  ownerId            String        @map("owner_id")
+  url                String        @db.VarChar(2048)
+  description        String?       @db.VarChar(255)
+  events             String[]
+  status             WebhookStatus @default(ENABLED)
+  secretHash         String        @map("secret_hash")
+  secretPrefix       String        @map("secret_prefix") @db.VarChar(32)
+  lastDeliveryAt     DateTime?     @map("last_delivery_at")
+  lastDeliveryStatus Int?          @map("last_delivery_status")
+  failureCount       Int           @default(0) @map("failure_count")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  owner              User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
   @@map("webhooks")
