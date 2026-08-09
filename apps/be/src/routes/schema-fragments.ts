@@ -197,3 +197,12 @@ export const errorResponseSchema = {
     },
   },
 } as const;
+
+/**
+ * Responses every rate-limited route can produce regardless of its handler:
+ * 429 from the limiter, 503 while the instance is draining.
+ */
+export const limitedResponses = {
+  429: errorResponseSchema,
+  503: errorResponseSchema,
+} as const;

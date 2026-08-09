@@ -29,6 +29,7 @@ catalog:
   '@clerk/nextjs': ^6.39.6
   '@coinbase/cdp-sdk': ^1.49.2
   '@fastify/cors': ^11.3.0
+  '@fastify/rate-limit': ^11.2.0
   '@fastify/swagger': ^9.8.1
   '@fastify/swagger-ui': ^6.1.1
   '@noble/curves': ^2.2.0

@@ -3,6 +3,7 @@ services:
     image: postgres:17-alpine
     container_name: 4mica-be-postgres
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-4mica}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-4mica}
@@ -42,11 +43,22 @@ services:
     image: 4mica-be:latest
     container_name: 4mica-be
     restart: unless-stopped
+    init: true
+    # Must exceed SHUTDOWN_TIMEOUT_MS so the app always force-exits itself
+    # before Docker resorts to SIGKILL.
+    stop_grace_period: 40s
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 4000
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-5000}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-20000}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_IP_MAX: ${RATE_LIMIT_IP_MAX:-300}
+      RATE_LIMIT_USER_MAX: ${RATE_LIMIT_USER_MAX:-120}
+      RATE_LIMIT_SENSITIVE_MAX: ${RATE_LIMIT_SENSITIVE_MAX:-10}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4173}
       DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD:-4mica}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}

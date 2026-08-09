@@ -11,6 +11,7 @@ import { guards } from "./guards";
 import {
   businessResponseSchema,
   errorResponseSchema,
+  limitedResponses,
   meResponseSchema,
   userResponseSchema,
 } from "./schema-fragments";
@@ -23,6 +24,7 @@ const patchOptions = (app: FastifyInstance, summary: string) => ({
     summary,
     security: [{ bearerAuth: [] }],
     response: {
+      ...limitedResponses,
       200: userResponseSchema,
       400: errorResponseSchema,
       401: errorResponseSchema,
@@ -40,7 +42,11 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["account"],
         summary: "The authenticated user with their business",
         security: [{ bearerAuth: [] }],
-        response: { 200: meResponseSchema, 401: errorResponseSchema },
+        response: {
+          ...limitedResponses,
+          200: meResponseSchema,
+          401: errorResponseSchema,
+        },
       },
     },
     getMeHandler,
@@ -72,7 +78,11 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["account"],
         summary: "The business owned by the authenticated user",
         security: [{ bearerAuth: [] }],
-        response: { 200: businessResponseSchema, 401: errorResponseSchema },
+        response: {
+          ...limitedResponses,
+          200: businessResponseSchema,
+          401: errorResponseSchema,
+        },
       },
     },
     getBusinessHandler,
@@ -87,6 +97,7 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
         summary: "Create or update the business",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           200: businessResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,

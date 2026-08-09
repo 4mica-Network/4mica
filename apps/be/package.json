@@ -24,6 +24,7 @@
     "@4mica/db": "workspace:*",
     "@clerk/backend": "catalog:",
     "@fastify/cors": "catalog:",
+    "@fastify/rate-limit": "catalog:",
     "@fastify/swagger": "catalog:",
     "@fastify/swagger-ui": "catalog:",
     "@prisma/adapter-pg": "catalog:",

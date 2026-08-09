@@ -39,6 +39,43 @@ describe("parseEnv", () => {
     expect(env.CLERK_JWT_KEY).toBe("");
     expect(env.CLERK_AUTHORIZED_PARTIES).toBe("");
   });
+
+  it("defaults the shutdown and rate-limit knobs", () => {
+    const env = parseEnv(VALID);
+
+    expect(env.SHUTDOWN_DRAIN_MS).toBe(5000);
+    expect(env.SHUTDOWN_TIMEOUT_MS).toBe(20000);
+    expect(env.RATE_LIMIT_WINDOW_MS).toBe(60000);
+    expect(env.RATE_LIMIT_IP_MAX).toBe(300);
+    expect(env.RATE_LIMIT_USER_MAX).toBe(120);
+    expect(env.RATE_LIMIT_SENSITIVE_MAX).toBe(10);
+  });
+
+  it("turns rate limiting off under NODE_ENV=test but on elsewhere", () => {
+    expect(parseEnv(VALID).RATE_LIMIT_ENABLED).toBe("false");
+    expect(
+      parseEnv({ ...VALID, NODE_ENV: "production" }).RATE_LIMIT_ENABLED,
+    ).toBe("true");
+    expect(
+      parseEnv({ ...VALID, RATE_LIMIT_ENABLED: "true" }).RATE_LIMIT_ENABLED,
+    ).toBe("true");
+  });
+
+  it("rejects a drain window that outlasts the shutdown deadline", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        SHUTDOWN_DRAIN_MS: "30000",
+        SHUTDOWN_TIMEOUT_MS: "20000",
+      }),
+    ).toThrow(/SHUTDOWN_DRAIN_MS: must be less than SHUTDOWN_TIMEOUT_MS/);
+  });
+
+  it("rejects a non-numeric rate limit", () => {
+    expect(() => parseEnv({ ...VALID, RATE_LIMIT_IP_MAX: "many" })).toThrow(
+      /RATE_LIMIT_IP_MAX must be numeric/,
+    );
+  });
 });
 
 describe("config", () => {

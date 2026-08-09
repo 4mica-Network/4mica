@@ -5,10 +5,10 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyInstance } from "fastify";
 import { loadUser } from "./auth/user-store";
 import { config } from "./config/index";
+import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
+import { registerRateLimit } from "./plugins/rate-limit";
 import { type RouteRegistration, routes } from "./routes/index";
-
-const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const PROD_ORIGIN_PATTERNS = [
   /^https:\/\/([a-z0-9-]+\.)*4mica\.io$/,
@@ -38,6 +38,29 @@ export const initApp = async (
     ajv: { customOptions: { removeAdditional: "all", coerceTypes: "array" } },
   });
 
+  // First hook of all: once draining, refuse new work before spending any
+  // effort on CORS, rate-limit accounting or token verification.
+  app.addHook("onRequest", async (request, reply) => {
+    if (isAcceptingTraffic() || request.url.startsWith("/health")) {
+      return;
+    }
+
+    reply.header("retry-after", Math.ceil(config.shutdown.drainMs / 1000));
+    reply.header("connection", "close");
+
+    return reply.code(503).send({
+      error: "service_unavailable",
+      message: "The service is shutting down. Retry shortly.",
+    });
+  });
+
+  // Fastify owns database teardown, so `initApp` is self-contained and tests
+  // that call `app.close()` release the client too.
+  app.addHook("onClose", async () => {
+    const { disconnect } = await import("@4mica/db");
+    await disconnect();
+  });
+
   await app.register(cors, {
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -56,6 +79,10 @@ export const initApp = async (
       callback(null, false);
     },
   });
+
+  if (config.rateLimit.enabled) {
+    await registerRateLimit(app);
+  }
 
   await app.register(clerkAuth, {
     secretKey: config.env.CLERK_SECRET_KEY,
@@ -105,51 +132,8 @@ export const initApp = async (
 
 export const runServer = async (): Promise<FastifyInstance> => {
   const app = await initApp(routes);
-  let shuttingDown = false;
 
-  const shutdown = async (reason: string, failed = false): Promise<void> => {
-    if (shuttingDown) {
-      return;
-    }
-    shuttingDown = true;
-    appLogger.info(`Shutting down (${reason})`);
-
-    const force = setTimeout(() => {
-      appLogger.error("Graceful shutdown timed out, forcing exit");
-      process.exit(1);
-    }, SHUTDOWN_TIMEOUT_MS);
-    force.unref();
-
-    let exitCode = failed ? 1 : 0;
-
-    try {
-      await app.close();
-      const { disconnect } = await import("@4mica/db");
-      await disconnect();
-    } catch (error) {
-      appLogger.error("Error during shutdown", { error });
-      exitCode = 1;
-    } finally {
-      clearTimeout(force);
-      process.exit(exitCode);
-    }
-  };
-
-  for (const signal of ["SIGINT", "SIGTERM"] as const) {
-    process.once(signal, () => {
-      void shutdown(signal);
-    });
-  }
-
-  process.on("uncaughtException", (error) => {
-    appLogger.error("Uncaught exception", { error });
-    void shutdown("uncaughtException", true);
-  });
-
-  process.on("unhandledRejection", (reason) => {
-    appLogger.error("Unhandled rejection", { reason });
-    void shutdown("unhandledRejection", true);
-  });
+  installShutdownHandlers(app);
 
   await app.listen({ host: config.env.HOST, port: config.env.PORT });
 

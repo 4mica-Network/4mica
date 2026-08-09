@@ -12,12 +12,14 @@ import {
   updateApiKeyHandler,
   updateWebhookHandler,
 } from "../controllers/developer/index";
+import { sensitiveRateLimit } from "../plugins/rate-limit";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
   createdApiKeyResponseSchema,
   createdWebhookResponseSchema,
   errorResponseSchema,
+  limitedResponses,
   webhookEventsResponseSchema,
   webhookResponseSchema,
 } from "./schema-fragments";
@@ -29,15 +31,24 @@ const idParamSchema = {
 } as const;
 
 export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
+  const base = guards(app);
+
+  /** Credential-minting and destructive routes get a tighter per-user budget. */
+  const strict = {
+    onRequest: base.onRequest,
+    preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+  };
+
   app.get(
     "/webhook-events",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "Events a webhook can subscribe to",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           200: webhookEventsResponseSchema,
           401: errorResponseSchema,
         },
@@ -49,12 +60,13 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.get(
     "/me/api-keys",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "List the account's API keys",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           200: { type: "array", items: apiKeyResponseSchema },
           401: errorResponseSchema,
         },
@@ -66,12 +78,13 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/api-keys",
     {
-      ...guards(app),
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Create an API key. The plaintext is returned only here.",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           201: createdApiKeyResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
@@ -84,13 +97,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.patch(
     "/me/api-keys/:id",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "Rename an API key",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           200: apiKeyResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
@@ -104,13 +118,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/api-keys/:id/revoke",
     {
-      ...guards(app),
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Revoke an API key without deleting its audit trail",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           200: apiKeyResponseSchema,
           401: errorResponseSchema,
           404: errorResponseSchema,
@@ -123,13 +138,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/api-keys/:id",
     {
-      ...guards(app),
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Delete an API key",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           204: { type: "null" },
           401: errorResponseSchema,
           404: errorResponseSchema,
@@ -142,12 +158,13 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.get(
     "/me/webhooks",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "List the account's webhook endpoints",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           200: { type: "array", items: webhookResponseSchema },
           401: errorResponseSchema,
         },
@@ -159,12 +176,13 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/webhooks",
     {
-      ...guards(app),
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Create a webhook. The signing secret is returned only here.",
         security: [{ bearerAuth: [] }],
         response: {
+          ...limitedResponses,
           201: createdWebhookResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
@@ -177,13 +195,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.patch(
     "/me/webhooks/:id",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "Update a webhook's url, events or status",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           200: webhookResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
@@ -197,13 +216,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/webhooks/:id/rotate-secret",
     {
-      ...guards(app),
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Issue a new signing secret for a webhook",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           200: createdWebhookResponseSchema,
           401: errorResponseSchema,
           404: errorResponseSchema,
@@ -216,13 +236,14 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/webhooks/:id",
     {
-      ...guards(app),
+      ...base,
       schema: {
         tags: ["developer"],
         summary: "Delete a webhook endpoint",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
+          ...limitedResponses,
           204: { type: "null" },
           401: errorResponseSchema,
           404: errorResponseSchema,

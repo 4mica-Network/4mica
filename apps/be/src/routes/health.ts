@@ -3,12 +3,17 @@ import { getHealthHandler } from "../controllers/health/index";
 
 const healthResponseSchema = {
   type: "object",
-  required: ["status", "uptime", "timestamp", "db"],
+  required: ["status", "state", "uptime", "timestamp", "db"],
   properties: {
-    status: { type: "string", enum: ["ok", "degraded"] },
+    status: { type: "string", enum: ["ok", "degraded", "draining"] },
+    state: {
+      type: "string",
+      enum: ["ready", "draining", "closing"],
+      description: "Whether the instance is still accepting traffic",
+    },
     uptime: { type: "number", description: "Process uptime in seconds" },
     timestamp: { type: "string", format: "date-time" },
-    db: { type: "string", enum: ["ok", "down"] },
+    db: { type: "string", enum: ["ok", "down", "unknown"] },
     agents: {
       type: "integer",
       description: "Row count, omitted when the database is down",

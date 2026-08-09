@@ -70,8 +70,10 @@ const buildTransports = () =>
         rotatingFile("error-%DATE%.log", "error"),
       ];
 
-export const createScopedLogger = (label: string): Logger =>
-  createLogger({
+const created: Logger[] = [];
+
+export const createScopedLogger = (label: string): Logger => {
+  const logger = createLogger({
     levels: LEVELS,
     level: config.env.LOG_LEVEL,
     defaultMeta: { label, service: "@4mica/be" },
@@ -79,5 +81,28 @@ export const createScopedLogger = (label: string): Logger =>
     exitOnError: false,
   });
 
+  created.push(logger);
+
+  return logger;
+};
+
 export const appLogger = createScopedLogger("app");
 export const httpLogger = createScopedLogger("http");
+
+export const closeLoggers = async (): Promise<void> => {
+  if (config.isTest) {
+    return;
+  }
+
+  await Promise.all(
+    created.map(
+      (logger) =>
+        new Promise<void>((resolve) => {
+          logger.once("finish", () => {
+            resolve();
+          });
+          logger.end();
+        }),
+    ),
+  );
+};

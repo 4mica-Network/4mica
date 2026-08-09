@@ -1,1 +1,6 @@
-export { appLogger, createScopedLogger, httpLogger } from "./loggers";
+export {
+  appLogger,
+  closeLoggers,
+  createScopedLogger,
+  httpLogger,
+} from "./loggers";

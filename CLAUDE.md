@@ -77,6 +77,10 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 - **`apps/be` structure**: `src/server.ts` exports `initApp(routes)` (no side effects, so tests can `.inject()` against it) and `runServer()`; `src/index.ts` is the only caller. Routes are `FastifyPluginCallback`s registered from the `{ plugin, prefix }[]` list in `src/routes/index.ts`. Env is parsed and validated once by valibot in `src/config/index.ts`; logging is winston (`src/logger/`). Swagger UI is registered at `/docs` in development only.
 
+- **`apps/be` lifecycle**: `src/lifecycle/` owns graceful degradation. A module-level `ServiceState` (`ready` → `draining` → `closing`) is the single source of truth for "am I taking traffic". On SIGTERM/SIGINT, `installShutdownHandlers` flips to `draining` — `/health` immediately answers 503 and an `onRequest` guard in `initApp` refuses new requests with 503 + `Retry-After` + `Connection: close` — waits `SHUTDOWN_DRAIN_MS` for in-flight work, then closes Fastify (whose `onClose` hook disconnects Prisma) and flushes the loggers, all capped by `SHUTDOWN_TIMEOUT_MS`. Keep the container's `stop_grace_period` above that cap.
+
+- **`apps/be` rate limiting**: `src/plugins/rate-limit.ts`, in-memory (no Redis). Two layers, because one hook can't do both jobs — an IP-keyed shield on `onRequest` ahead of Clerk verification, and a per-user limit on `preHandler` (where `request.auth` exists) keyed by Clerk user id with an IP fallback. `sensitiveRateLimit(app)` adds a tighter budget to credential-minting routes. Health and preflights are allowlisted; the whole thing is off under `NODE_ENV=test`.
+
 - **Data-driven content**: solutions/FAQs/team are typed TS data (e.g. `apps/web/i18n/locales/en/solutions.ts` with `getSolution(slug)`); dynamic routes use `generateStaticParams()`. SEO metadata is built from factories in `apps/web/seo/`.
 
 - **Tests**: Vitest (jsdom, v8 coverage), co-located `*.test.ts(x)`, global setup in `vitest.setup.ts`.

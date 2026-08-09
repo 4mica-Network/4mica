@@ -33,6 +33,9 @@ catalogs:
     '@fastify/cors':
       specifier: ^11.3.0
       version: 11.3.0
+    '@fastify/rate-limit':
+      specifier: ^11.2.0
+      version: 11.2.0
     '@fastify/swagger':
       specifier: ^9.8.1
       version: 9.8.1
@@ -386,6 +389,9 @@ importers:
       '@fastify/cors':
         specifier: 'catalog:'
         version: 11.3.0
+      '@fastify/rate-limit':
+        specifier: 'catalog:'
+        version: 11.2.0
       '@fastify/swagger':
         specifier: 'catalog:'
         version: 9.8.1
@@ -578,9 +584,6 @@ importers:
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@testing-library/user-event':
-        specifier: 'catalog:'
-        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: catalog:node24
         version: 24.12.4
@@ -2428,6 +2431,9 @@ packages:
 
   '@fastify/proxy-addr@5.1.0':
     resolution: {integrity: sha512-INS+6gh91cLUjB+PVHfu1UqcB76Sqtpyp7bnL+FYojhjygvOPA9ctiD/JDKsyD9Xgu4hUhCSJBPig/w7duNajw==}
+
+  '@fastify/rate-limit@11.2.0':
+    resolution: {integrity: sha512-X7osJd4XSvMoejYrnJkSZYYjY1eNYoBqhjlzf1RakC2204qExFqZFTKj5+T7VuzA/iUI9Z3UoSqQRkB2HpG0oQ==}
 
   '@fastify/send@4.1.0':
     resolution: {integrity: sha512-TMYeQLCBSy2TOFmV95hQWkiTYgC/SEx7vMdV+wnZVX4tt8VBLKzmH8vV9OzJehV0+XBfg+WxPMt5wp+JBUKsVw==}
@@ -9155,6 +9161,13 @@ snapshots:
     dependencies:
       '@fastify/forwarded': 3.0.2
       ipaddr.js: 2.4.0
+
+  '@fastify/rate-limit@11.2.0':
+    dependencies:
+      '@lukeed/ms': 2.0.2
+      fastify-plugin: 6.0.0
+      ip-address: 10.2.0
+      toad-cache: 3.7.4
 
   '@fastify/send@4.1.0':
     dependencies:
