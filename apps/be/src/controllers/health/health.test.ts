@@ -1,6 +1,6 @@
+import { healthRoutes } from "@routes/health";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { healthRoutes } from "../../routes/health";
-import { initApp } from "../../server";
+import { initApp } from "@/server";
 
 const { count } = vi.hoisted(() => ({ count: vi.fn() }));
 

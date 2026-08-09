@@ -1,7 +1,7 @@
+import { healthRoutes } from "@routes/health";
 import type { FastifyPluginCallback } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { healthRoutes } from "../routes/health";
-import { initApp } from "../server";
+import { initApp } from "@/server";
 import { resetServiceState, setServiceState } from "./state";
 
 const { count } = vi.hoisted(() => ({ count: vi.fn() }));

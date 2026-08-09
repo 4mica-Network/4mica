@@ -1,7 +1,7 @@
+import { clearUserCache } from "@auth/user-store";
+import { developerRoutes } from "@routes/developer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearUserCache } from "../../auth/user-store";
-import { developerRoutes } from "../../routes/developer";
-import { initApp } from "../../server";
+import { initApp } from "@/server";
 
 const { authenticateRequest, getUser, findUnique, upsert, apiKey, webhook } =
   vi.hoisted(() => ({

@@ -1,5 +1,5 @@
+import { isKnownEvent } from "@services/webhook-events";
 import * as v from "valibot";
-import { isKnownEvent } from "../../services/webhook-events";
 
 const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
 
@@ -14,7 +14,6 @@ const eventList = v.pipe(
   v.transform((events) => [...new Set(events)]),
 );
 
-/** Only https endpoints, so a signing secret is never sent in the clear. */
 const webhookUrl = v.pipe(
   v.string(),
   v.trim(),

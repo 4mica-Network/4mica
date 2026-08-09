@@ -1,6 +1,22 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@auth": fileURLToPath(new URL("./src/auth", import.meta.url)),
+      "@config": fileURLToPath(new URL("./src/config", import.meta.url)),
+      "@controllers": fileURLToPath(
+        new URL("./src/controllers", import.meta.url),
+      ),
+      "@lifecycle": fileURLToPath(new URL("./src/lifecycle", import.meta.url)),
+      "@logger": fileURLToPath(new URL("./src/logger", import.meta.url)),
+      "@plugins": fileURLToPath(new URL("./src/plugins", import.meta.url)),
+      "@routes": fileURLToPath(new URL("./src/routes", import.meta.url)),
+      "@services": fileURLToPath(new URL("./src/services", import.meta.url)),
+    },
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

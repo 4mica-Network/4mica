@@ -109,5 +109,27 @@
     "formatWithErrors": true,
     "indentStyle": "space",
     "lineWidth": 80
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/be/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../**"],
+                    "message": "Use a path alias (@/, @config/, @logger/, …) instead of parent-relative imports."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@4mica/db";
-import { generateApiKey, generateWebhookSecret } from "../../services/secrets";
+import { generateApiKey, generateWebhookSecret } from "@services/secrets";
 import type {
   CreateApiKeyInput,
   CreateWebhookInput,
@@ -7,7 +7,6 @@ import type {
   UpdateWebhookInput,
 } from "./schema";
 
-/** hashedKey is deliberately absent so a key can never leak through the API. */
 export const API_KEY_SELECT = {
   id: true,
   name: true,
@@ -59,7 +58,6 @@ export const createApiKey = async (
     select: API_KEY_SELECT,
   });
 
-  // The only time the plaintext exists outside the caller's request.
   return { apiKey, plaintext: secret.plaintext };
 };
 

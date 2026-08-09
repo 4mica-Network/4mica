@@ -5,7 +5,18 @@
     "target": "ES2023",
     "lib": ["ES2023"],
     "resolveJsonModule": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@auth/*": ["./src/auth/*"],
+      "@config/*": ["./src/config/*"],
+      "@controllers/*": ["./src/controllers/*"],
+      "@lifecycle/*": ["./src/lifecycle/*"],
+      "@logger/*": ["./src/logger/*"],
+      "@plugins/*": ["./src/plugins/*"],
+      "@routes/*": ["./src/routes/*"],
+      "@services/*": ["./src/services/*"]
+    }
   },
   "include": ["src", "tsup.config.ts", "vitest.config.ts"]
 }

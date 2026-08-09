@@ -1,5 +1,5 @@
+import { getHealthHandler } from "@controllers/health/index";
 import type { FastifyPluginCallback } from "fastify";
-import { getHealthHandler } from "../controllers/health/index";
 
 const healthResponseSchema = {
   type: "object",

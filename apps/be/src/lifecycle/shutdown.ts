@@ -1,6 +1,6 @@
+import { config } from "@config/index";
+import { appLogger, closeLoggers } from "@logger/index";
 import type { FastifyInstance } from "fastify";
-import { config } from "../config/index";
-import { appLogger, closeLoggers } from "../logger/index";
 import { setServiceState } from "./state";
 
 const SIGNALS = ["SIGINT", "SIGTERM"] as const;

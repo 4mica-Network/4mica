@@ -61,9 +61,9 @@ const loadApp = async (limits: Record<string, string>) => {
 
   const [{ initApp }, { healthRoutes }, { guards }, { sensitiveRateLimit }] =
     await Promise.all([
-      import("../server"),
-      import("../routes/health"),
-      import("../routes/guards"),
+      import("@/server"),
+      import("@routes/health"),
+      import("@routes/guards"),
       import("./rate-limit"),
     ]);
 
@@ -214,7 +214,7 @@ describe("rate limiting", () => {
 
   it("stays off by default under NODE_ENV=test", async () => {
     vi.resetModules();
-    const { config } = await import("../config/index");
+    const { config } = await import("@config/index");
 
     expect(config.rateLimit.enabled).toBe(false);
   });

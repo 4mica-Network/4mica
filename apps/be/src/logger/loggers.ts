@@ -1,3 +1,4 @@
+import { config } from "@config/index";
 import {
   addColors,
   createLogger,
@@ -6,7 +7,6 @@ import {
   transports,
 } from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { config } from "../config/index";
 
 const LEVELS = { error: 0, warn: 1, info: 2, http: 3, debug: 4 } as const;
 

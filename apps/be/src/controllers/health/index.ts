@@ -1,6 +1,6 @@
+import { getServiceState, type ServiceState } from "@lifecycle/index";
+import { appLogger } from "@logger/index";
 import type { RouteHandler } from "fastify";
-import { getServiceState, type ServiceState } from "../../lifecycle/index";
-import { appLogger } from "../../logger/index";
 import { countAgents } from "./repository";
 
 export interface HealthResponse {

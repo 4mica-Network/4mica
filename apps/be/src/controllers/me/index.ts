@@ -1,7 +1,7 @@
+import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
+import { appLogger } from "@logger/index";
 import type { RouteHandler } from "fastify";
 import type { GenericSchema } from "valibot";
-import { appLogger } from "../../logger/index";
-import { invalidBody, parseBody, requireUserId } from "../shared";
 import {
   getBusiness,
   getProfile,

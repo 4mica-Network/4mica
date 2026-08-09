@@ -1,8 +1,8 @@
 import type { AuthIdentity, AuthUser } from "@4mica/auth";
 import { prisma } from "@4mica/db";
 import { createClerkClient } from "@clerk/backend";
-import { config } from "../config/index";
-import { appLogger } from "../logger/index";
+import { config } from "@config/index";
+import { appLogger } from "@logger/index";
 
 const CACHE_TTL_MS = 60_000;
 

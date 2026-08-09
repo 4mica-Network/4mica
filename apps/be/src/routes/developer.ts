@@ -1,4 +1,3 @@
-import type { FastifyPluginCallback } from "fastify";
 import {
   createApiKeyHandler,
   createWebhookHandler,
@@ -11,8 +10,9 @@ import {
   rotateWebhookSecretHandler,
   updateApiKeyHandler,
   updateWebhookHandler,
-} from "../controllers/developer/index";
-import { sensitiveRateLimit } from "../plugins/rate-limit";
+} from "@controllers/developer/index";
+import { sensitiveRateLimit } from "@plugins/rate-limit";
+import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
@@ -33,7 +33,6 @@ const idParamSchema = {
 export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   const base = guards(app);
 
-  /** Credential-minting and destructive routes get a tighter per-user budget. */
   const strict = {
     onRequest: base.onRequest,
     preHandler: [...base.preHandler, sensitiveRateLimit(app)],

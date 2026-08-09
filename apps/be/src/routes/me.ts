@@ -1,4 +1,3 @@
-import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import {
   getBusinessHandler,
   getMeHandler,
@@ -6,7 +5,8 @@ import {
   updateNotificationsHandler,
   updateProfileHandler,
   upsertBusinessHandler,
-} from "../controllers/me/index";
+} from "@controllers/me/index";
+import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   businessResponseSchema,
@@ -16,7 +16,6 @@ import {
   userResponseSchema,
 } from "./schema-fragments";
 
-/** The three PATCH routes differ only by path, summary and handler. */
 const patchOptions = (app: FastifyInstance, summary: string) => ({
   ...guards(app),
   schema: {

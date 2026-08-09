@@ -1,7 +1,7 @@
+import { clearUserCache } from "@auth/user-store";
+import { meRoutes } from "@routes/me";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearUserCache } from "../../auth/user-store";
-import { meRoutes } from "../../routes/me";
-import { initApp } from "../../server";
+import { initApp } from "@/server";
 
 const {
   authenticateRequest,

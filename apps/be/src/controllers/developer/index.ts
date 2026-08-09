@@ -1,7 +1,12 @@
+import {
+  invalidBody,
+  notFound,
+  parseBody,
+  requireUserId,
+} from "@controllers/shared";
+import { appLogger } from "@logger/index";
+import { WEBHOOK_EVENTS } from "@services/webhook-events";
 import type { RouteHandler } from "fastify";
-import { appLogger } from "../../logger/index";
-import { WEBHOOK_EVENTS } from "../../services/webhook-events";
-import { invalidBody, notFound, parseBody, requireUserId } from "../shared";
 import {
   createApiKey,
   createWebhook,
