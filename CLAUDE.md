@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-pnpm + Turbo monorepo for **4Mica** (credit-layer infrastructure for the agentic economy). Three applications:
+pnpm + Turbo monorepo for **4Mica** (credit-layer infrastructure for the agentic economy). Four applications:
 
 - `apps/web` — Next.js 16 marketing + docs site (static export).
 - `apps/dashboard` — Vite 8 + React 19 SPA (react-router-dom), dev server on port 4173.
 - `apps/be` — Fastify 5 API serving the dashboard, on port 4000.
+- `apps/email` — Fastify 5 service rendering React Email templates and sending them via Resend, on port 4100.
 
 Shared code and config live in `@4mica/*` workspace packages.
 
@@ -63,7 +64,7 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 ## Architecture
 
-- **Monorepo layout**: `apps/*` are the applications; `packages/*` are shared libraries and config consumed as `@4mica/*` workspace deps (`url`, `db`, `seed`, `ui`, `sdk*`, `cli`, `tailwind-config`, `tsconfig`). Turbo orchestrates tasks. **Every third-party version goes in the `pnpm-workspace.yaml` catalog** and packages reference `"catalog:"` — do not run `pnpm add`, which writes a pinned literal (`.npmrc` sets `save-exact`). `biome.json` is the single lint/format source of truth (line width 80, enforced sorted CSS classes in `className`/`cn()`) — not ESLint/Prettier.
+- **Monorepo layout**: `apps/*` are the applications; `packages/*` are shared libraries and config consumed as `@4mica/*` workspace deps (`url`, `db`, `seed`, `ui`, `http`, `auth`, `email-client`, `sdk*`, `cli`, `tailwind-config`, `tsconfig`). Turbo orchestrates tasks. **Every third-party version goes in the `pnpm-workspace.yaml` catalog** and packages reference `"catalog:"` — do not run `pnpm add`, which writes a pinned literal (`.npmrc` sets `save-exact`). `biome.json` is the single lint/format source of truth (line width 80, enforced sorted CSS classes in `className`/`cn()`) — not ESLint/Prettier.
 
 - **`apps/web` is a static export**: Next.js 16 App Router, React 19, `output: "export"` with `images.unoptimized` → builds to `apps/web/out`. There is no SSR or server runtime; avoid patterns that require one.
 
@@ -80,6 +81,8 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 - **`apps/be` lifecycle**: `src/lifecycle/` owns graceful degradation. A module-level `ServiceState` (`ready` → `draining` → `closing`) is the single source of truth for "am I taking traffic". On SIGTERM/SIGINT, `installShutdownHandlers` flips to `draining` — `/health` immediately answers 503 and an `onRequest` guard in `initApp` refuses new requests with 503 + `Retry-After` + `Connection: close` — waits `SHUTDOWN_DRAIN_MS` for in-flight work, then closes Fastify (whose `onClose` hook disconnects Prisma) and flushes the loggers, all capped by `SHUTDOWN_TIMEOUT_MS`. Keep the container's `stop_grace_period` above that cap.
 
 - **`apps/be` rate limiting**: `src/plugins/rate-limit.ts`, in-memory (no Redis). Two layers, because one hook can't do both jobs — an IP-keyed shield on `onRequest` ahead of Clerk verification, and a per-user limit on `preHandler` (where `request.auth` exists) keyed by Clerk user id with an IP fallback. `sensitiveRateLimit(app)` adds a tighter budget to credential-minting routes. Health and preflights are allowlisted; the whole thing is off under `NODE_ENV=test`.
+
+- **`apps/email` is registry-driven**: `packages/email-client` owns the contract — one valibot schema per template in `src/payloads.ts`, collected into the `templateSchemas` map in `src/templates.ts`. The service derives *everything* from that map: `src/routes/emails.ts` generates one `POST /emails/<template-id>` per entry, the OpenAPI body schema comes from the same valibot schema via `@valibot/to-json-schema`, and `src/controllers/emails/index.ts` has a single `makeSendHandler(id)` for all of them. `src/templates/registry.ts` supplies only what differs per email — subject, React component, optional reply-to — and its `satisfies { [K in TemplateId]: … }` clause makes a missing entry a type error. **Adding a template is one schema, one map entry, one `.tsx`, one registry entry — never a new route or handler.** Fastify's validator compiler is replaced with a pass-through in `src/server.ts`: the JSON Schema is documentation only, and valibot is the sole validator so callers always get the `{ error, message, issues[] }` envelope. `EMAIL_DRY_RUN=true` (the default outside production) renders and logs without calling Resend, so the service and its tests run with no API key.
 
 - **Data-driven content**: solutions/FAQs/team are typed TS data (e.g. `apps/web/i18n/locales/en/solutions.ts` with `getSolution(slug)`); dynamic routes use `generateStaticParams()`. SEO metadata is built from factories in `apps/web/seo/`.
 

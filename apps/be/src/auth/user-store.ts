@@ -117,8 +117,6 @@ const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
       throw error;
     }
 
-    // users.email is unique. Another row already holds this address, so write
-    // everything except the email rather than failing the whole session.
     appLogger.warn("Email already claimed by another user, skipping it", {
       clerkUserId: identity.clerkUserId,
     });

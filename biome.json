@@ -112,7 +112,7 @@
   },
   "overrides": [
     {
-      "includes": ["apps/be/src/**"],
+      "includes": ["apps/be/src/**", "apps/email/src/**"],
       "linter": {
         "rules": {
           "style": {

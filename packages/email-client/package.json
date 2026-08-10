@@ -1,0 +1,35 @@
+{
+  "name": "@4mica/email-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Email payload contract and typed client for the 4Mica email service.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf .turbo"
+  },
+  "dependencies": {
+    "axios": "catalog:",
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
