@@ -15,11 +15,6 @@ const absoluteUrl = v.pipe(
 const nonEmpty = (label: string) =>
   v.pipe(v.string(), v.trim(), v.minLength(1, `${label} is required`));
 
-/**
- * Money is carried as a minor-unit integer plus an ISO-4217 code rather than a
- * pre-formatted string, so the template — not the caller — decides how it
- * renders. `2500` + `USD` becomes `$25.00`.
- */
 const money = v.object({
   amount: v.pipe(v.number(), v.integer("amount must be in minor units")),
   currency: v.pipe(
@@ -31,10 +26,6 @@ const money = v.object({
 
 export type Money = v.InferInput<typeof money>;
 
-/**
- * Fields every template accepts. `idempotencyKey` is forwarded to Resend so a
- * retried send never produces a duplicate message.
- */
 export const BaseEmailSchema = v.object({
   to: emailAddress,
   userName: v.optional(v.string(), "there"),
@@ -187,7 +178,6 @@ export const WeeklyReportSchema = v.object({
       v.object({
         label: nonEmpty("metric label"),
         value: v.string(),
-        /** Percentage change vs the previous period, e.g. 12.5 or -3. */
         change: v.optional(v.number()),
       }),
     ),

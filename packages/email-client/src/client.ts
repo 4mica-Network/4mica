@@ -35,18 +35,11 @@ export interface EmailClientLogger {
 }
 
 export interface EmailClientOptions {
-  /**
-   * Throw {@link EmailClientError} when a send fails (the default). Set to
-   * false for fire-and-forget paths — a signup should not fail because the
-   * mailer is down — and failed sends resolve to `null` instead.
-   */
   throwOnError?: boolean;
   timeoutMs?: number;
-  /** Retries for transport errors, 429 and 5xx. 4xx always fails fast. */
   retries?: number;
   headers?: Record<string, string>;
   logger?: EmailClientLogger;
-  /** Escape hatch for anything axios supports that is not modelled above. */
   axiosConfig?: AxiosRequestConfig;
 }
 
@@ -100,10 +93,6 @@ export class EmailClient {
     });
   }
 
-  /**
-   * Send any template. The payload type is resolved from the template id, so
-   * `send("welcome", …)` will not accept a receipt payload.
-   */
   async send<K extends TemplateId>(
     id: K,
     payload: TemplatePayload<K>,

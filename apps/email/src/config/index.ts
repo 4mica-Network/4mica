@@ -81,8 +81,6 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     );
   }
 
-  // A live sender with no key would accept every request and silently deliver
-  // nothing, so refuse to boot instead.
   if (
     result.output.EMAIL_DRY_RUN === "false" &&
     !result.output.RESEND_API_KEY.startsWith("re_")

@@ -11,7 +11,6 @@ export interface SendResult {
   dryRun: boolean;
 }
 
-/** Raised when Resend rejects the send or the SDK throws. */
 export class EmailSendError extends Error {
   readonly templateId: TemplateId;
 
@@ -22,10 +21,6 @@ export class EmailSendError extends Error {
   }
 }
 
-/**
- * Created lazily so importing this module never requires a key — the dry-run
- * path and the unit tests both run without one.
- */
 let client: Resend | undefined;
 
 const resend = (): Resend => {
@@ -34,12 +29,10 @@ const resend = (): Resend => {
   return client;
 };
 
-/** Test seam: forces the next call to build a fresh client. */
 export const resetResendClient = (): void => {
   client = undefined;
 };
 
-/** Turns ada@4mica.io into a***@4mica.io so logs never carry a full address. */
 const redact = (address: string): string => {
   const [local, domain] = address.split("@");
 
@@ -58,8 +51,6 @@ export const sendTemplate = async <K extends TemplateId>(
   const element = template.component(props);
   const subject = template.subject(props);
 
-  // A text/plain alternative materially improves deliverability, and some
-  // clients (and every screen reader fallback) prefer it.
   const [html, text] = await Promise.all([
     render(element),
     render(element, { plainText: true }),

@@ -16,7 +16,6 @@ const TOO_MANY_REQUESTS = {
 const isExempt = (request: FastifyRequest): boolean =>
   request.method === "OPTIONS" || request.url.startsWith("/health");
 
-/** The counted (non-allowlisted) branch of a limiter check. */
 type CountedResult = Extract<
   Awaited<ReturnType<ReturnType<FastifyInstance["createRateLimit"]>>>,
   { isExceeded: boolean }
@@ -31,11 +30,6 @@ const reject = (reply: FastifyReply, result: CountedResult) => {
   return reply.code(429).send(TOO_MANY_REQUESTS);
 };
 
-/**
- * A single IP-keyed layer, unlike apps/be's two. This service has no
- * authenticated principal to key a second budget on — every caller is another
- * internal service reached over the private network.
- */
 const ipShield = (app: FastifyInstance): onRequestAsyncHookHandler => {
   const check = app.createRateLimit({
     max: config.rateLimit.ipMax,

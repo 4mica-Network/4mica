@@ -18,19 +18,10 @@ import WaitlistInvitation from "@emails/platform/WaitlistInvitation";
 import WorkspaceInvite from "@emails/platform/WorkspaceInvite";
 import type { ReactElement } from "react";
 
-/**
- * Everything that differs between two emails, in one place. The route, the
- * request validation, the OpenAPI body schema and the client method are all
- * derived from this map plus the shared schema map in `@4mica/email-client`,
- * so adding a template is a single entry here rather than an edit in five
- * files.
- */
 export interface TemplateDefinition<K extends TemplateId> {
-  /** Shown as the OpenAPI operation summary. */
   summary: string;
   subject: (props: TemplateProps<K>) => string;
   component: (props: TemplateProps<K>) => ReactElement;
-  /** Overrides config.email.replyTo for this template only. */
   replyTo?: string;
 }
 
@@ -145,11 +136,6 @@ export const registry = {
 
 export type Registry = typeof registry;
 
-/**
- * The registry is keyed by a literal union, so reading it with a `TemplateId`
- * variable widens every payload to the union of all payloads. Callers that
- * already hold a matching `(id, props)` pair go through here instead.
- */
 export const getTemplate = <K extends TemplateId>(
   id: K,
 ): TemplateDefinition<K> => registry[id] as TemplateDefinition<K>;

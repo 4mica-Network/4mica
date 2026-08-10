@@ -12,20 +12,11 @@ export const initApp = async (
 ): Promise<FastifyInstance> => {
   const app = Fastify({
     trustProxy: true,
-    // Weekly reports and multi-line announcements are the largest bodies here;
-    // 256 KiB is well clear of them.
     bodyLimit: 262_144,
   });
 
-  // Route schemas carry a JSON Schema body purely so Swagger can document each
-  // template. Validation itself is valibot's job in the handler — it is the
-  // same schema the client's types come from, and it produces the
-  // `{ error, message, issues[] }` envelope callers parse. Letting ajv run
-  // first would reject bodies with its own generic "Bad Request" instead.
   app.setValidatorCompiler(() => (data) => ({ value: data }));
 
-  // First hook of all: once draining, refuse new work before spending any
-  // effort on rate-limit accounting or rendering.
   app.addHook("onRequest", async (request, reply) => {
     if (isAcceptingTraffic() || request.url.startsWith("/health")) {
       return;

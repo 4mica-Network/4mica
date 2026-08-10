@@ -4,11 +4,6 @@ import { appLogger } from "@logger/index";
 import { EmailSendError, sendTemplate } from "@services/resend";
 import type { RouteHandler } from "fastify";
 
-/**
- * One handler factory for all 16 routes. The template id closes over the
- * schema and the registry entry, so a new template needs no handler of its
- * own.
- */
 export const makeSendHandler = (id: TemplateId): RouteHandler => {
   const schema = templateSchemas[id];
 
@@ -20,8 +15,6 @@ export const makeSendHandler = (id: TemplateId): RouteHandler => {
     }
 
     try {
-      // parseBody narrows to the union of every template's output; the id and
-      // the schema it came from are the same key, so this pairing is sound.
       const result = await sendTemplate(id, parsed.data as never);
 
       return reply.code(202).send(result);

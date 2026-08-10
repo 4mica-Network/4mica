@@ -170,8 +170,6 @@ describe("POST /emails/:template", () => {
         payload: {},
       });
 
-      // An empty body is invalid for every template, but a missing route
-      // would answer 404 rather than 400.
       expect(response.statusCode, `${id} has no route`).toBe(400);
     }
 

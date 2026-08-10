@@ -9,11 +9,6 @@ describe("template registry", () => {
     expect(Object.keys(registry).sort()).toEqual([...templateIds].sort());
   });
 
-  /**
-   * Every template ships PreviewProps for `react-email dev`. Validating them
-   * through the shared schema means the preview data and the wire contract
-   * cannot drift, and it gives every template a render fixture for free.
-   */
   it.each(
     templateIds,
   )("renders %s from its preview props with a non-empty subject", async (id) => {
