@@ -133,7 +133,7 @@ export const TabGroup = ({
           {canScrollLeft && (
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-surface-deep via-surface-deep/85 to-transparent"
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-linear-to-r from-surface-deep via-surface-deep/85 to-transparent"
             />
           )}
 
@@ -151,7 +151,7 @@ export const TabGroup = ({
           <div
             ref={scrollContainerRef}
             className={cn(
-              "flex touch-pan-x space-x-1 overflow-x-auto overscroll-x-contain scroll-smooth whitespace-nowrap py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+              "scrollbar-none flex touch-pan-x space-x-1 overflow-x-auto overscroll-x-contain scroll-smooth whitespace-nowrap py-1 [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
               placementPosition,
             )}
             role="tablist"
@@ -170,7 +170,7 @@ export const TabGroup = ({
           {canScrollRight && (
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-surface-deep via-surface-deep/85 to-transparent"
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-linear-to-l from-surface-deep via-surface-deep/85 to-transparent"
             />
           )}
 
