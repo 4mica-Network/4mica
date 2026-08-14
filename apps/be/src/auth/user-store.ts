@@ -3,8 +3,16 @@ import { prisma } from "@4mica/db";
 import { createClerkClient } from "@clerk/backend";
 import { config } from "@config/index";
 import { appLogger } from "@logger/index";
+import {
+  isUniqueViolation,
+  uniqueViolationTargets,
+} from "@services/prisma-errors";
+import { generateUsername } from "@services/username";
 
 const CACHE_TTL_MS = 60_000;
+
+/** Handle collisions are a 40-bit coincidence; two retries is already generous. */
+const CREATE_ATTEMPTS = 3;
 
 interface CacheEntry {
   user: AuthUser;
@@ -72,20 +80,26 @@ const fetchProfile = async (identity: AuthIdentity): Promise<AuthIdentity> => {
   }
 };
 
-const isUniqueViolation = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  (error as { code?: string }).code === "P2002";
+interface UpsertOptions {
+  withEmail: boolean;
+  /**
+   * Written on create only. A returning user keeps whatever handle they have,
+   * including one they picked themselves and including null on rows that
+   * predate generated handles.
+   */
+  username: string;
+}
 
 const runUpsert = async (
   identity: AuthIdentity,
-  withEmail: boolean,
+  { withEmail, username }: UpsertOptions,
 ): Promise<AuthUser> =>
   toAuthUser(
     await prisma.user.upsert({
       where: { clerkUserId: identity.clerkUserId },
       create: {
         clerkUserId: identity.clerkUserId,
+        username,
         ...(withEmail && identity.email !== null
           ? { email: identity.email }
           : {}),
@@ -110,18 +124,39 @@ const runUpsert = async (
   );
 
 const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
-  try {
-    return await runUpsert(identity, true);
-  } catch (error) {
-    if (!isUniqueViolation(error)) {
-      throw error;
+  let options: UpsertOptions = {
+    withEmail: true,
+    username: generateUsername(),
+  };
+
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await runUpsert(identity, options);
+    } catch (error) {
+      if (!isUniqueViolation(error) || attempt === CREATE_ATTEMPTS) {
+        throw error;
+      }
+
+      const targets = uniqueViolationTargets(error);
+
+      // A generated handle lost a race with another insert. Draw a new one.
+      if (targets.includes("username")) {
+        appLogger.warn("Generated username was already taken, retrying", {
+          clerkUserId: identity.clerkUserId,
+        });
+        options = { ...options, username: generateUsername() };
+        continue;
+      }
+
+      if (!options.withEmail) {
+        throw error;
+      }
+
+      appLogger.warn("Email already claimed by another user, skipping it", {
+        clerkUserId: identity.clerkUserId,
+      });
+      options = { ...options, withEmail: false };
     }
-
-    appLogger.warn("Email already claimed by another user, skipping it", {
-      clerkUserId: identity.clerkUserId,
-    });
-
-    return runUpsert(identity, false);
   }
 };
 

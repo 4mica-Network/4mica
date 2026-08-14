@@ -15,7 +15,7 @@ import { NextResponse } from "next/server";
  * only cost is one warning per build. Migrating is a rename when we're ready.
  */
 
-const HANDLE_PATTERN = /^[A-Za-z0-9_-]{3,64}$/;
+const HANDLE_PATTERN = /^[A-Za-z0-9_-]{2,64}$/;
 
 /** Everything after the first path segment, preserved verbatim on redirect. */
 const rest = (segments: string[]): string =>

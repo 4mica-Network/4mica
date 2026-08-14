@@ -1,12 +1,14 @@
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
 import { appLogger } from "@logger/index";
+import {
+  isUniqueViolation,
+  uniqueViolationTarget,
+} from "@services/prisma-errors";
 import type { RouteHandler } from "fastify";
 import type { GenericSchema } from "valibot";
 import {
   getBusiness,
   getProfile,
-  isUniqueViolation,
-  uniqueViolationTarget,
   updateUser,
   upsertBusiness,
 } from "./repository";

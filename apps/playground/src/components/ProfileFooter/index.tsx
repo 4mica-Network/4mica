@@ -8,7 +8,7 @@ export function ProfileFooter({ show }: { show: boolean }) {
   }
 
   return (
-    <footer className="mt-12 border-overlay/10 border-t pt-6">
+    <footer className="mt-8 flex justify-center">
       <UiLink href={links.website} variant="muted" external className="text-sm">
         {messages.common.poweredBy}
       </UiLink>

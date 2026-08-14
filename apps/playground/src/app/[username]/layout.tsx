@@ -34,12 +34,13 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
 
   return (
     <div className="profile-scope min-h-screen" style={brandStyle}>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-10 sm:py-14">
-        {profile.isOwner && (
-          <OwnerBar
-            isPublished={profile.isPublished}
-            username={profile.username}
-          />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14 sm:py-20">
+        {/*
+          Owner-only, and only while the profile is still private: a published
+          profile should look to its owner exactly as it looks to everyone else.
+        */}
+        {profile.isOwner && !profile.isPublished && (
+          <OwnerBar username={profile.username} />
         )}
 
         {children}

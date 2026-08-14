@@ -1,17 +1,14 @@
-import { Link as UiLink } from "@4mica/ui";
-import { Mail } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
-import { CopyLinkButton } from "@/components/CopyLinkButton";
-import { Prose } from "@/components/Prose";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
-import { messages, t } from "@/i18n";
 import type { PublicProfile } from "@/types";
-import { formatMonthYear } from "@/utils/formatDate";
-import { profileUrl } from "@/utils/profileUrl";
 
+/**
+ * Deliberately just the face and the name. The handle is already in the URL,
+ * and everything else the profile knows lives on the rows below it.
+ */
 export function ProfileHeader({ profile }: { profile: PublicProfile }) {
   return (
-    <header className="flex flex-col gap-6 sm:flex-row sm:items-start">
+    <header className="flex flex-col gap-4">
       <Avatar
         src={profile.avatarUrl}
         name={profile.name}
@@ -19,44 +16,11 @@ export function ProfileHeader({ profile }: { profile: PublicProfile }) {
         size="lg"
       />
 
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h1 className="font-semibold text-2xl text-ink-strong sm:text-3xl">
-            {profile.name || profile.username}
-          </h1>
-          {profile.verified && <VerifiedBadge />}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-muted text-sm">
-          <span className="profile-accent font-medium">
-            @{profile.username}
-          </span>
-          <span aria-hidden="true" className="text-ink-subtle">
-            ·
-          </span>
-          <span>
-            {t(messages.profile.joined, {
-              date: formatMonthYear(profile.memberSince),
-            })}
-          </span>
-        </div>
-
-        <Prose text={profile.bio} className="max-w-2xl" />
-
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <CopyLinkButton url={profileUrl(profile.username)} />
-          {profile.email && (
-            <UiLink
-              href={`mailto:${profile.email}`}
-              variant="muted"
-              icon={<Mail aria-hidden="true" className="h-4 w-4" />}
-              iconPosition="left"
-              className="text-sm"
-            >
-              {messages.profile.contact}
-            </UiLink>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="font-semibold text-ink-strong text-lg">
+          {profile.name || profile.username}
+        </h1>
+        {profile.verified && <VerifiedBadge />}
       </div>
     </header>
   );

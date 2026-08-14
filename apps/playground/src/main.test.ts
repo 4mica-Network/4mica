@@ -55,7 +55,7 @@ describe("env contract", () => {
 
 describe("username param parsing", () => {
   it("accepts a plain handle", () => {
-    expect(parseUsername("mo")).toBeNull(); // too short
+    expect(parseUsername("mo")).toBe("mo"); // two characters is the floor
     expect(parseUsername("mo-4mica")).toBe("mo-4mica");
     expect(parseUsername("4mica_workspace")).toBe("4mica_workspace");
   });
@@ -70,7 +70,7 @@ describe("username param parsing", () => {
   });
 
   it.each([
-    ["ab", "shorter than 3"],
+    ["a", "shorter than 2"],
     ["a".repeat(65), "longer than 64"],
     ["a b", "contains a space"],
     ["../etc/passwd", "path traversal"],

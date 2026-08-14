@@ -77,7 +77,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
       <header className="flex items-start gap-4">
         <Avatar
           name={agent.name}
-          size="lg"
+          size="xl"
           src={agent.avatarUrl}
           username={agent.ref}
         />

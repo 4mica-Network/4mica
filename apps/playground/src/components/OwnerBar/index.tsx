@@ -9,10 +9,14 @@ import { links } from "@/services/links";
 
 export interface OwnerBarProps {
   username: string;
-  isPublished: boolean;
 }
 
-export function OwnerBar({ username, isPublished }: OwnerBarProps) {
+/**
+ * Shown only to the owner of a profile that is still private, to explain why
+ * nobody else can see the page. Once published there is no bar at all — the
+ * owner sees the same page as the public.
+ */
+export function OwnerBar({ username }: OwnerBarProps) {
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
 
@@ -25,26 +29,14 @@ export function OwnerBar({ username, isPublished }: OwnerBarProps) {
   };
 
   return (
-    <div
-      className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 ${
-        isPublished
-          ? "border-overlay/10 bg-overlay/5"
-          : "border-warning/30 bg-warning/10"
-      }`}
-    >
-      {!isPublished && (
-        <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
-      )}
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+      <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
 
       <div className="min-w-0 flex-1">
         <p className="font-medium text-ink-strong text-sm">
-          {isPublished
-            ? messages.owner.viewingOwn
-            : messages.owner.previewTitle}
+          {messages.owner.previewTitle}
         </p>
-        {!isPublished && (
-          <p className="text-ink-muted text-sm">{messages.owner.previewLead}</p>
-        )}
+        <p className="text-ink-muted text-sm">{messages.owner.previewLead}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -71,9 +63,7 @@ export function OwnerBar({ username, isPublished }: OwnerBarProps) {
           icon={<Settings aria-hidden="true" className="h-4 w-4" />}
         >
           <a href={`${links.app}/settings/profile`}>
-            {isPublished
-              ? messages.owner.manageAction
-              : messages.owner.publishAction}
+            {messages.owner.publishAction}
           </a>
         </Button>
       </div>

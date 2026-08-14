@@ -30,7 +30,7 @@ export const UpdateProfileSchema = v.partial(
       v.pipe(
         v.string(),
         v.trim(),
-        v.minLength(3),
+        v.minLength(2),
         v.maxLength(64),
         v.regex(
           /^[a-z0-9_-]+$/,

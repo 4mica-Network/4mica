@@ -4,7 +4,8 @@ import { initials } from "@/utils/initials";
 const SIZES = {
   sm: "h-9 w-9 text-xs",
   md: "h-12 w-12 text-sm",
-  lg: "h-20 w-20 text-xl sm:h-24 sm:w-24 sm:text-2xl",
+  lg: "h-16 w-16 text-lg",
+  xl: "h-20 w-20 text-xl sm:h-24 sm:w-24 sm:text-2xl",
 } as const;
 
 export interface AvatarProps {

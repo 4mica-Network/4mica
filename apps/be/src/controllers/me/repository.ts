@@ -113,16 +113,3 @@ export const upsertBusiness = async (
     update: data,
     select: BUSINESS_SELECT,
   });
-
-export const isUniqueViolation = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  (error as { code?: string }).code === "P2002";
-
-export const uniqueViolationTarget = (error: unknown): string => {
-  const target = (error as { meta?: { target?: unknown } })?.meta?.target;
-  if (Array.isArray(target)) {
-    return target.join(", ");
-  }
-  return typeof target === "string" ? target : "field";
-};

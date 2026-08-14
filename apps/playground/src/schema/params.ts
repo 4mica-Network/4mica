@@ -18,7 +18,7 @@ const UsernameParamSchema = v.pipe(
   v.string(),
   v.trim(),
   v.transform((value) => value.replace(/^@/, "").toLowerCase()),
-  v.minLength(3, "username must be at least 3 characters"),
+  v.minLength(2, "username must be at least 2 characters"),
   v.maxLength(64, "username must be at most 64 characters"),
   v.regex(
     USERNAME_PATTERN,
