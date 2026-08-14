@@ -23,6 +23,25 @@ enum PublicVisibility {
   PUBLIC
 }
 
+/**
+ * The chains 4Mica settles on. Stored as an enum rather than a raw CAIP-2
+ * string so a typo cannot reach a payment snippet; the CAIP-2 id, RPC and
+ * explorer URLs are derived from it in application code.
+ */
+enum PaymentNetwork {
+  BASE
+  BASE_SEPOLIA
+  ETHEREUM_SEPOLIA
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
 model Agent {
   id            String           @id @default(uuid(7))
   ownerId       String?          @map("owner_id")
@@ -35,6 +54,8 @@ model Agent {
   status        AgentStatus      @default(PENDING)
   visibility    PublicVisibility @default(PRIVATE)
   creditLimit   Decimal          @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  /// The chain this agent signs payment guarantees on.
+  network       PaymentNetwork   @default(ETHEREUM_SEPOLIA)
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
@@ -162,18 +183,59 @@ model ApiListing {
   docsUrl     String?          @map("docs_url") @db.VarChar(2048)
   category    String?          @db.VarChar(64)
   tags        String[]
+  /// Human display string ("Free in sandbox", "Usage-based"). The machine
+  /// price that drives payment snippets is `priceAmount`/`priceCurrency`.
   priceLabel  String?          @map("price_label") @db.VarChar(64)
   visibility  PublicVisibility @default(PRIVATE)
   publishedAt DateTime?        @map("published_at")
+
+  // --- x402 payment facts. Nullable because a listing can be published as a
+  // --- description before its owner has wired up payments.
+  network       PaymentNetwork?
+  /// The seller's receiving address. Safe to expose publicly — the x402
+  /// handshake advertises it in the 402 response body.
+  payToAddress  String?         @map("pay_to_address") @db.VarChar(42)
+  /// ERC-20 token accepted for payment. Null means the chain's native asset.
+  assetAddress  String?         @map("asset_address") @db.VarChar(42)
+  priceAmount   Decimal?        @map("price_amount") @db.Decimal(38, 18)
+  priceCurrency String?         @map("price_currency") @db.VarChar(16)
+  /// The endpoint that issues tabs / advertises requirements
+  /// (`paymentRequirements.extra.tabEndpoint`).
+  x402Endpoint  String?         @map("x402_endpoint") @db.VarChar(2048)
+
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
   deletedAt   DateTime?        @map("deleted_at")
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  endpoints ApiEndpoint[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
   @@map("api_listings")
+}
+
+/**
+ * One priced route on an `ApiListing`. Exists so an integration snippet can
+ * name a real method and path instead of a placeholder.
+ */
+model ApiEndpoint {
+  id          String     @id @default(uuid(7))
+  listingId   String     @map("listing_id")
+  method      HttpMethod @default(GET)
+  path        String     @db.VarChar(512)
+  summary     String?    @db.VarChar(280)
+  /// Overrides the listing price for this route when set.
+  priceAmount Decimal?   @map("price_amount") @db.Decimal(38, 18)
+  sortOrder   Int        @default(0) @map("sort_order")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  listing ApiListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, method, path])
+  @@index([listingId])
+  @@map("api_endpoints")
 }
 
 model Webhook {

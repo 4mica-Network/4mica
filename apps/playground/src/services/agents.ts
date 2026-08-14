@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import type { PublicAgent } from "@/schema/agent";
+import type { PaymentNetwork } from "@/schema/params";
 import { prisma } from "./db";
 
 /**
@@ -20,6 +21,17 @@ const AGENT_PUBLIC_SELECT = {
   status: true,
   visibility: true,
   createdAt: true,
+  network: true,
+} as const;
+
+/**
+ * The owner's own view. `walletAddress` is added only here: the agent detail
+ * page needs it to render a runnable payer snippet, and the owner already knows
+ * their own address. `creditLimit` stays out of both selects.
+ */
+const AGENT_OWNER_SELECT = {
+  ...AGENT_PUBLIC_SELECT,
+  walletAddress: true,
 } as const;
 
 type AgentRow = {
@@ -32,6 +44,8 @@ type AgentRow = {
   status: "PENDING" | "ACTIVE" | "SUSPENDED";
   visibility: "PRIVATE" | "UNLISTED" | "PUBLIC";
   createdAt: Date;
+  network: PaymentNetwork;
+  walletAddress?: string;
 };
 
 const toPublicAgent = (row: AgentRow): PublicAgent => ({
@@ -44,6 +58,10 @@ const toPublicAgent = (row: AgentRow): PublicAgent => ({
   status: row.status,
   visibility: row.visibility,
   createdAt: row.createdAt.toISOString(),
+  network: row.network,
+  // Absent from the public select, so this is null for non-owners by
+  // construction rather than by a conditional the caller could forget.
+  walletAddress: row.walletAddress ?? null,
 });
 
 /**
@@ -70,22 +88,26 @@ export const listPublicAgents = cache(
 /**
  * Resolve one agent by slug or id, scoped to its owner so a valid id from
  * another profile cannot be read through this URL.
+ *
+ * `isOwner` is a separate argument from the visibility widening on purpose:
+ * conflating "may see hidden rows" with "may see the wallet address" is how a
+ * future caller would leak the address.
  */
 export const getPublicAgent = cache(
   async (
     ownerId: string,
     idOrSlug: string,
-    includeHidden = false,
+    isOwner = false,
   ): Promise<PublicAgent | null> => {
     const row = await prisma.agent.findFirst({
       where: {
         ownerId,
-        ...(includeHidden
+        ...(isOwner
           ? {}
           : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
         OR: [{ slug: idOrSlug }, { id: idOrSlug }],
       },
-      select: AGENT_PUBLIC_SELECT,
+      select: isOwner ? AGENT_OWNER_SELECT : AGENT_PUBLIC_SELECT,
     });
 
     return row ? toPublicAgent(row) : null;

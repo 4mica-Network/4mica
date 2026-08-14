@@ -2,6 +2,7 @@ import { Tag, Link as UiLink } from "@4mica/ui";
 import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ApiIntegration } from "@/components/IntegrationSection/ApiIntegration";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { VisibilityTag } from "@/components/VisibilityTag";
@@ -130,6 +131,8 @@ export default async function ApiListingPage({
           <Prose text={listing.description} />
         </section>
       )}
+
+      <ApiIntegration isOwner={profile.isOwner} listing={listing} />
 
       {listing.tags.length > 0 && (
         <section className="flex flex-col gap-3">

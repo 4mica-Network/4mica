@@ -1,13 +1,16 @@
 import * as v from "valibot";
-import { VisibilitySchema } from "./params";
+import { PaymentNetworkSchema, VisibilitySchema } from "./params";
 
 /**
  * The public agent DTO.
  *
- * `walletAddress` and `creditLimit` are deliberately absent: a credit limit is
- * commercially sensitive and a wallet address is a doxxing / on-chain
- * correlation vector. Adding either needs an explicit per-agent opt-in field,
- * not a widened select.
+ * `creditLimit` is deliberately absent: it is commercially sensitive.
+ *
+ * `walletAddress` is **owner-only** — it is populated when the viewer owns the
+ * profile and `null` for everyone else, because a wallet address lets anyone
+ * correlate a profile with its on-chain activity. The integration snippet falls
+ * back to a placeholder when it is null. Making it unconditionally public needs
+ * an explicit per-agent opt-in field, not a widened select.
  */
 const PublicAgentSchema = v.object({
   /** The row id. Needed by the owner's visibility toggle; opaque otherwise. */
@@ -21,6 +24,10 @@ const PublicAgentSchema = v.object({
   status: v.picklist(["PENDING", "ACTIVE", "SUSPENDED"] as const),
   visibility: VisibilitySchema,
   createdAt: v.string(),
+  /** The chain this agent signs on. Public — it is not identifying. */
+  network: PaymentNetworkSchema,
+  /** Owner-only. `null` for every other viewer. */
+  walletAddress: v.nullable(v.string()),
 });
 
 export type PublicAgent = v.InferOutput<typeof PublicAgentSchema>;

@@ -50,6 +50,46 @@ export const en = {
     tagsHeading: "Tags",
   },
 
+  integration: {
+    heading: "Integration",
+    copy: "Copy",
+    copied: "Copied",
+    viewDocs: "Read the full integration guide",
+
+    installTitle: "Install the SDK",
+    installLead: "Add the client packages to your project.",
+
+    // API listing
+    apiLead:
+      "Pay per call with credit-backed guarantees. No prepaid balance, no gas on the request path.",
+    callTitle: "Call this API",
+    callLead:
+      "Wrap the fetch you already use. The client answers the 402, signs a guarantee, and retries — you get the response.",
+    receiptTitle: "See your transactions",
+    receiptLead:
+      "Each paid response carries its settled payment. Pair it with your own task log to make the spend auditable.",
+    endpointsTitle: "Priced endpoints",
+    nativeAsset: "Native asset",
+    erc20: "ERC-20",
+    notPayable: "This API is not accepting 4Mica payments yet.",
+    notPayableOwner:
+      "Add a network and a receiving address to this listing to show integration instructions here.",
+
+    // Agent
+    agentLead:
+      "This agent pays for the requests it makes. Wire it up once and every call it issues is credit-backed.",
+    payTitle: "Pay as this agent",
+    payLead:
+      "Register the 4Mica scheme against the agent's signer, then wrap its fetch.",
+    collateralTitle: "Fund it and check its credit",
+    collateralLead:
+      "Credit is extended against deposited collateral. Read the agent's positions to see what is available and what is locked.",
+    walletOwnerOnly:
+      "The agent's wallet address is only shown to you, the owner.",
+    inactiveAgent:
+      "This agent cannot sign payments until it is active. The setup below still applies.",
+  },
+
   visibility: {
     public: "Public",
     unlisted: "Unlisted",

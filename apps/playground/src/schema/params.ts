@@ -62,3 +62,27 @@ export const VisibilitySchema = v.picklist([
 ] as const);
 
 export type Visibility = v.InferOutput<typeof VisibilitySchema>;
+
+/**
+ * Mirrors the `PaymentNetwork` enum in packages/db. Kept as a literal union
+ * rather than imported from the generated client so the DTO layer stays free
+ * of Prisma types — the same reason `VisibilitySchema` is written out above.
+ */
+export const PaymentNetworkSchema = v.picklist([
+  "BASE",
+  "BASE_SEPOLIA",
+  "ETHEREUM_SEPOLIA",
+] as const);
+
+export type PaymentNetwork = v.InferOutput<typeof PaymentNetworkSchema>;
+
+/** Mirrors the `HttpMethod` enum in packages/db. */
+export const HttpMethodSchema = v.picklist([
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+] as const);
+
+export type HttpMethod = v.InferOutput<typeof HttpMethodSchema>;

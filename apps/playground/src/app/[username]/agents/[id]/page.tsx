@@ -2,6 +2,7 @@ import { Tag } from "@4mica/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
+import { AgentIntegration } from "@/components/IntegrationSection/AgentIntegration";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { VisibilityTag } from "@/components/VisibilityTag";
@@ -124,6 +125,8 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
           <Prose text={agent.description} />
         </section>
       )}
+
+      <AgentIntegration agent={agent} />
     </article>
   );
 }
