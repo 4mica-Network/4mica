@@ -6,13 +6,13 @@
 //! Split by subsystem, since each is opt-in independently:
 //!
 //! * [`relayer`] — the key and endpoint that sponsor gas. Absent ⇒ `/deposit` is unavailable.
-//! * [`deposit`] — throttling for those sponsored deposits.
+//! * [`sponsor`] — throttling for the sponsored actions those relayers pay for.
 //!
 //! Shared env helpers ([`trimmed_env`], [`normalize_url`]) stay here so both submodules read the
 //! environment the same way.
 
-mod deposit;
 mod relayer;
+mod sponsor;
 
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -23,9 +23,9 @@ use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
 use sdk_4mica::Address;
 use serde::Deserialize;
 
-use crate::limits::DepositLimits;
-use deposit::deposit_limits_from_env;
+use crate::limits::SponsorLimits;
 use relayer::{RelayerFallback, load_relayer_fallback, resolve_relayer_config};
+use sponsor::{DEPOSIT_PREFIX, WITHDRAW_PREFIX, sponsor_limits_from_env};
 
 pub use relayer::NetworkRelayerConfig;
 
@@ -51,7 +51,8 @@ pub struct ServiceConfig {
     pub bind_addr: SocketAddr,
     pub scheme: String,
     pub networks: Vec<NetworkConfig>,
-    pub deposit_limits: DepositLimits,
+    pub deposit_limits: SponsorLimits,
+    pub withdraw_limits: SponsorLimits,
 }
 
 #[derive(Clone)]
@@ -76,12 +77,14 @@ impl ServiceConfig {
         let bind_addr = bind_addr_from_env()?;
         let scheme = std::env::var(ENV_SCHEME).unwrap_or_else(|_| "4mica-credit".into());
         let networks = load_networks_from_env()?;
-        let deposit_limits = deposit_limits_from_env()?;
+        let deposit_limits = sponsor_limits_from_env(DEPOSIT_PREFIX)?;
+        let withdraw_limits = sponsor_limits_from_env(WITHDRAW_PREFIX)?;
         Ok(Self {
             bind_addr,
             scheme,
             networks,
             deposit_limits,
+            withdraw_limits,
         })
     }
 }
@@ -471,7 +474,7 @@ fn resolve_guarantee_domain(
 mod tests {
     use super::*;
     use relayer::{ENV_RELAYER_PRIVATE_KEY, ENV_RELAYER_RPC_URL};
-    use rpc::CorePublicParameters;
+    use rpc::{CorePublicParameters, GuaranteeVersionDomain};
     use serial_test::serial;
     use std::env;
 
@@ -485,6 +488,11 @@ mod tests {
             chain_id: 11155111,
             supported_guarantee_versions: vec![GUARANTEE_CLAIMS_VERSION],
             guarantee_domain_separator: format!("0x{}", "11".repeat(32)),
+            guarantee_domains: vec![GuaranteeVersionDomain {
+                version: GUARANTEE_CLAIMS_VERSION,
+                domain_separator: format!("0x{}", "11".repeat(32)),
+            }],
+            core_domain_separator: format!("0x{}", "22".repeat(32)),
             validators: vec!["https://validator.example".into()],
         }
     }

@@ -2,17 +2,21 @@ use std::collections::HashMap;
 
 use rpc::PaymentGuaranteeRequest;
 use sdk_4mica::BLSCert;
-use sdk_4mica::contract::Core4Mica::{Permit2Authorization, ReceiveAuthorization};
+use sdk_4mica::contract::Core4Mica::{
+    Permit2Authorization, ReceiveAuthorization, WithdrawalCancelAuthorization,
+    WithdrawalRequestAuthorization,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::state::ValidationError;
 use std::str::FromStr;
 
-use alloy::primitives::{B256, U256};
+use alloy::primitives::{Address, B256, U256};
 
 use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
-use crate::limits::DepositCounters;
+use crate::limits::SponsorCounters;
+use crate::withdraw::{WithdrawError, WithdrawIntent};
 
 #[derive(Clone, Copy, Debug)]
 pub struct X402Version<const N: u8>;
@@ -118,7 +122,9 @@ pub struct HealthResponse {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub relayers: Vec<RelayerHealth>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposits: Option<DepositCounters>,
+    pub deposits: Option<SponsorCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub withdrawals: Option<SponsorCounters>,
 }
 
 #[derive(Serialize)]
@@ -388,6 +394,149 @@ impl DepositResponse {
             error_code: Some(error.code().to_string()),
             retryable: Some(error.is_retryable()),
             permit2_allowance: Permit2AllowanceResponse::from_error(error),
+        }
+    }
+}
+
+/// A gasless withdrawal step. `action` selects which one, and the fields it needs travel alongside.
+///
+/// Finalization carries no authorization: `finalizeWithdrawalFor` pays the user whoever submits it,
+/// so there is nothing for the user to sign — and the grace period is weeks long, which would
+/// otherwise mean signing a fresh authorization long after the request.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(
+    tag = "action",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum WithdrawAction {
+    Request {
+        authorization: WithdrawalRequestAuthorization,
+    },
+    Cancel {
+        authorization: WithdrawalCancelAuthorization,
+    },
+    Finalize {
+        user: String,
+        asset: String,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawRequest {
+    /// CAIP-2 network. Omitted uses the facilitator's default (first configured) network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    #[serde(flatten)]
+    pub action: WithdrawAction,
+}
+
+impl WithdrawRequest {
+    pub fn parse(self) -> Result<WithdrawIntent, WithdrawError> {
+        Ok(match self.action {
+            WithdrawAction::Request { authorization } => WithdrawIntent::Request(authorization),
+            WithdrawAction::Cancel { authorization } => WithdrawIntent::Cancel(authorization),
+            WithdrawAction::Finalize { user, asset } => WithdrawIntent::Finalize {
+                user: parse_address(&user, "user")?,
+                asset: parse_address(&asset, "asset")?,
+            },
+        })
+    }
+}
+
+fn parse_address(value: &str, field: &str) -> Result<Address, WithdrawError> {
+    Address::from_str(value.trim())
+        .map_err(|_| WithdrawError::InvalidRequest(format!("invalid {field} address: {value}")))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawVerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+    /// Stable code so clients branch on this rather than parsing `invalidReason`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// True when retrying the identical request may succeed — throttling and transient chain
+    /// errors. A bad signature or an expired authorization will never become valid.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+impl WithdrawVerifyResponse {
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            invalid_reason: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn invalid(error: &WithdrawError) -> Self {
+        Self {
+            is_valid: false,
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// Echoed back so a caller can reconcile without re-parsing its own request. The action always
+    /// applies to `user` — the relayer cannot redirect it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+    /// Present for `request` only; the other actions carry no amount.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+impl WithdrawResponse {
+    pub fn success(tx_hash: B256, network: &str, intent: &WithdrawIntent) -> Self {
+        Self {
+            success: true,
+            tx_hash: Some(format!("{tx_hash:#x}")),
+            network: Some(network.to_string()),
+            user: Some(format!("{:#x}", intent.user())),
+            asset: Some(format!("{:#x}", intent.asset())),
+            amount: intent.amount().map(|amount| amount.to_string()),
+            error: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn failure(error: &WithdrawError) -> Self {
+        Self {
+            success: false,
+            tx_hash: None,
+            network: None,
+            user: None,
+            asset: None,
+            amount: None,
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
         }
     }
 }

@@ -25,9 +25,10 @@ use alloy::primitives::{Address, B256, U256};
 use sdk_4mica::contract::Core4Mica::{Permit2Authorization, ReceiveAuthorization};
 use sdk_4mica::contract::PERMIT2_ADDRESS;
 
-use crate::limits::{DepositGuard, DepositLimits};
+use crate::limits::{SponsorGuard, SponsorLimits};
 use crate::relayer::{DepositToken, Relayer};
 
+pub(crate) use error::classify_core4mica_revert;
 pub use error::{DepositError, Permit2AllowanceDetails};
 
 use eip712::{
@@ -190,7 +191,7 @@ impl DepositIntent {
 /// see — a paused contract, an asset disabled on-chain, an unsupported token.
 pub async fn verify(
     relayer: &Relayer,
-    limits: &DepositLimits,
+    limits: &SponsorLimits,
     intent: &DepositIntent,
     now: u64,
 ) -> Result<(), DepositError> {
@@ -515,7 +516,7 @@ async fn estimate_deposit_gas(
 /// limits by varying it on every request.
 pub async fn submit(
     relayer: &Relayer,
-    guard: &Arc<DepositGuard>,
+    guard: &Arc<SponsorGuard>,
     intent: &DepositIntent,
     now: u64,
 ) -> Result<B256, DepositError> {

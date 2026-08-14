@@ -14,7 +14,7 @@ use tower::ServiceExt;
 
 use crate::exact::ExactService;
 use crate::issuer::GuaranteeIssuer;
-use crate::limits::{DepositGuard, DepositLimits};
+use crate::limits::{SponsorGuard, SponsorLimits};
 use crate::verifier::CertificateValidator;
 use crypto::bls::KeyMaterial;
 
@@ -310,7 +310,8 @@ async fn supported_includes_exact_when_available() {
         vec![handler],
         Some(exact.clone() as Arc<dyn ExactService>),
         Vec::new(),
-        DepositGuard::new(DepositLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
     );
     let router = build_router(Arc::new(state));
 
@@ -861,7 +862,8 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         vec![handler],
         None,
         Vec::new(),
-        DepositGuard::new(DepositLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
     ))
 }
 
@@ -889,6 +891,177 @@ fn deposit_body(asset_transfer_method: Option<&str>) -> Value {
         body["assetTransferMethod"] = json!(method);
     }
     body
+}
+
+// ── gasless withdrawal ──────────────────────────────────────────────────────
+//
+// Same scope as the deposit handler tests: everything up to the first chain access. Signature
+// recovery, the nonce check and the simulation need a live node and belong in the e2e suite;
+// `withdraw.rs`'s own unit tests cover the window arithmetic and the dedup key.
+
+fn withdraw_request_body() -> Value {
+    json!({
+        "action": "request",
+        "authorization": {
+            "user": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "asset": "0x2222222222222222222222222222222222222222",
+            "amount": "1000000",
+            "validAfter": "0x0",
+            "validBefore": "0x77359400",
+            "nonce": "0x4242424242424242424242424242424242424242424242424242424242424242",
+            "signature": "0x111111111111111111111111111111111111111111111111111111111111111122222222222222222222222222222222222222222222222222222222222222221b"
+        }
+    })
+}
+
+fn withdraw_finalize_body() -> Value {
+    json!({
+        "action": "finalize",
+        "user": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "asset": "0x2222222222222222222222222222222222222222"
+    })
+}
+
+/// Every action must resolve to the same clear code on a facilitator that sponsors nothing, rather
+/// than 404 or a panic.
+#[tokio::test]
+async fn every_withdraw_action_reports_a_missing_relayer() {
+    for body in [
+        withdraw_request_body(),
+        json!({
+            "action": "cancel",
+            "authorization": {
+                "user": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "asset": "0x2222222222222222222222222222222222222222",
+                "validAfter": "0x0",
+                "validBefore": "0x77359400",
+                "nonce": "0x4343434343434343434343434343434343434343434343434343434343434343",
+                "signature": "0x111111111111111111111111111111111111111111111111111111111111111122222222222222222222222222222222222222222222222222222222222222221b"
+            }
+        }),
+        withdraw_finalize_body(),
+    ] {
+        let router = build_router(test_state(
+            Arc::new(MockVerifier::success()),
+            Arc::new(MockIssuer::success()),
+        ));
+
+        let response = router.oneshot(post_json("/withdraw", &body)).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let payload: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(payload["success"], false, "for {body}");
+        assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED", "for {body}");
+    }
+}
+
+#[tokio::test]
+async fn withdraw_verify_reports_a_missing_relayer() {
+    let router = build_router(test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    ));
+
+    let response = router
+        .oneshot(post_json("/withdraw/verify", &withdraw_request_body()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["isValid"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+/// An unrecognised `action` must be refused outright rather than silently defaulting to one.
+#[tokio::test]
+async fn withdraw_rejects_an_unknown_action() {
+    let router = build_router(test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    ));
+
+    let response = router
+        .oneshot(post_json(
+            "/withdraw",
+            &json!({ "action": "liquidate", "user": "0x0", "asset": "0x0" }),
+        ))
+        .await
+        .unwrap();
+
+    assert_ne!(response.status(), StatusCode::OK);
+}
+
+/// The withdrawal budget is separate from the deposit one, so exhausting deposits must leave
+/// withdrawals usable — a burst of one action cannot strand the other.
+#[tokio::test]
+async fn withdrawals_have_their_own_rate_limit_budget() {
+    let handler = FourMicaHandler::new(
+        "4mica-credit".into(),
+        "eip155:11155111".into(),
+        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        Vec::new(),
+    );
+    let deposit_guard = SponsorGuard::new(SponsorLimits {
+        global_limit: 1,
+        ..SponsorLimits::default()
+    });
+    let state = Arc::new(AppState::new(
+        vec![handler],
+        None,
+        Vec::new(),
+        deposit_guard,
+        SponsorGuard::new(SponsorLimits::default()),
+    ));
+
+    // Exhaust the deposit budget.
+    for _ in 0..2 {
+        build_router(Arc::clone(&state))
+            .oneshot(post_json("/deposit", &deposit_body(None)))
+            .await
+            .unwrap();
+    }
+
+    let response = build_router(Arc::clone(&state))
+        .oneshot(post_json("/withdraw", &withdraw_request_body()))
+        .await
+        .unwrap();
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_ne!(
+        payload["errorCode"], "RATE_LIMITED",
+        "deposits must not consume the withdrawal budget"
+    );
+}
+
+/// The counters are reported per action, so an operator can tell which one is being abused.
+#[tokio::test]
+async fn health_reports_withdrawal_counters_separately() {
+    let relayerless = build_router(test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    ));
+    let response = relayerless
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+
+    // No relayers means neither set of counters is meaningful, so both are omitted rather than
+    // reported as zero — the same rule `deposits` already follows.
+    assert!(payload.get("deposits").is_none());
+    assert!(payload.get("withdrawals").is_none());
 }
 
 /// A facilitator with no relayer is a supported deployment, so `/deposit` must answer with a clear
@@ -944,15 +1117,16 @@ async fn deposit_is_rate_limited_globally() {
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    let limits = DepositLimits {
+    let limits = SponsorLimits {
         global_limit: 2,
-        ..DepositLimits::default()
+        ..SponsorLimits::default()
     };
     let state = Arc::new(AppState::new(
         vec![handler],
         None,
         Vec::new(),
-        DepositGuard::new(limits),
+        SponsorGuard::new(limits),
+        SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
 
@@ -989,15 +1163,16 @@ async fn deposit_marks_throttling_as_retryable() {
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    let limits = DepositLimits {
+    let limits = SponsorLimits {
         global_limit: 1,
-        ..DepositLimits::default()
+        ..SponsorLimits::default()
     };
     let state = Arc::new(AppState::new(
         vec![handler],
         None,
         Vec::new(),
-        DepositGuard::new(limits),
+        SponsorGuard::new(limits),
+        SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
 
@@ -1057,15 +1232,16 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
-    let guard = DepositGuard::new(DepositLimits {
+    let guard = SponsorGuard::new(SponsorLimits {
         global_limit: 2,
-        ..DepositLimits::default()
+        ..SponsorLimits::default()
     });
     let state = Arc::new(AppState::new(
         vec![handler],
         None,
         Vec::new(),
         Arc::clone(&guard),
+        SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
 
@@ -1246,7 +1422,8 @@ fn exact_state(exact: Arc<MockExact>) -> SharedState {
         Vec::new(),
         Some(exact_service),
         Vec::new(),
-        DepositGuard::new(DepositLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuard::new(SponsorLimits::default()),
     ))
 }
 

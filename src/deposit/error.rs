@@ -17,6 +17,9 @@ use alloy::primitives::{Address, B256, U256};
 use sdk_4mica::contract::Core4Mica::Core4MicaErrors;
 use thiserror::Error;
 
+use crate::limits::ThrottleError;
+use crate::relayer::NoRelayer;
+
 #[derive(Debug, Error)]
 pub enum DepositError {
     #[error("{0}")]
@@ -104,6 +107,29 @@ pub struct Permit2AllowanceDetails {
     pub eip2612_nonce: Option<U256>,
 }
 
+impl From<NoRelayer> for DepositError {
+    fn from(err: NoRelayer) -> Self {
+        match err {
+            NoRelayer::NotConfigured => Self::NoRelayerConfigured,
+            NoRelayer::Network(network) => Self::NoRelayer(network),
+        }
+    }
+}
+
+impl From<ThrottleError> for DepositError {
+    fn from(err: ThrottleError) -> Self {
+        match err {
+            ThrottleError::RateLimited => Self::RateLimited,
+            ThrottleError::AddressRateLimited { address } => Self::AddressRateLimited { address },
+            ThrottleError::TooManyInFlight => Self::TooManyInFlight,
+            ThrottleError::DuplicateInFlight => Self::DuplicateInFlight,
+            ThrottleError::RelayerBalanceTooLow { balance, floor } => {
+                Self::RelayerBalanceTooLow { balance, floor }
+            }
+        }
+    }
+}
+
 impl DepositError {
     /// Structured detail for [`Self::Permit2AllowanceRequired`], so the fix does not have to be
     /// parsed out of the message.
@@ -164,9 +190,9 @@ impl DepositError {
     }
 }
 
-/// Names the Core4Mica reverts a deposit can realistically hit. Anything else falls back to its
-/// selector, which is still more useful than an opaque `execution reverted`.
-pub(super) fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
+/// Names the Core4Mica reverts a sponsored call can realistically hit. Anything else falls back to
+/// its selector, which is still more useful than an opaque `execution reverted`.
+fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
     use alloy::sol_types::SolInterface;
 
     match decoded {
@@ -194,30 +220,64 @@ pub(super) fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
             "ZeroCollateralCredit: {} of {} is too small to mint any collateral",
             err.amount, err.asset
         ),
+        Core4MicaErrors::NoWithdrawalRequested(_) => {
+            "NoWithdrawalRequested: there is no pending request for this user and asset".to_string()
+        }
+        Core4MicaErrors::GracePeriodNotElapsed(_) => {
+            "GracePeriodNotElapsed: the withdrawal is not payable yet".to_string()
+        }
+        Core4MicaErrors::InsufficientAvailable(_) => {
+            "InsufficientAvailable: the requested amount exceeds the withdrawable balance"
+                .to_string()
+        }
+        Core4MicaErrors::AuthorizationExpired(err) => {
+            format!(
+                "AuthorizationExpired: validBefore {} has passed",
+                err.validBefore
+            )
+        }
+        Core4MicaErrors::AuthorizationNotYetValid(err) => {
+            format!(
+                "AuthorizationNotYetValid: not valid until {}",
+                err.validAfter
+            )
+        }
+        Core4MicaErrors::AuthorizationAlreadyUsed(err) => {
+            format!(
+                "AuthorizationAlreadyUsed: {} has already spent nonce {}",
+                err.user, err.nonce
+            )
+        }
         other => format!("revert with selector 0x{}", hex::encode(other.selector())),
     }
 }
 
+/// Decodes a contract error into a readable revert reason, or `None` when the EVM never answered.
+///
+/// Revert data is the reliable discriminator: present means the EVM ran and rejected, absent means
+/// we never got an answer. Matching on `TransportError` instead would misfile every plain
+/// `require(...)` failure as a retryable outage, since a node reports a revert *through* the
+/// transport as JSON-RPC error 3.
+pub(crate) fn classify_core4mica_revert(err: &alloy::contract::Error) -> Option<String> {
+    let data = err.as_revert_data()?;
+    if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
+        return Some(describe_core4mica_error(&decoded));
+    }
+    // Not a Core4Mica error — a plain `require` string from a token or Permit2, or an unknown
+    // selector. `decode_revert_reason` recovers the former.
+    Some(
+        alloy::sol_types::decode_revert_reason(&data)
+            .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data))),
+    )
+}
+
 /// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
 ///
-/// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
-/// revert. Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so
-/// clients see `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
+/// Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so clients see
+/// `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
 pub(super) fn classify_call_error(err: alloy::contract::Error) -> DepositError {
-    // Order matters. A node reports a revert *through* the transport as JSON-RPC error 3, so
-    // matching on `TransportError` first would misfile every plain `require(...)` failure as a
-    // retryable outage. Revert data is the reliable discriminator: present means the EVM ran and
-    // rejected, absent means we never got an answer.
-    if let Some(data) = err.as_revert_data() {
-        if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
-            return DepositError::SimulationReverted(describe_core4mica_error(&decoded));
-        }
-        // Not a Core4Mica error — a plain `require` string from the token or Permit2, or an
-        // unknown selector. `decode_revert_reason` recovers the former.
-        let reason = alloy::sol_types::decode_revert_reason(&data)
-            .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data)));
-        return DepositError::SimulationReverted(reason);
+    match classify_core4mica_revert(&err) {
+        Some(reason) => DepositError::SimulationReverted(reason),
+        None => DepositError::Chain(anyhow::Error::new(err).context("deposit simulation")),
     }
-
-    DepositError::Chain(anyhow::Error::new(err).context("deposit simulation"))
 }
