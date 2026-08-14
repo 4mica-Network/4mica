@@ -1,5 +1,4 @@
 import { cn, Dropdown, Tooltip } from "@4mica/ui";
-import { links } from "@4mica/url";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
@@ -17,6 +16,7 @@ import {
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
 const EXPANDED_WIDTH = 256;
