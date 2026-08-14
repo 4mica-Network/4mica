@@ -16,6 +16,8 @@ export default defineConfig({
     "components/select/index.tsx",
     "components/spinner/index.tsx",
     "components/switch/index.tsx",
+    "components/tab/index.tsx",
+    "components/tab/TabGroup.tsx",
     "components/tag/index.tsx",
     "components/tooltip/index.tsx",
     "lib/cn.ts",

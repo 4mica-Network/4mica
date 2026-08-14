@@ -28,6 +28,18 @@ export {
   type SwitchColors,
   type SwitchProps,
 } from "./components/switch";
+export { Tab, type TabProps } from "./components/tab";
+// `useTabContext` is deliberately not re-exported: scripts/preserve-use-client
+// marks any built chunk whose source names a `use*` identifier, so a hook in the
+// barrel would stamp `"use client"` on dist/index.js and drag every server-safe
+// export (Button, Link, cn) into the client graph.
+export { TabGroup } from "./components/tab/TabGroup";
+// `Tab` is already taken by the component, so the item type ships as `TabItem`.
+export type {
+  Tab as TabItem,
+  TabGroupPlacement,
+  TabsProps,
+} from "./components/tab/type";
 export { Tag, type TagProps } from "./components/tag";
 export { Tooltip, type TooltipProps } from "./components/tooltip";
 export { cn } from "./lib/cn";
