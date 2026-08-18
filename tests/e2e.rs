@@ -26,8 +26,13 @@
 //!
 //! Coverage:
 //!
-//!   * **Always** — `/health`, `/supported`, `/verify`, and a *negative* `/settle` (a
-//!     locally-signed, unfunded payload core rejects, proving the `core/guarantees` path executes).
+//!   * **Always** — `/health`, `/supported`, `/verify`, a *negative* `/settle` (a
+//!     locally-signed, unfunded payload core rejects, proving the `core/guarantees` path
+//!     executes), and a *negative* `/clearing/claim` (an unknown cycle core refuses to serve
+//!     terms for, proving the authenticated clearing-action path executes). The *positive*
+//!     claim path needs a committed, funded cycle only core's DB helpers can arrange — it lives
+//!     in `4mica-core`'s `integration-tests/tests/sponsored_claim.rs`, pointed at a running
+//!     facilitator via `E2E_FACILITATOR_URL`.
 //!   * **Happy path** — a real SDK-signed payment that mints a BLS certificate.
 //!   * **Gasless deposit** — the SDK signs an EIP-3009 authorization, the facilitator pays the gas,
 //!     and collateral lands on the signer. The token is discovered from `/core/tokens`.
@@ -452,6 +457,33 @@ async fn e2e_facilitator_endpoints() {
         "[e2e] negative /settle reached core/guarantees, error: {}",
         settle_body["error"]
     );
+
+    // --- /clearing/claim (negative): a well-formed claim for a cycle core has never seen.
+    // The relayer is configured, so the request passes the sponsorship gate and the
+    // facilitator asks core for the cycle's committed terms with its authenticated wallet —
+    // ACTION_UNAVAILABLE proves that round trip executed and core answered. The positive
+    // path needs a committed, funded cycle, which only `4mica-core`'s integration tests can
+    // arrange (`integration-tests/tests/sponsored_claim.rs`, run against this facilitator).
+    let claim_body = json!({
+        "cycleId": format!("e2e-missing:{}", unique_nonce_hex()),
+        "creditor": ANVIL_ACCT2_ADDR,
+    });
+    for (endpoint, ok_field) in [
+        ("clearing/claim/verify", "isValid"),
+        ("clearing/claim", "success"),
+    ] {
+        let (status, body) = post_json(&client, &format!("{base}/{endpoint}"), &claim_body).await;
+        assert!(status.is_success(), "{endpoint} HTTP status: {status}");
+        assert_eq!(
+            body[ok_field], false,
+            "{endpoint} must refuse a cycle core does not know: {body}"
+        );
+        assert_eq!(
+            body["errorCode"], "ACTION_UNAVAILABLE",
+            "{endpoint} should surface core's refusal to serve the cycle's terms: {body}"
+        );
+    }
+    eprintln!("[e2e] negative /clearing/claim reached core's clearing-action route");
 
     // --- /verify rejection cases (the facilitator's own routing/validation) ---
     assert_verify_rejected(

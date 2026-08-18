@@ -10,6 +10,7 @@ use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
 
+use crate::clearing::ClearingActions;
 use crate::limits::SponsorGuard;
 use crate::relayer::{NoRelayer, Relayer};
 use crate::server::model::{
@@ -39,11 +40,15 @@ pub(crate) struct AppState {
     /// Networks that opted into gas sponsorship. Empty means `/deposit` is unavailable, which is a
     /// valid deployment — the facilitator still serves `/verify` and `/settle`.
     relayers: Vec<Relayer>,
+    /// Per-network resolvers for clearing-cycle terms, keyed by CAIP-2 network id. Every network
+    /// gets one — resolving terms only needs core, not a relayer.
+    clearing: Vec<(String, Arc<ClearingActions>)>,
     /// Throttling shared across networks: the relayer's gas budget and this process's capacity are
     /// global resources, so limiting per-network would let N networks multiply the exposure. One
     /// guard per action, so a burst of deposits cannot exhaust what a withdrawal needs.
     deposit_guard: Arc<SponsorGuard>,
     withdraw_guard: Arc<SponsorGuard>,
+    claim_guard: Arc<SponsorGuard>,
 }
 
 impl AppState {
@@ -51,15 +56,19 @@ impl AppState {
         four_mica: Vec<FourMicaHandler>,
         exact: Option<Arc<dyn ExactService>>,
         relayers: Vec<Relayer>,
+        clearing: Vec<(String, Arc<ClearingActions>)>,
         deposit_guard: Arc<SponsorGuard>,
         withdraw_guard: Arc<SponsorGuard>,
+        claim_guard: Arc<SponsorGuard>,
     ) -> Self {
         Self {
             four_mica,
             exact,
             relayers,
+            clearing,
             deposit_guard,
             withdraw_guard,
+            claim_guard,
         }
     }
 
@@ -69,6 +78,17 @@ impl AppState {
 
     pub fn withdraw_guard(&self) -> &Arc<SponsorGuard> {
         &self.withdraw_guard
+    }
+
+    pub fn claim_guard(&self) -> &Arc<SponsorGuard> {
+        &self.claim_guard
+    }
+
+    pub fn clearing_actions_for(&self, network: &str) -> Option<&Arc<ClearingActions>> {
+        self.clearing
+            .iter()
+            .find(|(id, _)| id == network)
+            .map(|(_, actions)| actions)
     }
 
     /// Health plus the operational signals worth paging on.
@@ -111,6 +131,7 @@ impl AppState {
             status: if degraded { "degraded" } else { "ok" },
             deposits: (!self.relayers.is_empty()).then(|| self.deposit_guard.counters()),
             withdrawals: (!self.relayers.is_empty()).then(|| self.withdraw_guard.counters()),
+            claims: (!self.relayers.is_empty()).then(|| self.claim_guard.counters()),
             relayers,
         }
     }

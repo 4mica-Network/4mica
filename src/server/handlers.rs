@@ -10,12 +10,13 @@ use tracing::{info, warn};
 
 use super::{
     model::{
-        DepositRequest, DepositResponse, DepositVerifyResponse, SettleRequest, SettleResponse,
-        SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse, WithdrawRequest,
-        WithdrawResponse, WithdrawVerifyResponse,
+        ClaimRequest, ClaimResponse, ClaimVerifyResponse, DepositRequest, DepositResponse,
+        DepositVerifyResponse, SettleRequest, SettleResponse, SupportedKind, SupportedResponse,
+        VerifyRequest, VerifyResponse, WithdrawRequest, WithdrawResponse, WithdrawVerifyResponse,
     },
     state::SharedState,
 };
+use crate::clearing::{self, ClaimError, ClaimTerms};
 use crate::deposit::{self, DepositError, DepositIntent};
 use crate::withdraw::{self, WithdrawError, WithdrawIntent};
 
@@ -29,6 +30,8 @@ pub(super) fn build_router(state: SharedState) -> Router {
         .route("/deposit/verify", post(deposit_verify_handler))
         .route("/withdraw", post(withdraw_handler))
         .route("/withdraw/verify", post(withdraw_verify_handler))
+        .route("/clearing/claim", post(claim_handler))
+        .route("/clearing/claim/verify", post(claim_verify_handler))
         .route("/health", get(health_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -196,6 +199,86 @@ async fn run_withdraw(
         WithdrawResponse::success(tx_hash, relayer.network(), &intent),
         intent.action(),
     ))
+}
+
+/// Preflight for [`claim_handler`]: every check, no broadcast.
+async fn claim_verify_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<ClaimRequest>,
+) -> impl IntoResponse {
+    match run_claim_verify(&state, request).await {
+        Ok(()) => Json(ClaimVerifyResponse::valid()),
+        Err(err) => {
+            state.claim_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "claim verification failed");
+            Json(ClaimVerifyResponse::invalid(&err))
+        }
+    }
+}
+
+async fn run_claim_verify(state: &SharedState, request: ClaimRequest) -> Result<(), ClaimError> {
+    state.claim_guard().check_global()?;
+    let (relayer, terms) = resolve_claim(state, &request).await?;
+    clearing::verify(relayer, state.claim_guard().limits(), &terms).await
+}
+
+/// Submits a net-credit claim on the creditor's behalf, with the relayer paying gas.
+///
+/// The payout goes to `creditor` for the amount the committed Merkle leaf fixes — this service
+/// cannot alter either, which is why the request carries no signature.
+async fn claim_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<ClaimRequest>,
+) -> impl IntoResponse {
+    match run_claim(&state, request).await {
+        Ok(response) => {
+            state.claim_guard().record_sponsored();
+            info!(
+                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                creditor = response.creditor.as_deref().unwrap_or_default(),
+                cycle_id = response.cycle_id.as_deref().unwrap_or_default(),
+                amount = response.amount.as_deref().unwrap_or_default(),
+                network = response.network.as_deref().unwrap_or_default(),
+                "sponsored net-credit claim submitted"
+            );
+            Json(response)
+        }
+        Err(err) => {
+            state.claim_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "sponsored net-credit claim failed");
+            Json(ClaimResponse::failure(&err))
+        }
+    }
+}
+
+async fn run_claim(
+    state: &SharedState,
+    request: ClaimRequest,
+) -> Result<ClaimResponse, ClaimError> {
+    state.claim_guard().check_global()?;
+    let (relayer, terms) = resolve_claim(state, &request).await?;
+    let tx_hash = clearing::submit(relayer, state.claim_guard(), &terms).await?;
+    Ok(ClaimResponse::success(tx_hash, relayer.network(), &terms))
+}
+
+/// Validates the request's identifiers, then resolves the claim's terms from the network's core.
+async fn resolve_claim<'a>(
+    state: &'a SharedState,
+    request: &ClaimRequest,
+) -> Result<(&'a crate::relayer::Relayer, ClaimTerms), ClaimError> {
+    let creditor = clearing::parse_creditor(&request.creditor)?;
+    let cycle_id = clearing::parse_cycle_id(&request.cycle_id)?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let actions = state
+        .clearing_actions_for(relayer.network())
+        .ok_or_else(|| {
+            ClaimError::ActionUnavailable(format!(
+                "no core endpoint configured for network {}",
+                relayer.network()
+            ))
+        })?;
+    let terms = actions.claim_terms(cycle_id, creditor).await?;
+    Ok((relayer, terms))
 }
 
 fn now_secs() -> u64 {

@@ -60,6 +60,32 @@ mod token {
 
 pub use token::DepositToken;
 
+mod clearing_house {
+    alloy::sol! {
+    /// The slice of the ClearingHouse this facilitator submits claims to. The errors are declared
+    /// so a revert decodes to its reason instead of a bare selector; their signatures must match
+    /// the deployed contract's exactly or the selectors will not resolve.
+    #[sol(rpc)]
+    contract ClearingHouse {
+        function claimNetCreditFor(address creditor, bytes32 cycleId, uint256 netCredit, bytes32[] calldata proof) external;
+
+        error AmountZero();
+        error CycleNotFound(bytes32 cycleId);
+        error InvalidCycleStatus(bytes32 cycleId, uint8 status);
+        error InvalidProof();
+        error AlreadyClaimed(bytes32 cycleId, address creditor);
+        error PaymentFinalityPending(uint64 deadline);
+        error ClaimExceedsFundedLiquidity(uint256 available, uint256 requested);
+        error CycleUnderfunded(uint256 available, uint256 required);
+        error NativeTransferFailed(address recipient, uint256 amount);
+        error ClaimConversionShortfall(uint256 requested, uint256 got);
+        error ClaimedCreditExceedsCommitted(uint256 attempted, uint256 total);
+    }
+    }
+}
+
+pub use clearing_house::ClearingHouse;
+
 /// Why no relayer could be resolved for a request. Shared by every sponsored endpoint, each of
 /// which converts it into its own error type.
 #[derive(Debug, thiserror::Error)]
@@ -187,6 +213,15 @@ impl Relayer {
 
     pub fn contract_address(&self) -> Address {
         self.inner.contract_address
+    }
+
+    /// The ClearingHouse at `address`. Unlike Core4Mica the address is not fixed per deployment —
+    /// core names the contract that settles each cycle, so the caller passes it in.
+    pub fn clearing_house(
+        &self,
+        address: Address,
+    ) -> ClearingHouse::ClearingHouseInstance<DynProvider> {
+        ClearingHouse::new(address, self.inner.provider.clone())
     }
 
     pub fn provider(&self) -> DynProvider {

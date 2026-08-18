@@ -231,6 +231,38 @@ The facilitator enforces that:
   relayer is configured, otherwise every request returns `errorCode: "NO_RELAYER"`.
 - `POST /withdraw` and `POST /withdraw/verify` – gasless withdrawals; see below. Same availability
   rule as `/deposit`.
+- `POST /clearing/claim` and `POST /clearing/claim/verify` – sponsored net-credit claims; see
+  below. Same availability rule as `/deposit`.
+
+### Sponsored net-credit claims
+
+A net creditor in a committed clearing cycle is owed money on-chain, but collecting it costs a
+transaction — and a creditor who never held native gas cannot send one. These endpoints let the
+facilitator's relayer submit `claimNetCreditFor` for them:
+
+```jsonc
+{
+  "cycleId": "eth:1800000000",   // as core names it: text id or the 0x-prefixed on-chain hash
+  "creditor": "0x…",
+  "network": "eip155:…"          // optional; defaults to the first configured network
+}
+```
+
+`/clearing/claim` answers with `{ "success": true, "txHash", "network", "creditor", "cycleId",
+"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/claim/verify`
+answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
+error codes reuse `/withdraw`'s strings wherever the meaning is the same.
+
+The request carries no signature and needs none: the ClearingHouse pays the address the cycle's
+committed Merkle leaf names, for the amount that leaf fixes, so a submitter can neither redirect
+nor inflate the payout. Everything the transaction depends on — the ClearingHouse address, the
+amount, the proof — is resolved from core (which is why the facilitator's auth wallet must be able
+to read clearing actions), never taken from the request; the caller only names *which* claim to
+submit. `amount` echoes the committed net credit — in a `Shortfall` cycle the on-chain payout is a
+pro-rata fraction of it.
+
+Throttling is configured separately (`X402_CLAIM_*`), and concurrent submissions for the same
+cycle are deduplicated so only one pays gas — the other would revert as `AlreadyClaimed`.
 
 ### Gasless withdrawals
 

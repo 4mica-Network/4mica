@@ -1,6 +1,7 @@
 //! Throttling knobs for sponsored actions, read from the environment.
 //!
-//! Each action gets its own set under its own prefix (`X402_DEPOSIT_*`, `X402_WITHDRAW_*`), so a
+//! Each action gets its own set under its own prefix (`X402_DEPOSIT_*`, `X402_WITHDRAW_*`,
+//! `X402_CLAIM_*`), so a
 //! burst of one cannot exhaust the budget the other needs — they cost different amounts of gas and
 //! deserve different ceilings. Every value defaults to [`SponsorLimits::default`], so a deployment
 //! that predates gas sponsorship picks up protection without a config change.
@@ -19,6 +20,7 @@ use crate::limits::SponsorLimits;
 
 pub(super) const DEPOSIT_PREFIX: &str = "X402_DEPOSIT";
 pub(super) const WITHDRAW_PREFIX: &str = "X402_WITHDRAW";
+pub(super) const CLAIM_PREFIX: &str = "X402_CLAIM";
 
 /// Env var names for one action's knobs. Built from a prefix so a new sponsored action needs a
 /// constant rather than six.

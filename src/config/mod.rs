@@ -25,7 +25,7 @@ use serde::Deserialize;
 
 use crate::limits::SponsorLimits;
 use relayer::{RelayerFallback, load_relayer_fallback, resolve_relayer_config};
-use sponsor::{DEPOSIT_PREFIX, WITHDRAW_PREFIX, sponsor_limits_from_env};
+use sponsor::{CLAIM_PREFIX, DEPOSIT_PREFIX, WITHDRAW_PREFIX, sponsor_limits_from_env};
 
 pub use relayer::NetworkRelayerConfig;
 
@@ -53,6 +53,7 @@ pub struct ServiceConfig {
     pub networks: Vec<NetworkConfig>,
     pub deposit_limits: SponsorLimits,
     pub withdraw_limits: SponsorLimits,
+    pub claim_limits: SponsorLimits,
 }
 
 #[derive(Clone)]
@@ -79,12 +80,14 @@ impl ServiceConfig {
         let networks = load_networks_from_env()?;
         let deposit_limits = sponsor_limits_from_env(DEPOSIT_PREFIX)?;
         let withdraw_limits = sponsor_limits_from_env(WITHDRAW_PREFIX)?;
+        let claim_limits = sponsor_limits_from_env(CLAIM_PREFIX)?;
         Ok(Self {
             bind_addr,
             scheme,
             networks,
             deposit_limits,
             withdraw_limits,
+            claim_limits,
         })
     }
 }

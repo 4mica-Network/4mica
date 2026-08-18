@@ -310,6 +310,8 @@ async fn supported_includes_exact_when_available() {
         vec![handler],
         Some(exact.clone() as Arc<dyn ExactService>),
         Vec::new(),
+        Vec::new(),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     );
@@ -862,6 +864,8 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         vec![handler],
         None,
         Vec::new(),
+        Vec::new(),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ))
@@ -1014,7 +1018,9 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
         vec![handler],
         None,
         Vec::new(),
+        Vec::new(),
         deposit_guard,
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ));
 
@@ -1062,6 +1068,7 @@ async fn health_reports_withdrawal_counters_separately() {
     // reported as zero — the same rule `deposits` already follows.
     assert!(payload.get("deposits").is_none());
     assert!(payload.get("withdrawals").is_none());
+    assert!(payload.get("claims").is_none());
 }
 
 /// A facilitator with no relayer is a supported deployment, so `/deposit` must answer with a clear
@@ -1125,7 +1132,9 @@ async fn deposit_is_rate_limited_globally() {
         vec![handler],
         None,
         Vec::new(),
+        Vec::new(),
         SponsorGuard::new(limits),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
@@ -1171,7 +1180,9 @@ async fn deposit_marks_throttling_as_retryable() {
         vec![handler],
         None,
         Vec::new(),
+        Vec::new(),
         SponsorGuard::new(limits),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
@@ -1240,7 +1251,9 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
         vec![handler],
         None,
         Vec::new(),
+        Vec::new(),
         Arc::clone(&guard),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ));
     let router = build_router(state);
@@ -1381,6 +1394,98 @@ fn deposit_request_accepts_an_sdk_serialized_authorization() {
     assert_eq!(parsed_auth.validBefore, authorization.validBefore);
 }
 
+// ── sponsored net-credit claims ─────────────────────────────────────────────
+//
+// These cover what resolves before core or the chain is consulted. Everything past that —
+// resolving terms from core, simulation, broadcast — needs the live stack.
+
+fn claim_body() -> Value {
+    json!({
+        "cycleId": "eth:1800000000",
+        "creditor": "0x000000000000000000000000000000000000c0ed",
+    })
+}
+
+#[tokio::test]
+async fn claim_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/claim", &claim_body()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+#[tokio::test]
+async fn claim_verify_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/claim/verify", &claim_body()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["isValid"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+/// The request's own identifiers are checked before any relayer or core work, so a bad one gets a
+/// precise code even on a facilitator that sponsors nothing.
+#[tokio::test]
+async fn claim_rejects_a_malformed_creditor() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let mut body = claim_body();
+    body["creditor"] = json!("not-an-address");
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/claim", &body))
+        .await
+        .unwrap();
+
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+}
+
+#[tokio::test]
+async fn claim_rejects_a_cycle_id_that_could_escape_its_url() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let mut body = claim_body();
+    body["cycleId"] = json!("../participants/0xdead/clearing-action");
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/claim", &body))
+        .await
+        .unwrap();
+
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+}
+
 /// POSTs a `/verify` request against a fresh router and decodes the response.
 ///
 /// `/verify` answers `200 OK` with `isValid: false` for business-rule rejections, so almost every
@@ -1422,6 +1527,8 @@ fn exact_state(exact: Arc<MockExact>) -> SharedState {
         Vec::new(),
         Some(exact_service),
         Vec::new(),
+        Vec::new(),
+        SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
         SponsorGuard::new(SponsorLimits::default()),
     ))
