@@ -553,15 +553,19 @@ async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv
         .expect("init SDK client");
 
     let before = sdk
-        .user
-        .get_principal_balance(token.clone())
+        .account
+        .principal_balance(token.clone())
         .await
         .expect("read principal balance");
 
+    let token_address: sdk_4mica::Address = token
+        .parse()
+        .expect("core advertised a valid token address");
+
     // Signing is chain-free: the SDK takes the token's domain separator from core over HTTP.
     let authorization = sdk
-        .user
-        .sign_deposit_authorization(token.clone(), sdk_4mica::U256::from(amount))
+        .deposit
+        .sign_eip3009(token_address, sdk_4mica::U256::from(amount))
         .await
         .unwrap_or_else(|err| {
             panic!(
@@ -617,8 +621,8 @@ async fn run_gasless_deposit(client: &reqwest::Client, base: &str, env: &TestEnv
     // The payload binds `to` and `value`, so a facilitator cannot redirect the funds. Assert the
     // signer was credited — reading on-chain, which has no indexer lag.
     let after = sdk
-        .user
-        .get_principal_balance(token.clone())
+        .account
+        .principal_balance(token.clone())
         .await
         .expect("read principal balance");
     assert_eq!(
@@ -923,7 +927,7 @@ async fn ensure_payer_collateral(
 
     // `getUserAllAssets` rather than `principalBalance`: the latter is stablecoin-only and rejects
     // the zero address, while the happy path settles against native ETH collateral.
-    let existing = match sdk.user.get_user().await {
+    let existing = match sdk.account.assets().await {
         Ok(assets) => assets
             .into_iter()
             .find(|asset| asset.asset.eq_ignore_ascii_case(ETH_ASSET))
@@ -941,7 +945,7 @@ async fn ensure_payer_collateral(
 
     // Generously more than the 1-wei payments the happy path makes, so one seed covers many runs.
     let seed = sdk_4mica::U256::from(1_000_000_000_000_000_000u64);
-    match sdk.user.deposit(seed, None).await {
+    match sdk.deposit.send(sdk_4mica::Asset::Native, seed).await {
         Ok(_) => {
             eprintln!("[e2e] seeded {seed} wei of collateral for the payer");
             // The deposit is mined but not yet at confirmation depth; advance past it.
@@ -1025,15 +1029,19 @@ async fn run_sponsored_permit_deposit(client: &reqwest::Client, base: &str, env:
         .expect("init SDK client");
 
     let before = sdk
-        .user
-        .get_principal_balance(token.clone())
+        .account
+        .principal_balance(token.clone())
         .await
         .unwrap_or_default();
 
+    let token_address: sdk_4mica::Address = token
+        .parse()
+        .expect("core advertised a valid token address");
+
     // The Permit2 half comes from the SDK, exactly as a real client would produce it.
     let permit2 = match sdk
-        .user
-        .sign_deposit_permit2(token.clone(), sdk_4mica::U256::from(amount))
+        .deposit
+        .sign_permit2(token_address, sdk_4mica::U256::from(amount))
         .await
     {
         Ok(auth) => auth,
@@ -1077,8 +1085,8 @@ async fn run_sponsored_permit_deposit(client: &reqwest::Client, base: &str, env:
     assert_eq!(settle["success"], true, "/deposit failed: {settle}");
 
     let after = sdk
-        .user
-        .get_principal_balance(token.clone())
+        .account
+        .principal_balance(token.clone())
         .await
         .expect("read principal balance");
     assert_eq!(

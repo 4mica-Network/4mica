@@ -4,9 +4,9 @@
 //! forwards to core. This module is the one place the facilitator becomes an on-chain actor,
 //! signing and broadcasting transactions with its own key and paying the gas.
 //!
-//! It exists for the gasless deposit flow, where the payer signs an EIP-3009 authorization and
-//! never touches the chain. Because the token binds `to` and `value` inside that signature and
-//! Core4Mica credits collateral to `auth.from`, the relayer cannot redirect funds or alter the
+//! It exists for the gasless flows, where the user signs an authorization and never touches the
+//! chain. Because every such signature binds who benefits and what moves, and Core4Mica applies the
+//! action to the signer rather than `msg.sender`, the relayer cannot redirect funds or alter the
 //! amount — the worst a compromised relayer can do is decline to submit, or waste its own gas.
 
 use std::collections::HashMap;
@@ -60,6 +60,16 @@ mod token {
 
 pub use token::DepositToken;
 
+/// Why no relayer could be resolved for a request. Shared by every sponsored endpoint, each of
+/// which converts it into its own error type.
+#[derive(Debug, thiserror::Error)]
+pub enum NoRelayer {
+    #[error("gas sponsorship is not enabled on this facilitator")]
+    NotConfigured,
+    #[error("no relayer is configured for network {0}")]
+    Network(String),
+}
+
 /// A funded signer bound to one network's chain, able to submit Core4Mica transactions.
 #[derive(Clone)]
 pub struct Relayer {
@@ -75,6 +85,8 @@ struct RelayerInner {
     /// Token EIP-712 domain separators, memoised. Immutable per token per chain, so a hit can
     /// never go stale and every deposit after the first avoids an `eth_call`.
     token_domain_separators: RwLock<HashMap<Address, B256>>,
+    /// Core4Mica's own EIP-712 domain separator, memoised. Fixed for the lifetime of a deployment.
+    core_domain_separator: tokio::sync::OnceCell<B256>,
     /// Native balance with a short TTL. Read on every deposit and every health check, so an
     /// uncached read would turn `/health` into an RPC amplifier. Staleness is harmless: the floor
     /// is a coarse safety limit, not an accounting figure.
@@ -149,6 +161,7 @@ impl Relayer {
                 contract_address: public_params.contract_address,
                 provider,
                 token_domain_separators: RwLock::new(HashMap::new()),
+                core_domain_separator: tokio::sync::OnceCell::new(),
                 cached_balance: RwLock::new(None),
             }),
         }))
@@ -206,6 +219,30 @@ impl Relayer {
             .await
             .insert(token, separator);
         Ok(separator)
+    }
+
+    /// Core4Mica's EIP-712 domain separator, read once and cached.
+    ///
+    /// Read from the contract rather than reconstructed from name/version/chainId, for the same
+    /// reason a token's is: a wrong reconstruction yields a well-formed separator that no signature
+    /// will ever verify against.
+    pub async fn core_domain_separator(&self) -> Result<B256, crate::withdraw::WithdrawError> {
+        self.inner
+            .core_domain_separator
+            .get_or_try_init(|| async {
+                self.contract()
+                    .DOMAIN_SEPARATOR()
+                    .call()
+                    .await
+                    .map_err(|err| {
+                        crate::withdraw::WithdrawError::Chain(anyhow::Error::new(err).context(
+                            "Core4Mica does not expose DOMAIN_SEPARATOR (deployment predates \
+                             gasless withdrawals?)",
+                        ))
+                    })
+            })
+            .await
+            .copied()
     }
 
     /// Native balance of the relayer account, in wei. A relayer that cannot pay gas is useless,

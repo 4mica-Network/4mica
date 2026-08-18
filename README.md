@@ -208,9 +208,11 @@ The facilitator enforces that:
     "relayers": [
       { "network": "eip155:84532", "address": "0x…", "balanceWei": "…", "belowFloor": false }
     ],
-    "deposits": { "sponsored": 12, "rejected": 3, "throttled": 1 }
+    "deposits": { "sponsored": 12, "rejected": 3, "throttled": 1 },
+    "withdrawals": { "sponsored": 4, "rejected": 0, "throttled": 0 }
   }
   ```
+  Counters are per sponsored action, so a rising `rejected` names which one is being abused.
   `status` is `degraded` when any relayer is at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, or
   when its balance cannot be read — so a plain HTTP check is enough to alert on. A rising
   `throttled` distinguishes an abuse attempt from a merely misconfigured client. Balances are
@@ -227,6 +229,56 @@ The facilitator enforces that:
     facilitator, allowing clients to follow the x402 debit flow unchanged.
 - `POST /deposit` and `POST /deposit/verify` – gasless deposits; see below. Available only when a
   relayer is configured, otherwise every request returns `errorCode: "NO_RELAYER"`.
+- `POST /withdraw` and `POST /withdraw/verify` – gasless withdrawals; see below. Same availability
+  rule as `/deposit`.
+
+### Gasless withdrawals
+
+A user who deposited gaslessly still has no native gas to withdraw with. These endpoints close that
+loop: the user signs an EIP-712 authorization against Core4Mica's own domain and the facilitator
+broadcasts the matching call.
+
+One endpoint covers all three steps, selected by `action`:
+
+```jsonc
+// Open a withdrawal request, starting its grace period.
+{
+  "action": "request",
+  "authorization": {
+    "user": "0x…",          // the signer; collateral is only ever released to them
+    "asset": "0x…",         // 0x0000…0000 for ETH
+    "amount": "1000000",
+    "validAfter": "0x0",
+    "validBefore": "0x…",
+    "nonce": "0x…",         // random 32 bytes, burned on use
+    "signature": "0x…"      // 65-byte ECDSA, or any EIP-1271 blob for a smart account
+  }
+}
+
+// Clear a pending request. Same shape without `amount`.
+{ "action": "cancel", "authorization": { … } }
+
+// Pay out an elapsed request. No authorization — see below.
+{ "action": "finalize", "user": "0x…", "asset": "0x…" }
+```
+
+Both endpoints answer with `{ "success": true, "txHash", "network", "user", "asset", "amount"? }`,
+or `{ "success": false, "error", "errorCode", "retryable" }`. `/withdraw/verify` answers with
+`{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The error codes are
+the same strings `/deposit` uses wherever the meaning is the same, so client handling of
+`RATE_LIMITED` or `SIGNATURE_MISMATCH` does not depend on which endpoint produced it.
+
+Unlike a deposit, this works for **native ETH** too — Core4Mica verifies the signature itself rather
+than relying on what the asset implements.
+
+`finalize` deliberately carries no signature. `finalizeWithdrawalFor` pays the user whoever submits
+it and the amount was fixed at request time, so a submitter gains nothing; requiring a signature
+would instead mean the user has to be around to produce one a grace period (weeks) after
+requesting. The trade-off is that anyone may finalize the moment the period elapses, ending Aave
+yield accrual slightly earlier than the user might have chosen — cancel before then to avoid that.
+
+Throttling is configured separately from deposits (`X402_WITHDRAW_*`), so a burst of one cannot
+exhaust the budget the other needs.
 
 ### Gasless deposits
 
@@ -664,6 +716,16 @@ export X402_DEPOSIT_MAX_GAS=600000          # ceiling on estimate AND explicit t
 # Strongly recommended: refuse deposits below this, so a drain cannot run to zero. Unset = disabled.
 export X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI=100000000000000000
 
+# Withdrawal throttling. Same knobs, same defaults, its own budget — so a burst of deposits cannot
+# strand withdrawals. Finalization is the expensive step (it unwinds an Aave position), so raise
+# X402_WITHDRAW_MAX_GAS rather than the deposit one if you see GAS_CEILING_EXCEEDED there.
+export X402_WITHDRAW_MAX_IN_FLIGHT=16
+export X402_WITHDRAW_PER_ADDRESS_LIMIT=5
+export X402_WITHDRAW_GLOBAL_LIMIT=60
+export X402_WITHDRAW_WINDOW_SECS=60
+export X402_WITHDRAW_MAX_GAS=600000
+export X402_WITHDRAW_MIN_RELAYER_BALANCE_WEI=100000000000000000
+
 # Optional: pin the expected domain separator (32-byte hex, 0x-prefixed)
 export X402_GUARANTEE_DOMAIN=0x...
 # legacy: FOUR_MICA_GUARANTEE_DOMAIN / 4MICA_GUARANTEE_DOMAIN
@@ -726,6 +788,10 @@ keeping custody, settlement, and tab management under your own infrastructure.
   verifies the payer's EIP-3009 authorization, then signs and broadcasts
   `depositStablecoinWithAuthorization` with its relayer key, paying the gas. Collateral is credited
   to the signer. `POST /deposit/verify` runs the same checks without broadcasting.
+- **Gasless withdrawal (`POST /withdraw`)** – the same shape for the other direction: the user signs
+  an EIP-712 authorization against Core4Mica's domain, the facilitator verifies it, then broadcasts
+  `requestWithdrawalWithAuthorization`, `cancelWithdrawalWithAuthorization` or
+  `finalizeWithdrawalFor`. Collateral is only ever released to the signer.
 - **Verification (`POST /verify`)** – recipients send the `paymentPayload` plus the
   `paymentRequirements` they issued to the client. The facilitator validates the claims against the
   requirements and mirrors the upstream x402 error semantics. No 4mica network call is made in this

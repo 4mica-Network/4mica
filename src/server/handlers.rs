@@ -11,11 +11,13 @@ use tracing::{info, warn};
 use super::{
     model::{
         DepositRequest, DepositResponse, DepositVerifyResponse, SettleRequest, SettleResponse,
-        SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
+        SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse, WithdrawRequest,
+        WithdrawResponse, WithdrawVerifyResponse,
     },
     state::SharedState,
 };
 use crate::deposit::{self, DepositError, DepositIntent};
+use crate::withdraw::{self, WithdrawError, WithdrawIntent};
 
 pub(super) fn build_router(state: SharedState) -> Router {
     Router::new()
@@ -25,6 +27,8 @@ pub(super) fn build_router(state: SharedState) -> Router {
         .route("/settle", post(settle_handler))
         .route("/deposit", post(deposit_handler))
         .route("/deposit/verify", post(deposit_verify_handler))
+        .route("/withdraw", post(withdraw_handler))
+        .route("/withdraw/verify", post(withdraw_verify_handler))
         .route("/health", get(health_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -41,7 +45,7 @@ async fn deposit_verify_handler(
         Err(err) => {
             // Counted like a submit rejection: this endpoint consumes a global rate-limit slot and
             // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
-            state.deposit_guard().record_rejected(&err);
+            state.deposit_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = err.code(), "deposit verification failed");
             Json(DepositVerifyResponse::invalid(&err))
         }
@@ -89,7 +93,7 @@ async fn deposit_handler(
             Json(response)
         }
         Err(err) => {
-            state.deposit_guard().record_rejected(&err);
+            state.deposit_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = err.code(), "gasless deposit failed");
             Json(DepositResponse::failure(&err))
         }
@@ -116,6 +120,81 @@ async fn run_deposit(
         tx_hash,
         relayer.network(),
         &intent,
+    ))
+}
+
+/// Preflight for [`withdraw_handler`], with the same guarantee: every check, no broadcast.
+async fn withdraw_verify_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<WithdrawRequest>,
+) -> impl IntoResponse {
+    match run_withdraw_verify(&state, request).await {
+        Ok(()) => Json(WithdrawVerifyResponse::valid()),
+        Err(err) => {
+            state.withdraw_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "withdrawal verification failed");
+            Json(WithdrawVerifyResponse::invalid(&err))
+        }
+    }
+}
+
+async fn run_withdraw_verify(
+    state: &SharedState,
+    request: WithdrawRequest,
+) -> Result<(), WithdrawError> {
+    state.withdraw_guard().check_global()?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent = request.parse()?;
+    withdraw::verify(
+        relayer,
+        state.withdraw_guard().limits(),
+        &intent,
+        now_secs(),
+    )
+    .await
+}
+
+/// Submits a gasless withdrawal step, with the relayer paying gas.
+///
+/// The action always applies to the user named in the authorization, never to the relayer — the
+/// signature binds every field, so this service cannot alter any of them.
+async fn withdraw_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<WithdrawRequest>,
+) -> impl IntoResponse {
+    match run_withdraw(&state, request).await {
+        Ok((response, action)) => {
+            state.withdraw_guard().record_sponsored();
+            info!(
+                action,
+                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                user = response.user.as_deref().unwrap_or_default(),
+                asset = response.asset.as_deref().unwrap_or_default(),
+                network = response.network.as_deref().unwrap_or_default(),
+                "gasless withdrawal submitted"
+            );
+            Json(response)
+        }
+        Err(err) => {
+            state.withdraw_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "gasless withdrawal failed");
+            Json(WithdrawResponse::failure(&err))
+        }
+    }
+}
+
+async fn run_withdraw(
+    state: &SharedState,
+    request: WithdrawRequest,
+) -> Result<(WithdrawResponse, &'static str), WithdrawError> {
+    state.withdraw_guard().check_global()?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let intent: WithdrawIntent = request.parse()?;
+
+    let tx_hash = withdraw::submit(relayer, state.withdraw_guard(), &intent, now_secs()).await?;
+    Ok((
+        WithdrawResponse::success(tx_hash, relayer.network(), &intent),
+        intent.action(),
     ))
 }
 

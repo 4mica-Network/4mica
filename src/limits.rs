@@ -1,11 +1,15 @@
-//! Rate limiting and concurrency control for sponsored deposits.
+//! Rate limiting and concurrency control for sponsored actions.
 //!
-//! `/deposit` spends the relayer's ETH on behalf of an unauthenticated caller. The signature binds
-//! the amount and destination, so nobody can *steal* a deposit — but nothing in the protocol stops
-//! someone submitting a stream of legitimate, worthless deposits and burning gas. These are the
+//! `/deposit` and `/withdraw` spend the relayer's ETH on behalf of an unauthenticated caller. The
+//! signature binds who benefits, so nobody can *steal* anything — but nothing in the protocol stops
+//! someone submitting a stream of legitimate, worthless requests and burning gas. These are the
 //! controls that must live in-process because they depend on state only this service has: which
 //! address a signature actually recovered to, how many submissions are in flight, and what the
 //! relayer's balance is.
+//!
+//! One implementation, instantiated once per sponsored action. Separate instances rather than a
+//! shared one so a burst of deposits cannot exhaust the budget a withdrawal needs — they cost
+//! different amounts of gas and deserve different ceilings.
 //!
 //! Controls better handled upstream (an API gateway or WAF) are deliberately absent: IP-based
 //! limiting, API keys, and TLS termination all belong to a layer that can see the real client.
@@ -25,13 +29,28 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use alloy::primitives::{Address, B256, U256};
+use thiserror::Error;
 
-use crate::deposit::DepositError;
+/// Why the guard refused. Kept separate from the per-action error types so one guard can serve
+/// several of them; each converts these into its own variants.
+#[derive(Debug, Error)]
+pub enum ThrottleError {
+    #[error("too many requests; retry shortly")]
+    RateLimited,
+    #[error("address {address} has exceeded its rate limit; retry shortly")]
+    AddressRateLimited { address: Address },
+    #[error("too many requests in flight; retry shortly")]
+    TooManyInFlight,
+    #[error("this authorization is already being submitted")]
+    DuplicateInFlight,
+    #[error("relayer balance {balance} is at or below the configured floor {floor}")]
+    RelayerBalanceTooLow { balance: U256, floor: U256 },
+}
 
 /// Tunables, all with defaults chosen to be permissive enough for normal use and tight enough that
 /// a single misbehaving client cannot monopolise the relayer.
 #[derive(Clone, Debug)]
-pub struct DepositLimits {
+pub struct SponsorLimits {
     /// Concurrent submissions across all callers. Bounds how much damage a burst can do before the
     /// rate limiter observes it.
     pub max_in_flight: usize,
@@ -46,17 +65,17 @@ pub struct DepositLimits {
     /// Ceiling on distinct addresses tracked at once. Without it, spamming fresh `from` values
     /// would grow the rate-limit map unboundedly — a memory attack in place of a gas one.
     pub max_tracked_addresses: usize,
-    /// Hard cap on gas for one sponsored deposit, used both as the pre-flight estimate ceiling and
-    /// as the explicit limit on the broadcast transaction.
+    /// Hard cap on gas for one sponsored transaction, used both as the pre-flight estimate ceiling
+    /// and as the explicit limit on the broadcast transaction.
     ///
-    /// Without it the token decides what a deposit costs us: a hostile or merely expensive
+    /// Without it the asset decides what the action costs us: a hostile or merely expensive
     /// `receiveWithAuthorization` sets the bill. x402 names an unbounded gas limit as the
     /// "trap door" vector for draining a facilitator. Unused gas is refunded, so setting this at
     /// the ceiling costs nothing in the normal case and bounds the worst one.
     pub max_gas: u64,
 }
 
-impl Default for DepositLimits {
+impl Default for SponsorLimits {
     fn default() -> Self {
         Self {
             max_in_flight: 16,
@@ -89,8 +108,8 @@ struct GuardState {
 /// until now the service emitted no signal at all — a slow drain would have gone unnoticed.
 #[derive(Debug, Default, Clone, Copy, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DepositCounters {
-    /// Deposits broadcast and mined successfully.
+pub struct SponsorCounters {
+    /// Transactions broadcast and mined successfully.
     pub sponsored: u64,
     /// Requests refused for any reason — bad signature, throttling, gas ceiling.
     pub rejected: u64,
@@ -99,16 +118,16 @@ pub struct DepositCounters {
     pub throttled: u64,
 }
 
-pub struct DepositGuard {
-    limits: DepositLimits,
+pub struct SponsorGuard {
+    limits: SponsorLimits,
     state: Mutex<GuardState>,
     sponsored: AtomicU64,
     rejected: AtomicU64,
     throttled: AtomicU64,
 }
 
-impl DepositGuard {
-    pub fn new(limits: DepositLimits) -> Arc<Self> {
+impl SponsorGuard {
+    pub fn new(limits: SponsorLimits) -> Arc<Self> {
         Arc::new(Self {
             limits,
             state: Mutex::new(GuardState::default()),
@@ -122,34 +141,37 @@ impl DepositGuard {
         self.sponsored.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn record_rejected(&self, error: &DepositError) {
+    /// `throttled` marks a rejection that came from these limits rather than from the request
+    /// itself. Passed in rather than inspected because the caller holds an action-specific error
+    /// type, and only it can tell the two apart.
+    pub fn record_rejected(&self, throttled: bool) {
         self.rejected.fetch_add(1, Ordering::Relaxed);
-        if error.is_throttling() {
+        if throttled {
             self.throttled.fetch_add(1, Ordering::Relaxed);
         }
     }
 
-    pub fn counters(&self) -> DepositCounters {
-        DepositCounters {
+    pub fn counters(&self) -> SponsorCounters {
+        SponsorCounters {
             sponsored: self.sponsored.load(Ordering::Relaxed),
             rejected: self.rejected.load(Ordering::Relaxed),
             throttled: self.throttled.load(Ordering::Relaxed),
         }
     }
 
-    pub fn limits(&self) -> &DepositLimits {
+    pub fn limits(&self) -> &SponsorLimits {
         &self.limits
     }
 
     /// Pre-verification admission check. Bounds total volume without trusting any field in the
     /// request, since none of them are proven yet.
-    pub fn check_global(&self) -> Result<(), DepositError> {
+    pub fn check_global(&self) -> Result<(), ThrottleError> {
         let now = Instant::now();
         let mut state = self.lock();
 
         prune(&mut state.global, now, self.limits.window);
         if state.global.len() >= self.limits.global_limit {
-            return Err(DepositError::RateLimited);
+            return Err(ThrottleError::RateLimited);
         }
         state.global.push_back(now);
         Ok(())
@@ -163,15 +185,15 @@ impl DepositGuard {
         self: &Arc<Self>,
         from: Address,
         nonce: B256,
-    ) -> Result<DepositPermit, DepositError> {
+    ) -> Result<SponsorPermit, ThrottleError> {
         let now = Instant::now();
         let mut state = self.lock();
 
         if state.in_flight.len() >= self.limits.max_in_flight {
-            return Err(DepositError::TooManyInFlight);
+            return Err(ThrottleError::TooManyInFlight);
         }
         if state.in_flight.contains(&(from, nonce)) {
-            return Err(DepositError::DuplicateInFlight);
+            return Err(ThrottleError::DuplicateInFlight);
         }
 
         // Sweep before tracking a new address so the map holds only genuinely-active callers.
@@ -193,32 +215,32 @@ impl DepositGuard {
             }
             // Still full: fail closed rather than grow without bound.
             if state.per_address.len() >= self.limits.max_tracked_addresses {
-                return Err(DepositError::RateLimited);
+                return Err(ThrottleError::RateLimited);
             }
         }
 
         let seen = state.per_address.entry(from).or_default();
         prune(seen, now, self.limits.window);
         if seen.len() >= self.limits.per_address_limit {
-            return Err(DepositError::AddressRateLimited { address: from });
+            return Err(ThrottleError::AddressRateLimited { address: from });
         }
         seen.push_back(now);
         // Inserted last: every failure path above returns before reserving, so there is nothing to
         // roll back and no way to leak a slot.
         state.in_flight.insert((from, nonce));
 
-        Ok(DepositPermit {
+        Ok(SponsorPermit {
             guard: Arc::clone(self),
             from,
             nonce,
         })
     }
 
-    pub fn check_relayer_balance(&self, balance: U256) -> Result<(), DepositError> {
+    pub fn check_relayer_balance(&self, balance: U256) -> Result<(), ThrottleError> {
         if !self.limits.min_relayer_balance_wei.is_zero()
             && balance <= self.limits.min_relayer_balance_wei
         {
-            return Err(DepositError::RelayerBalanceTooLow {
+            return Err(ThrottleError::RelayerBalanceTooLow {
                 balance,
                 floor: self.limits.min_relayer_balance_wei,
             });
@@ -245,22 +267,22 @@ impl DepositGuard {
 
 /// Holds an in-flight slot for one authorization. Releasing on drop rather than at the end of the
 /// submit path means a `?` return or a panic cannot strand capacity.
-pub struct DepositPermit {
-    guard: Arc<DepositGuard>,
+pub struct SponsorPermit {
+    guard: Arc<SponsorGuard>,
     from: Address,
     nonce: B256,
 }
 
-impl std::fmt::Debug for DepositPermit {
+impl std::fmt::Debug for SponsorPermit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DepositPermit")
+        f.debug_struct("SponsorPermit")
             .field("from", &self.from)
             .field("nonce", &self.nonce)
             .finish()
     }
 }
 
-impl Drop for DepositPermit {
+impl Drop for SponsorPermit {
     fn drop(&mut self) {
         self.guard.release(self.from, self.nonce);
     }
@@ -286,8 +308,8 @@ mod tests {
     /// Deliberately roomy. Each test tightens the single limit it exercises, so a failure names
     /// the constraint that actually bound — the checks run in order, and a too-small unrelated
     /// limit would mask the one under test.
-    fn limits() -> DepositLimits {
-        DepositLimits {
+    fn limits() -> SponsorLimits {
+        SponsorLimits {
             max_in_flight: 32,
             per_address_limit: 32,
             global_limit: 32,
@@ -300,7 +322,7 @@ mod tests {
 
     #[test]
     fn global_limit_bounds_requests_before_verification() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             global_limit: 3,
             ..limits()
         });
@@ -308,12 +330,12 @@ mod tests {
             guard.check_global().expect("within limit");
         }
         let err = guard.check_global().expect_err("expected rate limit");
-        assert_eq!(err.code(), "RATE_LIMITED");
+        assert!(matches!(err, ThrottleError::RateLimited));
     }
 
     #[test]
     fn per_address_limit_applies_to_a_verified_signer() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             per_address_limit: 2,
             ..limits()
         });
@@ -326,12 +348,12 @@ mod tests {
         let err = guard
             .reserve(addr(1), B256::repeat_byte(3))
             .expect_err("expected per-address limit");
-        assert_eq!(err.code(), "ADDRESS_RATE_LIMITED");
+        assert!(matches!(err, ThrottleError::AddressRateLimited { .. }));
     }
 
     #[test]
     fn in_flight_slots_are_released_on_drop() {
-        let guard = DepositGuard::new(limits());
+        let guard = SponsorGuard::new(limits());
         {
             let _permit = guard
                 .reserve(addr(1), B256::repeat_byte(1))
@@ -343,7 +365,7 @@ mod tests {
 
     #[test]
     fn max_in_flight_bounds_concurrent_submissions() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             max_in_flight: 2,
             ..limits()
         });
@@ -352,25 +374,25 @@ mod tests {
         let err = guard
             .reserve(addr(3), B256::repeat_byte(3))
             .expect_err("expected in-flight cap");
-        assert_eq!(err.code(), "TOO_MANY_IN_FLIGHT");
+        assert!(matches!(err, ThrottleError::TooManyInFlight));
     }
 
     /// The on-chain nonce guard rejects a *sequential* replay; this covers the concurrent case,
     /// where both submissions would otherwise be broadcast and one would revert after paying gas.
     #[test]
     fn the_same_authorization_cannot_be_submitted_twice_concurrently() {
-        let guard = DepositGuard::new(limits());
+        let guard = SponsorGuard::new(limits());
         let _first = guard.reserve(addr(1), B256::repeat_byte(9)).expect("first");
         let err = guard
             .reserve(addr(1), B256::repeat_byte(9))
             .expect_err("expected duplicate rejection");
-        assert_eq!(err.code(), "DUPLICATE_IN_FLIGHT");
+        assert!(matches!(err, ThrottleError::DuplicateInFlight));
     }
 
     /// A rejected reservation must not consume the slot it was denied.
     #[test]
     fn a_denied_reservation_leaves_no_in_flight_slot_behind() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             per_address_limit: 2,
             ..limits()
         });
@@ -391,7 +413,7 @@ mod tests {
     /// Spamming fresh addresses must not grow the tracking map without bound.
     #[test]
     fn tracked_addresses_are_capped() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             max_tracked_addresses: 2,
             ..limits()
         });
@@ -402,12 +424,12 @@ mod tests {
         let err = guard
             .reserve(addr(3), B256::repeat_byte(3))
             .expect_err("expected rejection");
-        assert_eq!(err.code(), "RATE_LIMITED");
+        assert!(matches!(err, ThrottleError::RateLimited));
     }
 
     #[test]
     fn relayer_balance_floor_is_enforced_when_set() {
-        let guard = DepositGuard::new(DepositLimits {
+        let guard = SponsorGuard::new(SponsorLimits {
             min_relayer_balance_wei: U256::from(1_000u64),
             ..limits()
         });
@@ -418,12 +440,12 @@ mod tests {
         let err = guard
             .check_relayer_balance(U256::from(1_000u64))
             .expect_err("at floor is not above it");
-        assert_eq!(err.code(), "RELAYER_BALANCE_TOO_LOW");
+        assert!(matches!(err, ThrottleError::RelayerBalanceTooLow { .. }));
     }
 
     #[test]
     fn relayer_balance_floor_is_disabled_by_default() {
-        let guard = DepositGuard::new(limits());
+        let guard = SponsorGuard::new(limits());
         guard
             .check_relayer_balance(U256::ZERO)
             .expect("zero floor disables the check");

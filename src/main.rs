@@ -8,6 +8,7 @@ mod relayer;
 mod server;
 mod telemetry;
 mod verifier;
+mod withdraw;
 
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ use crate::config::{ServiceConfig, load_public_params};
 use crate::exact::ExactService;
 use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
-use crate::limits::DepositGuard;
+use crate::limits::SponsorGuard;
 use crate::relayer::Relayer;
 use crate::server::state::{AppState, FourMicaHandler};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
@@ -95,12 +96,20 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
-    let deposit_guard = DepositGuard::new(service_cfg.deposit_limits.clone());
-    log_deposit_limits(&deposit_guard, relayers.is_empty());
+    let deposit_guard = SponsorGuard::new(service_cfg.deposit_limits.clone());
+    let withdraw_guard = SponsorGuard::new(service_cfg.withdraw_limits.clone());
+    log_sponsor_limits("deposit", &deposit_guard, relayers.is_empty());
+    log_sponsor_limits("withdraw", &withdraw_guard, relayers.is_empty());
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
-    let state = AppState::new(four_mica_handlers, exact_service, relayers, deposit_guard);
+    let state = AppState::new(
+        four_mica_handlers,
+        exact_service,
+        relayers,
+        deposit_guard,
+        withdraw_guard,
+    );
 
     server::run(service_cfg, state).await
 }
@@ -146,9 +155,12 @@ async fn connect_relayer(
     Ok(Some(relayer))
 }
 
-fn log_deposit_limits(guard: &DepositGuard, no_relayers: bool) {
+fn log_sponsor_limits(action: &str, guard: &SponsorGuard, no_relayers: bool) {
     if no_relayers {
-        info!("no relayers configured; /deposit is unavailable");
+        info!(
+            action,
+            "no relayers configured; gas sponsorship is unavailable"
+        );
         return;
     }
 
@@ -160,11 +172,13 @@ fn log_deposit_limits(guard: &DepositGuard, no_relayers: bool) {
         window_secs = limits.window.as_secs(),
         min_relayer_balance_wei = %limits.min_relayer_balance_wei,
         max_gas = limits.max_gas,
-        "deposit throttling active"
+        action,
+        "sponsorship throttling active"
     );
     if limits.min_relayer_balance_wei.is_zero() {
         warn!(
-            "X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI is unset; deposits will keep being submitted \
+            action,
+            "no MIN_RELAYER_BALANCE_WEI floor is set; transactions will keep being submitted \
              until the relayer is fully drained"
         );
     }

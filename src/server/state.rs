@@ -10,9 +10,8 @@ use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
 
-use crate::deposit::DepositError;
-use crate::limits::DepositGuard;
-use crate::relayer::Relayer;
+use crate::limits::SponsorGuard;
+use crate::relayer::{NoRelayer, Relayer};
 use crate::server::model::{
     HealthResponse, PaymentRequirements, RelayerHealth, SettleRequest, SettleResponse,
     SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
@@ -41,8 +40,10 @@ pub(crate) struct AppState {
     /// valid deployment — the facilitator still serves `/verify` and `/settle`.
     relayers: Vec<Relayer>,
     /// Throttling shared across networks: the relayer's gas budget and this process's capacity are
-    /// global resources, so limiting per-network would let N networks multiply the exposure.
-    deposit_guard: Arc<DepositGuard>,
+    /// global resources, so limiting per-network would let N networks multiply the exposure. One
+    /// guard per action, so a burst of deposits cannot exhaust what a withdrawal needs.
+    deposit_guard: Arc<SponsorGuard>,
+    withdraw_guard: Arc<SponsorGuard>,
 }
 
 impl AppState {
@@ -50,18 +51,24 @@ impl AppState {
         four_mica: Vec<FourMicaHandler>,
         exact: Option<Arc<dyn ExactService>>,
         relayers: Vec<Relayer>,
-        deposit_guard: Arc<DepositGuard>,
+        deposit_guard: Arc<SponsorGuard>,
+        withdraw_guard: Arc<SponsorGuard>,
     ) -> Self {
         Self {
             four_mica,
             exact,
             relayers,
             deposit_guard,
+            withdraw_guard,
         }
     }
 
-    pub fn deposit_guard(&self) -> &Arc<DepositGuard> {
+    pub fn deposit_guard(&self) -> &Arc<SponsorGuard> {
         &self.deposit_guard
+    }
+
+    pub fn withdraw_guard(&self) -> &Arc<SponsorGuard> {
+        &self.withdraw_guard
     }
 
     /// Health plus the operational signals worth paging on.
@@ -103,23 +110,21 @@ impl AppState {
         HealthResponse {
             status: if degraded { "degraded" } else { "ok" },
             deposits: (!self.relayers.is_empty()).then(|| self.deposit_guard.counters()),
+            withdrawals: (!self.relayers.is_empty()).then(|| self.withdraw_guard.counters()),
             relayers,
         }
     }
 
     /// Resolves the relayer for `network`, defaulting to the first configured one when the caller
     /// omits it — the single-network case, which is most deployments.
-    pub fn relayer_for(&self, network: Option<&str>) -> Result<&Relayer, DepositError> {
+    pub fn relayer_for(&self, network: Option<&str>) -> Result<&Relayer, NoRelayer> {
         match network {
             Some(network) => self
                 .relayers
                 .iter()
                 .find(|relayer| relayer.network() == network)
-                .ok_or_else(|| DepositError::NoRelayer(network.to_string())),
-            None => self
-                .relayers
-                .first()
-                .ok_or(DepositError::NoRelayerConfigured),
+                .ok_or_else(|| NoRelayer::Network(network.to_string())),
+            None => self.relayers.first().ok_or(NoRelayer::NotConfigured),
         }
     }
 
