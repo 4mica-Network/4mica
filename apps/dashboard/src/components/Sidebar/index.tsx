@@ -61,6 +61,31 @@ function Label({
   );
 }
 
+/**
+ * `User.name` is `@default("")`, not nullable, so an unset name arrives as a
+ * blank string — `??` would happily return it. Everything here is trimmed and
+ * blank-checked rather than null-checked.
+ */
+const firstNonBlank = (
+  ...values: (string | null | undefined)[]
+): string | undefined => values.find((value) => value?.trim())?.trim();
+
+/** Who the sidebar says you are: a real name if we have one, else an email. */
+function useDisplayName(): string {
+  const { t } = useTranslation();
+  const { user } = useUser();
+  const currentUser = useAppSelector(selectUser);
+
+  return (
+    firstNonBlank(
+      currentUser?.name,
+      user?.fullName,
+      currentUser?.email,
+      user?.primaryEmailAddress?.emailAddress,
+    ) ?? t("sidebar.newUser")
+  );
+}
+
 function AvatarCircle() {
   const { t } = useTranslation();
   const { user } = useUser();
@@ -146,17 +171,10 @@ function ActionRow({
 function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const { signOut } = useClerk();
-  const { user } = useUser();
-  const currentUser = useAppSelector(selectUser);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
 
-  const displayName =
-    currentUser?.name ??
-    currentUser?.email ??
-    user?.fullName ??
-    user?.primaryEmailAddress?.emailAddress ??
-    t("org");
+  const displayName = useDisplayName();
 
   return (
     <>
@@ -221,17 +239,19 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
 }
 
 function StaticBrand({ collapsed }: { collapsed: boolean }) {
-  const { t } = useTranslation();
+  const displayName = useDisplayName();
   return (
     <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
-      <span className="grid h-11 w-9 shrink-0 place-items-center">
+      {/* mr-1 matches AvatarMenu. The avatar is 32px inside a 36px box, so
+          without it the label sits 2px off the circle. */}
+      <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
         <AvatarCircle />
       </span>
       <Label
         collapsed={collapsed}
         className="pr-2 font-medium text-ink-strong text-sm"
       >
-        {t("org")}
+        {displayName}
       </Label>
     </div>
   );
