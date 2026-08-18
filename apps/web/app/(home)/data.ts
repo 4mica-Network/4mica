@@ -21,7 +21,6 @@ export const PARTNERS = [
     name: "ChaosChain",
     logo: "/assets/chaos_chain_logo.svg",
     href: links.partner.chaosChain,
-    // White monochrome logo — invert to dark so it stays visible in light mode.
     invertOnLight: true,
   },
   {
@@ -34,14 +33,12 @@ export const PARTNERS = [
     name: "ClawCash",
     logo: "/assets/claw-cash.png",
     href: links.partner.clawCash,
-    // Solid black logo — invert to white in dark mode so it stays visible.
     invertOnDark: true,
   },
   {
     name: "Lambda Class",
     logo: "/assets/lambda-class.png",
     href: links.partner.lambdaClass,
-    // Solid black logo — invert to white in dark mode so it stays visible.
     invertOnDark: true,
   },
 ];
@@ -51,8 +48,8 @@ export const TRUST_POINTS = messages.home.trustPoints;
 export const SCENARIO = {
   capital: 10_000,
   gasCostX402: 1_000,
-  x402LatencyHours: 278, // 1M txs × 1 s avg block time ÷ 3600
-  micaLatencyHours: 2.7, // 1M txs × 10 ms BLS sign + verify ÷ 3_600_000
+  x402LatencyHours: 278,
+  micaLatencyHours: 2.7,
   yieldRate: 0.05,
 };
 

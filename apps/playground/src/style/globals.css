@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@4mica/tailwind-config/styles.css";
+@import "./profile.css";
+/* src/style/ is two levels below the app root — a wrong path here silently
+   drops every design token with no build error. */
+@config "../../tailwind.config.ts";

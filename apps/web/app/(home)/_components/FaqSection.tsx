@@ -74,7 +74,6 @@ export default function FaqSection() {
           })}
         </div>
 
-        {/* Contact Support */}
         <div className="mt-14 flex items-center justify-start gap-1.5 text-md">
           <span className="font-normal text-ink-muted">
             {messages.home.sections.faqSupportPrompt}

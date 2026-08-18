@@ -5,12 +5,6 @@ import type { BlogPostMeta } from "@lib/blogMeta";
 import { useMemo, useState } from "react";
 import { messages } from "@/i18n";
 
-/**
- * Category tabs + the post grid. Filtering happens in the browser because the
- * site is a static export — every post ships with the page and the tabs only
- * decide what is shown.
- */
-
 const ALL = messages.blog.allArticles;
 
 export default function PostList({ posts }: { posts: BlogPostMeta[] }) {
@@ -22,7 +16,6 @@ export default function PostList({ posts }: { posts: BlogPostMeta[] }) {
     return [ALL, ...[...seen].sort((a, b) => a.localeCompare(b))];
   }, [posts]);
 
-  // `messages` is `as const`, so the state has to be widened to plain string.
   const [active, setActive] = useState<string>(ALL);
 
   const visible =
@@ -30,7 +23,6 @@ export default function PostList({ posts }: { posts: BlogPostMeta[] }) {
 
   return (
     <div>
-      {/* "All articles" alone would have nothing to switch between. */}
       {categories.length > 1 ? (
         <div className="overflow-x-auto border-overlay/10 border-b">
           <div className="flex min-w-max gap-6">

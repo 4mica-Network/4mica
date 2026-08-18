@@ -23,7 +23,6 @@ export type NavItem = {
   href?: string;
   external?: boolean;
   children?: NavSection[];
-  /** Large-screen placement of the dropdown panel. Defaults to "center". */
   align?: "center" | "left";
 };
 
@@ -39,15 +38,12 @@ const toNavItem = (solution: {
   icon: solution.icon,
 });
 
-// Audience pages come first: facilitators are the primary customer.
 const customerItems: NavLinkItem[] = customerSolutions.map(toNavItem);
 const useCaseItems: NavLinkItem[] = useCaseSolutions.map(toNavItem);
 
 export const NAV_ITEMS: NavItem[] = [
   {
     label: messages.navigation.solutions,
-    // Leftmost, widest panel: anchor to the trigger's left edge so it opens
-    // rightward instead of spilling off to the left when centered.
     align: "left",
     children: [
       {

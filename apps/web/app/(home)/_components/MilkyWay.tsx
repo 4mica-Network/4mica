@@ -7,9 +7,6 @@ const rand = (seed: number) => {
   return x - Math.floor(x);
 };
 
-// Round style values so the server (Framer Motion rounds to ~6 significant
-// figures) and client (React emits full precision) emit identical strings,
-// avoiding a hydration mismatch.
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
 const STARS = Array.from({ length: 96 }, (_, i) => {

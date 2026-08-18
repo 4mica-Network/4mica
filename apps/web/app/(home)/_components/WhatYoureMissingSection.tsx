@@ -14,8 +14,6 @@ import {
   x402Total,
 } from "../data";
 
-// Bright shades read well on the dark theme; deeper 600-level shades keep
-// enough contrast on light surfaces.
 const ACCENTS = {
   dark: { red: "#f87171", green: "#4ade80" },
   light: { red: "#dc2626", green: "#16a34a" },
@@ -57,9 +55,6 @@ function ComparisonCard({
   totalValue,
 }: ComparisonCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-  // The pointer-follow glow position is written to CSS vars on this ref so
-  // moving the cursor never re-renders the card. `isHovered` only toggles on
-  // enter/leave, which is cheap and gates the border background swap.
   const borderRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -230,7 +225,6 @@ export default function WhatYoureMissingSection() {
           />
         </div>
 
-        {/* Delta */}
         <motion.div
           className="mt-10 flex w-full flex-col items-start justify-start gap-5 px-2 text-left sm:flex-row"
           initial="hidden"

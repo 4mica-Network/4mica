@@ -12,7 +12,6 @@ export default function ThemeToggle({
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Only reflect the resolved theme after mount to avoid a hydration mismatch.
   useEffect(() => setMounted(true), []);
 
   const isDark = !mounted || theme === "dark";

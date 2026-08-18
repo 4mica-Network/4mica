@@ -172,7 +172,7 @@ function TipBubble({
       ref={bubbleRef}
       role="tooltip"
       className={cn(
-        "fixed z-50 max-w-[min(320px,calc(100vw-24px))] whitespace-normal break-words rounded-md border border-border bg-popover px-2.5 py-1.5 text-popover-foreground text-xs leading-relaxed shadow-md transition-opacity duration-150 ease-out",
+        "wrap-break-word fixed z-50 max-w-[min(320px,calc(100vw-24px))] whitespace-normal rounded-md border border-border bg-popover px-2.5 py-1.5 text-popover-foreground text-xs leading-relaxed shadow-md transition-opacity duration-150 ease-out",
         interactive ? "pointer-events-auto" : "pointer-events-none",
         visible ? "opacity-100" : "opacity-0",
       )}
@@ -246,6 +246,7 @@ export function Tooltip({
     const wrap = (node: ReactNode) => {
       const isInteractive = trigger === "hover";
       return (
+        // biome-ignore lint/a11y/noStaticElementInteractions: <TODO: fix this>
         <span
           ref={anchorRef}
           onMouseEnter={isInteractive ? show : undefined}
