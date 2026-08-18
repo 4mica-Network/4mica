@@ -10,6 +10,8 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
+  BUSINESS_TYPES,
+  blankToNull,
   Card,
   FieldRow,
   KybTag,
@@ -22,27 +24,9 @@ import {
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 
-const BUSINESS_TYPES = [
-  { title: "—", value: "" },
-  { title: "Sole trader", value: "SOLE_TRADER" },
-  { title: "Partnership", value: "PARTNERSHIP" },
-  { title: "LLC", value: "LLC" },
-  { title: "Corporation", value: "CORPORATION" },
-  { title: "Non-profit", value: "NON_PROFIT" },
-];
-
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
   (code) => ({ title: code, value: code }),
 );
-
-/** Empty strings mean "clear this optional field"; the API expects null. */
-const blankToNull = (changes: Record<string, unknown>, keep: string[] = []) =>
-  Object.fromEntries(
-    Object.entries(changes).map(([key, value]) => [
-      key,
-      value === "" && !keep.includes(key) ? null : value,
-    ]),
-  );
 
 export function BusinessSettings() {
   const { t } = useTranslation();

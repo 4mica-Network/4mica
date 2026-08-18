@@ -103,9 +103,32 @@ export interface Business {
   updatedAt: string;
 }
 
+export const USERNAME_STATUS = {
+  IDLE: "idle",
+  CHECKING: "checking",
+  AVAILABLE: "available",
+  TAKEN: "taken",
+  RESERVED: "reserved",
+  ERROR: "error",
+} as const;
+
+export type UsernameStatus =
+  (typeof USERNAME_STATUS)[keyof typeof USERNAME_STATUS];
+
+/**
+ * The advisory availability probe behind the onboarding handle picker. `value`
+ * is the candidate the status belongs to, so an out-of-order response for a
+ * handle the user has already edited past can be discarded.
+ */
+export interface UsernameCheck {
+  value: string;
+  status: UsernameStatus;
+}
+
 export type UserState = {
   user: User | null;
   business: Business | null;
+  usernameCheck: UsernameCheck;
   isLoading: boolean;
   /** Keyed by card id, so each card shows its own spinner. */
   savingSections: Record<string, boolean>;

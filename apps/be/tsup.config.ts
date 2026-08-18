@@ -12,7 +12,7 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   treeshake: true,
-  noExternal: ["@4mica/db", "@4mica/auth"],
+  noExternal: ["@4mica/db", "@4mica/auth", "@4mica/url"],
   external: [
     "@prisma/client",
     "@prisma/adapter-pg",

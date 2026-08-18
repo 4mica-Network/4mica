@@ -1,6 +1,8 @@
 import { HttpError } from "@4mica/http";
 import {
+  checkUsernameAvailability,
   getMe,
+  type UsernameAvailability,
   updateAccount as updateAccountRequest,
   updateNotifications as updateNotificationsRequest,
   updateProfile as updateProfileRequest,
@@ -8,8 +10,10 @@ import {
 } from "@api/user";
 import i18n from "@i18n";
 import { notifyError } from "@utils/notification";
-import { call, put, select, takeEvery } from "redux-saga/effects";
+import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import {
+  checkUsernameFailed,
+  checkUsernameSucceeded,
   fetchUserFailed,
   fetchUserPending,
   fetchUserSucceeded,
@@ -138,8 +142,82 @@ export function* updateBusiness(action: {
   }
 }
 
+export function* checkUsername(action: {
+  type: string;
+  payload: string;
+}): Generator {
+  try {
+    const response = yield call(() =>
+      checkUsernameAvailability(action.payload),
+    );
+    const { username, available, reason } = response as UsernameAvailability;
+    yield put(checkUsernameSucceeded(username, available, reason));
+  } catch {
+    // Deliberately quiet: this probe is advisory, the write is the authority,
+    // and a toast on every failed keystroke check would be noise.
+    yield put(checkUsernameFailed(action.payload));
+  }
+}
+
+/**
+ * Write the business, then flip the flag — and only in that order, so a failed
+ * business write can never leave an account marked onboarded with no entity.
+ */
+export function* completeOnboarding(action: {
+  type: string;
+  payload: Partial<Business>;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    const business = yield call(() => upsertBusinessRequest(action.payload));
+    yield put(updateBusinessSucceeded(business as Business, action.meta));
+  } catch (error) {
+    const message = toMessage(
+      error,
+      i18n.t("store.business.updateFailedBody", {
+        defaultValue: "Something went wrong while saving your business.",
+      }),
+    );
+    yield put(updateBusinessFailed(message, toIssueMap(error), action.meta));
+    notifyError({
+      title: i18n.t("store.business.updateFailedTitle", {
+        defaultValue: "Update failed",
+      }),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+    return;
+  }
+
+  const meta = { section: "onboarding.complete" };
+
+  try {
+    const user = yield call(() =>
+      updateAccountRequest({ completeOnboarding: true }),
+    );
+    yield put(updateUserSucceeded(user as User, meta));
+  } catch (error) {
+    const message = toMessage(
+      error,
+      i18n.t("store.user.onboardingFailedBody", {
+        defaultValue: "We couldn't finish setting up your account.",
+      }),
+    );
+    yield put(updateUserFailed(message, toIssueMap(error), meta));
+    notifyError({
+      title: i18n.t("store.user.onboardingFailedTitle", {
+        defaultValue: "Setup incomplete",
+      }),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
 export default [
   takeEvery(actionTypes.FETCH_USER_REQUESTED, fetchUser),
+  takeLatest(actionTypes.CHECK_USERNAME_REQUESTED, checkUsername),
+  takeLatest(actionTypes.COMPLETE_ONBOARDING_REQUESTED, completeOnboarding),
   takeEvery(actionTypes.UPDATE_PROFILE_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_ACCOUNT_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_NOTIFICATIONS_REQUESTED, updateUser),

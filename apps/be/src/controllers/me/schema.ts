@@ -1,6 +1,49 @@
+import {
+  isReservedSegment,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MESSAGE,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "@4mica/url";
 import * as v from "valibot";
 
 const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
+
+/**
+ * The one handle rule, shared with the availability check and with the
+ * playground's route params via @4mica/url.
+ *
+ * `toLowerCase` runs before the pattern so "Ada" normalises to "ada" instead of
+ * 400ing — the playground lowercases when it resolves a profile, so a
+ * mixed-case handle stored here would be unreachable at its own public URL.
+ * The reserved check keeps handles out of the marketing site's namespace;
+ * public profiles are served bare off the same apex domain, so without it a
+ * user could claim `pricing` and shadow that page.
+ */
+const usernameFormatPipe = v.pipe(
+  v.string(),
+  v.trim(),
+  v.toLowerCase(),
+  v.minLength(USERNAME_MIN_LENGTH),
+  v.maxLength(USERNAME_MAX_LENGTH),
+  v.regex(USERNAME_PATTERN, USERNAME_MESSAGE),
+);
+
+const usernamePipe = v.pipe(
+  usernameFormatPipe,
+  v.check((value) => !isReservedSegment(value), "that username is reserved"),
+);
+
+/**
+ * GET /me/username-available — the candidate handle, not an identity.
+ *
+ * Format only: a reserved handle is well-formed, so the handler answers it as a
+ * 200 `{ available: false, reason: "reserved" }` rather than a 400. The client
+ * is asking a question, and "no, and here's why" is a valid answer.
+ */
+export const CheckUsernameSchema = v.object({ username: usernameFormatPipe });
+
+export type CheckUsernameInput = v.InferOutput<typeof CheckUsernameSchema>;
 
 const nullableText = (max: number) =>
   v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(max)));
@@ -26,18 +69,7 @@ export const BUSINESS_TYPES = [
 export const UpdateProfileSchema = v.partial(
   v.object({
     name: trimmed(120),
-    username: v.nullable(
-      v.pipe(
-        v.string(),
-        v.trim(),
-        v.minLength(2),
-        v.maxLength(64),
-        v.regex(
-          /^[a-z0-9_-]+$/,
-          "username may only contain lowercase letters, numbers, - and _",
-        ),
-      ),
-    ),
+    username: v.nullable(usernamePipe),
     bio: nullableText(2000),
     description: nullableText(2000),
     avatarUrl: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2048))),

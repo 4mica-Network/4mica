@@ -12,6 +12,28 @@ import type { ReactNode } from "react";
 export type { Option };
 export { Switch };
 
+/** Mirrors the `BusinessType` enum; the blank entry clears the field. */
+export const BUSINESS_TYPES: Option[] = [
+  { title: "—", value: "" },
+  { title: "Sole trader", value: "SOLE_TRADER" },
+  { title: "Partnership", value: "PARTNERSHIP" },
+  { title: "LLC", value: "LLC" },
+  { title: "Corporation", value: "CORPORATION" },
+  { title: "Non-profit", value: "NON_PROFIT" },
+];
+
+/** Empty strings mean "clear this optional field"; the API expects null. */
+export const blankToNull = (
+  changes: Record<string, unknown>,
+  keep: string[] = [],
+) =>
+  Object.fromEntries(
+    Object.entries(changes).map(([key, value]) => [
+      key,
+      value === "" && !keep.includes(key) ? null : value,
+    ]),
+  );
+
 export function Card({
   className,
   children,
@@ -219,6 +241,8 @@ export function TextInput({
   prefix,
   format,
   maxLength,
+  trailingIcon,
+  autoFocus,
 }: {
   id: string;
   value: string;
@@ -230,6 +254,9 @@ export function TextInput({
   prefix?: string;
   format?: "lowercase" | "uppercase";
   maxLength?: number;
+  /** Status affordance inside the field — a spinner, tick or cross. */
+  trailingIcon?: ReactNode;
+  autoFocus?: boolean;
 }) {
   return (
     <InputField
@@ -242,6 +269,8 @@ export function TextInput({
       prefix={prefix}
       format={format}
       maxLength={maxLength}
+      trailingIcon={trailingIcon}
+      autoFocus={autoFocus}
       onChange={(e) => onChange(e.target.value)}
     />
   );

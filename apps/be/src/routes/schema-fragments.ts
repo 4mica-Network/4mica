@@ -182,6 +182,24 @@ export const webhookEventsResponseSchema = {
   },
 } as const;
 
+/**
+ * Deliberately says nothing about who holds a taken handle — the serializer
+ * strips anything the handler did not put here, which is the point.
+ */
+export const usernameAvailabilityResponseSchema = {
+  type: "object",
+  required: ["username", "available"],
+  properties: {
+    username: str,
+    available: bool,
+    reason: {
+      type: "string",
+      nullable: true,
+      enum: ["taken", "reserved", null],
+    },
+  },
+} as const;
+
 export const errorResponseSchema = {
   type: "object",
   required: ["error", "message"],

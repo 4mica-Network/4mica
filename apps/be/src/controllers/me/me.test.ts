@@ -238,8 +238,154 @@ describe("account routes", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().message).toContain("username");
+    // The client keys its field errors off `issues[].path`, so a 409 has to
+    // carry the same envelope a 400 does or "already taken" cannot land under
+    // the username input.
+    expect(res.json().issues).toEqual([
+      { path: "username", message: expect.stringContaining("username") },
+    ]);
 
     await app.close();
+  });
+
+  it("PATCH /me/profile lowercases the username", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "  AdaLovelace  " },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data.username).toBe("adalovelace");
+
+    await app.close();
+  });
+
+  it("PATCH /me/profile refuses a handle reserved by the marketing site", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "pricing" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].path).toBe("username");
+    expect(update).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  describe("GET /me/username-available", () => {
+    /**
+     * One `findUnique` mock serves three callers — loadUser (by clerkUserId),
+     * getProfile (by id) and findUsernameOwner (by username) — so the
+     * availability tests have to answer per `where` clause.
+     */
+    const withUsernameOwner = (owner: { id: string } | null) => {
+      findUnique.mockImplementation(
+        async ({ where }: { where: Record<string, unknown> }) =>
+          "username" in where ? owner : FULL_USER,
+      );
+    };
+
+    const check = async (username: string) => {
+      const app = await initApp([{ plugin: meRoutes }]);
+      const res = await app.inject({
+        method: "GET",
+        url: `/me/username-available?username=${encodeURIComponent(username)}`,
+        headers: AUTH,
+      });
+      await app.close();
+      return res;
+    };
+
+    it("reports an unclaimed handle as available", async () => {
+      withUsernameOwner(null);
+
+      const res = await check("ada-builds");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({
+        username: "ada-builds",
+        available: true,
+        reason: null,
+      });
+    });
+
+    it("reports a handle held by someone else as taken", async () => {
+      withUsernameOwner({ id: OTHER_USER_ID });
+
+      const res = await check("ada-builds");
+
+      expect(res.json()).toMatchObject({ available: false, reason: "taken" });
+    });
+
+    it("treats the caller's own handle as available", async () => {
+      withUsernameOwner({ id: AUTH_USER.id });
+
+      const res = await check("ada");
+
+      expect(res.json()).toMatchObject({ available: true, reason: null });
+    });
+
+    it("rejects a reserved handle without touching the database", async () => {
+      withUsernameOwner(null);
+
+      const res = await check("pricing");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        available: false,
+        reason: "reserved",
+      });
+      expect(
+        findUnique.mock.calls.some(([args]) => "username" in args.where),
+      ).toBe(false);
+    });
+
+    it("normalises the candidate before answering", async () => {
+      withUsernameOwner(null);
+
+      const res = await check("  AdaBuilds  ");
+
+      expect(res.json().username).toBe("adabuilds");
+    });
+
+    it("rejects a malformed candidate", async () => {
+      withUsernameOwner(null);
+
+      const tooShort = await check("a");
+      expect(tooShort.statusCode).toBe(400);
+      expect(tooShort.json().issues[0].path).toBe("username");
+
+      const badChars = await check("Not Valid!");
+      expect(badChars.statusCode).toBe(400);
+    });
+
+    it("never reveals who holds a taken handle", async () => {
+      withUsernameOwner({ id: OTHER_USER_ID });
+
+      const res = await check("ada-builds");
+
+      expect(Object.keys(res.json()).sort()).toEqual([
+        "available",
+        "reason",
+        "username",
+      ]);
+      expect(res.payload).not.toContain(OTHER_USER_ID);
+    });
+
+    it("requires authentication", async () => {
+      authenticateRequest.mockResolvedValue(signedOut());
+
+      const res = await check("ada-builds");
+
+      expect(res.statusCode).toBe(401);
+    });
   });
 
   it("PATCH /me/account validates the email", async () => {
@@ -448,6 +594,7 @@ describe("account routes", () => {
 
     for (const [method, url] of [
       ["GET", "/me"],
+      ["GET", "/me/username-available?username=ada"],
       ["PATCH", "/me/profile"],
       ["PATCH", "/me/account"],
       ["PATCH", "/me/notifications"],

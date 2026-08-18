@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import { OnboardingGate } from "@/components/Onboarding";
 import { Sidebar } from "@/components/Sidebar";
 
 export function AppShell() {
@@ -27,6 +28,10 @@ export function AppShell() {
           <Outlet />
         </div>
       </main>
+
+      {/* Mounted here rather than in main.tsx so it lives inside the
+          authenticated subtree and survives route changes without remounting. */}
+      <OnboardingGate />
     </div>
   );
 }

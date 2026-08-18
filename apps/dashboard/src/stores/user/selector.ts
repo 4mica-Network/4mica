@@ -1,5 +1,5 @@
 import type { RootState } from "..";
-import type { Business, User, UserState } from "./type";
+import type { Business, User, UsernameCheck, UserState } from "./type";
 
 export const selectUserState = (state: RootState): UserState => state.user;
 
@@ -35,3 +35,21 @@ export const selectIsEmailVerified = (state: RootState): boolean =>
 
 export const selectKybStatus = (state: RootState): string =>
   state.user.business?.kybStatus ?? "UNVERIFIED";
+
+export const selectUsernameCheck = (state: RootState): UsernameCheck =>
+  state.user.usernameCheck;
+
+export const selectHasCompletedOnboarding = (state: RootState): boolean =>
+  Boolean(state.user.user?.completeOnboarding);
+
+/**
+ * Null-safe on purpose. Before GET /me resolves `user` is null, so this is
+ * false and the blocking modal never flashes on top of the app; if the fetch
+ * fails it stays null and stays false, and `state.user.error` is what surfaces.
+ *
+ * Do NOT rewrite this as `!selectIsUserLoading(state) && ...` — `isLoading`
+ * starts false and only flips true once FETCH_USER_PENDING lands, so there is a
+ * window where that reads "loaded" for a user who has not been fetched at all.
+ */
+export const selectNeedsOnboarding = (state: RootState): boolean =>
+  state.user.user !== null && !state.user.user.completeOnboarding;

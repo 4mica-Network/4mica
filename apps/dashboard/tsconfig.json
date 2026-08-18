@@ -23,5 +23,15 @@
       "@i18n": ["./src/i18n/index.ts"]
     }
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts", "tailwind.config.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "vitest.config.ts",
+    // Carries the `@testing-library/jest-dom/vitest` side-effect import that
+    // augments vitest's `Assertion` with toHaveFocus/toHaveAttribute/etc.
+    // Without it in the program, `types: ["node"]` leaves those matchers
+    // untyped and every component test fails to compile.
+    "vitest.setup.ts",
+    "tailwind.config.ts"
+  ]
 }

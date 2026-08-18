@@ -31,6 +31,18 @@ export const updateNotifications = (data: Partial<User>) =>
     data,
   });
 
+export interface UsernameAvailability {
+  username: string;
+  available: boolean;
+  reason: "taken" | "reserved" | null;
+}
+
+export const checkUsernameAvailability = (username: string) =>
+  httpClient.request<UsernameAvailability>({
+    url: `/me/username-available?username=${encodeURIComponent(username)}`,
+    method: HttpMethod.GET,
+  });
+
 export const getBusiness = () =>
   httpClient.request<Business | null>({
     url: "/me/business",

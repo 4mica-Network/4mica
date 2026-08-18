@@ -13,6 +13,8 @@ export default defineConfig({
     "components/dropdown/index.tsx",
     "components/input-field/index.tsx",
     "components/link/index.tsx",
+    "components/modal/index.tsx",
+    "components/modal/useModalA11y.ts",
     "components/select/index.tsx",
     "components/spinner/index.tsx",
     "components/switch/index.tsx",
