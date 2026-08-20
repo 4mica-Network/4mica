@@ -11,12 +11,13 @@ use tracing::{info, warn};
 use super::{
     model::{
         ClaimRequest, ClaimResponse, ClaimVerifyResponse, DepositRequest, DepositResponse,
-        DepositVerifyResponse, SettleRequest, SettleResponse, SupportedKind, SupportedResponse,
-        VerifyRequest, VerifyResponse, WithdrawRequest, WithdrawResponse, WithdrawVerifyResponse,
+        DepositVerifyResponse, PayRequest, PayResponse, PayVerifyResponse, SettleRequest,
+        SettleResponse, SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
+        WithdrawRequest, WithdrawResponse, WithdrawVerifyResponse,
     },
     state::SharedState,
 };
-use crate::clearing::{self, ClaimError, ClaimTerms};
+use crate::clearing::{self, ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{self, DepositError, DepositIntent};
 use crate::withdraw::{self, WithdrawError, WithdrawIntent};
 
@@ -32,6 +33,8 @@ pub(super) fn build_router(state: SharedState) -> Router {
         .route("/withdraw/verify", post(withdraw_verify_handler))
         .route("/clearing/claim", post(claim_handler))
         .route("/clearing/claim/verify", post(claim_verify_handler))
+        .route("/clearing/pay", post(pay_handler))
+        .route("/clearing/pay/verify", post(pay_verify_handler))
         .route("/health", get(health_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -259,6 +262,102 @@ async fn run_claim(
     let (relayer, terms) = resolve_claim(state, &request).await?;
     let tx_hash = clearing::submit(relayer, state.claim_guard(), &terms).await?;
     Ok(ClaimResponse::success(tx_hash, relayer.network(), &terms))
+}
+
+/// Preflight for [`pay_handler`]. Runs every check without broadcasting, so a debtor can find out
+/// an authorization is unusable before anyone spends gas on it.
+async fn pay_verify_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<PayRequest>,
+) -> impl IntoResponse {
+    match run_pay_verify(&state, request).await {
+        Ok(()) => Json(PayVerifyResponse::valid()),
+        Err(err) => {
+            state.pay_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "payment verification failed");
+            Json(PayVerifyResponse::invalid(&err))
+        }
+    }
+}
+
+async fn run_pay_verify(state: &SharedState, request: PayRequest) -> Result<(), PayError> {
+    state.pay_guard().check_global()?;
+    let (relayer, terms) = resolve_pay(state, &request).await?;
+    clearing::verify_pay(
+        relayer,
+        state.pay_guard().limits(),
+        &terms,
+        &request.authorization,
+        now_secs(),
+    )
+    .await
+}
+
+/// Submits a net-debit payment on the debtor's behalf, with the relayer paying gas.
+///
+/// The funds come from the debtor's own EIP-3009 signature — bound to the ClearingHouse, the
+/// committed amount, and the cycle — so this service can decide only whether to submit, never what
+/// is paid.
+async fn pay_handler(
+    State(state): State<SharedState>,
+    Json(request): Json<PayRequest>,
+) -> impl IntoResponse {
+    match run_pay(&state, request).await {
+        Ok(response) => {
+            state.pay_guard().record_sponsored();
+            info!(
+                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                debtor = response.debtor.as_deref().unwrap_or_default(),
+                cycle_id = response.cycle_id.as_deref().unwrap_or_default(),
+                amount = response.amount.as_deref().unwrap_or_default(),
+                network = response.network.as_deref().unwrap_or_default(),
+                "sponsored net-debit payment submitted"
+            );
+            Json(response)
+        }
+        Err(err) => {
+            state.pay_guard().record_rejected(err.is_throttling());
+            warn!(reason = %err, code = err.code(), "sponsored net-debit payment failed");
+            Json(PayResponse::failure(&err))
+        }
+    }
+}
+
+async fn run_pay(state: &SharedState, request: PayRequest) -> Result<PayResponse, PayError> {
+    state.pay_guard().check_global()?;
+    let (relayer, terms) = resolve_pay(state, &request).await?;
+    let tx_hash = clearing::submit_pay(
+        relayer,
+        state.pay_guard(),
+        &terms,
+        &request.authorization,
+        now_secs(),
+    )
+    .await?;
+    Ok(PayResponse::success(tx_hash, relayer.network(), &terms))
+}
+
+/// Validates the request's identifiers, then resolves the debit's terms from the network's core.
+/// The debtor is the authorization's `from` — core then proves (or refuses) a leaf for exactly
+/// that address, so a stranger's signature simply resolves no terms.
+async fn resolve_pay<'a>(
+    state: &'a SharedState,
+    request: &PayRequest,
+) -> Result<(&'a crate::relayer::Relayer, PayTerms), PayError> {
+    let cycle_id = clearing::parse_pay_cycle_id(&request.cycle_id)?;
+    let relayer = state.relayer_for(request.network.as_deref())?;
+    let actions = state
+        .clearing_actions_for(relayer.network())
+        .ok_or_else(|| {
+            PayError::ActionUnavailable(format!(
+                "no core endpoint configured for network {}",
+                relayer.network()
+            ))
+        })?;
+    let terms = actions
+        .pay_terms(cycle_id, request.authorization.from)
+        .await?;
+    Ok((relayer, terms))
 }
 
 /// Validates the request's identifiers, then resolves the claim's terms from the network's core.

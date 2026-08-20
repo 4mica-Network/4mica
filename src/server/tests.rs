@@ -23,7 +23,7 @@ use super::model::{
     PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
     VerifyResponse, X402PaymentPayload,
 };
-use super::state::{AppState, FourMicaHandler, SharedState, ValidationError};
+use super::state::{AppState, FourMicaHandler, SharedState, SponsorGuards, ValidationError};
 
 #[tokio::test]
 async fn verify_endpoint_accepts_valid_payload() {
@@ -311,9 +311,7 @@ async fn supported_includes_exact_when_available() {
         Some(exact.clone() as Arc<dyn ExactService>),
         Vec::new(),
         Vec::new(),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        default_guards(),
     );
     let router = build_router(Arc::new(state));
 
@@ -852,6 +850,15 @@ async fn settle_rejects_an_out_of_range_x402_version() {
     assert_eq!(issuer.issue_calls(), 0);
 }
 
+fn default_guards() -> SponsorGuards {
+    SponsorGuards {
+        deposit: SponsorGuard::new(SponsorLimits::default()),
+        withdraw: SponsorGuard::new(SponsorLimits::default()),
+        claim: SponsorGuard::new(SponsorLimits::default()),
+        pay: SponsorGuard::new(SponsorLimits::default()),
+    }
+}
+
 fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedState {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
@@ -865,9 +872,7 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         None,
         Vec::new(),
         Vec::new(),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        default_guards(),
     ))
 }
 
@@ -1019,9 +1024,10 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
         None,
         Vec::new(),
         Vec::new(),
-        deposit_guard,
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuards {
+            deposit: deposit_guard,
+            ..default_guards()
+        },
     ));
 
     // Exhaust the deposit budget.
@@ -1133,9 +1139,10 @@ async fn deposit_is_rate_limited_globally() {
         None,
         Vec::new(),
         Vec::new(),
-        SponsorGuard::new(limits),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuards {
+            deposit: SponsorGuard::new(limits),
+            ..default_guards()
+        },
     ));
     let router = build_router(state);
 
@@ -1181,9 +1188,10 @@ async fn deposit_marks_throttling_as_retryable() {
         None,
         Vec::new(),
         Vec::new(),
-        SponsorGuard::new(limits),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuards {
+            deposit: SponsorGuard::new(limits),
+            ..default_guards()
+        },
     ));
     let router = build_router(state);
 
@@ -1252,9 +1260,10 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
         None,
         Vec::new(),
         Vec::new(),
-        Arc::clone(&guard),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        SponsorGuards {
+            deposit: Arc::clone(&guard),
+            ..default_guards()
+        },
     ));
     let router = build_router(state);
 
@@ -1486,6 +1495,101 @@ async fn claim_rejects_a_cycle_id_that_could_escape_its_url() {
     assert_eq!(payload["errorCode"], "INVALID_REQUEST");
 }
 
+// ── sponsored net-debit payments ────────────────────────────────────────────
+//
+// Same coverage boundary as the claim tests: what resolves before core or the chain is consulted.
+
+fn pay_body() -> Value {
+    json!({
+        "cycleId": "eth:1800000000",
+        "authorization": {
+            "from": "0x000000000000000000000000000000000000debb",
+            "validAfter": "0",
+            "validBefore": "2000000000",
+            "nonce": format!("0x{}", "aa".repeat(32)),
+            "v": 27,
+            "r": format!("0x{}", "11".repeat(32)),
+            "s": format!("0x{}", "22".repeat(32)),
+        },
+    })
+}
+
+#[tokio::test]
+async fn pay_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/pay", &pay_body()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+#[tokio::test]
+async fn pay_verify_reports_a_missing_relayer() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/pay/verify", &pay_body()))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["isValid"], false);
+    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+}
+
+#[tokio::test]
+async fn pay_rejects_a_cycle_id_that_could_escape_its_url() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let mut body = pay_body();
+    body["cycleId"] = json!("../participants/0xdead/clearing-action");
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/pay", &body))
+        .await
+        .unwrap();
+
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+}
+
+/// The debtor is `authorization.from` — a request with no authorization at all cannot name one, so
+/// it is refused by deserialization rather than defaulted.
+#[tokio::test]
+async fn pay_requires_an_authorization() {
+    let state = test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    );
+    let body = json!({ "cycleId": "eth:1800000000" });
+
+    let response = build_router(state)
+        .oneshot(post_json("/clearing/pay", &body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 /// POSTs a `/verify` request against a fresh router and decodes the response.
 ///
 /// `/verify` answers `200 OK` with `isValid: false` for business-rule rejections, so almost every
@@ -1528,9 +1632,7 @@ fn exact_state(exact: Arc<MockExact>) -> SharedState {
         Some(exact_service),
         Vec::new(),
         Vec::new(),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
-        SponsorGuard::new(SponsorLimits::default()),
+        default_guards(),
     ))
 }
 

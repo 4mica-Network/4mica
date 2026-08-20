@@ -233,6 +233,8 @@ The facilitator enforces that:
   rule as `/deposit`.
 - `POST /clearing/claim` and `POST /clearing/claim/verify` – sponsored net-credit claims; see
   below. Same availability rule as `/deposit`.
+- `POST /clearing/pay` and `POST /clearing/pay/verify` – sponsored net-debit payments; see below.
+  Same availability rule as `/deposit`.
 
 ### Sponsored net-credit claims
 
@@ -263,6 +265,42 @@ pro-rata fraction of it.
 
 Throttling is configured separately (`X402_CLAIM_*`), and concurrent submissions for the same
 cycle are deduplicated so only one pays gas — the other would revert as `AlreadyClaimed`.
+
+### Sponsored net-debit payments
+
+The debtor's side of the same cycle. Paying a net debit pulls money *out of* the debtor's wallet,
+so unlike a claim it carries the debtor's signature — an EIP-3009 `receiveWithAuthorization` the
+facilitator submits via `payNetDebitWithAuthorization`, paying the gas. The debtor needs no native
+balance and no prior allowance. ERC-20 cycles only: a native-asset debit cannot be pulled by
+signature.
+
+```jsonc
+{
+  "cycleId": "eth:1800000000",   // as core names it: text id or the 0x-prefixed on-chain hash
+  "network": "eip155:…",         // optional; defaults to the first configured network
+  "authorization": {
+    "from": "0x…",               // the debtor; the funds only ever leave this account
+    "validAfter": "0x0",
+    "validBefore": "0x…",
+    "nonce": "0x…",              // MUST equal the cycle's on-chain (0x…) id — binds the payment to it
+    "v": 27, "r": "0x…", "s": "0x…"
+  }
+}
+```
+
+`/clearing/pay` answers with `{ "success": true, "txHash", "network", "debtor", "cycleId",
+"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/pay/verify`
+answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
+error codes reuse `/deposit`'s and `/clearing/claim`'s strings wherever the meaning is the same.
+
+The signature is what makes this safe to relay: it binds the receiver (the ClearingHouse), the
+exact amount, and — through the nonce — the cycle it settles, so a submitter can change none of
+them. As with claims, the contract address, the amount and the proof are resolved from core, never
+taken from the request; the digest is built from *those* terms, so a signature over anything else
+simply mismatches.
+
+Throttling is configured separately (`X402_PAY_*`), and concurrent submissions for the same cycle
+are deduplicated so only one pays gas — the other would revert as `AlreadyPaid`.
 
 ### Gasless withdrawals
 

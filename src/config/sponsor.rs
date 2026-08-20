@@ -21,6 +21,7 @@ use crate::limits::SponsorLimits;
 pub(super) const DEPOSIT_PREFIX: &str = "X402_DEPOSIT";
 pub(super) const WITHDRAW_PREFIX: &str = "X402_WITHDRAW";
 pub(super) const CLAIM_PREFIX: &str = "X402_CLAIM";
+pub(super) const PAY_PREFIX: &str = "X402_PAY";
 
 /// Env var names for one action's knobs. Built from a prefix so a new sponsored action needs a
 /// constant rather than six.

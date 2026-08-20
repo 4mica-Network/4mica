@@ -15,7 +15,7 @@
 //! facilitator does not pay for transactions that were always going to revert. Every check here is
 //! re-enforced on-chain.
 
-mod eip712;
+pub(crate) mod eip712;
 mod error;
 
 use std::str::FromStr;

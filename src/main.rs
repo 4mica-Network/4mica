@@ -23,7 +23,7 @@ use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
 use crate::limits::SponsorGuard;
 use crate::relayer::Relayer;
-use crate::server::state::{AppState, FourMicaHandler};
+use crate::server::state::{AppState, FourMicaHandler, SponsorGuards};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
 use tracing::{info, warn};
 
@@ -110,9 +110,11 @@ async fn main() -> anyhow::Result<()> {
     let deposit_guard = SponsorGuard::new(service_cfg.deposit_limits.clone());
     let withdraw_guard = SponsorGuard::new(service_cfg.withdraw_limits.clone());
     let claim_guard = SponsorGuard::new(service_cfg.claim_limits.clone());
+    let pay_guard = SponsorGuard::new(service_cfg.pay_limits.clone());
     log_sponsor_limits("deposit", &deposit_guard, relayers.is_empty());
     log_sponsor_limits("withdraw", &withdraw_guard, relayers.is_empty());
     log_sponsor_limits("claim", &claim_guard, relayers.is_empty());
+    log_sponsor_limits("pay", &pay_guard, relayers.is_empty());
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
@@ -121,9 +123,12 @@ async fn main() -> anyhow::Result<()> {
         exact_service,
         relayers,
         clearing_actions,
-        deposit_guard,
-        withdraw_guard,
-        claim_guard,
+        SponsorGuards {
+            deposit: deposit_guard,
+            withdraw: withdraw_guard,
+            claim: claim_guard,
+            pay: pay_guard,
+        },
     );
 
     server::run(service_cfg, state).await

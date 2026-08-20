@@ -62,24 +62,42 @@ pub use token::DepositToken;
 
 mod clearing_house {
     alloy::sol! {
-    /// The slice of the ClearingHouse this facilitator submits claims to. The errors are declared
-    /// so a revert decodes to its reason instead of a bare selector; their signatures must match
-    /// the deployed contract's exactly or the selectors will not resolve.
+    /// The slice of the ClearingHouse this facilitator submits claims and debit payments to. The
+    /// errors are declared so a revert decodes to its reason instead of a bare selector; their
+    /// signatures must match the deployed contract's exactly or the selectors will not resolve.
     #[sol(rpc)]
     contract ClearingHouse {
+        /// The debtor's EIP-3009 authorization, same shape as the wire form the SDK sends.
+        struct ReceiveAuthorization {
+            address from;
+            uint256 validAfter;
+            uint256 validBefore;
+            bytes32 nonce;
+            uint8 v;
+            bytes32 r;
+            bytes32 s;
+        }
+
         function claimNetCreditFor(address creditor, bytes32 cycleId, uint256 netCredit, bytes32[] calldata proof) external;
+        function payNetDebitWithAuthorization(bytes32 cycleId, uint256 netDebit, bytes32[] calldata proof, ReceiveAuthorization calldata auth) external;
 
         error AmountZero();
         error CycleNotFound(bytes32 cycleId);
         error InvalidCycleStatus(bytes32 cycleId, uint8 status);
         error InvalidProof();
         error AlreadyClaimed(bytes32 cycleId, address creditor);
+        error AlreadyPaid(bytes32 cycleId, address debtor);
         error PaymentFinalityPending(uint64 deadline);
+        error PaymentWindowElapsed(uint64 deadline);
         error ClaimExceedsFundedLiquidity(uint256 available, uint256 requested);
         error CycleUnderfunded(uint256 available, uint256 required);
         error NativeTransferFailed(address recipient, uint256 amount);
         error ClaimConversionShortfall(uint256 requested, uint256 got);
         error ClaimedCreditExceedsCommitted(uint256 attempted, uint256 total);
+        error ResolvedDebitExceedsCommitted(uint256 attempted, uint256 total);
+        error ExactPaymentRequired(uint256 expected, uint256 actual);
+        error NativeAssetUnsupported();
+        error AuthorizationCycleMismatch(bytes32 nonce, bytes32 cycleId);
     }
     }
 }

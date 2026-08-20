@@ -14,7 +14,7 @@ use std::str::FromStr;
 
 use alloy::primitives::{Address, B256, U256};
 
-use crate::clearing::{ClaimError, ClaimTerms};
+use crate::clearing::{ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
 use crate::limits::SponsorCounters;
 use crate::withdraw::{WithdrawError, WithdrawIntent};
@@ -128,6 +128,8 @@ pub struct HealthResponse {
     pub withdrawals: Option<SponsorCounters>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claims: Option<SponsorCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debits: Option<SponsorCounters>,
 }
 
 #[derive(Serialize)]
@@ -617,6 +619,112 @@ pub struct ClaimResponse {
     /// See [`WithdrawVerifyResponse::retryable`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retryable: Option<bool>,
+}
+
+/// A sponsored net-debit payment. The caller names the cycle and supplies the debtor's EIP-3009
+/// authorization; the contract, the amount and the proof are resolved from core, and the
+/// authorization's signature binds the receiver, the amount and (as its nonce) the cycle — so the
+/// caller can only decide *whether* this debit is paid, never what it pays or to whom.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayRequest {
+    /// CAIP-2 network. Omitted uses the facilitator's default (first configured) network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// The cycle as core names it — either the text id or the 0x-prefixed on-chain hash.
+    pub cycle_id: String,
+    /// The debtor is `authorization.from`; there is no separate field to disagree with it.
+    pub authorization: ReceiveAuthorization,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayVerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+    /// Stable code so clients branch on this rather than parsing `invalidReason`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+impl PayVerifyResponse {
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            invalid_reason: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn invalid(error: &PayError) -> Self {
+        Self {
+            is_valid: false,
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// Echoed back so a caller can reconcile without re-parsing its own request. The funds always
+    /// come from `debtor` — the signer — and go into the cycle's escrow.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debtor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cycle_id: Option<String>,
+    /// The committed net debit, as core proved it and the debtor signed it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+impl PayResponse {
+    pub fn success(tx_hash: B256, network: &str, terms: &PayTerms) -> Self {
+        Self {
+            success: true,
+            tx_hash: Some(format!("{tx_hash:#x}")),
+            network: Some(network.to_string()),
+            debtor: Some(format!("{:#x}", terms.debtor)),
+            cycle_id: Some(format!("{:#x}", terms.cycle_id)),
+            amount: Some(terms.amount.to_string()),
+            error: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn failure(error: &PayError) -> Self {
+        Self {
+            success: false,
+            tx_hash: None,
+            network: None,
+            debtor: None,
+            cycle_id: None,
+            amount: None,
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+        }
+    }
 }
 
 impl ClaimResponse {

@@ -1,4 +1,5 @@
-//! Claim-sponsorship failures, and how chain errors are turned into them.
+//! Clearing-sponsorship failures — claims and debit payments — and how chain errors are turned
+//! into them.
 //!
 //! Mirrors [`crate::withdraw::error`], reusing the same code strings wherever the meaning is the
 //! same, so a client's handling of `RATE_LIMITED` or `SIMULATION_REVERTED` does not depend on which
@@ -130,14 +131,173 @@ impl ClaimError {
     }
 }
 
+/// Debit-payment sponsorship failures. A payment differs from a claim in carrying the debtor's
+/// EIP-3009 signature, so it inherits the deposit flow's signature-shaped rejections on top of the
+/// claim flow's action-resolution and throttling ones.
+#[derive(Debug, Error)]
+pub enum PayError {
+    #[error("{0}")]
+    InvalidRequest(String),
+    #[error("{0}")]
+    MalformedSignature(String),
+    #[error("gas sponsorship is not enabled on this facilitator")]
+    NoRelayerConfigured,
+    #[error("no relayer is configured for network {0}")]
+    NoRelayer(String),
+    /// Core would not serve the cycle's terms — an unknown cycle, a participant with no committed
+    /// leaf, or an authorization problem between this facilitator and core.
+    #[error("could not resolve the clearing action from core: {0}")]
+    ActionUnavailable(String),
+    /// Core answered, but about a credit rather than the debit that was asked for.
+    #[error("core returned a {returned} action for a net-debit payment")]
+    ActionMismatch { returned: String },
+    #[error("authorization expired at {valid_before} (now {now})")]
+    Expired { valid_before: u64, now: u64 },
+    #[error("authorization is not valid until {valid_after} (now {now})")]
+    NotYetValid { valid_after: u64, now: u64 },
+    #[error("signature recovers to {recovered}, not the declared debtor {declared}")]
+    SignatureMismatch {
+        recovered: Address,
+        declared: Address,
+    },
+    #[error("this authorization's nonce has already been used")]
+    NonceAlreadyUsed,
+    #[error("debtor holds {balance} of the token but the net debit is {needed}")]
+    InsufficientBalance { balance: U256, needed: U256 },
+    #[error("payment would revert: {0}")]
+    SimulationReverted(String),
+    #[error("chain error: {0:#}")]
+    Chain(#[from] anyhow::Error),
+    /// Nothing was submitted — safe to retry.
+    #[error("failed to broadcast payment: {0}")]
+    Broadcast(String),
+    /// The transaction *was* broadcast but its outcome is unknown. Distinct from [`Self::Broadcast`]
+    /// because retrying risks a double submission; poll `tx_hash` instead.
+    #[error("payment {tx_hash} was broadcast but its receipt could not be read: {reason}")]
+    ReceiptUnavailable { tx_hash: B256, reason: String },
+    /// Mined and reverted, so gas *was* spent. Distinct from [`Self::SimulationReverted`], which
+    /// means we declined before spending anything.
+    #[error("payment {tx_hash} reverted on-chain")]
+    RevertedOnChain { tx_hash: B256 },
+    #[error("too many payment requests; retry shortly")]
+    RateLimited,
+    #[error("address {address} has exceeded its payment rate limit; retry shortly")]
+    AddressRateLimited { address: Address },
+    #[error("too many payments in flight; retry shortly")]
+    TooManyInFlight,
+    #[error("this payment is already being submitted")]
+    DuplicateInFlight,
+    #[error("relayer balance {balance} is at or below the configured floor {floor}")]
+    RelayerBalanceTooLow { balance: U256, floor: U256 },
+    #[error("payment needs {estimated} gas, above the sponsored ceiling of {ceiling}")]
+    GasCeilingExceeded { estimated: u64, ceiling: u64 },
+}
+
+impl From<NoRelayer> for PayError {
+    fn from(err: NoRelayer) -> Self {
+        match err {
+            NoRelayer::NotConfigured => Self::NoRelayerConfigured,
+            NoRelayer::Network(network) => Self::NoRelayer(network),
+        }
+    }
+}
+
+impl From<ThrottleError> for PayError {
+    fn from(err: ThrottleError) -> Self {
+        match err {
+            ThrottleError::RateLimited => Self::RateLimited,
+            ThrottleError::AddressRateLimited { address } => Self::AddressRateLimited { address },
+            ThrottleError::TooManyInFlight => Self::TooManyInFlight,
+            ThrottleError::DuplicateInFlight => Self::DuplicateInFlight,
+            ThrottleError::RelayerBalanceTooLow { balance, floor } => {
+                Self::RelayerBalanceTooLow { balance, floor }
+            }
+        }
+    }
+}
+
+impl PayError {
+    /// Stable, machine-readable code so clients can branch without string matching.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidRequest(_) => "INVALID_REQUEST",
+            Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
+            Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
+            Self::NoRelayer(_) => "NO_RELAYER",
+            Self::ActionUnavailable(_) => "ACTION_UNAVAILABLE",
+            Self::ActionMismatch { .. } => "ACTION_MISMATCH",
+            Self::Expired { .. } => "EXPIRED",
+            Self::NotYetValid { .. } => "NOT_YET_VALID",
+            Self::SignatureMismatch { .. } => "SIGNATURE_MISMATCH",
+            Self::NonceAlreadyUsed => "NONCE_ALREADY_USED",
+            Self::InsufficientBalance { .. } => "INSUFFICIENT_BALANCE",
+            Self::SimulationReverted(_) => "SIMULATION_REVERTED",
+            Self::Chain(_) => "CHAIN_ERROR",
+            Self::Broadcast(_) => "BROADCAST_FAILED",
+            Self::ReceiptUnavailable { .. } => "RECEIPT_UNAVAILABLE",
+            Self::RevertedOnChain { .. } => "REVERTED_ON_CHAIN",
+            Self::RateLimited => "RATE_LIMITED",
+            Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
+            Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
+            Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
+            Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
+            Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
+        }
+    }
+
+    /// Whether this rejection came from throttling rather than the request itself. The single
+    /// source of truth for both [`Self::is_retryable`] and the abuse counters.
+    pub fn is_throttling(&self) -> bool {
+        matches!(
+            self,
+            Self::RateLimited
+                | Self::AddressRateLimited { .. }
+                | Self::TooManyInFlight
+                | Self::DuplicateInFlight
+        )
+    }
+
+    /// Whether the caller should retry the same request later, as opposed to changing it.
+    ///
+    /// Deliberately excludes [`Self::ReceiptUnavailable`]: that transaction may still land, and its
+    /// EIP-3009 nonce with it, so a retry risks paying gas to rediscover `AlreadyPaid`.
+    pub fn is_retryable(&self) -> bool {
+        self.is_throttling()
+            || matches!(
+                self,
+                Self::RelayerBalanceTooLow { .. } | Self::Chain(_) | Self::ActionUnavailable(_)
+            )
+    }
+}
+
 /// Splits an alloy contract error into "the claim would revert" and "the node is unreachable".
 ///
 /// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
 /// revert. Reverts decode against the ClearingHouse error ABI, so a caller sees `AlreadyClaimed`
 /// rather than a bare selector.
 pub(super) fn classify_call_error(err: alloy::contract::Error) -> ClaimError {
+    match split_call_error(err, "claim simulation") {
+        CallFailure::Reverted(reason) => ClaimError::SimulationReverted(reason),
+        CallFailure::Chain(err) => ClaimError::Chain(err),
+    }
+}
+
+/// [`classify_call_error`], for the debit-payment path.
+pub(super) fn classify_pay_call_error(err: alloy::contract::Error) -> PayError {
+    match split_call_error(err, "payment simulation") {
+        CallFailure::Reverted(reason) => PayError::SimulationReverted(reason),
+        CallFailure::Chain(err) => PayError::Chain(err),
+    }
+}
+
+enum CallFailure {
+    Reverted(String),
+    Chain(anyhow::Error),
+}
+
+fn split_call_error(err: alloy::contract::Error, context: &'static str) -> CallFailure {
     let Some(data) = err.as_revert_data() else {
-        return ClaimError::Chain(anyhow::Error::new(err).context("claim simulation"));
+        return CallFailure::Chain(anyhow::Error::new(err).context(context));
     };
 
     let reason = ClearingHouseErrors::abi_decode(&data)
@@ -146,7 +306,7 @@ pub(super) fn classify_call_error(err: alloy::contract::Error) -> ClaimError {
             alloy::sol_types::decode_revert_reason(&data)
                 .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data)))
         });
-    ClaimError::SimulationReverted(reason)
+    CallFailure::Reverted(reason)
 }
 
 fn describe(error: ClearingHouseErrors) -> String {
@@ -192,5 +352,26 @@ fn describe(error: ClearingHouseErrors) -> String {
                 e.deadline
             )
         }
+        ClearingHouseErrors::AlreadyPaid(e) => {
+            format!("debtor {} has already paid this cycle", e.debtor)
+        }
+        ClearingHouseErrors::PaymentWindowElapsed(e) => {
+            format!("the payment window closed at {}", e.deadline)
+        }
+        ClearingHouseErrors::ResolvedDebitExceedsCommitted(e) => format!(
+            "payment would take resolved debit to {}, above the committed {}",
+            e.attempted, e.total
+        ),
+        ClearingHouseErrors::ExactPaymentRequired(e) => format!(
+            "the token delivered {} of the {} required",
+            e.actual, e.expected
+        ),
+        ClearingHouseErrors::NativeAssetUnsupported(_) => {
+            "a native-asset debit cannot be pulled by authorization".to_string()
+        }
+        ClearingHouseErrors::AuthorizationCycleMismatch(e) => format!(
+            "the authorization's nonce {:#x} does not name cycle {:#x}",
+            e.nonce, e.cycleId
+        ),
     }
 }

@@ -65,7 +65,7 @@ sol! {
 }
 
 /// `keccak256(0x19 0x01 ‖ domainSeparator ‖ hashStruct(ReceiveWithAuthorization))`.
-pub(super) fn receive_authorization_digest(
+pub(crate) fn receive_authorization_digest(
     domain_separator: B256,
     from: Address,
     to: Address,
@@ -149,7 +149,7 @@ pub(super) fn permit_transfer_from_digest(
 
 /// Recovers the signer, accepting `v` in either Electrum (27/28) or raw parity (0/1) form —
 /// EIP-3009 tokens expect the former, but signers differ and rejecting 0/1 would be gratuitous.
-pub(super) fn recover_signer(
+pub(crate) fn recover_signer(
     digest: &B256,
     r: B256,
     s: B256,
