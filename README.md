@@ -270,14 +270,20 @@ cycle are deduplicated so only one pays gas — the other would revert as `Alrea
 
 The debtor's side of the same cycle. Paying a net debit pulls money *out of* the debtor's wallet,
 so unlike a claim it carries the debtor's signature — an EIP-3009 `receiveWithAuthorization` the
-facilitator submits via `payNetDebitWithAuthorization`, paying the gas. The debtor needs no native
-balance and no prior allowance. ERC-20 cycles only: a native-asset debit cannot be pulled by
-signature.
+facilitator submits via `payNetDebitWithAuthorization`, or, for tokens without EIP-3009, a Permit2
+`PermitTransferFrom` submitted via `payNetDebitWithPermit2` — the facilitator paying the gas
+either way. The debtor needs no native balance and no prior allowance (EIP-3009), or only the
+one-time `approve(PERMIT2, …)` (Permit2, sponsorable via `eip2612Permit` exactly as on
+`/deposit`). ERC-20 cycles only: a native-asset debit cannot be pulled by signature.
+
+The scheme travels under the same `assetTransferMethod` tag as `/deposit`, and exactly one of
+`authorization` or `permit2Authorization` must be present:
 
 ```jsonc
 {
   "cycleId": "eth:1800000000",   // as core names it: text id or the 0x-prefixed on-chain hash
   "network": "eip155:…",         // optional; defaults to the first configured network
+  "assetTransferMethod": "eip3009",  // optional; the authorization's shape already says
   "authorization": {
     "from": "0x…",               // the debtor; the funds only ever leave this account
     "validAfter": "0x0",
@@ -285,19 +291,30 @@ signature.
     "nonce": "0x…",              // MUST equal the cycle's on-chain (0x…) id — binds the payment to it
     "v": 27, "r": "0x…", "s": "0x…"
   }
+  // — or —
+  // "assetTransferMethod": "permit2",
+  // "permit2Authorization": {
+  //   "from": "0x…",
+  //   "nonce": "0x…",           // MUST equal uint256(cycle's on-chain id)
+  //   "deadline": "0x…",
+  //   "signature": "0x…"
+  // },
+  // "eip2612Permit": { "value", "deadline", "v", "r", "s" }   // optional sponsored approval
 }
 ```
 
 `/clearing/pay` answers with `{ "success": true, "txHash", "network", "debtor", "cycleId",
 "amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/pay/verify`
 answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
-error codes reuse `/deposit`'s and `/clearing/claim`'s strings wherever the meaning is the same.
+error codes reuse `/deposit`'s and `/clearing/claim`'s strings wherever the meaning is the same —
+including `PERMIT2_ALLOWANCE_REQUIRED` with the same `permit2Allowance` detail (and `eip2612Nonce`
+escape hatch) as `/deposit`.
 
-The signature is what makes this safe to relay: it binds the receiver (the ClearingHouse), the
-exact amount, and — through the nonce — the cycle it settles, so a submitter can change none of
-them. As with claims, the contract address, the amount and the proof are resolved from core, never
-taken from the request; the digest is built from *those* terms, so a signature over anything else
-simply mismatches.
+The signature is what makes this safe to relay: it binds the receiver/spender (the ClearingHouse),
+the exact amount, and — through the nonce — the cycle it settles, so a submitter can change none
+of them. As with claims, the contract address, the amount and the proof are resolved from core,
+never taken from the request; the digest is built from *those* terms, so a signature over anything
+else simply mismatches.
 
 Throttling is configured separately (`X402_PAY_*`), and concurrent submissions for the same cycle
 are deduplicated so only one pays gas — the other would revert as `AlreadyPaid`.

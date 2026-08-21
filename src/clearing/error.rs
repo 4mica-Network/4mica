@@ -9,6 +9,7 @@ use alloy::primitives::{Address, B256, U256};
 use alloy::sol_types::SolInterface;
 use thiserror::Error;
 
+use crate::deposit::{DepositError, Permit2AllowanceDetails};
 use crate::limits::ThrottleError;
 use crate::relayer::{ClearingHouse::ClearingHouseErrors, NoRelayer};
 
@@ -140,6 +141,8 @@ pub enum PayError {
     InvalidRequest(String),
     #[error("{0}")]
     MalformedSignature(String),
+    #[error("unsupported assetTransferMethod {0}")]
+    UnsupportedTransferMethod(String),
     #[error("gas sponsorship is not enabled on this facilitator")]
     NoRelayerConfigured,
     #[error("no relayer is configured for network {0}")]
@@ -191,6 +194,46 @@ pub enum PayError {
     RelayerBalanceTooLow { balance: U256, floor: U256 },
     #[error("payment needs {estimated} gas, above the sponsored ceiling of {ceiling}")]
     GasCeilingExceeded { estimated: u64, ceiling: u64 },
+    /// Permit2's one-time on-chain approval is missing — see
+    /// [`DepositError::Permit2AllowanceRequired`], whose semantics (and `eip2612_nonce` escape
+    /// hatch) this shares.
+    #[error(
+        "{} has approved {} of {} to Permit2 but {} is required; sign an EIP-2612 permit or \
+         submit a one-time approve(PERMIT2, ...) and retry",
+        .0.from, .0.allowance, .0.asset, .0.required
+    )]
+    Permit2AllowanceRequired(Box<Permit2AllowanceDetails>),
+}
+
+/// Re-shapes a failure from the shared Permit2 machinery in [`crate::deposit`] into the payment
+/// error space. The variants those helpers can actually produce map one-to-one; anything else is
+/// chain trouble and is reported as such rather than invented a new meaning.
+impl From<DepositError> for PayError {
+    fn from(err: DepositError) -> Self {
+        match err {
+            DepositError::InvalidRequest(message) => Self::InvalidRequest(message),
+            DepositError::MalformedSignature(message) => Self::MalformedSignature(message),
+            DepositError::Expired { valid_before, now } => Self::Expired { valid_before, now },
+            DepositError::SignatureMismatch {
+                recovered,
+                declared,
+            } => Self::SignatureMismatch {
+                recovered,
+                declared,
+            },
+            DepositError::Permit2AllowanceRequired(details) => {
+                Self::Permit2AllowanceRequired(details)
+            }
+            DepositError::SimulationReverted(reason) => Self::SimulationReverted(reason),
+            DepositError::Broadcast(message) => Self::Broadcast(message),
+            DepositError::ReceiptUnavailable { tx_hash, reason } => {
+                Self::ReceiptUnavailable { tx_hash, reason }
+            }
+            DepositError::RevertedOnChain { tx_hash } => Self::RevertedOnChain { tx_hash },
+            DepositError::Chain(err) => Self::Chain(err),
+            other => Self::Chain(anyhow::Error::msg(other.to_string())),
+        }
+    }
 }
 
 impl From<NoRelayer> for PayError {
@@ -217,11 +260,21 @@ impl From<ThrottleError> for PayError {
 }
 
 impl PayError {
+    /// Structured detail for [`Self::Permit2AllowanceRequired`], so the fix does not have to be
+    /// parsed out of the message.
+    pub fn permit2_allowance_details(&self) -> Option<&Permit2AllowanceDetails> {
+        match self {
+            Self::Permit2AllowanceRequired(details) => Some(details),
+            _ => None,
+        }
+    }
+
     /// Stable, machine-readable code so clients can branch without string matching.
     pub fn code(&self) -> &'static str {
         match self {
             Self::InvalidRequest(_) => "INVALID_REQUEST",
             Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
+            Self::UnsupportedTransferMethod(_) => "UNSUPPORTED_TRANSFER_METHOD",
             Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
             Self::NoRelayer(_) => "NO_RELAYER",
             Self::ActionUnavailable(_) => "ACTION_UNAVAILABLE",
@@ -242,6 +295,7 @@ impl PayError {
             Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
             Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
             Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
+            Self::Permit2AllowanceRequired(_) => "PERMIT2_ALLOWANCE_REQUIRED",
         }
     }
 

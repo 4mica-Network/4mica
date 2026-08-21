@@ -38,11 +38,12 @@ use eip712::{
 use error::classify_call_error;
 
 /// Asset transfer methods this facilitator can service, matching x402's `scheme_exact_evm` names.
+/// Shared with the clearing flow, whose debit payments travel under the same tags.
 ///
 /// `eip3009` is truly gasless. `permit2` works for any ERC-20 but needs a prior on-chain
 /// `approve(PERMIT2, ...)` from the payer, so the payer still pays gas once.
-const ASSET_TRANSFER_METHOD_EIP3009: &str = "eip3009";
-const ASSET_TRANSFER_METHOD_PERMIT2: &str = "permit2";
+pub(crate) const ASSET_TRANSFER_METHOD_EIP3009: &str = "eip3009";
+pub(crate) const ASSET_TRANSFER_METHOD_PERMIT2: &str = "permit2";
 
 /// An EIP-2612 permit authorising Permit2 to spend the payer's tokens.
 ///
@@ -340,38 +341,62 @@ async fn verify_permit2(
     );
     require_signer_from_bytes(&digest, auth.signature.as_ref(), auth.from)?;
 
-    // The one precondition unique to Permit2, and the reason x402 gives it a dedicated status:
-    // the payer must have made a one-time on-chain `approve(PERMIT2, ...)` themselves. Without a
-    // distinct code the client just sees a revert and has no idea an approval is what is missing.
+    // Permit2 tracks nonces in a bitmap rather than a boolean map; the simulation catches a reused
+    // nonce, so there is no cheap pre-check worth the extra round trip.
+    ensure_permit2_allowance(
+        relayer,
+        token,
+        intent.asset,
+        intent.amount,
+        auth.from,
+        permit,
+        now,
+    )
+    .await
+}
+
+/// The one precondition unique to Permit2, and the reason x402 gives it a dedicated status: the
+/// payer must have made a one-time on-chain `approve(PERMIT2, ...)` themselves. Without a distinct
+/// code the client just sees a revert and has no idea an approval is what is missing.
+///
+/// Shared by every Permit2-sponsoring flow (deposits and debit payments), which is why it takes
+/// the asset and amount rather than a deposit intent.
+pub(crate) async fn ensure_permit2_allowance(
+    relayer: &Relayer,
+    token: &DepositToken::DepositTokenInstance<alloy::providers::DynProvider>,
+    asset: Address,
+    amount: U256,
+    owner: Address,
+    permit: Option<&Eip2612Permit>,
+    now: u64,
+) -> Result<(), DepositError> {
     let allowance = token
-        .allowance(auth.from, PERMIT2_ADDRESS)
+        .allowance(owner, PERMIT2_ADDRESS)
         .call()
         .await
         .map_err(classify_call_error)?;
-    if allowance < intent.amount {
-        // x402's `eip2612GasSponsoring`: a signed permit stands in for the missing approval, and
-        // the relayer submits it. Without one there is nothing we can do for the payer.
-        let Some(permit) = permit else {
-            // Hand back the one value a chain-free client cannot compute for itself. Best-effort:
-            // a token without EIP-2612 simply has no nonce to report, which is itself the answer.
-            let eip2612_nonce = token.nonces(auth.from).call().await.ok();
-            return Err(DepositError::Permit2AllowanceRequired(Box::new(
-                Permit2AllowanceDetails {
-                    from: auth.from,
-                    asset: intent.asset,
-                    spender: PERMIT2_ADDRESS,
-                    allowance,
-                    required: intent.amount,
-                    eip2612_nonce,
-                },
-            )));
-        };
-        verify_eip2612_permit(relayer, token, intent, auth.from, permit, now).await?;
+    if allowance >= amount {
+        return Ok(());
     }
 
-    // Permit2 tracks nonces in a bitmap rather than a boolean map; the simulation catches a reused
-    // nonce, so there is no cheap pre-check worth the extra round trip.
-    Ok(())
+    // x402's `eip2612GasSponsoring`: a signed permit stands in for the missing approval, and
+    // the relayer submits it. Without one there is nothing we can do for the payer.
+    let Some(permit) = permit else {
+        // Hand back the one value a chain-free client cannot compute for itself. Best-effort:
+        // a token without EIP-2612 simply has no nonce to report, which is itself the answer.
+        let eip2612_nonce = token.nonces(owner).call().await.ok();
+        return Err(DepositError::Permit2AllowanceRequired(Box::new(
+            Permit2AllowanceDetails {
+                from: owner,
+                asset,
+                spender: PERMIT2_ADDRESS,
+                allowance,
+                required: amount,
+                eip2612_nonce,
+            },
+        )));
+    };
+    verify_eip2612_permit(relayer, token, asset, amount, owner, permit, now).await
 }
 
 /// Checks a sponsored EIP-2612 permit before the relayer pays to submit it.
@@ -381,7 +406,8 @@ async fn verify_permit2(
 async fn verify_eip2612_permit(
     relayer: &Relayer,
     token: &DepositToken::DepositTokenInstance<alloy::providers::DynProvider>,
-    intent: &DepositIntent,
+    asset: Address,
+    amount: U256,
     owner: Address,
     permit: &Eip2612Permit,
     now: u64,
@@ -392,14 +418,14 @@ async fn verify_eip2612_permit(
             now,
         });
     }
-    if permit.value < intent.amount {
+    if permit.value < amount {
         return Err(DepositError::Permit2AllowanceRequired(Box::new(
             Permit2AllowanceDetails {
                 from: owner,
-                asset: intent.asset,
+                asset,
                 spender: PERMIT2_ADDRESS,
                 allowance: permit.value,
-                required: intent.amount,
+                required: amount,
                 eip2612_nonce: None,
             },
         )));
@@ -411,7 +437,7 @@ async fn verify_eip2612_permit(
         .call()
         .await
         .map_err(classify_call_error)?;
-    let domain_separator = relayer.token_domain_separator(intent.asset).await?;
+    let domain_separator = relayer.token_domain_separator(asset).await?;
     let digest = permit_digest(
         domain_separator,
         owner,
@@ -424,29 +450,30 @@ async fn verify_eip2612_permit(
 }
 
 /// Whether Permit2's allowance is still short, re-read immediately before submitting. The payer
-/// may have approved between `/deposit/verify` and now, in which case sponsoring is wasted gas.
-async fn needs_permit2_allowance(
+/// may have approved between verification and now, in which case sponsoring is wasted gas.
+pub(crate) async fn needs_permit2_allowance(
     relayer: &Relayer,
-    intent: &DepositIntent,
+    asset: Address,
+    amount: U256,
     owner: Address,
 ) -> Result<bool, DepositError> {
-    let allowance = DepositToken::new(intent.asset, relayer.provider())
+    let allowance = DepositToken::new(asset, relayer.provider())
         .allowance(owner, PERMIT2_ADDRESS)
         .call()
         .await
         .map_err(classify_call_error)?;
-    Ok(allowance < intent.amount)
+    Ok(allowance < amount)
 }
 
 /// Broadcasts the payer's EIP-2612 permit so Permit2 gains its allowance, with the relayer paying.
-async fn submit_permit(
+pub(crate) async fn submit_permit(
     relayer: &Relayer,
-    intent: &DepositIntent,
+    asset: Address,
     owner: Address,
     permit: &Eip2612Permit,
     gas: u64,
 ) -> Result<(), DepositError> {
-    let receipt = DepositToken::new(intent.asset, relayer.provider())
+    let receipt = DepositToken::new(asset, relayer.provider())
         .permit(
             owner,
             PERMIT2_ADDRESS,
@@ -473,8 +500,8 @@ async fn submit_permit(
     tracing::info!(
         tx_hash = %receipt.transaction_hash,
         owner = %owner,
-        asset = %intent.asset,
-        "sponsored EIP-2612 permit so Permit2 can pull the deposit"
+        asset = %asset,
+        "sponsored EIP-2612 permit so Permit2 gains its allowance"
     );
     Ok(())
 }
@@ -534,11 +561,11 @@ pub async fn submit(
         authorization,
         permit: Some(permit),
     } = &intent.authorization
-        && needs_permit2_allowance(relayer, intent, authorization.from).await?
+        && needs_permit2_allowance(relayer, intent.asset, intent.amount, authorization.from).await?
     {
         submit_permit(
             relayer,
-            intent,
+            intent.asset,
             authorization.from,
             permit,
             guard.limits().max_gas,

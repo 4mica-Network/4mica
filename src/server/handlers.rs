@@ -282,12 +282,12 @@ async fn pay_verify_handler(
 
 async fn run_pay_verify(state: &SharedState, request: PayRequest) -> Result<(), PayError> {
     state.pay_guard().check_global()?;
-    let (relayer, terms) = resolve_pay(state, &request).await?;
+    let (relayer, terms, authorization) = resolve_pay(state, request).await?;
     clearing::verify_pay(
         relayer,
         state.pay_guard().limits(),
         &terms,
-        &request.authorization,
+        &authorization,
         now_secs(),
     )
     .await
@@ -325,25 +325,38 @@ async fn pay_handler(
 
 async fn run_pay(state: &SharedState, request: PayRequest) -> Result<PayResponse, PayError> {
     state.pay_guard().check_global()?;
-    let (relayer, terms) = resolve_pay(state, &request).await?;
+    let (relayer, terms, authorization) = resolve_pay(state, request).await?;
     let tx_hash = clearing::submit_pay(
         relayer,
         state.pay_guard(),
         &terms,
-        &request.authorization,
+        &authorization,
         now_secs(),
     )
     .await?;
     Ok(PayResponse::success(tx_hash, relayer.network(), &terms))
 }
 
-/// Validates the request's identifiers, then resolves the debit's terms from the network's core.
-/// The debtor is the authorization's `from` — core then proves (or refuses) a leaf for exactly
-/// that address, so a stranger's signature simply resolves no terms.
-async fn resolve_pay<'a>(
-    state: &'a SharedState,
-    request: &PayRequest,
-) -> Result<(&'a crate::relayer::Relayer, PayTerms), PayError> {
+/// Validates the request's identifiers and authorization shape, then resolves the debit's terms
+/// from the network's core. The debtor is the authorization's `from` — core then proves (or
+/// refuses) a leaf for exactly that address, so a stranger's signature simply resolves no terms.
+async fn resolve_pay(
+    state: &SharedState,
+    request: PayRequest,
+) -> Result<
+    (
+        &crate::relayer::Relayer,
+        PayTerms,
+        clearing::PayAuthorization,
+    ),
+    PayError,
+> {
+    let authorization = clearing::PayAuthorization::parse(
+        request.asset_transfer_method.as_deref(),
+        request.authorization,
+        request.permit2_authorization,
+        request.eip2612_permit.map(|p| p.parse()).transpose()?,
+    )?;
     let cycle_id = clearing::parse_pay_cycle_id(&request.cycle_id)?;
     let relayer = state.relayer_for(request.network.as_deref())?;
     let actions = state
@@ -354,10 +367,8 @@ async fn resolve_pay<'a>(
                 relayer.network()
             ))
         })?;
-    let terms = actions
-        .pay_terms(cycle_id, request.authorization.from)
-        .await?;
-    Ok((relayer, terms))
+    let terms = actions.pay_terms(cycle_id, authorization.from()).await?;
+    Ok((relayer, terms, authorization))
 }
 
 /// Validates the request's identifiers, then resolves the claim's terms from the network's core.

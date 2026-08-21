@@ -117,7 +117,7 @@ pub(super) fn require_signer(
 ///
 /// Needs neither a chain read nor server-advertised metadata: Permit2 is deployed at one canonical
 /// address on every chain and its domain has a fixed name and no version.
-pub(super) fn permit2_domain_separator(chain_id: u64) -> B256 {
+pub(crate) fn permit2_domain_separator(chain_id: u64) -> B256 {
     let type_hash = alloy::primitives::keccak256(
         b"EIP712Domain(string name,uint256 chainId,address verifyingContract)".as_slice(),
     );
@@ -130,7 +130,7 @@ pub(super) fn permit2_domain_separator(chain_id: u64) -> B256 {
 }
 
 /// Permit2 `PermitTransferFrom` signing hash, with the nested `TokenPermissions` hashed first.
-pub(super) fn permit_transfer_from_digest(
+pub(crate) fn permit_transfer_from_digest(
     domain_separator: B256,
     token: Address,
     amount: U256,
@@ -188,7 +188,7 @@ pub(super) fn permit_digest(
 ///
 /// Permit2 signs with a packed `bytes` blob rather than split `(v, r, s)`, so this is the
 /// counterpart to [`require_signer`] for that shape.
-pub(super) fn require_signer_from_bytes(
+pub(crate) fn require_signer_from_bytes(
     digest: &B256,
     signature: &[u8],
     declared: Address,

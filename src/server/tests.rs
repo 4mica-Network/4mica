@@ -20,7 +20,7 @@ use crypto::bls::KeyMaterial;
 
 use super::handlers::build_router;
 use super::model::{
-    PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
+    PayResponse, PaymentRequirements, SettleRequest, SettleResponse, SupportedKind, VerifyRequest,
     VerifyResponse, X402PaymentPayload,
 };
 use super::state::{AppState, FourMicaHandler, SharedState, SponsorGuards, ValidationError};
@@ -1587,7 +1587,13 @@ async fn pay_requires_an_authorization() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    // Either scheme's field can satisfy the request, so a missing authorization is a structured
+    // rejection rather than a deserialization error.
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: PayResponse = serde_json::from_slice(&body).unwrap();
+    assert!(!payload.success);
+    assert_eq!(payload.error_code.as_deref(), Some("INVALID_REQUEST"));
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.

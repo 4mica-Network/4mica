@@ -78,8 +78,17 @@ mod clearing_house {
             bytes32 s;
         }
 
+        /// The debtor's Permit2 authorization, same shape as the wire form the SDK sends.
+        struct Permit2Authorization {
+            address from;
+            uint256 nonce;
+            uint256 deadline;
+            bytes signature;
+        }
+
         function claimNetCreditFor(address creditor, bytes32 cycleId, uint256 netCredit, bytes32[] calldata proof) external;
         function payNetDebitWithAuthorization(bytes32 cycleId, uint256 netDebit, bytes32[] calldata proof, ReceiveAuthorization calldata auth) external;
+        function payNetDebitWithPermit2(bytes32 cycleId, uint256 netDebit, bytes32[] calldata proof, Permit2Authorization calldata p) external;
 
         error AmountZero();
         error CycleNotFound(bytes32 cycleId);
