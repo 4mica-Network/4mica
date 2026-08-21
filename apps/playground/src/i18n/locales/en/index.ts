@@ -18,11 +18,28 @@ export const en = {
     loading: "Loading…",
   },
 
+  auth: {
+    join: "Join",
+    signIn: "Sign in",
+    signInTitle: "Welcome back",
+    signInSubtitle: "Sign in to your 4Mica account to continue.",
+    signUpTitle: "Join 4Mica",
+    signUpSubtitle:
+      "Create an account to pay for this API with credit-backed guarantees.",
+    google: "Continue with Google",
+    error: "We could not complete that. Try again.",
+    haveAccount: "Already have an account?",
+    needAccount: "New to 4Mica?",
+    dashboard: "Go to your dashboard",
+  },
+
   profile: {
     verified: "Verified",
     verifiedHint: "This account has been verified by 4Mica.",
     agentsHeading: "Agents",
     apisHeading: "APIs",
+    noAgentsTitle: "No agents yet",
+    noApisTitle: "No APIs yet",
     noAgents: "No published agents yet.",
     noApis: "No published APIs yet.",
     noAgentsOwner:
@@ -48,6 +65,7 @@ export const en = {
     published: "Published {{date}}",
     aboutHeading: "About this API",
     tagsHeading: "Tags",
+    noTags: "No tags yet",
   },
 
   integration: {
@@ -69,6 +87,7 @@ export const en = {
     receiptLead:
       "Each paid response carries its settled payment. Pair it with your own task log to make the spend auditable.",
     endpointsTitle: "Priced endpoints",
+    noEndpoints: "No priced endpoints yet",
     nativeAsset: "Native asset",
     erc20: "ERC-20",
     notPayable: "This API is not accepting 4Mica payments yet.",

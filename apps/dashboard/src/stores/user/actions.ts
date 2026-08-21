@@ -86,6 +86,43 @@ export const updateBusinessFailed = (
   meta,
 });
 
+export const checkUsername = (username: string) => ({
+  type: actionTypes.CHECK_USERNAME_REQUESTED,
+  payload: username,
+});
+
+export const checkUsernameSucceeded = (
+  username: string,
+  available: boolean,
+  reason: "taken" | "reserved" | null,
+) => ({
+  type: actionTypes.CHECK_USERNAME_SUCCEEDED,
+  payload: { username, available, reason },
+});
+
+export const checkUsernameFailed = (username: string) => ({
+  type: actionTypes.CHECK_USERNAME_FAILED,
+  payload: { username },
+});
+
+export const resetUsernameCheck = () => ({
+  type: actionTypes.RESET_USERNAME_CHECK,
+});
+
+/**
+ * The last leg of onboarding: write the business, and only if that lands, flip
+ * `completeOnboarding`. The ordering matters, so it belongs in a saga rather
+ * than two dispatches racing from a component.
+ */
+export const completeOnboarding = (
+  payload: Partial<Business>,
+  section = "onboarding.business",
+) => ({
+  type: actionTypes.COMPLETE_ONBOARDING_REQUESTED,
+  payload,
+  meta: { section },
+});
+
 export const clearValidationIssues = () => ({
   type: actionTypes.CLEAR_VALIDATION_ISSUES,
 });

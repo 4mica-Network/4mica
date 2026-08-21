@@ -25,6 +25,9 @@ export const selectRevealedSecret = (state: RootState): RevealedSecret | null =>
 export const selectIsDeveloperLoading = (state: RootState): boolean =>
   state.developer.isLoading;
 
+export const selectHasLoadedDeveloper = (state: RootState): boolean =>
+  state.developer.hasLoaded;
+
 export const selectIsPending =
   (key: string) =>
   (state: RootState): boolean =>

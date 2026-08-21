@@ -7,22 +7,18 @@ import { Apps } from "@/pages/apps";
 import { Balances } from "@/pages/balances";
 import { BusinessSettings } from "@/pages/business";
 import { ComplianceSettings } from "@/pages/compliance";
-import { CreateInvoice } from "@/pages/create-invoice";
 import { Customers } from "@/pages/customers";
 import { DeveloperSettings } from "@/pages/developer";
 import { Disputes } from "@/pages/disputes";
 import { Help } from "@/pages/help";
-import { Identity } from "@/pages/identity";
 import { NotificationSettings } from "@/pages/notification";
 import { Overview } from "@/pages/overview";
 import { Payments } from "@/pages/payments";
 import { PlansSettings } from "@/pages/plans";
 import { ProfileSettings } from "@/pages/profile";
-import { Reports } from "@/pages/reports";
 import { TeamSettings } from "@/pages/team";
 import { Transactions } from "@/pages/transactions";
 import { Wallet } from "@/pages/wallet";
-import { Whitelist } from "@/pages/whitelist";
 
 export interface RouteMeta {
   path?: string;
@@ -41,11 +37,7 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "agents", component: Agents },
   { path: "agents/:id", component: AgentDetail },
   { path: "agents/:id/advanced", component: AgentAdvanced },
-  { path: "whitelist", component: Whitelist },
   { path: "apps", component: Apps },
-  { path: "reports", component: Reports },
-  { path: "identity", component: Identity },
-  { path: "create-invoice", component: CreateInvoice },
   { path: "help", component: Help },
 ];
 

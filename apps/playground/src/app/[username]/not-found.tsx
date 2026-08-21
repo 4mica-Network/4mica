@@ -11,7 +11,7 @@ export default function ProfileNotFound() {
       <p className="text-ink-muted">{messages.errors.profileNotFoundLead}</p>
       <div className="flex justify-center gap-3">
         <Button size="sm" asChild>
-          <a href={links.signup}>{messages.errors.profileNotFoundAction}</a>
+          <a href="/sign-up">{messages.errors.profileNotFoundAction}</a>
         </Button>
         <Button intent="ghost" size="sm" asChild>
           <a href={links.website}>{messages.errors.home}</a>

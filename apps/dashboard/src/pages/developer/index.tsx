@@ -1,5 +1,8 @@
 import { fetchDeveloper } from "@stores/developer/actions";
-import { selectIsDeveloperLoading } from "@stores/developer/selector";
+import {
+  selectHasLoadedDeveloper,
+  selectIsDeveloperLoading,
+} from "@stores/developer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +15,7 @@ export function DeveloperSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectIsDeveloperLoading);
+  const hasLoaded = useAppSelector(selectHasLoadedDeveloper);
 
   useEffect(() => {
     dispatch(fetchDeveloper());
@@ -22,7 +26,9 @@ export function DeveloperSettings() {
       titleKey="page.settings.developer.title"
       descriptionKey="page.settings.developer.description"
     >
-      {isLoading ? (
+      {/* Only blank the page on the very first load. Later re-fetches redraw
+          the same content, so showing a spinner over it is just a flicker. */}
+      {isLoading && !hasLoaded ? (
         <p className="text-ink-muted text-sm">{t("settings.loading")}</p>
       ) : (
         <>

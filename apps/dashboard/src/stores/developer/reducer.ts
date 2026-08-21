@@ -13,6 +13,7 @@ export const INITIAL_STATE: DeveloperState = {
   events: [],
   revealed: null,
   isLoading: false,
+  hasLoaded: false,
   pending: {},
   error: null,
   validationIssues: {},
@@ -64,6 +65,7 @@ export default function developerReducer(
         webhooks: payload.webhooks,
         events: payload.events,
         isLoading: false,
+        hasLoaded: true,
         error: null,
       };
     }

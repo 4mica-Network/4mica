@@ -1,5 +1,6 @@
 import { applyMiddleware, combineReducers, compose, createStore } from "redux";
 import createSagaMiddleware from "redux-saga";
+import bannerReducer from "./banner/reducer";
 import developerReducer from "./developer/reducer";
 import rootSaga from "./rootSaga";
 import userReducer from "./user/reducer";
@@ -7,6 +8,7 @@ import userReducer from "./user/reducer";
 const rootReducer = combineReducers({
   user: userReducer,
   developer: developerReducer,
+  banner: bannerReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

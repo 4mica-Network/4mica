@@ -85,6 +85,13 @@ export const BUSINESS_SELECT = {
 export const getProfile = async (userId: string) =>
   prisma.user.findUnique({ where: { id: userId }, select: USER_SELECT });
 
+/**
+ * Who holds `username`, if anyone. Selects the id and nothing else — the
+ * availability response must never leak whose handle it is.
+ */
+export const findUsernameOwner = async (username: string) =>
+  prisma.user.findUnique({ where: { username }, select: { id: true } });
+
 export const getBusiness = async (userId: string) =>
   prisma.business.findUnique({
     where: { ownerId: userId },

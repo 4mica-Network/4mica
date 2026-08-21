@@ -22,6 +22,7 @@
   "dependencies": {
     "@4mica/auth": "workspace:*",
     "@4mica/db": "workspace:*",
+    "@4mica/url": "workspace:*",
     "@clerk/backend": "catalog:",
     "@fastify/cors": "catalog:",
     "@fastify/rate-limit": "catalog:",

@@ -4,6 +4,7 @@ import type { Business, User, UserState } from "./type";
 export const INITIAL_STATE: UserState = {
   user: null,
   business: null,
+  usernameCheck: { value: "", status: "idle" },
   isLoading: false,
   savingSections: {},
   rollback: null,
@@ -188,6 +189,74 @@ export default function userReducer(
         ),
         error: payload?.message ?? "Update failed.",
         validationIssues: payload?.issues ?? {},
+      };
+    }
+
+    case actionTypes.CHECK_USERNAME_REQUESTED:
+      return {
+        ...state,
+        usernameCheck: {
+          value: action.payload as string,
+          status: "checking",
+        },
+      };
+
+    case actionTypes.CHECK_USERNAME_SUCCEEDED: {
+      const payload = action.payload as {
+        username: string;
+        available: boolean;
+        reason: "taken" | "reserved" | null;
+      };
+
+      // The saga is takeLatest, so a stale response is normally cancelled
+      // before it lands. This guard is the one that is actually testable, and
+      // it also covers a response that resolves in the same tick as a newer
+      // request being queued.
+      if (payload.username !== state.usernameCheck.value) {
+        return state;
+      }
+
+      return {
+        ...state,
+        usernameCheck: {
+          value: payload.username,
+          status: payload.available ? "available" : (payload.reason ?? "taken"),
+        },
+      };
+    }
+
+    case actionTypes.CHECK_USERNAME_FAILED: {
+      const payload = action.payload as { username: string };
+      if (payload.username !== state.usernameCheck.value) {
+        return state;
+      }
+      // "error" is deliberately not a blocking state — the server write is the
+      // authority, so a rate-limited or flaky probe must not brick the wizard.
+      return {
+        ...state,
+        usernameCheck: { value: payload.username, status: "error" },
+      };
+    }
+
+    case actionTypes.RESET_USERNAME_CHECK:
+      return { ...state, usernameCheck: { value: "", status: "idle" } };
+
+    case actionTypes.COMPLETE_ONBOARDING_REQUESTED: {
+      const patch = action.payload as Partial<Business>;
+      return {
+        ...state,
+        business: state.business
+          ? { ...state.business, ...patch }
+          : state.business,
+        businessRollback:
+          state.businessRollback ?? snapshot(state.business, patch),
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          true,
+        ),
+        error: null,
+        validationIssues: {},
       };
     }
 

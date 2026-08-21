@@ -1,4 +1,5 @@
 import {
+  checkUsernameHandler,
   getBusinessHandler,
   getMeHandler,
   updateAccountHandler,
@@ -6,6 +7,7 @@ import {
   updateProfileHandler,
   upsertBusinessHandler,
 } from "@controllers/me/index";
+import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
@@ -13,6 +15,7 @@ import {
   errorResponseSchema,
   limitedResponses,
   meResponseSchema,
+  usernameAvailabilityResponseSchema,
   userResponseSchema,
 } from "./schema-fragments";
 
@@ -49,6 +52,34 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     getMeHandler,
+  );
+
+  // Sensitive because it is a lookup over the public handle namespace and the
+  // dashboard calls it from a typeahead. `guards` keeps it authenticated, which
+  // is also what gives the per-user limiter a key to work with.
+  app.get(
+    "/me/username-available",
+    {
+      onRequest: guards(app).onRequest,
+      preHandler: [...guards(app).preHandler, sensitiveRateLimit(app)],
+      schema: {
+        tags: ["account"],
+        summary: "Whether a handle can be claimed",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          required: ["username"],
+          properties: { username: { type: "string" } },
+        },
+        response: {
+          ...limitedResponses,
+          200: usernameAvailabilityResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+    },
+    checkUsernameHandler,
   );
 
   app.patch(

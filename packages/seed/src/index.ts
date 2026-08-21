@@ -109,6 +109,67 @@ const API_LISTINGS = [
   },
 ] as const;
 
+const poster = (label: string, fill: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">` +
+      `<rect width="320" height="180" fill="${fill}"/>` +
+      `<text x="50%" y="53%" fill="#7BCBFF" font-family="sans-serif" font-size="15" text-anchor="middle">${label}</text>` +
+      `</svg>`,
+  )}`;
+
+const SAMPLE_VIDEO =
+  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+
+const inNinetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+const BANNERS = [
+  {
+    slug: "series-a-1m",
+    title: "We raised $1M",
+    message:
+      "Seed round closed. We're putting it into faster settlement and higher credit limits.",
+    url: "https://4mica.io/blog",
+    thumbnailUrl: null,
+    videoUrl: null,
+    alt: null,
+    isVideo: false,
+    priority: 30,
+    active: true,
+    startsAt: null,
+    endsAt: inNinetyDays,
+  },
+  {
+    slug: "integrate-with-4mica",
+    title: "Integrate with 4Mica",
+    message:
+      "Two minutes: issue an API key, sign your first payment, settle on Base.",
+    url: "https://docs.4mica.io",
+    thumbnailUrl: poster("Integration walkthrough", "#123c4a"),
+    videoUrl: SAMPLE_VIDEO,
+    alt: "Integration walkthrough",
+    isVideo: true,
+    priority: 20,
+    active: true,
+    startsAt: null,
+    endsAt: null,
+  },
+  {
+    slug: "set-up-your-account",
+    title: "Finish setting up",
+    message:
+      "Add your business details and verify KYB so payouts can reach you.",
+    url: "https://docs.4mica.io",
+    thumbnailUrl: poster("Account setup", "#0f2a2e"),
+    videoUrl: SAMPLE_VIDEO,
+    alt: "Account setup walkthrough",
+    isVideo: true,
+    priority: 10,
+    active: true,
+    startsAt: null,
+    endsAt: null,
+  },
+] as const;
+
 const seed = async (): Promise<void> => {
   const profileFields = {
     username: PROFILE.username,
@@ -244,17 +305,45 @@ const seed = async (): Promise<void> => {
     });
   }
 
-  const [agents, listings, endpoints] = await Promise.all([
+  await prisma.banner.deleteMany({
+    where: { slug: { notIn: BANNERS.map((item) => item.slug) } },
+  });
+
+  for (const item of BANNERS) {
+    const fields = {
+      title: item.title,
+      message: item.message,
+      url: item.url,
+      thumbnailUrl: item.thumbnailUrl,
+      videoUrl: item.videoUrl,
+      alt: item.alt,
+      isVideo: item.isVideo,
+      priority: item.priority,
+      active: item.active,
+      startsAt: item.startsAt,
+      endsAt: item.endsAt,
+    };
+
+    await prisma.banner.upsert({
+      where: { slug: item.slug },
+      update: fields,
+      create: { slug: item.slug, ...fields },
+      select: { id: true },
+    });
+  }
+
+  const [agents, listings, endpoints, banners] = await Promise.all([
     prisma.agent.count(),
     prisma.apiListing.count(),
     prisma.apiEndpoint.count(),
+    prisma.banner.count(),
   ]);
 
   const plural = (count: number, noun: string) =>
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")} and ${plural(API_LISTINGS.length, "api listing")} (${agents} agent rows, ${listings} listing rows, ${endpoints} endpoint rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(API_LISTINGS.length, "api listing")} and ${plural(BANNERS.length, "banner")} (${agents} agent rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows total).`,
   );
 };
 

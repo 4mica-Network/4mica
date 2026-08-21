@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkUsername,
+  checkUsernameFailed,
+  checkUsernameSucceeded,
+  completeOnboarding,
+  resetUsernameCheck,
+  updateBusinessFailed,
   updateProfile,
   updateUserFailed,
   updateUserSucceeded,
 } from "./actions";
 import reducer, { INITIAL_STATE } from "./reducer";
-import type { User, UserState } from "./type";
+import type { Business, User, UserState } from "./type";
 
 const user = { private: true, hidden: false, name: "Ada" } as User;
 
@@ -97,5 +103,98 @@ describe("user reducer optimistic updates", () => {
     );
 
     expect(state.user?.private).toBe(true);
+  });
+});
+
+describe("username availability check", () => {
+  it("records the candidate it is checking", () => {
+    const next = reducer(seeded, checkUsername("ada"));
+
+    expect(next.usernameCheck).toEqual({ value: "ada", status: "checking" });
+  });
+
+  it("applies a verdict for the candidate in flight", () => {
+    const checking = reducer(seeded, checkUsername("ada"));
+    const done = reducer(checking, checkUsernameSucceeded("ada", true, null));
+
+    expect(done.usernameCheck.status).toBe("available");
+  });
+
+  it("maps an unavailable verdict to its reason", () => {
+    const checking = reducer(seeded, checkUsername("pricing"));
+    const done = reducer(
+      checking,
+      checkUsernameSucceeded("pricing", false, "reserved"),
+    );
+
+    expect(done.usernameCheck.status).toBe("reserved");
+  });
+
+  it("ignores a verdict for a candidate the user has already typed past", () => {
+    // Out-of-order responses would otherwise put a green tick next to a handle
+    // nobody asked about.
+    const stale = reducer(seeded, checkUsername("ad"));
+    const current = reducer(stale, checkUsername("ada"));
+    const raced = reducer(current, checkUsernameSucceeded("ad", true, null));
+
+    expect(raced.usernameCheck).toEqual({ value: "ada", status: "checking" });
+  });
+
+  it("ignores a failure for a stale candidate too", () => {
+    const current = reducer(seeded, checkUsername("ada"));
+    const raced = reducer(current, checkUsernameFailed("ad"));
+
+    expect(raced.usernameCheck.status).toBe("checking");
+  });
+
+  it("clears the verdict on reset", () => {
+    const checking = reducer(seeded, checkUsername("ada"));
+    const cleared = reducer(checking, resetUsernameCheck());
+
+    expect(cleared.usernameCheck).toEqual({ value: "", status: "idle" });
+  });
+});
+
+describe("completing onboarding", () => {
+  const withBusiness: UserState = {
+    ...seeded,
+    business: { legalName: "Old Ltd", country: "GB" } as Business,
+  };
+
+  it("optimistically applies the business patch and marks the section saving", () => {
+    const next = reducer(
+      withBusiness,
+      completeOnboarding({ legalName: "Analytical Engines Ltd" }),
+    );
+
+    expect(next.business?.legalName).toBe("Analytical Engines Ltd");
+    expect(next.savingSections["onboarding.business"]).toBe(true);
+    expect(next.businessRollback).toEqual({ legalName: "Old Ltd" });
+  });
+
+  it("reverts the business when the write fails", () => {
+    const pending = reducer(
+      withBusiness,
+      completeOnboarding({ legalName: "Analytical Engines Ltd" }),
+    );
+    const failed = reducer(
+      pending,
+      updateBusinessFailed("nope", {}, { section: "onboarding.business" }),
+    );
+
+    expect(failed.business?.legalName).toBe("Old Ltd");
+    expect(failed.savingSections).toEqual({});
+    expect(failed.error).toBe("nope");
+  });
+
+  it("sets the flag when the account write lands", () => {
+    const done = reducer(
+      seeded,
+      updateUserSucceeded({ ...user, completeOnboarding: true } as User, {
+        section: "onboarding.complete",
+      }),
+    );
+
+    expect(done.user?.completeOnboarding).toBe(true);
   });
 });

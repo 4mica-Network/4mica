@@ -1,13 +1,17 @@
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MESSAGE,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "@4mica/url";
 import * as v from "valibot";
 
 /**
  * Route-param validation. This is the only thing standing between a raw URL
- * segment and a Prisma `where` clause, so the bounds and the character class
- * are copied verbatim from apps/be/src/controllers/me/schema.ts — the two must
- * never diverge, or a handle the API accepts becomes unreachable here.
+ * segment and a Prisma `where` clause. The bounds and the character class come
+ * from @4mica/url, which is also what apps/be validates writes against — so a
+ * handle the API accepts can never be unreachable here.
  */
-
-const USERNAME_PATTERN = /^[a-z0-9_-]+$/;
 
 /**
  * Handles are addressed bare (`/mo`). A leading `@` is accepted and stripped
@@ -18,12 +22,9 @@ const UsernameParamSchema = v.pipe(
   v.string(),
   v.trim(),
   v.transform((value) => value.replace(/^@/, "").toLowerCase()),
-  v.minLength(2, "username must be at least 2 characters"),
-  v.maxLength(64, "username must be at most 64 characters"),
-  v.regex(
-    USERNAME_PATTERN,
-    "username may only contain lowercase letters, numbers, - and _",
-  ),
+  v.minLength(USERNAME_MIN_LENGTH, "username must be at least 2 characters"),
+  v.maxLength(USERNAME_MAX_LENGTH, "username must be at most 64 characters"),
+  v.regex(USERNAME_PATTERN, USERNAME_MESSAGE),
 );
 
 /** A uuid(7) primary key or a per-owner slug. Same character class. */
