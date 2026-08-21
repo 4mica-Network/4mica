@@ -12,6 +12,11 @@ export {
   type Placement,
 } from "./components/dropdown";
 export {
+  EmptyState,
+  type EmptyStateAction,
+  type EmptyStateProps,
+} from "./components/empty-state";
+export {
   InputField,
   type InputFieldProps,
   type RegisterLike,

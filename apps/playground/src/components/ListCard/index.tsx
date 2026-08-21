@@ -11,10 +11,3 @@ export function ListCard({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-/** The in-card empty state, without a competing dashed border. */
-export function ListEmpty({ message }: { message: string }) {
-  return (
-    <p className="px-5 py-8 text-center text-ink-muted text-sm">{message}</p>
-  );
-}

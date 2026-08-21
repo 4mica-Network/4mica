@@ -11,6 +11,7 @@ export default defineConfig({
     "components/checkbox/index.tsx",
     "components/combo-box/index.tsx",
     "components/dropdown/index.tsx",
+    "components/empty-state/index.tsx",
     "components/input-field/index.tsx",
     "components/link/index.tsx",
     "components/modal/index.tsx",

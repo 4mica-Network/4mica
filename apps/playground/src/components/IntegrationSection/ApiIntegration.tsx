@@ -1,4 +1,4 @@
-import { Tag, Link as UiLink } from "@4mica/ui";
+import { EmptyState, Tag, Link as UiLink } from "@4mica/ui";
 import { ExternalLink } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
 import { CodeTabs } from "@/components/CodeTabs";
@@ -58,13 +58,13 @@ export function ApiIntegration({ listing, isOwner }: ApiIntegrationProps) {
         </div>
       )}
 
-      {listing.endpoints.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-ink-subtle text-xs uppercase tracking-wide">
-            {messages.integration.endpointsTitle}
-          </h3>
-          <ul className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10">
-            {listing.endpoints.map((endpoint) => (
+      <div className="flex flex-col gap-2">
+        <h3 className="text-ink-subtle text-xs uppercase tracking-wide">
+          {messages.integration.endpointsTitle}
+        </h3>
+        <ul className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10">
+          {listing.endpoints.length > 0 ? (
+            listing.endpoints.map((endpoint) => (
               <li
                 className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3"
                 key={endpoint.id}
@@ -79,10 +79,18 @@ export function ApiIntegration({ listing, isOwner }: ApiIntegrationProps) {
                   </span>
                 )}
               </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            ))
+          ) : (
+            <li>
+              <EmptyState
+                variant="plain"
+                size="sm"
+                title={messages.integration.noEndpoints}
+              />
+            </li>
+          )}
+        </ul>
+      </div>
 
       {snippets && (
         <StepList>

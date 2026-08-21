@@ -1,4 +1,4 @@
-import { Tag, Link as UiLink } from "@4mica/ui";
+import { EmptyState, Tag, Link as UiLink } from "@4mica/ui";
 import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -134,11 +134,11 @@ export default async function ApiListingPage({
 
       <ApiIntegration isOwner={profile.isOwner} listing={listing} />
 
-      {listing.tags.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-ink-strong text-lg">
-            {messages.api.tagsHeading}
-          </h2>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold text-ink-strong text-lg">
+          {messages.api.tagsHeading}
+        </h2>
+        {listing.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {listing.tags.map((tag) => (
               <Tag key={tag} size="sm">
@@ -146,8 +146,10 @@ export default async function ApiListingPage({
               </Tag>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <EmptyState size="sm" title={messages.api.noTags} />
+        )}
+      </section>
     </article>
   );
 }

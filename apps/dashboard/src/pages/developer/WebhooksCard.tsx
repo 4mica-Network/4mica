@@ -1,4 +1,12 @@
-import { Button, ComboBox, InputField, Spinner, Switch, Tag } from "@4mica/ui";
+import {
+  Button,
+  ComboBox,
+  EmptyState,
+  InputField,
+  Spinner,
+  Switch,
+  Tag,
+} from "@4mica/ui";
 import {
   createWebhook,
   deleteWebhook,
@@ -13,7 +21,8 @@ import {
 } from "@stores/developer/selector";
 import type { Webhook } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { Trash2 } from "lucide-react";
+// `Webhook` is already the store's entity type in this file.
+import { Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, FieldRow, SettingsSection } from "@/components/form";
@@ -264,11 +273,12 @@ export function WebhooksCard() {
       </Card>
 
       {webhooks.length === 0 ? (
-        <Card>
-          <p className="text-ink-muted text-sm">
-            {t("developer.webhooks.empty")}
-          </p>
-        </Card>
+        <EmptyState
+          icon={<WebhookIcon size={20} />}
+          title={t("developer.webhooks.emptyTitle")}
+          description={t("developer.webhooks.emptyDescription")}
+          data-testid="webhooks"
+        />
       ) : (
         webhooks.map((webhook) => (
           <WebhookRow key={webhook.id} webhook={webhook} />

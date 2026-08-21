@@ -1,4 +1,4 @@
-import { Button, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
 import {
   createApiKey,
   deleteApiKey,
@@ -11,7 +11,7 @@ import {
 } from "@stores/developer/selector";
 import type { ApiKey } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { Trash2 } from "lucide-react";
+import { KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, SettingsSection } from "@/components/form";
@@ -133,9 +133,12 @@ export function ApiKeysCard() {
       </Card>
 
       {apiKeys.length === 0 ? (
-        <Card>
-          <p className="text-ink-muted text-sm">{t("developer.keys.empty")}</p>
-        </Card>
+        <EmptyState
+          icon={<KeyRound size={20} />}
+          title={t("developer.keys.emptyTitle")}
+          description={t("developer.keys.emptyDescription")}
+          data-testid="api-keys"
+        />
       ) : (
         apiKeys.map((apiKey) => <ApiKeyRow key={apiKey.id} apiKey={apiKey} />)
       )}

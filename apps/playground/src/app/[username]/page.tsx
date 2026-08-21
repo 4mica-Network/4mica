@@ -1,8 +1,9 @@
+import { EmptyState } from "@4mica/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AgentRow } from "@/components/AgentRow";
 import { ApiListingRow } from "@/components/ApiListingRow";
-import { ListCard, ListEmpty } from "@/components/ListCard";
+import { ListCard } from "@/components/ListCard";
 import { ProfileHeader } from "@/components/ProfileHeader";
 import { ProfileTabs } from "@/components/ProfileTabs";
 import { messages } from "@/i18n";
@@ -63,8 +64,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 />
               ))
             ) : (
-              <ListEmpty
-                message={
+              <EmptyState
+                variant="plain"
+                title={messages.profile.noAgentsTitle}
+                description={
                   profile.isOwner
                     ? messages.profile.noAgentsOwner
                     : messages.profile.noAgents
@@ -85,8 +88,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 />
               ))
             ) : (
-              <ListEmpty
-                message={
+              <EmptyState
+                variant="plain"
+                title={messages.profile.noApisTitle}
+                description={
                   profile.isOwner
                     ? messages.profile.noApisOwner
                     : messages.profile.noApis
