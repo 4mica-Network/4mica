@@ -16,6 +16,7 @@ import {
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
@@ -350,6 +351,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </nav>
 
       <div className="p-3">
+        {!inSettings && !collapsed && <SidebarBanners />}
         <div className="flex flex-col gap-0.5">
           <ActionRow
             icon={Eye}

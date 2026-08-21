@@ -148,6 +148,7 @@ model User {
   webhooks                       Webhook[]
   agents                         Agent[]
   apiListings                    ApiListing[]
+  bannerInteractions             BannerInteraction[]
 
   @@index([email])
   @@map("users")
@@ -289,4 +290,52 @@ model Business {
 
   @@index([kybStatus])
   @@map("businesses")
+}
+
+enum BannerInteractionType {
+  VIEWED
+  CLICKED
+  DISMISSED
+  VIDEO_PLAYED
+}
+
+model Banner {
+  id           String    @id @default(uuid(7))
+  slug         String    @unique @db.VarChar(64)
+  title        String?   @db.VarChar(120)
+  message      String?   @db.VarChar(280)
+  url          String?   @db.VarChar(2048)
+  thumbnailUrl String?   @map("thumbnail_url") @db.VarChar(2048)
+  videoUrl     String?   @map("video_url") @db.VarChar(2048)
+  alt          String?   @db.VarChar(160)
+  isVideo      Boolean   @default(false) @map("is_video")
+  priority     Int       @default(0)
+  active       Boolean   @default(true)
+  startsAt     DateTime? @map("starts_at")
+  endsAt       DateTime? @map("ends_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  interactions BannerInteraction[]
+
+  @@index([active, startsAt, endsAt])
+  @@map("banners")
+}
+
+model BannerInteraction {
+  id        String                @id @default(uuid(7))
+  bannerId  String                @map("banner_id")
+  userId    String                @map("user_id")
+  type      BannerInteractionType
+  count     Int                   @default(1)
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  banner Banner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bannerId, userId, type])
+  @@index([bannerId, type])
+  @@index([userId])
+  @@map("banner_interactions")
 }

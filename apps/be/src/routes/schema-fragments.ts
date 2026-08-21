@@ -200,6 +200,24 @@ export const usernameAvailabilityResponseSchema = {
   },
 } as const;
 
+export const bannerResponseSchema = {
+  type: "array",
+  items: {
+    type: "object",
+    required: ["id"],
+    properties: {
+      id: str,
+      title: nullStr,
+      message: nullStr,
+      url: nullStr,
+      thumbnailUrl: nullStr,
+      videoUrl: nullStr,
+      alt: nullStr,
+      isVideo: bool,
+    },
+  },
+} as const;
+
 export const errorResponseSchema = {
   type: "object",
   required: ["error", "message"],

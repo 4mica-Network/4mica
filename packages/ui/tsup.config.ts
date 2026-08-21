@@ -6,6 +6,7 @@ export default defineConfig({
   // "use client" and drags server-safe exports like `cn` along with it.
   entry: [
     "index.ts",
+    "components/banner/index.tsx",
     "components/button/index.tsx",
     "components/card/index.tsx",
     "components/checkbox/index.tsx",
@@ -18,11 +19,15 @@ export default defineConfig({
     "components/modal/useModalA11y.ts",
     "components/select/index.tsx",
     "components/spinner/index.tsx",
+    "components/stack/index.tsx",
+    "components/stack/AutoStackHeight.tsx",
     "components/switch/index.tsx",
     "components/tab/index.tsx",
     "components/tab/TabGroup.tsx",
     "components/tag/index.tsx",
     "components/tooltip/index.tsx",
+    "components/typography/index.tsx",
+    "components/video-player/index.tsx",
     "lib/cn.ts",
     "utils/getIconSize.ts",
     "utils/hexToRGB.ts",

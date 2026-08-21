@@ -106,6 +106,10 @@ export const initApp = async (
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
           { name: "developer", description: "API keys and webhooks" },
+          {
+            name: "banners",
+            description: "Dashboard promo banners and interaction tracking",
+          },
         ],
         components: {
           securitySchemes: {

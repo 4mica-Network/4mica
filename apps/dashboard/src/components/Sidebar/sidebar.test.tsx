@@ -1,3 +1,4 @@
+import { INITIAL_STATE as BANNER_INITIAL_STATE } from "@stores/banner/reducer";
 import { INITIAL_STATE } from "@stores/user/reducer";
 import type { User } from "@stores/user/type";
 import { render, screen } from "@testing-library/react";
@@ -17,7 +18,11 @@ vi.mock("@clerk/clerk-react", () => ({
 const { Sidebar } = await import("./index");
 
 const renderAt = (path: string, user: Partial<User> | null) => {
-  const state = { user: { ...INITIAL_STATE, user }, developer: {} };
+  const state = {
+    user: { ...INITIAL_STATE, user },
+    developer: {},
+    banner: BANNER_INITIAL_STATE,
+  };
   const store = createStore(() => state);
   return render(
     <Provider store={store}>
