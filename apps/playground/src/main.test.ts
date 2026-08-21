@@ -291,8 +291,12 @@ describe("reserved segments vs nginx", () => {
     "sign-up",
     "sso-callback",
   ])("proxies /%s to the playground", (segment) => {
+    // `[^;]*mica_playground` rather than a literal URL: the edge proxies via
+    // `proxy_pass $mica_playground` (a `set` variable plus Docker's resolver)
+    // so upstream DNS is re-read per request instead of pinned at startup.
+    // What matters here is that the route targets the playground at all.
     const rule = new RegExp(
-      `location \\^~ /${segment}\\s+{[^}]*proxy_pass http://mica_playground;`,
+      `location \\^~ /${segment}\\s+{[^}]*proxy_pass [^;]*mica_playground;`,
     );
 
     expect(nginxConf).toMatch(rule);

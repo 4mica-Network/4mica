@@ -66,6 +66,16 @@
     },
     "@4mica/playground#typecheck": {
       "dependsOn": ["@4mica/db#build"]
+    },
+    "@4mica/dashboard#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": [
+        "VITE_CLERK_PUBLISHABLE_KEY",
+        "VITE_API_URL",
+        "VITE_BASE_URL",
+        "VITE_APP_URL"
+      ]
     }
   }
 }

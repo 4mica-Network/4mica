@@ -1,0 +1,75 @@
+name: Deploy 4mica Email Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/email/**"
+      - "packages/email-client/**"
+      - "packages/url/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/actions/remote-deploy/**"
+      - ".github/workflows/deploy-email.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: deploy-email-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy email with Docker Compose
+        uses: ./.github/actions/remote-deploy
+        with:
+          server_host: ${{ secrets.EMAIL_SERVER_HOST }}
+          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') && 'dev' || 'main' }}
+          repo_ssh_url: git@github.com:${{ github.repository }}.git
+          service_dir: apps/email
+          health_container: 4mica-email
+          # EMAIL_DRY_RUN defaults to false under NODE_ENV=production, so the
+          # container fails at boot without a valid re_… RESEND_API_KEY.
+          # EMAIL_BIND_ADDR must stay off 0.0.0.0: the service has no auth of its
+          # own, so reaching it is the authorisation.
+          env_contents: |
+            NODE_ENV=production
+            EMAIL_PORT=${{ vars.EMAIL_PORT || '4100' }}
+            EMAIL_BIND_ADDR=${{ vars.EMAIL_BIND_ADDR || '127.0.0.1' }}
+            LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            EMAIL_DRY_RUN=${{ vars.EMAIL_DRY_RUN || 'false' }}
+
+            EMAIL_FROM_NAME=${{ vars.EMAIL_FROM_NAME || '4Mica' }}
+            EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS || 'no-reply@4mica.io' }}
+            EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO || 'support@4mica.io' }}
+
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL || 'https://4mica.io' }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'https://app.4mica.io' }}
+
+            SHUTDOWN_DRAIN_MS=${{ vars.SHUTDOWN_DRAIN_MS || '5000' }}
+            SHUTDOWN_TIMEOUT_MS=${{ vars.SHUTDOWN_TIMEOUT_MS || '20000' }}
+
+            RATE_LIMIT_ENABLED=${{ vars.RATE_LIMIT_ENABLED || 'true' }}
+            RATE_LIMIT_WINDOW_MS=${{ vars.RATE_LIMIT_WINDOW_MS || '60000' }}
+            RATE_LIMIT_IP_MAX=${{ vars.RATE_LIMIT_IP_MAX || '300' }}

@@ -20,9 +20,8 @@ services:
       PORT: 3100
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIR: /app/logs
-      # Must reach the Postgres started by apps/be. Either join that stack's
-      # network (see `networks` below, the right answer for a real deploy) or
-      # point this at host.docker.internal:5433 for a laptop.
+      # The same database apps/be migrates. In production that is the managed
+      # instance; on a laptop, host.docker.internal:5433 reaches `pnpm db:up`.
       DATABASE_URL: ${DATABASE_URL}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
@@ -30,6 +29,9 @@ services:
       - "127.0.0.1:${PLAYGROUND_PORT:-8081}:3100"
     volumes:
       - playground-logs:/app/logs
+    networks:
+      - default
+      - edge
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/api/health"]
       interval: 30s
@@ -45,6 +47,9 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "127.0.0.1:${EDGE_PORT:-8088}:80"
+    networks:
+      - default
+      - edge
     depends_on:
       playground:
         condition: service_healthy
@@ -52,10 +57,11 @@ services:
 volumes:
   playground-logs:
     name: 4mica-playground-logs
-# Uncomment to share the database network created by apps/be/docker-compose.yml
-# instead of going through the host:
-#
-# networks:
-#   default:
-#     name: be_default
-#     external: true
+
+networks:
+  # Shared with apps/web so `edge` can resolve both upstreams. The two stacks
+  # are separate compose projects and either may come up first, so the network
+  # is created out of band: `docker network create 4mica-edge`.
+  edge:
+    name: 4mica-edge
+    external: true

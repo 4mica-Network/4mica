@@ -1,0 +1,232 @@
+name: Remote Docker Compose deploy
+description: >-
+  SSH to a server, sync the repo checkout to a branch, write the service's .env
+  and bring its docker compose stack up. Mirrors the steps proven in
+  build-react-app.yml.
+
+inputs:
+  server_host:
+    description: Hostname or IP of the target server.
+    required: true
+  server_user:
+    description: SSH user on the target server.
+    required: true
+  ssh_key:
+    description: Private key authorised on the target server.
+    required: true
+  deploy_path:
+    description: Repo checkout path on the server. A leading ~ is expanded there.
+    required: true
+  branch:
+    description: Branch to check out and fast-forward to.
+    required: true
+  repo_ssh_url:
+    description: git SSH URL used to clone if the checkout does not exist yet.
+    required: true
+  service_dir:
+    description: Repo-relative directory holding the compose file, e.g. apps/be.
+    required: true
+  compose_file:
+    description: Compose file name within service_dir.
+    required: false
+    default: docker-compose.yml
+  env_contents:
+    description: >-
+      Full body of the .env file to write into service_dir. Compose reads it via
+      --env-file, and build args interpolate from it too.
+    required: true
+  pre_up:
+    description: >-
+      Optional shell run on the server, from service_dir, before compose up.
+      Used for idempotent setup such as creating a shared external network.
+    required: false
+    default: ""
+  health_container:
+    description: >-
+      Optional container name to poll for a healthy state after the deploy. When
+      set, the step fails the job (after dumping logs) if it never goes healthy.
+    required: false
+    default: ""
+  health_timeout:
+    description: Seconds to wait for health_container to report healthy.
+    required: false
+    default: "180"
+
+runs:
+  using: composite
+  steps:
+    - name: Configure SSH
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh_key }}
+        SERVER_HOST: ${{ inputs.server_host }}
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+        ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+    - name: Prepare remote checkout
+      shell: bash
+      env:
+        SERVER_USER: ${{ inputs.server_user }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        DEPLOY_PATH: ${{ inputs.deploy_path }}
+        BRANCH: ${{ inputs.branch }}
+        REPO_SSH_URL: ${{ inputs.repo_ssh_url }}
+      run: |
+        set -euo pipefail
+        ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" "$BRANCH" "$REPO_SSH_URL" <<'EOF'
+        set -euo pipefail
+        DEPLOY_PATH="$1"
+        BRANCH="$2"
+        REPO_SSH_URL="$3"
+
+        case "$DEPLOY_PATH" in
+          "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+          "~") DEPLOY_PATH="$HOME" ;;
+        esac
+
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+        ssh-keygen -F github.com >/dev/null || ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+        chmod 600 "$HOME/.ssh/known_hosts"
+
+        if [ ! -d "$DEPLOY_PATH/.git" ]; then
+          echo "No git checkout found at $DEPLOY_PATH."
+          if [ -d "$DEPLOY_PATH" ] && [ -n "$(find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            BACKUP_PATH="${DEPLOY_PATH}.bootstrap-$(date +%Y%m%d%H%M%S)"
+            echo "Moving existing non-git directory to $BACKUP_PATH."
+            mv "$DEPLOY_PATH" "$BACKUP_PATH"
+          fi
+          echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
+          mkdir -p "$(dirname "$DEPLOY_PATH")"
+          git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
+        fi
+
+        cd "$DEPLOY_PATH"
+        git remote set-url origin "$REPO_SSH_URL"
+        git fetch origin "$BRANCH"
+        git checkout "$BRANCH"
+        git pull --ff-only origin "$BRANCH"
+        EOF
+
+    - name: Write remote environment
+      shell: bash
+      env:
+        SERVER_USER: ${{ inputs.server_user }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        DEPLOY_PATH: ${{ inputs.deploy_path }}
+        SERVICE_DIR: ${{ inputs.service_dir }}
+        ENV_CONTENTS: ${{ inputs.env_contents }}
+      run: |
+        set -euo pipefail
+        ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p $DEPLOY_PATH/$SERVICE_DIR"
+        printf '%s\n' "$ENV_CONTENTS" \
+          | ssh "$SERVER_USER@$SERVER_HOST" "cat > $DEPLOY_PATH/$SERVICE_DIR/.env"
+        ssh "$SERVER_USER@$SERVER_HOST" "chmod 600 $DEPLOY_PATH/$SERVICE_DIR/.env"
+
+    - name: Deploy with Docker Compose
+      shell: bash
+      env:
+        SERVER_USER: ${{ inputs.server_user }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        DEPLOY_PATH: ${{ inputs.deploy_path }}
+        SERVICE_DIR: ${{ inputs.service_dir }}
+        COMPOSE_FILE_NAME: ${{ inputs.compose_file }}
+        PRE_UP: ${{ inputs.pre_up }}
+      run: |
+        set -euo pipefail
+        # ssh does not preserve argv boundaries — it joins its arguments with
+        # spaces and lets the remote shell re-parse the result. pre_up contains
+        # spaces and operators, so passing it raw would leak `|| true` onto the
+        # outer command line and mask a failed deploy. base64 has no characters
+        # the shell touches.
+        PRE_UP_B64="$(printf '%s' "$PRE_UP" | base64 | tr -d '\n')"
+        ssh "$SERVER_USER@$SERVER_HOST" bash -s -- \
+          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "$PRE_UP_B64" <<'EOF'
+        set -euo pipefail
+        DEPLOY_PATH="$1"
+        SERVICE_DIR="$2"
+        COMPOSE_FILE_NAME="$3"
+        PRE_UP="$(printf '%s' "$4" | base64 -d)"
+
+        case "$DEPLOY_PATH" in
+          "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+          "~") DEPLOY_PATH="$HOME" ;;
+        esac
+
+        cd "$DEPLOY_PATH/$SERVICE_DIR"
+
+        if [ -n "$PRE_UP" ]; then
+          echo "Running pre-up: $PRE_UP"
+          bash -c "$PRE_UP"
+        fi
+
+        # No `down` first: compose recreates only the containers whose config or
+        # image changed, which keeps the downtime window to a single restart.
+        docker compose -f "$COMPOSE_FILE_NAME" --env-file .env up -d --build --remove-orphans
+        docker image prune -f
+        docker compose -f "$COMPOSE_FILE_NAME" --env-file .env ps
+        EOF
+
+    - name: Wait for healthy
+      if: inputs.health_container != ''
+      shell: bash
+      env:
+        SERVER_USER: ${{ inputs.server_user }}
+        SERVER_HOST: ${{ inputs.server_host }}
+        DEPLOY_PATH: ${{ inputs.deploy_path }}
+        SERVICE_DIR: ${{ inputs.service_dir }}
+        COMPOSE_FILE_NAME: ${{ inputs.compose_file }}
+        HEALTH_CONTAINER: ${{ inputs.health_container }}
+        HEALTH_TIMEOUT: ${{ inputs.health_timeout }}
+      run: |
+        set -euo pipefail
+        ssh "$SERVER_USER@$SERVER_HOST" bash -s -- \
+          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "$HEALTH_CONTAINER" "$HEALTH_TIMEOUT" <<'EOF'
+        set -euo pipefail
+        DEPLOY_PATH="$1"
+        SERVICE_DIR="$2"
+        COMPOSE_FILE_NAME="$3"
+        CONTAINER="$4"
+        TIMEOUT="$5"
+
+        case "$DEPLOY_PATH" in
+          "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+          "~") DEPLOY_PATH="$HOME" ;;
+        esac
+
+        cd "$DEPLOY_PATH/$SERVICE_DIR"
+
+        deadline=$(( $(date +%s) + TIMEOUT ))
+        while [ "$(date +%s)" -lt "$deadline" ]; do
+          status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+            "$CONTAINER" 2>/dev/null || echo missing)"
+          case "$status" in
+            healthy)
+              echo "$CONTAINER is healthy."
+              exit 0
+              ;;
+            none)
+              echo "$CONTAINER has no healthcheck; treating a running container as success."
+              exit 0
+              ;;
+            unhealthy)
+              echo "$CONTAINER reported unhealthy."
+              break
+              ;;
+            *)
+              echo "$CONTAINER status: $status — waiting..."
+              sleep 5
+              ;;
+          esac
+        done
+
+        echo "::error::$CONTAINER did not become healthy within ${TIMEOUT}s."
+        docker compose -f "$COMPOSE_FILE_NAME" --env-file .env ps
+        docker compose -f "$COMPOSE_FILE_NAME" --env-file .env logs --tail=200
+        exit 1
+        EOF

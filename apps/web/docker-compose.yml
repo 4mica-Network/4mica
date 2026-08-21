@@ -14,9 +14,20 @@ services:
       PORT: 3000
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:3000"
+    networks:
+      - default
+      - edge
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
+
+networks:
+  # Shared with apps/playground so its `edge` nginx can resolve `web`. Created
+  # out of band (`docker network create 4mica-edge`) because the two stacks are
+  # separate compose projects and either may come up first.
+  edge:
+    name: 4mica-edge
+    external: true

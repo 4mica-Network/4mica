@@ -1,0 +1,62 @@
+name: Deploy 4mica Dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/dashboard/**"
+      - "packages/ui/**"
+      - "packages/http/**"
+      - "packages/url/**"
+      - "packages/tailwind-config/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/actions/remote-deploy/**"
+      - ".github/workflows/deploy-dashboard.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: deploy-dashboard-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy dashboard with Docker Compose
+        uses: ./.github/actions/remote-deploy
+        with:
+          server_host: ${{ secrets.DASHBOARD_SERVER_HOST }}
+          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') && 'dev' || 'main' }}
+          repo_ssh_url: git@github.com:${{ github.repository }}.git
+          service_dir: apps/dashboard
+          health_container: 4mica-dashboard
+          # Every VITE_* value here is a build arg, inlined into the bundle by
+          # Vite. Changing one needs a rebuild, which `up -d --build` does.
+          # The Clerk publishable key ships in the browser bundle, so it is a
+          # variable, not a secret.
+          env_contents: |
+            DASHBOARD_PORT=${{ vars.DASHBOARD_PORT || '8082' }}
+
+            VITE_CLERK_PUBLISHABLE_KEY=${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_BASE_URL=${{ vars.VITE_BASE_URL }}
+            VITE_APP_URL=${{ vars.VITE_APP_URL }}

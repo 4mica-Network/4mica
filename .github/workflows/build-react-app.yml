@@ -107,6 +107,10 @@ jobs:
           esac
 
           cd "$DEPLOY_PATH/apps/web"
+          # Shared with apps/playground, whose edge nginx fronts both stacks.
+          # Declared `external: true` in each compose file and either may come
+          # up first, so create it here too.
+          docker network create 4mica-edge 2>/dev/null || true
           docker compose --env-file .env down
           docker compose --env-file .env up -d --build --remove-orphans
           docker image prune -f

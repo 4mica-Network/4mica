@@ -1,0 +1,70 @@
+#
+# Production stack for apps/be.
+#
+# Deliberately a standalone file rather than an override of docker-compose.yml:
+# an override can add to a service but cannot delete the `postgres` service or
+# the `depends_on: postgres` edges that the local stack relies on. Here the
+# database is external/managed and reached through DATABASE_URL.
+#
+# Usage: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# The explicit project name matters: compose otherwise derives it from the
+# directory, making this stack share `be` with docker-compose.yml. The deploy
+# action passes --remove-orphans, which would then treat a locally running
+# 4mica-be-postgres as an orphan of this file and delete it.
+name: 4mica-be-prod
+
+services:
+  migrate:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+      target: migrator
+    image: 4mica-be-migrate:latest
+    container_name: 4mica-be-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+  be:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+    image: 4mica-be:latest
+    container_name: 4mica-be
+    restart: unless-stopped
+    init: true
+    # Must exceed SHUTDOWN_TIMEOUT_MS so the app always force-exits itself
+    # before Docker resorts to SIGKILL.
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-5000}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-20000}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_IP_MAX: ${RATE_LIMIT_IP_MAX:-300}
+      RATE_LIMIT_USER_MAX: ${RATE_LIMIT_USER_MAX:-120}
+      RATE_LIMIT_SENSITIVE_MAX: ${RATE_LIMIT_SENSITIVE_MAX:-10}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      DATABASE_URL: ${DATABASE_URL}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      # A PEM. Store it with literal \n escapes — src/config/index.ts unescapes
+      # them, and a real newline would break the .env file this reads from.
+      CLERK_JWT_KEY: ${CLERK_JWT_KEY:-}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-}
+    ports:
+      - "127.0.0.1:${BE_PORT:-4000}:4000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
