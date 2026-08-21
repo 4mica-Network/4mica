@@ -5,7 +5,7 @@ services:
       dockerfile: apps/playground/Dockerfile
       args:
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://4mica.io}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://4mica.io}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.4mica.io}
         # Required. apps/web owns the bare /_next tree on this origin, so
         # without a prefix every page here loads unstyled and the server logs
         # nothing. nginx strips it back off.

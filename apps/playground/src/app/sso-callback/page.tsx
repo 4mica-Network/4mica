@@ -11,7 +11,12 @@ export default function SsoCallbackPage() {
         <Spinner size="lg" />
         <p className="text-ink-muted text-sm">{messages.common.loading}</p>
       </div>
-      <AuthenticateWithRedirectCallback />
+      <AuthenticateWithRedirectCallback
+        signInUrl="/sign-in"
+        signInFallbackRedirectUrl="/"
+        signUpFallbackRedirectUrl="/"
+        continueSignUpUrl="/sign-up"
+      />
     </main>
   );
 }

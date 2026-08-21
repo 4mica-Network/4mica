@@ -285,4 +285,19 @@ describe("reserved segments vs nginx", () => {
 
     expect(missing).toEqual([]);
   });
+
+  it.each([
+    "sign-in",
+    "sign-up",
+    "sso-callback",
+  ])("proxies /%s to the playground", (segment) => {
+    const rule = new RegExp(
+      `location \\^~ /${segment}\\s+{[^}]*proxy_pass http://mica_playground;`,
+    );
+
+    expect(nginxConf).toMatch(rule);
+    expect(nginxConf).not.toMatch(
+      new RegExp(`\\|${segment}\\||\\(${segment}\\||\\|${segment}\\)`),
+    );
+  });
 });

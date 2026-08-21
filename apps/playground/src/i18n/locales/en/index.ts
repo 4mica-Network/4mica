@@ -18,6 +18,21 @@ export const en = {
     loading: "Loading…",
   },
 
+  auth: {
+    join: "Join",
+    signIn: "Sign in",
+    signInTitle: "Welcome back",
+    signInSubtitle: "Sign in to your 4Mica account to continue.",
+    signUpTitle: "Join 4Mica",
+    signUpSubtitle:
+      "Create an account to pay for this API with credit-backed guarantees.",
+    google: "Continue with Google",
+    error: "We could not complete that. Try again.",
+    haveAccount: "Already have an account?",
+    needAccount: "New to 4Mica?",
+    dashboard: "Go to your dashboard",
+  },
+
   profile: {
     verified: "Verified",
     verifiedHint: "This account has been verified by 4Mica.",

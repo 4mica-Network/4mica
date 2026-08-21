@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { OwnerBar } from "@/components/OwnerBar";
 import { ProfileFooter } from "@/components/ProfileFooter";
+import { TopBar } from "@/components/TopBar";
 import { parseUsername } from "@/schema/params";
 import { getPublicProfile } from "@/services/profile";
 
@@ -33,7 +34,9 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
     : undefined;
 
   return (
-    <div className="profile-scope min-h-screen" style={brandStyle}>
+    <div className="profile-scope relative min-h-screen" style={brandStyle}>
+      <TopBar />
+
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14 sm:py-20">
         {/*
           Owner-only, and only while the profile is still private: a published
