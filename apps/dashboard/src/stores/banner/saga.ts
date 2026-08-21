@@ -27,9 +27,6 @@ export function* fetchBanners(): Generator {
     const banners = (yield call(api.getBanners)) as Banner[];
     yield put(fetchBannersSucceeded(banners));
   } catch (error) {
-    // No toast: a failed promo fetch is not something the user can act on. But
-    // it must not be invisible to us either, or the deck just silently renders
-    // nothing.
     if (import.meta.env.DEV) {
       console.warn("[banners] fetch failed", error);
     }

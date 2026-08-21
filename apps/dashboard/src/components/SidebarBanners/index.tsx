@@ -25,10 +25,6 @@ export function SidebarBanners() {
     { defaultValue: [], listenStorageChange: true },
   );
 
-  // Gated on the user, not bare mount. `CurrentUserProvider` registers the auth
-  // token provider in its own mount effect, and React runs child effects before
-  // parent ones — fetching here on mount sends the request before any token
-  // exists, which 401s. A loaded user is proof the token pipeline is up.
   useEffect(() => {
     if (!userId) {
       return;

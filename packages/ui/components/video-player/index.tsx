@@ -79,7 +79,7 @@ export const VideoPlayer = ({
   if (isPlaying && videoUrl) {
     return (
       <div className={frame} data-testid={prefix} data-playing="true">
-        {/* biome-ignore lint/a11y/useMediaCaption: caption tracks are opt-in via `captions` — the consumer supplies one when the clip has speech. */}
+        {/* biome-ignore lint/a11y/useMediaCaption: caption tracks are opt-in via `captions`. */}
         <video
           ref={(node) => {
             node?.play().catch(() => {});

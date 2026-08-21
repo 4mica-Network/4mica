@@ -69,9 +69,6 @@ describe("sidebar banners", () => {
     useUser.mockReturnValue({ user: null });
   });
 
-  // CurrentUserProvider registers the auth token provider in a mount effect, and
-  // React runs child effects before parent ones. Fetching on bare mount sends the
-  // request before any token exists, which 401s and leaves the deck empty.
   it("does not fetch before the user has loaded", () => {
     const { dispatched } = renderDeck([], null);
 

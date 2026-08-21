@@ -28,11 +28,6 @@ export function AutoStackHeight<T extends { id: string | number }>({
   const containerRef = useRef<HTMLDivElement>(null);
   const [cardHeight, setCardHeight] = useState<number>();
 
-  // Measures the TALLEST card, not the first. Cards are absolutely positioned,
-  // so anything taller than the reserved height overflows and paints over
-  // whatever follows in the sidebar. Card heights differ whenever some carry
-  // media and some do not, and `direction="top"` means the front card is the
-  // last item — so the first card is never a safe proxy.
   useEffect(() => {
     const node = containerRef.current;
     if (!node) {
@@ -81,9 +76,6 @@ export function AutoStackHeight<T extends { id: string | number }>({
         height,
         width: typeof width === "number" ? `${width}px` : width,
         paddingTop: growth === "up" ? reserved : undefined,
-        // Hidden, not unmounted, until the first measurement lands: the cards
-        // still need layout to be measurable, but an unsized container is a
-        // zero-height one, which would overlap its siblings for a frame.
         visibility: cardHeight === undefined ? "hidden" : undefined,
       }}
       data-testid={prefix}
