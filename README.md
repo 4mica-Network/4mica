@@ -231,6 +231,93 @@ The facilitator enforces that:
   relayer is configured, otherwise every request returns `errorCode: "NO_RELAYER"`.
 - `POST /withdraw` and `POST /withdraw/verify` – gasless withdrawals; see below. Same availability
   rule as `/deposit`.
+- `POST /clearing/claim` and `POST /clearing/claim/verify` – sponsored net-credit claims; see
+  below. Same availability rule as `/deposit`.
+- `POST /clearing/pay` and `POST /clearing/pay/verify` – sponsored net-debit payments; see below.
+  Same availability rule as `/deposit`.
+
+### Sponsored net-credit claims
+
+A net creditor in a committed clearing cycle is owed money on-chain, but collecting it costs a
+transaction — and a creditor who never held native gas cannot send one. These endpoints let the
+facilitator's relayer submit `claimNetCreditFor` for them:
+
+```jsonc
+{
+  "cycleId": "eth:1800000000",   // as core names it: text id or the 0x-prefixed on-chain hash
+  "creditor": "0x…",
+  "network": "eip155:…"          // optional; defaults to the first configured network
+}
+```
+
+`/clearing/claim` answers with `{ "success": true, "txHash", "network", "creditor", "cycleId",
+"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/claim/verify`
+answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
+error codes reuse `/withdraw`'s strings wherever the meaning is the same.
+
+The request carries no signature and needs none: the ClearingHouse pays the address the cycle's
+committed Merkle leaf names, for the amount that leaf fixes, so a submitter can neither redirect
+nor inflate the payout. Everything the transaction depends on — the ClearingHouse address, the
+amount, the proof — is resolved from core (which is why the facilitator's auth wallet must be able
+to read clearing actions), never taken from the request; the caller only names *which* claim to
+submit. `amount` echoes the committed net credit — in a `Shortfall` cycle the on-chain payout is a
+pro-rata fraction of it.
+
+Throttling is configured separately (`X402_CLAIM_*`), and concurrent submissions for the same
+cycle are deduplicated so only one pays gas — the other would revert as `AlreadyClaimed`.
+
+### Sponsored net-debit payments
+
+The debtor's side of the same cycle. Paying a net debit pulls money *out of* the debtor's wallet,
+so unlike a claim it carries the debtor's signature — an EIP-3009 `receiveWithAuthorization` the
+facilitator submits via `payNetDebitWithAuthorization`, or, for tokens without EIP-3009, a Permit2
+`PermitTransferFrom` submitted via `payNetDebitWithPermit2` — the facilitator paying the gas
+either way. The debtor needs no native balance and no prior allowance (EIP-3009), or only the
+one-time `approve(PERMIT2, …)` (Permit2, sponsorable via `eip2612Permit` exactly as on
+`/deposit`). ERC-20 cycles only: a native-asset debit cannot be pulled by signature.
+
+The scheme travels under the same `assetTransferMethod` tag as `/deposit`, and exactly one of
+`authorization` or `permit2Authorization` must be present:
+
+```jsonc
+{
+  "cycleId": "eth:1800000000",   // as core names it: text id or the 0x-prefixed on-chain hash
+  "network": "eip155:…",         // optional; defaults to the first configured network
+  "assetTransferMethod": "eip3009",  // optional; the authorization's shape already says
+  "authorization": {
+    "from": "0x…",               // the debtor; the funds only ever leave this account
+    "validAfter": "0x0",
+    "validBefore": "0x…",
+    "nonce": "0x…",              // MUST equal the cycle's on-chain (0x…) id — binds the payment to it
+    "v": 27, "r": "0x…", "s": "0x…"
+  }
+  // — or —
+  // "assetTransferMethod": "permit2",
+  // "permit2Authorization": {
+  //   "from": "0x…",
+  //   "nonce": "0x…",           // MUST equal uint256(cycle's on-chain id)
+  //   "deadline": "0x…",
+  //   "signature": "0x…"
+  // },
+  // "eip2612Permit": { "value", "deadline", "v", "r", "s" }   // optional sponsored approval
+}
+```
+
+`/clearing/pay` answers with `{ "success": true, "txHash", "network", "debtor", "cycleId",
+"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/pay/verify`
+answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
+error codes reuse `/deposit`'s and `/clearing/claim`'s strings wherever the meaning is the same —
+including `PERMIT2_ALLOWANCE_REQUIRED` with the same `permit2Allowance` detail (and `eip2612Nonce`
+escape hatch) as `/deposit`.
+
+The signature is what makes this safe to relay: it binds the receiver/spender (the ClearingHouse),
+the exact amount, and — through the nonce — the cycle it settles, so a submitter can change none
+of them. As with claims, the contract address, the amount and the proof are resolved from core,
+never taken from the request; the digest is built from *those* terms, so a signature over anything
+else simply mismatches.
+
+Throttling is configured separately (`X402_PAY_*`), and concurrent submissions for the same cycle
+are deduplicated so only one pays gas — the other would revert as `AlreadyPaid`.
 
 ### Gasless withdrawals
 

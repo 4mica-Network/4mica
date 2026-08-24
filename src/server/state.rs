@@ -10,6 +10,7 @@ use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
 
+use crate::clearing::ClearingActions;
 use crate::limits::SponsorGuard;
 use crate::relayer::{NoRelayer, Relayer};
 use crate::server::model::{
@@ -39,11 +40,20 @@ pub(crate) struct AppState {
     /// Networks that opted into gas sponsorship. Empty means `/deposit` is unavailable, which is a
     /// valid deployment — the facilitator still serves `/verify` and `/settle`.
     relayers: Vec<Relayer>,
+    /// Per-network resolvers for clearing-cycle terms, keyed by CAIP-2 network id. Every network
+    /// gets one — resolving terms only needs core, not a relayer.
+    clearing: Vec<(String, Arc<ClearingActions>)>,
     /// Throttling shared across networks: the relayer's gas budget and this process's capacity are
-    /// global resources, so limiting per-network would let N networks multiply the exposure. One
-    /// guard per action, so a burst of deposits cannot exhaust what a withdrawal needs.
-    deposit_guard: Arc<SponsorGuard>,
-    withdraw_guard: Arc<SponsorGuard>,
+    /// global resources, so limiting per-network would let N networks multiply the exposure.
+    guards: SponsorGuards,
+}
+
+/// One guard per sponsored action, so a burst of deposits cannot exhaust what a withdrawal needs.
+pub struct SponsorGuards {
+    pub deposit: Arc<SponsorGuard>,
+    pub withdraw: Arc<SponsorGuard>,
+    pub claim: Arc<SponsorGuard>,
+    pub pay: Arc<SponsorGuard>,
 }
 
 impl AppState {
@@ -51,24 +61,39 @@ impl AppState {
         four_mica: Vec<FourMicaHandler>,
         exact: Option<Arc<dyn ExactService>>,
         relayers: Vec<Relayer>,
-        deposit_guard: Arc<SponsorGuard>,
-        withdraw_guard: Arc<SponsorGuard>,
+        clearing: Vec<(String, Arc<ClearingActions>)>,
+        guards: SponsorGuards,
     ) -> Self {
         Self {
             four_mica,
             exact,
             relayers,
-            deposit_guard,
-            withdraw_guard,
+            clearing,
+            guards,
         }
     }
 
     pub fn deposit_guard(&self) -> &Arc<SponsorGuard> {
-        &self.deposit_guard
+        &self.guards.deposit
     }
 
     pub fn withdraw_guard(&self) -> &Arc<SponsorGuard> {
-        &self.withdraw_guard
+        &self.guards.withdraw
+    }
+
+    pub fn claim_guard(&self) -> &Arc<SponsorGuard> {
+        &self.guards.claim
+    }
+
+    pub fn pay_guard(&self) -> &Arc<SponsorGuard> {
+        &self.guards.pay
+    }
+
+    pub fn clearing_actions_for(&self, network: &str) -> Option<&Arc<ClearingActions>> {
+        self.clearing
+            .iter()
+            .find(|(id, _)| id == network)
+            .map(|(_, actions)| actions)
     }
 
     /// Health plus the operational signals worth paging on.
@@ -76,7 +101,7 @@ impl AppState {
     /// Balances come from the relayer's TTL cache, so polling this endpoint cannot amplify into
     /// RPC load.
     pub async fn health(&self) -> HealthResponse {
-        let floor = self.deposit_guard.limits().min_relayer_balance_wei;
+        let floor = self.guards.deposit.limits().min_relayer_balance_wei;
         let mut relayers = Vec::with_capacity(self.relayers.len());
         let mut degraded = false;
 
@@ -109,8 +134,10 @@ impl AppState {
 
         HealthResponse {
             status: if degraded { "degraded" } else { "ok" },
-            deposits: (!self.relayers.is_empty()).then(|| self.deposit_guard.counters()),
-            withdrawals: (!self.relayers.is_empty()).then(|| self.withdraw_guard.counters()),
+            deposits: (!self.relayers.is_empty()).then(|| self.guards.deposit.counters()),
+            withdrawals: (!self.relayers.is_empty()).then(|| self.guards.withdraw.counters()),
+            claims: (!self.relayers.is_empty()).then(|| self.guards.claim.counters()),
+            debits: (!self.relayers.is_empty()).then(|| self.guards.pay.counters()),
             relayers,
         }
     }

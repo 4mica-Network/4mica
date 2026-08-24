@@ -14,6 +14,7 @@ use std::str::FromStr;
 
 use alloy::primitives::{Address, B256, U256};
 
+use crate::clearing::{ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
 use crate::limits::SponsorCounters;
 use crate::withdraw::{WithdrawError, WithdrawIntent};
@@ -125,6 +126,10 @@ pub struct HealthResponse {
     pub deposits: Option<SponsorCounters>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<SponsorCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claims: Option<SponsorCounters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debits: Option<SponsorCounters>,
 }
 
 #[derive(Serialize)]
@@ -306,13 +311,20 @@ pub struct Permit2AllowanceResponse {
 
 impl Permit2AllowanceResponse {
     fn from_error(error: &DepositError) -> Option<Self> {
-        let details = error.permit2_allowance_details()?;
-        Some(Self {
+        error.permit2_allowance_details().map(Self::from_details)
+    }
+
+    fn from_pay_error(error: &PayError) -> Option<Self> {
+        error.permit2_allowance_details().map(Self::from_details)
+    }
+
+    fn from_details(details: &crate::deposit::Permit2AllowanceDetails) -> Self {
+        Self {
             spender: format!("{:#x}", details.spender),
             allowance: details.allowance.to_string(),
             required: details.required.to_string(),
             eip2612_nonce: details.eip2612_nonce.map(|nonce| nonce.to_string()),
-        })
+        }
     }
 }
 
@@ -533,6 +545,244 @@ impl WithdrawResponse {
             network: None,
             user: None,
             asset: None,
+            amount: None,
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+        }
+    }
+}
+
+/// A sponsored net-credit claim. Deliberately thin: everything the transaction depends on — the
+/// contract, the amount, the proof — is resolved from core, so the caller can only name *which*
+/// claim to submit, not what it does.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimRequest {
+    /// CAIP-2 network. Omitted uses the facilitator's default (first configured) network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// The cycle as core names it — either the text id or the 0x-prefixed on-chain hash.
+    pub cycle_id: String,
+    pub creditor: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimVerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+    /// Stable code so clients branch on this rather than parsing `invalidReason`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+impl ClaimVerifyResponse {
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            invalid_reason: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn invalid(error: &ClaimError) -> Self {
+        Self {
+            is_valid: false,
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// Echoed back so a caller can reconcile without re-parsing its own request. The payout always
+    /// goes to `creditor` — the relayer cannot redirect it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creditor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cycle_id: Option<String>,
+    /// The committed net credit, as core proved it. In a Shortfall cycle the on-chain payout can
+    /// be a pro-rata fraction of this.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
+/// A sponsored net-debit payment. The caller names the cycle and supplies the debtor's
+/// authorization; the contract, the amount and the proof are resolved from core, and the
+/// authorization's signature binds the receiver/spender, the amount and (as its nonce) the
+/// cycle — so the caller can only decide *whether* this debit is paid, never what it pays or to
+/// whom.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayRequest {
+    /// CAIP-2 network. Omitted uses the facilitator's default (first configured) network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// The cycle as core names it — either the text id or the 0x-prefixed on-chain hash.
+    pub cycle_id: String,
+    /// `eip3009` (default) or `permit2`, matching the deposit endpoint. Optional — the
+    /// authorization field that is present already identifies the scheme — but a mismatch is
+    /// rejected rather than silently ignored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_transfer_method: Option<String>,
+    /// EIP-3009 `receiveWithAuthorization`. Exactly one of this and `permit2Authorization` must
+    /// be present. The debtor is the authorization's `from`; there is no separate field to
+    /// disagree with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization: Option<ReceiveAuthorization>,
+    /// Permit2 `PermitTransferFrom`, for tokens without EIP-3009. Requires the debtor to have made
+    /// a one-time on-chain `approve(PERMIT2, ...)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permit2_authorization: Option<Permit2Authorization>,
+    /// Optional EIP-2612 permit granting Permit2 its allowance, so the debtor never needs gas.
+    /// Only meaningful alongside `permit2Authorization`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eip2612_permit: Option<Eip2612PermitRequest>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayVerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+    /// Stable code so clients branch on this rather than parsing `invalidReason`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+}
+
+impl PayVerifyResponse {
+    pub fn valid() -> Self {
+        Self {
+            is_valid: true,
+            invalid_reason: None,
+            error_code: None,
+            retryable: None,
+            permit2_allowance: None,
+        }
+    }
+
+    pub fn invalid(error: &PayError) -> Self {
+        Self {
+            is_valid: false,
+            invalid_reason: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_pay_error(error),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PayResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    /// Echoed back so a caller can reconcile without re-parsing its own request. The funds always
+    /// come from `debtor` — the signer — and go into the cycle's escrow.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debtor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cycle_id: Option<String>,
+    /// The committed net debit, as core proved it and the debtor signed it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// See [`WithdrawVerifyResponse::retryable`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+}
+
+impl PayResponse {
+    pub fn success(tx_hash: B256, network: &str, terms: &PayTerms) -> Self {
+        Self {
+            success: true,
+            tx_hash: Some(format!("{tx_hash:#x}")),
+            network: Some(network.to_string()),
+            debtor: Some(format!("{:#x}", terms.debtor)),
+            cycle_id: Some(format!("{:#x}", terms.cycle_id)),
+            amount: Some(terms.amount.to_string()),
+            error: None,
+            error_code: None,
+            retryable: None,
+            permit2_allowance: None,
+        }
+    }
+
+    pub fn failure(error: &PayError) -> Self {
+        Self {
+            success: false,
+            tx_hash: None,
+            network: None,
+            debtor: None,
+            cycle_id: None,
+            amount: None,
+            error: Some(error.to_string()),
+            error_code: Some(error.code().to_string()),
+            retryable: Some(error.is_retryable()),
+            permit2_allowance: Permit2AllowanceResponse::from_pay_error(error),
+        }
+    }
+}
+
+impl ClaimResponse {
+    pub fn success(tx_hash: B256, network: &str, terms: &ClaimTerms) -> Self {
+        Self {
+            success: true,
+            tx_hash: Some(format!("{tx_hash:#x}")),
+            network: Some(network.to_string()),
+            creditor: Some(format!("{:#x}", terms.creditor)),
+            cycle_id: Some(format!("{:#x}", terms.cycle_id)),
+            amount: Some(terms.amount.to_string()),
+            error: None,
+            error_code: None,
+            retryable: None,
+        }
+    }
+
+    pub fn failure(error: &ClaimError) -> Self {
+        Self {
+            success: false,
+            tx_hash: None,
+            network: None,
+            creditor: None,
+            cycle_id: None,
             amount: None,
             error: Some(error.to_string()),
             error_code: Some(error.code().to_string()),

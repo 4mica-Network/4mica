@@ -1,4 +1,5 @@
 mod auth;
+mod clearing;
 mod config;
 mod deposit;
 mod exact;
@@ -15,13 +16,14 @@ use std::sync::Arc;
 use anyhow::Context;
 
 use crate::auth::AuthSession;
+use crate::clearing::ClearingActions;
 use crate::config::{ServiceConfig, load_public_params};
 use crate::exact::ExactService;
 use crate::exact::try_from_env as build_exact_service;
 use crate::issuer::{GuaranteeIssuer, LiveGuaranteeIssuer};
 use crate::limits::SponsorGuard;
 use crate::relayer::Relayer;
-use crate::server::state::{AppState, FourMicaHandler};
+use crate::server::state::{AppState, FourMicaHandler, SponsorGuards};
 use crate::verifier::{CertificateValidator, CertificateVerifier};
 use tracing::{info, warn};
 
@@ -36,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
         ServiceConfig::from_env().context("failed to load facilitator configuration")?;
     let mut four_mica_handlers = Vec::new();
     let mut relayers: Vec<Relayer> = Vec::new();
+    let mut clearing_actions: Vec<(String, Arc<ClearingActions>)> = Vec::new();
     for network in service_cfg.networks.iter() {
         let auth_cfg = &network.auth;
         let auth_session = Some(Arc::new(
@@ -87,6 +90,14 @@ async fn main() -> anyhow::Result<()> {
             relayers.push(relayer);
         }
 
+        clearing_actions.push((
+            network.id.clone(),
+            Arc::new(ClearingActions::new(
+                network.core_api_base_url.clone(),
+                auth_session.clone(),
+            )),
+        ));
+
         four_mica_handlers.push(FourMicaHandler::new(
             service_cfg.scheme.clone(),
             network.id.clone(),
@@ -98,8 +109,12 @@ async fn main() -> anyhow::Result<()> {
 
     let deposit_guard = SponsorGuard::new(service_cfg.deposit_limits.clone());
     let withdraw_guard = SponsorGuard::new(service_cfg.withdraw_limits.clone());
+    let claim_guard = SponsorGuard::new(service_cfg.claim_limits.clone());
+    let pay_guard = SponsorGuard::new(service_cfg.pay_limits.clone());
     log_sponsor_limits("deposit", &deposit_guard, relayers.is_empty());
     log_sponsor_limits("withdraw", &withdraw_guard, relayers.is_empty());
+    log_sponsor_limits("claim", &claim_guard, relayers.is_empty());
+    log_sponsor_limits("pay", &pay_guard, relayers.is_empty());
 
     let exact_service: Option<Arc<dyn ExactService>> = build_exact_service().await?;
 
@@ -107,8 +122,13 @@ async fn main() -> anyhow::Result<()> {
         four_mica_handlers,
         exact_service,
         relayers,
-        deposit_guard,
-        withdraw_guard,
+        clearing_actions,
+        SponsorGuards {
+            deposit: deposit_guard,
+            withdraw: withdraw_guard,
+            claim: claim_guard,
+            pay: pay_guard,
+        },
     );
 
     server::run(service_cfg, state).await
