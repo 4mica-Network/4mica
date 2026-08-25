@@ -1,0 +1,26 @@
+{
+  "name": "@4mica/x402-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "tsx src/server.ts",
+    "client": "tsx src/client.ts",
+    "deposit": "tsx src/deposit.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "@4mica/sdk": "catalog:",
+    "@4mica/x402": "workspace:*",
+    "@x402/fetch": "catalog:",
+    "dotenv": "catalog:",
+    "express": "catalog:",
+    "viem": "catalog:"
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

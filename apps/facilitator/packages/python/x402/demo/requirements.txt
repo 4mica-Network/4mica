@@ -1,0 +1,11 @@
+# Local package (installs fourmica_x402 from repo)
+-e ..[all]
+
+# Demo runtime deps (requires Python >= 3.10)
+fastapi[standard]>=0.115.0
+uvicorn>=0.27.0
+python-dotenv>=1.0.0
+# x402 isn't published on PyPI for Python 3.9; use local checkout instead:
+-e /Users/maironmahzoun/x402/python/x402
+sdk-4mica>=0.5.1
+requests>=2.32.0
