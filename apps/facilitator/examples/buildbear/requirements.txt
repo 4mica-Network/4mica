@@ -1,0 +1,9 @@
+sdk-4mica[bls]
+fastapi
+uvicorn
+httpx
+langchain-openai
+langgraph
+openai
+python-dotenv
+eth-account

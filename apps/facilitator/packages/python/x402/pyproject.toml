@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "4mica-x402"
+version = "1.2.3"
+description = "Python integration for x402 Payment Protocol with 4mica credit flow"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "4mica" }]
+dependencies = ["x402>=2.14.0", "sdk-4mica>=1.2.4"]
+
+[project.optional-dependencies]
+fastapi = ["fastapi[standard]>=0.115.0", "starlette>=0.27.0"]
+flask = ["flask>=3.0.0"]
+httpx = ["httpx>=0.27.0"]
+requests = ["requests>=2.32.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.5.0", "black>=24.0.0"]
+all = [
+  "fastapi[standard]>=0.115.0",
+  "starlette>=1.0.0",
+  "flask>=3.0.0",
+  "httpx>=0.27.0",
+  "requests>=2.32.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/4mica-Network/x402-4mica"
+Repository = "https://github.com/4mica-Network/x402-4mica"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "B"]
+ignore = ["E203"]
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]

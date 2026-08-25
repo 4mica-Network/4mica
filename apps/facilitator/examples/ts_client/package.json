@@ -1,0 +1,17 @@
+{
+  "name": "ts-client-example",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "ts-node client.ts"
+  },
+  "dependencies": {
+    "dotenv": "catalog:",
+    "sdk-4mica": "0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:node26",
+    "ts-node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

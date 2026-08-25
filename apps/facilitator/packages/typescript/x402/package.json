@@ -1,0 +1,74 @@
+{
+  "name": "@4mica/x402",
+  "version": "1.2.5",
+  "type": "module",
+  "description": "TypeScript x402 utilities for interacting with the 4Mica payment network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4mica-Network/4mica.git",
+    "directory": "apps/facilitator/packages/typescript/x402"
+  },
+  "homepage": "https://github.com/4mica-Network/4mica/tree/main/apps/facilitator/packages/typescript/x402#readme",
+  "bugs": {
+    "url": "https://github.com/4mica-Network/4mica/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./server/express": {
+      "types": "./dist/server/express/index.d.ts",
+      "import": "./dist/server/express/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "lint:write": "biome check --write --diagnostic-level=error .",
+    "fmt": "biome format .",
+    "fmt:write": "biome format --write .",
+    "demo:server": "pnpm --filter @4mica/x402-demo server",
+    "demo:client": "pnpm --filter @4mica/x402-demo client",
+    "demo:dev": "pnpm --filter @4mica/x402-demo dev"
+  },
+  "dependencies": {
+    "@x402/core": "catalog:",
+    "@x402/extensions": "catalog:",
+    "@4mica/sdk": "catalog:",
+    "viem": "catalog:"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:node26",
+    "express": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@x402/paywall": "^2.2.0",
+    "express": "^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@x402/paywall": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,107 @@
+# 4mica-x402 Demo
+
+This demo shows how to use `4mica-x402` to protect an API endpoint with 4mica payments.
+
+## Setup
+
+1. **Install dependencies**
+
+From the `packages/python/x402` directory:
+
+```bash
+python -m pip install -r demo/requirements.txt
+```
+
+If the local x402 path in `demo/requirements.txt` does not match your machine,
+update the `-e /path/to/x402` line.
+
+2. **Configure environment variables**
+
+Copy the example file and edit it:
+
+```bash
+cp demo/.env.example demo/.env
+# Edit demo/.env with your private key and settings
+```
+
+Required variables:
+- `PRIVATE_KEY`: Your Ethereum private key (with 0x prefix) for Sepolia testnet
+- `PAY_TO_ADDRESS`: Address that will receive payments
+
+## Running the Demo
+
+### Terminal 1: Start the server
+
+From the demo directory:
+
+```bash
+cd demo
+uvicorn server:app --host 0.0.0.0 --port 3000
+```
+
+You should see:
+```
+x402 Demo Server running on http://localhost:3000
+Protected endpoint: http://localhost:3000/api/premium-data
+Payment required: $0.01 (4mica credit on Sepolia)
+```
+
+### Terminal 2: Run the client
+
+The client will automatically load environment variables from `.env`:
+
+```bash
+cd demo
+python client.py
+```
+
+You can also set PRIVATE_KEY inline:
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey python client.py
+```
+
+## What Happens
+
+1. **Server** starts with one protected endpoint: `GET /api/premium-data`
+   - Requires a payment of $0.01 in 4mica credits on Sepolia
+   - Uses x402 payment protocol
+
+2. **Client** makes a request to the protected endpoint:
+   - First receives `402 Payment Required` response
+   - Automatically opens a payment tab via the 4mica facilitator
+   - Signs and submits the payment
+   - Retries the request with payment proof
+   - Receives the protected data
+
+3. **Payment Flow**
+   ```
+   Client → GET /api/premium-data
+          ← 402 Payment Required (with payment requirements)
+
+   Client → POST /payment/tab (open payment tab)
+          ← 200 OK (tab details)
+
+   Client → Signs payment guarantee (via 4mica SDK)
+
+   Client → GET /api/premium-data (with payment proof)
+          ← 200 OK (protected data)
+   ```
+
+## Testing Without Running the Client
+
+You can also test the server manually using curl:
+
+```bash
+# Check server status
+curl http://localhost:3000/
+
+# Try to access protected endpoint (will return 402)
+curl -v http://localhost:3000/api/premium-data
+```
+
+## Notes
+
+- Make sure your account has sufficient balance on Sepolia testnet
+- The demo uses the default 4mica facilitator configuration
+- Tab TTL is set to 1 hour (3600 seconds)
