@@ -27,8 +27,6 @@ export default async function BlogPostPage({ params }: RouteParams) {
     notFound();
   }
 
-  // Every slug is pre-generated above, so this template-literal import resolves
-  // to a build-time module graph — no runtime module loading in the export.
   const { default: Post } = await import(`@/content/blog/${slug}.mdx`);
 
   return (

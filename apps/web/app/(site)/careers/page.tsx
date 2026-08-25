@@ -20,7 +20,6 @@ export default function CareersPage() {
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">
-          {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">{messages.careers.kicker}</p>
             <h1 className="section-title font-normal">
@@ -31,7 +30,6 @@ export default function CareersPage() {
             </p>
           </div>
 
-          {/* Ways to get involved — connected block */}
           <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
             <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
               {GET_INVOLVED.map((item) => (
@@ -56,7 +54,6 @@ export default function CareersPage() {
             </div>
           </div>
 
-          {/* Our values */}
           <div className="mt-40">
             <div className="mx-auto max-w-2xl text-center">
               <p className="section-kicker">{messages.careers.valuesKicker}</p>
@@ -93,8 +90,6 @@ export default function CareersPage() {
             </div>
           </div>
 
-          {/* Perks & benefits — split header. Deliberately left-aligned to break
-              up the run of centered sections above and below it. */}
           <div className="mt-40">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="max-w-xl">
@@ -128,10 +123,8 @@ export default function CareersPage() {
             </div>
           </div>
 
-          {/* Life at 4Mica */}
           <LifeAt4Mica />
 
-          {/* CTA */}
           <div className="mt-40 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
               {messages.careers.ctaTitle}

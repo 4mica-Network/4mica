@@ -8,6 +8,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["index.ts", "components", "lib", "stories", ".storybook"],
+  "include": ["index.ts", "components", "lib", "stories", ".storybook/**/*"],
   "exclude": ["dist", "storybook-static", "node_modules"]
 }

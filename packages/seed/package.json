@@ -1,0 +1,31 @@
+{
+  "name": "@4mica/seed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Development seed data for the 4Mica Postgres database.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "seed": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .turbo"
+  },
+  "dependencies": {
+    "@4mica/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "dotenv": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

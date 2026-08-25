@@ -7,8 +7,6 @@ import { teamMembers } from "./data";
 type Member = (typeof teamMembers)[number];
 
 function TeamMemberCard({ member }: { member: Member }) {
-  // Drive the cursor spotlight via CSS custom properties on the ref instead of
-  // React state, so pointer movement causes no re-render of the card.
   const spotRef = useRef<HTMLDivElement | null>(null);
 
   const handleMove = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -33,9 +31,7 @@ function TeamMemberCard({ member }: { member: Member }) {
 
   return (
     <div className="flex w-44 flex-col items-center text-center">
-      {/* Capsule image with spotlight */}
       <div className="relative">
-        {/* Ambient glow behind the capsule */}
         <div
           className="pointer-events-none absolute -inset-5 -z-10 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover/card:opacity-100"
           style={{
@@ -58,7 +54,6 @@ function TeamMemberCard({ member }: { member: Member }) {
             className="object-cover grayscale transition duration-500 ease-out group-hover/card:grayscale-0"
             style={{ objectPosition: member.imagePosition ?? "50% 20%" }}
           />
-          {/* Cursor-following spotlight (position driven via CSS vars on ref) */}
           <div
             ref={spotRef}
             className="pointer-events-none absolute inset-0 transition-opacity duration-300"

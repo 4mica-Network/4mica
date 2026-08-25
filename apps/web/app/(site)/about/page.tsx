@@ -21,7 +21,6 @@ export default function AboutPage() {
       <Header />
       <div className="pt-64 pb-20">
         <section className="w-full">
-          {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">{messages.about.kicker}</p>
             <h1 className="section-title font-normal">
@@ -29,12 +28,9 @@ export default function AboutPage() {
             </h1>
           </div>
 
-          {/* Mission + highlights + company info — one connected block */}
           <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
             <div className="flex flex-col divide-y divide-overlay/10">
-              {/* Mission card */}
               <div className="group relative overflow-hidden bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-12">
-                {/* Decorative glow */}
                 <div
                   className="pointer-events-none absolute -top-24 -right-20 h-72 w-72 rounded-full blur-3xl transition-opacity duration-500 group-hover:opacity-80"
                   style={{
@@ -60,7 +56,6 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              {/* Highlights */}
               <div className="grid sm:grid-cols-2">
                 {highlights.map((highlight, i) => (
                   <div
@@ -87,7 +82,6 @@ export default function AboutPage() {
                 ))}
               </div>
 
-              {/* Company info */}
               <div className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
@@ -116,10 +110,8 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* Roadmap */}
           <TimelineSection />
 
-          {/* Founders */}
           {ceo && cto && (
             <div className="mt-24">
               <div className="mx-auto max-w-2xl text-center">
@@ -189,7 +181,6 @@ export default function AboutPage() {
             </div>
           )}
 
-          {/* Careers CTA */}
           <div className="mt-24 text-center">
             <h2 className="mx-auto max-w-2xl font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
               {messages.about.careersTitle}

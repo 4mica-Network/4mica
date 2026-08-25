@@ -71,6 +71,92 @@ const buildRoutes = () =>
     logo: "/assets/logo_transparent.png",
   }) as const;
 
+/**
+ * Root path segments that can never be a username.
+ *
+ * Public profiles are served bare (`4mica.io/<username>`) from the same apex
+ * domain as the marketing site, so every segment the marketing site owns has to
+ * be excluded from the handle namespace. The list is derived from `routes` so it
+ * cannot drift, plus the pages that exist only as files under `apps/web/app`.
+ *
+ * `apps/playground/nginx.conf` encodes the same list as proxy rules, and
+ * `apps/playground/src/main.test.ts` asserts the two stay in sync.
+ */
+export const reservedSegments: ReadonlySet<string> = new Set([
+  ...Object.values(buildRoutes())
+    .filter((route) => route.startsWith("/") && route !== "/")
+    .map((route) => route.slice(1).split("/")[0]),
+  // apps/web pages that have no entry in `routes`
+  "careers",
+  "dpa",
+  "legal",
+  "pricing",
+  "solution",
+  "solutions",
+  // auth and playground literals
+  "api",
+  "docs",
+  "sign-in",
+  "sign-up",
+  "sso-callback",
+  "status",
+  "waitlist",
+  // framework and static assets
+  "_next",
+  "assets",
+  "favicon.ico",
+  "icon.png",
+  "llms.txt",
+  "manifest.webmanifest",
+  "og",
+  "p",
+  "robots.txt",
+  "sitemap.xml",
+]);
+
+/** True when `segment` is claimable as a public profile handle. */
+export const isReservedSegment = (segment: string): boolean =>
+  reservedSegments.has(segment.toLowerCase());
+
+/**
+ * The handle character class and bounds.
+ *
+ * This lives beside `reservedSegments` because the two are one rule: what may
+ * become a public profile handle. It used to be copied into
+ * apps/be/src/controllers/me/schema.ts and apps/playground/src/schema/params.ts
+ * with a "must never diverge" comment on the copy; the dashboard needing a
+ * client-side check made a third copy the breaking point.
+ */
+export const USERNAME_PATTERN = /^[a-z0-9_-]+$/;
+export const USERNAME_MIN_LENGTH = 2;
+export const USERNAME_MAX_LENGTH = 64;
+
+export const USERNAME_MESSAGE =
+  "username may only contain lowercase letters, numbers, - and _";
+
+/** Format only — says nothing about whether the handle is free or reserved. */
+export const isValidUsername = (value: string): boolean =>
+  value.length >= USERNAME_MIN_LENGTH &&
+  value.length <= USERNAME_MAX_LENGTH &&
+  USERNAME_PATTERN.test(value);
+
+/**
+ * The shape `generateUsername()` in apps/be mints for every new account:
+ * `user-` plus 8 characters of Crockford base32 minus i/l/o/u. Callers use this
+ * to tell "the system picked this" from "the person picked this" — the
+ * onboarding wizard will not let a generated handle count as a chosen one.
+ */
+export const GENERATED_USERNAME_PREFIX = "user-";
+export const GENERATED_USERNAME_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
+export const GENERATED_USERNAME_SUFFIX_LENGTH = 8;
+
+const GENERATED_USERNAME_PATTERN = new RegExp(
+  `^${GENERATED_USERNAME_PREFIX}[${GENERATED_USERNAME_ALPHABET}]{${GENERATED_USERNAME_SUFFIX_LENGTH}}$`,
+);
+
+export const isGeneratedUsername = (value: string): boolean =>
+  GENERATED_USERNAME_PATTERN.test(value);
+
 const buildLinks = ({ base, appBase, root }: Bases) => {
   const routes = buildRoutes();
 
@@ -79,6 +165,8 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     website: base,
     root,
     app: appBase,
+    /** The canonical public profile URL. Bare handle, no `@` prefix. */
+    profile: (username: string) => `${base}/${username}`,
     signin: `${appBase}/sign-in`,
     signup: `${appBase}/sign-up`,
     waitlist: `${appBase}/waitlist`,

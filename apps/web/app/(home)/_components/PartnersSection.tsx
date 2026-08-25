@@ -18,8 +18,6 @@ const arrowNudge: Variants = {
 };
 
 export default function PartnersSection() {
-  // Pause the SMIL orbit + blur filter (an always-running, continuously
-  // recomposited animation) whenever the ecosystem mark is scrolled out of view.
   const orbitRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -48,8 +46,6 @@ export default function PartnersSection() {
       />
       <div className="mx-auto w-full max-w-300">
         <div className="mb-16 w-full overflow-hidden">
-          {/* Ecosystem header lives inside the card so the border wraps it and
-              it blends into the primitives grid below (matches DocsCallout). */}
           <div className="border-overlay/10 border-b px-6 py-10 text-center sm:px-8">
             <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
               <svg
@@ -191,7 +187,6 @@ export default function PartnersSection() {
             })}
           </div>
 
-          {/* Trust points */}
           <div className="grid w-full grid-cols-1 sm:grid-cols-3">
             {TRUST_POINTS.map((t) => (
               <div
@@ -213,7 +208,6 @@ export default function PartnersSection() {
             ))}
           </div>
 
-          {/* Partner logos */}
           <div className="border-overlay/10 border-t px-6 py-8 pb-0 text-left sm:px-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>

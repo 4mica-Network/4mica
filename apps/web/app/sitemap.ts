@@ -12,8 +12,6 @@ const toAbsoluteUrl = (path: string) =>
 
 type Entry = MetadataRoute.Sitemap[number];
 
-// Crawl priority by page type. Marketing and product pages lead; legal pages
-// are indexable but should not compete with them for crawl budget.
 const RANK: { match: (path: string) => boolean; hints: Partial<Entry> }[] = [
   {
     match: (path) => path === "/",
@@ -54,8 +52,6 @@ const hintsFor = (path: string): Partial<Entry> =>
 export default function sitemap(): MetadataRoute.Sitemap {
   const buildDate = new Date();
 
-  // Blog posts carry their own publish date instead of the build timestamp, so
-  // an unrelated deploy does not tell crawlers every post just changed.
   const postDates = new Map(
     getAllBlogPosts().map((post) => [
       `/blog/${post.slug}`,

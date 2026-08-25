@@ -15,4 +15,5 @@ node_modules
 **/.env.*
 !.env.example
 **/tsconfig.tsbuildinfo
+packages/db/src/generated
 .DS_Store

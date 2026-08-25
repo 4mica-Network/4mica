@@ -3,19 +3,12 @@ import type { BlogPostMeta } from "@lib/blogMeta";
 import { messages } from "@/i18n";
 import { SITE_NAME } from "./shared";
 
-/**
- * JSON-LD builders. Structured data is rendered by `components/JsonLd.tsx`;
- * every builder returns a plain object so it can be serialized at build time
- * (the site is a static export — nothing here runs in the browser).
- */
-
 const absolute = (path: string) =>
   path === "/" ? links.website : new URL(path, links.website).toString();
 
 const ORGANIZATION_ID = `${links.website}/#organization`;
 const WEBSITE_ID = `${links.website}/#website`;
 
-/** Publisher identity — reused by every other node via `@id`. */
 export const organizationSchema = () => ({
   "@type": "Organization",
   "@id": ORGANIZATION_ID,
@@ -45,7 +38,6 @@ export const websiteSchema = () => ({
   inLanguage: "en",
 });
 
-/** Home page: Organization + WebSite + the FAQ block rendered on the page. */
 export const homeSchema = () => ({
   "@context": "https://schema.org",
   "@graph": [
@@ -63,10 +55,6 @@ export const homeSchema = () => ({
   ],
 });
 
-/**
- * A plain content page: publisher identity plus the trail that leads to it.
- * `extra` carries page-specific nodes (an FAQ block, a service, …).
- */
 export const pageSchema = (
   trail: { name: string; path: string }[],
   extra: object[] = [],
@@ -80,7 +68,6 @@ export const pageSchema = (
   ],
 });
 
-/** An FAQ block rendered on a page, keyed to that page. */
 export const faqSchema = (
   path: string,
   faqs: readonly { question: string; answer: string }[],
@@ -94,7 +81,6 @@ export const faqSchema = (
   })),
 });
 
-/** The blog index: the Blog itself plus the posts it lists. */
 export const blogListSchema = (posts: BlogPostMeta[]) =>
   pageSchema(
     [{ name: "Blog", path: "/blog" }],
@@ -119,7 +105,6 @@ export const blogListSchema = (posts: BlogPostMeta[]) =>
     ],
   );
 
-/** A blog post: BlogPosting + the breadcrumb trail that leads to it. */
 export const blogPostSchema = (post: BlogPostMeta) => {
   const url = absolute(`/blog/${post.slug}`);
 
@@ -150,7 +135,6 @@ export const blogPostSchema = (post: BlogPostMeta) => {
   };
 };
 
-/** Breadcrumb trail, always rooted at the home page. */
 export const breadcrumbSchema = (trail: { name: string; path: string }[]) => ({
   "@type": "BreadcrumbList",
   itemListElement: [{ name: "Home", path: "/" }, ...trail].map(
@@ -163,7 +147,6 @@ export const breadcrumbSchema = (trail: { name: string; path: string }[]) => ({
   ),
 });
 
-/** A solution page: the service 4Mica offers for that audience. */
 export const solutionSchema = (solution: {
   slug: string;
   label: string;

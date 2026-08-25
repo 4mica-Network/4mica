@@ -157,6 +157,25 @@
     letter-spacing: -0.02em;
     color: rgb(var(--ink-strong));
   }
+
+  /*
+   * Tailwind v4's preflight dropped the `cursor: pointer` v3 gave buttons, so a
+   * <button> hovers with an arrow while an <a href> next to it shows a hand.
+   * Put it back for everything that is actually clickable — the `.btn` class
+   * already does this, but plenty of controls are bare buttons.
+   */
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 @layer components {
@@ -694,6 +713,15 @@
     color: #f4c28b;
   }
 
+  /* Shiki ships a single dark theme (Vesper) with no light counterpart, so a
+     code frame keeps its own dark ground in both themes. Following the page
+     theme would put near-black tokens on a white surface in light mode.
+     These are literals rather than tokens for exactly that reason. */
+  .code-surface {
+    background-color: rgb(16 16 16);
+    color: rgb(216 216 216);
+  }
+
   /* Shiki (Vesper theme) — strip the theme's own chrome so the panel's
      black surface and font stack show through, keep only token colors. */
   .shiki-code .shiki {
@@ -724,6 +752,13 @@
     font-size: 10px;
     color: rgb(var(--ink-subtle) / 0.6);
     user-select: none;
+  }
+
+  /* Gutter numbers inside a pinned-dark frame cannot use the theme-aware ink
+     token above — in light mode it resolves to a dark slate and disappears
+     against the frame. Fixed white alpha instead. */
+  .code-surface .shiki-numbered .shiki .line::before {
+    color: rgb(255 255 255 / 0.35);
   }
 
   /* MDX article body (blog posts). Element-level rules live here rather than

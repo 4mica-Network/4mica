@@ -15,9 +15,6 @@ export const metadata = metaFor("/pricing");
 
 const content = messages.pricing;
 
-// A single rhythm for the gap between sections, so every subject change gets
-// the same pause. Scales with the viewport: tight on phones, generous on
-// desktop where the eye has further to travel.
 const SECTION_GAP = "mt-28 sm:mt-36 lg:mt-44";
 
 function SectionHeader({
@@ -54,15 +51,10 @@ function SectionHeader({
   );
 }
 
-// The one thing a reader comes to this page for is the number, so it goes
-// above the fold with nothing competing for attention. No SECTION_GAP here —
-// the hero sits directly under the header.
 function PricingHero() {
   return (
     <section className="mx-auto max-w-3xl pt-10 text-center sm:pt-14 lg:pt-16">
       <p className="section-kicker">{content.kicker}</p>
-      {/* Hero scale, not section scale: font-sans and larger than the
-          section-title h2s below, matching the home page hero. */}
       <h1 className="mt-4 font-sans text-4xl text-ink-strong leading-tight tracking-tight sm:text-5xl lg:text-6xl">
         {content.title}
       </h1>
@@ -319,7 +311,6 @@ function FacilitatorSavings() {
                 key={point.title}
                 className="group relative flex gap-4 p-6 transition-colors duration-500 hover:bg-overlay/[0.018]"
               >
-                {/* <ShinyHoverBorder radiusClass="rounded-none" /> */}
                 <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10">
                   <i className={`${point.icon} text-2xl`} />
                 </div>
@@ -452,8 +443,6 @@ export default function PricingPage() {
       <Header />
       <div className="pt-18 pb-32">
         <section className="w-full">
-          {/* Problem → outcome → explanation → proof → action: the price and
-              the model land before the netting example argues for them. */}
           <PricingHero />
           <PricingModel />
           <FeeBreakdown />
