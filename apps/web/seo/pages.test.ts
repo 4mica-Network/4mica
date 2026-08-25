@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { describe, expect, it } from "vitest";
 import { solutionSlugs } from "@/i18n/locales/en/solutions";
+import { getAllBlogPosts } from "@/lib/blog";
 import {
   allPagePaths,
   metadataForSlug,
+  metaForBlogPost,
   metaForSolution,
   pageSlugs,
   pathToSlug,
@@ -69,5 +71,18 @@ describe("seo page registry", () => {
 
   it("returns undefined for an unknown solution", () => {
     expect(metaForSolution("does-not-exist")).toBeUndefined();
+  });
+
+  it("emits an OG slug per blog post and metadata to match", () => {
+    for (const post of getAllBlogPosts()) {
+      expect(generatedSlugs).toContain(`blog-${post.slug}`);
+      expect(metaForBlogPost(post.slug)?.alternates?.canonical).toBe(
+        `/blog/${post.slug}`,
+      );
+    }
+  });
+
+  it("returns undefined for an unknown blog post", () => {
+    expect(metaForBlogPost("does-not-exist")).toBeUndefined();
   });
 });

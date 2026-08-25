@@ -1,6 +1,9 @@
 import { links } from "@4mica/url";
 import { messages } from "@/i18n";
-import { solutions } from "../../app/solutions/data";
+import {
+  customerSolutions,
+  useCaseSolutions,
+} from "../../app/(site)/solutions/data";
 
 export type NavLinkItem = {
   title: string;
@@ -20,22 +23,40 @@ export type NavItem = {
   href?: string;
   external?: boolean;
   children?: NavSection[];
+  /** Large-screen placement of the dropdown panel. Defaults to "center". */
+  align?: "center" | "left";
 };
 
-const solutionItems: NavLinkItem[] = solutions.map((solution) => ({
+const toNavItem = (solution: {
+  slug: string;
+  label: string;
+  description: string;
+  icon: string;
+}): NavLinkItem => ({
   title: solution.label,
   href: `/solutions/${solution.slug}`,
   description: solution.description,
   icon: solution.icon,
-}));
+});
+
+// Audience pages come first: facilitators are the primary customer.
+const customerItems: NavLinkItem[] = customerSolutions.map(toNavItem);
+const useCaseItems: NavLinkItem[] = useCaseSolutions.map(toNavItem);
 
 export const NAV_ITEMS: NavItem[] = [
   {
     label: messages.navigation.solutions,
+    // Leftmost, widest panel: anchor to the trigger's left edge so it opens
+    // rightward instead of spilling off to the left when centered.
+    align: "left",
     children: [
       {
+        title: messages.navigation.byCustomer,
+        items: customerItems,
+      },
+      {
         title: messages.navigation.byUseCase,
-        items: solutionItems,
+        items: useCaseItems,
       },
     ],
   },
@@ -71,6 +92,12 @@ export const NAV_ITEMS: NavItem[] = [
             description: messages.navigation.librariesAndSdksDescription,
             icon: "ri-terminal-box-line",
             external: true,
+          },
+          {
+            title: messages.navigation.blog,
+            href: links.blog,
+            description: messages.navigation.blogDescription,
+            icon: "ri-article-line",
           },
         ],
       },

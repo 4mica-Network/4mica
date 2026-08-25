@@ -3,15 +3,16 @@ import type { PageSeo } from "./shared";
 
 export const LEADERSHIP_SEO: PageSeo = {
   path: links.team,
-  title: "Team | 4Mica",
+  title: "Team | The People Building 4Mica",
   description:
-    "Meet the 4Mica team building production-grade credit rails for AI agents, APIs, and web3 commerce.",
+    "Meet the cryptographers and payments engineers building 4Mica's x402 credit and clearing layer for agentic payments, API payments, and stablecoin settlement.",
   keywords: [
     "4Mica team",
     "4Mica leadership",
-    "web3 payments team",
-    "AI agent infrastructure",
+    "agentic payments team",
+    "settlement infrastructure",
+    "x402",
     "cryptography founders",
   ],
-  imageAlt: "4Mica leadership team",
+  imageAlt: "The 4Mica team building x402 settlement infrastructure",
 };

@@ -1,0 +1,96 @@
+---
+title: How 4Mica works
+description: A walkthrough of the x402 credit and clearing layer — how an agent gets credit, how requests clear off-chain, and how a cycle settles net on-chain.
+date: 2026-07-15
+author: Mairon Mahzoun
+authorAvatar: /assets/mairon.jpg
+authorRole: CTO & Co-Founder
+category: Engineering
+tags: [x402, credit, settlement]
+thumbnail: /blog/how-4mica-works/hero.svg
+thumbnailAlt: Abstract impasto painting in cyan, violet, and lime
+keywords: [x402 credit layer, agentic payments, payment clearing, settlement infrastructure]
+---
+
+Agents make a lot of very small requests. Paying for each of them on-chain is
+slow and expensive, and pre-funding every counterparty locks up capital that
+could be doing something useful. 4Mica sits between the two: agents pay on
+credit, requests clear instantly, and the resulting balance settles on-chain
+once per cycle.
+
+## Giving an agent credit
+
+Credit comes from one collateral position, not from a balance per counterparty.
+The client registers the `4mica-credit` scheme once and keeps using the same
+`fetch` it already had — every paid request is then signed against that credit.
+
+```typescript
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+// Every request is now credit-based — no gas, no chain round trip.
+const response = await fetchWithPayment("https://api.example.com/data");
+```
+
+## Authorizing a request
+
+On the server side the middleware advertises a price per route. When a request
+arrives, the payer signs a guarantee for that amount, the facilitator submits it
+to Core, and Core verifies the signature and available collateral before
+returning a BLS certificate — one round trip, no chain write.
+
+```typescript
+import { FourMicaEvmScheme } from "@4mica/x402/server";
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /data": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.01",
+          network: "eip155:84532",
+          payTo: "0xYourAddress",
+        },
+      },
+    },
+    { advertisedEndpoint: "https://api.example.com/x402" },
+  ),
+);
+```
+
+Because authorization is a signature check against available collateral rather
+than a transfer, it stays fast even when an agent is issuing thousands of calls
+a minute.
+
+![The 4Mica request flow: agent, facilitator, and settlement](/blog/how-4mica-works/flow.svg)
+
+## Settling the clearing cycle
+
+Payable guarantees accumulate into a clearing cycle. The cycle closes, computes
+net positions per counterparty, and commits only those net positions on-chain.
+Forty outgoing and twenty-seven incoming guarantees become a single net debit of
+thirteen — one movement instead of sixty-seven.
+
+Netting changes settlement movement, not payment history. Every guarantee and
+certificate behind a net position stays on record, so a settled figure can
+always be expanded back into the individual charges that produced it.
+
+## What it means for integrations
+
+The practical shape of an integration is small. Clients keep their HTTP client
+and add a scheme; services keep their routes and add a middleware. There is no
+new wallet to manage per counterparty, no contract to deploy, and no separate
+reconciliation pipeline to build — the credit layer is doing that work.
+
+If you want the full API surface, the [documentation](https://docs.4mica.io)
+covers the client and server SDKs in both TypeScript and Python.
