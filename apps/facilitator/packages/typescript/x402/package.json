@@ -6,12 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/4mica-Network/facilitator-4mica.git",
-    "directory": "packages/typescript/x402"
+    "url": "https://github.com/4mica-Network/4mica.git",
+    "directory": "apps/facilitator/packages/typescript/x402"
   },
-  "homepage": "https://github.com/4mica-Network/facilitator-4mica/tree/main/packages/typescript/x402#readme",
+  "homepage": "https://github.com/4mica-Network/4mica/tree/main/apps/facilitator/packages/typescript/x402#readme",
   "bugs": {
-    "url": "https://github.com/4mica-Network/facilitator-4mica/issues"
+    "url": "https://github.com/4mica-Network/4mica/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -54,7 +54,7 @@
     "@arethetypeswrong/cli": "catalog:",
     "@biomejs/biome": "catalog:",
     "@types/express": "catalog:",
-    "@types/node": "catalog:",
+    "@types/node": "catalog:node26",
     "express": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

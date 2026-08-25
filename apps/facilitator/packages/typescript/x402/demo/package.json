@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@types/express": "catalog:",
-    "@types/node": "catalog:",
+    "@types/node": "catalog:node26",
     "tsx": "catalog:",
     "typescript": "catalog:"
   }

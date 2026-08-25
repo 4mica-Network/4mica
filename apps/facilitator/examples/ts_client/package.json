@@ -10,7 +10,7 @@
     "sdk-4mica": "0.2.0"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
+    "@types/node": "catalog:node26",
     "ts-node": "catalog:",
     "typescript": "catalog:"
   }
