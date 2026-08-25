@@ -1,11 +1,14 @@
-name: Release image
+name: Facilitator release image
 
 on:
   push:
     branches:
       - main
     tags:
-      - "v*"
+      - "facilitator-v*"
+    paths:
+      - "apps/facilitator/**"
+      - ".github/workflows/facilitator-release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -37,23 +40,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Lowercases the repository name for GHCR and derives tags:
-      # main -> :main, v1.2.3 -> :1.2.3 and :1.2, every build -> :sha-<full sha>
+      # Keeps publishing to the pre-monorepo image name so existing
+      # deployments (compose defaults to facilitator-4mica:latest) keep working.
+      # main -> :main, facilitator-v1.2.3 -> :1.2.3 and :1.2, every build -> :sha-<full sha>
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          images: ${{ env.REGISTRY }}/4mica-network/facilitator-4mica
           tags: |
             type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=match,pattern=facilitator-v(\d+\.\d+\.\d+),group=1
+            type=match,pattern=facilitator-v(\d+\.\d+)\.\d+,group=1
             type=sha,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: apps/facilitator
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
