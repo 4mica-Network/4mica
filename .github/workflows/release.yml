@@ -1,8 +1,5 @@
 name: Release SDK
 
-# Temporarily disabled: SDK publishing requires the NPM_TOKEN secret, which is
-# not configured yet. Runs only via manual dispatch until the token is added;
-# restore the `push` trigger below to re-enable automatic releases on main.
 on:
   workflow_dispatch:
 

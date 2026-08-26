@@ -278,6 +278,7 @@
   "onboarding.username.available": "{{username}} is available",
   "onboarding.username.taken": "{{username}} is already taken",
   "onboarding.username.reserved": "That handle is reserved.",
+  "onboarding.username.blacklisted": "That handle isn't available.",
   "onboarding.username.invalid": "Use 2–64 lowercase letters, numbers, - or _.",
   "onboarding.business.hint": "We need this to settle payouts. You can refine the rest in Settings.",
   "onboarding.business.legalName": "Legal name",

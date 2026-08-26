@@ -1,3 +1,4 @@
+import type { UsernameUnavailability } from "@api/user";
 import actionTypes from "./actionTypes";
 import type { Business, User, UserState } from "./type";
 
@@ -205,13 +206,9 @@ export default function userReducer(
       const payload = action.payload as {
         username: string;
         available: boolean;
-        reason: "taken" | "reserved" | null;
+        reason: UsernameUnavailability | null;
       };
 
-      // The saga is takeLatest, so a stale response is normally cancelled
-      // before it lands. This guard is the one that is actually testable, and
-      // it also covers a response that resolves in the same tick as a newer
-      // request being queued.
       if (payload.username !== state.usernameCheck.value) {
         return state;
       }
@@ -230,8 +227,6 @@ export default function userReducer(
       if (payload.username !== state.usernameCheck.value) {
         return state;
       }
-      // "error" is deliberately not a blocking state — the server write is the
-      // authority, so a rate-limited or flaky probe must not brick the wizard.
       return {
         ...state,
         usernameCheck: { value: payload.username, status: "error" },

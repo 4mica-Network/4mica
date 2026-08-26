@@ -24,7 +24,7 @@ on:
           - prod
 
 concurrency:
-  group: deploy-email-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
   cancel-in-progress: false
 
 jobs:
@@ -47,14 +47,9 @@ jobs:
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/email
           health_container: 4mica-email
-          # EMAIL_DRY_RUN defaults to false under NODE_ENV=production, so the
-          # container fails at boot without a valid re_… RESEND_API_KEY.
-          # EMAIL_BIND_ADDR must stay off 0.0.0.0: the service has no auth of its
-          # own, so reaching it is the authorisation.
+          pre_up: docker network create 4mica-internal 2>/dev/null || true
           env_contents: |
             NODE_ENV=production
-            EMAIL_PORT=${{ vars.EMAIL_PORT || '4100' }}
-            EMAIL_BIND_ADDR=${{ vars.EMAIL_BIND_ADDR || '127.0.0.1' }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
 
             RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}

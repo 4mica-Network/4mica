@@ -26,9 +26,7 @@ on:
           - prod
 
 concurrency:
-  # Shares a server (and the 4mica-edge network) with the web deploy, so this
-  # must not run concurrently with itself.
-  group: deploy-playground-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
   cancel-in-progress: false
 
 jobs:
@@ -43,7 +41,6 @@ jobs:
       - name: Deploy playground with Docker Compose
         uses: ./.github/actions/remote-deploy
         with:
-          # Co-located with apps/web: the edge nginx in this stack fronts both.
           server_host: ${{ secrets.SERVER_HOST }}
           server_user: ${{ vars.SERVER_USER || 'mo' }}
           ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -52,12 +49,7 @@ jobs:
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/playground
           health_container: 4mica-playground
-          # Idempotent: either stack may come up first, and the network is
-          # declared `external: true` in both compose files.
           pre_up: docker network create 4mica-edge 2>/dev/null || true
-          # NEXT_PUBLIC_* are build args inlined by Next; the rest are runtime.
-          # NEXT_PUBLIC_ASSET_PREFIX is required in production — apps/web owns
-          # the bare /_next tree on this origin.
           env_contents: |
             NODE_ENV=production
             PLAYGROUND_PORT=${{ vars.PLAYGROUND_PORT || '8081' }}

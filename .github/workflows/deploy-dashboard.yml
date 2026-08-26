@@ -26,7 +26,7 @@ on:
           - prod
 
 concurrency:
-  group: deploy-dashboard-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
   cancel-in-progress: false
 
 jobs:

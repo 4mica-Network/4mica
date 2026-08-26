@@ -1,9 +1,9 @@
 import {
-  isReservedSegment,
   USERNAME_MAX_LENGTH,
   USERNAME_MESSAGE,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
+  usernameUnavailableReason,
 } from "@4mica/url";
 import * as v from "valibot";
 
@@ -16,9 +16,10 @@ const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
  * `toLowerCase` runs before the pattern so "Ada" normalises to "ada" instead of
  * 400ing — the playground lowercases when it resolves a profile, so a
  * mixed-case handle stored here would be unreachable at its own public URL.
- * The reserved check keeps handles out of the marketing site's namespace;
+ * The availability check keeps handles out of the marketing site's namespace —
  * public profiles are served bare off the same apex domain, so without it a
- * user could claim `pricing` and shadow that page.
+ * user could claim `pricing` and shadow that page — and out of the blacklist,
+ * which bars role and brand names like `admin` or `stripe`.
  */
 const usernameFormatPipe = v.pipe(
   v.string(),
@@ -31,15 +32,18 @@ const usernameFormatPipe = v.pipe(
 
 const usernamePipe = v.pipe(
   usernameFormatPipe,
-  v.check((value) => !isReservedSegment(value), "that username is reserved"),
+  v.check(
+    (value) => usernameUnavailableReason(value) === null,
+    "that username is not available",
+  ),
 );
 
 /**
  * GET /me/username-available — the candidate handle, not an identity.
  *
- * Format only: a reserved handle is well-formed, so the handler answers it as a
- * 200 `{ available: false, reason: "reserved" }` rather than a 400. The client
- * is asking a question, and "no, and here's why" is a valid answer.
+ * Format only: a reserved or blacklisted handle is well-formed, so the handler
+ * answers it as a 200 `{ available: false, reason }` rather than a 400. The
+ * client is asking a question, and "no, and here's why" is a valid answer.
  */
 export const CheckUsernameSchema = v.object({ username: usernameFormatPipe });
 

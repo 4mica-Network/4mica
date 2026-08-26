@@ -109,6 +109,7 @@ export const USERNAME_STATUS = {
   AVAILABLE: "available",
   TAKEN: "taken",
   RESERVED: "reserved",
+  BLACKLISTED: "blacklisted",
   ERROR: "error",
 } as const;
 

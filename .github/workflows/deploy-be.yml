@@ -25,7 +25,7 @@ on:
           - prod
 
 concurrency:
-  group: deploy-be-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
   cancel-in-progress: false
 
 jobs:
@@ -47,10 +47,9 @@ jobs:
           branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') && 'dev' || 'main' }}
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/be
-          # The prod stack has no postgres service — DATABASE_URL points at the
-          # managed instance and the one-shot `migrate` container runs against it.
           compose_file: docker-compose.prod.yml
           health_container: 4mica-be
+          pre_up: docker network create 4mica-internal 2>/dev/null || true
           env_contents: |
             NODE_ENV=production
             BE_PORT=${{ vars.BE_PORT || '4000' }}
@@ -59,6 +58,10 @@ jobs:
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
             CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
+
+            # Reaches apps/email over the 4mica-internal Docker network. Leave
+            # unset to disable sending rather than fail boot.
+            EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}
 
             CLERK_PUBLISHABLE_KEY=${{ vars.CLERK_PUBLISHABLE_KEY }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}

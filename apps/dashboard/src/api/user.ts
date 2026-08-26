@@ -1,4 +1,5 @@
 import { HttpMethod } from "@4mica/http";
+import type { UsernameUnavailableReason } from "@4mica/url";
 import type { Business, User } from "@stores/user/type";
 import { httpClient } from "./client";
 
@@ -31,10 +32,11 @@ export const updateNotifications = (data: Partial<User>) =>
     data,
   });
 
+export type UsernameUnavailability = UsernameUnavailableReason | "taken";
 export interface UsernameAvailability {
   username: string;
   available: boolean;
-  reason: "taken" | "reserved" | null;
+  reason: UsernameUnavailability | null;
 }
 
 export const checkUsernameAvailability = (username: string) =>

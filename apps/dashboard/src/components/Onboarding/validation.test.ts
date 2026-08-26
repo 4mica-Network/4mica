@@ -60,6 +60,14 @@ describe("onboarding username gating", () => {
   it("blocks a handle the server said is unavailable", () => {
     expect(isUsernameValid("ada", "taken")).toBe(false);
     expect(isUsernameValid("ada", "reserved")).toBe(false);
+    expect(isUsernameValid("ada", "blacklisted")).toBe(false);
+  });
+
+  it("rejects reserved and blacklisted handles on shape alone", () => {
+    expect(isUsernameShapeValid("pricing")).toBe(false);
+    expect(isUsernameShapeValid("admin")).toBe(false);
+    expect(isUsernameShapeValid("google")).toBe(false);
+    expect(isUsernameShapeValid("ada")).toBe(true);
   });
 
   it("allows submission once a handle is confirmed free", () => {
@@ -67,8 +75,6 @@ describe("onboarding username gating", () => {
   });
 
   it("still allows submission when the probe itself failed", () => {
-    // The probe is advisory and the write is the authority — a rate-limited or
-    // offline check must not strand the user in the wizard.
     expect(isUsernameValid("ada", "error")).toBe(true);
     expect(isUsernameValid("ada", "idle")).toBe(true);
   });

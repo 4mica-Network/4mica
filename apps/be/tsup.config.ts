@@ -12,7 +12,10 @@ export default defineConfig({
   sourcemap: true,
   minify: false,
   treeshake: true,
-  noExternal: ["@4mica/db", "@4mica/auth", "@4mica/url"],
+  // Workspace packages ship raw TS (their `exports` point at src/), so they
+  // have to be bundled rather than resolved at runtime. axios stays external —
+  // it is a real dependency of @4mica/email-client and of apps/be.
+  noExternal: ["@4mica/db", "@4mica/auth", "@4mica/email-client", "@4mica/url"],
   external: [
     "@prisma/client",
     "@prisma/adapter-pg",

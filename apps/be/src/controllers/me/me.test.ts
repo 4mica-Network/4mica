@@ -279,6 +279,22 @@ describe("account routes", () => {
     await app.close();
   });
 
+  it("PATCH /me/profile refuses a blacklisted handle", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/profile",
+      headers: AUTH,
+      payload: { username: "admin" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].path).toBe("username");
+    expect(update).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   describe("GET /me/username-available", () => {
     /**
      * One `findUnique` mock serves three callers — loadUser (by clerkUserId),
@@ -341,6 +357,26 @@ describe("account routes", () => {
       expect(res.json()).toMatchObject({
         available: false,
         reason: "reserved",
+      });
+      expect(
+        findUnique.mock.calls.some(([args]) => "username" in args.where),
+      ).toBe(false);
+    });
+
+    /**
+     * Distinct from "reserved": `google` is not a route and has no page, so the
+     * blacklist is the only thing stopping it being claimed. It must answer 200
+     * with its own reason, not fall through to the database as available.
+     */
+    it("rejects a blacklisted handle without touching the database", async () => {
+      withUsernameOwner(null);
+
+      const res = await check("google");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        available: false,
+        reason: "blacklisted",
       });
       expect(
         findUnique.mock.calls.some(([args]) => "username" in args.where),

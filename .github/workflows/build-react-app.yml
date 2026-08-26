@@ -3,6 +3,17 @@ name: Deploy 4mica Website
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/ui/**"
+      - "packages/url/**"
+      - "packages/tailwind-config/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - ".github/actions/remote-deploy/**"
+      - ".github/workflows/build-react-app.yml"
   workflow_dispatch:
     inputs:
       environment:
@@ -13,106 +24,32 @@ on:
           - dev
           - prod
 
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
-    env:
-      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: ${{ vars.SERVER_USER || 'mo' }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      REPO_SSH_URL: git@github.com:${{ github.repository }}.git
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Configure SSH
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
-
-      - name: Prepare remote checkout
-        run: |
-          set -euo pipefail
-          if [ "$DEPLOY_ENV" = "dev" ]; then
-            BRANCH="dev"
-          else
-            BRANCH="main"
-          fi
-
-          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" "$BRANCH" "$REPO_SSH_URL" <<'EOF'
-          set -euo pipefail
-          DEPLOY_PATH="$1"
-          BRANCH="$2"
-          REPO_SSH_URL="$3"
-
-          case "$DEPLOY_PATH" in
-            "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
-            "~") DEPLOY_PATH="$HOME" ;;
-          esac
-
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
-          ssh-keygen -F github.com >/dev/null || ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-
-          if [ ! -d "$DEPLOY_PATH/.git" ]; then
-            echo "No git checkout found at $DEPLOY_PATH."
-            if [ -d "$DEPLOY_PATH" ] && [ -n "$(find "$DEPLOY_PATH" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-              BACKUP_PATH="${DEPLOY_PATH}.bootstrap-$(date +%Y%m%d%H%M%S)"
-              echo "Moving existing non-git directory to $BACKUP_PATH."
-              mv "$DEPLOY_PATH" "$BACKUP_PATH"
-            fi
-            echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
-            mkdir -p "$(dirname "$DEPLOY_PATH")"
-            git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
-          fi
-
-          cd "$DEPLOY_PATH"
-          git remote set-url origin "$REPO_SSH_URL"
-          git fetch origin "$BRANCH"
-          git checkout "$BRANCH"
-          git pull --ff-only origin "$BRANCH"
-          EOF
-
-      - name: Write remote web environment
-        run: |
-          set -euo pipefail
-          ssh "$SERVER_USER@$SERVER_HOST" "mkdir -p $DEPLOY_PATH/apps/web"
-          ssh "$SERVER_USER@$SERVER_HOST" "cat > $DEPLOY_PATH/apps/web/.env" <<EOF
-          NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
-          NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
-          WEB_PORT=${{ vars.WEB_PORT || '8080' }}
-          EOF
-          ssh "$SERVER_USER@$SERVER_HOST" "chmod 600 $DEPLOY_PATH/apps/web/.env"
-
-      - name: Deploy web app with Docker Compose
-        run: |
-          set -euo pipefail
-          ssh "$SERVER_USER@$SERVER_HOST" bash -s -- "$DEPLOY_PATH" <<'EOF'
-          set -euo pipefail
-          DEPLOY_PATH="$1"
-
-          case "$DEPLOY_PATH" in
-            "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
-            "~") DEPLOY_PATH="$HOME" ;;
-          esac
-
-          cd "$DEPLOY_PATH/apps/web"
-          # Shared with apps/playground, whose edge nginx fronts both stacks.
-          # Declared `external: true` in each compose file and either may come
-          # up first, so create it here too.
-          docker network create 4mica-edge 2>/dev/null || true
-          docker compose --env-file .env down
-          docker compose --env-file .env up -d --build --remove-orphans
-          docker image prune -f
-          docker compose ps
-          EOF
+      - name: Deploy web with Docker Compose
+        uses: ./.github/actions/remote-deploy
+        with:
+          server_host: ${{ secrets.SERVER_HOST }}
+          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') && 'dev' || 'main' }}
+          repo_ssh_url: git@github.com:${{ github.repository }}.git
+          service_dir: apps/web
+          health_container: 4mica-web
+          pre_up: docker network create 4mica-edge 2>/dev/null || true
+          env_contents: |
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+            WEB_PORT=${{ vars.WEB_PORT || '8080' }}

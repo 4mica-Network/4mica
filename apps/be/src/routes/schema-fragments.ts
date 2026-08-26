@@ -195,7 +195,7 @@ export const usernameAvailabilityResponseSchema = {
     reason: {
       type: "string",
       nullable: true,
-      enum: ["taken", "reserved", null],
+      enum: ["taken", "reserved", "blacklisted", null],
     },
   },
 } as const;
