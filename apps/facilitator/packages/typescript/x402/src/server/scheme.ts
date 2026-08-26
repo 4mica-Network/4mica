@@ -1,7 +1,9 @@
+import { SDK_DEFAULT_ASSET_TRANSFER_METHOD } from '@x402/core/server'
 import type {
   AssetAmount,
   MoneyParser,
   Network,
+  PaymentFlowConfig,
   PaymentRequirements,
   Price,
   SchemeNetworkServer,
@@ -14,6 +16,17 @@ export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532',
  */
 export class FourMicaEvmScheme implements SchemeNetworkServer {
   readonly scheme = '4mica-credit'
+  // The 4mica-credit scheme settles against a tab, not an on-wire asset
+  // transfer, so it only declares the SDK plumbing ATM. `authorization`
+  // (verify before the handler, settle after) mirrors the credit model:
+  // the claim is verified up front and recorded once the resource is served.
+  readonly defaultAssetTransferMethod = SDK_DEFAULT_ASSET_TRANSFER_METHOD
+  readonly paymentFlows: Readonly<Record<string, PaymentFlowConfig>> = {
+    [SDK_DEFAULT_ASSET_TRANSFER_METHOD]: {
+      supported: ['authorization'],
+      default: 'authorization',
+    },
+  }
   private moneyParsers: MoneyParser[] = []
 
   constructor(readonly advertisedTabEndpoint: string) {}
