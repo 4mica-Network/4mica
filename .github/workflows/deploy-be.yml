@@ -36,13 +36,16 @@ jobs:
           service_dir: apps/be
           compose_file: docker-compose.prod.yml
           health_container: 4mica-be
-          pre_up: docker network create 4mica-internal 2>/dev/null || true
+          pre_up: docker network create 4mica-internal 2>/dev/null || true; docker network create 4mica-data 2>/dev/null || true
           env_contents: |
             NODE_ENV=production
             BE_PORT=${{ vars.BE_PORT || '4000' }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
 
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            POSTGRES_USER=${{ vars.POSTGRES_USER || '4mica' }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ vars.POSTGRES_DB || '4mica' }}
+            POSTGRES_PORT=${{ vars.POSTGRES_PORT || '5432' }}
 
             CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
 

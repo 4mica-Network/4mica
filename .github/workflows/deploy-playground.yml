@@ -35,14 +35,16 @@ jobs:
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/playground
           health_container: 4mica-playground
-          pre_up: docker network create 4mica-edge 2>/dev/null || true
+          pre_up: docker network create 4mica-edge 2>/dev/null || true; docker network create 4mica-data 2>/dev/null || true
           env_contents: |
             NODE_ENV=production
             PLAYGROUND_PORT=${{ vars.PLAYGROUND_PORT || '8081' }}
             EDGE_PORT=${{ vars.EDGE_PORT || '8088' }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
 
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            POSTGRES_USER=${{ vars.POSTGRES_USER || '4mica' }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ vars.POSTGRES_DB || '4mica' }}
 
             NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL || 'https://4mica.io' }}
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'https://app.4mica.io' }}
