@@ -1,0 +1,51 @@
+{
+  "name": "@4mica/email",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fastify service rendering React Email templates and sending them through Resend.",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "email:preview": "email dev --dir emails --port 3200",
+    "email:up": "docker network create 4mica-internal 2>/dev/null || true && docker compose up -d --build",
+    "email:down": "docker compose down",
+    "clean": "rm -rf dist logs .turbo .react-email"
+  },
+  "dependencies": {
+    "@4mica/email-client": "workspace:*",
+    "@4mica/url": "workspace:*",
+    "@fastify/rate-limit": "catalog:",
+    "@fastify/swagger": "catalog:",
+    "@fastify/swagger-ui": "catalog:",
+    "@valibot/to-json-schema": "catalog:",
+    "dotenv": "catalog:",
+    "fastify": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-email": "catalog:",
+    "resend": "catalog:",
+    "valibot": "catalog:",
+    "winston": "catalog:",
+    "winston-daily-rotate-file": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@react-email/ui": "catalog:",
+    "@types/node": "catalog:node24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

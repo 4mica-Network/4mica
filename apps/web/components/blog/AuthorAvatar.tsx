@@ -1,11 +1,5 @@
 import Image from "next/image";
 
-/**
- * Author portrait with a deterministic initials fallback, so a post whose
- * frontmatter omits `authorAvatar` still occupies the same footprint and the
- * cards in the grid stay aligned.
- */
-
 const initialsOf = (name: string): string =>
   name
     .split(/\s+/)

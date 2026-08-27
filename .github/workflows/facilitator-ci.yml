@@ -1,0 +1,64 @@
+name: Facilitator CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/facilitator/**"
+      - ".github/workflows/facilitator-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Rust
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/facilitator
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --all-features
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter "./apps/facilitator/**" run lint
+
+      - name: Format check
+        run: pnpm --filter "./apps/facilitator/**" run fmt
+
+      - name: Test
+        run: pnpm --filter "./apps/facilitator/**" run test
+
+      - name: Build
+        run: pnpm --filter "./apps/facilitator/**" run build

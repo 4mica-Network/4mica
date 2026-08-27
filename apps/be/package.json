@@ -1,0 +1,52 @@
+{
+  "name": "@4mica/be",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fastify backend API serving the 4Mica dashboard.",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist logs .turbo",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:nuke": "docker compose down -v",
+    "be:up": "docker compose up -d --build",
+    "be:down": "docker compose down"
+  },
+  "dependencies": {
+    "@4mica/auth": "workspace:*",
+    "@4mica/db": "workspace:*",
+    "@4mica/email-client": "workspace:*",
+    "@4mica/url": "workspace:*",
+    "@clerk/backend": "catalog:",
+    "@fastify/cors": "catalog:",
+    "@fastify/rate-limit": "catalog:",
+    "@fastify/swagger": "catalog:",
+    "@fastify/swagger-ui": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "axios": "catalog:",
+    "dotenv": "catalog:",
+    "fastify": "catalog:",
+    "valibot": "catalog:",
+    "winston": "catalog:",
+    "winston-daily-rotate-file": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

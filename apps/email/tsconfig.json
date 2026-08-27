@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@4mica/tsconfig/backend.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@config/*": ["./src/config/*"],
+      "@controllers/*": ["./src/controllers/*"],
+      "@lifecycle/*": ["./src/lifecycle/*"],
+      "@logger/*": ["./src/logger/*"],
+      "@plugins/*": ["./src/plugins/*"],
+      "@routes/*": ["./src/routes/*"],
+      "@services/*": ["./src/services/*"],
+      "@templates/*": ["./src/templates/*"],
+      "@emails/*": ["./emails/*"],
+      "@components/*": ["./components/*"]
+    }
+  },
+  "include": [
+    "src",
+    "emails",
+    "components",
+    "tsup.config.ts",
+    "vitest.config.ts"
+  ]
+}

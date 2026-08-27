@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+coverage/
+*.tgz
+
+# Environment
+**/.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor
+.DS_Store
+.vscode/
+.idea/
+.fleet/
+
+# Tooling caches
+.eslintcache
+.pnp.*
+.pnpm-store/
+
+# Tests
+*.tsbuildinfo
+
+# Local
+tmp/

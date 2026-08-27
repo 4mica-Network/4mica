@@ -13,7 +13,6 @@ import {
 
 const generatedSlugs = pageSlugs().map((entry) => entry.slug);
 
-// The /og/<slug> that a page's metadata points at.
 const ogSlug = (metadata: Metadata): string => {
   const images = metadata.openGraph?.images;
   const first = Array.isArray(images) ? images[0] : images;
@@ -58,7 +57,6 @@ describe("seo page registry", () => {
     for (const slug of generatedSlugs) {
       const metadata = metadataForSlug(slug);
       expect(metadata).toBeDefined();
-      // The image url is /og/<its own slug>, so it must be in the static params.
       expect(generatedSlugs).toContain(ogSlug(metadata as Metadata));
     }
   });

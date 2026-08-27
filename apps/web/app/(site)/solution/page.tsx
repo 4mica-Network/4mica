@@ -96,7 +96,6 @@ export default function SolutionPage() {
       <Header />
       <div className="pt-36 pb-20">
         <section className="w-full">
-          {/* Header */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">Solution</p>
             <h1 className="section-title text-balance font-normal">
@@ -110,10 +109,8 @@ export default function SolutionPage() {
             </p>
           </div>
 
-          {/* Problem + Case study — one connected block */}
           <div className="mt-14 overflow-hidden rounded-md border border-overlay/10">
             <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-overlay/10">
-              {/* Problem */}
               <div className="group relative border-overlay/10 border-b bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10 lg:border-b-0">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
@@ -147,7 +144,6 @@ export default function SolutionPage() {
                 </div>
               </div>
 
-              {/* Case study */}
               <div className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10">
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
@@ -192,7 +188,6 @@ export default function SolutionPage() {
             </div>
           </div>
 
-          {/* The 4Mica solution */}
           <div className="mt-24">
             <div className="mx-auto max-w-2xl text-center">
               <p className="section-kicker">How it works</p>
@@ -232,7 +227,6 @@ export default function SolutionPage() {
             </div>
           </div>
 
-          {/* Architecture */}
           <div className="mt-24">
             <div className="mx-auto max-w-2xl text-center">
               <p className="section-kicker">Architecture</p>
@@ -241,10 +235,8 @@ export default function SolutionPage() {
               </h2>
             </div>
 
-            {/* Flow + config — one connected block */}
             <div className="mt-12 overflow-hidden rounded-md border border-overlay/10">
               <div className="divide-y divide-overlay/10">
-                {/* Flow */}
                 <div className="grid divide-y divide-overlay/10 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
                   {ARCHITECTURE_STEPS.map((step, i) => (
                     <div
@@ -272,7 +264,6 @@ export default function SolutionPage() {
                   ))}
                 </div>
 
-                {/* Config */}
                 <div className="grid divide-y divide-overlay/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
                   {CONFIG_CARDS.map((card) => (
                     <div
@@ -300,7 +291,6 @@ export default function SolutionPage() {
             </div>
           </div>
 
-          {/* Closing */}
           <div className="mx-auto mt-20 max-w-3xl text-center">
             <p className="text-ink-body text-xl italic leading-relaxed sm:text-2xl">
               &ldquo;4Mica is building the missing payment primitive that makes

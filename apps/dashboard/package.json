@@ -3,15 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local 4Mica dashboard — manage trading agents, transactions, and the trade allow-list (sandbox mode).",
+  "description": "Local 4Mica dashboard \u2014 manage trading agents, transactions, and the trade allow-list (sandbox mode).",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "dashboard:up": "docker compose up -d --build",
+    "dashboard:down": "docker compose down"
   },
   "dependencies": {
+    "@4mica/http": "workspace:*",
     "@4mica/ui": "workspace:*",
+    "@4mica/url": "workspace:*",
+    "@clerk/clerk-react": "catalog:",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",
     "i18next": "catalog:",
@@ -19,18 +26,27 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-i18next": "catalog:",
-    "react-router-dom": "catalog:"
+    "react-redux": "catalog:",
+    "react-router-dom": "catalog:",
+    "react-toastify": "catalog:",
+    "redux": "catalog:",
+    "redux-saga": "catalog:"
   },
   "devDependencies": {
     "@4mica/tailwind-config": "workspace:*",
     "@4mica/tsconfig": "workspace:*",
     "@tailwindcss/vite": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:node24",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:typescript-latest",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

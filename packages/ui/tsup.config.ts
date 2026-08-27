@@ -1,13 +1,36 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
+  // Every component needs its own entry so client-only code lands in its own
+  // chunk. Without one it is inlined into the barrel, which then gets marked
+  // "use client" and drags server-safe exports like `cn` along with it.
   entry: [
     "index.ts",
+    "components/banner/index.tsx",
     "components/button/index.tsx",
+    "components/card/index.tsx",
+    "components/checkbox/index.tsx",
+    "components/combo-box/index.tsx",
     "components/dropdown/index.tsx",
+    "components/empty-state/index.tsx",
+    "components/input-field/index.tsx",
     "components/link/index.tsx",
+    "components/modal/index.tsx",
+    "components/modal/useModalA11y.ts",
+    "components/select/index.tsx",
+    "components/spinner/index.tsx",
+    "components/stack/index.tsx",
+    "components/stack/AutoStackHeight.tsx",
+    "components/switch/index.tsx",
+    "components/tab/index.tsx",
+    "components/tab/TabGroup.tsx",
+    "components/tag/index.tsx",
     "components/tooltip/index.tsx",
+    "components/typography/index.tsx",
+    "components/video-player/index.tsx",
     "lib/cn.ts",
+    "utils/getIconSize.ts",
+    "utils/hexToRGB.ts",
   ],
   outDir: "dist",
   format: ["esm", "cjs"],

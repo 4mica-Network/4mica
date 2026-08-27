@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@4mica/tsconfig/backend.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src", "vitest.config.ts"]
+}

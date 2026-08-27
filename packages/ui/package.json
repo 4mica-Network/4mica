@@ -36,6 +36,8 @@
     "@radix-ui/react-slot": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "framer-motion": "catalog:",
+    "lucide-react": "catalog:",
     "tailwind-merge": "catalog:"
   },
   "peerDependencies": {
@@ -56,7 +58,6 @@
     "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "storybook": "8.6.14",

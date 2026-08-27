@@ -12,6 +12,18 @@
   "files": [
     "src"
   ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf .turbo"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  },
   "publishConfig": {
     "access": "public"
   }

@@ -1,0 +1,341 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AgentStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum PublicVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+/**
+ * The chains 4Mica settles on. Stored as an enum rather than a raw CAIP-2
+ * string so a typo cannot reach a payment snippet; the CAIP-2 id, RPC and
+ * explorer URLs are derived from it in application code.
+ */
+enum PaymentNetwork {
+  BASE
+  BASE_SEPOLIA
+  ETHEREUM_SEPOLIA
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
+model Agent {
+  id            String           @id @default(uuid(7))
+  ownerId       String?          @map("owner_id")
+  slug          String?          @db.VarChar(64)
+  name          String
+  headline      String?          @db.VarChar(160)
+  description   String?
+  avatarUrl     String?          @map("avatar_url")
+  walletAddress String           @unique @map("wallet_address")
+  status        AgentStatus      @default(PENDING)
+  visibility    PublicVisibility @default(PRIVATE)
+  creditLimit   Decimal          @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  /// The chain this agent signs payment guarantees on.
+  network       PaymentNetwork   @default(ETHEREUM_SEPOLIA)
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@unique([ownerId, slug])
+  @@index([status])
+  @@index([ownerId, visibility])
+  @@map("agents")
+}
+
+enum KybStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum BusinessType {
+  SOLE_TRADER
+  PARTNERSHIP
+  LLC
+  CORPORATION
+  NON_PROFIT
+}
+
+enum NotificationPlacement {
+  topLeft
+  topRight
+  bottomLeft
+  bottomRight
+}
+
+enum WebhookStatus {
+  ENABLED
+  DISABLED
+}
+
+model User {
+  id                             String                @id @default(uuid(7))
+  clerkUserId                    String                @unique @map("clerk_user_id")
+  username                       String?               @unique @db.VarChar(64)
+  name                           String                @default("")
+  email                          String?               @unique @db.VarChar(255)
+  emailVerified                  Boolean               @default(false) @map("email_verified")
+  phoneNumber                    String?               @unique @map("phone_number") @db.VarChar(20)
+  phoneNumberVerified            Boolean               @default(false) @map("phone_number_verified")
+  avatarUrl                      String?               @map("avatar_url")
+  description                    String?
+  bio                            String?
+  private                        Boolean               @default(true)
+  hidden                         Boolean               @default(false)
+  verified                       Boolean               @default(false)
+  locked                         Boolean               @default(false)
+  banned                         Boolean               @default(false)
+  theme                          String                @default("dark")
+  appTheme                       String                @default("dark") @map("app_theme")
+  language                       String                @default("en")
+  timeZone                       String                @default("UTC") @map("time_zone")
+  privacyMode                    Boolean               @default(false) @map("privacy_mode")
+  twoFactorEnabled               Boolean               @default(false) @map("two_factor_enabled")
+  defaultHome                    String                @default("overview") @map("default_home")
+  disableBranding                Boolean               @default(false) @map("disable_branding")
+  allowCustomBrandColor          Boolean               @default(false) @map("allow_custom_brand_color")
+  primaryBrandColor              String                @default("") @map("primary_brand_color")
+  secondaryBrandColor            String                @default("") @map("secondary_brand_color")
+  allowSEOIndexing               Boolean               @default(false) @map("allow_seo_indexing")
+  allowNotification              Boolean               @default(true) @map("allow_notification")
+  allowSMS                       Boolean               @default(false) @map("allow_sms")
+  notificationPlacement          NotificationPlacement @default(bottomRight) @map("notification_placement")
+  allowMonthlyEmails             Boolean               @default(true) @map("allow_monthly_emails")
+  allowInviteAcceptedEmails      Boolean               @default(true) @map("allow_invite_accepted_emails")
+  allowChangelogNewsletterEmails Boolean               @default(true) @map("allow_changelog_newsletter_emails")
+  allowMarketingOnboardingEmails Boolean               @default(true) @map("allow_marketing_onboarding_emails")
+  allowPrivacyLegalEmails        Boolean               @default(true) @map("allow_privacy_legal_emails")
+  allowDpaEmails                 Boolean               @default(true) @map("allow_dpa_emails")
+  allowEmailVisibility           Boolean               @default(true) @map("allow_email_visibility")
+  allowPhoneNumberVisibility     Boolean               @default(true) @map("allow_phone_number_visibility")
+  completeOnboarding             Boolean               @default(false) @map("complete_onboarding")
+  isSeeded                       Boolean               @default(false) @map("is_seeded")
+  lastViewed                     String?               @map("last_viewed")
+  lastLogin                      DateTime              @default(now()) @map("last_login")
+  lastSeenAt                     DateTime              @default(now()) @map("last_seen_at")
+  usageTime                      Int                   @default(0) @map("usage_time")
+  createdAt                      DateTime              @default(now()) @map("created_at")
+  updatedAt                      DateTime              @updatedAt @map("updated_at")
+  deletedAt                      DateTime?             @map("deleted_at")
+  business                       Business?
+  apiKeys                        ApiKey[]
+  webhooks                       Webhook[]
+  agents                         Agent[]
+  apiListings                    ApiListing[]
+  bannerInteractions             BannerInteraction[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid(7))
+  ownerId    String    @map("owner_id")
+  name       String    @db.VarChar(120)
+  prefix     String    @db.VarChar(32)
+  last4      String    @db.VarChar(4)
+  hashedKey  String    @unique @map("hashed_key")
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("api_keys")
+}
+
+model ApiListing {
+  id          String           @id @default(uuid(7))
+  ownerId     String           @map("owner_id")
+  slug        String           @db.VarChar(64)
+  name        String           @db.VarChar(120)
+  summary     String?          @db.VarChar(280)
+  description String?
+  baseUrl     String?          @map("base_url") @db.VarChar(2048)
+  docsUrl     String?          @map("docs_url") @db.VarChar(2048)
+  category    String?          @db.VarChar(64)
+  tags        String[]
+  /// Human display string ("Free in sandbox", "Usage-based"). The machine
+  /// price that drives payment snippets is `priceAmount`/`priceCurrency`.
+  priceLabel  String?          @map("price_label") @db.VarChar(64)
+  visibility  PublicVisibility @default(PRIVATE)
+  publishedAt DateTime?        @map("published_at")
+
+  // --- x402 payment facts. Nullable because a listing can be published as a
+  // --- description before its owner has wired up payments.
+  network       PaymentNetwork?
+  /// The seller's receiving address. Safe to expose publicly — the x402
+  /// handshake advertises it in the 402 response body.
+  payToAddress  String?         @map("pay_to_address") @db.VarChar(42)
+  /// ERC-20 token accepted for payment. Null means the chain's native asset.
+  assetAddress  String?         @map("asset_address") @db.VarChar(42)
+  priceAmount   Decimal?        @map("price_amount") @db.Decimal(38, 18)
+  priceCurrency String?         @map("price_currency") @db.VarChar(16)
+  /// The endpoint that issues tabs / advertises requirements
+  /// (`paymentRequirements.extra.tabEndpoint`).
+  x402Endpoint  String?         @map("x402_endpoint") @db.VarChar(2048)
+
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  deletedAt   DateTime?        @map("deleted_at")
+
+  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  endpoints ApiEndpoint[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, visibility])
+  @@map("api_listings")
+}
+
+/**
+ * One priced route on an `ApiListing`. Exists so an integration snippet can
+ * name a real method and path instead of a placeholder.
+ */
+model ApiEndpoint {
+  id          String     @id @default(uuid(7))
+  listingId   String     @map("listing_id")
+  method      HttpMethod @default(GET)
+  path        String     @db.VarChar(512)
+  summary     String?    @db.VarChar(280)
+  /// Overrides the listing price for this route when set.
+  priceAmount Decimal?   @map("price_amount") @db.Decimal(38, 18)
+  sortOrder   Int        @default(0) @map("sort_order")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  listing ApiListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, method, path])
+  @@index([listingId])
+  @@map("api_endpoints")
+}
+
+model Webhook {
+  id                 String        @id @default(uuid(7))
+  ownerId            String        @map("owner_id")
+  url                String        @db.VarChar(2048)
+  description        String?       @db.VarChar(255)
+  events             String[]
+  status             WebhookStatus @default(ENABLED)
+  secretHash         String        @map("secret_hash")
+  secretPrefix       String        @map("secret_prefix") @db.VarChar(32)
+  lastDeliveryAt     DateTime?     @map("last_delivery_at")
+  lastDeliveryStatus Int?          @map("last_delivery_status")
+  failureCount       Int           @default(0) @map("failure_count")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  owner              User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("webhooks")
+}
+
+model Business {
+  id                  String        @id @default(uuid(7))
+  ownerId             String        @unique @map("owner_id")
+  legalName           String        @default("") @map("legal_name") @db.VarChar(255)
+  tradingName         String?       @map("trading_name") @db.VarChar(255)
+  businessType        BusinessType? @map("business_type")
+  registrationNumber  String?       @map("registration_number") @db.VarChar(64)
+  taxId               String?       @map("tax_id") @db.VarChar(64)
+  vatNumber           String?       @map("vat_number") @db.VarChar(64)
+  industry            String?       @db.VarChar(128)
+  website             String?       @db.VarChar(255)
+  description         String?
+  supportEmail        String?       @map("support_email") @db.VarChar(255)
+  supportPhone        String?       @map("support_phone") @db.VarChar(20)
+  addressLine1        String?       @map("address_line1") @db.VarChar(255)
+  addressLine2        String?       @map("address_line2") @db.VarChar(255)
+  city                String?       @db.VarChar(128)
+  region              String?       @db.VarChar(128)
+  postalCode          String?       @map("postal_code") @db.VarChar(32)
+  country             String?       @db.VarChar(2)
+  statementDescriptor String?       @map("statement_descriptor") @db.VarChar(22)
+  payoutCurrency      String        @default("USD") @map("payout_currency") @db.VarChar(3)
+  kybStatus           KybStatus     @default(UNVERIFIED) @map("kyb_status")
+  kybVerifiedAt       DateTime?     @map("kyb_verified_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  deletedAt           DateTime?     @map("deleted_at")
+  owner               User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([kybStatus])
+  @@map("businesses")
+}
+
+enum BannerInteractionType {
+  VIEWED
+  CLICKED
+  DISMISSED
+  VIDEO_PLAYED
+}
+
+model Banner {
+  id           String    @id @default(uuid(7))
+  slug         String    @unique @db.VarChar(64)
+  title        String?   @db.VarChar(120)
+  message      String?   @db.VarChar(280)
+  url          String?   @db.VarChar(2048)
+  thumbnailUrl String?   @map("thumbnail_url") @db.VarChar(2048)
+  videoUrl     String?   @map("video_url") @db.VarChar(2048)
+  alt          String?   @db.VarChar(160)
+  isVideo      Boolean   @default(false) @map("is_video")
+  priority     Int       @default(0)
+  active       Boolean   @default(true)
+  startsAt     DateTime? @map("starts_at")
+  endsAt       DateTime? @map("ends_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  interactions BannerInteraction[]
+
+  @@index([active, startsAt, endsAt])
+  @@map("banners")
+}
+
+model BannerInteraction {
+  id        String                @id @default(uuid(7))
+  bannerId  String                @map("banner_id")
+  userId    String                @map("user_id")
+  type      BannerInteractionType
+  count     Int                   @default(1)
+  createdAt DateTime              @default(now()) @map("created_at")
+  updatedAt DateTime              @updatedAt @map("updated_at")
+
+  banner Banner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bannerId, userId, type])
+  @@index([bannerId, type])
+  @@index([userId])
+  @@map("banner_interactions")
+}

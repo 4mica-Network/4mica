@@ -1,0 +1,78 @@
+services:
+  playground:
+    build:
+      context: ../..
+      dockerfile: apps/playground/Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://4mica.io}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.4mica.io}
+        # Required. apps/web owns the bare /_next tree on this origin, so
+        # without a prefix every page here loads unstyled and the server logs
+        # nothing. nginx strips it back off.
+        NEXT_PUBLIC_ASSET_PREFIX: ${NEXT_PUBLIC_ASSET_PREFIX:-/p}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    image: 4mica-playground:latest
+    container_name: 4mica-playground
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3100
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIR: /app/logs
+      # The same database apps/be migrates, reached over the shared 4mica-data
+      # network — `postgres` is that stack's service name. Composed from the
+      # POSTGRES_* parts so the credentials have one source of truth; set the
+      # same values here as in apps/be/.env.
+      #
+      # On a laptop, point DATABASE_URL_OVERRIDE at host.docker.internal:5433
+      # to reach `pnpm db:up` instead.
+      DATABASE_URL: ${DATABASE_URL_OVERRIDE:-postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+    ports:
+      - "127.0.0.1:${PLAYGROUND_PORT:-8081}:3100"
+    volumes:
+      - playground-logs:/app/logs
+    networks:
+      - default
+      - edge
+      - data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  edge:
+    image: nginx:1.27-alpine
+    container_name: 4mica-edge
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:${EDGE_PORT:-8088}:80"
+    networks:
+      - default
+      - edge
+    depends_on:
+      playground:
+        condition: service_healthy
+
+volumes:
+  playground-logs:
+    name: 4mica-playground-logs
+
+networks:
+  # Shared with apps/web so `edge` can resolve both upstreams. The two stacks
+  # are separate compose projects and either may come up first, so the network
+  # is created out of band: `docker network create 4mica-edge`.
+  edge:
+    name: 4mica-edge
+    external: true
+  # Shared with apps/be so `postgres` resolves. Created out of band
+  # (`docker network create 4mica-data`) since either stack may come up first.
+  data:
+    name: 4mica-data
+    external: true

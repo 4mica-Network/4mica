@@ -13,6 +13,7 @@
       "!**/output.js",
       "!**/dist",
       "!**/build",
+      "!**/target",
       "!**/storybook-static",
       "!**/pnpm-lock.yaml",
       "!**/node_modules",
@@ -23,12 +24,14 @@
       "!**/dev-dist",
       "!**/.all-contributorsrc",
       "!**/.turbo",
+      "!**/.claude",
       "!packages/cli/templates",
       "!apps/**/coverage",
       "!apps/**/cypress",
       "!apps/**/test-results",
       "!apps/**/dev-dist",
-      "!apps/web/out"
+      "!apps/web/out",
+      "!packages/db/src/generated"
     ]
   },
   "linter": {
@@ -86,6 +89,7 @@
       "!**/node_modules/**",
       "!**/dist/**",
       "!**/build/**",
+      "!**/target/**",
       "!**/storybook-static/**",
       "!**/.next/**",
       "!**/.vscode/**",
@@ -107,5 +111,27 @@
     "formatWithErrors": true,
     "indentStyle": "space",
     "lineWidth": 80
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/be/src/**", "apps/email/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["../**"],
+                    "message": "Use a path alias (@/, @config/, @logger/, …) instead of parent-relative imports."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

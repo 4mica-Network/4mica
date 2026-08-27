@@ -1,0 +1,43 @@
+{
+  "name": "@4mica/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Prisma schema, generated client and shared client singleton for 4Mica.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "prisma",
+    "src"
+  ],
+  "scripts": {
+    "build": "prisma generate",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:create": "prisma migrate dev --create-only",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:reset": "prisma migrate reset",
+    "push": "prisma db push",
+    "studio": "prisma studio",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf src/generated .turbo"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "dotenv": "catalog:",
+    "prisma": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

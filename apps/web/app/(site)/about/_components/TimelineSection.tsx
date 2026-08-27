@@ -24,16 +24,15 @@ function StatusChip({ status }: { status: Status }) {
   );
 }
 
-// Road geometry. X in percent (responsive); Y in pixels (so labels fit).
 const PER_ROW = 2;
 const X_LEFT = 12;
 const X_RIGHT = 88;
 const NODE_LEFT = 32;
 const NODE_RIGHT = 68;
 const BULGE = 11;
-const NODE_TOP = 70; // first row center, px
-const ROW_GAP = 210; // distance between rows, px
-const BOTTOM = 170; // reserved space for the last row's labels, px
+const NODE_TOP = 70;
+const ROW_GAP = 210;
+const BOTTOM = 170;
 
 export default function TimelineSection() {
   const currentIndex = milestones.findIndex((m) => !m.done);
@@ -43,7 +42,6 @@ export default function TimelineSection() {
   const height = NODE_TOP + (rows - 1) * ROW_GAP + BOTTOM;
   const yPct = (r: number) => ((NODE_TOP + r * ROW_GAP) / height) * 100;
 
-  // Node positions: flow left→right, then right→left, down the page.
   const nodes = milestones.map((milestone, i) => {
     const row = Math.floor(i / PER_ROW);
     const posInRow = i % PER_ROW;
@@ -58,7 +56,6 @@ export default function TimelineSection() {
     return { milestone, index: i, x, y: yPct(row) };
   });
 
-  // Switchback road: flat rows joined by smooth U-turns at alternating sides.
   let path = `M ${X_LEFT} ${yPct(0).toFixed(2)}`;
   for (let r = 0; r < rows; r++) {
     const ltr = r % 2 === 0;
@@ -86,7 +83,6 @@ export default function TimelineSection() {
         </div>
 
         <div className="relative mx-auto" style={{ height: `${height}px` }}>
-          {/* The road */}
           <svg
             className="absolute inset-0 h-full w-full"
             viewBox="0 0 100 100"
@@ -113,7 +109,6 @@ export default function TimelineSection() {
             />
           </svg>
 
-          {/* Stops */}
           {nodes.map(({ milestone, index, x, y }) => {
             const status: Status = milestone.done
               ? "Shipped"
@@ -127,7 +122,6 @@ export default function TimelineSection() {
                 className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 hover:z-40"
                 style={{ left: `${x}%`, top: `${y}%` }}
               >
-                {/* Node */}
                 <div
                   className={`relative flex h-12 w-12 items-center justify-center rounded-full shadow-[0_0_0_6px_rgba(8,8,10,0.92)] transition-transform duration-300 group-hover:scale-110 ${
                     milestone.done
@@ -144,7 +138,6 @@ export default function TimelineSection() {
                   )}
                 </div>
 
-                {/* Label */}
                 <div className="absolute top-full left-1/2 mt-3 flex w-44 -translate-x-1/2 flex-col items-center text-center sm:w-52">
                   <span className="text-ink-muted text-md">
                     {milestone.quarter}
@@ -156,7 +149,6 @@ export default function TimelineSection() {
                     <StatusChip status={status} />
                   </div>
 
-                  {/* Description popover (floats, doesn't shift layout) */}
                   <div className="pointer-events-none absolute top-full left-1/2 z-50 mt-3 w-60 max-w-[80vw] -translate-x-1/2 translate-y-1 rounded-lg border border-overlay/10 bg-surface/95 px-4 py-3 text-ink-muted text-md leading-relaxed opacity-0 shadow-2xl backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                     {milestone.description}
                   </div>

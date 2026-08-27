@@ -27,6 +27,55 @@
     },
     "clean": {
       "cache": false
+    },
+    "seed": {
+      "cache": false,
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/db#build": {
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts", "package.json"],
+      "outputs": ["src/generated/**"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/db#typecheck": {
+      "dependsOn": ["@4mica/db#build"]
+    },
+    "@4mica/be#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/playground#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@4mica/db#build", "@4mica/ui#build"],
+      "passThroughEnv": ["DATABASE_URL"]
+    },
+    "@4mica/playground#build": {
+      "dependsOn": ["^build", "@4mica/db#build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "passThroughEnv": ["DATABASE_URL", "CLERK_SECRET_KEY"],
+      "env": [
+        "NEXT_PUBLIC_BASE_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_ASSET_PREFIX"
+      ]
+    },
+    "@4mica/playground#typecheck": {
+      "dependsOn": ["@4mica/db#build"]
+    },
+    "@4mica/dashboard#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": [
+        "VITE_CLERK_PUBLISHABLE_KEY",
+        "VITE_API_URL",
+        "VITE_BASE_URL",
+        "VITE_APP_URL"
+      ]
     }
   }
 }

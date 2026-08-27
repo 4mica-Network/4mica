@@ -1,0 +1,59 @@
+services:
+  email:
+    build:
+      context: ../..
+      dockerfile: apps/email/Dockerfile
+    image: 4mica-email:latest
+    container_name: 4mica-email
+    restart: unless-stopped
+    init: true
+    # Must exceed SHUTDOWN_TIMEOUT_MS so the app always force-exits itself
+    # before Docker resorts to SIGKILL.
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4100
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_DRY_RUN: ${EMAIL_DRY_RUN:-false}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-4Mica}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-no-reply@4mica.io}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@4mica.io}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://4mica.io}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.4mica.io}
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-5000}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-20000}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_IP_MAX: ${RATE_LIMIT_IP_MAX:-300}
+    # Deliberately no `ports:`. The service has no authentication of its own —
+    # reaching it IS the authorisation — so it is published nowhere and is
+    # reachable only by the containers that share `4mica-internal`. Publishing
+    # even on 127.0.0.1 would expose it to every process on a shared host.
+    #
+    # To poke at it during local development, go through the container rather
+    # than the host: `docker exec 4mica-email wget -qO- localhost:4100/health`.
+    networks:
+      - default
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  # Shared with apps/be so it can resolve `email`. Docker isolates user-defined
+  # bridges from one another, so joining this network is the whole access
+  # control: a container that is not on it cannot route here at all.
+  #
+  # Created out of band (`docker network create 4mica-internal`) because be and
+  # email are separate compose projects and either may come up first.
+  #
+  # Not `internal: true` — that would only cut egress, which email needs to
+  # reach Resend. Inbound is already closed by having no published port.
+  internal:
+    name: 4mica-internal
+    external: true

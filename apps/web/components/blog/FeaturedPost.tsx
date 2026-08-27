@@ -5,12 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { messages } from "@/i18n";
 
-/**
- * The newest post, rendered as the page's hero. The artwork sits behind the
- * copy on wide screens and drops below the fold of the card on narrow ones, so
- * the text column keeps its measure at every width — and a post with no
- * thumbnail simply renders the copy on the plain surface.
- */
 export default function FeaturedPost({ post }: { post: BlogPostMeta }) {
   return (
     <article className="group relative overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 transition-colors duration-500 hover:bg-overlay/[0.018]">
