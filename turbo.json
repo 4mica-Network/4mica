@@ -56,7 +56,7 @@
     "@4mica/playground#build": {
       "dependsOn": ["^build", "@4mica/db#build"],
       "outputs": [".next/**", "!.next/cache/**"],
-      "passThroughEnv": ["DATABASE_URL"],
+      "passThroughEnv": ["DATABASE_URL", "CLERK_SECRET_KEY"],
       "env": [
         "NEXT_PUBLIC_BASE_URL",
         "NEXT_PUBLIC_APP_URL",

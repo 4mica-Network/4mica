@@ -1,19 +1,6 @@
 name: Deploy 4mica Website
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/web/**"
-      - "packages/ui/**"
-      - "packages/url/**"
-      - "packages/tailwind-config/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - ".github/actions/remote-deploy/**"
-      - ".github/workflows/build-react-app.yml"
   workflow_dispatch:
     inputs:
       environment:
@@ -25,14 +12,14 @@ on:
           - prod
 
 concurrency:
-  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+  group: deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
+      name: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -44,7 +31,7 @@ jobs:
           server_user: ${{ vars.SERVER_USER || 'mo' }}
           ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
           deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
-          branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') && 'dev' || 'main' }}
+          branch: ${{ inputs.environment == 'dev' && 'dev' || 'main' }}
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/web
           health_container: 4mica-web

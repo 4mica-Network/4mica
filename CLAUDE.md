@@ -94,6 +94,8 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 All five services run on **one machine**, each as its own compose project, published to loopback and fronted by the host's nginx (`infra/nginx/`, copied to the box by hand, not by CI). Five workflows — `build-react-app.yml` (web), `deploy-{be,dashboard,email,playground}.yml` — all delegate to the `.github/actions/remote-deploy` composite action, which SSHes in, fast-forwards the `DEPLOY_PATH` checkout, writes `<service_dir>/.env`, and runs `docker compose up -d --build` followed by a healthcheck poll. They share **one** concurrency group per environment because they share one checkout.
 
+**Every deploy workflow is `workflow_dispatch` only — merging to `main` deploys nothing.** A human runs it from the Actions tab and picks `dev` or `prod`; the environment input, not the triggering ref, decides which branch is deployed. Do not add a `push:` trigger back: on a single box that turns one merge into several concurrent `git pull`s against the same checkout. `release.yml` and `facilitator-release.yml` are dispatch-only for the same reason; `facilitator-ci.yml` keeps `pull_request` because it only runs checks and publishes nothing.
+
 Two external Docker networks, created idempotently by each workflow's `pre_up`:
 
 - **`4mica-edge`** joins `web` + `playground` so the `edge` nginx can resolve both and split `4mica.io` between marketing routes and the bare-handle namespace.

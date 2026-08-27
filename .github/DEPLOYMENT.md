@@ -76,16 +76,30 @@ redeploy would leave nginx pinned to a dead container IP.
 
 ## Triggers
 
-Each workflow runs on push to `main` filtered to its own paths (app, the
-workspace packages it depends on, root manifests, and the workflow/action
-files), or on `workflow_dispatch` with a `dev` / `prod` choice. `dev` deploys the
-`dev` branch, `prod` deploys `main`.
+**Nothing deploys automatically.** Every deploy workflow is `workflow_dispatch`
+only — merging to `main` changes nothing on the server. To ship, open the repo's
+**Actions** tab, pick the workflow, hit **Run workflow**, and choose the
+environment: `dev` deploys the `dev` branch, `prod` deploys `main`.
+
+Because the branch comes from the `environment` input rather than the triggering
+push, the ref you launch from in the dropdown only decides which copy of the
+*workflow file* runs. `prod` always deploys `main`.
+
+Deploying more than one service means running more than one workflow. That is
+deliberate: on a single box a push-triggered fan-out is how you get four
+concurrent `git pull`s against one checkout.
 
 All five share **one** `concurrency` group per environment — `deploy-<env>`, with
 no service in the name. They deploy to the same machine and therefore the same
 `DEPLOY_PATH` checkout, so a per-service group would let two runs `git pull` the
 same working tree at once. The cost is that deploys queue instead of running in
 parallel; that is the trade the single-box topology makes.
+
+The non-deploy workflows follow the same rule. `release.yml` (SDK publish) and
+`facilitator-release.yml` (GHCR image push) are dispatch-only.
+`facilitator-ci.yml` is the one exception and keeps its `pull_request` trigger —
+it only runs Rust checks and publishes nothing, so it validates a PR *before* a
+merge rather than reacting to one.
 
 None of them `docker compose down` first — compose recreates only what changed.
 Each then polls the container's healthcheck and fails the job (after dumping

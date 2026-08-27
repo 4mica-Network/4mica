@@ -1,16 +1,11 @@
 name: Facilitator CI
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "apps/facilitator/**"
-      - ".github/workflows/facilitator-ci.yml"
   pull_request:
     paths:
       - "apps/facilitator/**"
       - ".github/workflows/facilitator-ci.yml"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -47,10 +42,10 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Use Node.js 22
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
