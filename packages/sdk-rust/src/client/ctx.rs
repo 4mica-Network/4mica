@@ -468,6 +468,11 @@ impl<S> ClientCtx<S> {
             .get_or_try_init(|| async {
                 let wallet = EthereumWallet::new(self.0.cfg.signer.clone());
                 ProviderBuilder::new()
+                    .disable_recommended_fillers()
+                    .with_gas_estimation()
+                    .with_blob_gas_estimation()
+                    .with_simple_nonce_management()
+                    .fetch_chain_id()
                     .wallet(wallet)
                     .connect(self.chain_rpc_url()?.as_ref())
                     .await
