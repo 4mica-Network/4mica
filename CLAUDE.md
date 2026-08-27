@@ -90,4 +90,17 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 ## Deployment
 
-`.github/workflows/build-react-app.yml` deploys on push to `main` (or manual dispatch for dev/prod). It SSHes into a remote server, pulls the branch, writes `apps/web/.env` from GitHub vars, and runs `docker compose up -d --build`.
+`.github/DEPLOYMENT.md` is the authoritative reference — read it before touching anything here.
+
+All five services run on **one machine**, each as its own compose project, published to loopback and fronted by the host's nginx (`infra/nginx/`, copied to the box by hand, not by CI). Five workflows — `build-react-app.yml` (web), `deploy-{be,dashboard,email,playground}.yml` — all delegate to the `.github/actions/remote-deploy` composite action, which SSHes in, fast-forwards the `DEPLOY_PATH` checkout, writes `<service_dir>/.env`, and runs `docker compose up -d --build` followed by a healthcheck poll. They share **one** concurrency group per environment because they share one checkout.
+
+**Every deploy workflow is `workflow_dispatch` only — merging to `main` deploys nothing.** A human runs it from the Actions tab and picks `dev` or `prod`; the environment input, not the triggering ref, decides which branch is deployed. Do not add a `push:` trigger back: on a single box that turns one merge into several concurrent `git pull`s against the same checkout. `release.yml` and `facilitator-release.yml` are dispatch-only for the same reason; `facilitator-ci.yml` keeps `pull_request` because it only runs checks and publishes nothing.
+
+Two external Docker networks, created idempotently by each workflow's `pre_up`:
+
+- **`4mica-edge`** joins `web` + `playground` so the `edge` nginx can resolve both and split `4mica.io` between marketing routes and the bare-handle namespace.
+- **`4mica-internal`** joins `be` + `email`. `apps/email` publishes **no host port** — it has no authentication of its own, so network membership is the entire access control. `be` reaches it at `http://email:4100` (the compose service name) via `EMAIL_SERVICE_URL`, which is optional: unset disables sending rather than failing boot.
+
+Postgres is external/managed; `apps/be/docker-compose.prod.yml` (not `docker-compose.yml`, which is local-dev only) runs the one-shot `migrate` container against `DATABASE_URL` before `be` starts.
+
+- **Username policy lives in `packages/url`** and has two distinct halves that must not be merged. `reservedSegments` is about *path collisions* — every entry is a real page on 4mica.io with a matching proxy rule in `apps/playground/nginx.conf`; two tests in `apps/playground/src/main.test.ts` fail the build if it drifts from either nginx or the filesystem. `blacklistedUsernames` bars role and brand names (`admin`, `stripe`) that are **not** routes and have no page to proxy to. `usernameUnavailableReason()` is the single entry point both `apps/be` and the dashboard call.

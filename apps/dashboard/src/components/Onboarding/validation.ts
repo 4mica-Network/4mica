@@ -1,4 +1,4 @@
-import { isReservedSegment, isValidUsername } from "@4mica/url";
+import { isValidUsername, usernameUnavailableReason } from "@4mica/url";
 import type { UsernameStatus } from "@stores/user/type";
 
 /**
@@ -26,7 +26,9 @@ export const isNameValid = (name: string): boolean => {
 /** Format and namespace only — availability is the server's answer to give. */
 export const isUsernameShapeValid = (username: string): boolean => {
   const candidate = username.trim().toLowerCase();
-  return isValidUsername(candidate) && !isReservedSegment(candidate);
+  return (
+    isValidUsername(candidate) && usernameUnavailableReason(candidate) === null
+  );
 };
 
 /**
@@ -41,7 +43,8 @@ export const isUsernameValid = (
   isUsernameShapeValid(username) &&
   status !== "checking" &&
   status !== "taken" &&
-  status !== "reserved";
+  status !== "reserved" &&
+  status !== "blacklisted";
 
 /** Only `legalName` is required; the rest is refined later in Settings. */
 export const isBusinessValid = (legalName: string): boolean =>

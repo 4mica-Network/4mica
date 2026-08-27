@@ -1,14 +1,6 @@
 name: Facilitator release image
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "facilitator-v*"
-    paths:
-      - "apps/facilitator/**"
-      - ".github/workflows/facilitator-release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -43,6 +35,10 @@ jobs:
       # Keeps publishing to the pre-monorepo image name so existing
       # deployments (compose defaults to facilitator-4mica:latest) keep working.
       # main -> :main, facilitator-v1.2.3 -> :1.2.3 and :1.2, every build -> :sha-<full sha>
+      #
+      # These read `github.ref`, which for a manual run is whatever ref you pick
+      # in the "Run workflow" dropdown — so publishing a version tag means
+      # dispatching against the `facilitator-v*` tag, not a branch.
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v5

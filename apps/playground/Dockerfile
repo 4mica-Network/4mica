@@ -47,6 +47,13 @@ ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL \
 # connected to — same trick as packages/db/prisma.config.ts.
 ENV DATABASE_URL=postgresql://unset:unset@127.0.0.1:1/unset
 
+# src/env.ts rejects a CLERK_SECRET_KEY that is not sk_-prefixed, and the same
+# metadata collection evaluates it. Deliberately a build-only sentinel rather
+# than an ARG: a real key passed as a build arg is recorded in the image
+# history, so it must only ever arrive at runtime via compose `environment:`.
+# This ENV belongs to the builder stage and does not reach the runner below.
+ENV CLERK_SECRET_KEY=sk_build_time_placeholder
+
 # turbo (not `next build` directly) so the @4mica/db#build edge runs
 # `prisma generate` first and @4mica/ui's dist is fresh.
 RUN turbo build --filter=@4mica/playground

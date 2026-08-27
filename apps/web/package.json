@@ -16,7 +16,9 @@
     "knip": "knip",
     "knip:prod": "knip --production --exclude types",
     "refresh": "taze",
-    "clean": "tsx ../../scripts/clean.ts"
+    "clean": "tsx ../../scripts/clean.ts",
+    "web:up": "docker network create 4mica-edge 2>/dev/null || true && docker compose up -d --build",
+    "web:down": "docker compose down"
   },
   "dependencies": {
     "@4mica/tailwind-config": "workspace:*",

@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
     "clean": "tsx ../../scripts/clean.ts",
-    "playground:up": "docker compose up -d --build",
+    "playground:up": "docker network create 4mica-edge 2>/dev/null || true && docker compose up -d --build",
     "playground:down": "docker compose down"
   },
   "dependencies": {

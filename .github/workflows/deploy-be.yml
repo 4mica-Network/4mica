@@ -1,0 +1,68 @@
+name: Deploy 4mica API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy be with Docker Compose
+        uses: ./.github/actions/remote-deploy
+        with:
+          server_host: ${{ secrets.BE_SERVER_HOST }}
+          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          branch: ${{ inputs.environment == 'dev' && 'dev' || 'main' }}
+          repo_ssh_url: git@github.com:${{ github.repository }}.git
+          service_dir: apps/be
+          compose_file: docker-compose.prod.yml
+          health_container: 4mica-be
+          pre_up: docker network create 4mica-internal 2>/dev/null || true; docker network create 4mica-data 2>/dev/null || true
+          env_contents: |
+            NODE_ENV=production
+            BE_PORT=${{ vars.BE_PORT || '4000' }}
+            LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+
+            POSTGRES_USER=${{ vars.POSTGRES_USER || '4mica' }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ vars.POSTGRES_DB || '4mica' }}
+            POSTGRES_PORT=${{ vars.POSTGRES_PORT || '5432' }}
+
+            CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
+
+            # Reaches apps/email over the 4mica-internal Docker network. Leave
+            # unset to disable sending rather than fail boot.
+            EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}
+
+            CLERK_PUBLISHABLE_KEY=${{ vars.CLERK_PUBLISHABLE_KEY }}
+            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            CLERK_JWT_KEY=${{ secrets.CLERK_JWT_KEY }}
+            CLERK_AUTHORIZED_PARTIES=${{ vars.CLERK_AUTHORIZED_PARTIES }}
+
+            SHUTDOWN_DRAIN_MS=${{ vars.SHUTDOWN_DRAIN_MS || '5000' }}
+            SHUTDOWN_TIMEOUT_MS=${{ vars.SHUTDOWN_TIMEOUT_MS || '20000' }}
+
+            RATE_LIMIT_ENABLED=${{ vars.RATE_LIMIT_ENABLED || 'true' }}
+            RATE_LIMIT_WINDOW_MS=${{ vars.RATE_LIMIT_WINDOW_MS || '60000' }}
+            RATE_LIMIT_IP_MAX=${{ vars.RATE_LIMIT_IP_MAX || '300' }}
+            RATE_LIMIT_USER_MAX=${{ vars.RATE_LIMIT_USER_MAX || '120' }}
+            RATE_LIMIT_SENSITIVE_MAX=${{ vars.RATE_LIMIT_SENSITIVE_MAX || '10' }}

@@ -30,8 +30,6 @@ export function UsernameStep({
   const candidate = value.trim().toLowerCase();
   const isGenerated = isGeneratedUsername(savedUsername);
 
-  // Clear a stale verdict from a previous visit to this step, so the tick from
-  // the last candidate cannot appear next to a freshly typed one.
   useEffect(() => {
     return () => {
       dispatch(resetUsernameCheck());
@@ -40,8 +38,6 @@ export function UsernameStep({
 
   useDebounceEffect(
     () => {
-      // No request for something the server would only 400, and none for the
-      // handle they already own — the endpoint would answer "available" anyway.
       if (!isUsernameShapeValid(candidate) || candidate === savedUsername) {
         return;
       }
@@ -82,6 +78,11 @@ export function UsernameStep({
         };
       case "reserved":
         return { text: t("onboarding.username.reserved"), tone: "text-danger" };
+      case "blacklisted":
+        return {
+          text: t("onboarding.username.blacklisted"),
+          tone: "text-danger",
+        };
       default:
         return null;
     }
@@ -96,7 +97,11 @@ export function UsernameStep({
     if (status === "available") {
       return <Check className="h-4 w-4 text-success" />;
     }
-    if (status === "taken" || status === "reserved") {
+    if (
+      status === "taken" ||
+      status === "reserved" ||
+      status === "blacklisted"
+    ) {
       return <X className="h-4 w-4 text-danger" />;
     }
     return undefined;

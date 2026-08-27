@@ -1,0 +1,58 @@
+name: Deploy 4mica Email Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy email with Docker Compose
+        uses: ./.github/actions/remote-deploy
+        with:
+          server_host: ${{ secrets.EMAIL_SERVER_HOST }}
+          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          branch: ${{ inputs.environment == 'dev' && 'dev' || 'main' }}
+          repo_ssh_url: git@github.com:${{ github.repository }}.git
+          service_dir: apps/email
+          health_container: 4mica-email
+          pre_up: docker network create 4mica-internal 2>/dev/null || true
+          env_contents: |
+            NODE_ENV=production
+            LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            EMAIL_DRY_RUN=${{ vars.EMAIL_DRY_RUN || 'false' }}
+
+            EMAIL_FROM_NAME=${{ vars.EMAIL_FROM_NAME || '4Mica' }}
+            EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS || 'no-reply@4mica.io' }}
+            EMAIL_REPLY_TO=${{ vars.EMAIL_REPLY_TO || 'support@4mica.io' }}
+
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL || 'https://4mica.io' }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'https://app.4mica.io' }}
+
+            SHUTDOWN_DRAIN_MS=${{ vars.SHUTDOWN_DRAIN_MS || '5000' }}
+            SHUTDOWN_TIMEOUT_MS=${{ vars.SHUTDOWN_TIMEOUT_MS || '20000' }}
+
+            RATE_LIMIT_ENABLED=${{ vars.RATE_LIMIT_ENABLED || 'true' }}
+            RATE_LIMIT_WINDOW_MS=${{ vars.RATE_LIMIT_WINDOW_MS || '60000' }}
+            RATE_LIMIT_IP_MAX=${{ vars.RATE_LIMIT_IP_MAX || '300' }}

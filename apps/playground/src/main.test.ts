@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isReservedSegment, reservedSegments } from "@4mica/url";
 import { describe, expect, it } from "vitest";
@@ -286,13 +286,54 @@ describe("reserved segments vs nginx", () => {
     expect(missing).toEqual([]);
   });
 
+  /**
+   * The other half of the same guard, from the filesystem instead of nginx.
+   *
+   * The test above catches a reserved segment with no proxy rule. This one
+   * catches the reverse and more likely mistake: someone adds a page under
+   * apps/web/app and never touches packages/url, so `4mica.io/<that page>`
+   * stays in the handle namespace and the first person to claim it shadows a
+   * live marketing route.
+   *
+   * Asserted one direction only. `routes` reserves several segments that have
+   * no page yet (agents, interactive-protocol, leadership, register, roadmap);
+   * those are harmless and should stay reserved.
+   */
+  it("reserves every top-level route in apps/web", () => {
+    const webApp = fileURLToPath(new URL("../../web/app", import.meta.url));
+
+    // `(home)` and `(site)` are route groups — parentheses mean they add no
+    // path segment, so the real routes are one level further down.
+    const segmentsIn = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
+        .flatMap((entry) =>
+          entry.name.startsWith("(")
+            ? segmentsIn(`${dir}/${entry.name}`)
+            : // Dynamic segments like [slug] are never a top-level route.
+              entry.name.startsWith("[")
+              ? []
+              : [entry.name],
+        );
+
+    const unreserved = segmentsIn(webApp).filter(
+      (segment) => !reservedSegments.has(segment),
+    );
+
+    expect(unreserved).toEqual([]);
+  });
+
   it.each([
     "sign-in",
     "sign-up",
     "sso-callback",
   ])("proxies /%s to the playground", (segment) => {
+    // `[^;]*mica_playground` rather than a literal URL: the edge proxies via
+    // `proxy_pass $mica_playground` (a `set` variable plus Docker's resolver)
+    // so upstream DNS is re-read per request instead of pinned at startup.
+    // What matters here is that the route targets the playground at all.
     const rule = new RegExp(
-      `location \\^~ /${segment}\\s+{[^}]*proxy_pass http://mica_playground;`,
+      `location \\^~ /${segment}\\s+{[^}]*proxy_pass [^;]*mica_playground;`,
     );
 
     expect(nginxConf).toMatch(rule);

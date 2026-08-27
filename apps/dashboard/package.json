@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dashboard:up": "docker compose up -d --build",
+    "dashboard:down": "docker compose down"
   },
   "dependencies": {
     "@4mica/http": "workspace:*",

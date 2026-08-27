@@ -130,9 +130,17 @@ describe("username availability check", () => {
     expect(done.usernameCheck.status).toBe("reserved");
   });
 
+  it("carries the blacklisted reason through as its own status", () => {
+    const checking = reducer(seeded, checkUsername("google"));
+    const done = reducer(
+      checking,
+      checkUsernameSucceeded("google", false, "blacklisted"),
+    );
+
+    expect(done.usernameCheck.status).toBe("blacklisted");
+  });
+
   it("ignores a verdict for a candidate the user has already typed past", () => {
-    // Out-of-order responses would otherwise put a green tick next to a handle
-    // nobody asked about.
     const stale = reducer(seeded, checkUsername("ad"));
     const current = reducer(stale, checkUsername("ada"));
     const raced = reducer(current, checkUsernameSucceeded("ad", true, null));

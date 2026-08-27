@@ -1,4 +1,4 @@
-name: Deploy 4mica Website
+name: Deploy 4mica Dashboard
 
 on:
   workflow_dispatch:
@@ -24,19 +24,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Deploy web with Docker Compose
+      - name: Deploy dashboard with Docker Compose
         uses: ./.github/actions/remote-deploy
         with:
-          server_host: ${{ secrets.SERVER_HOST }}
+          server_host: ${{ secrets.DASHBOARD_SERVER_HOST }}
           server_user: ${{ vars.SERVER_USER || 'mo' }}
           ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
           deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
           branch: ${{ inputs.environment == 'dev' && 'dev' || 'main' }}
           repo_ssh_url: git@github.com:${{ github.repository }}.git
-          service_dir: apps/web
-          health_container: 4mica-web
-          pre_up: docker network create 4mica-edge 2>/dev/null || true
+          service_dir: apps/dashboard
+          health_container: 4mica-dashboard
+          # Every VITE_* value here is a build arg, inlined into the bundle by
+          # Vite. Changing one needs a rebuild, which `up -d --build` does.
+          # The Clerk publishable key ships in the browser bundle, so it is a
+          # variable, not a secret.
           env_contents: |
-            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
-            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
-            WEB_PORT=${{ vars.WEB_PORT || '8080' }}
+            DASHBOARD_PORT=${{ vars.DASHBOARD_PORT || '8082' }}
+
+            VITE_CLERK_PUBLISHABLE_KEY=${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_BASE_URL=${{ vars.VITE_BASE_URL }}
+            VITE_APP_URL=${{ vars.VITE_APP_URL }}

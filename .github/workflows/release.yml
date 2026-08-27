@@ -1,8 +1,5 @@
 name: Release SDK
 
-# Temporarily disabled: SDK publishing requires the NPM_TOKEN secret, which is
-# not configured yet. Runs only via manual dispatch until the token is added;
-# restore the `push` trigger below to re-enable automatic releases on main.
 on:
   workflow_dispatch:
 
@@ -25,10 +22,10 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Use Node.js 22
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
           registry-url: https://registry.npmjs.org
 

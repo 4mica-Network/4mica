@@ -1,0 +1,137 @@
+#
+# Production stack for apps/be: postgres + one-shot migrate + the API.
+#
+# Deliberately a standalone file rather than an override of docker-compose.yml:
+# an override can add to a service but cannot rename the `postgres` container or
+# repoint the volume, and the two stacks must never share either.
+#
+# Usage: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# The explicit project name matters: compose otherwise derives it from the
+# directory, making this stack share `be` with docker-compose.yml. The deploy
+# action passes --remove-orphans, which would then treat a locally running
+# 4mica-be-postgres as an orphan of this file and delete it.
+name: 4mica-be-prod
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: 4mica-be-postgres-prod
+    restart: unless-stopped
+    # Postgres needs time to checkpoint and shut down cleanly. Cutting this
+    # short risks recovery on next boot.
+    stop_grace_period: 30s
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-4mica}
+      # No default, unlike the dev stack: a production database must never come
+      # up on the throwaway password. Compose refuses to start without it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-4mica}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    # Loopback only, so pg_dump and psql work from the host without exposing
+    # the database off-box.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - default
+      - data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-4mica} -d ${POSTGRES_DB:-4mica}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+      target: migrator
+    image: 4mica-be-migrate:latest
+    container_name: 4mica-be-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
+    networks:
+      - default
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  be:
+    build:
+      context: ../..
+      dockerfile: apps/be/Dockerfile
+    image: 4mica-be:latest
+    container_name: 4mica-be
+    restart: unless-stopped
+    init: true
+    # Must exceed SHUTDOWN_TIMEOUT_MS so the app always force-exits itself
+    # before Docker resorts to SIGKILL.
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-5000}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-20000}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_IP_MAX: ${RATE_LIMIT_IP_MAX:-300}
+      RATE_LIMIT_USER_MAX: ${RATE_LIMIT_USER_MAX:-120}
+      RATE_LIMIT_SENSITIVE_MAX: ${RATE_LIMIT_SENSITIVE_MAX:-10}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Composed from the POSTGRES_* parts rather than taking a whole
+      # DATABASE_URL, so the credentials have exactly one source of truth.
+      # apps/playground builds the same string from the same variables.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      CLERK_JWT_KEY: ${CLERK_JWT_KEY:-}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-}
+      EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
+    ports:
+      - "127.0.0.1:${BE_PORT:-4000}:4000"
+    networks:
+      - default
+      - internal
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  # Named separately from the dev stack's 4mica-be-postgres-data so the two can
+  # never end up sharing a data directory.
+  postgres-data:
+    name: 4mica-be-postgres-prod-data
+
+networks:
+  internal:
+    name: 4mica-internal
+    external: true
+  # Shared with apps/playground, which is a separate compose project and so
+  # cannot reach this stack's default network. It reads the same database
+  # directly and never migrates it. Deliberately NOT 4mica-internal: that one
+  # is what keeps apps/email reachable by apps/be alone, and putting the
+  # playground on it would hand it access to the email service too.
+  #
+  # Created out of band (`docker network create 4mica-data`) because either
+  # stack may come up first.
+  data:
+    name: 4mica-data
+    external: true

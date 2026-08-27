@@ -9,6 +9,7 @@ import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { registerRateLimit } from "./plugins/rate-limit";
 import { type RouteRegistration, routes } from "./routes/index";
+import { getEmailClient } from "./services/email";
 
 const PROD_ORIGIN_PATTERNS = [
   /^https:\/\/([a-z0-9-]+\.)*4mica\.io$/,
@@ -53,6 +54,13 @@ export const initApp = async (
       message: "The service is shutting down. Retry shortly.",
     });
   });
+
+  // Decorated once here so handlers reach the email service through the
+  // instance rather than importing the singleton — the same shape Fastify
+  // plugins use, and the seam a test replaces. `null` when EMAIL_SERVICE_URL is
+  // unset, which every caller must handle: a notification channel being down
+  // is not a reason to fail the request that triggered it.
+  app.decorate("email", getEmailClient());
 
   // Fastify owns database teardown, so `initApp` is self-contained and tests
   // that call `app.close()` release the client too.
@@ -143,6 +151,15 @@ export const runServer = async (): Promise<FastifyInstance> => {
 
   appLogger.info(
     `@4mica/be listening on http://${config.env.HOST}:${config.env.PORT}`,
+  );
+
+  // Surfaced at boot because the failure mode is otherwise silent: emails
+  // simply never send, and nothing errors. In production this should always
+  // read as the email service being reachable over 4mica-internal.
+  appLogger.info(
+    app.email
+      ? `Email service configured at ${config.emailServiceUrl}`
+      : "Email service not configured (EMAIL_SERVICE_URL unset); sending disabled",
   );
 
   if (config.isDev) {

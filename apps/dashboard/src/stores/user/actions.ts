@@ -1,4 +1,4 @@
-import type { MeResponse } from "@api/user";
+import type { MeResponse, UsernameUnavailability } from "@api/user";
 import actionTypes from "./actionTypes";
 import type { Business, User } from "./type";
 
@@ -94,7 +94,7 @@ export const checkUsername = (username: string) => ({
 export const checkUsernameSucceeded = (
   username: string,
   available: boolean,
-  reason: "taken" | "reserved" | null,
+  reason: UsernameUnavailability | null,
 ) => ({
   type: actionTypes.CHECK_USERNAME_SUCCEEDED,
   payload: { username, available, reason },
@@ -109,11 +109,6 @@ export const resetUsernameCheck = () => ({
   type: actionTypes.RESET_USERNAME_CHECK,
 });
 
-/**
- * The last leg of onboarding: write the business, and only if that lands, flip
- * `completeOnboarding`. The ordering matters, so it belongs in a saga rather
- * than two dispatches racing from a component.
- */
 export const completeOnboarding = (
   payload: Partial<Business>,
   section = "onboarding.business",

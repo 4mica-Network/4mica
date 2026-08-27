@@ -22,6 +22,7 @@
   "dependencies": {
     "@4mica/auth": "workspace:*",
     "@4mica/db": "workspace:*",
+    "@4mica/email-client": "workspace:*",
     "@4mica/url": "workspace:*",
     "@clerk/backend": "catalog:",
     "@fastify/cors": "catalog:",
@@ -30,6 +31,7 @@
     "@fastify/swagger-ui": "catalog:",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "axios": "catalog:",
     "dotenv": "catalog:",
     "fastify": "catalog:",
     "valibot": "catalog:",

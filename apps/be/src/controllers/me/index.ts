@@ -1,4 +1,4 @@
-import { isReservedSegment } from "@4mica/url";
+import { usernameUnavailableReason } from "@4mica/url";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import {
@@ -81,10 +81,12 @@ export const checkUsernameHandler: RouteHandler = async (request, reply) => {
 
   const { username } = parsed.data;
 
-  // Short-circuit before Prisma: the marketing site owns these segments and no
-  // row will ever hold one.
-  if (isReservedSegment(username)) {
-    return reply.send({ username, available: false, reason: "reserved" });
+  // Short-circuit before Prisma: policy alone settles these, and no row will
+  // ever hold one. "reserved" means the marketing site owns the path;
+  // "blacklisted" means the name is barred outright (roles, brands).
+  const blocked = usernameUnavailableReason(username);
+  if (blocked) {
+    return reply.send({ username, available: false, reason: blocked });
   }
 
   const owner = await findUsernameOwner(username);

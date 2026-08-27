@@ -12,8 +12,6 @@ const stateWith = (user: UserState["user"]): RootState =>
 
 describe("onboarding selectors", () => {
   it("does not ask for onboarding before GET /me resolves", () => {
-    // The contract that stops the blocking modal flashing over the app on every
-    // page load. Do not "simplify" this to !completeOnboarding.
     expect(selectNeedsOnboarding(stateWith(null))).toBe(false);
     expect(selectHasCompletedOnboarding(stateWith(null))).toBe(false);
   });

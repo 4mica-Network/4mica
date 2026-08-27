@@ -34,6 +34,15 @@ const EnvSchema = v.object({
   ),
   CLERK_JWT_KEY: v.string(),
   CLERK_AUTHORIZED_PARTIES: v.string(),
+  // Optional on purpose. Empty disables sending rather than failing boot, so
+  // local dev and tests need no email service running.
+  EMAIL_SERVICE_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith("http", "EMAIL_SERVICE_URL must be an http(s) URL"),
+    ),
+  ]),
   SHUTDOWN_DRAIN_MS: numeric("SHUTDOWN_DRAIN_MS", 0, 60_000),
   SHUTDOWN_TIMEOUT_MS: numeric("SHUTDOWN_TIMEOUT_MS", 1_000, 120_000),
   RATE_LIMIT_ENABLED: v.picklist(
@@ -61,6 +70,7 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     CLERK_SECRET_KEY: source.CLERK_SECRET_KEY ?? "",
     CLERK_JWT_KEY: source.CLERK_JWT_KEY ?? "",
     CLERK_AUTHORIZED_PARTIES: source.CLERK_AUTHORIZED_PARTIES ?? "",
+    EMAIL_SERVICE_URL: source.EMAIL_SERVICE_URL ?? "",
     SHUTDOWN_DRAIN_MS: source.SHUTDOWN_DRAIN_MS ?? "5000",
     SHUTDOWN_TIMEOUT_MS: source.SHUTDOWN_TIMEOUT_MS ?? "20000",
     RATE_LIMIT_ENABLED:
@@ -107,6 +117,8 @@ export const config = {
   clerkAuthorizedParties: env.CLERK_AUTHORIZED_PARTIES.split(",")
     .map((party) => party.trim())
     .filter(Boolean),
+  /** `undefined` when unset — see src/services/email.ts. */
+  emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
   shutdown: {
     drainMs: env.SHUTDOWN_DRAIN_MS,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
