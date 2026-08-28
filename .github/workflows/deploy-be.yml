@@ -42,10 +42,11 @@ jobs:
             BE_PORT=${{ vars.BE_PORT || '4000' }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
 
+            POSTGRES_HOST=${{ vars.POSTGRES_HOST || 'host.docker.internal' }}
+            POSTGRES_PORT=${{ vars.POSTGRES_PORT || '5432' }}
             POSTGRES_USER=${{ vars.POSTGRES_USER || '4mica' }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             POSTGRES_DB=${{ vars.POSTGRES_DB || '4mica' }}
-            POSTGRES_PORT=${{ vars.POSTGRES_PORT || '5432' }}
 
             CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
 
