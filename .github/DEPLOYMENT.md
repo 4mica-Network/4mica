@@ -24,17 +24,32 @@ copied to the box by hand, not by CI.
 Set every `*_SERVER_HOST` secret — `SERVER_HOST`, `BE_SERVER_HOST`,
 `EMAIL_SERVER_HOST`, `DASHBOARD_SERVER_HOST` — to that one machine.
 
-Postgres is **external/managed**. `apps/be/docker-compose.yml` (with its bundled
-`postgres` service) is local-dev only; production uses
-`apps/be/docker-compose.prod.yml`, which reads `DATABASE_URL` and still runs the
-`migrate` container before `be` starts. `playground` reads the same database
-directly and never migrates it.
+**Postgres is external to the stacks.** `apps/be/docker-compose.yml` bundles a
+`postgres` service, but that file is local-dev only; production uses
+`apps/be/docker-compose.prod.yml`, which contains just the one-shot `migrate`
+container and the API. Both connect *out* to a Postgres that already exists on
+the box — the deploy neither creates nor owns it. Bundling one would put a
+second, empty database on the same machine fighting the real one for port 5432.
 
-### Two Docker networks, two jobs
+No `DATABASE_URL` is ever passed in: both compose files **compose** it from the
+`POSTGRES_*` parts, so the credentials have exactly one source of truth.
+`playground` builds the same string from the same variables and never migrates
+the database — set `POSTGRES_HOST` identically in both, or the two apps quietly
+read different databases.
 
-Both are `external: true` in the compose files and created idempotently by the
-workflows' `pre_up`, because the stacks are separate compose projects and any of
-them may come up first.
+**`POSTGRES_HOST` is resolved from inside a container, so it is never
+`localhost`.** Two values are valid:
+
+| Where Postgres runs | `POSTGRES_HOST` | Also required |
+| --- | --- | --- |
+| On the host | `host.docker.internal` (the default) | The `extra_hosts: host-gateway` entry the compose files already carry, plus host-side `listen_addresses` and `pg_hba.conf` — see bootstrap |
+| In another compose project | that container's name or network alias | Attach that container to `4mica-data` |
+
+### Three Docker networks, three jobs
+
+All three are `external: true` in the compose files and created idempotently by
+the workflows' `pre_up`, because the stacks are separate compose projects and any
+of them may come up first.
 
 **`4mica-edge`** joins `web` and `playground` so the `edge` nginx can resolve
 both. The routing split — `web` keeps its marketing routes, `playground` owns
@@ -56,6 +71,14 @@ Consequences worth knowing before you debug it:
   `EMAIL_SERVICE_URL` must be set to.
 - `EMAIL_SERVICE_URL` is optional. Unset disables sending rather than failing
   boot, so a broken email service degrades the API instead of taking it down.
+
+**`4mica-data`** is the database network, joining `be`, `migrate` and
+`playground`. It carries a Postgres member only when the database is itself a
+container in another compose project attached to it; with a host Postgres the
+network is inert and the containers reach the host via `host.docker.internal`
+instead. It is deliberately *not* `4mica-internal`: that network is the whole of
+the email service's access control, and putting `playground` on it would hand it
+the email service too.
 
 ### Its reserved-path regex
 
@@ -126,10 +149,10 @@ change.
 | Service | Secrets | Variables |
 | --- | --- | --- |
 | web | `SERVER_HOST` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `WEB_PORT` |
-| be | `BE_SERVER_HOST`, `DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY` | `BE_PORT`, `LOG_LEVEL`, `CORS_ORIGINS`, `EMAIL_SERVICE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_AUTHORIZED_PARTIES`, `SHUTDOWN_*`, `RATE_LIMIT_*` |
+| be | `BE_SERVER_HOST`, `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `BE_PORT`, `LOG_LEVEL`, `CORS_ORIGINS`, `EMAIL_SERVICE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_AUTHORIZED_PARTIES`, `SHUTDOWN_*`, `RATE_LIMIT_*` |
 | email | `EMAIL_SERVER_HOST`, `RESEND_API_KEY` | `EMAIL_DRY_RUN`, `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, `EMAIL_REPLY_TO`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL` |
 | dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL` |
-| playground | `SERVER_HOST` (same host as web), `DATABASE_URL`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `PLAYGROUND_PORT`, `EDGE_PORT`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
+| playground | `SERVER_HOST` (same host as web), `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `PLAYGROUND_PORT`, `EDGE_PORT`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
 
 Values the single-box layout pins:
 
@@ -145,6 +168,28 @@ Values the single-box layout pins:
 
 ### Gotchas that will bite on first deploy
 
+- **`DEPLOY_PATH`'s parent must be writable by `SERVER_USER`.** The action
+  clones unprivileged — there is no `sudo` anywhere in it — so with the
+  bootstrap `chown` skipped, `mkdir -p /var/www` succeeds (it already exists,
+  owned by root) and the next line fails with
+  `fatal: could not create work tree dir '/var/www/4mica': Permission denied`,
+  exit 128, on **Prepare remote checkout**. See bootstrap step 3.
+- **`POSTGRES_PASSWORD` has no default.** `docker-compose.prod.yml` declares it
+  `${POSTGRES_PASSWORD:?…}` on purpose, so a production database can never come
+  up on the dev stack's throwaway password — compose refuses to start without
+  it. `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER` and `POSTGRES_DB` do
+  default (`host.docker.internal`, `5432`, `4mica`, `4mica`) and only need
+  setting to override. All of them must match between `be` and `playground`.
+- **`POSTGRES_HOST=localhost` never works.** It is resolved inside the
+  container, where `localhost` is the container itself. Use
+  `host.docker.internal` for a host Postgres, or the container alias for a
+  containerised one.
+- **A bundled Postgres would collide on 5432.** If you ever add a `postgres`
+  service back to `docker-compose.prod.yml`, it will fail to start against an
+  existing host instance with
+  `Bind for 0.0.0.0:5432 failed: port is already allocated`. That is the symptom
+  of two databases, not of a misconfigured port — the stacks connect out to one
+  database rather than shipping their own.
 - **`CLERK_JWT_KEY` is a PEM.** Store it with literal `\n` escapes. The `.env`
   file is line-based, so a real newline truncates it; `apps/be/src/config/index.ts`
   already unescapes `\n` on read.
@@ -173,20 +218,60 @@ Values the single-box layout pins:
    then set the `DEPLOY_PATH` variable to `/var/www/4mica`. Note the default is
    `~/var/www/4mica`, which expands to `$HOME/var/www/4mica` — a different
    directory. Pick one deliberately.
-4. Give that user a deploy key or read access for `git clone` over SSH — the
+
+   **Do not skip this.** The action's clone runs as `SERVER_USER` with no
+   `sudo`, so an un-`chown`ed `/var/www/4mica` fails the deploy at **Prepare
+   remote checkout** with `could not create work tree dir … Permission denied`.
+4. Add that user to the `docker` group —
+   `sudo usermod -aG docker "$SERVER_USER"`, then reconnect. The action runs
+   bare `docker compose`, `docker image prune` and `docker inspect` over SSH; a
+   user outside the group gets `permission denied … /var/run/docker.sock` on
+   the compose step.
+5. Give that user a deploy key or read access for `git clone` over SSH — the
    workflow clones into `DEPLOY_PATH` on first run, so no manual checkout is
-   needed.
-5. `docker network create 4mica-edge && docker network create 4mica-internal`.
-   The workflows also do this, so it is only needed to bring the stacks up by
-   hand.
-6. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
+   needed. The clone uses the **server's own** SSH identity; the runner's key is
+   never agent-forwarded. Verify with
+   `sudo -iu "$SERVER_USER" ssh -T git@github.com` (the "does not provide shell
+   access" greeting is success).
+6. `docker network create 4mica-edge && docker network create 4mica-internal &&
+   docker network create 4mica-data`. The workflows also do this, so it is only
+   needed to bring the stacks up by hand.
+7. **Make the existing Postgres reachable from containers.** Neither stack ships
+   a database; both dial out to this one. For a Postgres running on the host:
+
+   - `listen_addresses` in `postgresql.conf` must cover the Docker bridge.
+     Prefer naming it explicitly — `listen_addresses = 'localhost,172.17.0.1'`
+     (check with `ip -4 addr show docker0`) — over `'*'`, which puts the
+     database on every interface including the public one and leaves a firewall
+     rule as the only thing between it and the internet.
+   - `pg_hba.conf` must accept the container subnets, e.g.
+     `host all all 172.16.0.0/12 scram-sha-256`. That range covers user-defined
+     bridges (172.18+), not just `docker0`. Reload with
+     `sudo systemctl reload postgresql`.
+   - If `ufw` is active it will drop this traffic even with Postgres listening,
+     because it arrives on the host's INPUT chain from a Docker interface:
+     `sudo ufw allow in on docker0 to any port 5432 proto tcp`.
+   - Create the role and database matching `POSTGRES_USER` / `POSTGRES_DB` /
+     `POSTGRES_PASSWORD`. The `migrate` container applies the schema; it does
+     not create the database.
+   - Verify from a container, not from the host:
+     `docker run --rm --add-host host.docker.internal:host-gateway postgres:17-alpine
+     psql "postgresql://4mica:<pw>@host.docker.internal:5432/4mica" -c '\l'`
+
+   For a Postgres that is itself a container in another project, skip the above:
+   attach it to `4mica-data` (`docker network connect 4mica-data <container>`)
+   and set `POSTGRES_HOST` to its name instead.
+8. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
    `api.4mica.io`, then install the host nginx configs and TLS certificates —
    see [`infra/nginx/README.md`](../infra/nginx/README.md).
-7. Open only 80/443 in the firewall. Every service binds loopback, so nothing
-   else needs to be reachable.
-8. Run each workflow via `workflow_dispatch` → `dev` and confirm it ends on the
-   health-wait step. They share a concurrency group, so they queue rather than
-   run together.
+9. Open only 80/443 in the firewall. Every service binds loopback, so nothing
+   else needs to be reachable. **Check 5432 specifically**: step 7 widens the
+   host Postgres beyond loopback, and if it ended up on `'*'` the database is
+   exposed to the internet behind nothing but a password. Confirm from off-box
+   with `nc -vz <host> 5432` — it must fail.
+10. Run each workflow via `workflow_dispatch` → `dev` and confirm it ends on the
+    health-wait step. They share a concurrency group, so they queue rather than
+    run together.
 
 ## Running the stacks locally
 

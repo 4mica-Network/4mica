@@ -42,6 +42,9 @@ jobs:
             EDGE_PORT=${{ vars.EDGE_PORT || '8088' }}
             LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
 
+            # Must match apps/be exactly — see the note in deploy-be.yml.
+            POSTGRES_HOST=${{ vars.POSTGRES_HOST || 'host.docker.internal' }}
+            POSTGRES_PORT=${{ vars.POSTGRES_PORT || '5432' }}
             POSTGRES_USER=${{ vars.POSTGRES_USER || '4mica' }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             POSTGRES_DB=${{ vars.POSTGRES_DB || '4mica' }}
