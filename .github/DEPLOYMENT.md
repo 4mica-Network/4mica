@@ -42,8 +42,27 @@ read different databases.
 
 | Where Postgres runs | `POSTGRES_HOST` | Also required |
 | --- | --- | --- |
+| In another compose project | **that container's name** — preferred | Nothing. Each workflow's `pre_up` attaches it to `4mica-data` for you |
 | On the host | `host.docker.internal` (the default) | The `extra_hosts: host-gateway` entry the compose files already carry, plus host-side `listen_addresses` and `pg_hba.conf` — see bootstrap |
-| In another compose project | that container's name or network alias | Attach that container to `4mica-data` |
+
+**Prefer the container form when you have the choice.** Naming the container
+keeps database traffic on the private `4mica-data` bridge; the host form sends
+it out of the container, into the host's published port and back, which only
+works if Postgres is listening beyond loopback — and a Postgres listening beyond
+loopback is one firewall rule away from being on the internet.
+
+The attach is done by `pre_up` in `deploy-be.yml` and `deploy-playground.yml`:
+
+```sh
+pg='${{ vars.POSTGRES_HOST }}'
+if [ -n "$pg" ] && [ "$pg" != host.docker.internal ]; then
+  docker network connect 4mica-data "$pg" 2>/dev/null || true
+fi
+```
+
+It is idempotent and runs in both workflows because either stack may come up
+first. `POSTGRES_HOST` must therefore be the **container name**, not a bare
+network alias — `docker network connect` takes a container.
 
 ### Three Docker networks, three jobs
 
@@ -236,40 +255,62 @@ Values the single-box layout pins:
 6. `docker network create 4mica-edge && docker network create 4mica-internal &&
    docker network create 4mica-data`. The workflows also do this, so it is only
    needed to bring the stacks up by hand.
-7. **Make the existing Postgres reachable from containers.** Neither stack ships
-   a database; both dial out to this one. For a Postgres running on the host:
+7. **Create the role and database.** Neither stack ships a database and the
+   `migrate` container creates neither — it only applies the schema to one that
+   already exists. Match `POSTGRES_USER` / `POSTGRES_DB` / `POSTGRES_PASSWORD`.
+   **Both defaults start with a digit, so they must be double-quoted in SQL** —
+   bare `CREATE ROLE 4mica` is a syntax error:
 
-   - `listen_addresses` in `postgresql.conf` must cover the Docker bridge.
-     Prefer naming it explicitly — `listen_addresses = 'localhost,172.17.0.1'`
-     (check with `ip -4 addr show docker0`) — over `'*'`, which puts the
-     database on every interface including the public one and leaves a firewall
-     rule as the only thing between it and the internet.
-   - `pg_hba.conf` must accept the container subnets, e.g.
+   ```sql
+   CREATE ROLE "4mica" LOGIN PASSWORD '<POSTGRES_PASSWORD>';
+   CREATE DATABASE "4mica" OWNER "4mica";
+   ```
+
+   Run that with `sudo -u postgres psql` for a host Postgres, or
+   `docker exec -i <container> psql -U postgres` for a containerised one. You
+   can instead point `POSTGRES_USER` / `POSTGRES_DB` at a role and database that
+   already exist; Prisma creates tables and its own `_prisma_migrations` table,
+   so the role must own the database or hold `CREATE` on its schema.
+8. **Make Postgres reachable from the containers.**
+
+   *Containerised Postgres (preferred)* — nothing to do. Set `POSTGRES_HOST` to
+   the container's name and each workflow's `pre_up` joins it to `4mica-data`.
+   Confirm with `docker inspect -f '{{json .NetworkSettings.Networks}}' <container>`.
+
+   *Host Postgres* — the containers dial `host.docker.internal`, so the server
+   must accept connections from the Docker bridge:
+
+   - `listen_addresses` in `postgresql.conf` must cover it. Name it explicitly —
+     `listen_addresses = 'localhost,172.17.0.1'` (check with
+     `ip -4 addr show docker0`) — rather than `'*'`, which puts the database on
+     every interface including the public one and leaves a firewall rule as the
+     only thing between it and the internet.
+   - `pg_hba.conf` must accept the container subnets:
      `host all all 172.16.0.0/12 scram-sha-256`. That range covers user-defined
-     bridges (172.18+), not just `docker0`. Reload with
-     `sudo systemctl reload postgresql`.
-   - If `ufw` is active it will drop this traffic even with Postgres listening,
+     bridges (172.18+), not just `docker0`. Prefer it over `host all all all`,
+     which accepts a password attempt from anywhere the port is reachable.
+     Reload with `sudo systemctl reload postgresql`.
+   - If `ufw` is active it drops this traffic even with Postgres listening,
      because it arrives on the host's INPUT chain from a Docker interface:
      `sudo ufw allow in on docker0 to any port 5432 proto tcp`.
-   - Create the role and database matching `POSTGRES_USER` / `POSTGRES_DB` /
-     `POSTGRES_PASSWORD`. The `migrate` container applies the schema; it does
-     not create the database.
-   - Verify from a container, not from the host:
-     `docker run --rm --add-host host.docker.internal:host-gateway postgres:17-alpine
-     psql "postgresql://4mica:<pw>@host.docker.internal:5432/4mica" -c '\l'`
 
-   For a Postgres that is itself a container in another project, skip the above:
-   attach it to `4mica-data` (`docker network connect 4mica-data <container>`)
-   and set `POSTGRES_HOST` to its name instead.
-8. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
+   Verify either form from inside a container, never from the host — a host
+   `psql` proves nothing, since it goes over loopback or the unix socket:
+
+   ```sh
+   docker run --rm --add-host host.docker.internal:host-gateway postgres:17-alpine \
+     psql "postgresql://4mica:<pw>@host.docker.internal:5432/4mica" -c '\conninfo'
+   ```
+
+9. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
    `api.4mica.io`, then install the host nginx configs and TLS certificates —
    see [`infra/nginx/README.md`](../infra/nginx/README.md).
-9. Open only 80/443 in the firewall. Every service binds loopback, so nothing
-   else needs to be reachable. **Check 5432 specifically**: step 7 widens the
-   host Postgres beyond loopback, and if it ended up on `'*'` the database is
-   exposed to the internet behind nothing but a password. Confirm from off-box
-   with `nc -vz <host> 5432` — it must fail.
-10. Run each workflow via `workflow_dispatch` → `dev` and confirm it ends on the
+10. Open only 80/443 in the firewall. Every service binds loopback, so nothing
+    else needs to be reachable. **Check 5432 specifically**: a host Postgres
+    widened beyond loopback in step 8, or a container publishing `0.0.0.0:5432`,
+    is exposed to the internet behind nothing but a password. Confirm from
+    off-box with `nc -vz <host> 5432` — it must fail.
+11. Run each workflow via `workflow_dispatch` → `dev` and confirm it ends on the
     health-wait step. They share a concurrency group, so they queue rather than
     run together.
 
