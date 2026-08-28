@@ -77,10 +77,10 @@ networks:
   edge:
     name: 4mica-edge
     external: true
-  # The database network, shared with apps/be. Only carries members when
-  # Postgres itself is a container in another compose project attached to it;
-  # with a host Postgres it is inert. Created out of band
-  # (`docker network create 4mica-data`) since any stack may come up first.
+  # The database network, shared with apps/be. When POSTGRES_HOST names a
+  # container, the deploy workflows' pre_up attaches it here so this app can
+  # resolve it by name; with a host Postgres the network is inert. Created out
+  # of band (`docker network create 4mica-data`) since any stack may come first.
   data:
     name: 4mica-data
     external: true
