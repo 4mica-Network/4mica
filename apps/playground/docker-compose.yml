@@ -20,16 +20,22 @@ services:
       PORT: 3100
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIR: /app/logs
-      # The same database apps/be migrates, reached over the shared 4mica-data
-      # network — `postgres` is that stack's service name. Composed from the
-      # POSTGRES_* parts so the credentials have one source of truth; set the
-      # same values here as in apps/be/.env.
+      # The same database apps/be migrates, and this app never migrates it.
+      # Composed from the POSTGRES_* parts so the credentials have one source of
+      # truth: set the same values here as in apps/be/.env, POSTGRES_HOST
+      # included, or the two apps quietly read different databases.
       #
-      # On a laptop, point DATABASE_URL_OVERRIDE at host.docker.internal:5433
-      # to reach `pnpm db:up` instead.
-      DATABASE_URL: ${DATABASE_URL_OVERRIDE:-postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public}
+      # POSTGRES_HOST is resolved from inside the container, so it is never
+      # `localhost` — see the note in apps/be/docker-compose.prod.yml. On a
+      # laptop, point DATABASE_URL_OVERRIDE at host.docker.internal:5433 to
+      # reach `pnpm db:up` instead.
+      DATABASE_URL: ${DATABASE_URL_OVERRIDE:-postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-host.docker.internal}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-4mica}?schema=public}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+    # Makes `host.docker.internal` resolve to the host on Linux, where Docker
+    # does not provide it by default.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${PLAYGROUND_PORT:-8081}:3100"
     volumes:
@@ -71,8 +77,10 @@ networks:
   edge:
     name: 4mica-edge
     external: true
-  # Shared with apps/be so `postgres` resolves. Created out of band
-  # (`docker network create 4mica-data`) since either stack may come up first.
+  # The database network, shared with apps/be. Only carries members when
+  # Postgres itself is a container in another compose project attached to it;
+  # with a host Postgres it is inert. Created out of band
+  # (`docker network create 4mica-data`) since any stack may come up first.
   data:
     name: 4mica-data
     external: true

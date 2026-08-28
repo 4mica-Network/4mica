@@ -1,9 +1,11 @@
 #
-# Production stack for apps/be: postgres + one-shot migrate + the API.
+# Production stack for apps/be: a one-shot migrate container plus the API.
 #
-# Deliberately a standalone file rather than an override of docker-compose.yml:
-# an override can add to a service but cannot rename the `postgres` container or
-# repoint the volume, and the two stacks must never share either.
+# Postgres is NOT part of this stack. Production runs its own Postgres — a host
+# service or a container belonging to another project — and both services here
+# connect out to it via POSTGRES_HOST. Bundling one would mean a second, empty
+# database on the same box fighting the real one for port 5432.
+# `docker-compose.yml`, with its bundled `postgres` service, is local-dev only.
 #
 # Usage: docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 #
@@ -13,39 +15,20 @@
 # 4mica-be-postgres as an orphan of this file and delete it.
 name: 4mica-be-prod
 
-services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: 4mica-be-postgres-prod
-    restart: unless-stopped
-    # Postgres needs time to checkpoint and shut down cleanly. Cutting this
-    # short risks recovery on next boot.
-    stop_grace_period: 30s
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-4mica}
-      # No default, unlike the dev stack: a production database must never come
-      # up on the throwaway password. Compose refuses to start without it.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      POSTGRES_DB: ${POSTGRES_DB:-4mica}
-      POSTGRES_INITDB_ARGS: "--data-checksums"
-    # Loopback only, so pg_dump and psql work from the host without exposing
-    # the database off-box.
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - default
-      - data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-4mica} -d ${POSTGRES_DB:-4mica}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+# Anchor so `migrate` and `be` cannot drift apart: they must agree on the
+# database exactly, or migrations land somewhere the API never reads.
+#
+# POSTGRES_HOST is resolved from *inside* the container, so it is never
+# `localhost`. Two values make sense in production:
+#   - `host.docker.internal` — Postgres runs on the host. The extra_hosts entry
+#     below is what makes that name resolve on Linux; the host must also listen
+#     on the Docker bridge and allow that subnet in pg_hba.conf.
+#   - a container name/alias on the `4mica-data` network — Postgres runs in
+#     another compose project. Attach that container to 4mica-data.
+x-database-url: &database-url
+  DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@${POSTGRES_HOST:-host.docker.internal}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-4mica}?schema=public
 
+services:
   migrate:
     build:
       context: ../..
@@ -54,14 +37,14 @@ services:
     image: 4mica-be-migrate:latest
     container_name: 4mica-be-migrate
     restart: "no"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
+    environment: *database-url
+    # Makes `host.docker.internal` resolve to the host on Linux, where Docker
+    # does not provide it by default.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - default
       - data
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   be:
     build:
@@ -75,6 +58,9 @@ services:
     # before Docker resorts to SIGKILL.
     stop_grace_period: 40s
     environment:
+      # Same anchor as `migrate`, so the API can never read a different
+      # database than the one the migrations were applied to.
+      <<: *database-url
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 4000
@@ -87,15 +73,13 @@ services:
       RATE_LIMIT_USER_MAX: ${RATE_LIMIT_USER_MAX:-120}
       RATE_LIMIT_SENSITIVE_MAX: ${RATE_LIMIT_SENSITIVE_MAX:-10}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
-      # Composed from the POSTGRES_* parts rather than taking a whole
-      # DATABASE_URL, so the credentials have exactly one source of truth.
-      # apps/playground builds the same string from the same variables.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-4mica}?schema=public
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       CLERK_JWT_KEY: ${CLERK_JWT_KEY:-}
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-}
       EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${BE_PORT:-4000}:4000"
     networks:
@@ -103,8 +87,6 @@ services:
       - internal
       - data
     depends_on:
-      postgres:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     healthcheck:
@@ -114,24 +96,21 @@ services:
       retries: 3
       start_period: 10s
 
-volumes:
-  # Named separately from the dev stack's 4mica-be-postgres-data so the two can
-  # never end up sharing a data directory.
-  postgres-data:
-    name: 4mica-be-postgres-prod-data
-
 networks:
   internal:
     name: 4mica-internal
     external: true
-  # Shared with apps/playground, which is a separate compose project and so
-  # cannot reach this stack's default network. It reads the same database
-  # directly and never migrates it. Deliberately NOT 4mica-internal: that one
-  # is what keeps apps/email reachable by apps/be alone, and putting the
-  # playground on it would hand it access to the email service too.
+  # The database network. It carries no members of its own here — it exists so
+  # that a Postgres container living in another compose project can be attached
+  # to it and reached by name from `be`, `migrate` and `playground` alike.
+  # Harmless when Postgres is a host service instead.
   #
-  # Created out of band (`docker network create 4mica-data`) because either
-  # stack may come up first.
+  # Deliberately NOT 4mica-internal: that one is what keeps apps/email reachable
+  # by apps/be alone, and putting the playground on it would hand it access to
+  # the email service too.
+  #
+  # Created out of band (`docker network create 4mica-data`) because any stack
+  # may come up first.
   data:
     name: 4mica-data
     external: true
