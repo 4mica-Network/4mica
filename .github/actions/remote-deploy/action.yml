@@ -167,7 +167,17 @@ runs:
 
         # No `down` first: compose recreates only the containers whose config or
         # image changed, which keeps the downtime window to a single restart.
-        docker compose -f "$COMPOSE_FILE_NAME" --env-file .env up -d --build --remove-orphans
+        #
+        # On failure, dump the logs before exiting. `up` reports only that a
+        # service exited non-zero — for a one-shot container like `migrate`,
+        # which is gone from the health-wait step's view, that message is the
+        # entire diagnosis unless we go and fetch the reason here.
+        if ! docker compose -f "$COMPOSE_FILE_NAME" --env-file .env up -d --build --remove-orphans; then
+          echo "::error::docker compose up failed. Container logs follow."
+          docker compose -f "$COMPOSE_FILE_NAME" --env-file .env ps -a || true
+          docker compose -f "$COMPOSE_FILE_NAME" --env-file .env logs --tail=200 --no-color || true
+          exit 1
+        fi
         docker image prune -f
         docker compose -f "$COMPOSE_FILE_NAME" --env-file .env ps
         EOF
