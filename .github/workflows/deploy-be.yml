@@ -36,7 +36,18 @@ jobs:
           service_dir: apps/be
           compose_file: docker-compose.prod.yml
           health_container: 4mica-be
-          pre_up: docker network create 4mica-internal 2>/dev/null || true; docker network create 4mica-data 2>/dev/null || true
+          pre_up: |
+            docker network create 4mica-internal 2>/dev/null || true
+            docker network create 4mica-data 2>/dev/null || true
+            # When POSTGRES_HOST names a Postgres container run by some other
+            # project, join it to the database network so `be` and `migrate`
+            # resolve it by name and their traffic stays on a private bridge
+            # instead of hairpinning out through the host's published port.
+            # Idempotent, and a no-op for a host Postgres.
+            pg='${{ vars.POSTGRES_HOST }}'
+            if [ -n "$pg" ] && [ "$pg" != host.docker.internal ]; then
+              docker network connect 4mica-data "$pg" 2>/dev/null || true
+            fi
           env_contents: |
             NODE_ENV=production
             BE_PORT=${{ vars.BE_PORT || '4000' }}

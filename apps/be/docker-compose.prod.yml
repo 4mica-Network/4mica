@@ -100,10 +100,11 @@ networks:
   internal:
     name: 4mica-internal
     external: true
-  # The database network. It carries no members of its own here — it exists so
-  # that a Postgres container living in another compose project can be attached
-  # to it and reached by name from `be`, `migrate` and `playground` alike.
-  # Harmless when Postgres is a host service instead.
+  # The database network, joining `be`, `migrate` and `playground` to Postgres.
+  # When POSTGRES_HOST names a container, the deploy workflows' pre_up attaches
+  # it here, so the traffic stays on a private bridge rather than hairpinning
+  # out through the host's published port. Inert when Postgres is a host
+  # service, which the containers reach via host.docker.internal instead.
   #
   # Deliberately NOT 4mica-internal: that one is what keeps apps/email reachable
   # by apps/be alone, and putting the playground on it would hand it access to
