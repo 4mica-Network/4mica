@@ -2,8 +2,8 @@
 the same basic-scheme DST core signs under."""
 
 import pytest
-from conftest import TEST_ADDRESS, FakeRpc, make_ctx
 from py_ecc.bls import G2Basic
+from stubs import TEST_ADDRESS, FakeRpc, make_ctx
 
 from fourmica_sdk.client.payment import PaymentClient
 from fourmica_sdk.errors import (
@@ -48,7 +48,7 @@ def cert_claims(**overrides) -> PaymentGuaranteeClaims:
 
 
 def payment_client(rpc=None) -> PaymentClient:
-    from conftest import make_public_params
+    from stubs import make_public_params
 
     ctx = make_ctx(
         rpc=rpc,

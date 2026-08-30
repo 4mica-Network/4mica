@@ -1,5 +1,5 @@
 import pytest
-from conftest import TEST_ADDRESS, FakeGateway, FakeRpc, make_ctx
+from stubs import TEST_ADDRESS, FakeGateway, FakeRpc, make_ctx
 
 from fourmica_sdk.client.model import Route, TokenRoute
 from fourmica_sdk.client.settlement import SettlementClient

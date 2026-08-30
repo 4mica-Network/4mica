@@ -1,5 +1,5 @@
 import pytest
-from conftest import CONTRACT_ADDRESS, TEST_PRIVATE_KEY
+from stubs import CONTRACT_ADDRESS, TEST_PRIVATE_KEY
 
 import fourmica_sdk.client.ctx as ctx_module
 from fourmica_sdk.client.ctx import ClientCtx
