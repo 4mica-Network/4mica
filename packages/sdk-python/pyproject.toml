@@ -1,0 +1,37 @@
+[project]
+name = "sdk-4mica"
+version = "1.2.10"
+description = "Python SDK for interacting with the 4Mica payment network."
+authors = [{ name = "4Mica Network", email = "mairon@4mica.xyz" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "web3>=7.14.1",
+  "httpx>=0.28.0",
+  "eth-abi>=5.2.0",
+  "eth-utils>=6.0.0",
+  "pydantic>=2.12.0",
+  "typing-extensions>=4.15.0",
+  "certifi>=2026.2.25",
+  "websockets>=15.0.1",
+  "py-ecc>=8.0.0",
+]
+
+[project.optional-dependencies]
+cdp = ["cdp-sdk>=1.0.0"]
+dev = ["pytest>=9.0.1", "pytest-asyncio>=1.3.0"]
+
+[project.urls]
+homepage = "https://4mica.xyz"
+repository = "https://github.com/4mica-Network/4mica-core"
+documentation = "https://docs.4mica.xyz"
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fourmica_sdk*"]
+
+[tool.setuptools.package-data]
+fourmica_sdk = ["abi/*.json"]
