@@ -1,37 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "sdk-4mica"
-version = "1.2.10"
-description = "Python SDK for interacting with the 4Mica payment network."
-authors = [{ name = "4Mica Network", email = "mairon@4mica.xyz" }]
+version = "2.0.0a1"
+description = "4Mica Python SDK — payment guarantees and settlement-cycle clearing for the agentic economy"
 readme = "README.md"
-requires-python = ">=3.9"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "4Mica Network", email = "engineering@4mica.io" }]
+keywords = ["4mica", "x402", "payments", "ethereum", "stablecoin"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries",
+]
 dependencies = [
   "web3>=7.14.1",
   "httpx>=0.28.0",
   "eth-abi>=5.2.0",
   "eth-utils>=6.0.0",
-  "pydantic>=2.12.0",
-  "typing-extensions>=4.15.0",
-  "certifi>=2026.2.25",
-  "websockets>=15.0.1",
+  "eth-account>=0.13.0",
   "py-ecc>=8.0.0",
+  "typing-extensions>=4.15.0",
+  "certifi>=2024.2.2",
 ]
 
 [project.optional-dependencies]
 cdp = ["cdp-sdk>=1.0.0"]
-dev = ["pytest>=9.0.1", "pytest-asyncio>=1.3.0"]
+dev = ["pytest>=8.4.0", "pytest-asyncio>=1.0.0", "ruff>=0.6.0"]
 
 [project.urls]
-homepage = "https://4mica.xyz"
-repository = "https://github.com/4mica-Network/4mica-core"
-documentation = "https://docs.4mica.xyz"
+Homepage = "https://4mica.io"
+Repository = "https://github.com/4mica-Network/4mica"
+Documentation = "https://docs.4mica.xyz"
 
-[tool.setuptools]
-package-dir = { "" = "." }
+[tool.hatch.build.targets.wheel]
+packages = ["fourmica_sdk"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["fourmica_sdk*"]
+[tool.hatch.build.targets.wheel.force-include]
+"fourmica_sdk/contract/abi" = "fourmica_sdk/contract/abi"
 
-[tool.setuptools.package-data]
-fourmica_sdk = ["abi/*.json"]
+[tool.pytest.ini_options]
+addopts = '-m "not integration"'
+markers = [
+  "integration: tests that need a live 4mica-core stack",
+]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

@@ -1,80 +1,59 @@
 import pytest
 
-from fourmica_sdk.config import ConfigBuilder
+from fourmica_sdk.config import DEFAULT_RPC_URL, ConfigBuilder
 from fourmica_sdk.errors import ConfigError
 
-
-def test_config_builder_reads_from_env(monkeypatch):
-    monkeypatch.setenv("4MICA_RPC_URL", "https://example.com")
-    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", "11" * 32)
-    cfg = ConfigBuilder().from_env().build()
-    assert cfg.rpc_url == "https://example.com"
-    assert cfg.wallet_private_key.startswith("0x11")
+KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 
-def test_config_builder_resolves_base_network():
-    by_name = ConfigBuilder().network("base").wallet_private_key("11" * 32).build()
-    by_caip2 = (
-        ConfigBuilder().network("eip155:8453").wallet_private_key("11" * 32).build()
-    )
-
-    assert by_name.rpc_url == "https://base.api.4mica.xyz/"
-    assert by_caip2.rpc_url == "https://base.api.4mica.xyz/"
-
-
-def test_config_builder_network_env_takes_precedence(monkeypatch):
-    monkeypatch.setenv("4MICA_NETWORK", "base")
-    monkeypatch.setenv("4MICA_RPC_URL", "https://example.com")
-    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", "11" * 32)
-
-    cfg = ConfigBuilder().from_env().build()
-
-    assert cfg.rpc_url == "https://base.api.4mica.xyz/"
-
-
-def test_config_builder_requires_private_key(monkeypatch):
-    monkeypatch.delenv("4MICA_WALLET_PRIVATE_KEY", raising=False)
-    builder = ConfigBuilder().from_env()
-    with pytest.raises(ConfigError):
-        builder.build()
-
-
-def test_config_builder_rejects_invalid_private_key():
-    builder = ConfigBuilder().wallet_private_key("0x1234")
-    with pytest.raises(ConfigError):
-        builder.build()
-
-
-def test_config_builder_auth_defaults_to_rpc_url():
-    cfg = (
-        ConfigBuilder()
-        .rpc_url("https://example.com")
-        .wallet_private_key("11" * 32)
-        .enable_auth()
-        .build()
-    )
+def test_defaults_enable_siwe_auth():
+    cfg = ConfigBuilder().wallet_private_key(KEY).build()
+    assert cfg.rpc_url == DEFAULT_RPC_URL
     assert cfg.auth is not None
-    assert cfg.auth.auth_url == "https://example.com"
+    assert cfg.auth.auth_url == DEFAULT_RPC_URL
     assert cfg.auth.refresh_margin_secs == 60
+    assert cfg.facilitator_url is None
 
 
-def test_config_builder_reads_auth_env(monkeypatch):
-    monkeypatch.setenv("4MICA_RPC_URL", "https://example.com")
-    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", "11" * 32)
-    monkeypatch.setenv("4MICA_BEARER_TOKEN", "token")
-    monkeypatch.setenv("4MICA_AUTH_URL", "https://auth.example.com")
-    monkeypatch.setenv("4MICA_AUTH_REFRESH_MARGIN_SECS", "120")
-    cfg = ConfigBuilder().from_env().build()
+def test_bearer_token_replaces_siwe():
+    cfg = ConfigBuilder().wallet_private_key(KEY).bearer_token("token").build()
     assert cfg.bearer_token == "token"
-    assert cfg.auth is not None
-    assert cfg.auth.auth_url == "https://auth.example.com"
-    assert cfg.auth.refresh_margin_secs == 120
+    assert cfg.auth is None
 
 
-def test_config_builder_reads_bearer_token_from_env(monkeypatch):
-    monkeypatch.setenv("4MICA_RPC_URL", "https://example.com")
-    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", "11" * 32)
-    monkeypatch.setenv("4MICA_BEARER_TOKEN", "my-static-token")
-    monkeypatch.delenv("4MICA_AUTH_URL", raising=False)
+def test_network_shorthand_and_caip2():
+    cfg = ConfigBuilder().network("base").wallet_private_key(KEY).build()
+    assert cfg.rpc_url == "https://base.api.4mica.xyz/"
+    cfg = ConfigBuilder().network("eip155:8453").wallet_private_key(KEY).build()
+    assert cfg.rpc_url == "https://base.api.4mica.xyz/"
+    with pytest.raises(ConfigError, match="unknown network"):
+        ConfigBuilder().network("solana")
+
+
+def test_missing_signer_is_rejected():
+    with pytest.raises(ConfigError, match="wallet_private_key"):
+        ConfigBuilder().build()
+
+
+def test_invalid_urls_are_rejected():
+    with pytest.raises(ConfigError):
+        ConfigBuilder().rpc_url("not-a-url").wallet_private_key(KEY).build()
+    with pytest.raises(ConfigError):
+        (ConfigBuilder().wallet_private_key(KEY).facilitator_url("not-a-url").build())
+
+
+def test_from_env_reads_facilitator_url(monkeypatch):
+    monkeypatch.setenv("4MICA_RPC_URL", "https://env.example/")
+    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", KEY)
+    monkeypatch.setenv("4MICA_FACILITATOR_URL", "https://facilitator.example/")
     cfg = ConfigBuilder().from_env().build()
-    assert cfg.bearer_token == "my-static-token"
+    assert cfg.rpc_url == "https://env.example/"
+    assert cfg.facilitator_url == "https://facilitator.example/"
+
+
+def test_from_env_network_takes_precedence(monkeypatch):
+    monkeypatch.setenv("4MICA_NETWORK", "base-sepolia")
+    monkeypatch.setenv("4MICA_RPC_URL", "https://env.example/")
+    monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", KEY)
+    cfg = ConfigBuilder().from_env().build()
+    assert cfg.rpc_url == "https://base.sepolia.api.4mica.xyz/"

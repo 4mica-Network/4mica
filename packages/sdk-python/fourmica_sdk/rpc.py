@@ -1,13 +1,30 @@
+"""HTTP client for the 4Mica core operator API.
+
+Mirrors ``crates/rpc/src/proxy.rs``: the paths here are exactly the routes
+core serves (``core/src/http.rs``); anything else is another service's
+endpoint. GETs retry on 429/5xx; POSTs never do — they may have acted.
+"""
+
 from __future__ import annotations
 
 import asyncio
-import httpx
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+import httpx
+
 from .errors import RpcError
-from .models import SupportedTokensResponse
-from .signing import CorePublicParameters
+from .models import (
+    AssetBalanceInfo,
+    BLSCert,
+    ClearingParticipantProof,
+    ClearingSettlementAction,
+    ClearingSettlementActionResponse,
+    CorePublicParameters,
+    RecipientPaymentInfo,
+    SupportedTokensResponse,
+    UserSuspensionStatus,
+)
 
 ADMIN_API_KEY_HEADER = "x-api-key"
 AUTHORIZATION_HEADER = "authorization"
@@ -26,16 +43,16 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 0.5  # seconds
 
 
-def _serialize_tab_id(tab_id: int) -> str:
-    return hex(int(tab_id))
-
-
 class RpcProxy:
-    """HTTP client for the core facilitator API."""
+    """HTTP client for the core operator API."""
 
-    def __init__(self, endpoint: str) -> None:
+    def __init__(
+        self, endpoint: str, transport: Optional[httpx.AsyncBaseTransport] = None
+    ) -> None:
         base = endpoint if endpoint.endswith("/") else f"{endpoint}/"
-        self._client = httpx.AsyncClient(base_url=base, timeout=20.0)
+        self._client = httpx.AsyncClient(
+            base_url=base, timeout=20.0, transport=transport
+        )
         self._admin_api_key: Optional[str] = None
         self._bearer_token: Optional[str] = None
         self._token_provider: Optional[TokenProvider] = None
@@ -129,91 +146,67 @@ class RpcProxy:
         return await self._decode(resp)
 
     async def get_public_params(self) -> CorePublicParameters:
-        data = await self._get("/core/public-params")
-        return CorePublicParameters.from_rpc(data)
+        return CorePublicParameters.from_rpc(await self._get("/core/public-params"))
 
-    async def issue_guarantee(self, body: Dict[str, Any]) -> Dict[str, Any]:
-        return await self._post("/core/guarantees", body)
+    async def get_supported_tokens(self) -> SupportedTokensResponse:
+        return SupportedTokensResponse.from_rpc(await self._get("/core/tokens"))
 
-    async def create_payment_tab(self, body: Dict[str, Any]) -> Dict[str, Any]:
-        return await self._post("/core/payment-tabs", body)
+    async def issue_guarantee(self, body: Dict[str, Any]) -> BLSCert:
+        return BLSCert.from_rpc(await self._post("/core/guarantees", body))
 
-    async def list_settled_tabs(self, recipient_address: str) -> List[Dict[str, Any]]:
-        return await self._get(f"/core/recipients/{recipient_address}/settled-tabs")
+    async def get_clearing_participant_proof(
+        self, cycle_id: str, participant: str
+    ) -> ClearingParticipantProof:
+        raw = await self._get(
+            f"/core/cycles/{cycle_id}/participants/{participant}/clearing-proof"
+        )
+        return ClearingParticipantProof.from_rpc(raw)
 
-    async def list_pending_remunerations(
-        self, recipient_address: str
-    ) -> List[Dict[str, Any]]:
-        return await self._get(
-            f"/core/recipients/{recipient_address}/pending-remunerations"
+    async def get_clearing_settlement_action(
+        self, cycle_id: str, participant: str, action: ClearingSettlementAction
+    ) -> ClearingSettlementActionResponse:
+        raw = await self._get(
+            f"/core/cycles/{cycle_id}/participants/{participant}/clearing-action",
+            params={"action": ClearingSettlementAction(action).value},
+        )
+        return ClearingSettlementActionResponse.from_rpc(raw)
+
+    async def get_clearing_pay_net_debit_action(
+        self, cycle_id: str, debtor: str
+    ) -> ClearingSettlementActionResponse:
+        return await self.get_clearing_settlement_action(
+            cycle_id, debtor, ClearingSettlementAction.PAY_NET_DEBIT
         )
 
-    async def get_tab(self, tab_id: int) -> Optional[Dict[str, Any]]:
-        return await self._get(f"/core/tabs/{_serialize_tab_id(tab_id)}")
-
-    async def list_user_tabs(
-        self, user_address: str, settlement_statuses: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        params: Optional[Dict[str, Any]] = None
-        if settlement_statuses:
-            params = {"settlement_status": settlement_statuses}
-        return await self._get(f"/core/users/{user_address}/tabs", params=params)
-
-    async def list_recipient_tabs(
-        self, recipient_address: str, settlement_statuses: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        params: Optional[Dict[str, Any]] = None
-        if settlement_statuses:
-            params = {"settlement_status": settlement_statuses}
-        return await self._get(
-            f"/core/recipients/{recipient_address}/tabs", params=params
-        )
-
-    async def get_tab_guarantees(self, tab_id: int) -> List[Dict[str, Any]]:
-        return await self._get(f"/core/tabs/{_serialize_tab_id(tab_id)}/guarantees")
-
-    async def get_latest_guarantee(self, tab_id: int) -> Optional[Dict[str, Any]]:
-        return await self._get(
-            f"/core/tabs/{_serialize_tab_id(tab_id)}/guarantees/latest"
-        )
-
-    async def get_guarantee(self, tab_id: int, req_id: int) -> Optional[Dict[str, Any]]:
-        return await self._get(
-            f"/core/tabs/{_serialize_tab_id(tab_id)}/guarantees/{req_id}"
+    async def get_clearing_claim_net_credit_action(
+        self, cycle_id: str, creditor: str
+    ) -> ClearingSettlementActionResponse:
+        return await self.get_clearing_settlement_action(
+            cycle_id, creditor, ClearingSettlementAction.CLAIM_NET_CREDIT
         )
 
     async def list_recipient_payments(
         self, recipient_address: str
-    ) -> List[Dict[str, Any]]:
-        return await self._get(f"/core/recipients/{recipient_address}/payments")
-
-    async def get_collateral_events_for_tab(self, tab_id: int) -> List[Dict[str, Any]]:
-        return await self._get(
-            f"/core/tabs/{_serialize_tab_id(tab_id)}/collateral-events"
-        )
-
-    async def get_supported_tokens(self) -> SupportedTokensResponse:
-        response = await self._get("/core/tokens")
-        return SupportedTokensResponse.from_rpc(response)
+    ) -> List[RecipientPaymentInfo]:
+        raw = await self._get(f"/core/recipients/{recipient_address}/payments")
+        return [RecipientPaymentInfo.from_rpc(item) for item in raw or []]
 
     async def get_user_asset_balance(
         self, user_address: str, asset_address: str
-    ) -> Optional[Dict[str, Any]]:
-        return await self._get(f"/core/users/{user_address}/assets/{asset_address}")
+    ) -> Optional[AssetBalanceInfo]:
+        # Core answers JSON null (not 404) when the user holds nothing in the asset.
+        raw = await self._get(f"/core/users/{user_address}/assets/{asset_address}")
+        return AssetBalanceInfo.from_rpc(raw) if raw is not None else None
 
     async def update_user_suspension(
         self, user_address: str, suspended: bool
-    ) -> Dict[str, Any]:
-        body = {"suspended": suspended}
-        return await self._post(
-            f"/core/users/{user_address}/suspension", body, admin=True
+    ) -> UserSuspensionStatus:
+        raw = await self._post(
+            f"/core/users/{user_address}/suspension",
+            {"suspended": suspended},
+            admin=True,
         )
+        return UserSuspensionStatus.from_rpc(raw)
 
-    async def create_admin_api_key(self, body: Dict[str, Any]) -> Dict[str, Any]:
-        return await self._post("/core/admin/api-keys", body, admin=True)
-
-    async def list_admin_api_keys(self) -> List[Dict[str, Any]]:
-        return await self._get("/core/admin/api-keys", admin=True)
-
-    async def revoke_admin_api_key(self, key_id: str) -> Dict[str, Any]:
-        return await self._post(f"/core/admin/api-keys/{key_id}/revoke", {}, admin=True)
+    async def health(self) -> Dict[str, Any]:
+        return await self._get("/core/health")
