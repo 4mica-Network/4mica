@@ -43,9 +43,6 @@ Documentation = "https://docs.4mica.xyz"
 [tool.hatch.build.targets.wheel]
 packages = ["fourmica_sdk"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"fourmica_sdk/contract/abi" = "fourmica_sdk/contract/abi"
-
 [tool.pytest.ini_options]
 addopts = '-m "not integration"'
 markers = [
