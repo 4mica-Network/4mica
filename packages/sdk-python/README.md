@@ -135,6 +135,36 @@ positions = await client.account.assets()
 balance = await client.account.asset_balance("0xToken...")
 ```
 
+### Gasless routes
+
+With a facilitator configured (`.facilitator_url(...)` or
+`4MICA_FACILITATOR_URL`), token-moving operations can run without the signer
+paying gas: the payer signs an authorization and the facilitator submits it.
+Unpinned `send()` prefers gasless and falls back to self-funding when nothing
+will sponsor it; a pin makes the route explicit:
+
+```python
+await (
+    client.deposit.of("0xToken...", 5_000_000).gasless().send()
+)  # EIP-3009, then Permit2
+await client.withdraw.request(None, 10**17).gasless().send()  # works for ETH too
+await client.settlement.pay(cycle_id).permit2().sponsor_approval().send()
+await client.settlement.claim(cycle_id).gasless().send()  # nothing to sign at all
+
+auth = (
+    await client.deposit.of("0xToken...", 5_000_000).eip3009().sign()
+)  # sign offline...
+await (
+    client.deposit.of("0xToken...", 5_000_000).eip3009().authorization(auth).send()
+)  # ...redeem anywhere
+```
+
+Read the receipt's `route` to see which one actually ran. Rejections that
+name the request itself (`SIGNATURE_MISMATCH`, `INSUFFICIENT_BALANCE`, …)
+are surfaced, not retried — your own transaction would fail the same way —
+and an `OutcomeUnknownError` means the facilitator may already have
+submitted: check the chain before resending.
+
 ## x402
 
 The SDK implements the `4mica-credit` x402 scheme, versions 1 and 2. There is
@@ -161,8 +191,8 @@ print(settled.settlement.success, settled.settlement.certificate)
 Everything derives from `FourMicaError`. Contract reverts decode to typed
 exceptions (`InsufficientAvailableError`, `GracePeriodNotElapsedError`, …);
 missing allowances surface as `Erc20AllowanceRequiredError` *before* gas is
-spent; facilitator rejections (from the sponsorship routes arriving in a later
-release) carry their `errorCode` verbatim on `FacilitatorRejectedError`.
+spent; facilitator rejections carry their `errorCode` verbatim on
+`FacilitatorRejectedError`, so callers can branch on codes this SDK predates.
 
 ## Development
 

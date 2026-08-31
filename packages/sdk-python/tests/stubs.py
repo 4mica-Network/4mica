@@ -2,15 +2,47 @@
 
 from typing import Any, Dict, List, Optional
 
+import httpx
+
 from fourmica_sdk.client.ctx import ClientCtx  # noqa: E402
+from fourmica_sdk.client.facilitator import Facilitator  # noqa: E402
 from fourmica_sdk.config import Config  # noqa: E402
-from fourmica_sdk.models import CorePublicParameters  # noqa: E402
+from fourmica_sdk.models import (  # noqa: E402
+    CorePublicParameters,
+    SupportedTokenInfo,
+    SupportedTokensResponse,
+)
 from fourmica_sdk.signing import LocalAccountSigner  # noqa: E402
 
 # anvil key #0
 TEST_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 TEST_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 CONTRACT_ADDRESS = "0x00000000000000000000000000000000C04E4a1c"
+TOKEN_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+TOKEN_DOMAIN = "0x" + "ab" * 32
+FACILITATOR_URL = "https://facilitator.example/"
+
+
+def supported_tokens(domain_separator: Optional[str] = TOKEN_DOMAIN):
+    return SupportedTokensResponse(
+        chain_id=84532,
+        tokens=[
+            SupportedTokenInfo(
+                symbol="USDC",
+                address=TOKEN_ADDRESS,
+                decimals=6,
+                domain_separator=domain_separator,
+            )
+        ],
+    )
+
+
+def attach_facilitator(ctx: ClientCtx, handler) -> None:
+    """Point the ctx's facilitator at an httpx MockTransport handler."""
+    ctx.facilitator = Facilitator(
+        FACILITATOR_URL,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
 
 
 class FakeRpc:

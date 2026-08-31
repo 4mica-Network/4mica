@@ -29,6 +29,13 @@ class EvmSigner(Protocol):
 
     async def sign_message(self, message: Union[str, bytes]) -> Union[str, bytes]: ...
 
+    async def sign_hash(self, message_hash: bytes) -> Union[str, bytes]:
+        """Sign a raw 32-byte digest, unprefixed. Gasless authorizations need
+        this: their EIP-712 digests build on opaque domain separators (a
+        token's own ``DOMAIN_SEPARATOR()``), which typed-data signing cannot
+        reconstruct."""
+        ...
+
 
 class LocalAccountSigner:
     """Default signer backed by an ``eth_account.Account``."""
@@ -65,6 +72,12 @@ class LocalAccountSigner:
             message = message.encode()
         signed = self._account.sign_message(encode_defunct(primitive=message))
         return signed.signature.hex()
+
+    async def sign_hash(self, message_hash: bytes) -> str:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, lambda: self._account.unsafe_sign_hash(message_hash).signature.hex()
+        )
 
 
 class PaymentSigner:
