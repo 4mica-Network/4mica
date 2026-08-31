@@ -18,10 +18,7 @@ def test_fastapi_wrapper_builds():
         }
     }
 
-    middleware = fastapi_payment_middleware_from_config(
-        routes,
-        tab_endpoint="http://localhost:3000/payment/tab",
-    )
+    middleware = fastapi_payment_middleware_from_config(routes)
 
     @app.middleware("http")
     async def x402_mw(request, call_next):
@@ -47,10 +44,6 @@ def test_flask_wrapper_builds():
         }
     }
 
-    middleware = flask_payment_middleware_from_config(
-        app,
-        routes,
-        tab_endpoint="http://localhost:3000/payment/tab",
-    )
+    middleware = flask_payment_middleware_from_config(app, routes)
 
     assert middleware is not None

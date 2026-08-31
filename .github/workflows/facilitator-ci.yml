@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/facilitator/**"
+      - "packages/sdk-python/**"
       - ".github/workflows/facilitator-ci.yml"
   workflow_dispatch:
 
@@ -62,3 +63,32 @@ jobs:
 
       - name: Build
         run: pnpm --filter "./apps/facilitator/**" run build
+
+  python:
+    name: Python (4mica-x402)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/facilitator/packages/python/x402
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        # The in-repo SDK first: 4mica-x402 pins sdk-4mica>=2.0.0a1, and
+        # pre-releases only resolve from PyPI once published.
+        run: |
+          uv venv
+          uv pip install -e ../../../../../packages/sdk-python
+          uv pip install -e ".[dev,fastapi,flask,httpx]"
+
+      - name: Ruff lint
+        run: uv run ruff check src tests demo
+
+      - name: Pytest
+        run: uv run pytest

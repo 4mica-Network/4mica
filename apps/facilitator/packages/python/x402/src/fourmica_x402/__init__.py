@@ -22,23 +22,17 @@ try:  # Optional: facilitator depends on x402
     from .facilitator import (
         FourMicaFacilitatorClient,
         FourMicaFacilitatorClientSync,
-        OpenTabError,
-        OpenTabResponse,
     )
 
     __all__.extend(
         [
             "FourMicaFacilitatorClient",
             "FourMicaFacilitatorClientSync",
-            "OpenTabError",
-            "OpenTabResponse",
         ]
     )
 except Exception:
     FourMicaFacilitatorClient = None  # type: ignore[assignment]
     FourMicaFacilitatorClientSync = None  # type: ignore[assignment]
-    OpenTabError = None  # type: ignore[assignment]
-    OpenTabResponse = None  # type: ignore[assignment]
 
 try:  # Optional: server scheme depends on x402
     from .server_scheme import FourMicaEvmScheme
