@@ -80,8 +80,6 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        # The in-repo SDK first: 4mica-x402 pins sdk-4mica>=2.0.0a1, and
-        # pre-releases only resolve from PyPI once published.
         run: |
           uv venv
           uv pip install -e ../../../../../packages/sdk-python
@@ -91,4 +89,4 @@ jobs:
         run: uv run ruff check src tests demo
 
       - name: Pytest
-        run: uv run pytest
+        run: uv run pytestbut

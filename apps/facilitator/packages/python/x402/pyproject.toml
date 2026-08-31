@@ -12,6 +12,9 @@ license = { text = "MIT" }
 authors = [{ name = "4mica" }]
 dependencies = ["x402>=2.21.0", "sdk-4mica>=2.0.0a1,<3"]
 
+[tool.uv.sources]
+sdk-4mica = { path = "../../../../../packages/sdk-python", editable = true }
+
 [project.optional-dependencies]
 fastapi = ["fastapi[standard]>=0.115.0", "starlette>=0.27.0"]
 flask = ["flask>=3.0.0"]
