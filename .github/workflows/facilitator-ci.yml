@@ -89,4 +89,4 @@ jobs:
         run: uv run ruff check src tests demo
 
       - name: Pytest
-        run: uv run pytestbut
+        run: uv run pytest
