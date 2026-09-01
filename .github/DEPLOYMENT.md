@@ -187,6 +187,15 @@ Values the single-box layout pins:
 
 ### Gotchas that will bite on first deploy
 
+- **Paste `*_SERVER_HOST` secrets without a trailing newline.** A trailing
+  newline or space becomes part of the hostname, and `ssh` rejects it with
+  `hostname contains invalid characters` and exit 255 — from **Prepare remote
+  checkout**, not from the step that set it. **Validate deploy target** now
+  trims the ends and logs a `::warning::` naming the secret to re-enter, so
+  this degrades to a warning rather than a failed deploy. An empty secret, a
+  `host:port` pair, and a `https://` prefix each fail there with their own
+  message. Note the trimmed value is re-masked with `::add-mask::`, since the
+  runner only masks the secret's exact stored value.
 - **`DEPLOY_PATH` must be writable by `SERVER_USER`.** The action clones
   unprivileged — there is no `sudo` anywhere in it — so with the bootstrap
   `chown` skipped, **Prepare remote checkout** fails with
