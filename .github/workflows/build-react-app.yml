@@ -40,3 +40,13 @@ jobs:
             NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
             WEB_PORT=${{ vars.WEB_PORT || '8080' }}
+
+            # This box serves 4mica.io, so it runs the `edge` nginx that splits
+            # the apex between apps/web and apps/playground. EDGE_PORT is what
+            # infra/nginx/4mica.io.conf proxies to.
+            EDGE_PORT=${{ vars.EDGE_PORT || '8088' }}
+            # apps/playground runs on the apps/be box, so this is an address
+            # reachable from here — e.g. http://10.0.0.5:8081, matching that
+            # box's PLAYGROUND_BIND and PLAYGROUND_PORT. Required: `edge`
+            # refuses to start without it rather than serving a broken apex.
+            PLAYGROUND_UPSTREAM=${{ vars.PLAYGROUND_UPSTREAM }}

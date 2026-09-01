@@ -24,10 +24,41 @@ services:
       retries: 3
       start_period: 15s
 
+  # Owns the 4mica.io root namespace: apps/web keeps its known routes and
+  # apps/playground takes everything else as a bare handle. It lives here, with
+  # apps/web, because this is the box 4mica.io resolves to — the host nginx
+  # sends the whole domain to EDGE_PORT and does no path routing of its own.
+  edge:
+    image: nginx:1.27-alpine
+    container_name: 4mica-edge
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      # apps/web is local, so a compose service name over 4mica-edge.
+      MICA_WEB_UPSTREAM: http://web:3000
+      # apps/playground runs on the apps/be box, so this is an address reachable
+      # across the network, e.g. http://10.0.0.5:8081. Required: a blank value
+      # would make nginx fail to start with an unhelpful parse error, and there
+      # is no sane default for another machine's address.
+      MICA_PLAYGROUND_UPSTREAM: ${PLAYGROUND_UPSTREAM:?PLAYGROUND_UPSTREAM is required — the address apps/playground is reachable at from this box}
+      # Restricts envsubst to our own names. Without it every nginx variable in
+      # the template ($host, $connection_upgrade, …) is replaced with an empty
+      # string and the config silently stops working.
+      NGINX_ENVSUBST_FILTER: "^MICA_"
+    ports:
+      - "127.0.0.1:${EDGE_PORT:-8088}:80"
+    networks:
+      - default
+      - edge
+    depends_on:
+      web:
+        condition: service_healthy
+
 networks:
-  # Shared with apps/playground so its `edge` nginx can resolve `web`. Created
-  # out of band (`docker network create 4mica-edge`) because the two stacks are
-  # separate compose projects and either may come up first.
+  # Joins `web` and `edge`. Created out of band
+  # (`docker network create 4mica-edge`) because the deploy action brings this
+  # stack up with an external network it does not manage.
   edge:
     name: 4mica-edge
     external: true

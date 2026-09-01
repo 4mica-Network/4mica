@@ -254,8 +254,11 @@ describe("safeBrandColor", () => {
 });
 
 describe("reserved segments vs nginx", () => {
+  // Lives with apps/web: the `edge` nginx runs on the 4mica.io box, which is
+  // apps/web's, while this app runs beside apps/be. The guard stays here
+  // because it is this app's namespace that a missing rule would leak into.
   const nginxConf = readFileSync(
-    fileURLToPath(new URL("../nginx.conf", import.meta.url)),
+    fileURLToPath(new URL("../../web/nginx.conf.template", import.meta.url)),
     "utf8",
   );
 

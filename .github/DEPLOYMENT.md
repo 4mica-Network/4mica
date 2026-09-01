@@ -8,21 +8,42 @@ workflow only supplies the host, the compose file and the env body.
 
 ## Topology
 
-**One server runs everything.** Each service is still its own compose project
-and its own workflow — they are merely co-located. Everything publishes to
-**loopback only**; the host's nginx terminates TLS and proxies inward. Those
-server blocks live in [`infra/nginx/`](../infra/nginx/) as reference and are
-copied to the box by hand, not by CI.
+**Two servers.** Each service is still its own compose project and its own
+workflow. Everything publishes to **loopback only**, with one deliberate
+exception noted below; each host's nginx terminates TLS and proxies inward.
+Those server blocks live in [`infra/nginx/`](../infra/nginx/) as reference and
+are copied to the boxes by hand, not by CI.
+
+**Box A — the `4mica.io` box** (`SERVER_HOST`). Runs `web` and the `edge` nginx
+that owns the apex namespace. This is where `4mica.io` DNS points and where its
+TLS certificate lives.
 
 | Public host | Host port | Services | Workflow |
 | --- | --- | --- | --- |
-| `4mica.io`, `www.4mica.io` | 8088 | `edge` nginx → `web` (8080) / `playground` (8081) | [build-react-app.yml](workflows/build-react-app.yml), [deploy-playground.yml](workflows/deploy-playground.yml) |
-| `app.4mica.io` | 8082 | `dashboard` | [deploy-dashboard.yml](workflows/deploy-dashboard.yml) |
-| `api.4mica.io` | 4000 | `be` + one-shot `migrate` | [deploy-be.yml](workflows/deploy-be.yml) |
-| *(none)* | *(none)* | `email` | [deploy-email.yml](workflows/deploy-email.yml) |
+| `4mica.io`, `www.4mica.io` | 8088 | `edge` nginx → `web` (8080) locally, `playground` across the network | [build-react-app.yml](workflows/build-react-app.yml) |
 
-Set every `*_SERVER_HOST` secret — `SERVER_HOST`, `BE_SERVER_HOST`,
-`EMAIL_SERVER_HOST`, `DASHBOARD_SERVER_HOST` — to that one machine.
+**Box B — the application box** (`BE_SERVER_HOST`, `DASHBOARD_SERVER_HOST`,
+`EMAIL_SERVER_HOST`, and the playground half of `deploy-playground.yml`). Runs
+everything else, including Postgres.
+
+| Public host | Host port | Services | Workflow |
+| --- | --- | --- | --- |
+| `app.4mica.io` | 8082 | `dashboard` | [deploy-dashboard.yml](workflows/deploy-dashboard.yml) |
+| `api.app.4mica.io` | 4000 | `be` + one-shot `migrate` | [deploy-be.yml](workflows/deploy-be.yml) |
+| *(none)* | *(none)* | `email` | [deploy-email.yml](workflows/deploy-email.yml) |
+| *(via Box A's `edge`)* | 8081 on `PLAYGROUND_BIND` | `playground` | [deploy-playground.yml](workflows/deploy-playground.yml) |
+
+`SERVER_HOST` is Box A and is used by `build-react-app.yml` alone. Every other
+`*_SERVER_HOST` is Box B. `deploy-playground.yml` deliberately reuses
+`BE_SERVER_HOST` rather than taking a secret of its own, because `playground`
+cannot be separated from Postgres — see the coupling list below.
+
+**The one non-loopback port.** `edge` sits on Box A and `playground` on Box B,
+so `playground` must publish somewhere Box A can reach: `PLAYGROUND_BIND`. Put
+it on a **private network address** between the two machines. It defaults to
+`127.0.0.1`, which fails closed — the deploy still succeeds and only the apex
+domain breaks. Never set it to `0.0.0.0`: `playground` holds Clerk credentials
+and a database connection, and there is no authentication in front of it.
 
 **Postgres is external to the stacks.** `apps/be/docker-compose.yml` bundles a
 `postgres` service, but that file is local-dev only; production uses
@@ -70,10 +91,12 @@ All three are `external: true` in the compose files and created idempotently by
 the workflows' `pre_up`, because the stacks are separate compose projects and any
 of them may come up first.
 
-**`4mica-edge`** joins `web` and `playground` so the `edge` nginx can resolve
-both. The routing split — `web` keeps its marketing routes, `playground` owns
-the bare-handle namespace `4mica.io/<username>` — lives in
-[`apps/playground/nginx.conf`](../apps/playground/nginx.conf).
+**`4mica-edge`** joins `web` and `edge` on Box A so the `edge` nginx can
+resolve `web` by name. The routing split — `web` keeps its marketing routes,
+`playground` owns the bare-handle namespace `4mica.io/<username>` — lives in
+[`apps/web/nginx.conf.template`](../apps/web/nginx.conf.template). `playground`
+is not on this network: it is on Box B and `edge` reaches it at
+`PLAYGROUND_UPSTREAM`.
 
 **`4mica-internal`** joins `be` and `email`, and is the *entire* access control
 for the email service. That service has no authentication of its own — reaching
@@ -101,7 +124,7 @@ the email service too.
 
 ### Its reserved-path regex
 
-`apps/playground/nginx.conf`'s marketing regex must stay in sync with
+`apps/web/nginx.conf.template`'s marketing regex must stay in sync with
 `reservedSegments` in `packages/url/src/index.ts`;
 `apps/playground/src/main.test.ts` fails the build otherwise, because a missing
 entry silently turns a marketing route into a claimable handle. A second test
@@ -115,6 +138,13 @@ never be added to `reservedSegments` — they have no page to proxy to.
 `edge` proxies through `set` variables plus Docker's embedded resolver rather
 than `upstream` blocks. Static upstreams resolve once at startup, so a `web`
 redeploy would leave nginx pinned to a dead container IP.
+
+Both upstreams come from the environment: the file is a **template**, and the
+nginx image runs `envsubst` over `/etc/nginx/templates` at startup.
+`NGINX_ENVSUBST_FILTER: ^MICA_` is load-bearing — without it `envsubst`
+replaces nginx's own `$host`, `$remote_addr` and `$connection_upgrade` with
+empty strings and the config no longer parses. Only `MICA_WEB_UPSTREAM` and
+`MICA_PLAYGROUND_UPSTREAM` are substituted.
 
 ## Triggers
 
@@ -161,17 +191,40 @@ Shared across every workflow:
 | var | `SERVER_USER` | Defaults to `mo` |
 | var | `DEPLOY_PATH` | Defaults to `~/var/www/4mica`. Set it at **repository** scope, or not at all — a per-environment value splits the checkout in two |
 
-Per service. Every `*_SERVER_HOST` is the **same machine** — they stay separate
-secrets only so a service can later be moved to its own box without a code
-change.
+Per service. Every `*_SERVER_HOST` must hold the **same machine address**. They
+are separate secrets so that a service *without* network coupling — today only
+`dashboard` — can later move to its own box. The others cannot be split by
+changing a secret, because a Docker network spans one host and two of them are
+load-bearing:
+
+- **`web` + `edge`** — `apps/web/docker-compose.yml` ships the `edge` nginx, and
+  `apps/web/nginx.conf.template` resolves `web` by container name over
+  `4mica-edge`. `edge` must also be on the box `4mica.io` resolves to, since
+  `infra/nginx/4mica.io.conf` proxies the whole domain to `EDGE_PORT` on
+  loopback.
+- **`be` + `email`** — `be` reaches `http://email:4100` over `4mica-internal`,
+  and `apps/email` publishes no host port, so that network is its entire access
+  control.
+- **`playground` + Postgres** — `playground` reads the database `be` migrates,
+  reaching it as `host.docker.internal` or a container on `4mica-data`. Neither
+  crosses a machine, which is why `playground` deploys to Box B.
+
+`edge` → `playground` is the one link that *does* cross the boxes, and it is
+the exception that proves the rule: it works only because it is a plain
+address (`PLAYGROUND_UPSTREAM`) rather than Docker DNS, and it costs a
+non-loopback port on Box B.
+
+A mismatch does not fail the deploy. Each stack comes up on whichever box its
+secret names and only misbehaves later, so check these values first when a
+service deploys green but cannot reach its neighbours.
 
 | Service | Secrets | Variables |
 | --- | --- | --- |
-| web | `SERVER_HOST` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `WEB_PORT` |
+| web + edge (Box A) | `SERVER_HOST` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `WEB_PORT`, `EDGE_PORT`, **`PLAYGROUND_UPSTREAM`** |
 | be | `BE_SERVER_HOST`, `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `BE_PORT`, `LOG_LEVEL`, `CORS_ORIGINS`, `EMAIL_SERVICE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_AUTHORIZED_PARTIES`, `SHUTDOWN_*`, `RATE_LIMIT_*` |
 | email | `EMAIL_SERVER_HOST`, `RESEND_API_KEY` | `EMAIL_DRY_RUN`, `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, `EMAIL_REPLY_TO`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL` |
 | dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL` |
-| playground | `SERVER_HOST` (same host as web), `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `PLAYGROUND_PORT`, `EDGE_PORT`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
+| playground (Box B) | `BE_SERVER_HOST` (same host as be), `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `PLAYGROUND_PORT`, **`PLAYGROUND_BIND`**, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
 
 Values the single-box layout pins:
 
@@ -180,7 +233,7 @@ Values the single-box layout pins:
 | `CORS_ORIGINS` | `https://app.4mica.io` |
 | `CLERK_AUTHORIZED_PARTIES` | `https://app.4mica.io,https://4mica.io` |
 | `EMAIL_SERVICE_URL` | `http://email:4100` |
-| `VITE_API_URL` | `https://api.4mica.io` |
+| `VITE_API_URL` | `https://api.app.4mica.io` |
 | `VITE_APP_URL` / `NEXT_PUBLIC_APP_URL` | `https://app.4mica.io` |
 | `VITE_BASE_URL` / `NEXT_PUBLIC_BASE_URL` | `https://4mica.io` |
 | `NEXT_PUBLIC_ASSET_PREFIX` | `/p` |
@@ -320,9 +373,12 @@ Values the single-box layout pins:
      psql "postgresql://4mica:<pw>@host.docker.internal:5432/4mica" -c '\conninfo'
    ```
 
-9. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
-   `api.4mica.io`, then install the host nginx configs and TLS certificates —
-   see [`infra/nginx/README.md`](../infra/nginx/README.md).
+9. Point DNS at the right box for each host — `4mica.io` and `www.4mica.io` at
+   Box A, `app.4mica.io` and `api.app.4mica.io` at Box B — then install that
+   box's host nginx configs and TLS certificates; see
+   [`infra/nginx/README.md`](../infra/nginx/README.md). A record aimed at the
+   wrong box yields a certificate that cannot be renewed, because the HTTP-01
+   challenge is answered by whichever machine DNS resolves to.
 10. Open only 80/443 in the firewall. Every service binds loopback, so nothing
     else needs to be reachable. **Check 5432 specifically**: a host Postgres
     widened beyond loopback in step 8, or a container publishing `0.0.0.0:5432`,

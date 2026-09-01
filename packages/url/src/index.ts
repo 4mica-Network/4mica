@@ -79,7 +79,7 @@ const buildRoutes = () =>
  * be excluded from the handle namespace. The list is derived from `routes` so it
  * cannot drift, plus the pages that exist only as files under `apps/web/app`.
  *
- * `apps/playground/nginx.conf` encodes the same list as proxy rules, and
+ * `apps/web/nginx.conf.template` encodes the same list as proxy rules, and
  * `apps/playground/src/main.test.ts` asserts the two stay in sync.
  */
 export const reservedSegments: ReadonlySet<string> = new Set([
@@ -123,7 +123,7 @@ export const isReservedSegment = (segment: string): boolean =>
  *
  * Deliberately separate from `reservedSegments`, which is about *path
  * collisions* — every entry there is a real page on 4mica.io and has a matching
- * proxy rule in apps/playground/nginx.conf. These are not routes. They are
+ * proxy rule in apps/web/nginx.conf.template. These are not routes. They are
  * names that would let someone impersonate the company, a role, or a
  * third-party brand.
  *

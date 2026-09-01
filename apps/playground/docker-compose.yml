@@ -36,13 +36,18 @@ services:
     # does not provide it by default.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # The `edge` nginx that fronts 4mica.io lives with apps/web on another box,
+    # so this port has to be reachable from there rather than loopback-only.
+    # PLAYGROUND_BIND defaults to 127.0.0.1 so an unset value fails closed:
+    # the deploy succeeds and only the apex domain breaks, which is far better
+    # than silently publishing an authenticated app on every interface. Set it
+    # to this box's private-network address, never 0.0.0.0.
     ports:
-      - "127.0.0.1:${PLAYGROUND_PORT:-8081}:3100"
+      - "${PLAYGROUND_BIND:-127.0.0.1}:${PLAYGROUND_PORT:-8081}:3100"
     volumes:
       - playground-logs:/app/logs
     networks:
       - default
-      - edge
       - data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/api/health"]
@@ -51,32 +56,15 @@ services:
       retries: 3
       start_period: 20s
 
-  edge:
-    image: nginx:1.27-alpine
-    container_name: 4mica-edge
-    restart: unless-stopped
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    ports:
-      - "127.0.0.1:${EDGE_PORT:-8088}:80"
-    networks:
-      - default
-      - edge
-    depends_on:
-      playground:
-        condition: service_healthy
-
 volumes:
   playground-logs:
     name: 4mica-playground-logs
 
 networks:
-  # Shared with apps/web so `edge` can resolve both upstreams. The two stacks
-  # are separate compose projects and either may come up first, so the network
-  # is created out of band: `docker network create 4mica-edge`.
-  edge:
-    name: 4mica-edge
-    external: true
+  # No 4mica-edge here. The `edge` nginx moved to apps/web on the 4mica.io box
+  # and reaches this app over the network via PLAYGROUND_UPSTREAM — a Docker
+  # network spans one host, so membership would buy nothing.
+  #
   # The database network, shared with apps/be. When POSTGRES_HOST names a
   # container, the deploy workflows' pre_up attaches it here so this app can
   # resolve it by name; with a host Postgres the network is inert. Created out
