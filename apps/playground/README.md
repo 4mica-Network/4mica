@@ -45,14 +45,17 @@ share one root namespace. Three things keep them apart:
 
 1. `reservedSegments` in `packages/url/src/index.ts` — the single source of
    truth for "this segment is not a handle".
-2. `nginx.conf` — apps/web keeps its known routes; **the playground is the
-   default**, because an unrecognised first segment is a profile.
+2. `apps/web/nginx.conf.template` — apps/web keeps its known routes; **the
+   playground is the default**, because an unrecognised first segment is a
+   profile. It lives with apps/web because the `edge` nginx runs on the
+   `4mica.io` box, while this app runs beside apps/be and is reached over the
+   network.
 3. A test in `src/main.test.ts` that fails if any reserved segment has no rule
-   in `nginx.conf`.
+   in that template.
 
 That test is the whole safety net. Add a page to `apps/web` and you must add its
-segment to `reservedSegments` *and* to `nginx.conf`, or the path silently
-becomes a claimable handle in production.
+segment to `reservedSegments` *and* to `apps/web/nginx.conf.template`, or the
+path silently becomes a claimable handle in production.
 
 `/@username` 308-redirects to `/username`, so older dashboard links still work.
 
