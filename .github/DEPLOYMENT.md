@@ -159,7 +159,7 @@ Shared across every workflow:
 | --- | --- | --- |
 | secret | `SSH_PRIVATE_KEY` | Authorised on the deploy user |
 | var | `SERVER_USER` | Defaults to `mo` |
-| var | `DEPLOY_PATH` | Defaults to `~/var/www/4mica` |
+| var | `DEPLOY_PATH` | Defaults to `~/var/www/4mica`. Set it at **repository** scope, or not at all — a per-environment value splits the checkout in two |
 
 Per service. Every `*_SERVER_HOST` is the **same machine** — they stay separate
 secrets only so a service can later be moved to its own box without a code
@@ -187,12 +187,28 @@ Values the single-box layout pins:
 
 ### Gotchas that will bite on first deploy
 
-- **`DEPLOY_PATH`'s parent must be writable by `SERVER_USER`.** The action
-  clones unprivileged — there is no `sudo` anywhere in it — so with the
-  bootstrap `chown` skipped, `mkdir -p /var/www` succeeds (it already exists,
-  owned by root) and the next line fails with
-  `fatal: could not create work tree dir '/var/www/4mica': Permission denied`,
-  exit 128, on **Prepare remote checkout**. See bootstrap step 3.
+- **Paste `*_SERVER_HOST` secrets without a trailing newline.** A trailing
+  newline or space becomes part of the hostname, and `ssh` rejects it with
+  `hostname contains invalid characters` and exit 255 — from **Prepare remote
+  checkout**, not from the step that set it. **Validate deploy target** now
+  trims the ends and logs a `::warning::` naming the secret to re-enter, so
+  this degrades to a warning rather than a failed deploy. An empty secret, a
+  `host:port` pair, and a `https://` prefix each fail there with their own
+  message. Note the trimmed value is re-masked with `::add-mask::`, since the
+  runner only masks the secret's exact stored value.
+- **`DEPLOY_PATH` must be writable by `SERVER_USER`.** The action clones
+  unprivileged — there is no `sudo` anywhere in it — so with the bootstrap
+  `chown` skipped, **Prepare remote checkout** fails with
+  `::error::Cannot create /var/www/4mica as user <user>`. See bootstrap step 3.
+- **Set `DEPLOY_PATH` at repository scope, not per environment.** Every
+  workflow on a box shares one checkout and one concurrency group, so a value
+  present on `prod` but absent on `dev` (or added between two runs) silently
+  produces a *second* checkout: unset resolves to the default
+  `~/var/www/4mica` → `$HOME/var/www/4mica`, while a set value is usually the
+  absolute `/var/www/4mica`. The stacks then drift apart, and the concurrency
+  group no longer protects anything. **Prepare remote checkout** prints
+  `Deploy path resolves to …` on every run — compare it across two workflows
+  when a service is stuck on an old commit.
 - **`POSTGRES_PASSWORD` has no default.** `docker-compose.prod.yml` declares it
   `${POSTGRES_PASSWORD:?…}` on purpose, so a production database can never come
   up on the dev stack's throwaway password — compose refuses to start without
@@ -234,13 +250,15 @@ Values the single-box layout pins:
    its `~/.ssh/authorized_keys`.
 3. Create the checkout directory and give it to that user:
    `sudo mkdir -p /var/www/4mica && sudo chown "$SERVER_USER:$SERVER_USER" /var/www/4mica`,
-   then set the `DEPLOY_PATH` variable to `/var/www/4mica`. Note the default is
-   `~/var/www/4mica`, which expands to `$HOME/var/www/4mica` — a different
-   directory. Pick one deliberately.
+   then set the `DEPLOY_PATH` variable to `/var/www/4mica` **at repository
+   scope**. Note the default is `~/var/www/4mica`, which expands to
+   `$HOME/var/www/4mica` — a different directory. Pick one deliberately and use
+   it everywhere; leaving `DEPLOY_PATH` unset entirely is equally valid and
+   needs no `sudo` at all, since the deploy user owns its own `$HOME`.
 
    **Do not skip this.** The action's clone runs as `SERVER_USER` with no
    `sudo`, so an un-`chown`ed `/var/www/4mica` fails the deploy at **Prepare
-   remote checkout** with `could not create work tree dir … Permission denied`.
+   remote checkout** with `Cannot create /var/www/4mica as user <user>`.
 4. Add that user to the `docker` group —
    `sudo usermod -aG docker "$SERVER_USER"`, then reconnect. The action runs
    bare `docker compose`, `docker image prune` and `docker inspect` over SSH; a
