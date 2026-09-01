@@ -158,7 +158,7 @@ runs:
         # `/var/www/4mica` look alike but are different directories. Every
         # workflow on a box must resolve to the same one — they share a
         # checkout and a concurrency group.
-        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un))."
+        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un) on host $(hostname))."
 
         mkdir -p "$HOME/.ssh"
         chmod 700 "$HOME/.ssh"
@@ -180,8 +180,21 @@ runs:
           # name the bootstrap step the operator skipped instead. The clone
           # then lands in the empty directory; the non-empty case was already
           # moved aside above.
-          if ! mkdir -p "$DEPLOY_PATH" 2>/dev/null; then
-            echo "::error::Cannot create $DEPLOY_PATH as user $(id -un). See DEPLOYMENT.md bootstrap step 3: sudo mkdir -p '$DEPLOY_PATH' && sudo chown $(id -un):$(id -gn) '$DEPLOY_PATH'"
+          if ! MKDIR_ERR="$(mkdir -p "$DEPLOY_PATH" 2>&1)"; then
+            echo "::error::Cannot create $DEPLOY_PATH as user $(id -un) on host $(hostname): ${MKDIR_ERR:-mkdir failed}"
+            # `mkdir -p` succeeds on a directory that already exists, so a
+            # failure here is never "the chown was not run" alone. Print the
+            # whole chain: the deploy user needs write on the first missing
+            # level and +x on every level above it, and an existing *file* at
+            # the target fails with "File exists" rather than a permission error.
+            echo "Path chain, deepest first:"
+            P="$DEPLOY_PATH"
+            while [ -n "$P" ] && [ "$P" != "/" ]; do
+              ls -ld "$P" 2>&1 || echo "  $P — does not exist"
+              P="$(dirname "$P")"
+            done
+            ls -ld / 2>&1 || true
+            echo "See DEPLOYMENT.md bootstrap step 3. Usually: sudo mkdir -p '$DEPLOY_PATH' && sudo chown $(id -un):$(id -gn) '$DEPLOY_PATH'"
             exit 1
           fi
           git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
