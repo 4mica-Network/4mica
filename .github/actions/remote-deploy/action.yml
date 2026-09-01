@@ -89,6 +89,12 @@ runs:
           "~") DEPLOY_PATH="$HOME" ;;
         esac
 
+        # Printed because the default `~/var/www/4mica` and an absolute
+        # `/var/www/4mica` look alike but are different directories. Every
+        # workflow on a box must resolve to the same one — they share a
+        # checkout and a concurrency group.
+        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un))."
+
         mkdir -p "$HOME/.ssh"
         chmod 700 "$HOME/.ssh"
         ssh-keygen -F github.com >/dev/null || ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
@@ -102,7 +108,17 @@ runs:
             mv "$DEPLOY_PATH" "$BACKUP_PATH"
           fi
           echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
-          mkdir -p "$(dirname "$DEPLOY_PATH")"
+          # Create the target itself, not just its parent: the parent is
+          # typically an existing root-owned /var/www, so `mkdir -p` on it
+          # succeeds and git fails one line later with a bare exit 128. This
+          # runs unprivileged — there is no sudo anywhere in this action — so
+          # name the bootstrap step the operator skipped instead. The clone
+          # then lands in the empty directory; the non-empty case was already
+          # moved aside above.
+          if ! mkdir -p "$DEPLOY_PATH" 2>/dev/null; then
+            echo "::error::Cannot create $DEPLOY_PATH as user $(id -un). See DEPLOYMENT.md bootstrap step 3: sudo mkdir -p '$DEPLOY_PATH' && sudo chown $(id -un):$(id -gn) '$DEPLOY_PATH'"
+            exit 1
+          fi
           git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
         fi
 
