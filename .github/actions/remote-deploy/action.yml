@@ -158,7 +158,21 @@ runs:
         # `/var/www/4mica` look alike but are different directories. Every
         # workflow on a box must resolve to the same one — they share a
         # checkout and a concurrency group.
-        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un) on host $(hostname))."
+        # Several boxes share the hostname `4mica`, so the hostname alone cannot
+        # tell you which one a deploy reached. This fingerprint can, and it
+        # leaks nothing. The server addresses are stored as secrets and cannot
+        # be printed — the runner masks the exact stored value, nothing else.
+        #
+        # To compare, run this on the box you think it is. Keep the printf: a
+        # bare `cat /etc/machine-id | sha256sum` hashes the trailing newline
+        # too and gives a different, misleading answer.
+        #   printf '%s' "$(cat /etc/machine-id 2>/dev/null || hostname)" \
+        #     | sha256sum | cut -c1-8
+        if command -v sha256sum >/dev/null 2>&1; then HASH_CMD="sha256sum"; else HASH_CMD="shasum -a 256"; fi
+        FP_SRC="$(cat /etc/machine-id 2>/dev/null || true)"
+        [ -n "$FP_SRC" ] || FP_SRC="$(hostname)"
+        FINGERPRINT="$(printf '%s' "$FP_SRC" | $HASH_CMD | cut -c1-8)"
+        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un) on host $(hostname), machine $FINGERPRINT)."
 
         mkdir -p "$HOME/.ssh"
         chmod 700 "$HOME/.ssh"
