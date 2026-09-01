@@ -162,6 +162,14 @@ async def test_a_mismatched_echo_is_an_unknown_outcome():
         await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).eip3009().send()
 
 
+async def test_an_unreadable_amount_echo_is_an_unknown_outcome():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return success({"amount": "not-a-number"})
+
+    with pytest.raises(OutcomeUnknownError, match="echoed amount"):
+        await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).eip3009().send()
+
+
 async def test_success_without_tx_hash_is_an_unknown_outcome():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"success": True})

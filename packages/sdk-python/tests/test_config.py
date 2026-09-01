@@ -15,6 +15,12 @@ def test_defaults_enable_siwe_auth():
     assert cfg.facilitator_url is None
 
 
+def test_disable_auth_runs_unauthenticated():
+    cfg = ConfigBuilder().wallet_private_key(KEY).disable_auth().build()
+    assert cfg.auth is None
+    assert cfg.bearer_token is None
+
+
 def test_bearer_token_replaces_siwe():
     cfg = ConfigBuilder().wallet_private_key(KEY).bearer_token("token").build()
     assert cfg.bearer_token == "token"

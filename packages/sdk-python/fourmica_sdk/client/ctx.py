@@ -87,6 +87,30 @@ class ClientCtx:
             )
 
         rpc = RpcProxy(cfg.rpc_url)
+        try:
+            public_params = await rpc.get_public_params()
+
+            if len(public_params.public_key) != _BLS_G1_COMPRESSED_BYTES:
+                raise ClientInitializationError(
+                    "invalid operator public key: expected "
+                    f"{_BLS_G1_COMPRESSED_BYTES} bytes, got "
+                    f"{len(public_params.public_key)}"
+                )
+
+            contract_address = normalize_address(
+                cfg.contract_address or public_params.contract_address
+            )
+            ethereum_http_rpc_url = (
+                cfg.ethereum_http_rpc_url or public_params.ethereum_http_rpc_url or None
+            )
+
+            guarantee_domain, guarantee_domains = await cls._fetch_guarantee_metadata(
+                public_params, contract_address, ethereum_http_rpc_url
+            )
+        except BaseException:
+            await rpc.aclose()
+            raise
+
         auth_session: Optional[AuthSession] = None
         if cfg.auth is not None:
             auth_session = AuthSession(
@@ -98,27 +122,6 @@ class ClientCtx:
             rpc = rpc.with_token_provider(auth_session.access_token)
         elif cfg.bearer_token:
             rpc = rpc.with_bearer_token(cfg.bearer_token)
-
-        public_params = await rpc.get_public_params()
-
-        if len(public_params.public_key) != _BLS_G1_COMPRESSED_BYTES:
-            raise ClientInitializationError(
-                "invalid operator public key: expected "
-                f"{_BLS_G1_COMPRESSED_BYTES} bytes, got {len(public_params.public_key)}"
-            )
-
-        contract_address = normalize_address(
-            cfg.contract_address or public_params.contract_address
-        )
-        # An explicit config wins over what core advertises; neither is required
-        # until a path that reads chain state or transacts runs.
-        ethereum_http_rpc_url = (
-            cfg.ethereum_http_rpc_url or public_params.ethereum_http_rpc_url or None
-        )
-
-        guarantee_domain, guarantee_domains = await cls._fetch_guarantee_metadata(
-            public_params, contract_address, ethereum_http_rpc_url
-        )
 
         return cls(
             cfg=cfg,

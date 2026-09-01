@@ -434,10 +434,16 @@ async def _submit(
     # different deposit has, and the receipt is refused rather than made to
     # describe it.
     echoed_amount = response.get("amount")
-    if echoed_amount is not None and int(str(echoed_amount), 0) != amount:
-        raise OutcomeUnknownError(
-            f"facilitator echoed amount {echoed_amount}, expected {amount}"
-        )
+    if echoed_amount is not None:
+        # An echo that cannot be read is no confirmation that it matched.
+        try:
+            parsed_amount = int(str(echoed_amount), 0)
+        except ValueError:
+            parsed_amount = None
+        if parsed_amount != amount:
+            raise OutcomeUnknownError(
+                f"facilitator echoed amount {echoed_amount}, expected {amount}"
+            )
 
     return DepositReceipt(
         tx_hash=tx_hash,
