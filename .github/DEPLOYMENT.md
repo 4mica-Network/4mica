@@ -29,7 +29,7 @@ everything else, including Postgres.
 | Public host | Host port | Services | Workflow |
 | --- | --- | --- | --- |
 | `app.4mica.io` | 8082 | `dashboard` | [deploy-dashboard.yml](workflows/deploy-dashboard.yml) |
-| `api.4mica.io` | 4000 | `be` + one-shot `migrate` | [deploy-be.yml](workflows/deploy-be.yml) |
+| `api.app.4mica.io` | 4000 | `be` + one-shot `migrate` | [deploy-be.yml](workflows/deploy-be.yml) |
 | *(none)* | *(none)* | `email` | [deploy-email.yml](workflows/deploy-email.yml) |
 | *(via Box A's `edge`)* | 8081 on `PLAYGROUND_BIND` | `playground` | [deploy-playground.yml](workflows/deploy-playground.yml) |
 
@@ -233,7 +233,7 @@ Values the single-box layout pins:
 | `CORS_ORIGINS` | `https://app.4mica.io` |
 | `CLERK_AUTHORIZED_PARTIES` | `https://app.4mica.io,https://4mica.io` |
 | `EMAIL_SERVICE_URL` | `http://email:4100` |
-| `VITE_API_URL` | `https://api.4mica.io` |
+| `VITE_API_URL` | `https://api.app.4mica.io` |
 | `VITE_APP_URL` / `NEXT_PUBLIC_APP_URL` | `https://app.4mica.io` |
 | `VITE_BASE_URL` / `NEXT_PUBLIC_BASE_URL` | `https://4mica.io` |
 | `NEXT_PUBLIC_ASSET_PREFIX` | `/p` |
@@ -373,9 +373,12 @@ Values the single-box layout pins:
      psql "postgresql://4mica:<pw>@host.docker.internal:5432/4mica" -c '\conninfo'
    ```
 
-9. Point DNS at the box for `4mica.io`, `www.4mica.io`, `app.4mica.io` and
-   `api.4mica.io`, then install the host nginx configs and TLS certificates —
-   see [`infra/nginx/README.md`](../infra/nginx/README.md).
+9. Point DNS at the right box for each host — `4mica.io` and `www.4mica.io` at
+   Box A, `app.4mica.io` and `api.app.4mica.io` at Box B — then install that
+   box's host nginx configs and TLS certificates; see
+   [`infra/nginx/README.md`](../infra/nginx/README.md). A record aimed at the
+   wrong box yields a certificate that cannot be renewed, because the HTTP-01
+   challenge is answered by whichever machine DNS resolves to.
 10. Open only 80/443 in the firewall. Every service binds loopback, so nothing
     else needs to be reachable. **Check 5432 specifically**: a host Postgres
     widened beyond loopback in step 8, or a container publishing `0.0.0.0:5432`,
