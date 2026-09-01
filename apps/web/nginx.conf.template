@@ -1,16 +1,28 @@
 #
 # Edge split for 4mica.io.
 #
-# Handles are bare (4mica.io/<username>), so this app and apps/web share one
-# root namespace. The model is therefore inverted from the usual setup:
+# Handles are bare (4mica.io/<username>), so apps/playground and apps/web share
+# one root namespace. The model is therefore inverted from the usual setup:
 # apps/web keeps its known routes, and the playground is the DEFAULT — an
 # unrecognised first segment is a profile handle.
 #
 # IMPORTANT: the reserved-path regex below must stay in sync with
 # `reservedSegments` in packages/url/src/index.ts. A test in
-# src/main.test.ts fails the build if a reserved segment has no rule here,
-# because a missing one silently turns a marketing route into a claimable
-# handle.
+# apps/playground/src/main.test.ts fails the build if a reserved segment has no
+# rule here, because a missing one silently turns a marketing route into a
+# claimable handle. That test reads this file across the workspace — keep the
+# path in step if either moves.
+#
+# This is a TEMPLATE, not a finished config: the nginx image runs envsubst over
+# /etc/nginx/templates at startup. Only names matching NGINX_ENVSUBST_FILTER
+# (`^MICA_`) are substituted, which is what keeps nginx's own $host,
+# $remote_addr, $connection_upgrade and friends from being blanked out.
+#
+# The two apps no longer share a host: this container and apps/web sit on the
+# 4mica.io box, and apps/playground runs beside apps/be. MICA_WEB_UPSTREAM is
+# therefore a Docker service name, while MICA_PLAYGROUND_UPSTREAM is an address
+# reachable across the network. Both stay behind `set` variables so the
+# resolver comment below still applies to the local one.
 #
 
 map $http_upgrade $connection_upgrade {
@@ -35,8 +47,8 @@ server {
   resolver 127.0.0.11 valid=10s ipv6=off;
   resolver_timeout 5s;
 
-  set $mica_web        http://web:3000;
-  set $mica_playground http://playground:3100;
+  set $mica_web        ${MICA_WEB_UPSTREAM};
+  set $mica_playground ${MICA_PLAYGROUND_UPSTREAM};
 
   proxy_http_version 1.1;
   proxy_set_header Host              $host;
