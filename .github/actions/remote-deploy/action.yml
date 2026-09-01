@@ -55,24 +55,89 @@ inputs:
 runs:
   using: composite
   steps:
+    # A *_SERVER_HOST secret pasted with a trailing newline or space carries
+    # that whitespace into `ssh user@host`, which rejects it with the opaque
+    # `hostname contains invalid characters` and exit 255 — from a later step,
+    # long after the real mistake. No hostname or IP may contain whitespace, so
+    # strip it here rather than fail, and say which secret needs re-entering.
+    # Every later step reads the cleaned values, not the raw inputs.
+    - name: Validate deploy target
+      id: target
+      shell: bash
+      env:
+        RAW_SERVER_HOST: ${{ inputs.server_host }}
+        RAW_SERVER_USER: ${{ inputs.server_user }}
+      run: |
+        set -euo pipefail
+        # Ends only. Whitespace in the middle is a different mistake — the
+        # character check below reports it instead of gluing the halves together.
+        trim() {
+          local s="$1"
+          s="${s#"${s%%[![:space:]]*}"}"
+          printf '%s' "${s%"${s##*[![:space:]]}"}"
+        }
+        host="$(trim "$RAW_SERVER_HOST")"
+        user="$(trim "$RAW_SERVER_USER")"
+
+        # The trimmed value differs from the secret, so the runner's automatic
+        # masking no longer covers it. Register it before it can reach a log.
+        [ -z "$host" ] || echo "::add-mask::$host"
+
+        if [ -z "$host" ]; then
+          echo "::error::server_host is empty — this workflow's *_SERVER_HOST secret is not set on this environment."
+          exit 1
+        fi
+        if [ -z "$user" ]; then
+          echo "::error::server_user is empty — set the SERVER_USER variable."
+          exit 1
+        fi
+        if [ "$host" != "$RAW_SERVER_HOST" ]; then
+          echo "::warning::Stripped whitespace from server_host. Re-enter this workflow's *_SERVER_HOST secret without a trailing newline or space."
+        fi
+        # Hostnames and IPs (v6 included) are limited to this set. Anything
+        # else survived the strip and would fail deeper in with a worse message.
+        case "$host" in
+          *[!A-Za-z0-9.:_-]*)
+            echo "::error::server_host contains characters that are not valid in a hostname or IP address. Check this workflow's *_SERVER_HOST secret — it should be a bare host, with no scheme, port, or user prefix."
+            exit 1 ;;
+        esac
+        # Colons are allowed above for IPv6, which always has several. Exactly
+        # one means a host:port pair, and ssh takes a port via -p, never in the
+        # destination — it would fail with an unresolvable hostname.
+        colons="${host//[!:]/}"
+        if [ "${#colons}" -eq 1 ]; then
+          echo "::error::server_host looks like host:port. Give the bare host — this action connects on port 22."
+          exit 1
+        fi
+
+        {
+          echo "server_host=$host"
+          echo "server_user=$user"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Configure SSH
       shell: bash
       env:
         SSH_PRIVATE_KEY: ${{ inputs.ssh_key }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
       run: |
         set -euo pipefail
         mkdir -p ~/.ssh
         printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan github.com >> ~/.ssh/known_hosts
-        ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts
+        # Catch it here: without this entry every later ssh fails with
+        # "Host key verification failed", which says nothing about the cause.
+        if ! ssh-keyscan "$SERVER_HOST" >> ~/.ssh/known_hosts; then
+          echo "::error::Could not fetch the deploy server's SSH host key. It is unreachable on port 22, or this workflow's *_SERVER_HOST secret points at the wrong host."
+          exit 1
+        fi
 
     - name: Prepare remote checkout
       shell: bash
       env:
-        SERVER_USER: ${{ inputs.server_user }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_USER: ${{ steps.target.outputs.server_user }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
         DEPLOY_PATH: ${{ inputs.deploy_path }}
         BRANCH: ${{ inputs.branch }}
         REPO_SSH_URL: ${{ inputs.repo_ssh_url }}
@@ -89,6 +154,12 @@ runs:
           "~") DEPLOY_PATH="$HOME" ;;
         esac
 
+        # Printed because the default `~/var/www/4mica` and an absolute
+        # `/var/www/4mica` look alike but are different directories. Every
+        # workflow on a box must resolve to the same one — they share a
+        # checkout and a concurrency group.
+        echo "Deploy path resolves to $DEPLOY_PATH (user $(id -un))."
+
         mkdir -p "$HOME/.ssh"
         chmod 700 "$HOME/.ssh"
         ssh-keygen -F github.com >/dev/null || ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
@@ -102,7 +173,17 @@ runs:
             mv "$DEPLOY_PATH" "$BACKUP_PATH"
           fi
           echo "Cloning $REPO_SSH_URL into $DEPLOY_PATH..."
-          mkdir -p "$(dirname "$DEPLOY_PATH")"
+          # Create the target itself, not just its parent: the parent is
+          # typically an existing root-owned /var/www, so `mkdir -p` on it
+          # succeeds and git fails one line later with a bare exit 128. This
+          # runs unprivileged — there is no sudo anywhere in this action — so
+          # name the bootstrap step the operator skipped instead. The clone
+          # then lands in the empty directory; the non-empty case was already
+          # moved aside above.
+          if ! mkdir -p "$DEPLOY_PATH" 2>/dev/null; then
+            echo "::error::Cannot create $DEPLOY_PATH as user $(id -un). See DEPLOYMENT.md bootstrap step 3: sudo mkdir -p '$DEPLOY_PATH' && sudo chown $(id -un):$(id -gn) '$DEPLOY_PATH'"
+            exit 1
+          fi
           git clone "$REPO_SSH_URL" "$DEPLOY_PATH"
         fi
 
@@ -116,8 +197,8 @@ runs:
     - name: Write remote environment
       shell: bash
       env:
-        SERVER_USER: ${{ inputs.server_user }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_USER: ${{ steps.target.outputs.server_user }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
         DEPLOY_PATH: ${{ inputs.deploy_path }}
         SERVICE_DIR: ${{ inputs.service_dir }}
         ENV_CONTENTS: ${{ inputs.env_contents }}
@@ -131,8 +212,8 @@ runs:
     - name: Deploy with Docker Compose
       shell: bash
       env:
-        SERVER_USER: ${{ inputs.server_user }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_USER: ${{ steps.target.outputs.server_user }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
         DEPLOY_PATH: ${{ inputs.deploy_path }}
         SERVICE_DIR: ${{ inputs.service_dir }}
         COMPOSE_FILE_NAME: ${{ inputs.compose_file }}
@@ -186,8 +267,8 @@ runs:
       if: inputs.health_container != ''
       shell: bash
       env:
-        SERVER_USER: ${{ inputs.server_user }}
-        SERVER_HOST: ${{ inputs.server_host }}
+        SERVER_USER: ${{ steps.target.outputs.server_user }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
         DEPLOY_PATH: ${{ inputs.deploy_path }}
         SERVICE_DIR: ${{ inputs.service_dir }}
         COMPOSE_FILE_NAME: ${{ inputs.compose_file }}
