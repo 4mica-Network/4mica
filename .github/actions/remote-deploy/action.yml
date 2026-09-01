@@ -226,13 +226,18 @@ runs:
         # outer command line and mask a failed deploy. base64 has no characters
         # the shell touches.
         PRE_UP_B64="$(printf '%s' "$PRE_UP" | base64 | tr -d '\n')"
+        # The b64: prefix keeps the argument non-empty. `pre_up` is optional and
+        # base64 of "" is "", so without it the same argv re-parsing drops the
+        # argument entirely: the remote `$4` is unset and `set -u` aborts with
+        # `$4: unbound variable`. Any later argument would also shift up a slot,
+        # which fails silently instead.
         ssh "$SERVER_USER@$SERVER_HOST" bash -s -- \
-          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "$PRE_UP_B64" <<'EOF'
+          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "b64:$PRE_UP_B64" <<'EOF'
         set -euo pipefail
         DEPLOY_PATH="$1"
         SERVICE_DIR="$2"
         COMPOSE_FILE_NAME="$3"
-        PRE_UP="$(printf '%s' "$4" | base64 -d)"
+        PRE_UP="$(printf '%s' "${4#b64:}" | base64 -d)"
 
         case "$DEPLOY_PATH" in
           "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
@@ -276,8 +281,12 @@ runs:
         HEALTH_TIMEOUT: ${{ inputs.health_timeout }}
       run: |
         set -euo pipefail
+        # Both trailing arguments must stay non-empty or ssh's argv re-parsing
+        # drops them and the positions shift. The step's `if:` guard is what
+        # guarantees it for health_container; do not remove it. health_timeout
+        # is defaulted, so pass the default again rather than an empty string.
         ssh "$SERVER_USER@$SERVER_HOST" bash -s -- \
-          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "$HEALTH_CONTAINER" "$HEALTH_TIMEOUT" <<'EOF'
+          "$DEPLOY_PATH" "$SERVICE_DIR" "$COMPOSE_FILE_NAME" "$HEALTH_CONTAINER" "${HEALTH_TIMEOUT:-180}" <<'EOF'
         set -euo pipefail
         DEPLOY_PATH="$1"
         SERVICE_DIR="$2"
