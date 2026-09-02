@@ -62,7 +62,9 @@ export default function FaqSection() {
 
                 <div
                   className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                    isOpen ? "max-h-125 pb-6 opacity-100" : "max-h-0 opacity-0"
+                    isOpen
+                      ? "max-h-collapse pb-6 opacity-100"
+                      : "max-h-0 opacity-0"
                   }`}
                 >
                   <p className="text-ink-muted text-md leading-relaxed">

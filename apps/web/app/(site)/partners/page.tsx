@@ -133,7 +133,7 @@ function WhyPartner() {
             {content.why.cards.map((card) => (
               <div
                 key={card.title}
-                className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid"
+                className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
               >
                 <ShinyHoverBorder radiusClass="rounded-none" />
                 <div className="relative z-10">
@@ -170,7 +170,7 @@ function PartnerPrograms() {
           {content.programs.items.map((program) => (
             <div
               key={program.label}
-              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018]"
+              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018] sm:p-8"
             >
               <ShinyHoverBorder />
               <div className="relative z-10 flex flex-1 flex-col">
@@ -394,7 +394,7 @@ function PartnerFaq() {
 
 function PartnerEnablement() {
   return (
-    <section className="section-gloss relative isolate overflow-hidden rounded-md px-8 py-8">
+    <section className="section-gloss relative isolate overflow-hidden rounded-md px-0 py-8 sm:px-8">
       <SectionBackdrop src="/bg/abstract-satin-folds.avif" position="left" />
       <div className="mx-auto w-full max-w-300">
         <SectionHeader
@@ -446,7 +446,7 @@ function PartnerEnablement() {
 
 function PartnerStories() {
   return (
-    <section className="section-gloss relative isolate overflow-hidden rounded-md px-8 py-8">
+    <section className="section-gloss relative isolate overflow-hidden rounded-md px-0 py-8 sm:px-8">
       <SectionBackdrop src="/bg/abstract-smoke.avif" position="right" />
       <div className="mx-auto w-full max-w-300">
         <SectionHeader
@@ -459,11 +459,11 @@ function PartnerStories() {
           {content.stories.items.map((story) => (
             <div
               key={story.partner}
-              className="group relative flex flex-col rounded-l-md border border-overlay/10 bg-surface-deep/25 p-8 transition-colors duration-500 hover:bg-overlay/[0.018]"
+              className="group relative flex flex-col rounded-md border border-overlay/10 bg-surface-deep/25 p-6 transition-colors duration-500 hover:bg-overlay/[0.018] sm:p-8 lg:rounded-r-none"
             >
               <ShinyHoverBorder />
               <div className="relative z-10 flex flex-1 flex-col">
-                <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
                   <Image
                     src={story.logo}
                     alt={`${story.partner} logo`}
@@ -501,7 +501,7 @@ function PartnerStories() {
             </div>
           ))}
 
-          <div className="relative flex flex-col justify-center rounded-r-md border border-overlay/10 border-l-0 bg-surface-deep/10 p-8">
+          <div className="relative mt-4 flex flex-col justify-center rounded-md border border-overlay/10 bg-surface-deep/10 p-6 sm:p-8 lg:mt-0 lg:rounded-l-none lg:border-l-0">
             <h3 className="font-semibold text-ink-strong text-xl">
               {content.stories.invite.title}
             </h3>

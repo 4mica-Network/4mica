@@ -77,7 +77,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-2 h-1 w-full cursor-pointer appearance-none rounded-full bg-overlay/15 accent-ink-strong"
+        className="mt-1 h-11 w-full cursor-pointer appearance-none bg-transparent accent-ink-strong [&::-moz-range-track]:h-1 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-overlay/15 [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-overlay/15"
       />
     </div>
   );
@@ -183,7 +183,7 @@ export default function SavingsCalculator() {
   return (
     <div className="overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
       <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:divide-x lg:divide-overlay/10">
-        <div className="space-y-6 p-8">
+        <div className="space-y-4 p-5 sm:space-y-6 sm:p-8">
           <Slider
             label={content.inputs.requests}
             value={requestIndex}
@@ -245,8 +245,8 @@ export default function SavingsCalculator() {
           />
         </div>
 
-        <div className="p-8">
-          <div className="grid gap-8 sm:grid-cols-2">
+        <div className="p-5 sm:p-8">
+          <div className="grid gap-6 sm:grid-cols-2 sm:gap-8">
             <div>
               <p className="mb-2 text-ink-subtle text-md uppercase tracking-wider">
                 {content.baselineLabel}
@@ -296,7 +296,7 @@ export default function SavingsCalculator() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-md border border-overlay/10 bg-overlay/3 p-6">
+          <div className="mt-8 rounded-md border border-overlay/10 bg-overlay/3 p-4 sm:p-6">
             <p className="text-ink-muted text-md">
               {positive
                 ? content.results.savingTitle

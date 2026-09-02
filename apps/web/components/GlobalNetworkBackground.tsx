@@ -214,8 +214,8 @@ export default function GlobalNetworkBackground() {
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
+      width = document.documentElement.clientWidth;
+      height = document.documentElement.clientHeight;
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
@@ -480,10 +480,8 @@ export default function GlobalNetworkBackground() {
   }, []);
 
   return (
-    <div className="bg-surface-deep" aria-hidden="true">
-      <div className="bg-surface-deep" />
+    <div className="global-background" aria-hidden="true">
       <canvas ref={canvasRef} className="global-network-canvas" />
-      <div className="bg-surface-deep" />
     </div>
   );
 }
