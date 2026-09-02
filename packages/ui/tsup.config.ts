@@ -34,7 +34,16 @@ export default defineConfig({
   ],
   outDir: "dist",
   format: ["esm", "cjs"],
-  dts: true,
+  // No `dts`. This package is private and every consumer compiles it from
+  // source — the two Next apps via `transpilePackages`, the dashboard via
+  // Vite — so package.json points `types` at index.ts and nothing reads a
+  // bundled .d.ts. Generating them ran 26 entries through rollup-plugin-dts,
+  // each dragging in the React, framer-motion, Radix and lucide type graphs:
+  // 2,316MB peak against 236MB for the rest of the build, which is what put
+  // the apps/web image build over the memory limit on the smaller box
+  // (`ERR_WORKER_OUT_OF_MEMORY`, tsup runs the dts pass in a worker thread).
+  // Re-enable it only alongside publishing this package, and expect to give
+  // the builder ~3GB if you do.
   splitting: true,
   clean: true,
   sourcemap: true,
