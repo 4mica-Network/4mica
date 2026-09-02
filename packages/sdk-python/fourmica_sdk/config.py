@@ -106,6 +106,10 @@ class ConfigBuilder:
         self._auth_enabled = True
         return self
 
+    def disable_auth(self) -> "ConfigBuilder":
+        self._auth_enabled = False
+        return self
+
     def auth_url(self, value: str) -> "ConfigBuilder":
         """Auth base URL for SIWE credentials. Defaults to the RPC URL."""
         self._auth_url = value

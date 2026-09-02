@@ -137,3 +137,29 @@ async def test_error_body_message_is_surfaced():
     )
     with pytest.raises(RpcError, match="user not registered"):
         await proxy.get_public_params()
+
+
+async def test_public_endpoints_never_consult_the_token_provider():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"chain_id": 1, "tokens": []})
+
+    async def provider() -> str:
+        raise AssertionError("public endpoint triggered a login")
+
+    proxy = proxy_with(handler).with_token_provider(provider)
+    await proxy.get_supported_tokens()
+    assert seen["auth"] is None
+
+
+async def test_transport_errors_become_rpc_errors():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    proxy = proxy_with(handler)
+    with pytest.raises(RpcError, match="request to /core/tokens failed"):
+        await proxy.get_supported_tokens()
+    with pytest.raises(RpcError, match="request to /core/guarantees failed"):
+        await proxy.issue_guarantee({"claims": {}})

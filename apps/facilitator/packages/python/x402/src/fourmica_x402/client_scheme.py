@@ -153,7 +153,7 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
             .from_env()
             .build()
         )
-        client = await FourMicaClient.new(cfg)
+        client = await FourMicaClient.connect(cfg)
         return X402Flow.from_client(client)
 
     async def _get_flow_async(self, rpc_url: str) -> X402Flow:

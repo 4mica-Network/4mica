@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "4mica-x402"
-version = "1.2.3"
+version = "2.0.0a1"
 description = "Python integration for x402 Payment Protocol with 4mica credit flow"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "4mica" }]
-dependencies = ["x402>=2.14.0", "sdk-4mica>=1.2.4"]
+dependencies = ["x402>=2.21.0", "sdk-4mica>=2.0.0a1,<3"]
+
+[tool.uv.sources]
+sdk-4mica = { path = "../../../../../packages/sdk-python", editable = true }
 
 [project.optional-dependencies]
 fastapi = ["fastapi[standard]>=0.115.0", "starlette>=0.27.0"]
@@ -38,6 +41,8 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "B"]
 ignore = ["E203"]
 

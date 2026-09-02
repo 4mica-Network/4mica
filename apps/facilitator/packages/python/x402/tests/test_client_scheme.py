@@ -8,6 +8,8 @@ pytest.importorskip("x402")
 pytest.importorskip("fourmica_sdk")
 pytest.importorskip("eth_account")
 
+SUBJECT = "0x" + "42" * 32
+
 
 class StubSigned:
     def __init__(self, payload):
@@ -22,10 +24,10 @@ class StubFlow:
     async def sign_payment_v2(self, payment_required, accepted, user_address):
         self.last_payment_required = payment_required
         self.last_accepted = accepted
-        return StubSigned({"claims": {"tab_id": "0x1"}, "v": 2})
+        return StubSigned({"claims": {"version": "v1", "req_id": "0x1"}, "v": 2})
 
     async def sign_payment(self, requirements, user_address):
-        return StubSigned({"claims": {"tab_id": "0x2"}, "v": 1})
+        return StubSigned({"claims": {"version": "v1", "req_id": "0x2"}, "v": 1})
 
 
 class StubScheme(FourMicaEvmScheme):
@@ -44,12 +46,11 @@ def test_create_payment_payload_v2():
         max_timeout_seconds=60,
         extra={
             "rpcUrl": "https://custom.rpc.example",
-            "validationRegistryAddress": "0x3333333333333333333333333333333333333333",
-            "validatorAddress": "0x4444444444444444444444444444444444444444",
-            "validatorAgentId": "7",
-            "minValidationScore": 80,
-            "requiredValidationTag": "hard-finality",
-            "jobHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "validation": {
+                "validator": "eip155:11155111:0x4444444444444444444444444444444444444444",
+                "subject": SUBJECT,
+                "deadline": 1_700_000_600,
+            },
             "resource": {
                 "url": "https://api.example.com/premium",
                 "description": "Premium dataset",
@@ -59,24 +60,12 @@ def test_create_payment_payload_v2():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 2
-    assert payload["claims"]["tab_id"] == "0x1"
+    assert payload["claims"]["req_id"] == "0x1"
     flow = scheme._flows["https://custom.rpc.example"]
     assert flow.last_payment_required.resource.url == "https://api.example.com/premium"
     assert flow.last_payment_required.resource.description == "Premium dataset"
-    assert (
-        flow.last_accepted.extra["validationRegistryAddress"]
-        == "0x3333333333333333333333333333333333333333"
-    )
-    assert (
-        flow.last_accepted.extra["validatorAddress"] == "0x4444444444444444444444444444444444444444"
-    )
-    assert flow.last_accepted.extra["validatorAgentId"] == "7"
-    assert flow.last_accepted.extra["minValidationScore"] == 80
-    assert flow.last_accepted.extra["requiredValidationTag"] == "hard-finality"
-    assert (
-        flow.last_accepted.extra["jobHash"]
-        == "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    )
+    assert flow.last_accepted.extra["validation"]["subject"] == SUBJECT
+    assert flow.last_accepted.extra["validation"]["deadline"] == 1_700_000_600
 
 
 def test_create_payment_payload_v1():
@@ -96,7 +85,7 @@ def test_create_payment_payload_v1():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 1
-    assert payload["claims"]["tab_id"] == "0x2"
+    assert payload["claims"]["req_id"] == "0x2"
 
 
 def test_create_payment_payload_v2_rejects_unknown_network_without_rpc():
