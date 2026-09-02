@@ -1,35 +1,45 @@
 # Host nginx
 
-Reference config for the machines that run the stacks. **Not deployed by CI** —
-the workflows only bring the containers up on loopback ports.
+Reference config for the machines that run the stacks. **Not written by CI** —
+the workflows only bring the containers up on loopback ports. `install.sh` puts
+these blocks on a box; run it there, with sudo, from a checkout.
 
 These configs split across the two boxes, and each box gets only the server
 blocks for the hosts that resolve to it. Installing a block on the wrong box
 gives you a certificate you cannot renew, because the HTTP-01 challenge is
-answered by whichever machine DNS points at.
+answered by whichever machine DNS points at. `install.sh` therefore has no
+default box — you name it.
 
 **Box A — the `4mica.io` box** (`SERVER_HOST`):
 
 ```bash
-sudo cp infra/nginx/4mica.io.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/4mica.io.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d 4mica.io -d www.4mica.io
+sudo infra/nginx/install.sh a
+sudo certbot --nginx -d 4mica.io -d www.4mica.io   # the script prints this too
 ```
 
 **Box B — the application box** (`BE_SERVER_HOST`):
 
 ```bash
-sudo cp infra/nginx/app.4mica.io.conf infra/nginx/api.app.4mica.io.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/app.4mica.io.conf     /etc/nginx/sites-enabled/
-sudo ln -s /etc/nginx/sites-available/api.app.4mica.io.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+sudo infra/nginx/install.sh b
 sudo certbot --nginx -d app.4mica.io -d api.app.4mica.io
 ```
+
+The script copies into `sites-available/`, symlinks into `sites-enabled/`, runs
+`nginx -t` **before** reloading, and prints the box's certbot line. It is
+idempotent — re-running it when nothing has changed does nothing.
 
 Certbot edits these files in place to add the TLS block and the :80 redirect, so
 after the first run the copies on the boxes diverge from the ones here. Treat
 this directory as the starting point, not the source of truth for what is live.
+
+**That divergence is why `install.sh` never overwrites an installed config.** It
+reports the difference and stops, because copying over it would delete the HTTPS
+block. Two flags cover the rest:
+
+| Flag | Use |
+| --- | --- |
+| `--force` | You changed the proxy rules here on purpose. Overwrites, keeps the old copy as `.bak-<timestamp>`, and tells you to re-run certbot |
+| `--check` | Read-only, **needs no sudo**. Reports missing, un-symlinked or diverged configs and exits non-zero. `build-react-app.yml` runs this after each deploy and turns a non-zero result into a warning |
 
 ## What goes where
 

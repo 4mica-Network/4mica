@@ -11,8 +11,12 @@ on:
           - dev
           - prod
 
+# Deliberately NOT the `deploy-<env>` group the other four workflows share.
+# That group exists to stop concurrent `git pull`s against one checkout; this
+# workflow is the only one targeting Box A and has a checkout of its own (see
+# deploy_path below), so sharing it would only make web queue behind Box B.
 concurrency:
-  group: deploy-${{ inputs.environment }}
+  group: deploy-web-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
@@ -28,14 +32,28 @@ jobs:
         uses: ./.github/actions/remote-deploy
         with:
           server_host: ${{ secrets.SERVER_HOST }}
-          server_user: ${{ vars.SERVER_USER || 'mo' }}
+          server_user: ${{ vars.WEB_SERVER_USER || vars.SERVER_USER || 'mo' }}
           ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          deploy_path: ${{ vars.DEPLOY_PATH || '~/var/www/4mica' }}
+          deploy_path: ${{ vars.WEB_DEPLOY_PATH || '~/var/www/4mica' }}
           branch: ${{ inputs.environment == 'dev' && 'dev' || 'main' }}
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/web
           health_container: 4mica-web
           pre_up: docker network create 4mica-edge 2>/dev/null || true
+          post_up: |
+            EDGE_PORT="$(sed -n 's/^EDGE_PORT=//p' .env | tail -1)"
+            EDGE_PORT="${EDGE_PORT:-8088}"
+            if ! curl -sfo /dev/null -H 'Host: 4mica.io' \
+                 "http://127.0.0.1:${EDGE_PORT}/"; then
+              echo "::warning::edge container is not answering on 127.0.0.1:${EDGE_PORT}."
+            fi
+            # No -L: after certbot this is a 301 to https, which is correct and
+            # which `curl -f` treats as success (it only fails on 4xx/5xx).
+            if ! curl -sfo /dev/null -H 'Host: 4mica.io' http://127.0.0.1/; then
+              echo "::warning::Host nginx is not serving 4mica.io on :80. Run 'sudo infra/nginx/install.sh a' on this box."
+            fi
+            bash ../../infra/nginx/install.sh --check a \
+              || echo "::warning::Host nginx config drifted from infra/nginx (see above). Expected if certbot has run; otherwise run 'sudo infra/nginx/install.sh a'."
           env_contents: |
             NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
