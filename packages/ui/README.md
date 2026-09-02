@@ -32,7 +32,7 @@ Icons are agnostic — pass any `ReactNode` via `icon` (with `iconPosition`).
 ## Scripts
 
 ```bash
-pnpm --filter @4mica/ui build            # bundle to dist/ (esm + cjs + d.ts)
+pnpm --filter @4mica/ui build            # bundle to dist/ (esm + cjs)
 pnpm --filter @4mica/ui dev              # tsup watch
 pnpm --filter @4mica/ui storybook        # Storybook on :6006
 pnpm --filter @4mica/ui build-storybook  # static Storybook
@@ -45,3 +45,19 @@ The app must (1) depend on `@4mica/ui` as `workspace:*`, (2) list it in
 `transpilePackages`, and (3) include the library source in its Tailwind
 `content` globs so the utility classes used by the components are generated.
 See `apps/web` for the reference wiring.
+
+### Types come from source, not `dist`
+
+`package.json` points every `types` key at `./index.ts` while each `default`
+still resolves to the built JS. That is deliberate, and `tsup.config.ts` has no
+`dts` for the same reason: this package is private, and consumers compile it
+from source anyway.
+
+Generating declarations meant running all 26 entries through
+`rollup-plugin-dts`, pulling in the React, framer-motion, Radix and lucide type
+graphs — **2,316MB peak against 236MB for the rest of the build**. That is what
+made the `apps/web` image build fail on the smaller deploy box with
+`ERR_WORKER_OUT_OF_MEMORY` (tsup runs the declaration pass in a worker thread).
+
+Turn it back on only if this package starts being published, and give the
+builder ~3GB when you do.
