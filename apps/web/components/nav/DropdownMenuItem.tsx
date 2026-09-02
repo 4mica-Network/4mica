@@ -15,7 +15,7 @@ export default function DropdownMenuItem({
           <i className={item.icon} />
         </span>
       )}
-      <span className="flex flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
           <span className="font-medium text-ink-strong text-md">
             {item.title}
@@ -25,7 +25,7 @@ export default function DropdownMenuItem({
           )}
         </span>
         {item.description && (
-          <span className="whitespace-nowrap text-ink-muted text-md">
+          <span className="text-ink-muted text-md md:whitespace-nowrap">
             {item.description}
           </span>
         )}
@@ -34,7 +34,7 @@ export default function DropdownMenuItem({
   );
 
   const className =
-    "group/item flex items-center gap-3 rounded-lg py-2.5 pr-8 pl-2.5 transition-colors hover:bg-overlay/5";
+    "group/item flex items-center gap-3 rounded-lg py-2.5 pr-4 pl-2.5 transition-colors hover:bg-overlay/5 md:pr-8";
 
   if (item.external) {
     return (

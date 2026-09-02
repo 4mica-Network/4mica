@@ -37,8 +37,8 @@ export default function HeroSection() {
   return (
     <section className="section-gloss relative isolate overflow-hidden">
       <div className="relative z-10 w-full">
-        <div className="mx-auto w-full max-w-7xl px-6 pt-32 pb-20 lg:pt-36 lg:pb-32">
-          <div className="flex flex-col items-center gap-12 text-center lg:flex-row lg:items-center lg:justify-between lg:gap-12 lg:text-left">
+        <div className="mx-auto w-full pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-32">
+          <div className="flex min-w-0 flex-col items-center gap-10 text-center sm:gap-12 lg:flex-row lg:items-center lg:justify-between lg:gap-12 lg:text-left">
             <motion.div
               className="flex flex-1 flex-col items-center lg:items-start"
               variants={container}
@@ -47,15 +47,18 @@ export default function HeroSection() {
             >
               <motion.h1
                 variants={item}
-                className="select-none font-sans text-4xl text-ink-strong leading-tight tracking-[0.01em] sm:text-5xl lg:text-6xl"
+                className="select-none text-balance font-sans text-3xl text-ink-strong leading-tight tracking-[0.01em] sm:text-4xl md:text-5xl"
               >
                 <span className="sr-only">
                   {titlePrefix} {rotatingWords[0]} {titleConnector} {titleLine2}
                 </span>
                 <span aria-hidden>
-                  <span className="block whitespace-nowrap">
+                  <span className="block sm:whitespace-nowrap">
                     {titlePrefix}{" "}
-                    <span className="relative inline-grid text-left align-bottom">
+                    {/* All words share one grid cell, so the reserved box is the
+                        widest/tallest of them and rotating causes no layout shift.
+                        Block-level `grid` on mobile lets the longest word wrap. */}
+                    <span className="relative grid text-center sm:inline-grid sm:text-left sm:align-bottom">
                       {rotatingWords.map((word) => (
                         <span
                           key={word}
@@ -86,26 +89,26 @@ export default function HeroSection() {
 
               <motion.p
                 variants={item}
-                className="mt-6 max-w-xl select-none text-ink-body/80 text-lg leading-relaxed md:text-xl"
+                className="mt-6 max-w-xl select-none text-ink-body/80 text-md leading-relaxed sm:text-lg md:text-xl"
               >
                 {messages.home.hero.subtitle}
               </motion.p>
 
               <motion.div
                 variants={item}
-                className="mt-8 flex flex-col gap-3 sm:flex-row"
+                className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
               >
                 <a
                   href={links.docs}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-primary btn-lg btn-no-lift hero-cta-primary whitespace-nowrap font-semibold"
+                  className="btn btn-primary btn-lg btn-no-lift hero-cta-primary w-full whitespace-nowrap font-semibold sm:w-auto"
                 >
                   <span>{messages.common.actions.startBuilding}</span>
                 </a>
                 <a
                   href="#how-it-works"
-                  className="hero-cta-ghost inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-surface-deep"
+                  className="hero-cta-ghost inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md leading-none backdrop-blur-sm transition-colors duration-200 ease-out hover:text-surface-deep sm:w-auto"
                 >
                   <i className="ri-play-fill relative z-10 text-lg leading-none" />
                   <span className="relative z-10">
@@ -136,7 +139,7 @@ export default function HeroSection() {
             </motion.div>
 
             <motion.div
-              className="shrink-0"
+              className="hidden shrink-0 lg:block"
               initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}

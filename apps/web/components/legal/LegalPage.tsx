@@ -33,7 +33,7 @@ export default function LegalPage({
 
         <div className="mx-auto mt-16 flex max-w-5xl gap-12">
           <TableOfContent toc={toc} />
-          <article className="min-w-0 flex-1">{children}</article>
+          <article className="blog-content min-w-0 flex-1">{children}</article>
         </div>
       </div>
       <Footer />

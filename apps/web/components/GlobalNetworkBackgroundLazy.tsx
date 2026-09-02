@@ -6,7 +6,7 @@ const GlobalNetworkBackground = dynamic(
   () => import("./GlobalNetworkBackground"),
   {
     ssr: false,
-    loading: () => <div className="bg-surface-deep" aria-hidden="true" />,
+    loading: () => <div className="global-background" aria-hidden="true" />,
   },
 );
 

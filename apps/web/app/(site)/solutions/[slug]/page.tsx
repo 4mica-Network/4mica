@@ -311,7 +311,7 @@ export default async function SolutionDetailPage({ params }: RouteParams) {
               {solution.points.map((point) => (
                 <div
                   key={point.title}
-                  className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid sm:p-10"
+                  className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-10"
                 >
                   <ShinyHoverBorder radiusClass="rounded-none" />
                   <div className="relative z-10">

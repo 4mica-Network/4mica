@@ -201,7 +201,7 @@ export default function SolutionPage() {
                 {SOLUTION_FEATURES.map((feature, i) => (
                   <div
                     key={feature.title}
-                    className={`group relative border-overlay/10 bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid ${
+                    className={`group relative border-overlay/10 bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8 ${
                       i > 0 ? "border-t" : ""
                     } ${i < 2 ? "sm:border-t-0" : ""} ${
                       i % 2 === 1 ? "sm:border-l" : ""

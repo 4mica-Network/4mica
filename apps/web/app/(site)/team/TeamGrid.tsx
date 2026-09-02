@@ -30,7 +30,7 @@ function TeamMemberCard({ member }: { member: Member }) {
   };
 
   return (
-    <div className="flex w-44 flex-col items-center text-center">
+    <div className="flex w-36 flex-col items-center text-center sm:w-44">
       <div className="relative">
         <div
           className="pointer-events-none absolute -inset-5 -z-10 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover/card:opacity-100"
@@ -41,7 +41,7 @@ function TeamMemberCard({ member }: { member: Member }) {
         />
         {/* biome-ignore lint/a11y/noStaticElementInteractions: cursor-tracking spotlight is a decorative visual enhancement with no keyboard equivalent. */}
         <div
-          className="group/card relative h-60 w-44 overflow-hidden rounded-full border border-overlay/10 bg-surface"
+          className="group/card relative h-48 w-36 overflow-hidden rounded-full border border-overlay/10 bg-surface sm:h-60 sm:w-44"
           onMouseMove={handleMove}
           onMouseLeave={handleLeave}
         >
@@ -49,7 +49,7 @@ function TeamMemberCard({ member }: { member: Member }) {
             src={member.image}
             alt={`${member.name}, ${member.role} at 4Mica`}
             fill
-            sizes="176px"
+            sizes="(min-width: 640px) 176px, 144px"
             quality={100}
             className="object-cover grayscale transition duration-500 ease-out group-hover/card:grayscale-0"
             style={{ objectPosition: member.imagePosition ?? "50% 20%" }}
@@ -77,7 +77,7 @@ function TeamMemberCard({ member }: { member: Member }) {
 
 export default function TeamGrid() {
   return (
-    <div className="mt-16 flex flex-wrap items-start justify-center gap-x-10 gap-y-12">
+    <div className="mt-16 flex flex-wrap items-start justify-center gap-x-6 gap-y-10 sm:gap-x-10 sm:gap-y-12">
       {teamMembers.map((member) => (
         <TeamMemberCard key={member.name} member={member} />
       ))}

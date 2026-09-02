@@ -17,6 +17,13 @@ type EmProps = React.HTMLAttributes<HTMLElement>;
 type StrongProps = React.HTMLAttributes<HTMLElement>;
 type AnchorProps = React.ComponentPropsWithoutRef<"a">;
 type BlockquoteProps = React.HTMLAttributes<HTMLElement>;
+type TableProps = React.HTMLAttributes<HTMLTableElement>;
+type CellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
+
+const tableClass = "w-full table-auto border-collapse text-left text-ink-body";
+const thClass =
+  "border-white/10 border-b px-4 py-2 text-left font-medium text-ink-strong";
+const tdClass = "border-white/5 border-b px-4 py-2 text-left";
 
 const linkClass =
   "text-brand-teal underline underline-offset-2 transition-colors hover:text-brand-soft";
@@ -106,14 +113,11 @@ const components = {
   },
   Table: ({ data }: { data: { headers: string[]; rows: string[][] } }) => (
     <div className="my-4 overflow-x-auto">
-      <table className="w-full table-auto border-collapse text-left text-ink-body">
+      <table className={tableClass}>
         <thead>
           <tr>
             {data.headers.map((header) => (
-              <th
-                key={`header-${header}`}
-                className="border-white/10 border-b px-4 py-2 text-left font-medium text-ink-strong"
-              >
+              <th key={`header-${header}`} className={thClass}>
                 {header}
               </th>
             ))}
@@ -123,10 +127,7 @@ const components = {
           {data.rows.map((row) => (
             <tr key={row.join("-")}>
               {row.map((cell) => (
-                <td
-                  key={`${row.join("-")}-${cell}`}
-                  className="border-white/5 border-b px-4 py-2 text-left"
-                >
+                <td key={`${row.join("-")}-${cell}`} className={tdClass}>
                   {cell}
                 </td>
               ))}
@@ -136,6 +137,15 @@ const components = {
       </table>
     </div>
   ),
+  // `remark-gfm` emits plain <table> for pipe tables. Without the scroll wrapper
+  // a wide table pushes the whole page sideways on narrow screens.
+  table: (props: TableProps) => (
+    <div className="my-4 overflow-x-auto">
+      <table className={tableClass} {...props} />
+    </div>
+  ),
+  th: (props: CellProps) => <th className={thClass} {...props} />,
+  td: (props: CellProps) => <td className={tdClass} {...props} />,
   blockquote: (props: BlockquoteProps) => (
     <blockquote
       className="my-4 border-white/15 border-l-2 pl-4 text-ink-muted italic"
