@@ -30,7 +30,7 @@ export default function MilkyWay() {
   return (
     <div
       aria-hidden
-      className="relative size-80 shrink-0 -translate-x-8 md:size-96 lg:size-128 lg:-translate-x-32"
+      className="relative size-64 shrink-0 xl:size-112"
       style={{ WebkitMaskImage: CONTAINER_MASK, maskImage: CONTAINER_MASK }}
     >
       <div

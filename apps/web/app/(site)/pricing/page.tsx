@@ -98,7 +98,7 @@ function AudienceSection() {
             <Link
               key={card.label}
               href={card.href}
-              className={`group relative flex flex-col p-8 transition-colors duration-500 ${
+              className={`group relative flex flex-col p-6 transition-colors duration-500 sm:p-8 ${
                 "primary" in card && card.primary
                   ? "bg-surface-solid hover:bg-surface"
                   : "bg-surface hover:bg-surface-solid"
@@ -169,7 +169,7 @@ function PricingModel() {
           {content.model.cards.map((card) => (
             <div
               key={card.title}
-              className="group relative bg-surface p-8 transition-colors duration-500 hover:bg-surface-solid"
+              className="group relative bg-surface p-6 transition-colors duration-500 hover:bg-surface-solid sm:p-8"
             >
               <ShinyHoverBorder radiusClass="rounded-none" />
               <div className="relative z-10">
@@ -267,7 +267,7 @@ function FacilitatorSavings() {
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="rounded-md border border-overlay/10 bg-surface-deep/25 p-8">
+        <div className="rounded-md border border-overlay/10 bg-surface-deep/25 p-6 sm:p-8">
           <p className="font-medium text-ink-strong text-xl">
             {content.facilitators.example.title}
           </p>
@@ -449,7 +449,7 @@ export default function PricingPage() {
           <AudienceSection />
           <FacilitatorSavings />
 
-          <section className={cn(SECTION_GAP, "px-4 pt-6 sm:px-6 lg:px-8")}>
+          <section className={cn(SECTION_GAP, "pt-6")}>
             <SectionHeader
               kicker={content.calculator.kicker}
               title={content.calculator.title}

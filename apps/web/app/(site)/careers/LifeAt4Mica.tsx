@@ -48,7 +48,7 @@ export default function LifeAt4Mica() {
   const firstCardRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [cardWidth, setCardWidth] = useState(400 + 24);
+  const [cardWidth, setCardWidth] = useState(280 + 16);
 
   const measureCard = useCallback(() => {
     if (!firstCardRef.current) return;

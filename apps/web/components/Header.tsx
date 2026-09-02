@@ -27,11 +27,16 @@ export default function Header() {
       }
     };
 
-    if (isMobileMenuOpen) {
-      document.addEventListener("keydown", onEscape);
-    }
+    if (!isMobileMenuOpen) return;
 
-    return () => document.removeEventListener("keydown", onEscape);
+    document.addEventListener("keydown", onEscape);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onEscape);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isMobileMenuOpen]);
 
   return (
@@ -131,10 +136,10 @@ export default function Header() {
 
       <div
         id="mobile-menu"
-        className={`absolute top-20 right-0 left-0 max-h-[calc(100vh-5rem)] overflow-y-auto bg-surface-deep px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
+        className={`absolute top-20 right-0 left-0 max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain bg-surface-deep px-4 pb-6 transition-all duration-200 sm:px-6 md:hidden ${
           isMobileMenuOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none -translate-y-2 opacity-0"
+            : "pointer-events-none invisible -translate-y-2 opacity-0"
         }`}
       >
         <div className="mx-auto max-w-300 rounded-b-md pt-4">

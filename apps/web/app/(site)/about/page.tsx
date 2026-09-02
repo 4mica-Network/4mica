@@ -19,7 +19,7 @@ export default function AboutPage() {
     <div className="min-h-screen">
       <JsonLd data={pageSchema([{ name: "About", path: "/about" }])} />
       <Header />
-      <div className="pt-64 pb-20">
+      <div className="pt-36 pb-20 lg:pt-48">
         <section className="w-full">
           <div className="mx-auto max-w-3xl text-center">
             <p className="section-kicker">{messages.about.kicker}</p>
@@ -88,7 +88,7 @@ export default function AboutPage() {
                   <h2 className="font-semibold text-2xl text-ink-strong">
                     {messages.about.companyInfoTitle}
                   </h2>
-                  <div className="mt-8 grid grid-cols-2 gap-x-12 gap-y-6">
+                  <div className="mt-8 grid grid-cols-1 gap-x-12 gap-y-6 sm:grid-cols-2">
                     {companyInfo.map((item) => (
                       <div key={item.label} className="flex items-start gap-4">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/10 bg-overlay/5 text-ink-strong text-xl">
