@@ -41,6 +41,14 @@ inputs:
       Used for idempotent setup such as creating a shared external network.
     required: false
     default: ""
+  post_up:
+    description: >-
+      Optional shell run on the server, from service_dir, after compose up and
+      after the health wait. Used for checks on things the deploy does not own,
+      such as the host nginx. Its exit status is ignored — it must emit
+      `::warning::` rather than fail a deploy whose containers came up healthy.
+    required: false
+    default: ""
   health_container:
     description: >-
       Optional container name to poll for a healthy state after the deploy. When
@@ -356,4 +364,41 @@ runs:
         docker compose -f "$COMPOSE_FILE_NAME" --env-file .env ps
         docker compose -f "$COMPOSE_FILE_NAME" --env-file .env logs --tail=200
         exit 1
+        EOF
+
+    - name: Post-deploy checks
+      if: inputs.post_up != ''
+      shell: bash
+      env:
+        SERVER_USER: ${{ steps.target.outputs.server_user }}
+        SERVER_HOST: ${{ steps.target.outputs.server_host }}
+        DEPLOY_PATH: ${{ inputs.deploy_path }}
+        SERVICE_DIR: ${{ inputs.service_dir }}
+        POST_UP: ${{ inputs.post_up }}
+      run: |
+        set -euo pipefail
+        # Same base64 treatment as pre_up, for the same reason: ssh joins its
+        # arguments with spaces and lets the remote shell re-parse them, so a
+        # raw script body would leak its operators onto the outer command line.
+        # The b64: prefix keeps the argument non-empty — base64 of "" is "",
+        # and an empty argv slot is dropped, which would shift every later one.
+        POST_UP_B64="$(printf '%s' "$POST_UP" | base64 | tr -d '\n')"
+        # The whole point of this step is to report on things the deploy does
+        # not own — the host nginx, DNS, a peer box. Those are not reasons to
+        # fail a deploy whose containers are up and healthy, so the remote
+        # script's exit status is discarded and it speaks via ::warning::.
+        ssh "$SERVER_USER@$SERVER_HOST" bash -s -- \
+          "$DEPLOY_PATH" "$SERVICE_DIR" "b64:$POST_UP_B64" <<'EOF' || true
+        set -uo pipefail
+        DEPLOY_PATH="$1"
+        SERVICE_DIR="$2"
+        POST_UP="$(printf '%s' "${3#b64:}" | base64 -d)"
+
+        case "$DEPLOY_PATH" in
+          "~"/*) DEPLOY_PATH="$HOME/${DEPLOY_PATH#"~/"}" ;;
+          "~") DEPLOY_PATH="$HOME" ;;
+        esac
+
+        cd "$DEPLOY_PATH/$SERVICE_DIR" || exit 0
+        bash -c "$POST_UP"
         EOF

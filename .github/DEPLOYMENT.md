@@ -11,8 +11,11 @@ workflow only supplies the host, the compose file and the env body.
 **Two servers.** Each service is still its own compose project and its own
 workflow. Everything publishes to **loopback only**, with one deliberate
 exception noted below; each host's nginx terminates TLS and proxies inward.
-Those server blocks live in [`infra/nginx/`](../infra/nginx/) as reference and
-are copied to the boxes by hand, not by CI.
+Those server blocks live in [`infra/nginx/`](../infra/nginx/) and are installed
+on a box by running [`infra/nginx/install.sh`](../infra/nginx/install.sh) there
+with sudo — not by CI, which deliberately has no root on the hosts.
+`build-react-app.yml` does run `install.sh --check` after each deploy and warns
+if Box A's config is missing or has drifted.
 
 **Box A — the `4mica.io` box** (`SERVER_HOST`). Runs `web` and the `edge` nginx
 that owns the apex namespace. This is where `4mica.io` DNS points and where its
@@ -161,11 +164,16 @@ Deploying more than one service means running more than one workflow. That is
 deliberate: on a single box a push-triggered fan-out is how you get four
 concurrent `git pull`s against one checkout.
 
-All five share **one** `concurrency` group per environment — `deploy-<env>`, with
-no service in the name. They deploy to the same machine and therefore the same
-`DEPLOY_PATH` checkout, so a per-service group would let two runs `git pull` the
-same working tree at once. The cost is that deploys queue instead of running in
-parallel; that is the trade the single-box topology makes.
+Box B's four share **one** `concurrency` group per environment — `deploy-<env>`,
+with no service in the name. They deploy to the same machine and therefore the
+same `DEPLOY_PATH` checkout, so a per-service group would let two runs
+`git pull` the same working tree at once. The cost is that deploys queue instead
+of running in parallel; that is the trade the single-box topology makes.
+
+`build-react-app.yml` is the exception, on `deploy-web-<env>`. It is alone on
+Box A with a checkout of its own (`WEB_DEPLOY_PATH`), so there is no shared
+working tree for the group to protect — putting it in `deploy-<env>` would only
+make a web deploy wait on an unrelated `be` deploy.
 
 The non-deploy workflows follow the same rule. `release.yml` (SDK publish) and
 `facilitator-release.yml` (GHCR image push) are dispatch-only.
@@ -253,15 +261,25 @@ Values the single-box layout pins:
   unprivileged — there is no `sudo` anywhere in it — so with the bootstrap
   `chown` skipped, **Prepare remote checkout** fails with
   `::error::Cannot create /var/www/4mica as user <user>`. See bootstrap step 3.
-- **Set `DEPLOY_PATH` at repository scope, not per environment.** Every
-  workflow on a box shares one checkout and one concurrency group, so a value
-  present on `prod` but absent on `dev` (or added between two runs) silently
-  produces a *second* checkout: unset resolves to the default
-  `~/var/www/4mica` → `$HOME/var/www/4mica`, while a set value is usually the
-  absolute `/var/www/4mica`. The stacks then drift apart, and the concurrency
-  group no longer protects anything. **Prepare remote checkout** prints
-  `Deploy path resolves to …` on every run — compare it across two workflows
-  when a service is stuck on an old commit.
+- **Set `DEPLOY_PATH` at repository scope, not per environment.** Box B's four
+  workflows share one checkout and one concurrency group, so a value present on
+  `prod` but absent on `dev` (or added between two runs) silently produces a
+  *second* checkout: unset resolves to the default `~/var/www/4mica` →
+  `$HOME/var/www/4mica`, while a set value is usually the absolute
+  `/var/www/4mica`. The stacks then drift apart, and the concurrency group no
+  longer protects anything. **Prepare remote checkout** prints `Deploy path
+  resolves to …` on every run — compare it across two workflows when a service
+  is stuck on an old commit.
+- **`DEPLOY_PATH` describes Box B only.** It is one variable, but the boxes are
+  provisioned independently, and a path that exists and is `chown`ed on one is
+  not on the other. `build-react-app.yml` (Box A, and the only workflow that
+  targets it) therefore reads **`WEB_DEPLOY_PATH`** and **`WEB_SERVER_USER`**
+  instead, both optional and both defaulting to the home-relative
+  `~/var/www/4mica`, which the deploy user can create with no `sudo` at all.
+  Setting `DEPLOY_PATH=/var/www/4mica` for Box B is what broke Box A's deploy
+  once already — do not "tidy" the two back into one variable. For the same
+  reason Box A has its own `deploy-web-<env>` concurrency group: it does not
+  share Box B's checkout, so sharing the group only made it queue.
 - **`POSTGRES_PASSWORD` has no default.** `docker-compose.prod.yml` declares it
   `${POSTGRES_PASSWORD:?…}` on purpose, so a production database can never come
   up on the dev stack's throwaway password — compose refuses to start without
@@ -301,17 +319,23 @@ Values the single-box layout pins:
 1. Install Docker Engine, the Compose plugin, and nginx.
 2. Create the deploy user (matching `SERVER_USER`) and add the CI public key to
    its `~/.ssh/authorized_keys`.
-3. Create the checkout directory and give it to that user:
-   `sudo mkdir -p /var/www/4mica && sudo chown "$SERVER_USER:$SERVER_USER" /var/www/4mica`,
-   then set the `DEPLOY_PATH` variable to `/var/www/4mica` **at repository
-   scope**. Note the default is `~/var/www/4mica`, which expands to
-   `$HOME/var/www/4mica` — a different directory. Pick one deliberately and use
-   it everywhere; leaving `DEPLOY_PATH` unset entirely is equally valid and
-   needs no `sudo` at all, since the deploy user owns its own `$HOME`.
+3. Create the checkout directory. **On Box A there is nothing to do** — it
+   defaults to `~/var/www/4mica` → `$HOME/var/www/4mica`, which the deploy user
+   already owns, and the workflow clones into it on first run. Leave
+   `WEB_DEPLOY_PATH` unset.
 
-   **Do not skip this.** The action's clone runs as `SERVER_USER` with no
-   `sudo`, so an un-`chown`ed `/var/www/4mica` fails the deploy at **Prepare
-   remote checkout** with `Cannot create /var/www/4mica as user <user>`.
+   On **Box B**, if you want the absolute path, hand it to that user first:
+   `sudo mkdir -p /var/www/4mica && sudo chown "$SERVER_USER:$SERVER_USER" /var/www/4mica`,
+   then set `DEPLOY_PATH=/var/www/4mica` **at repository scope**. Leaving
+   `DEPLOY_PATH` unset is equally valid and needs no `sudo` at all. Pick one
+   deliberately and use it for all four of Box B's workflows.
+
+   **Do not skip the `chown` if you set the variable.** The action's clone runs
+   as `SERVER_USER` with no `sudo`, so an un-`chown`ed `/var/www/4mica` fails
+   the deploy at **Prepare remote checkout** with `Cannot create /var/www/4mica
+   as user <user>`. And do not point `WEB_DEPLOY_PATH` at Box B's value: the
+   two machines are provisioned separately, and that is exactly the mistake
+   that produced this error on Box A.
 4. Add that user to the `docker` group —
    `sudo usermod -aG docker "$SERVER_USER"`, then reconnect. The action runs
    bare `docker compose`, `docker image prune` and `docker inspect` over SSH; a
@@ -375,10 +399,12 @@ Values the single-box layout pins:
 
 9. Point DNS at the right box for each host — `4mica.io` and `www.4mica.io` at
    Box A, `app.4mica.io` and `api.app.4mica.io` at Box B — then install that
-   box's host nginx configs and TLS certificates; see
-   [`infra/nginx/README.md`](../infra/nginx/README.md). A record aimed at the
-   wrong box yields a certificate that cannot be renewed, because the HTTP-01
-   challenge is answered by whichever machine DNS resolves to.
+   box's host nginx configs and TLS certificates from a checkout:
+   `sudo infra/nginx/install.sh a` on Box A, `… b` on Box B, followed by the
+   certbot line it prints. See [`infra/nginx/README.md`](../infra/nginx/README.md).
+   A record aimed at the wrong box yields a certificate that cannot be renewed,
+   because the HTTP-01 challenge is answered by whichever machine DNS resolves
+   to — which is why the script makes you name the box rather than guessing.
 10. Open only 80/443 in the firewall. Every service binds loopback, so nothing
     else needs to be reachable. **Check 5432 specifically**: a host Postgres
     widened beyond loopback in step 8, or a container publishing `0.0.0.0:5432`,
