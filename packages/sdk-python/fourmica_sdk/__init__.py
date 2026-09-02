@@ -9,6 +9,13 @@ Quickstart::
 """
 
 from .auth import AuthClient, AuthNonceResponse, AuthSession, AuthTokens, SiweTemplate
+from .authorizations import (
+    Eip2612Permit,
+    Permit2Authorization,
+    ReceiveAuthorization,
+    WithdrawalCancelAuthorization,
+    WithdrawalRequestAuthorization,
+)
 from .client import Client
 from .client.model import (
     Asset,
@@ -119,6 +126,7 @@ __all__ = [
     "ContractError",
     "CorePublicParameters",
     "DepositReceipt",
+    "Eip2612Permit",
     "Erc20AllowanceRequiredError",
     "EvmSigner",
     "FacilitatorNotConfiguredError",
@@ -144,6 +152,8 @@ __all__ = [
     "PaymentSignature",
     "PaymentSigner",
     "Permit2AllowanceRequiredError",
+    "Permit2Authorization",
+    "ReceiveAuthorization",
     "RecipientPaymentInfo",
     "RevertedOnChainError",
     "Route",
@@ -167,6 +177,8 @@ __all__ = [
     "ValidationRequirement",
     "VerificationError",
     "WithdrawReceipt",
+    "WithdrawalCancelAuthorization",
+    "WithdrawalRequestAuthorization",
     "X402Error",
     "X402Flow",
     "X402PaymentRequired",

@@ -10,6 +10,8 @@ from typing import Dict, Optional
 from ..auth import AuthClient, AuthSession
 from ..config import Config
 from ..contract import ContractGateway
+from ..digest import core_domain_separator as derive_core_domain_separator
+from ..digest import permit2_domain_separator
 from ..errors import (
     ChainRpcUnavailableError,
     ClientError,
@@ -20,6 +22,7 @@ from ..models import GUARANTEE_CLAIMS_VERSION, CorePublicParameters
 from ..rpc import RpcProxy
 from ..signing import EvmSigner, LocalAccountSigner, PaymentSigner
 from ..utils import normalize_address, normalize_bytes32_hex
+from .facilitator import Facilitator
 
 _BLS_G1_COMPRESSED_BYTES = 48
 
@@ -51,6 +54,21 @@ class ClientCtx:
         self.guarantee_domains = guarantee_domains
         self.signer = signer
         self.payment_signer = PaymentSigner(signer)
+        #: Facilitator that sponsors gas; unconfigured, every gasless call
+        #: fails with FacilitatorNotConfiguredError and auto routes self-fund.
+        self.facilitator = Facilitator(cfg.facilitator_url)
+        # Prefer what core publishes (read from the contract, so right across
+        # a domain change); fall back to deriving it, sound because the
+        # contract fixes its domain as EIP712("Core4Mica", "1").
+        if public_params.core_domain_separator:
+            self.core_domain_separator = bytes.fromhex(
+                public_params.core_domain_separator.removeprefix("0x")
+            )
+        else:
+            self.core_domain_separator = derive_core_domain_separator(
+                self.chain_id, contract_address
+            )
+        self.permit2_domain_separator = permit2_domain_separator(self.chain_id)
         self._gateway: Optional[ContractGateway] = None
         self._gateway_lock = asyncio.Lock()
         self._token_domain_separators: Dict[str, str] = {}
@@ -69,6 +87,30 @@ class ClientCtx:
             )
 
         rpc = RpcProxy(cfg.rpc_url)
+        try:
+            public_params = await rpc.get_public_params()
+
+            if len(public_params.public_key) != _BLS_G1_COMPRESSED_BYTES:
+                raise ClientInitializationError(
+                    "invalid operator public key: expected "
+                    f"{_BLS_G1_COMPRESSED_BYTES} bytes, got "
+                    f"{len(public_params.public_key)}"
+                )
+
+            contract_address = normalize_address(
+                cfg.contract_address or public_params.contract_address
+            )
+            ethereum_http_rpc_url = (
+                cfg.ethereum_http_rpc_url or public_params.ethereum_http_rpc_url or None
+            )
+
+            guarantee_domain, guarantee_domains = await cls._fetch_guarantee_metadata(
+                public_params, contract_address, ethereum_http_rpc_url
+            )
+        except BaseException:
+            await rpc.aclose()
+            raise
+
         auth_session: Optional[AuthSession] = None
         if cfg.auth is not None:
             auth_session = AuthSession(
@@ -80,27 +122,6 @@ class ClientCtx:
             rpc = rpc.with_token_provider(auth_session.access_token)
         elif cfg.bearer_token:
             rpc = rpc.with_bearer_token(cfg.bearer_token)
-
-        public_params = await rpc.get_public_params()
-
-        if len(public_params.public_key) != _BLS_G1_COMPRESSED_BYTES:
-            raise ClientInitializationError(
-                "invalid operator public key: expected "
-                f"{_BLS_G1_COMPRESSED_BYTES} bytes, got {len(public_params.public_key)}"
-            )
-
-        contract_address = normalize_address(
-            cfg.contract_address or public_params.contract_address
-        )
-        # An explicit config wins over what core advertises; neither is required
-        # until a path that reads chain state or transacts runs.
-        ethereum_http_rpc_url = (
-            cfg.ethereum_http_rpc_url or public_params.ethereum_http_rpc_url or None
-        )
-
-        guarantee_domain, guarantee_domains = await cls._fetch_guarantee_metadata(
-            public_params, contract_address, ethereum_http_rpc_url
-        )
 
         return cls(
             cfg=cfg,
@@ -299,6 +320,7 @@ class ClientCtx:
 
     async def aclose(self) -> None:
         await self.rpc.aclose()
+        await self.facilitator.aclose()
         if self.auth_session is not None:
             await self.auth_session.aclose()
         if self._gateway is not None:

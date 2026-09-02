@@ -11,28 +11,44 @@ app = FastAPI()
 
 PORT = int(os.getenv("PORT", "3000"))
 PAY_TO_ADDRESS = os.getenv("PAY_TO_ADDRESS")
-ADVERTISED_ENDPOINT = os.getenv("ADVERTISED_ENDPOINT", f"http://localhost:{PORT}/payment/tab")
+NETWORK = os.getenv("NETWORK", "eip155:11155111")
+# Point these three at a local dev stack; leave unset for the hosted defaults.
+FACILITATOR_URL = os.getenv("FACILITATOR_URL")
+CORE_API_URL = os.getenv("CORE_API_URL")
+ASSET_ADDRESS = os.getenv("ASSET_ADDRESS")
+AMOUNT_BASE_UNITS = os.getenv("AMOUNT_BASE_UNITS", "1000")
 
 if not PAY_TO_ADDRESS:
     raise SystemExit("PAY_TO_ADDRESS env var is required")
 
+price = {"amount": AMOUNT_BASE_UNITS, "asset": ASSET_ADDRESS} if ASSET_ADDRESS else "$0.01"
+
+accepts = {
+    "scheme": "4mica-credit",
+    "price": price,
+    "network": NETWORK,
+    "payTo": PAY_TO_ADDRESS,
+}
+if CORE_API_URL:
+    # The paying client resolves its core endpoint from the requirements.
+    accepts["extra"] = {"rpcUrl": CORE_API_URL}
+
 routes = {
     "GET /api/premium-data": {
-        "accepts": {
-            "scheme": "4mica-credit",
-            "price": "$0.01",
-            "network": "eip155:11155111",
-            "payTo": PAY_TO_ADDRESS,
-        },
+        "accepts": accepts,
         "description": "Access to premium data endpoint",
     }
 }
 
-middleware = fastapi_payment_middleware_from_config(
-    routes,
-    tab_endpoint=ADVERTISED_ENDPOINT,
-    ttl_seconds=3600,
-)
+facilitator_client = None
+if FACILITATOR_URL:
+    from x402.http import FacilitatorConfig
+
+    from fourmica_x402.facilitator import FourMicaFacilitatorClient
+
+    facilitator_client = FourMicaFacilitatorClient(FacilitatorConfig(url=FACILITATOR_URL))
+
+middleware = fastapi_payment_middleware_from_config(routes, facilitator_client=facilitator_client)
 
 
 @app.middleware("http")
@@ -59,7 +75,7 @@ async def root():
             "protected": [
                 {
                     "path": "/api/premium-data",
-                    "price": "$0.01",
+                    "price": str(price),
                     "description": "Premium data endpoint (requires payment)",
                 }
             ],

@@ -78,13 +78,17 @@ class RpcProxy:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.aclose()
 
-    async def _headers(self, admin: bool = False) -> Dict[str, str]:
+    async def _headers(
+        self, admin: bool = False, authed: bool = True
+    ) -> Dict[str, str]:
         headers: Dict[str, str] = {
             SDK_CLIENT_HEADER: SDK_CLIENT,
             "user-agent": SDK_CLIENT,
         }
         if admin and self._admin_api_key:
             headers[ADMIN_API_KEY_HEADER] = self._admin_api_key
+        if not authed:
+            return headers
         token: Optional[str] = None
         if self._token_provider is not None:
             token = await self._token_provider()
@@ -123,14 +127,18 @@ class RpcProxy:
         path: str,
         admin: bool = False,
         params: Optional[Dict[str, Any]] = None,
+        authed: bool = True,
     ) -> Any:
         last_exc: Optional[RpcError] = None
         for attempt in range(_MAX_RETRIES):
             if attempt > 0:
                 await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** (attempt - 1)))
-            resp = await self._client.get(
-                path, headers=await self._headers(admin), params=params
-            )
+            try:
+                resp = await self._client.get(
+                    path, headers=await self._headers(admin, authed), params=params
+                )
+            except httpx.HTTPError as exc:
+                raise RpcError(f"request to {path} failed: {exc}") from exc
             try:
                 return await self._decode(resp)
             except RpcError as exc:
@@ -140,16 +148,23 @@ class RpcProxy:
         raise last_exc  # type: ignore[misc]
 
     async def _post(self, path: str, body: Any, admin: bool = False) -> Any:
-        resp = await self._client.post(
-            path, json=body, headers=await self._headers(admin)
-        )
+        try:
+            resp = await self._client.post(
+                path, json=body, headers=await self._headers(admin)
+            )
+        except httpx.HTTPError as exc:
+            raise RpcError(f"request to {path} failed: {exc}") from exc
         return await self._decode(resp)
 
     async def get_public_params(self) -> CorePublicParameters:
-        return CorePublicParameters.from_rpc(await self._get("/core/public-params"))
+        return CorePublicParameters.from_rpc(
+            await self._get("/core/public-params", authed=False)
+        )
 
     async def get_supported_tokens(self) -> SupportedTokensResponse:
-        return SupportedTokensResponse.from_rpc(await self._get("/core/tokens"))
+        return SupportedTokensResponse.from_rpc(
+            await self._get("/core/tokens", authed=False)
+        )
 
     async def issue_guarantee(self, body: Dict[str, Any]) -> BLSCert:
         return BLSCert.from_rpc(await self._post("/core/guarantees", body))
@@ -209,4 +224,4 @@ class RpcProxy:
         return UserSuspensionStatus.from_rpc(raw)
 
     async def health(self) -> Dict[str, Any]:
-        return await self._get("/core/health")
+        return await self._get("/core/health", authed=False)

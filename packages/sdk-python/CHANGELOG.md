@@ -39,6 +39,23 @@ repository into the `4mica` monorepo (`packages/sdk-python`); the PyPI name
 
 ### Added
 
+- **Facilitator-sponsored gasless routes** across deposits, withdrawals and
+  clearing settlement: `gasless()`, `eip3009()`, `permit2()` (with
+  `sponsor_approval()`) route pins, offline `sign()` terminals producing
+  self-contained authorizations (`ReceiveAuthorization`,
+  `Permit2Authorization`, `WithdrawalRequestAuthorization`,
+  `WithdrawalCancelAuthorization`), `authorization(...)` to redeem one signed
+  elsewhere, and `verify()` preflights. Auto `send()` prefers gasless and
+  falls back to self-funding only when the rejection does not name the
+  request; unknown outcomes are never retried. Facilitator rejections carry
+  their `errorCode` verbatim; `PERMIT2_ALLOWANCE_REQUIRED` surfaces as
+  `Permit2AllowanceRequiredError` with the EIP-2612 nonce when the approval
+  can be sponsored. Configure with `facilitator_url` /
+  `4MICA_FACILITATOR_URL`.
+- Authorization digests in `fourmica_sdk.digest` (EIP-3009, Permit2,
+  EIP-2612, withdrawal request/cancel), pinned against the deployed Base
+  Sepolia USDC and Permit2 domain separators; `EvmSigner` grew a `sign_hash`
+  method to sign them.
 - Settlement-cycle clearing: `client.settlement.pay(cycle_id)` /
   `claim(cycle_id)` builders with `action()`, `self_funded().approve()` and
   `send()`; `RpcProxy.get_clearing_participant_proof` /

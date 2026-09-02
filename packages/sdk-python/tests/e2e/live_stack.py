@@ -93,8 +93,34 @@ async def poll(fn, timeout: float = 30, interval: float = 1):
     return None
 
 
+async def mine_blocks(blocks: int = 1) -> None:
+    """Nudge anvil to mine, mirroring 4mica-core's test harness: core's
+    confirmation mode defaults to ``finalized``, which only advances as blocks
+    are produced — and anvil only produces them on transactions, so a lone
+    deposit never confirms itself. A no-op on RPCs without ``anvil_mine``."""
+    import httpx
+
+    url = os.environ.get("E2E_ETH_RPC_URL")
+    if not url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            await client.post(
+                url,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "anvil_mine",
+                    "params": [blocks],
+                },
+            )
+    except Exception:
+        pass
+
+
 async def credited_balance(client: Client, asset: Optional[str], minimum: int = 1):
     async def check():
+        await mine_blocks(1)
         balance = await client.account.asset_balance(asset)
         if balance is not None and balance.total >= minimum:
             return balance
@@ -171,6 +197,7 @@ async def wait_for_onchain_cycle(client: Client, action, timeout: float = 300):
     cycle_id = bytes.fromhex(action.cycle_id.removeprefix("0x"))
 
     async def check():
+        await mine_blocks(1)
         try:
             return await contract.functions.getCycle(cycle_id).call()
         except Exception:
