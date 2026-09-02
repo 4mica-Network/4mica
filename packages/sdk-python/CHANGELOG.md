@@ -1,29 +1,76 @@
 # Changelog
 
-## 1.0.0 - Unreleased
+## 2.0.0a1 - Unreleased
 
-### Added
-- `UserClient.list_tabs(settlement_statuses=None)` lists tabs for the authenticated user, with optional settlement-status filter.
-- `Client.logout()` invalidates the SIWE auth session and clears cached tokens.
-- `TxReceiptWaitOptions(timeout_secs, poll_latency_secs)` model; all transaction-sending methods (`approve_erc20`, `deposit`, `pay_tab`, `request_withdrawal`, `cancel_withdrawal`, `finalize_withdrawal`, `remunerate`) now accept an optional `wait_options` argument.
-- `UserClient.pay_tab` now auto-resolves `req_id`, `amount`, and `recipient_address` from the latest guarantee when those arguments are omitted.
-- `UserClient.get_user` accepts an optional `block_number` argument for historical queries.
-- `SupportedTokenInfo` and `SupportedTokensResponse` models for token discovery.
-- `RpcProxy.get_supported_tokens()` returns a `SupportedTokensResponse` (includes `chain_id` and `tokens` list).
-
-### Changed
-- Default `pytest` selection now excludes integration tests (`-m "not integration"`).
-- X402 V2 flow no longer requires `paymentRequirements.extra.validationChainId`.
-  The SDK derives `validation_chain_id` from the CAIP-2 network (`eip155:<chainId>`).
-- When `extra.validationChainId` is provided, it is validated against the derived network chain id.
-
-## 0.3.0
+Ground-up rewrite for the settlement-cycle protocol, mirroring the Rust SDK
+2.0 architecture. Development moved from the standalone `py-sdk-4mica`
+repository into the `4mica` monorepo (`packages/sdk-python`); the PyPI name
+(`sdk-4mica`) and import name (`fourmica_sdk`) are unchanged.
 
 ### Breaking
-- `PaymentGuaranteeRequestClaims` now requires `req_id`; signing payloads include `req_id` for EIP-712/EIP-191.
-- X402 payment envelopes include `req_id`; tab responses should return `nextReqId`/`reqId` to populate it.
 
-### Changed
-- `RpcProxy.list_recipient_tabs` now uses `settlement_status` query params.
-- `RpcError` exposes `status_code` for HTTP failures.
-- `ContractGateway` uses explicit overload signatures for withdrawal calls.
+- **The tab model is gone**, matching its removal from the core service.
+  Everything tab-shaped was deleted: `create_tab`, `pay_tab`, `list_tabs`,
+  settled-tabs / pending-remunerations / collateral-events queries,
+  `remunerate`, `TabInfo`, `GuaranteeInfo`, `TabPaymentStatus`, and the
+  `tabEndpoint` step of the x402 flow.
+- **`UserClient` / `RecipientClient` are replaced by capability sub-clients**:
+  `client.payment`, `client.settlement`, `client.deposit`, `client.withdraw`,
+  `client.account`, `client.tokens`. Intents build up and a terminal runs them
+  (`client.deposit.of(asset, amount).self_funded().send()`).
+- **`Client.new` is now `Client.connect(cfg)`**. The Ethereum provider is
+  constructed lazily on first chain access, so signing-only clients need no
+  Ethereum RPC endpoint.
+- **Guarantee claims are V1-only, 9 fields, with `cycle_id`** (server-assigned
+  settlement cycle) instead of `tab_id`, and no `total_amount`. Claims V2 and
+  the flat validation-policy hashing (`validation.py`) were removed; the
+  validation story is now the nested `ValidationRequirement`
+  (`{validator, subject, deadline?, params?}`) attached to V1 claims.
+- **Request signing changed**: the EIP-712 domain now includes
+  `verifyingContract`, and the signed struct has no `tabId`. Signatures
+  produced by 1.x do not verify against current core.
+- **x402**: scheme is exactly `4mica-credit`; `req_id` is a random 32-byte
+  value; `/settle` sends `{x402Version, paymentPayload (object),
+  paymentRequirements}` — the `paymentHeader` field is gone.
+- Admin API-key management methods were removed (the routes no longer exist).
+- The public-RPC fallback (`resolve_public_rpc_url`) was removed; the Ethereum
+  endpoint comes from config or from core's public parameters.
+- `requires-python` is now `>=3.10` (1.x claimed 3.9 but used 3.10 syntax).
+
+### Added
+
+- **Facilitator-sponsored gasless routes** across deposits, withdrawals and
+  clearing settlement: `gasless()`, `eip3009()`, `permit2()` (with
+  `sponsor_approval()`) route pins, offline `sign()` terminals producing
+  self-contained authorizations (`ReceiveAuthorization`,
+  `Permit2Authorization`, `WithdrawalRequestAuthorization`,
+  `WithdrawalCancelAuthorization`), `authorization(...)` to redeem one signed
+  elsewhere, and `verify()` preflights. Auto `send()` prefers gasless and
+  falls back to self-funding only when the rejection does not name the
+  request; unknown outcomes are never retried. Facilitator rejections carry
+  their `errorCode` verbatim; `PERMIT2_ALLOWANCE_REQUIRED` surfaces as
+  `Permit2AllowanceRequiredError` with the EIP-2612 nonce when the approval
+  can be sponsored. Configure with `facilitator_url` /
+  `4MICA_FACILITATOR_URL`.
+- Authorization digests in `fourmica_sdk.digest` (EIP-3009, Permit2,
+  EIP-2612, withdrawal request/cancel), pinned against the deployed Base
+  Sepolia USDC and Permit2 domain separators; `EvmSigner` grew a `sign_hash`
+  method to sign them.
+- Settlement-cycle clearing: `client.settlement.pay(cycle_id)` /
+  `claim(cycle_id)` builders with `action()`, `self_funded().approve()` and
+  `send()`; `RpcProxy.get_clearing_participant_proof` /
+  `get_clearing_settlement_action`; ClearingHouse contract support
+  (`payNetDebit`, `claimNetCreditFor`).
+- Account reads: `assets()`, `principal_balance`, `withdrawable_balance`,
+  `stablecoin_position`, `asset_balance`.
+- `SupportedTokenInfo.domain_separator`, relayed by core for gasless signing.
+- Typed contract reverts (`AmountZeroError`, `InsufficientAvailableError`, …)
+  and a reworked exception taxonomy mirroring the Rust SDK's error enums.
+- Golden-vector tests sharing `guarantee_vectors.json` with the Rust and
+  Solidity test suites.
+
+### Packaging
+
+- Proper `[build-system]` (hatchling). Dropped the unused `pydantic` and
+  `websockets` pins and the phantom `[bls]` extra (`py-ecc` is a normal
+  dependency). `requirements*.txt` replaced by `uv.lock`.

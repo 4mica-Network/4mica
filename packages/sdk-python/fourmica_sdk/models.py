@@ -1,11 +1,30 @@
+"""Wire types mirroring the core service's ``rpc-4mica`` crate.
+
+Core serializes snake_case JSON (``SiweTemplate`` in :mod:`.auth` is the one
+camelCase exception); ``from_rpc`` parsers accept both spellings defensively.
+U256 amounts serialize as 0x-prefixed hex, matching the Rust types.
+"""
+
 from __future__ import annotations
 
-import functools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .utils import normalize_address, normalize_bytes32_hex, parse_u256, serialize_u256
+from .errors import InvalidParamsError
+from .utils import (
+    ValidationError,
+    normalize_address,
+    normalize_bytes32_hex,
+    parse_u256,
+    serialize_u256,
+)
+
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+#: Current guarantee claims version. Clients always sign at this version; core
+#: accepts every version it advertises so older clients keep working.
+GUARANTEE_CLAIMS_VERSION = 1
 
 
 def _get_any(raw: Dict[str, Any], *keys: str) -> Any:
@@ -14,6 +33,17 @@ def _get_any(raw: Dict[str, Any], *keys: str) -> Any:
         if key in raw:
             return raw[key]
     return None
+
+
+def _normalize_hex_bytes(raw: str) -> str:
+    """Normalize 0x-prefixed hex of arbitrary length (validator params blobs)."""
+    value = str(raw).strip()
+    if value.startswith(("0x", "0X")):
+        value = value[2:]
+    if len(value) % 2 != 0:
+        raise ValidationError(f"invalid hex bytes: {raw}")
+    bytes.fromhex(value or "")
+    return "0x" + value.lower()
 
 
 class SigningScheme(str, Enum):
@@ -28,357 +58,405 @@ class PaymentSignature:
 
 
 @dataclass
+class ValidationRequirement:
+    """An agreement, signed by the payer, that a guarantee only becomes payable
+    once an external validator approves it."""
+
+    validator: str
+    subject: str
+    deadline: Optional[int] = None
+    params: str = "0x"
+
+    def __post_init__(self) -> None:
+        self.validator = str(self.validator)
+        self.subject = normalize_bytes32_hex(self.subject)
+        self.deadline = int(self.deadline) if self.deadline is not None else None
+        self.params = _normalize_hex_bytes(self.params or "0x")
+
+    def to_payload(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "validator": self.validator,
+            "subject": self.subject,
+        }
+        if self.deadline is not None:
+            payload["deadline"] = self.deadline
+        if self.params not in ("", "0x"):
+            payload["params"] = self.params
+        return payload
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "ValidationRequirement":
+        return cls(
+            validator=str(_get_any(raw, "validator")),
+            subject=str(_get_any(raw, "subject")),
+            deadline=_get_any(raw, "deadline"),
+            params=str(_get_any(raw, "params") or "0x"),
+        )
+
+
+@dataclass
 class PaymentGuaranteeRequestClaims:
+    """V1 payment guarantee request claims, as signed by the payer's wallet."""
+
     user_address: str
     recipient_address: str
-    tab_id: int
     req_id: int
     amount: int
-    timestamp: int
     asset_address: str
+    timestamp: int
+    validation: Optional[ValidationRequirement] = None
 
     def __post_init__(self) -> None:
         self.user_address = normalize_address(self.user_address)
         self.recipient_address = normalize_address(self.recipient_address)
-        self.tab_id = parse_u256(self.tab_id)
         self.req_id = parse_u256(self.req_id)
         self.amount = parse_u256(self.amount)
-        self.timestamp = int(self.timestamp)
         self.asset_address = normalize_address(self.asset_address)
+        self.timestamp = int(self.timestamp)
 
     @classmethod
     def new(
         cls,
         user_address: str,
         recipient_address: str,
-        tab_id: int,
         req_id: int,
         amount: int,
         timestamp: int,
-        erc20_token: Optional[str],
+        erc20_token: Optional[str] = None,
     ) -> "PaymentGuaranteeRequestClaims":
-        asset = erc20_token or "0x0000000000000000000000000000000000000000"
         return cls(
-            user_address=normalize_address(user_address),
-            recipient_address=normalize_address(recipient_address),
-            tab_id=parse_u256(tab_id),
-            req_id=parse_u256(req_id),
-            amount=parse_u256(amount),
-            timestamp=int(timestamp),
-            asset_address=normalize_address(asset),
+            user_address=user_address,
+            recipient_address=recipient_address,
+            req_id=req_id,
+            amount=amount,
+            asset_address=erc20_token or ZERO_ADDRESS,
+            timestamp=timestamp,
         )
 
+    def with_validation(
+        self, validation: ValidationRequirement
+    ) -> "PaymentGuaranteeRequestClaims":
+        return PaymentGuaranteeRequestClaims(
+            user_address=self.user_address,
+            recipient_address=self.recipient_address,
+            req_id=self.req_id,
+            amount=self.amount,
+            asset_address=self.asset_address,
+            timestamp=self.timestamp,
+            validation=validation,
+        )
+
+    @property
+    def version(self) -> int:
+        return GUARANTEE_CLAIMS_VERSION
+
     def to_payload(self) -> Dict[str, Any]:
-        return {
+        payload: Dict[str, Any] = {
             "version": "v1",
             "user_address": self.user_address,
             "recipient_address": self.recipient_address,
-            "tab_id": serialize_u256(self.tab_id),
             "req_id": serialize_u256(self.req_id),
             "amount": serialize_u256(self.amount),
             "asset_address": self.asset_address,
-            "timestamp": int(self.timestamp),
+            "timestamp": self.timestamp,
         }
-
-
-@dataclass
-class PaymentGuaranteeValidationPolicyV2:
-    validation_registry_address: str
-    validation_request_hash: str
-    validation_chain_id: int
-    validator_address: str
-    validator_agent_id: int
-    min_validation_score: int
-    validation_subject_hash: str
-    required_validation_tag: str
-    job_hash: str
-
-    def __post_init__(self) -> None:
-        self.validation_registry_address = normalize_address(
-            self.validation_registry_address
-        )
-        self.validation_request_hash = normalize_bytes32_hex(
-            self.validation_request_hash
-        )
-        self.validation_chain_id = parse_u256(self.validation_chain_id)
-        self.validator_address = normalize_address(self.validator_address)
-        self.validator_agent_id = parse_u256(self.validator_agent_id)
-        self.min_validation_score = int(self.min_validation_score)
-        if not 1 <= self.min_validation_score <= 100:
-            raise ValueError(
-                "min_validation_score must be in [1, 100], "
-                f"got {self.min_validation_score}"
-            )
-        self.validation_subject_hash = normalize_bytes32_hex(
-            self.validation_subject_hash
-        )
-        self.required_validation_tag = str(self.required_validation_tag)
-        self.job_hash = normalize_bytes32_hex(self.job_hash)
-
-
-@dataclass
-class PaymentGuaranteeRequestClaimsV2(PaymentGuaranteeRequestClaims):
-    validation_registry_address: str
-    validation_request_hash: str
-    validation_chain_id: int
-    validator_address: str
-    validator_agent_id: int
-    min_validation_score: int
-    validation_subject_hash: str
-    required_validation_tag: str
-    job_hash: str
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-        self.validation_registry_address = normalize_address(
-            self.validation_registry_address
-        )
-        self.validation_request_hash = normalize_bytes32_hex(
-            self.validation_request_hash
-        )
-        self.validation_chain_id = parse_u256(self.validation_chain_id)
-        self.validator_address = normalize_address(self.validator_address)
-        self.validator_agent_id = parse_u256(self.validator_agent_id)
-        self.min_validation_score = int(self.min_validation_score)
-        if not 1 <= self.min_validation_score <= 100:
-            raise ValueError(
-                "min_validation_score must be in [1, 100], "
-                f"got {self.min_validation_score}"
-            )
-        self.validation_subject_hash = normalize_bytes32_hex(
-            self.validation_subject_hash
-        )
-        self.required_validation_tag = str(self.required_validation_tag)
-        self.job_hash = normalize_bytes32_hex(self.job_hash)
-
-    @classmethod
-    def new(
-        cls,
-        user_address: str,
-        recipient_address: str,
-        tab_id: int,
-        req_id: int,
-        amount: int,
-        timestamp: int,
-        erc20_token: Optional[str],
-        validation_registry_address: str,
-        validation_request_hash: str,
-        validation_chain_id: int,
-        validator_address: str,
-        validator_agent_id: int,
-        min_validation_score: int,
-        validation_subject_hash: str,
-        required_validation_tag: str,
-        job_hash: str,
-    ) -> "PaymentGuaranteeRequestClaimsV2":
-        asset = erc20_token or "0x0000000000000000000000000000000000000000"
-        return cls(
-            user_address=normalize_address(user_address),
-            recipient_address=normalize_address(recipient_address),
-            tab_id=parse_u256(tab_id),
-            req_id=parse_u256(req_id),
-            amount=parse_u256(amount),
-            timestamp=int(timestamp),
-            asset_address=normalize_address(asset),
-            validation_registry_address=normalize_address(validation_registry_address),
-            validation_request_hash=normalize_bytes32_hex(validation_request_hash),
-            validation_chain_id=parse_u256(validation_chain_id),
-            validator_address=normalize_address(validator_address),
-            validator_agent_id=parse_u256(validator_agent_id),
-            min_validation_score=int(min_validation_score),
-            validation_subject_hash=normalize_bytes32_hex(validation_subject_hash),
-            required_validation_tag=str(required_validation_tag),
-            job_hash=normalize_bytes32_hex(job_hash),
-        )
-
-    @functools.cached_property
-    def validation_policy(self) -> PaymentGuaranteeValidationPolicyV2:
-        return PaymentGuaranteeValidationPolicyV2(
-            validation_registry_address=self.validation_registry_address,
-            validation_request_hash=self.validation_request_hash,
-            validation_chain_id=self.validation_chain_id,
-            validator_address=self.validator_address,
-            validator_agent_id=self.validator_agent_id,
-            min_validation_score=self.min_validation_score,
-            validation_subject_hash=self.validation_subject_hash,
-            required_validation_tag=self.required_validation_tag,
-            job_hash=self.job_hash,
-        )
-
-    def to_payload(self) -> Dict[str, Any]:
-        payload = super().to_payload()
-        payload.update(
-            {
-                "version": "v2",
-                "validation_registry_address": self.validation_registry_address,
-                "validation_request_hash": self.validation_request_hash,
-                "validation_chain_id": int(self.validation_chain_id),
-                "validator_address": self.validator_address,
-                "validator_agent_id": serialize_u256(self.validator_agent_id),
-                "min_validation_score": int(self.min_validation_score),
-                "validation_subject_hash": self.validation_subject_hash,
-                "required_validation_tag": self.required_validation_tag,
-                "job_hash": self.job_hash,
-            }
-        )
+        if self.validation is not None:
+            payload["validation"] = self.validation.to_payload()
         return payload
 
 
 @dataclass
 class PaymentGuaranteeClaims:
+    """Guarantee claims as signed by core's BLS key and decoded on-chain.
+
+    ``cycle_id`` is assigned by core — the settlement cycle the guarantee was
+    netted into — and never supplied by a client. Validation is enforced
+    off-chain and never enters this envelope.
+    """
+
     domain: bytes
     user_address: str
     recipient_address: str
-    tab_id: int
+    cycle_id: int
     req_id: int
     amount: int
-    total_amount: int
     asset_address: str
     timestamp: int
     version: int
-    validation_policy: Optional[PaymentGuaranteeValidationPolicyV2] = None
+
+    def __post_init__(self) -> None:
+        self.domain = bytes(self.domain)
+        self.user_address = normalize_address(self.user_address)
+        self.recipient_address = normalize_address(self.recipient_address)
+        self.cycle_id = parse_u256(self.cycle_id)
+        self.req_id = parse_u256(self.req_id)
+        self.amount = parse_u256(self.amount)
+        self.asset_address = normalize_address(self.asset_address)
+        self.timestamp = int(self.timestamp)
+        self.version = int(self.version)
 
 
 @dataclass
 class BLSCert:
-    claims: str  # hex of abi-encoded guarantee claims (with version prefix)
-    signature: str  # hex of compressed G2 signature (96 bytes)
+    """BLS certificate: hex-encoded claims bytes plus a compressed G2 signature."""
 
+    claims: str
+    signature: str
 
-@dataclass
-class TabPaymentStatus:
-    paid: int
-    remunerated: bool
-    asset: str
+    def __post_init__(self) -> None:
+        self.claims = str(self.claims)
+        self.signature = str(self.signature)
 
-    @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "TabPaymentStatus":
-        paid = raw.get("paid") if "paid" in raw else raw.get("paidAmount")
-        remunerated = (
-            raw.get("remunerated") if "remunerated" in raw else raw.get("paidOut")
-        )
-        asset = raw.get("asset") if "asset" in raw else raw.get("assetAddress")
-        return cls(
-            paid=parse_u256(paid),
-            remunerated=bool(remunerated),
-            asset=asset,
-        )
-
-
-@dataclass
-class UserInfo:
-    asset: str
-    collateral: int
-    withdrawal_request_amount: int
-    withdrawal_request_timestamp: int
-
-
-@dataclass
-class TabInfo:
-    tab_id: int
-    user_address: str
-    recipient_address: str
-    asset_address: str
-    start_timestamp: int
-    ttl_seconds: int
-    status: str
-    settlement_status: str
-    created_at: int
-    updated_at: int
-    total_amount: int = 0
-    paid_amount: int = 0
+    def claims_bytes(self) -> bytes:
+        return bytes.fromhex(self.claims.removeprefix("0x"))
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "TabInfo":
-        return cls(
-            tab_id=parse_u256(_get_any(raw, "tab_id", "tabId")),
-            user_address=_get_any(raw, "user_address", "userAddress"),
-            recipient_address=_get_any(raw, "recipient_address", "recipientAddress"),
-            asset_address=_get_any(raw, "asset_address", "assetAddress"),
-            start_timestamp=int(_get_any(raw, "start_timestamp", "startTimestamp")),
-            ttl_seconds=int(_get_any(raw, "ttl_seconds", "ttlSeconds")),
-            status=_get_any(raw, "status"),
-            settlement_status=_get_any(raw, "settlement_status", "settlementStatus"),
-            created_at=int(_get_any(raw, "created_at", "createdAt")),
-            updated_at=int(_get_any(raw, "updated_at", "updatedAt")),
-            total_amount=parse_u256(_get_any(raw, "total_amount", "totalAmount") or 0),
-            paid_amount=parse_u256(_get_any(raw, "paid_amount", "paidAmount") or 0),
-        )
+    def from_rpc(cls, raw: Dict[str, Any]) -> "BLSCert":
+        claims = _get_any(raw, "claims")
+        signature = _get_any(raw, "signature")
+        if claims is None or signature is None:
+            raise InvalidParamsError("certificate missing claims or signature")
+        return cls(claims=str(claims), signature=str(signature))
 
 
 @dataclass
-class GuaranteeInfo:
-    tab_id: int
-    req_id: int
-    from_address: str
-    to_address: str
-    asset_address: str
-    amount: int
-    timestamp: int
-    certificate: Optional[str]
+class GuaranteeVersionDomain:
+    """One guarantee version's EIP-712 domain separator, 0x-prefixed hex."""
 
-    @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "GuaranteeInfo":
-        return cls(
-            tab_id=parse_u256(_get_any(raw, "tab_id", "tabId")),
-            req_id=parse_u256(_get_any(raw, "req_id", "reqId")),
-            from_address=_get_any(raw, "from_address", "fromAddress"),
-            to_address=_get_any(raw, "to_address", "toAddress"),
-            asset_address=_get_any(raw, "asset_address", "assetAddress"),
-            amount=parse_u256(_get_any(raw, "amount")),
-            timestamp=int(
-                _get_any(raw, "start_timestamp", "startTimestamp", "timestamp") or 0
-            ),
-            certificate=_get_any(raw, "certificate"),
-        )
+    version: int
+    domain_separator: str
+
+    def __post_init__(self) -> None:
+        self.version = int(self.version)
+        self.domain_separator = normalize_bytes32_hex(self.domain_separator)
 
 
 @dataclass
-class PendingRemunerationInfo:
-    tab: TabInfo
-    latest_guarantee: Optional[GuaranteeInfo]
+class CorePublicParameters:
+    """Static parameters exposed by the core service (``GET /core/public-params``)."""
+
+    public_key: bytes
+    contract_address: str
+    eip712_name: str
+    eip712_version: str
+    chain_id: int
+    ethereum_http_rpc_url: str = ""
+    supported_guarantee_versions: List[int] = field(
+        default_factory=lambda: [GUARANTEE_CLAIMS_VERSION]
+    )
+    guarantee_domain_separator: str = ""
+    guarantee_domains: List[GuaranteeVersionDomain] = field(default_factory=list)
+    core_domain_separator: str = ""
+    validators: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.chain_id = int(self.chain_id)
+        self.supported_guarantee_versions = [
+            int(v) for v in self.supported_guarantee_versions
+        ]
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "PendingRemunerationInfo":
-        return cls(
-            tab=TabInfo.from_rpc(_get_any(raw, "tab")),
-            latest_guarantee=GuaranteeInfo.from_rpc(
-                _get_any(raw, "latest_guarantee", "latestGuarantee")
+    def from_rpc(cls, payload: Dict[str, Any]) -> "CorePublicParameters":
+        def require(*keys: str) -> Any:
+            value = _get_any(payload, *keys)
+            if value is None:
+                raise InvalidParamsError(f"missing core public parameter: {keys[0]}")
+            return value
+
+        pk = require("public_key", "publicKey")
+        if isinstance(pk, str):
+            pk_bytes = bytes.fromhex(pk.removeprefix("0x"))
+        else:
+            pk_bytes = bytes(pk)
+
+        versions_raw = _get_any(
+            payload, "supported_guarantee_versions", "supportedGuaranteeVersions"
+        )
+        versions = (
+            [int(v) for v in versions_raw]
+            if isinstance(versions_raw, list) and versions_raw
+            else [GUARANTEE_CLAIMS_VERSION]
+        )
+
+        domains_raw = _get_any(payload, "guarantee_domains", "guaranteeDomains") or []
+        domains = [
+            GuaranteeVersionDomain(
+                version=_get_any(entry, "version"),
+                domain_separator=_get_any(entry, "domain_separator", "domainSeparator"),
             )
-            if _get_any(raw, "latest_guarantee", "latestGuarantee")
-            else None,
+            for entry in domains_raw
+        ]
+
+        guarantee_domain_separator = str(
+            _get_any(payload, "guarantee_domain_separator", "guaranteeDomainSeparator")
+            or ""
+        )
+        if guarantee_domain_separator:
+            guarantee_domain_separator = normalize_bytes32_hex(
+                guarantee_domain_separator
+            )
+
+        core_domain_separator = str(
+            _get_any(payload, "core_domain_separator", "coreDomainSeparator") or ""
+        )
+        if core_domain_separator:
+            core_domain_separator = normalize_bytes32_hex(core_domain_separator)
+
+        return cls(
+            public_key=pk_bytes,
+            contract_address=str(require("contract_address", "contractAddress")),
+            eip712_name=str(require("eip712_name", "eip712Name")),
+            eip712_version=str(require("eip712_version", "eip712Version")),
+            chain_id=int(require("chain_id", "chainId")),
+            ethereum_http_rpc_url=str(
+                _get_any(payload, "ethereum_http_rpc_url", "ethereumHttpRpcUrl") or ""
+            ),
+            supported_guarantee_versions=versions,
+            guarantee_domain_separator=guarantee_domain_separator,
+            guarantee_domains=domains,
+            core_domain_separator=core_domain_separator,
+            validators=[str(v) for v in _get_any(payload, "validators") or []],
         )
 
 
 @dataclass
-class CollateralEventInfo:
-    id: str
-    user_address: str
-    asset_address: str
-    amount: int
-    event_type: str
-    tab_id: Optional[int]
-    req_id: Optional[int]
-    tx_id: Optional[str]
-    created_at: int
+class SupportedTokenInfo:
+    symbol: str
+    address: str
+    decimals: Optional[int] = None
+    domain_separator: Optional[str] = None
+    """The token's own EIP-712 ``DOMAIN_SEPARATOR()``, relayed by core so
+    clients can build gasless-deposit signatures without an Ethereum RPC.
+    ``None`` for tokens that do not expose one."""
+
+
+@dataclass
+class SupportedTokensResponse:
+    chain_id: int
+    tokens: List[SupportedTokenInfo]
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "CollateralEventInfo":
+    def from_rpc(cls, raw: Dict[str, Any]) -> "SupportedTokensResponse":
+        tokens = [
+            SupportedTokenInfo(
+                symbol=str(t.get("symbol", "")),
+                address=str(t.get("address", "")),
+                decimals=int(t["decimals"]) if t.get("decimals") is not None else None,
+                domain_separator=_get_any(t, "domain_separator", "domainSeparator"),
+            )
+            for t in raw.get("tokens", [])
+        ]
         return cls(
-            id=_get_any(raw, "id"),
-            user_address=_get_any(raw, "user_address", "userAddress"),
-            asset_address=_get_any(raw, "asset_address", "assetAddress"),
-            amount=parse_u256(_get_any(raw, "amount")),
-            event_type=_get_any(raw, "event_type", "eventType"),
-            tab_id=parse_u256(_get_any(raw, "tab_id", "tabId"))
-            if _get_any(raw, "tab_id", "tabId") is not None
-            else None,
-            req_id=parse_u256(_get_any(raw, "req_id", "reqId"))
-            if _get_any(raw, "req_id", "reqId") is not None
-            else None,
-            tx_id=_get_any(raw, "tx_id", "txId"),
-            created_at=int(_get_any(raw, "created_at", "createdAt")),
+            chain_id=int(_get_any(raw, "chain_id", "chainId") or 0), tokens=tokens
         )
+
+
+class ClearingParticipantRole(str, Enum):
+    NET_DEBTOR = "NET_DEBTOR"
+    NET_CREDITOR = "NET_CREDITOR"
+
+
+class ClearingSettlementAction(str, Enum):
+    PAY_NET_DEBIT = "pay_net_debit"
+    CLAIM_NET_CREDIT = "claim_net_credit"
+
+
+@dataclass
+class ClearingParticipantProof:
+    """A participant's committed Merkle leaf and proof for one clearing cycle."""
+
+    cycle_id: str
+    """On-chain bytes32 cycle identifier."""
+    cycle_id_text: str
+    """Core database cycle identifier (``{asset}:{period_start}``)."""
+    asset_address: str
+    participant: str
+    role: ClearingParticipantRole
+    amount: int
+    """Amount used with the participant's role-specific ClearingHouse call."""
+    net_debit: int
+    net_credit: int
+    leaf: str
+    merkle_root: str
+    proof: List[str]
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "ClearingParticipantProof":
+        try:
+            return cls(
+                cycle_id=normalize_bytes32_hex(
+                    str(_get_any(raw, "cycle_id", "cycleId"))
+                ),
+                cycle_id_text=str(_get_any(raw, "cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(_get_any(raw, "asset_address", "assetAddress"))
+                ),
+                participant=normalize_address(str(_get_any(raw, "participant"))),
+                role=ClearingParticipantRole(str(_get_any(raw, "role"))),
+                amount=parse_u256(_get_any(raw, "amount")),
+                net_debit=parse_u256(_get_any(raw, "net_debit", "netDebit")),
+                net_credit=parse_u256(_get_any(raw, "net_credit", "netCredit")),
+                leaf=normalize_bytes32_hex(str(_get_any(raw, "leaf"))),
+                merkle_root=normalize_bytes32_hex(
+                    str(_get_any(raw, "merkle_root", "merkleRoot"))
+                ),
+                proof=[
+                    normalize_bytes32_hex(str(item))
+                    for item in _get_any(raw, "proof") or []
+                ],
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid clearing proof: {exc}") from exc
+
+
+@dataclass
+class ClearingSettlementActionResponse:
+    """A ClearingHouse call prepared by core from a participant's committed leaf."""
+
+    contract_address: str
+    """ClearingHouse contract address."""
+    function_name: str
+    """Contract function name to call (``payNetDebit`` / ``claimNetCreditFor``)."""
+    action: ClearingSettlementAction
+    cycle_id: str
+    """On-chain bytes32 cycle identifier."""
+    cycle_id_text: str
+    asset_address: str
+    participant: str
+    """Participant whose committed Merkle leaf is proven."""
+    amount: int
+    payable_value: int
+    """Native value to attach; non-zero only for native-asset debtor payments."""
+    proof: List[str]
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "ClearingSettlementActionResponse":
+        try:
+            return cls(
+                contract_address=normalize_address(
+                    str(_get_any(raw, "contract_address", "contractAddress"))
+                ),
+                function_name=str(_get_any(raw, "function_name", "functionName")),
+                action=ClearingSettlementAction(str(_get_any(raw, "action"))),
+                cycle_id=normalize_bytes32_hex(
+                    str(_get_any(raw, "cycle_id", "cycleId"))
+                ),
+                cycle_id_text=str(_get_any(raw, "cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(_get_any(raw, "asset_address", "assetAddress"))
+                ),
+                participant=normalize_address(str(_get_any(raw, "participant"))),
+                amount=parse_u256(_get_any(raw, "amount")),
+                payable_value=parse_u256(
+                    _get_any(raw, "payable_value", "payableValue")
+                ),
+                proof=[
+                    normalize_bytes32_hex(str(item))
+                    for item in _get_any(raw, "proof") or []
+                ],
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid clearing action: {exc}") from exc
 
 
 @dataclass
@@ -428,29 +506,18 @@ class RecipientPaymentInfo:
 
 
 @dataclass
-class SupportedTokenInfo:
-    symbol: str
-    address: str
-    decimals: Optional[int] = None
-
-
-@dataclass
-class SupportedTokensResponse:
-    chain_id: int
-    tokens: List["SupportedTokenInfo"]
+class UserSuspensionStatus:
+    user_address: str
+    suspended: bool
+    updated_at: int
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "SupportedTokensResponse":
-        chain_id = int(_get_any(raw, "chain_id", "chainId") or 0)
-        tokens = [
-            SupportedTokenInfo(
-                symbol=t.get("symbol", ""),
-                address=t.get("address", ""),
-                decimals=int(t["decimals"]) if t.get("decimals") is not None else None,
-            )
-            for t in raw.get("tokens", [])
-        ]
-        return cls(chain_id=chain_id, tokens=tokens)
+    def from_rpc(cls, raw: Dict[str, Any]) -> "UserSuspensionStatus":
+        return cls(
+            user_address=_get_any(raw, "user_address", "userAddress"),
+            suspended=bool(_get_any(raw, "suspended")),
+            updated_at=int(_get_any(raw, "updated_at", "updatedAt")),
+        )
 
 
 @dataclass
@@ -462,20 +529,22 @@ class TxReceiptWaitOptions:
 __all__: List[str] = [
     "AssetBalanceInfo",
     "BLSCert",
-    "CollateralEventInfo",
-    "GuaranteeInfo",
+    "ClearingParticipantProof",
+    "ClearingParticipantRole",
+    "ClearingSettlementAction",
+    "ClearingSettlementActionResponse",
+    "CorePublicParameters",
+    "GUARANTEE_CLAIMS_VERSION",
+    "GuaranteeVersionDomain",
     "PaymentGuaranteeClaims",
     "PaymentGuaranteeRequestClaims",
-    "PaymentGuaranteeRequestClaimsV2",
-    "PaymentGuaranteeValidationPolicyV2",
     "PaymentSignature",
-    "PendingRemunerationInfo",
     "RecipientPaymentInfo",
     "SigningScheme",
     "SupportedTokenInfo",
     "SupportedTokensResponse",
-    "TabInfo",
-    "TabPaymentStatus",
     "TxReceiptWaitOptions",
-    "UserInfo",
+    "UserSuspensionStatus",
+    "ValidationRequirement",
+    "ZERO_ADDRESS",
 ]

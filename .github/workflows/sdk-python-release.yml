@@ -1,0 +1,46 @@
+name: Python SDK Release
+
+# Dispatch-only, like every release workflow in this repo. Publishes
+# packages/sdk-python to PyPI via trusted publishing (no token secret).
+#
+# Until the facilitator's Python x402 package (4mica-x402) is updated for SDK
+# 2.0, publish only PEP 440 pre-releases (2.0.0aN): its open `sdk-4mica>=1.2.4`
+# range would resolve a stable 2.0.0 and break against the removed tab API.
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/sdk-python
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          uv venv
+          uv pip install ".[dev]"
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Build
+        run: uv build
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/sdk-python/dist

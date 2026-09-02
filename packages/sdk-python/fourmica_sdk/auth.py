@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import httpx
+
 from .errors import (
     AuthConfigError,
     AuthDecodeError,
