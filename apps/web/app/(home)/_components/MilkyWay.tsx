@@ -27,9 +27,6 @@ const CONTAINER_MASK = "radial-gradient(circle, #000 48%, transparent 94%)";
 export default function MilkyWay() {
   const reduceMotion = useReducedMotion();
 
-  // Only rendered from `lg` up. The width is bounded by the hero headline: its
-  // unbreakable line costs 13.17em, so 13.17 x font-size has to fit in
-  // (container - this box - the 48px gap).
   return (
     <div
       aria-hidden

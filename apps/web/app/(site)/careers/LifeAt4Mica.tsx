@@ -48,7 +48,6 @@ export default function LifeAt4Mica() {
   const firstCardRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const [isHovered, setIsHovered] = useState(false);
-  // Mobile-first seed (min-w-70 + mr-4); corrected by measureCard() on mount.
   const [cardWidth, setCardWidth] = useState(280 + 16);
 
   const measureCard = useCallback(() => {

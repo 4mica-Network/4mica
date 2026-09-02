@@ -140,10 +140,6 @@ export default function TimelineSection() {
           </p>
         </div>
 
-        {/* Below `md` the serpentine canvas cannot fit two labels per row without
-            them overlapping, so milestones stack. The description is inline here
-            because the canvas exposes it through a hover tooltip, which touch
-            devices can never reach. */}
         <ol className="md:hidden">
           {milestones.map((milestone, index) => (
             <li

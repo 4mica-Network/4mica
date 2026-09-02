@@ -214,8 +214,6 @@ export default function GlobalNetworkBackground() {
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      // clientWidth excludes a classic scrollbar gutter; innerWidth does not, and
-      // the canvas would otherwise be wider than the layout viewport.
       width = document.documentElement.clientWidth;
       height = document.documentElement.clientHeight;
       canvas.width = Math.floor(width * dpr);

@@ -15,10 +15,28 @@ export default function HeroSection() {
 
   useEffect(() => {
     if (reduceMotion) return;
-    const id = setInterval(() => {
-      setIndex((prev) => (prev + 1) % rotatingWords.length);
-    }, 2800);
-    return () => clearInterval(id);
+
+    const query = window.matchMedia("(min-width: 40rem)");
+    let id: ReturnType<typeof setInterval> | undefined;
+
+    const sync = () => {
+      clearInterval(id);
+      id = undefined;
+      if (!query.matches) {
+        setIndex(0);
+        return;
+      }
+      id = setInterval(() => {
+        setIndex((prev) => (prev + 1) % rotatingWords.length);
+      }, 2800);
+    };
+
+    sync();
+    query.addEventListener("change", sync);
+    return () => {
+      clearInterval(id);
+      query.removeEventListener("change", sync);
+    };
   }, [reduceMotion]);
 
   const container = {
@@ -47,7 +65,7 @@ export default function HeroSection() {
             >
               <motion.h1
                 variants={item}
-                className="select-none text-balance font-sans text-3xl text-ink-strong leading-tight tracking-[0.01em] sm:text-4xl md:text-5xl"
+                className="select-none text-balance font-sans text-[clamp(1.6875rem,8.35vw,1.875rem)] text-ink-strong leading-tight tracking-[0.01em] sm:text-4xl md:text-5xl"
               >
                 <span className="sr-only">
                   {titlePrefix} {rotatingWords[0]} {titleConnector} {titleLine2}
@@ -55,10 +73,8 @@ export default function HeroSection() {
                 <span aria-hidden>
                   <span className="block sm:whitespace-nowrap">
                     {titlePrefix}{" "}
-                    {/* All words share one grid cell, so the reserved box is the
-                        widest/tallest of them and rotating causes no layout shift.
-                        Block-level `grid` on mobile lets the longest word wrap. */}
-                    <span className="relative grid text-center sm:inline-grid sm:text-left sm:align-bottom">
+                    <span className="sm:hidden">{rotatingWords[0]}</span>
+                    <span className="relative hidden text-left align-bottom sm:inline-grid">
                       {rotatingWords.map((word) => (
                         <span
                           key={word}

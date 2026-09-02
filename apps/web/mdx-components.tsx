@@ -137,8 +137,6 @@ const components = {
       </table>
     </div>
   ),
-  // `remark-gfm` emits plain <table> for pipe tables. Without the scroll wrapper
-  // a wide table pushes the whole page sideways on narrow screens.
   table: (props: TableProps) => (
     <div className="my-4 overflow-x-auto">
       <table className={tableClass} {...props} />
