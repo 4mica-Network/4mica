@@ -39,9 +39,19 @@ export async function requestJson<T>(
     decodeError: DecodeErrorFactory;
     httpError: HttpErrorFactory;
     allowEmptyOk?: boolean;
+    /** Wrap a fetch-level failure (DNS, refused connection, abort) into a typed error. */
+    wrapTransportError?: (err: unknown) => Error;
   },
 ): Promise<T> {
-  const response = await fetchFn(url, init);
+  let response: Response;
+  try {
+    response = await fetchFn(url, init);
+  } catch (err) {
+    if (options.wrapTransportError) {
+      throw options.wrapTransportError(err);
+    }
+    throw err;
+  }
 
   let text = "";
   try {

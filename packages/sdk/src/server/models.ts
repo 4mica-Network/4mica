@@ -1,21 +1,21 @@
 import type {
   PaymentRequirementsExtra,
-  X402PaymentEnvelopeV1,
-  X402PaymentEnvelopeV2,
   X402PaymentRequired,
   X402ResourceInfo,
 } from "@/x402/models";
 
-/** Decoded `X-PAYMENT` envelope: either the V1 or V2 wire shape. */
-export type X402PaymentEnvelope = X402PaymentEnvelopeV1 | X402PaymentEnvelopeV2;
+export type { X402PaymentEnvelope } from "@/x402/models";
 
 /**
- * Minimal verification surface the paywall needs: issue a payment guarantee for
- * an already-serialized wire payload. The SDK `Client`'s `rpc` proxy and its
- * `RpcProxy` both satisfy this structurally, so callers can pass `client.rpc`.
+ * Minimal verification surface the paywall needs: issue a payment guarantee
+ * for an already-serialized wire payload. The SDK `Client`'s `rpc` proxy and
+ * its `RpcProxy` both satisfy this structurally, so callers can pass
+ * `client.rpc` or the `Client` itself.
  */
 export interface GuaranteeVerifier {
-  issueGuarantee(payload: unknown): Promise<Record<string, unknown>>;
+  issueGuarantee(
+    payload: unknown,
+  ): Promise<{ claims: string; signature: string }>;
 }
 
 /** A bare verifier, or anything exposing one at `.rpc` (e.g. the SDK `Client`). */
@@ -39,17 +39,17 @@ export interface PaywallConfig {
   network: string;
   /** Amount required, as an integer string in the asset's base units. */
   amount: string;
-  /** Endpoint the payer calls to open/resolve a tab (advertised via `extra.tabEndpoint`). */
-  tabEndpoint: string;
   scheme?: string;
   x402Version?: number;
   description?: string;
   mimeType?: string;
   maxTimeoutSeconds?: number;
-  /** Extra requirements (e.g. a V2 validation policy); merged over `tabEndpoint`. */
+  /** Extra requirements — e.g. `{ validation: { validator, subject, … } }` to gate the payment on a validator. */
   extra?: PaymentRequirementsExtra;
   /** Override the described resource in the 402 body. */
-  resource?: Partial<X402ResourceInfo>;
+  resource?: Partial<
+    Pick<X402ResourceInfo, "url" | "description" | "mimeType">
+  >;
   /** Fully override the advertised 402 body. Takes precedence over every field above. */
   buildRequirements?: (input: PaywallInput) => X402PaymentRequired;
 }
@@ -60,7 +60,7 @@ export interface PaywallGuarantee {
   /** BLS12-381 G2 signature (hex). */
   signature: string;
   /** Raw guarantee record returned by the core RPC. */
-  raw: Record<string, unknown>;
+  raw: { claims: string; signature: string };
 }
 
 export type PaywallDecision =

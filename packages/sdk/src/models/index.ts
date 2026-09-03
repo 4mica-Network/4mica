@@ -1,18 +1,29 @@
-import { toBytes } from "viem";
+/**
+ * Wire types mirroring the core service's `rpc-4mica` crate.
+ *
+ * Core serializes snake_case JSON (`SiweTemplate` in `auth/` is the one
+ * camelCase exception); `fromRpc` parsers accept both spellings defensively.
+ * U256 amounts serialize as 0x-prefixed hex, matching the Rust types.
+ */
+
+import { InvalidParamsError } from "@/errors";
 import { getAny } from "@/serde";
 import {
-  ensureHexPrefix,
+  bytesFromHex,
   normalizeAddress,
+  normalizeBytes32Hex,
+  normalizeHexBytes,
   parseU256,
-  ValidationError,
+  serializeU256,
 } from "@/utils";
 
-export {
-  ADMIN_API_KEY_HEADER,
-  ADMIN_API_KEY_PREFIX,
-  ADMIN_SCOPE_MANAGE_KEYS,
-  ADMIN_SCOPE_SUSPEND_USERS,
-} from "@/constants";
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Current guarantee claims version. Clients always sign at this version; core
+ * accepts every version it advertises so older clients keep working.
+ */
+export const GUARANTEE_CLAIMS_VERSION = 1;
 
 /** Signing scheme used when producing a payment guarantee signature. */
 export enum SigningScheme {
@@ -30,134 +41,150 @@ export interface PaymentSignature {
 }
 
 /**
- * V1 payment guarantee request claims. Signed by the payer and submitted to the
- * core RPC to obtain a BLS guarantee certificate.
+ * An agreement, signed by the payer, that a guarantee only becomes payable
+ * once an external validator approves it.
+ */
+export class ValidationRequirement {
+  readonly validator: string;
+  /** 0x-prefixed bytes32 the validator must approve. */
+  readonly subject: string;
+  /** Unix seconds; core tightens this to the cycle's resolution cutoff. */
+  readonly deadline?: number;
+  /** 0x-prefixed validator-specific policy bytes. */
+  readonly params: string;
+
+  constructor(init: {
+    validator: string;
+    subject: string;
+    deadline?: number | null;
+    params?: string | null;
+  }) {
+    this.validator = String(init.validator);
+    this.subject = normalizeBytes32Hex(init.subject);
+    this.deadline =
+      init.deadline === undefined || init.deadline === null
+        ? undefined
+        : Number(init.deadline);
+    this.params = normalizeHexBytes(init.params || "0x");
+  }
+
+  toPayload(): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      validator: this.validator,
+      subject: this.subject,
+    };
+    if (this.deadline !== undefined) {
+      payload.deadline = this.deadline;
+    }
+    if (this.params !== "" && this.params !== "0x") {
+      payload.params = this.params;
+    }
+    return payload;
+  }
+
+  static fromRpc(raw: Record<string, unknown>): ValidationRequirement {
+    return new ValidationRequirement({
+      validator: String(getAny(raw, "validator")),
+      subject: String(getAny(raw, "subject")),
+      deadline: getAny<number | null>(raw, "deadline"),
+      params: String(getAny(raw, "params") ?? "0x"),
+    });
+  }
+}
+
+/**
+ * V1 payment guarantee request claims, as signed by the payer's wallet.
  *
- * Build with the static {@link PaymentGuaranteeRequestClaims.new} factory which
- * normalises addresses and parses `uint256` values.
+ * `reqId` is a client-generated random 256-bit nonce — uniqueness is all core
+ * asks of it. Build with the static {@link PaymentGuaranteeRequestClaims.new}
+ * factory which normalises addresses and parses `uint256` values.
  */
 export class PaymentGuaranteeRequestClaims {
-  userAddress: string;
-  recipientAddress: string;
-  reqId: bigint;
-  amount: bigint;
-  timestamp: number;
-  assetAddress: string;
+  readonly userAddress: string;
+  readonly recipientAddress: string;
+  readonly reqId: bigint;
+  readonly amount: bigint;
+  readonly assetAddress: string;
+  readonly timestamp: number;
+  readonly validation?: ValidationRequirement;
 
   constructor(init: {
     userAddress: string;
     recipientAddress: string;
-    reqId?: bigint;
-    amount: bigint;
-    timestamp: number;
+    reqId: number | bigint | string;
+    amount: number | bigint | string;
     assetAddress: string;
+    timestamp: number;
+    validation?: ValidationRequirement;
   }) {
-    this.userAddress = init.userAddress;
-    this.recipientAddress = init.recipientAddress;
-    this.reqId = init.reqId ?? 0n;
-    this.amount = init.amount;
-    this.timestamp = init.timestamp;
-    this.assetAddress = init.assetAddress;
+    this.userAddress = normalizeAddress(init.userAddress);
+    this.recipientAddress = normalizeAddress(init.recipientAddress);
+    this.reqId = parseU256(init.reqId);
+    this.amount = parseU256(init.amount);
+    this.assetAddress = normalizeAddress(init.assetAddress);
+    this.timestamp = Number(init.timestamp);
+    this.validation = init.validation;
   }
 
   static new(
     userAddress: string,
     recipientAddress: string,
+    reqId: number | bigint | string,
     amount: number | bigint | string,
     timestamp: number,
     erc20Token?: string | null,
-    reqId?: number | bigint | string,
   ): PaymentGuaranteeRequestClaims {
-    const asset = erc20Token ?? "0x0000000000000000000000000000000000000000";
     return new PaymentGuaranteeRequestClaims({
-      userAddress: normalizeAddress(userAddress),
-      recipientAddress: normalizeAddress(recipientAddress),
-      reqId: reqId !== undefined ? parseU256(reqId) : 0n,
-      amount: parseU256(amount),
-      timestamp: Number(timestamp),
-      assetAddress: normalizeAddress(asset),
+      userAddress,
+      recipientAddress,
+      reqId,
+      amount,
+      assetAddress: erc20Token || ZERO_ADDRESS,
+      timestamp,
     });
   }
-}
 
-/** On-chain validation policy fields carried in a V2 payment guarantee certificate. */
-export interface PaymentGuaranteeValidationPolicyV2 {
-  validationRegistryAddress: string;
-  validationRequestHash: string;
-  validationChainId: number;
-  validatorAddress: string;
-  validatorAgentId: bigint;
-  minValidationScore: number;
-  validationSubjectHash: string;
-  jobHash: string;
-  requiredValidationTag: string;
-}
+  withValidation(
+    validation: ValidationRequirement,
+  ): PaymentGuaranteeRequestClaims {
+    return new PaymentGuaranteeRequestClaims({
+      userAddress: this.userAddress,
+      recipientAddress: this.recipientAddress,
+      reqId: this.reqId,
+      amount: this.amount,
+      assetAddress: this.assetAddress,
+      timestamp: this.timestamp,
+      validation,
+    });
+  }
 
-/**
- * V2 payment guarantee request claims — extends V1 with a full on-chain validation policy.
- *
- * Compute `validationSubjectHash` via `computeValidationSubjectHash(baseClaims)` and
- * `validationRequestHash` via `computeValidationRequestHash(partialV2)` before constructing.
- * The `jobHash` must be provided and included in the validation request hash.
- *
- * @throws {@link ValidationError} if `minValidationScore` is outside [1, 100].
- */
-export class PaymentGuaranteeRequestClaimsV2 extends PaymentGuaranteeRequestClaims {
-  validationRegistryAddress: string;
-  validationRequestHash: string;
-  validationChainId: number;
-  validatorAddress: string;
-  validatorAgentId: bigint;
-  minValidationScore: number;
-  validationSubjectHash: string;
-  jobHash: string;
-  requiredValidationTag: string;
+  get version(): number {
+    return GUARANTEE_CLAIMS_VERSION;
+  }
 
-  constructor(init: {
-    userAddress: string;
-    recipientAddress: string;
-    reqId?: bigint;
-    amount: bigint;
-    timestamp: number;
-    assetAddress: string;
-    validationRegistryAddress: string;
-    validationRequestHash: string;
-    validationChainId: number;
-    validatorAddress: string;
-    validatorAgentId: bigint;
-    minValidationScore: number;
-    validationSubjectHash: string;
-    jobHash: string;
-    requiredValidationTag: string;
-  }) {
-    super(init);
-    if (init.minValidationScore < 1 || init.minValidationScore > 100) {
-      throw new ValidationError(
-        `minValidationScore must be in [1, 100], got ${init.minValidationScore}`,
-      );
+  toPayload(): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      version: "v1",
+      user_address: this.userAddress.toLowerCase(),
+      recipient_address: this.recipientAddress.toLowerCase(),
+      req_id: serializeU256(this.reqId),
+      amount: serializeU256(this.amount),
+      asset_address: this.assetAddress.toLowerCase(),
+      timestamp: this.timestamp,
+    };
+    if (this.validation !== undefined) {
+      payload.validation = this.validation.toPayload();
     }
-    this.validationRegistryAddress = normalizeAddress(
-      init.validationRegistryAddress,
-    );
-    this.validationRequestHash = ensureHexPrefix(
-      init.validationRequestHash,
-    ).toLowerCase();
-    this.validationChainId = init.validationChainId;
-    this.validatorAddress = normalizeAddress(init.validatorAddress);
-    this.validatorAgentId = init.validatorAgentId;
-    this.minValidationScore = init.minValidationScore;
-    this.validationSubjectHash = ensureHexPrefix(
-      init.validationSubjectHash,
-    ).toLowerCase();
-    this.jobHash = ensureHexPrefix(init.jobHash).toLowerCase();
-    this.requiredValidationTag = init.requiredValidationTag;
+    return payload;
   }
 }
 
 /**
- * Decoded payment guarantee claims, as returned by `decodeGuaranteeClaims`.
- * `version` is `1` for V1 certificates and `2` for V2 certificates.
- * V2 certificates additionally carry a `validationPolicy`.
+ * Guarantee claims as signed by core's BLS key and decoded on-chain.
+ *
+ * `cycleId` is assigned by core — the settlement cycle the guarantee was
+ * netted into — and never supplied by a client. Validation is enforced
+ * off-chain and never enters this envelope.
  */
 export interface PaymentGuaranteeClaims {
   domain: Uint8Array;
@@ -169,114 +196,200 @@ export interface PaymentGuaranteeClaims {
   assetAddress: string;
   timestamp: number;
   version: number;
-  validationPolicy?: PaymentGuaranteeValidationPolicyV2;
 }
 
-/**
- * BLS guarantee certificate returned by `issuePaymentGuarantee`.
- * Both fields are `0x`-prefixed hex strings.
- */
-export interface BLSCert {
+/** BLS certificate: hex-encoded claims bytes plus a compressed G2 signature. */
+export class BLSCert {
   /** ABI-encoded `(uint64 version, bytes innerClaims)` envelope as a hex string. */
-  claims: string;
+  readonly claims: string;
   /** BLS12-381 G2 signature as a hex string. */
-  signature: string;
+  readonly signature: string;
+
+  constructor(claims: string, signature: string) {
+    this.claims = String(claims);
+    this.signature = String(signature);
+  }
+
+  claimsBytes(): Uint8Array {
+    return bytesFromHex(this.claims);
+  }
+
+  static fromRpc(raw: Record<string, unknown>): BLSCert {
+    const claims = getAny(raw, "claims");
+    const signature = getAny(raw, "signature");
+    if (claims === undefined || signature === undefined) {
+      throw new InvalidParamsError("certificate missing claims or signature");
+    }
+    return new BLSCert(String(claims), String(signature));
+  }
 }
 
-/** On-chain collateral position for a single asset, returned by `getUser`. */
-export interface UserInfo {
-  /** Asset address (`0x000...` for ETH). */
-  asset: string;
-  /** Total deposited collateral available for payments (in token base units). */
-  collateral: bigint;
-  /** Amount of a pending withdrawal request (0 if none). */
-  withdrawalRequestAmount: bigint;
-  /** Unix timestamp when the withdrawal request was made (0 if none). */
-  withdrawalRequestTimestamp: number;
+/** One guarantee version's EIP-712 domain separator, 0x-prefixed hex. */
+export interface GuaranteeVersionDomain {
+  version: number;
+  domainSeparator: string;
 }
 
-export class UserSuspensionStatus {
+/** Static parameters exposed by the core service (`GET /core/public-params`). */
+export class CorePublicParameters {
   constructor(
-    public userAddress: string,
-    public suspended: boolean,
-    public updatedAt: number,
+    /** Operator BLS public key (48-byte compressed G1). */
+    public publicKey: Uint8Array,
+    public contractAddress: string,
+    public eip712Name: string,
+    public eip712Version: string,
+    public chainId: number,
+    public ethereumHttpRpcUrl: string = "",
+    public supportedGuaranteeVersions: number[] = [GUARANTEE_CLAIMS_VERSION],
+    public guaranteeDomainSeparator: string = "",
+    public guaranteeDomains: GuaranteeVersionDomain[] = [],
+    public coreDomainSeparator: string = "",
+    public validators: string[] = [],
   ) {}
 
-  static fromRpc(raw: Record<string, unknown>): UserSuspensionStatus {
-    return new UserSuspensionStatus(
-      (getAny(raw, "user_address", "userAddress") ?? "") as string,
-      Boolean(getAny(raw, "suspended")),
-      Number(getAny(raw, "updated_at", "updatedAt") ?? 0),
+  static fromRpc(payload: Record<string, unknown>): CorePublicParameters {
+    const require = (...keys: string[]): unknown => {
+      const value = getAny(payload, ...keys);
+      if (value === undefined || value === null) {
+        throw new InvalidParamsError(
+          `missing core public parameter: ${keys[0]}`,
+        );
+      }
+      return value;
+    };
+
+    const pkRaw = require("public_key", "publicKey");
+    const publicKey =
+      typeof pkRaw === "string"
+        ? bytesFromHex(pkRaw)
+        : pkRaw instanceof Uint8Array
+          ? pkRaw
+          : Array.isArray(pkRaw)
+            ? Uint8Array.from(pkRaw as ArrayLike<number>)
+            : new Uint8Array();
+
+    const versionsRaw = getAny(
+      payload,
+      "supported_guarantee_versions",
+      "supportedGuaranteeVersions",
+    );
+    const versions =
+      Array.isArray(versionsRaw) && versionsRaw.length > 0
+        ? versionsRaw.map((version) => Number(version))
+        : [GUARANTEE_CLAIMS_VERSION];
+
+    const domainsRaw =
+      getAny(payload, "guarantee_domains", "guaranteeDomains") ?? [];
+    const domains: GuaranteeVersionDomain[] = (
+      Array.isArray(domainsRaw) ? domainsRaw : []
+    ).map((entry) => ({
+      version: Number(getAny(entry as Record<string, unknown>, "version")),
+      domainSeparator: normalizeBytes32Hex(
+        String(
+          getAny(
+            entry as Record<string, unknown>,
+            "domain_separator",
+            "domainSeparator",
+          ),
+        ),
+      ),
+    }));
+
+    const guaranteeDomainSeparatorRaw = String(
+      getAny(
+        payload,
+        "guarantee_domain_separator",
+        "guaranteeDomainSeparator",
+      ) ?? "",
+    );
+    const coreDomainSeparatorRaw = String(
+      getAny(payload, "core_domain_separator", "coreDomainSeparator") ?? "",
+    );
+
+    return new CorePublicParameters(
+      publicKey,
+      String(require("contract_address", "contractAddress")),
+      String(require("eip712_name", "eip712Name")),
+      String(require("eip712_version", "eip712Version")),
+      Number(require("chain_id", "chainId")),
+      String(
+        getAny(payload, "ethereum_http_rpc_url", "ethereumHttpRpcUrl") ?? "",
+      ),
+      versions,
+      guaranteeDomainSeparatorRaw
+        ? normalizeBytes32Hex(guaranteeDomainSeparatorRaw)
+        : "",
+      domains,
+      coreDomainSeparatorRaw ? normalizeBytes32Hex(coreDomainSeparatorRaw) : "",
+      ((getAny(payload, "validators") ?? []) as unknown[]).map(String),
     );
   }
 }
 
-export class AdminApiKeyInfo {
+export interface SupportedTokenInfo {
+  symbol: string;
+  address: string;
+  decimals?: number;
+  /**
+   * The token's own EIP-712 `DOMAIN_SEPARATOR()`, relayed by core so clients
+   * can build gasless-deposit signatures without an Ethereum RPC. `undefined`
+   * for tokens that do not expose one.
+   */
+  domainSeparator?: string;
+}
+
+export class SupportedTokensResponse {
   constructor(
-    public id: string,
-    public name: string,
-    public scopes: string[],
-    public createdAt: number,
-    public revokedAt?: number | null,
+    public chainId: number,
+    public tokens: SupportedTokenInfo[],
   ) {}
 
-  static fromRpc(raw: Record<string, unknown>): AdminApiKeyInfo {
-    const revoked = getAny(raw, "revoked_at", "revokedAt");
-    return new AdminApiKeyInfo(
-      (getAny(raw, "id") ?? "") as string,
-      (getAny(raw, "name") ?? "") as string,
-      ((getAny(raw, "scopes") ?? []) as string[]).map(String),
-      Number(getAny(raw, "created_at", "createdAt") ?? 0),
-      revoked === undefined || revoked === null ? null : Number(revoked),
+  static fromRpc(raw: Record<string, unknown>): SupportedTokensResponse {
+    const tokensRaw = getAny(raw, "tokens");
+    const tokens: SupportedTokenInfo[] = [];
+    if (Array.isArray(tokensRaw)) {
+      for (const token of tokensRaw as Record<string, unknown>[]) {
+        const address = getAny(token, "address");
+        if (typeof address !== "string" || address.length === 0) continue;
+        const decimals = getAny(token, "decimals");
+        const domainSeparator = getAny(
+          token,
+          "domain_separator",
+          "domainSeparator",
+        );
+        tokens.push({
+          symbol: String(getAny(token, "symbol") ?? ""),
+          address,
+          decimals:
+            decimals === undefined || decimals === null
+              ? undefined
+              : Number(decimals),
+          domainSeparator:
+            domainSeparator === undefined || domainSeparator === null
+              ? undefined
+              : String(domainSeparator),
+        });
+      }
+    }
+    return new SupportedTokensResponse(
+      Number(getAny(raw, "chain_id", "chainId") ?? 0),
+      tokens,
     );
   }
 }
 
-export class AdminApiKeySecret {
-  constructor(
-    public id: string,
-    public name: string,
-    public scopes: string[],
-    public createdAt: number,
-    public apiKey: string,
-  ) {}
+/** Role a participant holds in a settlement cycle. Flat participants have neither. */
+export type ClearingParticipantRole = "NET_DEBTOR" | "NET_CREDITOR";
 
-  static fromRpc(raw: Record<string, unknown>): AdminApiKeySecret {
-    return new AdminApiKeySecret(
-      (getAny(raw, "id") ?? "") as string,
-      (getAny(raw, "name") ?? "") as string,
-      ((getAny(raw, "scopes") ?? []) as string[]).map(String),
-      Number(getAny(raw, "created_at", "createdAt") ?? 0),
-      (getAny(raw, "api_key", "apiKey") ?? "") as string,
-    );
-  }
-}
+/** Off-chain clearing settlement action prepared by core. */
+export type ClearingSettlementAction = "pay_net_debit" | "claim_net_credit";
 
-/**
- * Off-chain clearing settlement action a participant performs against the
- * ClearingHouse contract for a given cycle.
- */
-export type ClearingSettlementActionKind =
-  | "pay_net_debit"
-  | "claim_net_credit"
-  | "mark_defaulted";
-
-/** Role a participant holds in a settlement cycle. */
-export type ClearingParticipantRole =
-  | "NET_CREDITOR"
-  | "NET_DEBTOR"
-  | "BALANCED"
-  | string;
-
-/**
- * A participant's committed position in a settlement cycle, with the Merkle
- * proof needed to settle on-chain. Returned by `getClearingParticipantProof`.
- */
+/** A participant's committed Merkle leaf and proof for one clearing cycle. */
 export class ClearingParticipantProof {
   constructor(
     /** On-chain `bytes32` cycle identifier. */
     public cycleId: string,
-    /** Core database cycle identifier. */
+    /** Core database cycle identifier (`{asset}:{period_start}`). */
     public cycleIdText: string,
     public assetAddress: string,
     public participant: string,
@@ -291,53 +404,56 @@ export class ClearingParticipantProof {
   ) {}
 
   static fromRpc(raw: Record<string, unknown>): ClearingParticipantProof {
-    const proofRaw = getAny(raw, "proof") ?? [];
-    return new ClearingParticipantProof(
-      (getAny(raw, "cycle_id", "cycleId") ?? "") as string,
-      (getAny(raw, "cycle_id_text", "cycleIdText") ?? "") as string,
-      (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
-      (getAny(raw, "participant") ?? "") as string,
-      (getAny(raw, "role") ?? "") as ClearingParticipantRole,
-      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
-      parseU256(
-        (getAny(raw, "net_debit", "netDebit") ?? 0) as number | bigint | string,
-      ),
-      parseU256(
-        (getAny(raw, "net_credit", "netCredit") ?? 0) as
-          | number
-          | bigint
-          | string,
-      ),
-      (getAny(raw, "leaf") ?? "") as string,
-      (getAny(raw, "merkle_root", "merkleRoot") ?? "") as string,
-      (Array.isArray(proofRaw) ? proofRaw : []).map(String),
-    );
+    try {
+      const proofRaw = getAny(raw, "proof") ?? [];
+      return new ClearingParticipantProof(
+        normalizeBytes32Hex(String(getAny(raw, "cycle_id", "cycleId"))),
+        String(getAny(raw, "cycle_id_text", "cycleIdText")),
+        normalizeAddress(String(getAny(raw, "asset_address", "assetAddress"))),
+        normalizeAddress(String(getAny(raw, "participant"))),
+        String(getAny(raw, "role")) as ClearingParticipantRole,
+        parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
+        parseU256(
+          (getAny(raw, "net_debit", "netDebit") ?? 0) as
+            | number
+            | bigint
+            | string,
+        ),
+        parseU256(
+          (getAny(raw, "net_credit", "netCredit") ?? 0) as
+            | number
+            | bigint
+            | string,
+        ),
+        normalizeBytes32Hex(String(getAny(raw, "leaf"))),
+        normalizeBytes32Hex(String(getAny(raw, "merkle_root", "merkleRoot"))),
+        (Array.isArray(proofRaw) ? proofRaw : []).map((item) =>
+          normalizeBytes32Hex(String(item)),
+        ),
+      );
+    } catch (err) {
+      if (err instanceof InvalidParamsError) throw err;
+      throw new InvalidParamsError(`invalid clearing proof: ${String(err)}`);
+    }
   }
 }
 
-/**
- * A prepared ClearingHouse contract call for a participant, including the amount
- * and Merkle proof. Returned by `getClearingSettlementAction` and its helpers.
- */
+/** A ClearingHouse call prepared by core from a participant's committed leaf. */
 export class ClearingSettlementActionResponse {
   constructor(
     /** ClearingHouse contract address. */
     public contractAddress: string,
-    /** Contract function to call (`payNetDebit`, `claimNetCredit`, `markDefaulted`). */
+    /** Contract function name to call (`payNetDebit` / `claimNetCreditFor`). */
     public functionName: string,
-    public action: ClearingSettlementActionKind,
+    public action: ClearingSettlementAction,
     /** On-chain `bytes32` cycle identifier. */
     public cycleId: string,
-    /** Core database cycle identifier. */
     public cycleIdText: string,
     public assetAddress: string,
     /** Participant whose committed Merkle leaf is proven. */
     public participant: string,
-    /** Alias for `participant` when `action = mark_defaulted`. */
-    public debtor: string | null,
-    /** Amount argument for the selected ClearingHouse function. */
     public amount: bigint,
-    /** Native value to attach — non-zero only for native-asset debtor payments. */
+    /** Native value to attach; non-zero only for native-asset debtor payments. */
     public payableValue: bigint,
     public proof: string[],
   ) {}
@@ -345,27 +461,33 @@ export class ClearingSettlementActionResponse {
   static fromRpc(
     raw: Record<string, unknown>,
   ): ClearingSettlementActionResponse {
-    const proofRaw = getAny(raw, "proof") ?? [];
-    const debtor = getAny(raw, "debtor");
-    return new ClearingSettlementActionResponse(
-      (getAny(raw, "contract_address", "contractAddress") ?? "") as string,
-      (getAny(raw, "function_name", "functionName") ?? "") as string,
-      (getAny(raw, "action") ??
-        "claim_net_credit") as ClearingSettlementActionKind,
-      (getAny(raw, "cycle_id", "cycleId") ?? "") as string,
-      (getAny(raw, "cycle_id_text", "cycleIdText") ?? "") as string,
-      (getAny(raw, "asset_address", "assetAddress") ?? "") as string,
-      (getAny(raw, "participant") ?? "") as string,
-      typeof debtor === "string" ? debtor : null,
-      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
-      parseU256(
-        (getAny(raw, "payable_value", "payableValue") ?? 0) as
-          | number
-          | bigint
-          | string,
-      ),
-      (Array.isArray(proofRaw) ? proofRaw : []).map(String),
-    );
+    try {
+      const proofRaw = getAny(raw, "proof") ?? [];
+      return new ClearingSettlementActionResponse(
+        normalizeAddress(
+          String(getAny(raw, "contract_address", "contractAddress")),
+        ),
+        String(getAny(raw, "function_name", "functionName")),
+        String(getAny(raw, "action")) as ClearingSettlementAction,
+        normalizeBytes32Hex(String(getAny(raw, "cycle_id", "cycleId"))),
+        String(getAny(raw, "cycle_id_text", "cycleIdText")),
+        normalizeAddress(String(getAny(raw, "asset_address", "assetAddress"))),
+        normalizeAddress(String(getAny(raw, "participant"))),
+        parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
+        parseU256(
+          (getAny(raw, "payable_value", "payableValue") ?? 0) as
+            | number
+            | bigint
+            | string,
+        ),
+        (Array.isArray(proofRaw) ? proofRaw : []).map((item) =>
+          normalizeBytes32Hex(String(item)),
+        ),
+      );
+    } catch (err) {
+      if (err instanceof InvalidParamsError) throw err;
+      throw new InvalidParamsError(`invalid clearing action: ${String(err)}`);
+    }
   }
 }
 
@@ -417,107 +539,18 @@ export class RecipientPaymentInfo {
   }
 }
 
-export interface SupportedTokenInfo {
-  symbol: string;
-  address: string;
-  decimals?: number;
-}
-
-export class SupportedTokensResponse {
+export class UserSuspensionStatus {
   constructor(
-    public chainId: number,
-    public tokens: SupportedTokenInfo[],
+    public userAddress: string,
+    public suspended: boolean,
+    public updatedAt: number,
   ) {}
 
-  static fromRpc(raw: Record<string, unknown>): SupportedTokensResponse {
-    const tokensRaw = getAny(raw, "tokens");
-    const tokens: SupportedTokenInfo[] = [];
-    if (Array.isArray(tokensRaw)) {
-      for (const token of tokensRaw as Record<string, unknown>[]) {
-        const address = getAny(token, "address");
-        if (typeof address !== "string" || address.length === 0) continue;
-        const decimals = getAny(token, "decimals");
-        tokens.push({
-          symbol: String(getAny(token, "symbol") ?? ""),
-          address,
-          decimals:
-            decimals === undefined || decimals === null
-              ? undefined
-              : Number(decimals),
-        });
-      }
-    }
-    return new SupportedTokensResponse(
-      Number(getAny(raw, "chain_id", "chainId") ?? 0),
-      tokens,
-    );
-  }
-}
-
-export class CorePublicParameters {
-  constructor(
-    public publicKey: Uint8Array,
-    public contractAddress: string,
-    public ethereumHttpRpcUrl: string,
-    public eip712Name: string,
-    public eip712Version: string,
-    public chainId: number,
-    public maxAcceptedGuaranteeVersion: number = 1,
-    public acceptedGuaranteeVersions: number[] = [],
-    public activeGuaranteeDomainSeparator: string = "",
-    /** Allowlist of trusted validation registry addresses configured in core (may be empty). */
-    public trustedValidationRegistries: string[] = [],
-    public validationHashCanonicalizationVersion: string = "4MICA_VALIDATION_REQUEST_V1",
-  ) {}
-
-  static fromRpc(payload: Record<string, unknown>): CorePublicParameters {
-    const pkRaw = payload.public_key ?? payload.publicKey;
-    const pk =
-      typeof pkRaw === "string"
-        ? toBytes(pkRaw)
-        : pkRaw instanceof Uint8Array
-          ? pkRaw
-          : Array.isArray(pkRaw)
-            ? Uint8Array.from(pkRaw as ArrayLike<number>)
-            : new Uint8Array();
-    const registriesRaw =
-      payload.trusted_validation_registries ??
-      payload.trustedValidationRegistries;
-    const trustedValidationRegistries = Array.isArray(registriesRaw)
-      ? (registriesRaw as unknown[]).map(String)
-      : [];
-    return new CorePublicParameters(
-      pk,
-      String(payload.contract_address ?? payload.contractAddress ?? ""),
-      String(payload.ethereum_http_rpc_url ?? payload.ethereumHttpRpcUrl ?? ""),
-      (payload.eip712_name ?? payload.eip712Name ?? "4Mica") as string,
-      (payload.eip712_version ?? payload.eip712Version ?? "1") as string,
-      Number(payload.chain_id ?? payload.chainId),
-      Number(
-        payload.max_accepted_guarantee_version ??
-          payload.maxAcceptedGuaranteeVersion ??
-          1,
-      ),
-      Array.isArray(
-        payload.accepted_guarantee_versions ??
-          payload.acceptedGuaranteeVersions,
-      )
-        ? (
-            (payload.accepted_guarantee_versions ??
-              payload.acceptedGuaranteeVersions) as unknown[]
-          ).map((version) => Number(version))
-        : [],
-      String(
-        payload.active_guarantee_domain_separator ??
-          payload.activeGuaranteeDomainSeparator ??
-          "",
-      ),
-      trustedValidationRegistries,
-      String(
-        payload.validation_hash_canonicalization_version ??
-          payload.validationHashCanonicalizationVersion ??
-          "4MICA_VALIDATION_REQUEST_V1",
-      ),
+  static fromRpc(raw: Record<string, unknown>): UserSuspensionStatus {
+    return new UserSuspensionStatus(
+      (getAny(raw, "user_address", "userAddress") ?? "") as string,
+      Boolean(getAny(raw, "suspended")),
+      Number(getAny(raw, "updated_at", "updatedAt") ?? 0),
     );
   }
 }

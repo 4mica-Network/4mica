@@ -1,5 +1,7 @@
 import {
   type Account,
+  BaseError,
+  ContractFunctionRevertedError,
   createPublicClient,
   createWalletClient,
   erc20Abi,
@@ -19,26 +21,100 @@ import type {
   TWalletClient,
   TxReceiptWaitOptions,
 } from "@/contract/models";
-import { ContractError } from "@/errors";
-import { parseU256 } from "@/utils";
+import {
+  AaveNotConfiguredError,
+  AmountZeroError,
+  ContractError,
+  Erc20AllowanceRequiredError,
+  GracePeriodNotElapsedError,
+  InsufficientAvailableError,
+  NoWithdrawalRequestedError,
+  RevertedOnChainError,
+  StablecoinWithdrawShortfallError,
+  TransferFailedError,
+  UnknownRevertError,
+  UnsupportedAssetError,
+  ValueMismatchError,
+  ZeroCollateralCreditError,
+} from "@/errors";
+import { normalizeAddress, parseU256 } from "@/utils";
 
 export type { TxReceiptWaitOptions } from "@/contract/models";
 
 /**
- * Extract a human-readable message from a viem contract error, falling back
- * to the raw message if no structured reason is available.
+ * Map a decoded Core4Mica / ClearingHouse custom error to its typed SDK
+ * exception. Reverts with no matching decoder fall through to
+ * {@link UnknownRevertError}; anything without revert data stays a plain
+ * {@link ContractError} carrying the extracted message.
+ */
+function decodeRevert(error: unknown, context: string): ContractError | null {
+  if (!(error instanceof BaseError)) return null;
+  const revert = error.walk(
+    (err) => err instanceof ContractFunctionRevertedError,
+  );
+  if (!(revert instanceof ContractFunctionRevertedError)) return null;
+
+  const name = revert.data?.errorName;
+  const args = revert.data?.args ?? [];
+  switch (name) {
+    case "AmountZero":
+      return new AmountZeroError(`${context}: amount is zero`);
+    case "InsufficientAvailable":
+      return new InsufficientAvailableError(
+        `${context}: insufficient available balance`,
+      );
+    case "NoWithdrawalRequested":
+      return new NoWithdrawalRequestedError(
+        `${context}: no withdrawal requested`,
+      );
+    case "GracePeriodNotElapsed":
+      return new GracePeriodNotElapsedError(
+        `${context}: withdrawal grace period has not elapsed`,
+      );
+    case "TransferFailed":
+      return new TransferFailedError(`${context}: transfer failed`);
+    case "UnsupportedAsset":
+      return new UnsupportedAssetError(String(args[0] ?? "unknown"));
+    case "StablecoinWithdrawShortfall":
+      return new StablecoinWithdrawShortfallError(
+        `${context}: stablecoin withdrawal delivered less than requested`,
+      );
+    case "AaveNotConfigured":
+      return new AaveNotConfiguredError(`${context}: Aave is not configured`);
+    case "ValueMismatch":
+      return new ValueMismatchError(
+        `${context}: token delivered a different amount than expected`,
+      );
+    case "ZeroCollateralCredit":
+      return new ZeroCollateralCreditError(
+        `${context}: deposit too small to mint scaled collateral`,
+      );
+    case undefined:
+      break;
+    default:
+      return new ContractError(`${context}: reverted with ${name}`);
+  }
+  const raw = revert.raw;
+  if (typeof raw === "string" && raw.length >= 10) {
+    return new UnknownRevertError(raw.slice(0, 10), raw);
+  }
+  return null;
+}
+
+/**
+ * Extract a human-readable message from a viem contract error, mapping known
+ * custom errors to their typed exceptions.
  */
 function wrapViemError(error: unknown, context: string): ContractError {
   if (error instanceof ContractError) return error;
+  const decoded = decodeRevert(error, context);
+  if (decoded) return decoded;
   if (error instanceof Error) {
     const e = error as unknown as Record<string, unknown>;
-    const cause = e["cause"] as Record<string, unknown> | undefined;
+    const cause = e.cause as Record<string, unknown> | undefined;
     const reason =
-      cause?.["reason"] ??
-      cause?.["message"] ??
-      e["shortMessage"] ??
-      error.message;
-    const details = e["details"] ?? cause?.["details"];
+      cause?.reason ?? cause?.message ?? e.shortMessage ?? error.message;
+    const details = e.details ?? cause?.details;
     const suffix = details ? ` (${details})` : "";
     return new ContractError(`${context}: ${reason}${suffix}`);
   }
@@ -173,6 +249,21 @@ export class ContractGateway {
     };
   }
 
+  /** Wait for the receipt and refuse a mined-but-reverted transaction. */
+  private async waitChecked(
+    hash: Hex,
+    receiptOptions: { timeout?: number; pollingInterval?: number },
+  ) {
+    const receipt = await this.publicClient.waitForTransactionReceipt({
+      hash,
+      ...receiptOptions,
+    });
+    if (receipt.status !== "success") {
+      throw new RevertedOnChainError(hash);
+    }
+    return receipt;
+  }
+
   async getGuaranteeDomain(): Promise<string> {
     return this.contract.read.guaranteeDomainSeparator();
   }
@@ -189,21 +280,38 @@ export class ContractGateway {
     };
   }
 
+  async erc20Allowance(token: string, spender?: string): Promise<bigint> {
+    const account = this.walletClient.account;
+    if (!account) {
+      throw new ContractError("wallet client has no account configured");
+    }
+    const erc20 = this.erc20(token);
+    try {
+      return (await erc20.read.allowance([
+        account.address,
+        (spender ?? this.contract.address) as Hex,
+      ])) as bigint;
+    } catch (error) {
+      throw wrapViemError(error, "ERC20 allowance read failed");
+    }
+  }
+
   async approveErc20(
     token: string,
     amount: number | bigint | string,
     waitOptions?: TxReceiptWaitOptions,
+    spender?: string,
   ) {
     const { receipt } = this.splitWaitOptions(waitOptions);
     const erc20 = this.erc20(token);
-    const spender = this.contract.address;
+    const spenderAddress = (spender ?? this.contract.address) as Hex;
     const targetAllowance = parseU256(amount);
     const account = this.walletClient.account;
 
     if (account) {
       const currentAllowance = (await (erc20 as Erc20Contract).read.allowance([
         account.address,
-        spender,
+        spenderAddress,
       ])) as bigint;
       if (currentAllowance >= targetAllowance) {
         return undefined;
@@ -212,16 +320,9 @@ export class ContractGateway {
 
     const sendApprove = async (value: bigint) => {
       const hash = await this.enqueueTx(() =>
-        erc20.write.approve([spender, value], this.defaultFeeParams()),
+        erc20.write.approve([spenderAddress, value], this.defaultFeeParams()),
       );
-      const txReceipt = await this.publicClient.waitForTransactionReceipt({
-        hash,
-        ...receipt,
-      });
-      if (txReceipt.status !== "success") {
-        throw new ContractError(`approve transaction reverted: ${hash}`);
-      }
-      return txReceipt;
+      return this.waitChecked(hash, receipt);
     };
 
     let txReceipt: Awaited<ReturnType<typeof sendApprove>>;
@@ -248,7 +349,7 @@ export class ContractGateway {
       const actual = await this.waitForErc20Allowance(
         erc20,
         account.address,
-        spender,
+        spenderAddress,
         targetAllowance,
         receipt,
       );
@@ -305,15 +406,17 @@ export class ContractGateway {
       const account = this.walletClient.account;
       if (account) {
         const erc20 = this.erc20(erc20Token);
-        const allowance = await (erc20 as Erc20Contract).read.allowance([
+        const allowance = (await (erc20 as Erc20Contract).read.allowance([
           account.address,
           this.contract.address,
-        ]);
-        if ((allowance as bigint) < parsedAmount) {
-          throw new ContractError(
-            `Insufficient ERC20 allowance: ${allowance} approved but ${parsedAmount} required. ` +
-              `Call approveErc20("${erc20Token}", ${parsedAmount}) before depositing.`,
-          );
+        ])) as bigint;
+        if (allowance < parsedAmount) {
+          throw new Erc20AllowanceRequiredError({
+            token: erc20Token,
+            spender: this.contract.address,
+            allowance,
+            needed: parsedAmount,
+          });
         }
       }
 
@@ -340,7 +443,7 @@ export class ContractGateway {
       }
     }
 
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    return this.waitChecked(hash, receipt);
   }
 
   async getUserAssets(opts?: { blockNumber?: bigint }) {
@@ -358,6 +461,130 @@ export class ContractGateway {
     }));
   }
 
+  private async view<T>(fn: () => Promise<T>, context: string): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      throw wrapViemError(error, context);
+    }
+  }
+
+  async principalBalance(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.principalBalance([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "principalBalance failed",
+    );
+  }
+
+  async withdrawableBalance(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.withdrawableBalance([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "withdrawableBalance failed",
+    );
+  }
+
+  async guaranteeCapacity(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.guaranteeCapacity([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "guaranteeCapacity failed",
+    );
+  }
+
+  async grossYield(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.grossYield([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "grossYield failed",
+    );
+  }
+
+  async protocolYieldShare(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.protocolYieldShare([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "protocolYieldShare failed",
+    );
+  }
+
+  async userNetYield(user: string, asset: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.userNetYield([
+          normalizeAddress(user) as Hex,
+          normalizeAddress(asset) as Hex,
+        ]) as Promise<bigint>,
+      "userNetYield failed",
+    );
+  }
+
+  async totalUserScaledBalance(token: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.totalUserScaledBalance([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<bigint>,
+      "totalUserScaledBalance failed",
+    );
+  }
+
+  async protocolScaledBalance(token: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.protocolScaledBalance([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<bigint>,
+      "protocolScaledBalance failed",
+    );
+  }
+
+  async surplusScaledBalance(token: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.surplusScaledBalance([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<bigint>,
+      "surplusScaledBalance failed",
+    );
+  }
+
+  async contractScaledATokenBalance(token: string): Promise<bigint> {
+    return this.view(
+      () =>
+        this.contract.read.contractScaledATokenBalance([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<bigint>,
+      "contractScaledATokenBalance failed",
+    );
+  }
+
+  async stablecoinAToken(token: string): Promise<string> {
+    return this.view(
+      () =>
+        this.contract.read.stablecoinAToken([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<string>,
+      "stablecoinAToken failed",
+    );
+  }
+
   async requestWithdrawal(
     amount: number | bigint | string,
     erc20Token?: string,
@@ -367,20 +594,27 @@ export class ContractGateway {
     const value = parseU256(amount);
 
     let hash: Hex;
-    if (erc20Token) {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.requestWithdrawal(
-          [erc20Token as Hex, value],
-          this.defaultFeeParams(),
-        ),
-      );
-    } else {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.requestWithdrawal([value], this.defaultFeeParams()),
-      );
+    try {
+      if (erc20Token) {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.requestWithdrawal(
+            [erc20Token as Hex, value],
+            this.defaultFeeParams(),
+          ),
+        );
+      } else {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.requestWithdrawal(
+            [value],
+            this.defaultFeeParams(),
+          ),
+        );
+      }
+    } catch (error) {
+      throw wrapViemError(error, "requestWithdrawal failed");
     }
 
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    return this.waitChecked(hash, receipt);
   }
 
   async cancelWithdrawal(
@@ -389,20 +623,24 @@ export class ContractGateway {
   ) {
     const { receipt } = this.splitWaitOptions(waitOptions);
     let hash: Hex;
-    if (erc20Token) {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.cancelWithdrawal(
-          [erc20Token as Hex],
-          this.defaultFeeParams(),
-        ),
-      );
-    } else {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.cancelWithdrawal(this.defaultFeeParams()),
-      );
+    try {
+      if (erc20Token) {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.cancelWithdrawal(
+            [erc20Token as Hex],
+            this.defaultFeeParams(),
+          ),
+        );
+      } else {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.cancelWithdrawal(this.defaultFeeParams()),
+        );
+      }
+    } catch (error) {
+      throw wrapViemError(error, "cancelWithdrawal failed");
     }
 
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    return this.waitChecked(hash, receipt);
   }
 
   async finalizeWithdrawal(
@@ -411,46 +649,24 @@ export class ContractGateway {
   ) {
     const { receipt } = this.splitWaitOptions(waitOptions);
     let hash: Hex;
-    if (erc20Token) {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.finalizeWithdrawal(
-          [erc20Token as Hex],
-          this.defaultFeeParams(),
-        ),
-      );
-    } else {
-      hash = await this.enqueueTx(() =>
-        this.contract.write.finalizeWithdrawal(this.defaultFeeParams()),
-      );
+    try {
+      if (erc20Token) {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.finalizeWithdrawal(
+            [erc20Token as Hex],
+            this.defaultFeeParams(),
+          ),
+        );
+      } else {
+        hash = await this.enqueueTx(() =>
+          this.contract.write.finalizeWithdrawal(this.defaultFeeParams()),
+        );
+      }
+    } catch (error) {
+      throw wrapViemError(error, "finalizeWithdrawal failed");
     }
 
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
-  }
-
-  /**
-   * Claim a net credit committed for a settlement cycle (`claimNetCredit`).
-   *
-   * @param contractAddress - ClearingHouse contract address (from the clearing action).
-   * @param cycleId - On-chain `bytes32` cycle identifier.
-   * @param netCredit - Net credit amount committed for the caller.
-   * @param proof - Merkle proof of the caller's committed leaf.
-   */
-  async claimNetCredit(
-    contractAddress: string,
-    cycleId: Hex,
-    netCredit: bigint,
-    proof: Hex[],
-    waitOptions?: TxReceiptWaitOptions,
-  ) {
-    const { gas, receipt } = this.splitWaitOptions(waitOptions);
-    const ch = this.clearingHouse(contractAddress);
-    const hash = await this.enqueueTx(() =>
-      ch.write.claimNetCredit([cycleId, netCredit, proof], {
-        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
-        ...this.defaultFeeParams(),
-      }),
-    );
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    return this.waitChecked(hash, receipt);
   }
 
   /**
@@ -468,36 +684,51 @@ export class ContractGateway {
   ) {
     const { gas, receipt } = this.splitWaitOptions(waitOptions);
     const ch = this.clearingHouse(contractAddress);
-    const hash = await this.enqueueTx(() =>
-      ch.write.payNetDebit([cycleId, netDebit, proof], {
-        value: payableValue,
-        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
-        ...this.defaultFeeParams(),
-      }),
-    );
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    let hash: Hex;
+    try {
+      hash = await this.enqueueTx(() =>
+        ch.write.payNetDebit([cycleId, netDebit, proof], {
+          value: payableValue,
+          gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
+          ...this.defaultFeeParams(),
+        }),
+      );
+    } catch (error) {
+      throw wrapViemError(error, "payNetDebit failed");
+    }
+    return this.waitChecked(hash, receipt);
   }
 
   /**
-   * Mark a debtor defaulted after the clearing payment finality deadline
-   * (`markDefaulted`).
+   * Claim a net credit committed for a settlement cycle (`claimNetCreditFor`).
+   *
+   * The payout goes to `creditor` — the address the committed Merkle leaf
+   * names — whoever submits the transaction.
    */
-  async markDefaulted(
+  async claimNetCreditFor(
     contractAddress: string,
+    creditor: string,
     cycleId: Hex,
-    debtor: Hex,
-    netDebit: bigint,
+    netCredit: bigint,
     proof: Hex[],
     waitOptions?: TxReceiptWaitOptions,
   ) {
     const { gas, receipt } = this.splitWaitOptions(waitOptions);
     const ch = this.clearingHouse(contractAddress);
-    const hash = await this.enqueueTx(() =>
-      ch.write.markDefaulted([cycleId, debtor, netDebit, proof], {
-        gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
-        ...this.defaultFeeParams(),
-      }),
-    );
-    return this.publicClient.waitForTransactionReceipt({ hash, ...receipt });
+    let hash: Hex;
+    try {
+      hash = await this.enqueueTx(() =>
+        ch.write.claimNetCreditFor(
+          [normalizeAddress(creditor) as Hex, cycleId, netCredit, proof],
+          {
+            gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
+            ...this.defaultFeeParams(),
+          },
+        ),
+      );
+    } catch (error) {
+      throw wrapViemError(error, "claimNetCreditFor failed");
+    }
+    return this.waitChecked(hash, receipt);
   }
 }

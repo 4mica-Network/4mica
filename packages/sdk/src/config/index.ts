@@ -11,8 +11,11 @@ import {
 
 export type { Config } from "@/config/models";
 
+export const DEFAULT_RPC_URL = "https://ethereum.sepolia.api.4mica.xyz/";
+
 /**
- * Fluent builder for {@link Config}.
+ * Fluent builder for {@link Config}; hand the result to `Client.connect`.
+ * SIWE auth is on by default; a bearer token replaces it.
  *
  * @example
  * ```ts
@@ -24,17 +27,16 @@ export type { Config } from "@/config/models";
  * All fields can also be supplied from environment variables via {@link fromEnv}.
  */
 export class ConfigBuilder {
-  private _rpcUrl: string | undefined =
-    "https://ethereum.sepolia.api.4mica.xyz/";
+  private _rpcUrl: string | undefined = DEFAULT_RPC_URL;
   private _walletPrivateKey: string | undefined;
   private _signer: Account | undefined;
   private _ethereumHttpRpcUrl?: string;
   private _contractAddress?: string;
-  private _adminApiKey?: string;
   private _bearerToken?: string;
   private _authEnabled = true;
   private _authUrl?: string;
   private _authRefreshMarginSecs?: number;
+  private _facilitatorUrl?: string;
 
   /** Set the 4Mica core RPC URL directly. Use {@link network} to select a hosted network by name instead. Defaults to `https://ethereum.sepolia.api.4mica.xyz/`. */
   rpcUrl(value: string): ConfigBuilder {
@@ -51,12 +53,6 @@ export class ConfigBuilder {
    * `"ethereum-sepolia"` / `"eip155:11155111"`.
    *
    * @throws {@link ConfigError} if the network is not recognised.
-   *
-   * @example
-   * ```ts
-   * new ConfigBuilder().network("base").walletPrivateKey("0x...").build();
-   * new ConfigBuilder().network("eip155:8453").walletPrivateKey("0x...").build();
-   * ```
    */
   network(value: string): ConfigBuilder {
     const url = resolveNetworkRpcUrl(value);
@@ -81,21 +77,24 @@ export class ConfigBuilder {
     return this;
   }
 
-  /** Override the Ethereum HTTP RPC URL used for on-chain calls. */
+  /**
+   * Ethereum endpoint for on-chain reads and self-funded transactions.
+   * Normally unnecessary: core advertises one.
+   */
   ethereumHttpRpcUrl(value: string): ConfigBuilder {
     this._ethereumHttpRpcUrl = value;
     return this;
   }
 
-  /** Override the Core4Mica contract address. */
+  /** Override the Core4Mica contract address. Normally unnecessary: core advertises the deployment. */
   contractAddress(value: string): ConfigBuilder {
     this._contractAddress = value;
     return this;
   }
 
-  /** Set an admin API key for privileged RPC endpoints. */
-  adminApiKey(value: string): ConfigBuilder {
-    this._adminApiKey = value;
+  /** Facilitator that sponsors gas. Without one, every operation is self-funded. */
+  facilitatorUrl(value: string): ConfigBuilder {
+    this._facilitatorUrl = value;
     return this;
   }
 
@@ -105,13 +104,22 @@ export class ConfigBuilder {
     return this;
   }
 
-  /** Enable SIWE authentication using the default RPC URL as the auth endpoint. Auth is enabled by default; this is a no-op unless you previously called a method that disabled it. */
+  /** Enable SIWE authentication (the default). */
   enableAuth(): ConfigBuilder {
     this._authEnabled = true;
     return this;
   }
 
-  /** Set a custom SIWE authentication endpoint and enable auth. */
+  /**
+   * Disable SIWE authentication entirely. Requests carry no credentials;
+   * only public routes will answer.
+   */
+  disableAuth(): ConfigBuilder {
+    this._authEnabled = false;
+    return this;
+  }
+
+  /** Set a custom SIWE authentication endpoint and enable auth. Defaults to the RPC URL. */
   authUrl(value: string): ConfigBuilder {
     this._authUrl = value;
     this._authEnabled = true;
@@ -134,7 +142,7 @@ export class ConfigBuilder {
    * - `4MICA_WALLET_PRIVATE_KEY`
    * - `4MICA_ETHEREUM_HTTP_RPC_URL`
    * - `4MICA_CONTRACT_ADDRESS`
-   * - `4MICA_ADMIN_API_KEY`
+   * - `4MICA_FACILITATOR_URL`
    * - `4MICA_BEARER_TOKEN`
    * - `4MICA_AUTH_URL`
    * - `4MICA_AUTH_REFRESH_MARGIN_SECS`
@@ -158,8 +166,8 @@ export class ConfigBuilder {
       this._ethereumHttpRpcUrl = env["4MICA_ETHEREUM_HTTP_RPC_URL"];
     if (env["4MICA_CONTRACT_ADDRESS"])
       this._contractAddress = env["4MICA_CONTRACT_ADDRESS"];
-    if (env["4MICA_ADMIN_API_KEY"])
-      this._adminApiKey = env["4MICA_ADMIN_API_KEY"];
+    if (env["4MICA_FACILITATOR_URL"])
+      this._facilitatorUrl = env["4MICA_FACILITATOR_URL"];
     if (env["4MICA_BEARER_TOKEN"])
       this._bearerToken = env["4MICA_BEARER_TOKEN"];
     if (env["4MICA_AUTH_URL"]) {
@@ -196,7 +204,7 @@ export class ConfigBuilder {
         : undefined;
 
       const signer: Account =
-        this._signer ?? privateKeyToAccount(walletPrivateKey! as `0x${string}`);
+        this._signer ?? privateKeyToAccount(walletPrivateKey as `0x${string}`);
 
       const ethereumHttpRpcUrl = this._ethereumHttpRpcUrl
         ? validateUrl(this._ethereumHttpRpcUrl)
@@ -204,25 +212,25 @@ export class ConfigBuilder {
       const contractAddress = this._contractAddress
         ? normalizeAddress(this._contractAddress)
         : undefined;
-      const authUrl = this._authUrl ? validateUrl(this._authUrl) : undefined;
-      const refreshMargin =
-        this._authRefreshMarginSecs !== undefined
-          ? this._authRefreshMarginSecs
-          : 60;
+      const facilitatorUrl = this._facilitatorUrl
+        ? validateUrl(this._facilitatorUrl)
+        : undefined;
+      const refreshMargin = this._authRefreshMarginSecs ?? 60;
       if (!Number.isFinite(refreshMargin) || refreshMargin < 0) {
         throw new ValidationError("invalid auth refresh margin");
       }
-      const authEnabled = this._authEnabled;
+      const authEnabled = this._authEnabled && !this._bearerToken;
+      const authUrl = this._authUrl ? validateUrl(this._authUrl) : undefined;
 
       return {
         rpcUrl,
         signer,
         ethereumHttpRpcUrl,
         contractAddress,
-        adminApiKey: this._adminApiKey,
         bearerToken: this._bearerToken,
         authUrl: authEnabled ? (authUrl ?? rpcUrl) : undefined,
         authRefreshMarginSecs: authEnabled ? refreshMargin : undefined,
+        facilitatorUrl,
       };
     } catch (err) {
       if (err instanceof ValidationError) {

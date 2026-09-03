@@ -4,12 +4,18 @@ type Requirement = {
   asset: string;
   amount: string;
   payTo: string;
-  extra?: { tabEndpoint?: string };
+  extra?: Record<string, unknown>;
 };
 
 type Required402 = { x402Version: number; accepts: Requirement[] };
 
 function demoPaymentHeader(req: Requirement): string {
+  // Mint a random 32-byte req_id — uniqueness is all core asks of it.
+  const reqIdBytes = new Uint8Array(32);
+  crypto.getRandomValues(reqIdBytes);
+  const reqId = `0x${Array.from(reqIdBytes, (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("")}`;
   const envelope = {
     x402Version: 1,
     scheme: req.scheme,
@@ -19,7 +25,7 @@ function demoPaymentHeader(req: Requirement): string {
         version: "v1",
         user_address: "0x2222222222222222222222222222222222222222",
         recipient_address: req.payTo,
-        req_id: "0x1",
+        req_id: reqId,
         amount: `0x${BigInt(req.amount).toString(16)}`,
         asset_address: req.asset,
         timestamp: Math.floor(Date.now() / 1000),
