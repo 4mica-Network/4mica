@@ -34,12 +34,12 @@ describe('FourMicaEvmScheme', () => {
       payTo: '0x1111111111111111111111111111111111111111',
       extra: {
         rpcUrl: 'https://custom.rpc.example',
-        validationRegistryAddress: '0x3333333333333333333333333333333333333333',
-        validatorAddress: '0x4444444444444444444444444444444444444444',
-        validatorAgentId: '7',
-        minValidationScore: 80,
-        requiredValidationTag: 'hard-finality',
-        jobHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        validation: {
+          validator: 'validator-id',
+          subject: `0x${'42'.repeat(32)}`,
+          deadline: 1700000600,
+          params: '0xdeadbeef',
+        },
         resource: {
           url: 'https://api.example.com/premium',
           description: 'Premium dataset',
@@ -69,12 +69,12 @@ describe('FourMicaEvmScheme', () => {
       payTo: '0x1111111111111111111111111111111111111111',
     })
     expect(accepted.extra).toMatchObject({
-      validationRegistryAddress: '0x3333333333333333333333333333333333333333',
-      validatorAddress: '0x4444444444444444444444444444444444444444',
-      validatorAgentId: '7',
-      minValidationScore: 80,
-      requiredValidationTag: 'hard-finality',
-      jobHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      validation: {
+        validator: 'validator-id',
+        subject: `0x${'42'.repeat(32)}`,
+        deadline: 1700000600,
+        params: '0xdeadbeef',
+      },
     })
   })
 
