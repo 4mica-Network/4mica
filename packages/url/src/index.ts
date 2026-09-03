@@ -104,6 +104,7 @@ export const reservedSegments: ReadonlySet<string> = new Set([
   // framework and static assets
   "_next",
   "assets",
+  "bg",
   "favicon.ico",
   "icon.png",
   "llms.txt",

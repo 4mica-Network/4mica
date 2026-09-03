@@ -326,6 +326,33 @@ describe("reserved segments vs nginx", () => {
     expect(unreserved).toEqual([]);
   });
 
+  /**
+   * The same guard for static files, which is how this actually went wrong.
+   *
+   * `apps/web/public` is copied to the root of the export, so every entry in it
+   * is a top-level path on the shared apex — but nothing about adding an image
+   * feels like touching routing, so it is easy to miss. `public/bg` was added
+   * without a proxy rule and every background image on the homepage 404ed at
+   * the origin; it stayed invisible for a while because Cloudflare was still
+   * serving the file from cache.
+   *
+   * Reserving the segment is what makes the nginx test above demand a rule.
+   */
+  it("reserves every top-level entry in apps/web/public", () => {
+    const webPublic = fileURLToPath(
+      new URL("../../web/public", import.meta.url),
+    );
+
+    const unreserved = readdirSync(webPublic, { withFileTypes: true })
+      // Files carry their own exact-match rules (/robots.txt, /icon.png); it is
+      // the directories that need a prefix rule and a reserved segment.
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((segment) => !reservedSegments.has(segment));
+
+    expect(unreserved).toEqual([]);
+  });
+
   it.each([
     "sign-in",
     "sign-up",
