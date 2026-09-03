@@ -15,19 +15,17 @@ async function main() {
     .rpcUrl('https://ethereum.sepolia.api.4mica.xyz')
     .signer(account)
     .build()
-  const client = await Client.new(cfg)
+  const client = await Client.connect(cfg)
 
-  // const amount = 2_000_000 // 2 USDC in base units
+  // const amount = 2_000_000n // 2 USDC in base units
 
-  // const allowance = await client.user.approveErc20(USDC_ADDRESS, amount)
-  // console.log('Approval receipt:', allowance)
-
-  // const depositReceipt = await client.user.deposit(amount, USDC_ADDRESS)
+  // Gasless when a facilitator is configured, self-funded otherwise:
+  // const depositReceipt = await client.deposit.of(USDC_ADDRESS, amount).send()
   // console.log('Deposit receipt:', depositReceipt)
 
-  const userInfo = await client.user.getUser()
-  userInfo.forEach((user) => {
-    console.log('User asset:', user.asset, ', collateral:', Number(user.collateral))
+  const positions = await client.account.assets()
+  positions.forEach((position) => {
+    console.log('User asset:', position.asset, ', collateral:', Number(position.collateral))
   })
 }
 

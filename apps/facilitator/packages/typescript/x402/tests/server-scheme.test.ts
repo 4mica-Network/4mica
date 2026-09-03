@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../src/server/scheme.js'
 
-const scheme = () => new FourMicaEvmScheme('https://api.4mica.xyz/tabs')
+const scheme = () => new FourMicaEvmScheme()
 
 describe('FourMicaEvmScheme default assets', () => {
   // The name/version pair travels to clients in `extra` and is what they build their EIP-712
