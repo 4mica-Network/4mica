@@ -39,13 +39,44 @@ jobs:
           repo_ssh_url: git@github.com:${{ github.repository }}.git
           service_dir: apps/web
           health_container: 4mica-web
-          pre_up: docker network create 4mica-edge 2>/dev/null || true
+          pre_up: |
+            docker network create 4mica-edge 2>/dev/null || true
+            # The edge proxies the entire bare-handle namespace with
+            # `proxy_pass $mica_playground`, and nginx does not validate a `set`
+            # variable at startup. A value with no scheme therefore parses fine,
+            # the container starts healthy, and every playground request then
+            # fails with `invalid URL prefix` — a bare 500 for /sign-in, /api/
+            # and every profile, while the marketing routes stay green. Compose
+            # already refuses an empty value; this catches the malformed one.
+            # Checked here rather than warned about later because the edge this
+            # deploy is about to start would be broken for half the apex.
+            upstream="$(sed -n 's/^PLAYGROUND_UPSTREAM=//p' .env | tail -1)"
+            case "$upstream" in
+              http://*|https://*) ;;
+              "")
+                echo "::error::PLAYGROUND_UPSTREAM is empty. Set the variable to the address apps/playground is reachable at from this box, e.g. http://10.0.0.5:8081."
+                exit 1 ;;
+              *)
+                echo "::error::PLAYGROUND_UPSTREAM has no http:// or https:// scheme. nginx needs one to proxy_pass; without it the edge answers 500 for the whole handle namespace. Re-enter the variable as e.g. http://10.0.0.5:8081."
+                exit 1 ;;
+            esac
           post_up: |
             EDGE_PORT="$(sed -n 's/^EDGE_PORT=//p' .env | tail -1)"
             EDGE_PORT="${EDGE_PORT:-8088}"
             if ! curl -sfo /dev/null -H 'Host: 4mica.io' \
                  "http://127.0.0.1:${EDGE_PORT}/"; then
               echo "::warning::edge container is not answering on 127.0.0.1:${EDGE_PORT}."
+            fi
+            # `/` above is `location = /`, which is apps/web — it says nothing
+            # about the other half of the apex. /api/health is apps/playground's
+            # own healthcheck endpoint and is unambiguously routed to it, so
+            # this is the probe that catches a broken PLAYGROUND_UPSTREAM, a
+            # stopped playground, or a firewall between the boxes. A warning,
+            # not a failure: apps/playground runs on the other box and is not
+            # this deploy's to fix.
+            if ! curl -sfo /dev/null -H 'Host: 4mica.io' \
+                 "http://127.0.0.1:${EDGE_PORT}/api/health"; then
+              echo "::warning::The edge cannot reach apps/playground. The bare-handle namespace, /sign-in and /api are down even though apps/web is fine. Check PLAYGROUND_UPSTREAM in apps/web/.env on this box, and that 4mica-playground is up on the apps/be box."
             fi
             # No -L: after certbot this is a 301 to https, which is correct and
             # which `curl -f` treats as success (it only fails on 4xx/5xx).

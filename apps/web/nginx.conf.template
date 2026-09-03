@@ -66,6 +66,7 @@ server {
 
   location ^~ /_next/  { proxy_pass $mica_web; }
   location ^~ /assets/ { proxy_pass $mica_web; }
+  location ^~ /bg/     { proxy_pass $mica_web; }
   location ^~ /og/     { proxy_pass $mica_web; }
 
   location = /robots.txt           { proxy_pass $mica_web; }
@@ -79,6 +80,16 @@ server {
   location ~ ^/(about|agents|blog|careers|docs|dpa|interactive-protocol|leadership|legal|partners|pricing|privacy|register|roadmap|solution|solutions|status|team|terms|waitlist)(/|$) {
     proxy_pass $mica_web;
   }
+
+  # RSC payloads. `output: "export"` writes one beside every page — /index.txt,
+  # /about.txt, /__next._tree.txt — and the client fetches them to prefetch a
+  # navigation. They are NOT covered by the regex above, which requires `/` or
+  # end-of-string after the segment, so without this rule every prefetch lands
+  # in the handle namespace and client-side nav silently degrades to full page
+  # loads. Safe as a catch-all: USERNAME_PATTERN in packages/url is
+  # /^[a-z0-9_-]+$/, so no handle can ever end in ".txt". The exact-match rules
+  # for /robots.txt and /llms.txt above still win — `=` outranks a regex.
+  location ~ \.txt$ { proxy_pass $mica_web; }
 
   # --- 2. Playground assets ------------------------------------------------
   # next.config.ts sets assetPrefix=/p, so this app requests its chunks at

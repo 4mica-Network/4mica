@@ -52,12 +52,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN npm install -g pm2 serve && \
+# `serve` is pinned because serve.json below patches around the `mime-db` its
+# `serve-handler` dependency bundles; an unpinned bump could change which
+# extensions need the patch.
+RUN npm install -g pm2 serve@14.2.6 && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 web
 
 COPY --from=installer --chown=web:nodejs /app/apps/web/out ./out
 COPY --chown=web:nodejs apps/web/ecosystem.config.cjs ./ecosystem.config.cjs
+# Deliberately beside `out`, not inside it: `serve` would otherwise publish its
+# own config at /serve.json.
+COPY --chown=web:nodejs apps/web/serve.json ./serve.json
 
 USER web
 
