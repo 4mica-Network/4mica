@@ -25,21 +25,57 @@ import { SigningScheme } from "@/models";
 export { AccountClient } from "@/client/account";
 export { ClientCtx } from "@/client/ctx";
 export {
+  AuthorizedEip3009Deposit,
+  AuthorizedPermit2Deposit,
   DepositBuilder,
   DepositClient,
+  Eip3009Deposit,
+  GaslessDeposit,
+  Permit2Deposit,
   SelfFundedDeposit,
+  SponsoredPermit2Deposit,
 } from "@/client/deposit";
+export {
+  confirmFacilitatorEcho,
+  Facilitator,
+  NAMES_THE_CLAIM,
+  NAMES_THE_PAYMENT,
+  NAMES_THE_REQUEST,
+  refusesTheAuthorization,
+  rejectionError,
+  sponsorshipUnavailable,
+} from "@/client/facilitator";
 export * from "@/client/model";
 export { PaymentClient } from "@/client/payment";
 export {
+  AuthorizedPay,
   ClaimBuilder,
+  Eip3009Pay,
+  GaslessClaim,
+  GaslessPay,
   PayBuilder,
+  Permit2Pay,
   SelfFundedClaim,
   SelfFundedPay,
   SettlementClient,
+  SponsoredPermit2Pay,
 } from "@/client/settlement";
+export * as sig from "@/client/sig";
 export { TokensClient } from "@/client/tokens";
-export { WithdrawClient, WithdrawStepBuilder } from "@/client/withdraw";
+export {
+  AuthorizedCancel,
+  AuthorizedRequest,
+  CancelBuilder,
+  FinalizeBuilder,
+  GaslessCancel,
+  GaslessFinalize,
+  GaslessRequest,
+  RequestBuilder,
+  SelfFundedCancel,
+  SelfFundedFinalize,
+  SelfFundedRequest,
+  WithdrawClient,
+} from "@/client/withdraw";
 
 /**
  * A connected 4Mica client. Build a {@link Config} with

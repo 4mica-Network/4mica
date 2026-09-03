@@ -1,4 +1,5 @@
 export * from "@/auth";
+export * from "@/authorizations";
 export * from "@/bls";
 export * from "@/client";
 export * from "@/config";
