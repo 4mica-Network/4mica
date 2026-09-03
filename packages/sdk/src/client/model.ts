@@ -98,7 +98,7 @@ export interface DepositReceipt {
   asset: string;
   amount: bigint;
   network?: string;
-  raw?: TransactionReceipt;
+  raw?: TransactionReceipt | Record<string, unknown>;
 }
 
 /** Outcome of a withdrawal request, cancellation or finalization. */
@@ -108,7 +108,7 @@ export interface WithdrawReceipt {
   account: string;
   asset: string;
   network?: string;
-  raw?: TransactionReceipt;
+  raw?: TransactionReceipt | Record<string, unknown>;
 }
 
 /**
@@ -120,7 +120,7 @@ export interface PayReceipt {
   route: TokenRoute;
   account: string;
   network?: string;
-  raw?: TransactionReceipt;
+  raw?: TransactionReceipt | Record<string, unknown>;
 }
 
 /**
@@ -132,7 +132,7 @@ export interface ClaimReceipt {
   route: Route;
   account: string;
   network?: string;
-  raw?: TransactionReceipt;
+  raw?: TransactionReceipt | Record<string, unknown>;
 }
 
 /**

@@ -101,6 +101,40 @@ await client.settlement.claim(cycleId).creditor(creditorAddress).send();
 const action = await client.settlement.pay(cycleId).action();
 ```
 
+## Gasless routes
+
+With a `facilitatorUrl` configured, deposits, withdrawals, and settlement can run without the
+signer paying gas: the signer produces an EIP-712 authorization and the facilitator submits it at
+its own expense. Every route credits the authorization's signer — the choice only changes who
+pays — and the receipt's `route` field reports which one ran.
+
+```ts
+// Auto route: EIP-3009, then Permit2 with the approval sponsored, then self-funded.
+await client.deposit.of(usdc, 1_000_000n).send();
+
+// Pin a scheme; a pinned route fails rather than trying another one.
+await client.deposit.of(usdc, 1_000_000n).gasless().send();
+await client.deposit.of(usdc, 1_000_000n).permit2().sponsorApproval().send();
+
+// Sign now, submit elsewhere — the submitter needs no signer of their own.
+const auth = await client.deposit.of(usdc, 1_000_000n).eip3009().sign();
+await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).verify();
+await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).send();
+
+// Withdrawals work for ETH too; settlement debits pin the nonce to the cycle id.
+await client.withdraw.request(null, amount).gasless().send();
+await client.settlement.pay(cycleId).gasless().send();
+```
+
+<Note>
+  Native ETH has no gasless deposit route — no authorization scheme covers it —
+  and native-asset debits cannot be pulled by signature. Both self-fund.
+  `client.deposit.isGaslessAvailable()` reports whether a facilitator is
+  configured at all. A rejection carrying its `errorCode` surfaces as
+  `FacilitatorRejectedError`; an `OutcomeUnknownError` means the facilitator
+  may already have submitted — do not blindly retry it.
+</Note>
+
 ## Balances
 
 ```ts

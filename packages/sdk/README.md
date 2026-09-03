@@ -13,6 +13,8 @@ participant's obligations per cycle into a single net-debit or net-credit commit
 Merkle root. This SDK provides:
 
 - **Capability sub-clients**: `deposit`, `withdraw`, `payment`, `settlement`, `account`, `tokens`
+- **Gasless routes**: sign an EIP-3009, Permit2, or EIP-2612 authorization and let a configured
+  facilitator submit and pay the gas — deposits, withdrawals, and cycle settlement included
 - **X402 Flow Helper**: generate `X-PAYMENT` headers for 402-protected HTTP resources — tab-free,
   with a random per-payment `reqId` and no server round-trip before signing
 - **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a
@@ -242,6 +244,42 @@ const verified = await client.payment.verifyGuarantee(cert);
 await client.settlement.pay(cycleId).send();
 await client.settlement.claim(cycleId).send();
 ```
+
+### Gasless routes
+
+With a `facilitatorUrl` configured, deposits, withdrawals, and settlement run gaslessly: the
+signer produces an EIP-712 authorization and the facilitator submits it at its own expense. Every
+route credits the authorization's signer — the choice only changes who pays gas — and the
+receipt's `route` field reports which one ran.
+
+```ts
+// Auto route: EIP-3009, then Permit2 with the approval sponsored, then self-funded.
+await client.deposit.of(usdc, 1_000_000n).send();
+
+// Pin a scheme instead of letting the auto route decide:
+await client.deposit.of(usdc, 1_000_000n).gasless().send(); // no self-funded fallback
+await client.deposit.of(usdc, 1_000_000n).eip3009().send();
+await client.deposit.of(usdc, 1_000_000n).permit2().sponsorApproval().send();
+
+// Sign now, submit elsewhere (another process, session, or submitter):
+const auth = await client.deposit.of(usdc, 1_000_000n).eip3009().sign();
+await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).verify();
+await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).send();
+
+// Withdrawals work for ETH too — Core4Mica verifies the signature itself:
+await client.withdraw.request(null, amount).gasless().send();
+
+// Settlement debits pin the authorization nonce to the cycle id:
+await client.settlement.pay(cycleId).gasless().send();
+await client.settlement.claim(cycleId).gasless().send(); // claims sign nothing
+
+client.deposit.isGaslessAvailable(); // false when no facilitator is configured
+```
+
+Facilitator rejections carry their `errorCode` verbatim on `FacilitatorRejectedError`; a request
+that provably never arrived is a `SponsorshipTransportError`, and anything that may have been
+acted on is an `OutcomeUnknownError` — do not blindly retry those. A missing one-time Permit2
+approval surfaces as `Permit2AllowanceRequiredError`.
 
 ### X402 flow (HTTP 402)
 

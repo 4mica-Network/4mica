@@ -12,13 +12,20 @@ import {
 } from "viem";
 import { core4micaAbi } from "@/abi/core4mica";
 import { AuthSession, type AuthTokens } from "@/auth";
+import { Facilitator } from "@/client/facilitator";
 import type { Config } from "@/config";
 import { ContractGateway } from "@/contract";
+import {
+  coreDomainSeparator as deriveCoreDomainSeparator,
+  permit2DomainSeparator,
+} from "@/digest";
 import {
   AuthMissingConfigError,
   ChainRpcUnavailableError,
   ClientError,
   ClientInitializationError,
+  MissingTokenDomainSeparatorError,
+  SigningError,
 } from "@/errors";
 import { type CorePublicParameters, GUARANTEE_CLAIMS_VERSION } from "@/models";
 import { RpcProxy } from "@/rpc";
@@ -49,8 +56,19 @@ export class ClientCtx {
   readonly guaranteeDomains: Map<number, Uint8Array>;
   readonly signer: Account;
   readonly paymentSigner: PaymentSigner;
+  /**
+   * Facilitator that sponsors gas; unconfigured, every gasless call fails
+   * with FacilitatorNotConfiguredError and the auto routes self-fund.
+   */
+  readonly facilitator: Facilitator;
+  /** Core4Mica's own EIP-712 domain separator (withdrawal authorizations). */
+  readonly coreDomainSeparator: Hex;
+  /** Permit2's domain separator for this chain. */
+  readonly permit2DomainSeparator: Hex;
   private gatewayInstance?: ContractGateway;
   private gatewayPromise?: Promise<ContractGateway>;
+  private tokenDomainSeparators = new Map<string, string>();
+  private tokenDomainFetch?: Promise<void>;
 
   private constructor(init: {
     cfg: Config;
@@ -74,6 +92,14 @@ export class ClientCtx {
     this.guaranteeDomains = init.guaranteeDomains;
     this.signer = init.cfg.signer;
     this.paymentSigner = new PaymentSigner(init.cfg.signer);
+    this.facilitator = new Facilitator(init.cfg.facilitatorUrl);
+    // Prefer what core publishes (read from the contract, so right across a
+    // domain change); fall back to deriving it, sound because the contract
+    // fixes its domain as EIP712("Core4Mica", "1").
+    this.coreDomainSeparator = init.publicParams.coreDomainSeparator
+      ? (normalizeBytes32Hex(init.publicParams.coreDomainSeparator) as Hex)
+      : deriveCoreDomainSeparator(this.chainId, this.contractAddress);
+    this.permit2DomainSeparator = permit2DomainSeparator(this.chainId);
   }
 
   static async create(cfg: Config): Promise<ClientCtx> {
@@ -268,6 +294,67 @@ export class ClientCtx {
   }
 
   /**
+   * Sign a raw 32-byte digest with the configured account — what the gasless
+   * authorization schemes need. Local viem accounts support this; a JSON-RPC
+   * account does not, and is refused with a clear error.
+   */
+  async signHash(digest: Hex): Promise<Uint8Array> {
+    const account = this.signer as Account & {
+      sign?: (parameters: { hash: Hex }) => Promise<Hex>;
+    };
+    if (typeof account.sign !== "function") {
+      throw new SigningError(
+        "this account cannot sign raw digests (no sign({ hash }) support); " +
+          "gasless authorizations need a local account",
+      );
+    }
+    return bytesFromHex(await account.sign({ hash: digest }));
+  }
+
+  /**
+   * A token's EIP-712 domain separator, memoised. Deliberately not an
+   * `eth_call`: signing a gasless authorization must not require an Ethereum
+   * RPC endpoint. A hit never goes stale; a miss refetches in case a new
+   * asset has been registered.
+   */
+  async tokenDomainSeparator(token: string): Promise<string> {
+    const checksum = normalizeAddress(token);
+    const cached = this.tokenDomainSeparators.get(checksum);
+    if (cached !== undefined) {
+      return cached;
+    }
+    // Coalesce concurrent misses into one fetch.
+    if (!this.tokenDomainFetch) {
+      this.tokenDomainFetch = this.fetchTokenDomainSeparators().finally(() => {
+        this.tokenDomainFetch = undefined;
+      });
+    }
+    await this.tokenDomainFetch;
+    const found = this.tokenDomainSeparators.get(checksum);
+    if (found === undefined) {
+      throw new MissingTokenDomainSeparatorError(checksum);
+    }
+    return found;
+  }
+
+  private async fetchTokenDomainSeparators(): Promise<void> {
+    const tokens = await this.rpc.getSupportedTokens();
+    for (const info of tokens.tokens) {
+      if (!info.domainSeparator) {
+        continue;
+      }
+      try {
+        this.tokenDomainSeparators.set(
+          normalizeAddress(info.address),
+          normalizeBytes32Hex(info.domainSeparator),
+        );
+      } catch {
+        // A malformed entry is skipped rather than poisoning the cache.
+      }
+    }
+  }
+
+  /**
    * The transaction gateway, connected on first use so a client that only
    * signs and calls the API never needs an Ethereum endpoint. The chain id is
    * checked here rather than at connect.
@@ -315,5 +402,6 @@ export class ClientCtx {
 
   async aclose(): Promise<void> {
     await this.rpc.aclose();
+    await this.facilitator.aclose();
   }
 }

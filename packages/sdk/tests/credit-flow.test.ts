@@ -57,6 +57,7 @@ function fakeCtx(overrides: Partial<Record<string, unknown>> = {}): ClientCtx {
       return this.guaranteeDomains.get(version);
     },
     rpc: {},
+    facilitator: { isConfigured: () => false },
     gateway: async () => {
       throw new Error("no gateway in this test");
     },
