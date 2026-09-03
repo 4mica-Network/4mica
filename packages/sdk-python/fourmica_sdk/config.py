@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from .signing import EvmSigner
@@ -15,6 +15,8 @@ from .utils import (
     normalize_private_key,
     validate_url,
 )
+
+DEFAULT_RPC_URL = "https://ethereum.sepolia.api.4mica.xyz/"
 
 
 @dataclass
@@ -32,11 +34,16 @@ class Config:
     contract_address: Optional[str] = None
     bearer_token: Optional[str] = None
     auth: Optional[AuthConfig] = None
+    facilitator_url: Optional[str] = None
+    """Facilitator that sponsors gas. Without one, every operation is self-funded."""
 
 
 class ConfigBuilder:
+    """Builds a :class:`Config`; hand it to ``Client.connect``. SIWE auth is on
+    by default; a bearer token replaces it."""
+
     def __init__(self) -> None:
-        self._rpc_url: Optional[str] = "https://ethereum.sepolia.api.4mica.xyz/"
+        self._rpc_url: Optional[str] = DEFAULT_RPC_URL
         self._wallet_private_key: Optional[str] = None
         self._evm_signer: Optional["EvmSigner"] = None
         self._ethereum_http_rpc_url: Optional[str] = None
@@ -45,29 +52,18 @@ class ConfigBuilder:
         self._auth_enabled: bool = True
         self._auth_url: Optional[str] = None
         self._auth_refresh_margin_secs: Optional[Union[int, str]] = 60
+        self._facilitator_url: Optional[str] = None
 
     def rpc_url(self, value: str) -> "ConfigBuilder":
-        """Set the 4Mica core RPC URL directly. Use :meth:`network` to select a hosted network by name instead. Defaults to ``https://ethereum.sepolia.api.4mica.xyz/``."""
+        """Set the 4Mica core API URL directly; :meth:`network` selects a hosted
+        network by name instead."""
         self._rpc_url = value
         return self
 
     def network(self, value: str) -> "ConfigBuilder":
-        """Select a hosted 4Mica network by shorthand or CAIP-2 identifier.
-
-        Resolves to the corresponding core API URL. Mutually exclusive with
-        :meth:`rpc_url` — last call wins.
-
-        Supported values: ``"base"`` / ``"eip155:8453"``,
-        ``"base-sepolia"`` / ``"eip155:84532"``, ``"ethereum-sepolia"`` /
-        ``"eip155:11155111"``.
-
-        :raises ConfigError: if the network is not recognised.
-
-        Example::
-
-            ConfigBuilder().network("base").wallet_private_key("0x...").build()
-            ConfigBuilder().network("eip155:8453").wallet_private_key("0x...").build()
-        """
+        """Select a hosted 4Mica network by shorthand (``"base"``) or CAIP-2 id
+        (``"eip155:8453"``). Mutually exclusive with :meth:`rpc_url` — last
+        call wins."""
         url = resolve_network_rpc_url(value)
         if not url:
             raise ConfigError(
@@ -86,11 +82,20 @@ class ConfigBuilder:
         return self
 
     def ethereum_http_rpc_url(self, value: str) -> "ConfigBuilder":
+        """Ethereum endpoint for on-chain reads and self-funded transactions.
+        Normally unnecessary: core advertises one."""
         self._ethereum_http_rpc_url = value
         return self
 
     def contract_address(self, value: str) -> "ConfigBuilder":
+        """Normally unnecessary: core advertises the deployment."""
         self._contract_address = value
+        return self
+
+    def facilitator_url(self, value: str) -> "ConfigBuilder":
+        """Facilitator that sponsors gas. Without one, every operation is
+        self-funded."""
+        self._facilitator_url = value
         return self
 
     def bearer_token(self, value: str) -> "ConfigBuilder":
@@ -101,7 +106,12 @@ class ConfigBuilder:
         self._auth_enabled = True
         return self
 
+    def disable_auth(self) -> "ConfigBuilder":
+        self._auth_enabled = False
+        return self
+
     def auth_url(self, value: str) -> "ConfigBuilder":
+        """Auth base URL for SIWE credentials. Defaults to the RPC URL."""
         self._auth_url = value
         return self
 
@@ -121,6 +131,8 @@ class ConfigBuilder:
             self._ethereum_http_rpc_url = env["4MICA_ETHEREUM_HTTP_RPC_URL"]
         if "4MICA_CONTRACT_ADDRESS" in env:
             self._contract_address = env["4MICA_CONTRACT_ADDRESS"]
+        if "4MICA_FACILITATOR_URL" in env:
+            self._facilitator_url = env["4MICA_FACILITATOR_URL"]
         if "4MICA_BEARER_TOKEN" in env:
             self._bearer_token = env["4MICA_BEARER_TOKEN"]
         if "4MICA_AUTH_URL" in env:
@@ -169,8 +181,11 @@ class ConfigBuilder:
                 if self._contract_address
                 else None
             )
+            facilitator_url = (
+                validate_url(self._facilitator_url) if self._facilitator_url else None
+            )
             auth_config = None
-            if self._auth_enabled:
+            if self._auth_enabled and not self._bearer_token:
                 auth_url_raw = self._auth_url or self._rpc_url
                 auth_config = AuthConfig(
                     auth_url=validate_url(auth_url_raw),
@@ -187,4 +202,5 @@ class ConfigBuilder:
             contract_address=contract_address,
             bearer_token=self._bearer_token,
             auth=auth_config,
+            facilitator_url=facilitator_url,
         )

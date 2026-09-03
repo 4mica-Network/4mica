@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Callable, List
 
 from x402.interfaces import SchemeNetworkServer
+from x402.payment_flow import (
+    AUTHORIZATION_PAYMENT_FLOW,
+    SDK_DEFAULT_ASSET_TRANSFER_METHOD,
+)
 from x402.schemas import AssetAmount, Network, PaymentRequirements, Price
 
 from .constants import DEFAULT_ASSETS, UnsupportedNetworkError
@@ -16,9 +20,13 @@ class FourMicaEvmScheme(SchemeNetworkServer):
     """EVM server-side scheme for 4mica credit payments."""
 
     scheme = "4mica-credit"
+    # No on-wire assetTransferMethod: a claim is a claim. The signed payment
+    # is verified before the handler runs and settled (guarantee issued) after
+    # it — the library's authorization flow.
+    default_asset_transfer_method = SDK_DEFAULT_ASSET_TRANSFER_METHOD
+    payment_flows = {SDK_DEFAULT_ASSET_TRANSFER_METHOD: AUTHORIZATION_PAYMENT_FLOW}
 
-    def __init__(self, advertised_tab_endpoint: str) -> None:
-        self._advertised_tab_endpoint = advertised_tab_endpoint
+    def __init__(self) -> None:
         self._money_parsers: List[MoneyParser] = []
 
     def register_money_parser(self, parser: MoneyParser) -> "FourMicaEvmScheme":
@@ -26,6 +34,10 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         return self
 
     def parse_price(self, price: Price, network: Network) -> AssetAmount:
+        # x402 validates route configs into AssetAmount models before asking
+        # the scheme; one arriving here is already parsed.
+        if isinstance(price, AssetAmount):
+            return price
         if isinstance(price, dict) and "amount" in price:
             if not price.get("asset"):
                 raise ValueError(f"Asset address must be specified for network {network}")
@@ -49,10 +61,9 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         supported_kind,
         extensions: list[str],
     ) -> PaymentRequirements:
+        # Nothing to add since the tab step was removed from the protocol: a
+        # client signs its claim straight from the requirements.
         del supported_kind, extensions
-        extra = requirements.extra or {}
-        extra["tabEndpoint"] = self._advertised_tab_endpoint
-        requirements.extra = extra
         return requirements
 
     def _parse_money_to_decimal(self, money: str | float | int) -> float:

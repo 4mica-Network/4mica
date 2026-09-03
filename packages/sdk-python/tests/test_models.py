@@ -1,302 +1,152 @@
-"""Tests for model from_rpc parsers and data-model edge cases."""
-
-from __future__ import annotations
-
 import pytest
 
+from fourmica_sdk.errors import InvalidParamsError
 from fourmica_sdk.models import (
-    AssetBalanceInfo,
-    CollateralEventInfo,
-    GuaranteeInfo,
-    PaymentGuaranteeRequestClaimsV2,
-    PendingRemunerationInfo,
-    RecipientPaymentInfo,
+    ClearingParticipantProof,
+    ClearingSettlementActionResponse,
+    CorePublicParameters,
+    PaymentGuaranteeRequestClaims,
     SupportedTokensResponse,
+    ValidationRequirement,
 )
-from fourmica_sdk.signing import CorePublicParameters
 
-ADDR1 = "0x0000000000000000000000000000000000000001"
-ADDR2 = "0x0000000000000000000000000000000000000002"
-USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
-
-_TAB_RAW = {
-    "tab_id": "1",
-    "user_address": ADDR1,
-    "recipient_address": ADDR2,
-    "asset_address": USDC,
-    "start_timestamp": 100,
-    "ttl_seconds": 3600,
-    "status": "OPEN",
-    "settlement_status": "PENDING",
-    "created_at": 100,
-    "updated_at": 200,
-    "total_amount": "1000",
-    "paid_amount": "0",
-}
-
-_GUARANTEE_RAW = {
-    "tab_id": "1",
-    "req_id": "1",
-    "from_address": ADDR1,
-    "to_address": ADDR2,
-    "asset_address": USDC,
-    "amount": "1000",
-    "timestamp": 100,
-    "certificate": None,
+ACTION_SNAKE = {
+    "contract_address": "0x2222222222222222222222222222222222222222",
+    "function_name": "payNetDebit",
+    "action": "pay_net_debit",
+    "cycle_id": "0x" + "aa" * 32,
+    "cycle_id_text": "cycle",
+    "asset_address": "0x0000000000000000000000000000000000000000",
+    "participant": "0x1234567890123456789012345678901234567890",
+    "amount": "10",
+    "payable_value": "10",
+    "proof": [],
 }
 
 
-# ---------------------------------------------------------------------------
-# GuaranteeInfo.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_guarantee_info_from_rpc_snake_case():
-    raw = {
-        "tab_id": "42",
-        "req_id": "3",
-        "from_address": ADDR1,
-        "to_address": ADDR2,
-        "asset_address": USDC,
-        "amount": "1000",
-        "timestamp": 9999,
-        "certificate": "0xdeadbeef",
+def test_action_parses_camel_case_too():
+    camel = {
+        "contractAddress": ACTION_SNAKE["contract_address"],
+        "functionName": "claimNetCreditFor",
+        "action": "claim_net_credit",
+        "cycleId": ACTION_SNAKE["cycle_id"],
+        "cycleIdText": "cycle",
+        "assetAddress": ACTION_SNAKE["asset_address"],
+        "participant": ACTION_SNAKE["participant"],
+        "amount": "10",
+        "payableValue": "0",
+        "proof": ["0x" + "dd" * 32],
     }
-    g = GuaranteeInfo.from_rpc(raw)
-    assert g.tab_id == 42
-    assert g.req_id == 3
-    assert g.from_address == ADDR1
-    assert g.to_address == ADDR2
-    assert g.asset_address == USDC
-    assert g.amount == 1000
-    assert g.timestamp == 9999
-    assert g.certificate == "0xdeadbeef"
+    action = ClearingSettlementActionResponse.from_rpc(camel)
+    assert action.function_name == "claimNetCreditFor"
+    assert action.payable_value == 0
 
 
-def test_guarantee_info_from_rpc_camel_case():
+def test_action_rejects_bad_cycle_id():
+    bad = dict(ACTION_SNAKE, cycle_id="not-a-cycle")
+    with pytest.raises(InvalidParamsError):
+        ClearingSettlementActionResponse.from_rpc(bad)
+
+
+def test_proof_rejects_unknown_role():
     raw = {
-        "tabId": "10",
-        "reqId": "2",
-        "fromAddress": ADDR1,
-        "toAddress": ADDR2,
-        "assetAddress": USDC,
-        "amount": "500",
-        "startTimestamp": 1234,
-        "certificate": None,
+        "cycle_id": "0x" + "aa" * 32,
+        "cycle_id_text": "cycle",
+        "asset_address": "0x0000000000000000000000000000000000000000",
+        "participant": "0x1234567890123456789012345678901234567890",
+        "role": "FLAT",
+        "amount": "0",
+        "net_debit": "0",
+        "net_credit": "0",
+        "leaf": "0x" + "bb" * 32,
+        "merkle_root": "0x" + "cc" * 32,
+        "proof": [],
     }
-    g = GuaranteeInfo.from_rpc(raw)
-    assert g.tab_id == 10
-    assert g.req_id == 2
-    assert g.timestamp == 1234
-    assert g.certificate is None
+    with pytest.raises(InvalidParamsError):
+        ClearingParticipantProof.from_rpc(raw)
 
 
-# ---------------------------------------------------------------------------
-# CollateralEventInfo.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_collateral_event_from_rpc_optional_ids_absent():
-    raw = {
-        "id": "evt-1",
-        "user_address": ADDR1,
-        "asset_address": USDC,
-        "amount": "500",
-        "event_type": "DEPOSIT",
-        "created_at": 1000,
+def test_public_params_public_key_accepts_byte_list_and_hex():
+    base = {
+        "contract_address": "0x2222222222222222222222222222222222222222",
+        "eip712_name": "4mica",
+        "eip712_version": "1",
+        "chain_id": 84532,
     }
-    ev = CollateralEventInfo.from_rpc(raw)
-    assert ev.id == "evt-1"
-    assert ev.user_address == ADDR1
-    assert ev.amount == 500
-    assert ev.event_type == "DEPOSIT"
-    assert ev.tab_id is None
-    assert ev.req_id is None
-    assert ev.tx_id is None
-    assert ev.created_at == 1000
+    from_list = CorePublicParameters.from_rpc(dict(base, public_key=[1, 2, 3]))
+    assert from_list.public_key == b"\x01\x02\x03"
+    from_hex = CorePublicParameters.from_rpc(dict(base, public_key="0x010203"))
+    assert from_hex.public_key == b"\x01\x02\x03"
+    # Defaults when core omits the optional fields.
+    assert from_list.supported_guarantee_versions == [1]
+    assert from_list.guarantee_domains == []
+    assert from_list.ethereum_http_rpc_url == ""
 
 
-def test_collateral_event_from_rpc_with_ids():
-    raw = {
-        "id": "evt-2",
-        "userAddress": ADDR1,
-        "assetAddress": USDC,
-        "amount": "200",
-        "eventType": "LOCK",
-        "tabId": "99",
-        "reqId": "7",
-        "txId": "0xabcd",
-        "createdAt": 2000,
-    }
-    ev = CollateralEventInfo.from_rpc(raw)
-    assert ev.tab_id == 99
-    assert ev.req_id == 7
-    assert ev.tx_id == "0xabcd"
-    assert ev.event_type == "LOCK"
-
-
-# ---------------------------------------------------------------------------
-# AssetBalanceInfo.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_asset_balance_info_from_rpc():
-    raw = {
-        "user_address": ADDR1,
-        "asset_address": USDC,
-        "total": "9000",
-        "locked": "3000",
-        "version": "2",
-        "updated_at": 5000,
-    }
-    b = AssetBalanceInfo.from_rpc(raw)
-    assert b.user_address == ADDR1
-    assert b.asset_address == USDC
-    assert b.total == 9000
-    assert b.locked == 3000
-    assert b.version == 2
-    assert b.updated_at == 5000
-
-
-# ---------------------------------------------------------------------------
-# PendingRemunerationInfo.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_pending_remuneration_info_from_rpc_with_guarantee():
-    raw = {"tab": _TAB_RAW, "latest_guarantee": _GUARANTEE_RAW}
-    pr = PendingRemunerationInfo.from_rpc(raw)
-    assert pr.tab.tab_id == 1
-    assert pr.latest_guarantee is not None
-    assert pr.latest_guarantee.req_id == 1
-
-
-def test_pending_remuneration_info_from_rpc_null_guarantee():
-    raw = {"tab": _TAB_RAW, "latest_guarantee": None}
-    pr = PendingRemunerationInfo.from_rpc(raw)
-    assert pr.tab.tab_id == 1
-    assert pr.latest_guarantee is None
-
-
-# ---------------------------------------------------------------------------
-# RecipientPaymentInfo.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_recipient_payment_info_from_rpc():
-    raw = {
-        "user_address": ADDR1,
-        "recipient_address": ADDR2,
-        "tx_hash": "0xdeadbeef",
-        "amount": "750",
-        "verified": True,
-        "finalized": False,
-        "failed": False,
-        "created_at": 3000,
-    }
-    p = RecipientPaymentInfo.from_rpc(raw)
-    assert p.user_address == ADDR1
-    assert p.recipient_address == ADDR2
-    assert p.tx_hash == "0xdeadbeef"
-    assert p.amount == 750
-    assert p.verified is True
-    assert p.finalized is False
-    assert p.failed is False
-    assert p.created_at == 3000
-
-
-# ---------------------------------------------------------------------------
-# SupportedTokensResponse.from_rpc
-# ---------------------------------------------------------------------------
-
-
-def test_supported_tokens_response_from_rpc():
-    raw = {
-        "chainId": 8453,
-        "tokens": [
-            {"symbol": "USDC", "address": USDC, "decimals": 6},
-            {"symbol": "ETH", "address": "0x0000000000000000000000000000000000000000"},
-        ],
-    }
-    resp = SupportedTokensResponse.from_rpc(raw)
-    assert resp.chain_id == 8453
-    assert len(resp.tokens) == 2
-    assert resp.tokens[0].symbol == "USDC"
-    assert resp.tokens[0].address == USDC
-    assert resp.tokens[0].decimals == 6
-    assert resp.tokens[1].symbol == "ETH"
-    assert resp.tokens[1].decimals is None
-
-
-def test_supported_tokens_response_empty_list():
-    raw = {"chain_id": 1, "tokens": []}
-    resp = SupportedTokensResponse.from_rpc(raw)
-    assert resp.chain_id == 1
-    assert resp.tokens == []
-
-
-# ---------------------------------------------------------------------------
-# PaymentGuaranteeRequestClaimsV2 boundary validation
-# ---------------------------------------------------------------------------
-
-
-def test_claims_v2_accepts_min_validation_score_100():
-    claims = PaymentGuaranteeRequestClaimsV2.new(
-        user_address=ADDR1,
-        recipient_address=ADDR2,
-        tab_id=1,
-        req_id=0,
-        amount=1,
-        timestamp=1,
-        erc20_token=None,
-        validation_registry_address="0x0000000000000000000000000000000000000011",
-        validation_request_hash="0x" + "00" * 32,
-        validation_chain_id=1,
-        validator_address="0x0000000000000000000000000000000000000022",
-        validator_agent_id=1,
-        min_validation_score=100,
-        validation_subject_hash="0x" + "00" * 32,
-        required_validation_tag="",
-        job_hash="0x" + "11" * 32,
+def test_public_params_parses_guarantee_domains():
+    params = CorePublicParameters.from_rpc(
+        {
+            "public_key": "0x" + "00" * 48,
+            "contract_address": "0x2222222222222222222222222222222222222222",
+            "eip712_name": "4mica",
+            "eip712_version": "1",
+            "chain_id": 84532,
+            "supported_guarantee_versions": [1],
+            "guarantee_domains": [{"version": 1, "domain_separator": "0x" + "11" * 32}],
+        }
     )
-    assert claims.min_validation_score == 100
+    assert params.guarantee_domains[0].version == 1
+    assert params.guarantee_domains[0].domain_separator == "0x" + "11" * 32
 
 
-def test_claims_v2_accepts_min_validation_score_1():
-    claims = PaymentGuaranteeRequestClaimsV2.new(
-        user_address=ADDR1,
-        recipient_address=ADDR2,
-        tab_id=1,
-        req_id=0,
-        amount=1,
-        timestamp=1,
-        erc20_token=None,
-        validation_registry_address="0x0000000000000000000000000000000000000011",
-        validation_request_hash="0x" + "00" * 32,
-        validation_chain_id=1,
-        validator_address="0x0000000000000000000000000000000000000022",
-        validator_agent_id=1,
-        min_validation_score=1,
-        validation_subject_hash="0x" + "00" * 32,
-        required_validation_tag="",
-        job_hash="0x" + "11" * 32,
+def test_request_claims_payload_is_v1_tagged_hex():
+    claims = PaymentGuaranteeRequestClaims.new(
+        user_address="0x1234567890123456789012345678901234567890",
+        recipient_address="0x00000000000000000000000000000000000000Be",
+        req_id=7,
+        amount=1000,
+        timestamp=1_700_000_000,
     )
-    assert claims.min_validation_score == 1
+    payload = claims.to_payload()
+    assert payload["version"] == "v1"
+    assert payload["req_id"] == "0x7"
+    assert payload["amount"] == "0x3e8"
+    assert payload["asset_address"] == "0x0000000000000000000000000000000000000000"
+    assert "validation" not in payload
 
 
-# ---------------------------------------------------------------------------
-# CorePublicParameters edge cases
-# ---------------------------------------------------------------------------
+def test_validation_payload_omits_empty_optionals():
+    validation = ValidationRequirement(
+        validator="validator-id", subject="0x" + "42" * 32
+    )
+    payload = validation.to_payload()
+    assert "deadline" not in payload
+    assert "params" not in payload
+
+    full = ValidationRequirement(
+        validator="validator-id",
+        subject="0x" + "42" * 32,
+        deadline=123,
+        params="0xdeadbeef",
+    )
+    assert full.to_payload()["deadline"] == 123
+    assert full.to_payload()["params"] == "0xdeadbeef"
 
 
-def test_core_public_parameters_raises_when_public_key_missing():
-    with pytest.raises(ValueError, match="missing core public parameter"):
-        CorePublicParameters.from_rpc(
-            {
-                "contractAddress": "0x1234567890abcdef1234567890abcdef12345678",
-                "ethereumHttpRpcUrl": "http://localhost:8545",
-                "eip712Name": "4mica",
-                "eip712Version": "1",
-                "chainId": 1,
-            }
-        )
+def test_supported_tokens_carry_domain_separator():
+    tokens = SupportedTokensResponse.from_rpc(
+        {
+            "chain_id": 84532,
+            "tokens": [
+                {
+                    "symbol": "USDC",
+                    "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+                    "decimals": 6,
+                    "domain_separator": "0x" + "aa" * 32,
+                },
+                {"symbol": "ODD", "address": "0x" + "11" * 20},
+            ],
+        }
+    )
+    assert tokens.tokens[0].domain_separator == "0x" + "aa" * 32
+    assert tokens.tokens[1].domain_separator is None

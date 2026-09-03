@@ -69,8 +69,7 @@ PRIVATE_KEY=0xYourPrivateKey python client.py
 
 2. **Client** makes a request to the protected endpoint:
    - First receives `402 Payment Required` response
-   - Automatically opens a payment tab via the 4mica facilitator
-   - Signs and submits the payment
+   - Signs a payment guarantee straight from the requirements (via 4mica SDK)
    - Retries the request with payment proof
    - Receives the protected data
 
@@ -78,9 +77,6 @@ PRIVATE_KEY=0xYourPrivateKey python client.py
    ```
    Client → GET /api/premium-data
           ← 402 Payment Required (with payment requirements)
-
-   Client → POST /payment/tab (open payment tab)
-          ← 200 OK (tab details)
 
    Client → Signs payment guarantee (via 4mica SDK)
 
@@ -104,4 +100,3 @@ curl -v http://localhost:3000/api/premium-data
 
 - Make sure your account has sufficient balance on Sepolia testnet
 - The demo uses the default 4mica facilitator configuration
-- Tab TTL is set to 1 hour (3600 seconds)

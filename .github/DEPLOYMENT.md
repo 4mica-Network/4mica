@@ -222,6 +222,22 @@ the exception that proves the rule: it works only because it is a plain
 address (`PLAYGROUND_UPSTREAM`) rather than Docker DNS, and it costs a
 non-loopback port on Box B.
 
+**`PLAYGROUND_UPSTREAM` must include the scheme** — `http://10.0.0.5:8081`, not
+`10.0.0.5:8081`. It is interpolated into `set $mica_playground …` and nginx does
+not validate a `set` variable at startup, so a scheme-less value parses fine,
+`edge` starts and reports healthy, and then *every* playground request fails
+with `invalid URL prefix` in the container log. The symptom is a bare nginx
+**500** — not a 502 — on `/sign-in`, `/api/…` and every bare handle, while the
+marketing routes carry on working, so the site looks half-alive. `build-react-app.yml`
+now refuses to deploy on a scheme-less value, and its `post_up` probes
+`/api/health` through `edge` and warns if the playground half of the apex is
+unreachable. To confirm the diagnosis on Box A:
+
+```bash
+docker logs 4mica-edge 2>&1 | grep -i 'invalid URL prefix' | tail
+grep PLAYGROUND_UPSTREAM ~/var/www/4mica/apps/web/.env
+```
+
 A mismatch does not fail the deploy. Each stack comes up on whichever box its
 secret names and only misbehaves later, so check these values first when a
 service deploys green but cannot reach its neighbours.

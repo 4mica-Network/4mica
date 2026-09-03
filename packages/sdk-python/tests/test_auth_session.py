@@ -1,4 +1,5 @@
 import asyncio
+
 import pytest
 
 import fourmica_sdk.auth as auth_module

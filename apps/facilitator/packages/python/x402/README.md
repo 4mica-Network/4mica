@@ -34,10 +34,7 @@ routes = {
     }
 }
 
-middleware = fastapi_payment_middleware_from_config(
-    routes,
-    tab_endpoint="https://api.example.com/payment/tab",
-)
+middleware = fastapi_payment_middleware_from_config(routes)
 
 @app.middleware("http")
 async def x402_mw(request, call_next):

@@ -43,6 +43,14 @@ class CdpAccountSigner:
         # Plain string — CDP applies the EIP-191 prefix internally.
         return await self._cdp.evm.sign_message(self._address, message)
 
+    async def sign_hash(self, message_hash: bytes) -> str:
+        digest = (
+            message_hash
+            if isinstance(message_hash, str)
+            else "0x" + bytes(message_hash).hex()
+        )
+        return await self._cdp.evm.sign_hash(self._address, digest)
+
     async def sign_typed_data(self, full_message: dict) -> str:
         from cdp.openapi_client.models.eip712_domain import EIP712Domain
 

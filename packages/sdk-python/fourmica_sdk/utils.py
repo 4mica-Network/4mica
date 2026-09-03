@@ -64,7 +64,7 @@ def parse_u256(value: Union[int, str]) -> int:
 
 def load_abi(name: str) -> Any:
     """Load a bundled ABI JSON file."""
-    base = Path(__file__).resolve().parent / "abi"
+    base = Path(__file__).resolve().parent / "contract" / "abi"
     path = base / name
     with path.open("r", encoding="utf-8") as fp:
         return json.load(fp)["abi"]

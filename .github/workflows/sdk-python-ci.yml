@@ -1,0 +1,53 @@
+name: Python SDK CI
+
+on:
+  pull_request:
+    paths:
+      - "packages/sdk-python/**"
+      - ".github/workflows/sdk-python-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk-python
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          uv venv
+          uv pip install ".[dev,cdp]"
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Pytest
+        run: uv run pytest -q
+
+      - name: ABI drift check
+        run: |
+          for fn in payNetDebit claimNetCreditFor; do
+            jq -e --arg fn "$fn" '.abi[] | select(.type=="function" and .name==$fn)' \
+              fourmica_sdk/contract/abi/clearing_house.json > /dev/null
+          done
+          for fn in deposit depositStablecoin getGuaranteeVersionConfig depositStablecoinWithAuthorization; do
+            jq -e --arg fn "$fn" '.abi[] | select(.type=="function" and .name==$fn)' \
+              fourmica_sdk/contract/abi/core4mica.json > /dev/null
+          done

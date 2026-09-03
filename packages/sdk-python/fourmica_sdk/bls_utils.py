@@ -5,14 +5,15 @@ from typing import List
 from .errors import VerificationError
 
 _BLS_DEPENDENCY_MESSAGE = (
-    "py-ecc is required to decode BLS signatures; "
-    "install sdk-4mica[bls] to enable remuneration."
+    "py-ecc is required to decode BLS signatures; reinstall sdk-4mica with its "
+    "dependencies intact."
 )
 
 
 def _load_bls_modules():
     try:
-        from py_ecc.bls import G2Basic, G2ProofOfPossession as bls_pop
+        from py_ecc.bls import G2Basic
+        from py_ecc.bls import G2ProofOfPossession as bls_pop
 
         try:
             from py_ecc.bls.g2_primitives import signature_to_G2

@@ -8,7 +8,7 @@ pytest.importorskip("x402")
 
 
 def test_parse_price_asset_amount_passthrough():
-    scheme = FourMicaEvmScheme("http://tab")
+    scheme = FourMicaEvmScheme()
     price = {"amount": "123", "asset": "0xabc", "extra": {"k": "v"}}
     parsed = scheme.parse_price(price, "eip155:11155111")
     assert parsed.amount == "123"
@@ -16,21 +16,34 @@ def test_parse_price_asset_amount_passthrough():
     assert parsed.extra == {"k": "v"}
 
 
+def test_parse_price_accepts_a_validated_asset_amount():
+    """x402 validates route configs into AssetAmount models before calling
+    the scheme — a dict-priced route arrives here already parsed."""
+    from x402.schemas import AssetAmount
+
+    scheme = FourMicaEvmScheme()
+    price = AssetAmount(amount="1000", asset="0xabc", extra={"rpcUrl": "http://core"})
+    parsed = scheme.parse_price(price, "eip155:84532")
+    assert parsed is price
+
+
 def test_parse_price_money_default_conversion():
-    scheme = FourMicaEvmScheme("http://tab")
+    scheme = FourMicaEvmScheme()
     parsed = scheme.parse_price("$0.10", "eip155:11155111")
     assert parsed.amount == "100000"  # 0.10 USDC with 6 decimals
     assert parsed.asset == "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
 
 
 def test_parse_price_unsupported_network():
-    scheme = FourMicaEvmScheme("http://tab")
+    scheme = FourMicaEvmScheme()
     with pytest.raises(UnsupportedNetworkError):
         scheme.parse_price("$1.00", "eip155:1")
 
 
-def test_enhance_payment_requirements_injects_tab_endpoint():
-    scheme = FourMicaEvmScheme("http://tab")
+def test_enhance_payment_requirements_leaves_requirements_untouched():
+    """The tab step is gone from the protocol, so there is nothing to inject —
+    a client signs its claim straight from the requirements."""
+    scheme = FourMicaEvmScheme()
     req = PaymentRequirements(
         scheme="4mica-credit",
         network="eip155:11155111",
@@ -38,7 +51,8 @@ def test_enhance_payment_requirements_injects_tab_endpoint():
         amount="1",
         pay_to="0xdef",
         max_timeout_seconds=60,
-        extra={},
+        extra={"validation": {"validator": "v", "subject": "0x" + "11" * 32}},
     )
     result = scheme.enhance_payment_requirements(req, supported_kind={}, extensions=[])
-    assert result.extra["tabEndpoint"] == "http://tab"
+    assert result.extra == {"validation": {"validator": "v", "subject": "0x" + "11" * 32}}
+    assert "tabEndpoint" not in result.extra
