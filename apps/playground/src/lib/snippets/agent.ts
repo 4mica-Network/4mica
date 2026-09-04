@@ -47,7 +47,7 @@ const response = await fetchWithPayment("https://some-seller.example/data");`;
 
   const collateral = `import { Client, ConfigBuilder } from "@4mica/sdk";
 
-const client = await Client.new(
+const client = await Client.connect(
   new ConfigBuilder()
     .network("${sdkName}")
     .walletPrivateKey(process.env.AGENT_PRIVATE_KEY)
@@ -56,14 +56,14 @@ const client = await Client.new(
 
 try {
   // Deposit 0.001 ETH of collateral. Credit is extended against this balance.
-  await client.user.deposit(1_000_000_000_000_000n);
+  await client.deposit.of(null, 1_000_000_000_000_000n).send();
 
   // For an ERC-20 instead, approve first:
-  // await client.user.approveErc20(tokenAddress, "1000");
-  // await client.user.deposit("1000", tokenAddress);
+  // await client.deposit.of(tokenAddress, "1000").selfFunded().approve();
+  // await client.deposit.of(tokenAddress, "1000").send();
 
   // One entry per asset: collateral, locked credit, pending withdrawal.
-  const positions = await client.user.getUser();
+  const positions = await client.account.assets();
   console.log(positions);
 } finally {
   await client.aclose();
@@ -74,7 +74,7 @@ const receipt = response.headers.get("X-PAYMENT-RESPONSE");
 
 // Guarantees this agent signed are netted into a settlement cycle. When it
 // ends up a net debtor, pay the committed amount on-chain:
-// await client.user.payNetDebit(cycleId);
+// await client.settlement.pay(cycleId).send();
 
 // Record the request id, guarantee id, seller and amount against your own task
 // log — that pairing is what makes a payment auditable later.

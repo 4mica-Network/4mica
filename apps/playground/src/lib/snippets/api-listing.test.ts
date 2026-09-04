@@ -177,11 +177,10 @@ describe("buildApiListingSnippets", () => {
     expect(snippets?.typescript).toContain("Usage-based per call");
   });
 
-  it("uses the row's tab endpoint in the advertised requirements", () => {
+  it("advertises the tab-free requirements", () => {
     const snippets = buildApiListingSnippets(listing());
 
-    expect(snippets?.curl).toContain(
-      '"tabEndpoint": "https://api.4mica.io/v1/credit/x402"',
-    );
+    expect(snippets?.curl).toContain('"scheme": "4mica-credit"');
+    expect(snippets?.curl).not.toContain("tabEndpoint");
   });
 });

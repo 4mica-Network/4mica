@@ -9,14 +9,14 @@ import type {
   PaywallInput,
   PaywallVerifier,
 } from "@/server/models";
-import type {
+import {
   PaymentRequirementsV2,
+  SCHEME_4MICA_CREDIT,
   X402PaymentRequired,
   X402ResourceInfo,
 } from "@/x402/models";
 
 const X402_VERSION = 1;
-const DEFAULT_SCHEME = "4mica";
 const PAYMENT_HEADER = "x-payment";
 const PAYMENT_RESPONSE_HEADER = "X-PAYMENT-RESPONSE";
 const JSON_HEADERS: Record<string, string> = {
@@ -43,11 +43,11 @@ function buildResource(
   input: PaywallInput,
   config: PaywallConfig,
 ): X402ResourceInfo {
-  return {
+  return new X402ResourceInfo({
     url: config.resource?.url ?? input.url,
     description: config.resource?.description ?? config.description ?? "",
     mimeType: config.resource?.mimeType ?? config.mimeType ?? "",
-  };
+  });
 }
 
 function buildRequirements(
@@ -57,23 +57,26 @@ function buildRequirements(
 ): X402PaymentRequired {
   if (config.buildRequirements) {
     const custom = config.buildRequirements(input);
-    return error ? { ...custom, error } : custom;
+    if (error) {
+      custom.error = error;
+    }
+    return custom;
   }
-  const accepts: PaymentRequirementsV2 = {
-    scheme: config.scheme ?? DEFAULT_SCHEME,
+  const accepts = new PaymentRequirementsV2({
+    scheme: config.scheme ?? SCHEME_4MICA_CREDIT,
     network: config.network,
     asset: config.asset,
     amount: config.amount,
     payTo: config.payTo,
     maxTimeoutSeconds: config.maxTimeoutSeconds,
-    extra: { tabEndpoint: config.tabEndpoint, ...config.extra },
-  };
-  return {
+    extra: { ...config.extra },
+  });
+  return new X402PaymentRequired({
     x402Version: config.x402Version ?? X402_VERSION,
-    ...(error ? { error } : {}),
+    error,
     resource: buildResource(input, config),
     accepts: [accepts],
-  };
+  });
 }
 
 function requireResponse(
@@ -89,6 +92,16 @@ function requireResponse(
   };
 }
 
+function serializeRequired(body: X402PaymentRequired): string {
+  return JSON.stringify({
+    x402Version: body.x402Version,
+    ...(body.error ? { error: body.error } : {}),
+    resource: body.resource.toPayload(),
+    accepts: body.accepts.map((entry) => entry.toPayload()),
+    ...(body.extensions ? { extensions: body.extensions } : {}),
+  });
+}
+
 /**
  * Create a runtime-neutral x402 paywall.
  *
@@ -96,8 +109,8 @@ function requireResponse(
  * header is present, and otherwise decodes the header and forwards the payment
  * payload to the verifier's `issueGuarantee`. A successful guarantee means the
  * payment is cryptographically covered → allow the request. On-chain settlement
- * (the cycle-clearing `claimNetCredit` flow) is intentionally left as an
- * out-of-band recipient operation.
+ * (the cycle-clearing claim flow) is intentionally left as an out-of-band
+ * recipient operation.
  *
  * @param verifier - `client.rpc`, the SDK `Client`, or any {@link GuaranteeVerifier}.
  * @param config - Advertised requirements for the protected resource.
@@ -126,10 +139,15 @@ export function createPaywall(
     }
 
     try {
-      const raw = await guarantor.issueGuarantee(payload);
-      const claims = typeof raw.claims === "string" ? raw.claims : "";
-      const signature = typeof raw.signature === "string" ? raw.signature : "";
-      const guarantee: PaywallGuarantee = { claims, signature, raw };
+      const cert = await guarantor.issueGuarantee(payload);
+      const claims = typeof cert.claims === "string" ? cert.claims : "";
+      const signature =
+        typeof cert.signature === "string" ? cert.signature : "";
+      const guarantee: PaywallGuarantee = {
+        claims,
+        signature,
+        raw: { claims, signature },
+      };
       return {
         ok: true,
         guarantee,
@@ -155,7 +173,7 @@ export function createPaywall(
       header: (name) => request.headers.get(name),
     });
     if (!decision.ok) {
-      return new Response(JSON.stringify(decision.body), {
+      return new Response(serializeRequired(decision.body), {
         status: decision.status,
         headers: decision.headers,
       });

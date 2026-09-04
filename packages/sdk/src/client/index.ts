@@ -1,134 +1,110 @@
+/**
+ * Entry point to the SDK.
+ *
+ * Each field is an intent-builder client: an entry captures what to do
+ * (`client.deposit.of(...)`), a route pin narrows how (`.selfFunded()`),
+ * and a terminal does it (`.send()`, `.approve()`, `.action()`).
+ */
+
 import type { AuthTokens } from "@/auth";
-import { AuthSession } from "@/auth";
-import { RecipientClient } from "@/client/recipient";
-import { UserClient } from "@/client/user";
+import { AccountClient } from "@/client/account";
+import { ClientCtx } from "@/client/ctx";
+import { DepositClient } from "@/client/deposit";
+import { PaymentClient } from "@/client/payment";
+import { SettlementClient } from "@/client/settlement";
+import { TokensClient } from "@/client/tokens";
+import { WithdrawClient } from "@/client/withdraw";
 import type { Config } from "@/config";
-import { ContractGateway } from "@/contract";
-import { AuthMissingConfigError } from "@/errors";
-import type { CorePublicParameters } from "@/models";
-import { resolvePublicRpcUrl } from "@/networks";
-import { RpcProxy } from "@/rpc";
-import { PaymentSigner } from "@/signing";
+import type {
+  CorePublicParameters,
+  PaymentGuaranteeRequestClaims,
+  PaymentSignature,
+} from "@/models";
+import { SigningScheme } from "@/models";
+
+export { AccountClient } from "@/client/account";
+export { ClientCtx } from "@/client/ctx";
+export {
+  DepositBuilder,
+  DepositClient,
+  SelfFundedDeposit,
+} from "@/client/deposit";
+export * from "@/client/model";
+export { PaymentClient } from "@/client/payment";
+export {
+  ClaimBuilder,
+  PayBuilder,
+  SelfFundedClaim,
+  SelfFundedPay,
+  SettlementClient,
+} from "@/client/settlement";
+export { TokensClient } from "@/client/tokens";
+export { WithdrawClient, WithdrawStepBuilder } from "@/client/withdraw";
 
 /**
- * Top-level SDK client. Holds a live connection to the 4Mica core RPC and the
- * on-chain Core4Mica contract. Obtain an instance via {@link Client.new}.
+ * A connected 4Mica client. Build a {@link Config} with
+ * {@link ConfigBuilder}, then `await Client.connect(cfg)` — construction
+ * reaches core for its public parameters, which is why it is async and
+ * fallible.
  *
  * @example
  * ```ts
  * const cfg = new ConfigBuilder().walletPrivateKey("0x...").build();
- * const client = await Client.new(cfg);
+ * const client = await Client.connect(cfg);
  * try {
- *   // client.user  – payer-side operations
- *   // client.recipient – recipient-side operations
+ *   const claims = PaymentGuaranteeRequestClaims.new(...);
+ *   const signature = await client.payment.signRequest(claims);
  * } finally {
  *   await client.aclose();
  * }
  * ```
  */
 export class Client {
+  /** Depositing collateral. */
+  readonly deposit: DepositClient;
+  /** Requesting, cancelling and finalizing withdrawals. */
+  readonly withdraw: WithdrawClient;
+  /** Signing, issuing and verifying payment guarantees. */
+  readonly payment: PaymentClient;
+  /** Settling a clearing cycle, from either side. */
+  readonly settlement: SettlementClient;
+  /** Reading the signer's own balances and positions. */
+  readonly account: AccountClient;
+  /** Supported-token metadata and ERC-20 approvals. */
+  readonly tokens: TokensClient;
+  /** Shared connection state, exposed for advanced use (e.g. `ctx.rpc`). */
+  readonly ctx: ClientCtx;
+
+  private constructor(ctx: ClientCtx) {
+    this.ctx = ctx;
+    this.deposit = new DepositClient(ctx);
+    this.withdraw = new WithdrawClient(ctx);
+    this.payment = new PaymentClient(ctx);
+    this.settlement = new SettlementClient(ctx);
+    this.account = new AccountClient(ctx);
+    this.tokens = new TokensClient(ctx);
+  }
+
+  static async connect(cfg: Config): Promise<Client> {
+    return new Client(await ClientCtx.create(cfg));
+  }
+
   /** Low-level RPC proxy to the 4Mica core service. */
-  readonly rpc: RpcProxy;
-  /** Chain and contract parameters fetched from the core service at startup. */
-  readonly params: CorePublicParameters;
-  /** viem-backed gateway for on-chain calls (deposit, claimNetCredit, …). */
-  readonly gateway: ContractGateway;
-  /** 32-byte domain separator used to verify V1 BLS guarantee certificates. */
-  readonly guaranteeDomain: string;
-  /** Payer-side operations: deposit, sign, withdraw. */
-  readonly user: UserClient;
-  /** Recipient-side operations: tabs, guarantees, remuneration. */
-  readonly recipient: RecipientClient;
-  /** Payment signing wrapper around the configured viem Account. */
-  readonly signer: PaymentSigner;
-  private authSession?: AuthSession;
-
-  private constructor(
-    rpc: RpcProxy,
-    params: CorePublicParameters,
-    gateway: ContractGateway,
-    guaranteeDomain: string,
-    signer: PaymentSigner,
-    authSession?: AuthSession,
-  ) {
-    this.rpc = rpc;
-    this.params = params;
-    this.gateway = gateway;
-    this.guaranteeDomain = guaranteeDomain;
-    this.signer = signer;
-    this.authSession = authSession;
-    this.user = new UserClient(this);
-    this.recipient = new RecipientClient(this);
+  get rpc() {
+    return this.ctx.rpc;
   }
 
   /**
-   * Create and fully initialise a Client.
-   *
-   * Fetches public parameters from the core service, validates that the
-   * Ethereum RPC is on the expected chain, and sets up SIWE auth if configured.
-   *
-   * @param cfg - Validated configuration produced by {@link ConfigBuilder.build}.
-   * @throws {@link ConfigError} if the configuration is invalid.
-   * @throws {@link RpcError} if the core service is unreachable.
-   * @throws {@link ContractError} if the Ethereum RPC returns the wrong chain ID.
+   * The address this client signs as, and therefore the account every
+   * deposit credits.
    */
-  static async new(cfg: Config): Promise<Client> {
-    const rpc = new RpcProxy(cfg.rpcUrl, cfg.adminApiKey);
-    const params = await rpc.getPublicParams();
-    const gateway = await Client.buildGateway(cfg, params);
-
-    const guaranteeDomain = await gateway.getGuaranteeDomain();
-    const signer = new PaymentSigner(cfg.signer);
-
-    const authEnabled =
-      cfg.authUrl !== undefined || cfg.authRefreshMarginSecs !== undefined;
-    const authSession =
-      cfg.bearerToken || !authEnabled
-        ? undefined
-        : new AuthSession({
-            authUrl: cfg.authUrl ?? cfg.rpcUrl,
-            signer: cfg.signer,
-            refreshMarginSecs: cfg.authRefreshMarginSecs ?? 60,
-          });
-
-    if (cfg.bearerToken) {
-      rpc.withBearerToken(cfg.bearerToken);
-    } else if (authSession) {
-      rpc.withTokenProvider(() => authSession.accessToken());
-    }
-    return new Client(
-      rpc,
-      params,
-      gateway,
-      guaranteeDomain,
-      signer,
-      authSession,
-    );
+  get signerAddress(): string {
+    return this.ctx.signerAddress;
   }
 
-  private static async buildGateway(
-    cfg: Config,
-    params: CorePublicParameters,
-  ): Promise<ContractGateway> {
-    const ethRpcUrl =
-      cfg.ethereumHttpRpcUrl ??
-      params.ethereumHttpRpcUrl ??
-      resolvePublicRpcUrl(`eip155:${params.chainId}`);
-    const contractAddress = cfg.contractAddress ?? params.contractAddress;
-    return ContractGateway.create(
-      ethRpcUrl,
-      cfg.signer,
-      contractAddress as `0x${string}`,
-      params.chainId,
-    );
-  }
-
-  /**
-   * Release client resources. Safe to call multiple times.
-   * Use in a `finally` block to ensure cleanup after use.
-   */
-  async aclose(): Promise<void> {
-    await this.rpc.aclose();
+  /** Core's public parameters, as fetched at connect time. */
+  get publicParams(): CorePublicParameters {
+    return this.ctx.publicParams;
   }
 
   /**
@@ -136,16 +112,28 @@ export class Client {
    *
    * Not required for normal operation — the first authenticated RPC call
    * triggers auth automatically. Call this to pre-warm the session.
-   *
-   * @throws {@link AuthMissingConfigError} if auth was not enabled in the config.
    */
   async login(): Promise<AuthTokens> {
-    if (!this.authSession) {
-      throw new AuthMissingConfigError("auth is not enabled");
-    }
-    return this.authSession.login();
+    return this.ctx.login();
+  }
+
+  async logout(): Promise<void> {
+    return this.ctx.logout();
+  }
+
+  /**
+   * Sign a guarantee request as the payer — the `FlowSigner` surface
+   * {@link X402Flow} consumes.
+   */
+  async signPayment(
+    claims: PaymentGuaranteeRequestClaims,
+    scheme: SigningScheme = SigningScheme.EIP712,
+  ): Promise<PaymentSignature> {
+    return this.payment.signRequest(claims, scheme);
+  }
+
+  /** Release client resources. Safe to call multiple times. */
+  async aclose(): Promise<void> {
+    await this.ctx.aclose();
   }
 }
-
-export { RecipientClient } from "@/client/recipient";
-export { UserClient } from "@/client/user";

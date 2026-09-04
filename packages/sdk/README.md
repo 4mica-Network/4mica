@@ -8,13 +8,17 @@ The official TypeScript SDK for interacting with the 4Mica payment network.
 ## Overview
 
 4Mica is a payment network that enables cryptographically-enforced lines of credit for autonomous
-payments. This SDK provides:
+payments. Payments are guaranteed off-chain and netted into **settlement cycles**: core nets each
+participant's obligations per cycle into a single net-debit or net-credit committed to an on-chain
+Merkle root. This SDK provides:
 
-- **User Client**: deposit collateral, sign payments, and manage withdrawals in ETH or ERC20 tokens
-- **Recipient Client**: issue and verify payment guarantees, and claim net credit from cleared settlement cycles
-- **X402 Flow Helper**: generate X-PAYMENT headers for 402-protected HTTP resources via an X402-compatible service
-- **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a route behind an x402 payment
-- **Admin RPCs**: manage user suspension and admin API keys (when authorized)
+- **Capability sub-clients**: `deposit`, `withdraw`, `payment`, `settlement`, `account`, `tokens`
+- **X402 Flow Helper**: generate `X-PAYMENT` headers for 402-protected HTTP resources — tab-free,
+  with a random per-payment `reqId` and no server round-trip before signing
+- **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a
+  route behind an x402 payment
+- **Golden-vector parity**: EIP-712/EIP-191 digests and the guarantee envelope are pinned by the
+  same fixtures the Rust and Python SDKs test against
 
 ## Universal: runtime-neutral core + thin adapters
 
@@ -38,7 +42,6 @@ const paywall = createPaywall(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://your-recipient.example/tab",
 });
 
 // Web-standard (Hono, Next route handlers, SvelteKit, Remix, Deno, Bun.serve):
@@ -51,8 +54,8 @@ const decision = await paywall.protect({ method, url, header: (n) => headers.get
 ```
 
 Prefer a framework adapter (`@4mica/sdk-express`, `@4mica/sdk-hono`, `@4mica/sdk-next`) for
-idiomatic middleware. The paywall only **verifies** payment; on-chain settlement (`remunerate`)
-remains an out-of-band recipient operation.
+idiomatic middleware. The paywall only **verifies** payment; on-chain settlement (the
+cycle-clearing claim flow) remains an out-of-band recipient operation.
 
 ## Installation
 
@@ -91,14 +94,14 @@ The SDK requires a signing key and can use sensible defaults for the rest:
 - `rpcUrl` (optional): override the core API URL directly (for self-hosted deployments).
 - `ethereumHttpRpcUrl` (optional): Ethereum JSON-RPC endpoint; fetched from core if omitted
 - `contractAddress` (optional): Core4Mica contract address; fetched from core if omitted
-- `adminApiKey` (optional): API key for admin RPCs
-- `bearerToken` (optional): static bearer token for auth
-- `authUrl` and `authRefreshMarginSecs` (optional): SIWE auth config. Only used when auth is
-  enabled via `enableAuth()` or by setting either value (defaults to `rpcUrl` and 60 seconds).
+- `facilitatorUrl` (optional): facilitator that sponsors gas; without one, every operation is self-funded
+- `bearerToken` (optional): static bearer token for auth (replaces SIWE)
+- `authUrl` and `authRefreshMarginSecs` (optional): SIWE auth config. SIWE is on by default
+  (defaults to `rpcUrl` and 60 seconds); disable it entirely with `disableAuth()`.
 
 > Note: `ethereumHttpRpcUrl` and `contractAddress` are fetched from the core service by default.
-> The SDK validates the connected chain ID but does not verify the contract address or code. Only
-> override these if you need to use different values than the server defaults.
+> Connecting validates that core supports the guarantee version this SDK signs and resolves the
+> guarantee domain separators; the Ethereum RPC is only contacted lazily, on first on-chain use.
 
 ### 1) Using ConfigBuilder
 
@@ -111,9 +114,9 @@ async function main() {
     .walletPrivateKey('0x...')
     .build();
 
-  const client = await Client.new(cfg);
+  const client = await Client.connect(cfg);
   try {
-    // use client.user, client.recipient, client.rpc
+    // use client.deposit, client.payment, client.settlement, …
   } finally {
     await client.aclose();
   }
@@ -131,7 +134,7 @@ Set environment variables (example `.env`):
 # 4MICA_RPC_URL="https://base.sepolia.api.4mica.xyz/"
 4MICA_ETHEREUM_HTTP_RPC_URL="http://localhost:8545"
 4MICA_CONTRACT_ADDRESS="0x..."
-4MICA_ADMIN_API_KEY="ak_..."
+4MICA_FACILITATOR_URL="https://x402.4mica.xyz"
 4MICA_BEARER_TOKEN="Bearer <access_token>"
 4MICA_AUTH_URL="https://ethereum.sepolia.api.4mica.xyz/"
 4MICA_AUTH_REFRESH_MARGIN_SECS="60"
@@ -150,7 +153,7 @@ Then in code:
 import { Client, ConfigBuilder } from '@4mica/sdk';
 
 const cfg = new ConfigBuilder().fromEnv().build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
 ### 3) Using a Custom Signer
@@ -165,12 +168,13 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 const signer = privateKeyToAccount(process.env.PAYER_KEY as `0x${string}`);
 const cfg = new ConfigBuilder().signer(signer).build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
-### SIWE Auth (Optional)
+### SIWE Auth
 
-Enable automatic SIWE auth refresh, or pass a static bearer token:
+SIWE auth is on by default; the first authenticated RPC call logs in automatically. Connecting and
+fetching public parameters never triggers a login — those routes are public.
 
 ```ts
 import { Client, ConfigBuilder } from '@4mica/sdk';
@@ -178,64 +182,83 @@ import { Client, ConfigBuilder } from '@4mica/sdk';
 const cfg = new ConfigBuilder()
   .walletPrivateKey('0x...')
   .rpcUrl('https://api.4mica.xyz/')
-  .enableAuth()
   .build();
 
-const client = await Client.new(cfg);
-await client.login(); // optional: first RPC call also triggers auth
+const client = await Client.connect(cfg);
+await client.login(); // optional: pre-warm the session
 ```
 
-Or use a static token:
+Use a static token instead (replaces SIWE), or turn credentials off entirely:
 
 ```ts
-const cfg = new ConfigBuilder()
-  .walletPrivateKey('0x...')
-  .bearerToken('Bearer <access_token>')
-  .build();
+new ConfigBuilder().walletPrivateKey('0x...').bearerToken('Bearer <access_token>').build();
+new ConfigBuilder().walletPrivateKey('0x...').disableAuth().build();
 ```
 
 Env vars: `4MICA_BEARER_TOKEN`, `4MICA_AUTH_URL`, `4MICA_AUTH_REFRESH_MARGIN_SECS`.
 
 ## Usage
 
-The SDK exposes three main entry points:
+Every field on the client is an intent-builder sub-client: an entry captures what to do
+(`client.deposit.of(...)`), a route pin narrows how (`.selfFunded()`), and a terminal does it
+(`.send()`, `.approve()`, `.action()`).
 
-- `client.user`: payer-side operations (collateral, signing, withdrawals, net-debit settlement)
-- `client.recipient`: recipient-side operations (guarantees, cycle-clearing net-credit settlement)
-- `X402Flow`: helper for 402-protected HTTP resources
+- `client.deposit` — depositing collateral
+- `client.withdraw` — requesting, cancelling and finalizing withdrawals
+- `client.payment` — signing, issuing and verifying payment guarantees
+- `client.settlement` — settling a clearing cycle, from either side
+- `client.account` — the signer's own balances and positions
+- `client.tokens` — supported-token metadata and ERC-20 approvals
+- `X402Flow` — helper for 402-protected HTTP resources
 
-### End-to-end Example (Base Sepolia + x402 v2)
+### Quick tour
 
-See `examples/base-sepolia-x402-facilitator-e2e.ts` for a full flow in the `examples` folder:
+```ts
+import { Client, ConfigBuilder, PaymentGuaranteeRequestClaims } from '@4mica/sdk';
 
-- deposit collateral
-- resolve a payment session via the facilitator's `tabEndpoint` (returns the next `reqId`)
-- issue and verify V1 + V2 guarantees
-- settle a cleared cycle: payer `payNetDebit`, recipient `claimNetCredit`
-- settle V2 only after `wachai-validation-sdk` returns a passing ERC-8004 validation
-- submit + finalize withdrawal
+const client = await Client.connect(
+  new ConfigBuilder().network('base-sepolia').walletPrivateKey('0x...').build(),
+);
 
-Run it with:
+// Payer: deposit collateral (native ETH; pass a token address for ERC-20).
+await client.deposit.of(null, 1_000_000_000_000_000n).send();
 
-```bash
-cp examples/.env.x402-facilitator-e2e.example examples/.env.x402-facilitator-e2e
-npx dotenv-cli -e examples/.env.x402-facilitator-e2e -- npm run example:base-sepolia:x402-v2
+// Payer: sign a payment guarantee request.
+const claims = PaymentGuaranteeRequestClaims.new(
+  client.signerAddress, // user
+  '0xRecipient',        // recipient
+  reqId,                // random uint256 nonce
+  1000n,                // amount
+  Math.floor(Date.now() / 1000),
+  null,                 // asset (null = native)
+);
+const signature = await client.payment.signRequest(claims);
+
+// Recipient: redeem the signed request for a BLS certificate, then verify it.
+const cert = await client.payment.issueGuarantee(claims, signature);
+const verified = await client.payment.verifyGuarantee(cert);
+
+// After the cycle clears: debtor pays, creditor claims.
+await client.settlement.pay(cycleId).send();
+await client.settlement.claim(cycleId).send();
 ```
 
 ### X402 flow (HTTP 402)
 
 The X402 helper turns `paymentRequirements` from a `402 Payment Required` response into an
-X-PAYMENT header (and optional `/settle` call) that the facilitator will accept.
+`X-PAYMENT` header (and optional `/settle` call) that the facilitator will accept.
+
+There is **no tab step**: each payment carries a random 32-byte `reqId` minted locally, and core
+binds the guarantee to the open settlement cycle at issuance. Nothing is fetched before signing.
 
 #### What the SDK expects from `paymentRequirements`
 
 At minimum you need:
 
-- `scheme` and `network` (scheme must include `4mica`, e.g. `4mica-credit`)
+- `scheme` (must be exactly `4mica-credit`) and `network`
 - `payTo` (recipient address), `asset`, and `maxAmountRequired` (v1) or `amount` (v2)
-- `extra.tabEndpoint` for tab resolution
-
-`X402Flow` will refresh the tab by calling `extra.tabEndpoint` before signing.
+- optionally `extra.validation` (`{ validator, subject, deadline?, params? }`) to gate the payment
+  on an external validator
 
 #### X402 Version 1
 
@@ -243,27 +266,20 @@ Version 1 returns payment requirements in the JSON response body:
 
 ```ts
 import { Client, ConfigBuilder, X402Flow } from '@4mica/sdk';
-import type { PaymentRequirementsV1 } from '@4mica/sdk';
-
-type ResourceResponse = {
-  x402Version: number;
-  accepts: PaymentRequirementsV1[];
-  error?: string;
-};
 
 const cfg = new ConfigBuilder().walletPrivateKey('0x...').build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 const flow = X402Flow.fromClient(client);
 
-// 1) GET the protected endpoint and parse JSON body
+// 1) GET the protected endpoint and parse the JSON body
 const res = await fetch('https://resource-url/resource');
-const body = (await res.json()) as ResourceResponse;
+const body = await res.json();
 
-// 2) Select a payment option
+// 2) Select a payment option (raw objects are parsed and validated)
 const requirements = body.accepts[0];
 
 // 3) Build the X-PAYMENT header with the SDK
-const payment = await flow.signPayment(requirements, '0xUser');
+const payment = await flow.signPayment(requirements, client.signerAddress);
 
 // 4) Call the protected resource with the header
 await fetch('https://resource-url/resource', {
@@ -278,27 +294,26 @@ await client.aclose();
 Version 2 uses the `payment-required` header (base64-encoded) instead of a JSON response body:
 
 ```ts
-import { Client, ConfigBuilder, X402Flow } from '@4mica/sdk';
-import type { X402PaymentRequired, PaymentRequirementsV2 } from '@4mica/sdk';
+import { Client, ConfigBuilder, X402Flow, X402PaymentRequired } from '@4mica/sdk';
 
 const cfg = new ConfigBuilder().walletPrivateKey('0x...').build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 const flow = X402Flow.fromClient(client);
 
-// 1) GET the protected endpoint and extract payment-required header
+// 1) GET the protected endpoint and extract the payment-required header
 const res = await fetch('https://resource-url/resource');
 const header = res.headers.get('payment-required');
 if (!header) throw new Error('Missing payment-required header');
 
-// 2) Decode the header
+// 2) Decode and parse the challenge
 const decoded = Buffer.from(header, 'base64').toString('utf8');
-const paymentRequired = JSON.parse(decoded) as X402PaymentRequired;
+const paymentRequired = X402PaymentRequired.fromRaw(JSON.parse(decoded));
 
 // 3) Select a payment option
-const accepted = paymentRequired.accepts[0] as PaymentRequirementsV2;
+const accepted = paymentRequired.accepts[0];
 
 // 4) Build the PAYMENT-SIGNATURE header with the SDK
-const signed = await flow.signPaymentV2(paymentRequired, accepted, '0xUser');
+const signed = await flow.signPaymentV2(paymentRequired, accepted, client.signerAddress);
 
 // 5) Call the protected resource with the header
 await fetch('https://resource-url/resource', {
@@ -308,154 +323,119 @@ await fetch('https://resource-url/resource', {
 await client.aclose();
 ```
 
-#### Resource server / facilitator side
+#### Settling through a facilitator
 
-If your resource server proxies to the facilitator, you can reuse the SDK to settle after
-verifying:
+`settlePayment` POSTs `{ x402Version, paymentPayload, paymentRequirements }` to the facilitator's
+`/settle` — `paymentPayload` is the envelope object (`payment.envelope`), not the base64 header.
+Rejections come back as **HTTP 200 with `success: false`**, so check the receipt:
 
 ```ts
-import { Client, ConfigBuilder, X402Flow } from '@4mica/sdk';
-import type { PaymentRequirementsV1, X402SignedPayment } from '@4mica/sdk';
-
-async function settle(
-  facilitatorUrl: string,
-  paymentRequirements: PaymentRequirementsV1,
-  payment: X402SignedPayment
-) {
-  const core = await Client.new(
-    new ConfigBuilder().walletPrivateKey(process.env.RESOURCE_SIGNER_KEY!).build()
-  );
-  const flow = X402Flow.fromClient(core);
-
-  const settled = await flow.settlePayment(payment, paymentRequirements, facilitatorUrl);
-  console.log('settlement result:', settled.settlement);
-
-  await core.aclose();
+const settled = await flow.settlePayment(payment, requirements, facilitatorUrl);
+if (!settled.settlement.success) {
+  console.error('settlement rejected:', settled.settlement.error);
+} else {
+  console.log('tx:', settled.settlement.txHash, 'cert:', settled.settlement.certificate);
 }
 ```
 
 Notes:
 
-- `signPayment` and `signPaymentV2` always use EIP-712 signing and will error if the scheme is not 4mica.
-- `UserClient.signPayment` supports `SigningScheme.EIP712` (default) and `SigningScheme.EIP191`.
-- `settlePayment` only hits `/settle`; resource servers should still call `/verify` first when enforcing access.
-- `RecipientClient.claimNetCredit` requires the optional `@noble/curves` dependency for BLS decoding.
+- `signPayment` and `signPaymentV2` always use EIP-712 signing and error unless the scheme is
+  exactly `4mica-credit`.
+- `client.payment.signRequest` supports `SigningScheme.EIP712` (default) and `SigningScheme.EIP191`.
+- `settlePayment` only hits `/settle`; resource servers should still call `/verify` first when
+  enforcing access.
+- `client.payment.verifyGuarantee` BLS-verifies the certificate against the operator key from
+  `/core/public-params` (requires the optional `@noble/curves` dependency).
 
 ### API Methods Summary
 
 Settlement is **cycle-based**: core nets each participant's obligations for a clearing cycle into a
 single net-debit or net-credit committed to an on-chain Merkle root. Participants settle by fetching
 their prepared clearing action (contract address, amount, and Merkle proof) from core, then calling
-the `ClearingHouse`. `cycleId` is the on-chain `bytes32` cycle identifier.
+the `ClearingHouse`. `cycleId` is the on-chain `bytes32` cycle identifier (the text form works too).
 
-#### UserClient Methods (payer / net-debtor)
+#### `client.deposit`
 
-- `approveErc20(token, amount)`
-- `deposit(amount, erc20Token?)`
-- `getUser()`
-- `signPayment(claims, scheme?)`
-- `getClearingPayNetDebitAction(cycleId)` — fetch the prepared `payNetDebit` action
-- `payNetDebit(cycleId)` — settle the signer's committed net debit on-chain
-- `markDefaulted(cycleId, debtor)` — mark a debtor defaulted past the finality deadline
-- `requestWithdrawal(amount, erc20Token?)`
-- `cancelWithdrawal(erc20Token?)`
-- `finalizeWithdrawal(erc20Token?)`
+- `of(asset, amount)` — start a deposit (`null` asset = native ETH)
+  - `.send()` — deposit with the signer's own transaction
+  - `.selfFunded().approve()` — grant the ERC-20 allowance a self-funded deposit pulls
 
-ERC20 approval behavior:
+#### `client.withdraw`
 
-- `deposit(amount, erc20Token)` requires a prior `approveErc20(token, amount)` call.
-- `approveErc20` returns `undefined` when the existing allowance is already sufficient.
+- `request(asset, amount).send()` — start the withdrawal (grace period runs from here)
+- `cancel(asset).send()` / `finalize(asset).send()`
 
-#### RecipientClient Methods (payee / net-creditor)
+#### `client.payment`
 
-- `issuePaymentGuarantee(claims, signature, scheme)` — accepts V1 or V2 claims
-- `verifyPaymentGuarantee(cert)`
-- `getClearingParticipantProof(cycleId)` — this recipient's committed position + Merkle proof
-- `getClearingClaimNetCreditAction(cycleId)` — fetch the prepared `claimNetCredit` action
-- `claimNetCredit(cycleId)` — claim the committed net credit on-chain (requires `@noble/curves`)
-- `listRecipientPayments()`
-- `getUserAssetBalance(userAddress, assetAddress)`
+- `signRequest(claims, scheme?)` — sign a guarantee request as the payer
+- `issueGuarantee(claims, signature)` — redeem a payer's signature for a BLS certificate (recipient)
+- `verifyGuarantee(cert)` — BLS-verify + decode + domain-check a certificate
+- `listReceived()` — payments guaranteed to the signer as a recipient
+- `guaranteeDomain` / `guaranteeDomains` — the domain separator(s) certs are issued under
 
-#### Admin / RPC Methods
+#### `client.settlement`
 
-Available under `client.rpc` (requires an admin API key):
+- `pay(cycleId)` — the debtor side: `.action()`, `.selfFunded().approve()`, `.send()`
+- `claim(cycleId)` — the creditor side: `.creditor(addr)`, `.action()`, `.send()`
+  (claims take no signature: the payout goes to the address the committed leaf names)
 
-- `updateUserSuspension(userAddress, suspended)`
-- `createAdminApiKey({ name, scopes })`
-- `listAdminApiKeys()`
-- `revokeAdminApiKey(keyId)`
+#### `client.account`
 
-### V2 Payment Guarantees (on-chain validation policy)
+- `assets()` — the signer's position in every asset
+- `principalBalance(asset?)` / `withdrawableBalance(asset?)` / `stablecoinPosition(token)`
+- `assetBalance(asset?)` — the balance guarantees are accounted against (may lag the chain)
 
-V2 guarantees attach an on-chain validation policy that lets a validator agent attest to the
-quality/validity of a payment before it is remunerated. Use `PaymentGuaranteeRequestClaimsV2`
-and the canonical hash helpers:
+#### `client.tokens`
+
+- `supported()` — depositable assets and their metadata
+- `approve(token, amount)` — ERC-20 allowance for the Core4Mica contract
+
+### Validated guarantees
+
+A payer can agree that a guarantee only becomes payable once an external validator approves it, by
+attaching a `ValidationRequirement` to the claims (or letting `X402Flow` read it from
+`extra.validation`):
 
 ```ts
-import {
-  PaymentGuaranteeRequestClaimsV2,
-  computeValidationSubjectHash,
-  computeValidationRequestHash,
-  SigningScheme,
-} from '@4mica/sdk';
+import { PaymentGuaranteeRequestClaims, ValidationRequirement } from '@4mica/sdk';
 
-// 1) Build base V1 claims first
-const baseClaims = PaymentGuaranteeRequestClaims.new(
-  userAddress,
-  recipientAddress,
-  amount,
-  timestamp,
-  erc20Token,
-  reqId
+const claims = PaymentGuaranteeRequestClaims.new(
+  user, recipient, reqId, amount, timestamp, asset,
+).withValidation(
+  new ValidationRequirement({
+    validator: 'validator-id',        // must be on core's allowlist
+    subject: '0x…32-byte hash…',      // what the validator must approve
+    deadline: 1700000600,             // optional; core tightens it to the cycle cutoff
+    params: '0x…',                    // optional validator-specific policy bytes
+  }),
 );
-
-// 2) Compute canonical hashes
-const validationSubjectHash = computeValidationSubjectHash(baseClaims);
-
-const partialV2 = new PaymentGuaranteeRequestClaimsV2({
-  ...baseClaims,
-  validationRegistryAddress: '0x...',
-  validationRequestHash: '0x' + '00'.repeat(32), // placeholder
-  validationChainId: 1,
-  validatorAddress: '0x...',
-  validatorAgentId: 1n,
-  minValidationScore: 80, // 1–100
-  validationSubjectHash,
-  requiredValidationTag: 'my-tag',
-});
-
-const validationRequestHash = computeValidationRequestHash(partialV2);
-const claimsV2 = new PaymentGuaranteeRequestClaimsV2({ ...partialV2, validationRequestHash });
-
-// 3) Sign and issue
-const { signature, scheme } = await client.user.signPayment(claimsV2, SigningScheme.EIP712);
-const cert = await client.recipient.issuePaymentGuarantee(claimsV2, signature, scheme);
+const signature = await client.payment.signRequest(claims);
 ```
 
 ## Error Handling
 
-All SDK errors extend `FourMicaError`. Import individual error classes to distinguish them:
+All SDK errors extend `FourMicaError`, in per-area families mirroring the Rust SDK:
 
 ```ts
 import {
-  ConfigError, // invalid ConfigBuilder input
-  RpcError, // 4Mica core service error (has .status and .body)
-  SigningError, // signing scheme unsupported or address mismatch
-  ContractError, // on-chain call failed or unexpected result
-  VerificationError, // BLS certificate decode/domain mismatch
-  X402Error, // x402 flow error (bad scheme, tab resolution, settlement)
-  AuthError, // base class for all auth errors
-  AuthMissingConfigError, // auth not configured when login() is called
+  ConfigError,                 // invalid ConfigBuilder input
+  RpcError,                    // 4Mica core service error (has .status and .body)
+  ClientError,                 //   ├ ClientInitializationError, ChainRpcUnavailableError, …
+  PaymentError,                //   ├ SigningError, AddressMismatchError,
+                               //   │ CertificateMismatchError, GuaranteeDomainMismatchError, …
+  ContractError,               //   ├ typed on-chain reverts: AmountZeroError,
+                               //   │ InsufficientAvailableError, …, UnknownRevertError
+  Erc20AllowanceRequiredError, // a self-funded token pull needs an allowance first
+  X402Error,                   // x402 flow error (bad scheme, settlement transport)
+  AuthError,                   // base class for all auth errors
 } from '@4mica/sdk';
 
 try {
-  await client.recipient.remunerate(cert);
+  await client.settlement.pay(cycleId).send();
 } catch (err) {
-  if (err instanceof VerificationError) {
-    /* bad cert */
-  }
-  if (err instanceof ContractError) {
-    /* on-chain failure */
+  if (err instanceof Erc20AllowanceRequiredError) {
+    await client.settlement.pay(cycleId).selfFunded().approve();
   }
 }
 ```
