@@ -32,6 +32,12 @@ export const updateNotifications = (data: Partial<User>) =>
     data,
   });
 
+export const sendEmailVerification = () =>
+  httpClient.request<{ sent: boolean }>({
+    url: "/me/email/verification",
+    method: HttpMethod.POST,
+  });
+
 export type UsernameUnavailability = UsernameUnavailableReason | "taken";
 export interface UsernameAvailability {
   username: string;

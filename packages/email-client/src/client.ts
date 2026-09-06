@@ -3,6 +3,7 @@ import axios, { isAxiosError } from "axios";
 import { EmailClientError, type EmailValidationIssue } from "./errors";
 import type {
   AccountDeletedPayload,
+  AccountVerificationPayload,
   ActionRequiredPayload,
   AgentCreatedPayload,
   AnnouncementPayload,
@@ -171,6 +172,10 @@ export class EmailClient {
 
   sendActionRequired(payload: ActionRequiredPayload) {
     return this.send("action-required", payload);
+  }
+
+  sendAccountVerification(payload: AccountVerificationPayload) {
+    return this.send("account-verification", payload);
   }
 
   sendWaitlistConfirmation(payload: WaitlistConfirmationPayload) {

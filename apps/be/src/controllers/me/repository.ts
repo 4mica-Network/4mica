@@ -98,13 +98,31 @@ export const getBusiness = async (userId: string) =>
     select: BUSINESS_SELECT,
   });
 
+const clearsEmailVerification = async (
+  userId: string,
+  data: UpdateProfileInput | UpdateAccountInput | UpdateNotificationsInput,
+): Promise<boolean> => {
+  if (!("email" in data) || typeof data.email !== "string") {
+    return false;
+  }
+
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+
+  return current?.email !== data.email;
+};
+
 export const updateUser = async (
   userId: string,
   data: UpdateProfileInput | UpdateAccountInput | UpdateNotificationsInput,
 ) =>
   prisma.user.update({
     where: { id: userId },
-    data,
+    data: (await clearsEmailVerification(userId, data))
+      ? { ...data, emailVerified: false }
+      : data,
     select: USER_SELECT,
   });
 

@@ -1,12 +1,15 @@
+import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { updateProfile } from "@stores/user/actions";
+import { sendEmailVerification, updateProfile } from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
-import { useMemo } from "react";
+import { notifyError, notifySuccess } from "@utils/notification";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { EditableCard } from "@/components/EditableCard";
 import {
   Card,
@@ -20,11 +23,38 @@ import {
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 
+function useVerificationOutcome() {
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const outcome = params.get("verify");
+
+  useEffect(() => {
+    if (!outcome) {
+      return;
+    }
+
+    const notifier = outcome === "success" ? notifySuccess : notifyError;
+
+    notifier({
+      title: t(`page.settings.profile.verify.${outcome}.title`, {
+        defaultValue: "Verification",
+      }),
+      content: t(`page.settings.profile.verify.${outcome}.body`, {
+        defaultValue: "",
+      }),
+    });
+
+    setParams({}, { replace: true });
+  }, [outcome, setParams, t]);
+}
+
 export function ProfileSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
   const issues = useAppSelector(selectValidationIssues);
+
+  useVerificationOutcome();
 
   const savingIdentity = useAppSelector(selectIsSectionSaving("identity"));
   const savingColors = useAppSelector(selectIsSectionSaving("colors"));
@@ -42,6 +72,9 @@ export function ProfileSettings() {
   );
   const savingDisableBranding = useAppSelector(
     selectIsSectionSaving("disableBranding"),
+  );
+  const sendingVerification = useAppSelector(
+    selectIsSectionSaving("emailVerification"),
   );
 
   const identityInitial = useMemo(
@@ -103,13 +136,33 @@ export function ProfileSettings() {
               {t("settings.profile.accountStatusHint")}
             </p>
           </div>
-          <VerifiedBadge
-            verified={user.verified}
-            labels={{
-              yes: t("settings.verified"),
-              no: t("settings.unverified"),
-            }}
-          />
+          {user.emailVerified ? (
+            <VerifiedBadge
+              verified={user.emailVerified}
+              labels={{
+                yes: t("settings.verified"),
+                no: t("settings.unverified"),
+              }}
+            />
+          ) : (
+            <Button
+              type="button"
+              intent="invert"
+              size="sm"
+              className="btn-no-lift w-32 shrink-0"
+              disabled={sendingVerification}
+              aria-label={t("settings.profile.verifyEmail")}
+              onClick={() => dispatch(sendEmailVerification())}
+            >
+              <span className="flex w-full items-center justify-center text-sm">
+                {sendingVerification ? (
+                  <Spinner size="sm" />
+                ) : (
+                  t("settings.profile.verifyEmail")
+                )}
+              </span>
+            </Button>
+          )}
         </Card>
 
         <EditableCard

@@ -218,6 +218,12 @@ export const bannerResponseSchema = {
   },
 } as const;
 
+export const verificationSentResponseSchema = {
+  type: "object",
+  required: ["sent"],
+  properties: { sent: bool },
+} as const;
+
 export const errorResponseSchema = {
   type: "object",
   required: ["error", "message"],

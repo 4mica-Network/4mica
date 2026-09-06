@@ -1,6 +1,7 @@
 import type * as v from "valibot";
 import {
   AccountDeletedSchema,
+  AccountVerificationSchema,
   ActionRequiredSchema,
   AgentCreatedSchema,
   AnnouncementSchema,
@@ -27,6 +28,7 @@ import {
 export const templateSchemas = {
   welcome: WelcomeSchema,
   "action-required": ActionRequiredSchema,
+  "account-verification": AccountVerificationSchema,
   "waitlist-confirmation": WaitlistConfirmationSchema,
   "waitlist-invitation": WaitlistInvitationSchema,
   "workspace-invite": WorkspaceInviteSchema,

@@ -2,6 +2,7 @@ import type { TemplateId, TemplateProps } from "@4mica/email-client";
 import { brand, formatMoney } from "@components/index";
 import Announcement from "@emails/marketing/Announcement";
 import WeeklyReport from "@emails/marketing/WeeklyReport";
+import AccountVerification from "@emails/onboarding/AccountVerification";
 import ActionRequired from "@emails/onboarding/ActionRequired";
 import Welcome from "@emails/onboarding/Welcome";
 import AccountDeleted from "@emails/platform/AccountDeleted";
@@ -40,6 +41,12 @@ export const registry = {
     summary: "Ask the user to complete a required step",
     subject: ({ actionText }) => `Action required: ${actionText}`,
     component: ActionRequired,
+  }),
+
+  "account-verification": define<"account-verification">({
+    summary: "Ask a user to confirm their email address",
+    subject: () => `Verify your email for ${brand.name}`,
+    component: AccountVerification,
   }),
 
   "waitlist-confirmation": define<"waitlist-confirmation">({

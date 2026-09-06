@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 const API_KEY_PREFIX = "4mica_sk";
 const WEBHOOK_SECRET_PREFIX = "whsec";
+const EMAIL_VERIFICATION_PREFIX = "4mica_ev";
 
 export interface GeneratedSecret {
   /** Returned to the caller once and never stored. */
@@ -42,3 +43,6 @@ export const generateApiKey = (): GeneratedSecret => generate(API_KEY_PREFIX);
 
 export const generateWebhookSecret = (): GeneratedSecret =>
   generate(WEBHOOK_SECRET_PREFIX);
+
+export const generateEmailVerificationToken = (): GeneratedSecret =>
+  generate(EMAIL_VERIFICATION_PREFIX);
