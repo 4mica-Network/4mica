@@ -220,6 +220,39 @@ describe("account routes", () => {
     await app.close();
   });
 
+  it("PATCH /me/account un-verifies a changed email address", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { email: "ada@newdomain.com" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data).toEqual({
+      email: "ada@newdomain.com",
+      emailVerified: false,
+    });
+
+    await app.close();
+  });
+
+  it("PATCH /me/account leaves the flag alone when the email is unchanged", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { email: FULL_USER.email, timeZone: "Europe/London" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data).not.toHaveProperty("emailVerified");
+
+    await app.close();
+  });
+
   it("PATCH /me/profile maps a unique violation to 409", async () => {
     update.mockRejectedValue(
       Object.assign(new Error("unique"), {

@@ -113,6 +113,7 @@ export const initApp = async (
         tags: [
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
+          { name: "verification", description: "Email verification" },
           { name: "developer", description: "API keys and webhooks" },
           {
             name: "banners",
@@ -161,6 +162,15 @@ export const runServer = async (): Promise<FastifyInstance> => {
       ? `Email service configured at ${config.emailServiceUrl}`
       : "Email service not configured (EMAIL_SERVICE_URL unset); sending disabled",
   );
+
+  if (
+    !config.isProd &&
+    !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(config.appUrl)
+  ) {
+    appLogger.warn(
+      `APP_URL resolves to ${config.appUrl}; verification links will redirect there, not to a local dashboard`,
+    );
+  }
 
   if (config.isDev) {
     appLogger.info(`Swagger UI: http://localhost:${config.env.PORT}/docs`);

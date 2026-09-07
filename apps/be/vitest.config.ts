@@ -25,6 +25,8 @@ export default defineConfig({
       LOG_LEVEL: "error",
       CLERK_PUBLISHABLE_KEY: "pk_test_dGVzdC5jbGVyay5hY2NvdW50cy5kZXYk",
       CLERK_SECRET_KEY: "sk_test_000000000000000000000000000000000000000000",
+      PUBLIC_API_URL: "http://api.test",
+      APP_URL: "http://app.test",
     },
     server: {
       deps: {

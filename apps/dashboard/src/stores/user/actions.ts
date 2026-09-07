@@ -86,6 +86,25 @@ export const updateBusinessFailed = (
   meta,
 });
 
+export const sendEmailVerification = (section = "emailVerification") => ({
+  type: actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED,
+  meta: { section },
+});
+
+export const sendEmailVerificationSucceeded = (meta: UpdateMeta) => ({
+  type: actionTypes.SEND_EMAIL_VERIFICATION_SUCCEEDED,
+  meta,
+});
+
+export const sendEmailVerificationFailed = (
+  message: string,
+  meta: UpdateMeta,
+) => ({
+  type: actionTypes.SEND_EMAIL_VERIFICATION_FAILED,
+  payload: { message },
+  meta,
+});
+
 export const checkUsername = (username: string) => ({
   type: actionTypes.CHECK_USERNAME_REQUESTED,
   payload: username,

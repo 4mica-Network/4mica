@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { LinkConfig } from "@4mica/url";
 import * as v from "valibot";
 
 const LOG_LEVELS = ["error", "warn", "info", "http", "debug"] as const;
@@ -43,6 +44,13 @@ const EnvSchema = v.object({
       v.startsWith("http", "EMAIL_SERVICE_URL must be an http(s) URL"),
     ),
   ]),
+  PUBLIC_API_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith("http", "PUBLIC_API_URL must be an http(s) URL"),
+    ),
+  ]),
   SHUTDOWN_DRAIN_MS: numeric("SHUTDOWN_DRAIN_MS", 0, 60_000),
   SHUTDOWN_TIMEOUT_MS: numeric("SHUTDOWN_TIMEOUT_MS", 1_000, 120_000),
   RATE_LIMIT_ENABLED: v.picklist(
@@ -71,6 +79,7 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     CLERK_JWT_KEY: source.CLERK_JWT_KEY ?? "",
     CLERK_AUTHORIZED_PARTIES: source.CLERK_AUTHORIZED_PARTIES ?? "",
     EMAIL_SERVICE_URL: source.EMAIL_SERVICE_URL ?? "",
+    PUBLIC_API_URL: source.PUBLIC_API_URL ?? "",
     SHUTDOWN_DRAIN_MS: source.SHUTDOWN_DRAIN_MS ?? "5000",
     SHUTDOWN_TIMEOUT_MS: source.SHUTDOWN_TIMEOUT_MS ?? "20000",
     RATE_LIMIT_ENABLED:
@@ -119,6 +128,8 @@ export const config = {
     .filter(Boolean),
   /** `undefined` when unset — see src/services/email.ts. */
   emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
+  publicApiUrl: env.PUBLIC_API_URL || `http://localhost:${env.PORT}`,
+  appUrl: new LinkConfig(process.env).appBase,
   shutdown: {
     drainMs: env.SHUTDOWN_DRAIN_MS,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,

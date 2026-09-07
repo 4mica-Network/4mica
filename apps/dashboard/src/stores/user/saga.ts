@@ -2,6 +2,7 @@ import { HttpError } from "@4mica/http";
 import {
   checkUsernameAvailability,
   getMe,
+  sendEmailVerification as sendEmailVerificationRequest,
   type UsernameAvailability,
   updateAccount as updateAccountRequest,
   updateNotifications as updateNotificationsRequest,
@@ -9,7 +10,7 @@ import {
   upsertBusiness as upsertBusinessRequest,
 } from "@api/user";
 import i18n from "@i18n";
-import { notifyError } from "@utils/notification";
+import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import {
   checkUsernameFailed,
@@ -17,6 +18,8 @@ import {
   fetchUserFailed,
   fetchUserPending,
   fetchUserSucceeded,
+  sendEmailVerificationFailed,
+  sendEmailVerificationSucceeded,
   type UpdateMeta,
   updateBusinessFailed,
   updateBusinessSucceeded,
@@ -142,6 +145,44 @@ export function* updateBusiness(action: {
   }
 }
 
+export function* sendEmailVerification(action: {
+  type: string;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    yield call(sendEmailVerificationRequest);
+    yield put(sendEmailVerificationSucceeded(action.meta));
+
+    notifySuccess({
+      title: i18n.t("store.user.verificationSentTitle", {
+        defaultValue: "Check your inbox",
+      }),
+      content: i18n.t("store.user.verificationSentBody", {
+        defaultValue:
+          "We sent you a link. Open it and your account is verified.",
+      }),
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  } catch (error) {
+    const message = toMessage(
+      error,
+      i18n.t("store.user.verificationFailedBody", {
+        defaultValue: "We couldn't send the verification email.",
+      }),
+    );
+
+    yield put(sendEmailVerificationFailed(message, action.meta));
+
+    notifyError({
+      title: i18n.t("store.user.verificationFailedTitle", {
+        defaultValue: "Couldn't send the email",
+      }),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
 export function* checkUsername(action: {
   type: string;
   payload: string;
@@ -218,6 +259,10 @@ export default [
   takeEvery(actionTypes.FETCH_USER_REQUESTED, fetchUser),
   takeLatest(actionTypes.CHECK_USERNAME_REQUESTED, checkUsername),
   takeLatest(actionTypes.COMPLETE_ONBOARDING_REQUESTED, completeOnboarding),
+  takeLatest(
+    actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED,
+    sendEmailVerification,
+  ),
   takeEvery(actionTypes.UPDATE_PROFILE_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_ACCOUNT_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_NOTIFICATIONS_REQUESTED, updateUser),

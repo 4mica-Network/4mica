@@ -8,6 +8,8 @@ export { EmailClientError, type EmailValidationIssue } from "./errors";
 export {
   type AccountDeletedPayload,
   AccountDeletedSchema,
+  type AccountVerificationPayload,
+  AccountVerificationSchema,
   type ActionRequiredPayload,
   ActionRequiredSchema,
   type AgentCreatedPayload,

@@ -50,6 +50,15 @@ export const ActionRequiredSchema = v.object({
   reason: v.optional(v.string()),
 });
 
+export const AccountVerificationSchema = v.object({
+  ...base,
+  verifyUrl: absoluteUrl,
+  expiresInHours: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(168)),
+    24,
+  ),
+});
+
 // --- Waitlist & access ------------------------------------------------------
 
 export const WaitlistConfirmationSchema = v.object({
@@ -196,6 +205,9 @@ export const AnnouncementSchema = v.object({
 
 export type WelcomePayload = v.InferInput<typeof WelcomeSchema>;
 export type ActionRequiredPayload = v.InferInput<typeof ActionRequiredSchema>;
+export type AccountVerificationPayload = v.InferInput<
+  typeof AccountVerificationSchema
+>;
 export type WaitlistConfirmationPayload = v.InferInput<
   typeof WaitlistConfirmationSchema
 >;

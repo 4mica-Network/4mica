@@ -1,13 +1,17 @@
 import { runSaga } from "redux-saga";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { upsertBusiness, updateAccount, checkUsernameAvailability } = vi.hoisted(
-  () => ({
-    upsertBusiness: vi.fn(),
-    updateAccount: vi.fn(),
-    checkUsernameAvailability: vi.fn(),
-  }),
-);
+const {
+  upsertBusiness,
+  updateAccount,
+  checkUsernameAvailability,
+  sendEmailVerificationRequest,
+} = vi.hoisted(() => ({
+  upsertBusiness: vi.fn(),
+  updateAccount: vi.fn(),
+  checkUsernameAvailability: vi.fn(),
+  sendEmailVerificationRequest: vi.fn(),
+}));
 
 vi.mock("@api/user", () => ({
   getMe: vi.fn(),
@@ -16,12 +20,17 @@ vi.mock("@api/user", () => ({
   updateAccount,
   upsertBusiness,
   checkUsernameAvailability,
+  sendEmailVerification: sendEmailVerificationRequest,
 }));
 
-const { notifyError } = vi.hoisted(() => ({ notifyError: vi.fn() }));
-vi.mock("@utils/notification", () => ({ notifyError }));
+const { notifyError, notifySuccess } = vi.hoisted(() => ({
+  notifyError: vi.fn(),
+  notifySuccess: vi.fn(),
+}));
+vi.mock("@utils/notification", () => ({ notifyError, notifySuccess }));
 
-const { checkUsername, completeOnboarding } = await import("./saga");
+const { checkUsername, completeOnboarding, sendEmailVerification } =
+  await import("./saga");
 const actionTypes = (await import("./actionTypes")).default;
 
 interface Dispatched {
@@ -141,5 +150,42 @@ describe("checkUsername saga", () => {
 
     expect(types(dispatched)).toEqual([actionTypes.CHECK_USERNAME_FAILED]);
     expect(notifyError).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendEmailVerification saga", () => {
+  beforeEach(() => {
+    sendEmailVerificationRequest.mockReset();
+    notifySuccess.mockReset();
+    notifyError.mockReset();
+  });
+
+  const action = {
+    type: actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED,
+    meta: { section: "emailVerification" },
+  };
+
+  it("tells the user to check their inbox", async () => {
+    sendEmailVerificationRequest.mockResolvedValue({ sent: true });
+
+    const dispatched = await record(sendEmailVerification, action);
+
+    expect(types(dispatched)).toEqual([
+      actionTypes.SEND_EMAIL_VERIFICATION_SUCCEEDED,
+    ]);
+    expect(notifySuccess).toHaveBeenCalledTimes(1);
+    expect(notifyError).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the server's reason when the send is refused", async () => {
+    sendEmailVerificationRequest.mockRejectedValue(new Error("boom"));
+
+    const dispatched = await record(sendEmailVerification, action);
+
+    expect(types(dispatched)).toEqual([
+      actionTypes.SEND_EMAIL_VERIFICATION_FAILED,
+    ]);
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(notifySuccess).not.toHaveBeenCalled();
   });
 });

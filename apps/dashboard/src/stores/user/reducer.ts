@@ -193,6 +193,41 @@ export default function userReducer(
       };
     }
 
+    case actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED:
+      return {
+        ...state,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          true,
+        ),
+        error: null,
+      };
+
+    case actionTypes.SEND_EMAIL_VERIFICATION_SUCCEEDED:
+      return {
+        ...state,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
+        error: null,
+      };
+
+    case actionTypes.SEND_EMAIL_VERIFICATION_FAILED:
+      return {
+        ...state,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
+        error:
+          (action.payload as { message?: string })?.message ??
+          "We couldn't send the verification email.",
+      };
+
     case actionTypes.CHECK_USERNAME_REQUESTED:
       return {
         ...state,

@@ -3,6 +3,7 @@ import { bannerRoutes } from "./banners";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
+import { verificationRoutes } from "./verification";
 
 export interface RouteRegistration {
   plugin: FastifyPluginCallback;
@@ -12,8 +13,15 @@ export interface RouteRegistration {
 export const routes: RouteRegistration[] = [
   { plugin: healthRoutes },
   { plugin: meRoutes },
+  { plugin: verificationRoutes },
   { plugin: developerRoutes },
   { plugin: bannerRoutes },
 ];
 
-export { bannerRoutes, developerRoutes, healthRoutes, meRoutes };
+export {
+  bannerRoutes,
+  developerRoutes,
+  healthRoutes,
+  meRoutes,
+  verificationRoutes,
+};
