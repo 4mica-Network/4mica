@@ -1,3 +1,4 @@
+import { RpcProxy, resolveNetworkRpcUrl, type SupportedTokensResponse } from '@4mica/sdk'
 import { SDK_DEFAULT_ASSET_TRANSFER_METHOD } from '@x402/core/server'
 import type {
   AssetAmount,
@@ -11,8 +12,32 @@ import type {
 
 export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532', 'eip155:8453']
 
+/** The token a `Money` price resolves to, as core lists it for the network. */
+export interface DefaultAsset {
+  address: string
+  decimals: number
+}
+
+export interface FourMicaEvmSchemeOptions {
+  /**
+   * Core API URL per network. Defaults to the hosted deployments in `@4mica/sdk`'s
+   * `NETWORKS`; set an entry to point a network at a self-hosted core.
+   */
+  coreUrls?: Partial<Record<Network, string>>
+  /**
+   * Symbol of the token a `Money` price (`"$0.10"`) is denominated in, matched
+   * case-insensitively against core's token list. Defaults to `USDC`.
+   */
+  stablecoinSymbol?: string
+}
+
 /**
  * EVM server implementation for the 4mica payment scheme.
+ *
+ * A `Money` price resolves to the stablecoin core lists for the network
+ * (`GET /core/tokens`), so the advertised `asset` is always one core accepts a
+ * guarantee against. The list is fetched once per network and cached for the
+ * life of the instance.
  */
 export class FourMicaEvmScheme implements SchemeNetworkServer {
   readonly scheme = '4mica-credit'
@@ -27,6 +52,19 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     },
   }
   private moneyParsers: MoneyParser[] = []
+  private readonly coreUrls: Partial<Record<Network, string>>
+  private readonly stablecoinSymbol: string
+  private readonly defaultAssets = new Map<Network, Promise<DefaultAsset>>()
+
+  constructor(options: FourMicaEvmSchemeOptions = {}) {
+    this.coreUrls = options.coreUrls ?? {}
+    this.stablecoinSymbol = options.stablecoinSymbol ?? 'USDC'
+  }
+
+  /** Core's token list. Private static so tests can stub the network call. */
+  private static loadSupportedTokens(coreUrl: string): Promise<SupportedTokensResponse> {
+    return new RpcProxy(coreUrl).getSupportedTokens()
+  }
 
   /**
    * Register a custom money parser in the parser chain.
@@ -57,7 +95,7 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
    * Parses a price into an asset amount.
    * If price is already an AssetAmount, returns it directly.
    * If price is Money (string | number), parses to decimal and tries custom parsers.
-   * Falls back to default conversion if all custom parsers return null.
+   * Falls back to the stablecoin core lists for the network if all custom parsers return null.
    *
    * @param price - The price to parse
    * @param network - The network to use
@@ -146,23 +184,21 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
 
   /**
    * Default money conversion implementation.
-   * Converts decimal amount to the default stablecoin on the specified network.
+   * Converts a decimal amount to the stablecoin core lists for the network.
    *
    * @param amount - The decimal amount (e.g., 1.50)
    * @param network - The network to use
    * @returns The parsed asset amount in the default stablecoin
    */
-  private defaultMoneyConversion(amount: number, network: Network): AssetAmount {
-    const assetInfo = this.getDefaultAsset(network)
-    const tokenAmount = this.convertToTokenAmount(amount.toString(), assetInfo.decimals)
+  private async defaultMoneyConversion(amount: number, network: Network): Promise<AssetAmount> {
+    const asset = await this.getDefaultAsset(network)
 
     return {
-      amount: tokenAmount,
-      asset: assetInfo.address,
-      extra: {
-        name: assetInfo.name,
-        version: assetInfo.version,
-      },
+      amount: this.convertToTokenAmount(amount.toString(), asset.decimals),
+      asset: asset.address,
+      // No EIP-3009 domain hints: a 4mica-credit payer signs against core's
+      // guarantee domain (`GET /core/public-params`), never the token's.
+      extra: {},
     }
   }
 
@@ -186,52 +222,42 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   }
 
   /**
-   * Get the default asset info for a network (typically USDC)
-   *
-   * @param network - The network to get asset info for
-   * @returns The asset information including address, name, version, and decimals
+   * The stablecoin core lists for `network`, fetched once and cached. A failed
+   * lookup is not cached, so the next price parse retries.
    */
-  private getDefaultAsset(network: Network): {
-    address: string
-    name: string
-    version: string
-    decimals: number
-  } {
-    // Map of network to USDC info including EIP-712 domain parameters
-    // Each network has the right to determine its own default stablecoin that can be expressed as a USD string by calling servers
-    // NOTE: Currently only EIP-3009 supporting stablecoins can be used with this scheme
-    // Generic ERC20 support via EIP-2612/permit2 is planned, but not yet implemented.
-    const stablecoins: Record<
-      string,
-      { address: string; name: string; version: string; decimals: number }
-    > = {
-      'eip155:11155111': {
-        address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-        name: 'USDC',
-        version: '2',
-        decimals: 6,
-      }, // Ethereum Sepolia USDC
-      'eip155:84532': {
-        address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-        name: 'USDC',
-        version: '2',
-        decimals: 6,
-      }, // Base Sepolia USDC
-      'eip155:8453': {
-        address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        // Base mainnet USDC reports "USD Coin" from name(), unlike the testnet deployments.
-        // Clients build their EIP-712 domain from this, so it must match the token exactly.
-        name: 'USD Coin',
-        version: '2',
-        decimals: 6,
-      }, // Base mainnet USDC
+  private getDefaultAsset(network: Network): Promise<DefaultAsset> {
+    let pending = this.defaultAssets.get(network)
+    if (!pending) {
+      pending = this.resolveDefaultAsset(network).catch((err: unknown) => {
+        this.defaultAssets.delete(network)
+        throw err
+      })
+      this.defaultAssets.set(network, pending)
+    }
+    return pending
+  }
+
+  private async resolveDefaultAsset(network: Network): Promise<DefaultAsset> {
+    const coreUrl = this.coreUrls[network] ?? resolveNetworkRpcUrl(network)
+    if (!coreUrl) {
+      throw new Error(`No core API URL known for network ${network}; pass one in coreUrls`)
     }
 
-    const assetInfo = stablecoins[network]
-    if (!assetInfo) {
-      throw new Error(`No default asset configured for network ${network}`)
+    const { tokens } = await FourMicaEvmScheme.loadSupportedTokens(coreUrl)
+    const wanted = this.stablecoinSymbol.toLowerCase()
+    const token = tokens.find((entry) => entry.symbol.toLowerCase() === wanted)
+    if (!token) {
+      const listed = tokens.map((entry) => entry.symbol).join(', ') || 'none'
+      throw new Error(
+        `Core at ${coreUrl} lists no ${this.stablecoinSymbol} for network ${network} (listed: ${listed})`
+      )
+    }
+    if (token.decimals === undefined) {
+      throw new Error(
+        `Core at ${coreUrl} reports no decimals for ${token.symbol} on network ${network}`
+      )
     }
 
-    return assetInfo
+    return { address: token.address, decimals: token.decimals }
   }
 }

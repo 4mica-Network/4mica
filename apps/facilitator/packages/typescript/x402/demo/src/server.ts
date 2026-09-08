@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { FourMicaEvmScheme, FourMicaFacilitatorClient } from '@4mica/x402/server'
 import { paymentMiddlewareFromConfig } from '@4mica/x402/server/express'
 import express from 'express'
 
@@ -7,6 +8,13 @@ app.use(express.json())
 
 const PORT = process.env.PORT || 3000
 const PAY_TO_ADDRESS = process.env.PAY_TO_ADDRESS
+// Base Sepolia by default: the facilitator serves 4mica-credit there for x402 v1 and v2.
+const NETWORK = (process.env.NETWORK || 'eip155:84532') as `${string}:${string}`
+// Set CORE_URL to price against, and point payers at, a self-hosted core for NETWORK.
+const CORE_URL = process.env.CORE_URL
+// Facilitator that verifies and settles payments; the hosted one when unset.
+const FACILITATOR_URL = process.env.FACILITATOR_URL
+const PRICE = '$0.01'
 
 if (!PAY_TO_ADDRESS) {
   console.error('Error: PAY_TO_ADDRESS environment variable is required')
@@ -14,17 +22,31 @@ if (!PAY_TO_ADDRESS) {
 }
 
 app.use(
-  paymentMiddlewareFromConfig({
-    'GET /api/premium-data': {
-      accepts: {
-        scheme: '4mica-credit',
-        price: '$0.01',
-        network: 'eip155:11155111', // Ethereum Sepolia
-        payTo: PAY_TO_ADDRESS,
+  paymentMiddlewareFromConfig(
+    {
+      'GET /api/premium-data': {
+        accepts: {
+          scheme: '4mica-credit',
+          // Resolved to the stablecoin core lists for NETWORK.
+          price: PRICE,
+          network: NETWORK,
+          payTo: PAY_TO_ADDRESS,
+          // Tells payers where NETWORK's core lives when it is not the hosted one.
+          ...(CORE_URL ? { extra: { rpcUrl: CORE_URL } } : {}),
+        },
+        description: 'Access to premium data endpoint',
       },
-      description: 'Access to premium data endpoint',
     },
-  })
+    FACILITATOR_URL ? new FourMicaFacilitatorClient({ url: FACILITATOR_URL }) : undefined,
+    CORE_URL
+      ? [
+          {
+            network: NETWORK,
+            server: new FourMicaEvmScheme({ coreUrls: { [NETWORK]: CORE_URL } }),
+          },
+        ]
+      : undefined
+  )
 )
 
 app.get('/api/premium-data', (req, res) => {
@@ -41,12 +63,15 @@ app.get('/api/premium-data', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'x402 Demo Server',
+    network: NETWORK,
+    core: CORE_URL ?? 'hosted',
+    facilitator: FACILITATOR_URL ?? 'https://x402.4mica.xyz',
     endpoints: {
       free: ['/', '/health'],
       protected: [
         {
           path: '/api/premium-data',
-          price: '$0.01',
+          price: PRICE,
           description: 'Premium data endpoint (requires payment)',
         },
       ],
@@ -61,5 +86,5 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`x402 Demo Server running on http://localhost:${PORT}`)
   console.log(`Protected endpoint: http://localhost:${PORT}/api/premium-data`)
-  console.log(`Payment required: $0.01 (4mica credit on Sepolia)`)
+  console.log(`Payment required: ${PRICE} (4mica credit on ${NETWORK})`)
 })

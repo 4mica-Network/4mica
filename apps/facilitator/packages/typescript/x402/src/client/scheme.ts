@@ -1,7 +1,11 @@
 import {
   Client,
   ConfigBuilder,
+  RpcProxy,
+  resolveNetworkRpcUrl,
   PaymentRequirementsV2 as SdkPaymentRequirementsV2,
+  type SupportedTokenInfo,
+  type SupportedTokensResponse,
   X402Flow,
   X402PaymentRequired,
   X402ResourceInfo,
@@ -15,19 +19,36 @@ import type {
 import type { Account } from 'viem/accounts'
 import { SUPPORTED_NETWORKS } from '../server/scheme.js'
 
-const NETWORK_RPC_URLS: Record<Network, string> = {
-  'eip155:11155111': 'https://ethereum.sepolia.api.4mica.xyz',
-  'eip155:84532': 'https://base.sepolia.api.4mica.xyz',
-  'eip155:8453': 'https://base.api.4mica.xyz',
+export interface FourMicaEvmSchemeClientOptions {
+  /**
+   * Core API URL per network, overriding the hosted deployments in `@4mica/sdk`'s
+   * `NETWORKS`; set an entry to pay on a self-hosted core.
+   */
+  coreUrls?: Partial<Record<Network, string>>
+  /**
+   * Networks to connect to up front. Defaults to every hosted network plus the
+   * keys of `coreUrls`. Any other network connects lazily on its first payment.
+   */
+  networks?: Network[]
+}
+
+/** What `findDefaultAsset` reports for an asset core lists: `@x402/core`'s `DefaultAsset`. */
+export interface FourMicaDefaultAsset {
+  asset: string
+  decimals: number
+  symbol: string
 }
 
 export class FourMicaEvmScheme implements SchemeNetworkClient {
   readonly scheme = '4mica-credit'
+  // rpcUrl -> x402Flow
+  private readonly x402Flows = new Map<string, X402Flow>()
+  // rpcUrl -> the tokens that core accepts guarantees against
+  private readonly tokensByRpcUrl = new Map<string, SupportedTokenInfo[]>()
 
   private constructor(
     private readonly signer: Account,
-    // rpcUrl -> x402Flow
-    private readonly x402Flows: Map<string, X402Flow>
+    private readonly coreUrls: Partial<Record<Network, string>>
   ) {}
 
   private static async createX402Flow(signer: Account, rpcUrl: string): Promise<X402Flow> {
@@ -37,17 +58,37 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
     return X402Flow.fromClient(client)
   }
 
-  static async create(signer: Account): Promise<FourMicaEvmScheme> {
-    const x402Flows = new Map<string, X402Flow>()
+  /** Core's token list. Private static so tests can stub the network call. */
+  private static loadSupportedTokens(rpcUrl: string): Promise<SupportedTokensResponse> {
+    return new RpcProxy(rpcUrl).getSupportedTokens()
+  }
 
-    for (const network of SUPPORTED_NETWORKS) {
-      const rpcUrl = NETWORK_RPC_URLS[network]
-      if (!rpcUrl) continue
+  static async create(
+    signer: Account,
+    options: FourMicaEvmSchemeClientOptions = {}
+  ): Promise<FourMicaEvmScheme> {
+    const coreUrls = options.coreUrls ?? {}
+    const networks = options.networks ?? [
+      ...SUPPORTED_NETWORKS,
+      ...(Object.keys(coreUrls) as Network[]),
+    ]
+    const scheme = new FourMicaEvmScheme(signer, coreUrls)
 
-      x402Flows.set(rpcUrl, await FourMicaEvmScheme.createX402Flow(signer, rpcUrl))
+    for (const network of new Set(networks)) {
+      const rpcUrl = scheme.coreUrl(network)
+      if (rpcUrl) await scheme.flowFor(rpcUrl)
     }
 
-    return new FourMicaEvmScheme(signer, x402Flows)
+    return scheme
+  }
+
+  findDefaultAsset(asset: string, network: Network): FourMicaDefaultAsset | undefined {
+    const rpcUrl = this.coreUrl(network)
+    const tokens = rpcUrl ? this.tokensByRpcUrl.get(rpcUrl) : undefined
+    const token = tokens?.find((entry) => entry.address.toLowerCase() === asset.toLowerCase())
+    if (!token || token.decimals === undefined) return undefined
+
+    return { asset: token.address, decimals: token.decimals, symbol: token.symbol }
   }
 
   async createPaymentPayload(
@@ -59,16 +100,15 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
       throw new Error('Network is required in PaymentRequirements')
     }
 
-    const rpcUrl = (paymentRequirements.extra?.rpcUrl as string) ?? NETWORK_RPC_URLS[network]
+    // A resource server can point payers at a self-hosted core through
+    // `extra.rpcUrl`; then the payer's own overrides; then the hosted deployment.
+    const rpcUrl =
+      (paymentRequirements.extra?.rpcUrl as string | undefined) ?? this.coreUrl(network)
     if (!rpcUrl) {
-      throw new Error(`No RPC URL configured for network ${network}`)
+      throw new Error(`No core API URL known for network ${network}`)
     }
 
-    let x402Flow = this.x402Flows.get(rpcUrl)
-    if (!x402Flow) {
-      x402Flow = await FourMicaEvmScheme.createX402Flow(this.signer, rpcUrl)
-      this.x402Flows.set(rpcUrl, x402Flow)
-    }
+    const x402Flow = await this.flowFor(rpcUrl)
 
     if (x402Version === 1) {
       const signed = await x402Flow.signPayment(
@@ -110,5 +150,21 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
     }
 
     throw new Error(`Unsupported x402Version: ${x402Version}`)
+  }
+
+  private coreUrl(network: Network): string | undefined {
+    return this.coreUrls[network] ?? resolveNetworkRpcUrl(network)
+  }
+
+  /** The flow for a core, connected and its token list loaded on first use. */
+  private async flowFor(rpcUrl: string): Promise<X402Flow> {
+    let x402Flow = this.x402Flows.get(rpcUrl)
+    if (!x402Flow) {
+      x402Flow = await FourMicaEvmScheme.createX402Flow(this.signer, rpcUrl)
+      this.x402Flows.set(rpcUrl, x402Flow)
+      const { tokens } = await FourMicaEvmScheme.loadSupportedTokens(rpcUrl)
+      this.tokensByRpcUrl.set(rpcUrl, tokens)
+    }
+    return x402Flow
   }
 }

@@ -17,6 +17,8 @@ interface ResourceServerInternals {
   register: (network: Network, server: SchemeNetworkServer) => unknown
   hasExtension: (extension: string) => boolean
   registerExtension: (extension: unknown) => unknown
+  // network -> scheme -> server, as @x402/core keeps it.
+  registeredServerSchemes?: Map<string, Map<string, unknown>>
 }
 
 interface HTTPServerInternals {
@@ -28,10 +30,17 @@ function getHTTPServerInternals(httpServer: x402HTTPResourceServer): HTTPServerI
   return httpServer as unknown as HTTPServerInternals
 }
 
+/**
+ * Register the default 4mica scheme server for every hosted network, leaving
+ * alone any network the caller already registered one for (for example a
+ * `FourMicaEvmScheme` pointed at a self-hosted core).
+ */
 function registerNetworkServers(httpServer: x402HTTPResourceServer) {
   const schemeServer = new FourMicaEvmScheme()
   const server = getHTTPServerInternals(httpServer)
   SUPPORTED_NETWORKS.forEach((network) => {
+    const registered = server.ResourceServer.registeredServerSchemes?.get(network)
+    if (registered?.has(schemeServer.scheme)) return
     server.ResourceServer.register(network, schemeServer)
   })
 }

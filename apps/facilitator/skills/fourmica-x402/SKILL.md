@@ -1,88 +1,92 @@
 ---
 name: 4Mica
-description: 4Mica payment network and x402 credit-flow integration. Use when you need to build or modify a client (payer) that signs 4Mica x402 payments, a resource server (recipient) that issues 402 paymentRequirements and calls the facilitator, or the facilitator itself; when configuring tabs/verify/settle flows; or when wiring 4Mica SDKs (TypeScript, Rust, Python) and core endpoints.
+description: 4Mica x402 credit-flow integration. Use when building or modifying a client (payer) that signs 4mica-credit x402 payments, a resource server (recipient) that issues 402 paymentRequirements and calls the facilitator's /verify and /settle, or the facilitator itself; or when wiring the 4Mica SDKs (TypeScript, Rust, Python) and core endpoints.
 ---
 
 # 4Mica x402
 
 ## Overview
-Implement 4Mica credit flows for x402-protected HTTP resources. Use the SDKs to sign payment
-requirements and the facilitator to manage tabs, verify payment payloads, and settle for BLS
-certificates. Prefer SDK methods over hand-constructed payloads or signatures.
+Implement the `4mica-credit` scheme for x402-protected HTTP resources. A payer signs a payment
+guarantee claim straight from the recipient's `paymentRequirements`; the recipient hands the signed
+payload to the facilitator, which verifies it and settles by issuing a BLS certificate through
+4mica core. There is no tab, no token allowance and no per-payment on-chain transaction: the
+payer's collateral backs the guarantee, and guarantees net into one settlement per cycle. Prefer
+SDK methods over hand-built payloads or signatures.
 
 ## Constraint: Documentation-Only Agent
 - This agent does **not** execute SDKs or run commands. It only produces guidance in markdown.
 - Describe how to use the SDKs and facilitator, but do not perform installs, API calls, or runtime actions.
 
 ## Core Capabilities
-1. Generate X402 payment headers for v1 and v2 flows using the official SDKs.
-2. Issue and refresh tabs via `POST /tabs` using a resource server tab endpoint.
-3. Validate payment payloads with `POST /verify` before doing work.
-4. Settle payments with `POST /settle` to mint a BLS certificate.
+1. Generate x402 payment headers for v2 (`PAYMENT-SIGNATURE`) and legacy v1 (`X-PAYMENT`) using the official SDKs.
+2. Validate payment payloads with `POST /verify` before doing work.
+3. Settle payments with `POST /settle` to obtain the BLS certificate.
+4. Fund a payer's collateral, gaslessly through `POST /deposit` when the facilitator runs a relayer.
 5. Run or modify the facilitator with multi-network configuration.
 
 ## Decision Guide
-- If you are implementing a payer or client that retries a 402-protected request, use Client (Payer) Flow.
-- If you are implementing a protected resource server, use Resource Server (Recipient) Flow.
-- If you are running or modifying the facilitator, use Facilitator Operations.
-- If you need concrete APIs or examples, open the relevant file in `references/`.
+- Implementing a payer or client that retries a 402-protected request: use Client (Payer) Flow.
+- Implementing a protected resource server: use Resource Server (Recipient) Flow.
+- Running or modifying the facilitator: use Facilitator Operations.
 
 ## Prerequisites (Informational Only)
-- A 4Mica signing key for clients/payers.
+- A 4Mica signing key for the payer, with collateral deposited in 4mica core for the asset.
 - A recipient address for resource servers.
-- A supported CAIP-2 network string (example: `eip155:80002`).
-- A facilitator URL (hosted or self-run).
-- SDK installation steps belong in references; do not run installs here.
+- A supported CAIP-2 network string: `eip155:8453` (Base) or `eip155:84532` (Base Sepolia).
+- A facilitator URL: hosted at `https://x402.4mica.xyz/`, or self-run.
+- The core API for the network: `https://base.api.4mica.xyz/` (Base) or
+  `https://base.sepolia.api.4mica.xyz/` (Base Sepolia). `GET /core/tokens` lists the accepted assets;
+  `GET /core/public-params` carries the EIP-712 guarantee domain.
 
 ## Client (Payer) Flow
-1. Configure a 4Mica SDK client using a wallet signing key.
-2. Fetch `paymentRequirements` from the resource server.
-3. Confirm `paymentRequirements.extra.tabEndpoint` is present. X402 flows require it.
-4. Use `X402Flow` to sign. For v1, call `signPayment(...)` and send the `X-PAYMENT` header. For v2, decode the `payment-required` header, call `signPaymentV2(...)`, and send the `PAYMENT-SIGNATURE` header.
-5. Retry the HTTP request with the signed header.
+1. Configure a 4Mica SDK client with the wallet signing key and the network (`ConfigBuilder.network("base-sepolia")`, or the core API URL).
+2. Make the request. On `402`, read the `payment-required` response header (v2: base64 JSON with `x402Version: 2`, `accepts[]`, `resource`) or the JSON body's `accepts` (v1).
+3. Pick the `accepts` entry with `scheme: "4mica-credit"`.
+4. Sign with `X402Flow`. v2: `signPaymentV2(paymentRequired, accepted, userAddress)`, then send the `PAYMENT-SIGNATURE` header. v1: `signPayment(requirements, userAddress)`, then send the `X-PAYMENT` header. The flow mints a random 32-byte `req_id`, builds the claims (`user_address`, `recipient_address` = `payTo`, `asset_address` = `asset`, `amount`, `timestamp`, plus `validation` when the requirements carry `extra.validation`) and EIP-712-signs them against core's guarantee domain.
+5. Retry the request with the signed header.
 6. Close the client after use.
+7. With `@4mica/x402` and `@x402/fetch`, steps 2 to 5 are automatic: `wrapFetchWithPaymentFromConfig(fetch, { schemes: [{ network, client: await FourMicaEvmScheme.create(account) }] })`.
 
 ## Resource Server (Recipient) Flow
-1. On the initial request, reply with `402 Payment Required` and a `paymentRequirements` object.
-2. Include `scheme` (must include `4mica`, example `4mica-credit`).
-3. Include `network` as CAIP-2 (example `eip155:80002`).
-4. Include `payTo`, `asset`, and `maxAmountRequired` (v1) or `amount` (v2).
-5. Include `extra.tabEndpoint` that points to your tab endpoint.
-6. Implement the tab endpoint to accept `{ userAddress, paymentRequirements }` and call facilitator `POST /tabs` with `{ userAddress, recipientAddress=payTo, erc20Token=asset, network?, ttlSeconds? }`.
-7. Return the tab response to the client (at minimum `tabId` and `userAddress`).
-8. On the paid request, decode the payment header into a `paymentPayload`.
-9. Call facilitator `POST /verify` with `{ paymentPayload, paymentRequirements }`.
-10. Do the work only if `isValid` is true.
-11. Call facilitator `POST /settle` to obtain the BLS certificate.
-12. Persist the certificate for downstream remuneration if needed.
+1. On the initial request, reply `402 Payment Required` with the requirements: v2 puts base64 of `{ x402Version: 2, accepts: [...], resource }` in the `payment-required` header; v1 puts `accepts` in the JSON body.
+2. Each entry carries `scheme: "4mica-credit"`, a CAIP-2 `network`, `payTo`, `asset` (an address from core's token list for that network), `amount` (v2) or `maxAmountRequired` (v1), and `maxTimeoutSeconds`.
+3. To gate the payment on an external validator, add `extra.validation = { validator, subject, deadline?, params? }`. Nothing else is required in `extra`; there is no tab endpoint.
+4. On the paid request, decode `PAYMENT-SIGNATURE` (or legacy `X-PAYMENT`) into `paymentPayload`.
+5. Call facilitator `POST /verify` with `{ x402Version, paymentPayload, paymentRequirements }`.
+6. Do the work only if `isValid` is true.
+7. Call facilitator `POST /settle` with the same body to obtain the BLS certificate; core binds the guarantee to the open settlement cycle for the asset.
+8. Persist the certificate if you want an audit trail. Net credit is claimed on-chain when the cycle commits.
+9. With `@4mica/x402/server/express`, steps 1 to 7 are `paymentMiddlewareFromConfig({ "GET /path": { accepts: { scheme: "4mica-credit", price: "$0.10", network, payTo } } })`. The middleware resolves `price` to the stablecoin core lists for the network.
 
 ## Facilitator Operations
 1. Use the hosted facilitator (`https://x402.4mica.xyz/`) or run your own instance.
-2. Configure env vars for scheme, networks, core API URL, and assets.
-3. Expose `GET /supported`, `GET /health`, and `POST /tabs`, `/verify`, `/settle`.
-4. Enforce scheme, network, asset, and amount checks before settlement.
-5. When modifying code, start with `src/server/` and `src/config.rs` in the facilitator repo.
+2. Configure `X402_NETWORKS` (per-network `coreApiUrl` and auth key) and, for sponsored deposits, withdrawals and clearing, the relayer keys.
+3. Expose `GET /supported`, `GET /health`, `POST /verify`, `POST /settle`, and when a relayer is configured `POST /deposit`, `/withdraw`, `/clearing/pay`, `/clearing/claim` (each with a `/verify` twin).
+4. Enforce scheme, network, asset, amount, `payTo` and `extra.validation` checks before settlement.
+5. When modifying code, start with `src/server/` and `src/config/` in `apps/facilitator`.
 
 ## Version Notes
-- v1 uses a JSON response body containing `accepts` and the `X-PAYMENT` header on retry.
-- v2 uses a `payment-required` header (base64-encoded) and the `PAYMENT-SIGNATURE` header on retry.
+- v2 (primary) uses the `payment-required` response header and the `PAYMENT-SIGNATURE` request header. The envelope is `{ x402Version: 2, accepted, payload, resource? }`.
+- v1 (legacy) uses a JSON body with `accepts` and the `X-PAYMENT` request header. The envelope is `{ x402Version: 1, scheme, network, payload }`.
+- The claims are `version: "v1"` in both. The x402 version and the claims version are independent.
 
 ## Security and Correctness Rules
 1. Never hand-construct signatures or payment payloads. Use the SDKs.
-2. Ensure `scheme` includes `4mica-credit` and matches the payment payload.
-3. Ensure `network` matches a value returned by `/supported`.
-4. Ensure `payTo`, `asset`, and `amount` or `maxAmountRequired` match the signed claims exactly.
+2. `scheme` must be `4mica-credit` and match the payment payload.
+3. `network` must be one returned by `/supported`.
+4. `payTo`, `asset`, `amount` or `maxAmountRequired`, and `extra.validation` must match the signed claims exactly.
 5. Always call `/verify` before `/settle` and before performing the protected work.
+6. `req_id` is minted by the payer per payment; core rejects duplicates.
 
 ## Troubleshooting Checklist
-- `scheme` mismatch or missing `4mica`.
+- `scheme` mismatch or missing `4mica-credit`.
 - `network` not supported by `/supported`.
-- `extra.tabEndpoint` missing or unreachable.
-- `payTo`, `asset`, or amount mismatch with claims.
+- `asset` not in core's token list for the network (`GET /core/tokens`).
+- `payTo`, `asset`, or amount mismatch with the claims.
+- Payer has no free collateral for the asset: deposit first (`POST /deposit` for the gasless route).
 - Attempted settlement without successful verification.
 
 ## References
-- `references/facilitator.md` for endpoints, env vars, and request/response shapes.
-- `references/sdk-typescript.md` for `@4mica/sdk` usage and X402Flow details.
-- `references/sdk-rust.md` for `sdk-4mica` usage and X402Flow details.
-- `references/sdk-python.md` for the Python `fourmica_sdk` example.
+- `apps/facilitator/README.md` for endpoints, env vars, and request/response shapes.
+- `packages/sdk/README.md` (`@4mica/sdk`), `packages/sdk-rust/README.md` (`sdk-4mica`), `packages/sdk-python/README.md` (`fourmica_sdk`).
+- `apps/facilitator/packages/typescript/x402/README.md` for the Express middleware and the fetch client.

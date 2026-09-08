@@ -40,9 +40,9 @@
     "lint:write": "biome check --write --diagnostic-level=error .",
     "fmt": "biome format .",
     "fmt:write": "biome format --write .",
-    "demo:server": "pnpm --filter @4mica/x402-demo server",
-    "demo:client": "pnpm --filter @4mica/x402-demo client",
-    "demo:dev": "pnpm --filter @4mica/x402-demo dev"
+    "demo:server": "pnpm --filter @4mica/x402-demo run server",
+    "demo:client": "pnpm --filter @4mica/x402-demo run client",
+    "demo:dev": "pnpm --filter @4mica/x402-demo run dev"
   },
   "dependencies": {
     "@x402/core": "catalog:",
