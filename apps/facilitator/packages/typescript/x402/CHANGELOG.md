@@ -1,4 +1,4 @@
-# Changelog
+# @4mica/x402
 
 ## 2.0.0-alpha.1
 
