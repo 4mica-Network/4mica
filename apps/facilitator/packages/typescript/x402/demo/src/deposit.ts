@@ -1,12 +1,20 @@
 import 'dotenv/config'
-import { Client, ConfigBuilder } from '@4mica/sdk'
+import {
+  Client,
+  ConfigBuilder,
+  type DepositReceipt,
+  Erc20AllowanceRequiredError,
+  FacilitatorNotConfiguredError,
+} from '@4mica/sdk'
 import { formatUnits, parseUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
 // Base Sepolia by default; any shorthand or CAIP-2 id ConfigBuilder.network() knows works.
 const NETWORK = process.env.NETWORK || 'eip155:84532'
-// The hosted facilitator sponsors the deposit's gas: one signature, no ETH needed.
-// Set FACILITATOR_URL to an empty string to deposit self-funded from a wallet that holds gas.
+// Set CORE_URL to deposit on a self-hosted core for NETWORK instead of the hosted deployment.
+const CORE_URL = process.env.CORE_URL
+// The facilitator sponsors the deposit's gas: one signature, no ETH needed. Set
+// FACILITATOR_URL to an empty string to deposit self-funded from a wallet that holds gas.
 const FACILITATOR_URL = process.env.FACILITATOR_URL ?? 'https://x402.4mica.xyz'
 // In whole tokens (e.g. "2" = 2 USDC); converted with the decimals core reports.
 const DEPOSIT_AMOUNT = process.env.DEPOSIT_AMOUNT || '2'
@@ -21,7 +29,12 @@ async function main() {
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`)
-  const builder = new ConfigBuilder().network(NETWORK).signer(account)
+  const builder = new ConfigBuilder().signer(account)
+  if (CORE_URL) {
+    builder.rpcUrl(CORE_URL)
+  } else {
+    builder.network(NETWORK)
+  }
   if (FACILITATOR_URL) {
     builder.facilitatorUrl(FACILITATOR_URL)
   }
@@ -47,13 +60,39 @@ async function main() {
       ? 'gasless, sponsored by the facilitator'
       : 'self-funded'
     console.log(`Depositing ${DEPOSIT_AMOUNT} ${SYMBOL} (${route})...`)
-    const receipt = await client.deposit.of(token.address, amount).send()
+    const receipt = await deposit(client, token.address, amount)
     console.log(`Deposit tx: ${receipt.txHash} (route: ${receipt.route})`)
 
     const after = await collateralOf(client, token.address)
     console.log(`Collateral after:  ${formatUnits(after, token.decimals)} ${SYMBOL}`)
   } finally {
     await client.aclose()
+  }
+}
+
+async function deposit(client: Client, asset: string, amount: bigint): Promise<DepositReceipt> {
+  const builder = client.deposit.of(asset, amount)
+  try {
+    return await builder.send()
+  } catch (error) {
+    // The SDK reports a facilitator without a relayer as "not configured".
+    if (error instanceof FacilitatorNotConfiguredError) {
+      console.log('Facilitator cannot sponsor the deposit; depositing self-funded instead...')
+    } else if (!(error instanceof Erc20AllowanceRequiredError)) {
+      throw error
+    }
+  }
+
+  const selfFunded = builder.selfFunded()
+  try {
+    return await selfFunded.send()
+  } catch (error) {
+    if (!(error instanceof Erc20AllowanceRequiredError)) {
+      throw error
+    }
+    console.log(`Approving the 4mica contract to pull ${DEPOSIT_AMOUNT} ${SYMBOL}...`)
+    await selfFunded.approve()
+    return selfFunded.send()
   }
 }
 

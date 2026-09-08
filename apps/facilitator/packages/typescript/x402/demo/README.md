@@ -29,6 +29,7 @@ cp .env.example .env
 | `FACILITATOR_URL` | deposit | Facilitator that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty to deposit self-funded. |
 | `DEPOSIT_AMOUNT` | deposit | USDC to deposit. `2` by default. |
 | `PORT` | server | Listen port. `3000` by default. |
+| `CORE_URL` | all | A self-hosted core for `NETWORK`. Unset, the hosted deployment for the network is used. |
 
 ## 1. Fund the payer
 
@@ -36,7 +37,7 @@ A payer needs free collateral in 4mica core before it can sign a guarantee. Hold
 Sepolia USDC in the wallet, then:
 
 ```bash
-pnpm deposit
+pnpm run deposit
 ```
 
 The script asks core which USDC it accepts on the network, deposits `DEPOSIT_AMOUNT` of it
@@ -46,10 +47,11 @@ after. Without `FACILITATOR_URL` it sends the deposit transaction itself, so the
 ## 2. Start the server
 
 ```bash
-pnpm server
+pnpm run server
 ```
 
-Or from the package root: `pnpm demo:server`. You should see:
+Or from the package root: `pnpm demo:server`. Use `pnpm run`, not bare `pnpm server`: pnpm has a
+built-in `server` command that shadows the script and exits silently. You should see:
 
 ```
 x402 Demo Server running on http://localhost:3000
@@ -62,7 +64,7 @@ Payment required: $0.01 (4mica credit on eip155:84532)
 In a second terminal:
 
 ```bash
-pnpm client
+pnpm run client
 ```
 
 Or from the package root: `pnpm demo:client`.
@@ -98,6 +100,27 @@ curl http://localhost:3000/
 # Protected endpoint: returns 402 with the payment-required header
 curl -v http://localhost:3000/api/premium-data
 ```
+
+## Running against a local 4mica-core stack
+
+`deployment/dev_stack.sh up` in 4mica-core starts anvil, deploys mock stablecoins and runs core
+on port 3000. Run a facilitator against it (`apps/facilitator`, with `X402_NETWORKS` pointing at
+`http://localhost:3000/` and a relayer key for gasless deposits), then point the demo at both:
+
+```
+NETWORK=eip155:84532            # whatever CHAIN_ID the stack was started with
+CORE_URL=http://localhost:3000
+FACILITATOR_URL=http://localhost:8080
+PORT=3100                        # core already listens on 3000
+API_URL=http://localhost:3100
+PRIVATE_KEY=<a funded anvil account>
+PAY_TO_ADDRESS=<any other address>
+```
+
+The server then prices against the local core's token list, advertises `extra.rpcUrl` so the
+client signs against the same core, and verifies and settles through the local facilitator. Mint
+the payer some mock USDC first (`cast send <usdc> "mint(address,uint256)" <payer> 10000000`); the
+address is the first entry of `GET http://localhost:3000/core/tokens`.
 
 ## Notes
 

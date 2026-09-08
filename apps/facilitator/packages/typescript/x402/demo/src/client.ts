@@ -5,6 +5,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 // Must match the server's NETWORK; Base Sepolia by default.
 const NETWORK = (process.env.NETWORK || 'eip155:84532') as `${string}:${string}`
+// Set CORE_URL to pay on a self-hosted core for NETWORK instead of the hosted deployment.
+const CORE_URL = process.env.CORE_URL
 
 async function main() {
   const privateKey = process.env.PRIVATE_KEY
@@ -19,12 +21,15 @@ async function main() {
 
   console.log('Initializing x402 client...')
   console.log(`Target endpoint: ${endpoint}`)
-  console.log(`Network: ${NETWORK}`)
+  console.log(`Network: ${NETWORK}${CORE_URL ? ` (core at ${CORE_URL})` : ''}`)
 
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   console.log(`Using account: ${account.address}`)
 
-  const scheme = await FourMicaEvmScheme.create(account)
+  const scheme = await FourMicaEvmScheme.create(
+    account,
+    CORE_URL ? { coreUrls: { [NETWORK]: CORE_URL }, networks: [NETWORK] } : {}
+  )
 
   const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [

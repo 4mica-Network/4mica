@@ -77,6 +77,11 @@ const data = await response.json();
 console.log(data);
 ```
 
+`@x402/fetch` only pays in assets the scheme client recognises. `FourMicaEvmScheme` recognises
+whatever 4mica core lists for the network (`GET /core/tokens`), so the server's advertised USDC
+passes the client's spend controls and the default `$1` per-payment cap applies to it. Pass
+`spendControls` to change the cap or allow other assets.
+
 ### Using with Axios
 
 Use with `@x402/axios` for Axios-based applications:
@@ -248,6 +253,20 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
       client: baseScheme,
     },
   ],
+});
+```
+
+### Paying on a self-hosted core
+
+`FourMicaEvmScheme.create` connects to every hosted network up front. Pass `coreUrls` to
+override a network's core API URL and `networks` to limit the connections to the ones you use;
+a resource server can also steer payers with `extra.rpcUrl` in its requirements, which wins over
+both.
+
+```typescript
+const scheme = await FourMicaEvmScheme.create(account, {
+  coreUrls: { "eip155:84532": "http://localhost:3000/" },
+  networks: ["eip155:84532"],
 });
 ```
 
