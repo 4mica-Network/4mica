@@ -704,6 +704,9 @@ importers:
       express:
         specifier: 'catalog:'
         version: 5.2.1
+      publint:
+        specifier: 'catalog:'
+        version: 0.3.21
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

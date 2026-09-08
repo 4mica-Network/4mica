@@ -33,8 +33,13 @@
       "import": "./dist/client/index.js"
     }
   },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "check:exports": "attw --pack . --profile esm-only && publint --strict",
     "test": "vitest run",
     "lint": "biome check .",
     "lint:write": "biome check --write --diagnostic-level=error .",
@@ -56,6 +61,7 @@
     "@types/express": "catalog:",
     "@types/node": "catalog:node26",
     "express": "catalog:",
+    "publint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
