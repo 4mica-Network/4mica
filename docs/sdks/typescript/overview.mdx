@@ -7,13 +7,15 @@ description: "Install and use @4mica/sdk, the runtime-neutral SDK for the 4Mica 
 
 `@4mica/sdk` is the official TypeScript SDK for the 4Mica payment network. Use it to deposit collateral, sign payment guarantees, verify and settle them, run the x402 HTTP flow, and gate your own routes behind a payment.
 
-The SDK exposes five capabilities:
+The client is made of capability sub-clients:
 
-- **User client** (`client.user`) — deposit collateral, sign payments, and manage withdrawals in ETH or ERC20 tokens.
-- **Recipient client** (`client.recipient`) — issue and verify payment guarantees, and claim net credit from cleared settlement cycles.
+- **`client.deposit`** — deposit collateral in ETH or ERC20 tokens.
+- **`client.withdraw`** — request, cancel, and finalize withdrawals.
+- **`client.payment`** — sign, issue, and verify payment guarantees.
+- **`client.settlement`** — settle a cleared cycle from either side: the debtor pays, the creditor claims.
+- **`client.account`** / **`client.tokens`** — the signer's balances and supported-token metadata.
 - **X402 flow helper** (`X402Flow`) — turn a `402 Payment Required` response into a signed payment header.
 - **Server paywall** (`@4mica/sdk/server`) — an edge-safe primitive that gates a route behind an x402 payment.
-- **Admin RPCs** (`client.rpc`) — manage user suspension and admin API keys when authorized.
 
 ## Runtime-neutral
 
@@ -81,18 +83,18 @@ const cfg = new ConfigBuilder()
   .walletPrivateKey(process.env.PRIVATE_KEY as `0x${string}`)
   .build();
 
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 try {
-  // use client.user, client.recipient, and client.rpc
+  // use client.deposit, client.payment, client.settlement, …
 } finally {
   await client.aclose();
 }
 ```
 
-`Client.new` connects to the core service, fetches public parameters, and wires up the on-chain gateway. From the client you reach the three entry points:
+`Client.connect` reaches the core service for its public parameters and validates that it supports the guarantee version this SDK signs. The Ethereum RPC is only contacted lazily, on first on-chain use. From the client you reach the entry points:
 
-- `client.user` — payer-side operations (collateral, signing, withdrawals, net-debit settlement).
-- `client.recipient` — recipient-side operations (guarantees, net-credit settlement).
+- `client.deposit` / `client.withdraw` — payer-side collateral operations.
+- `client.payment` — signing and issuing guarantees; `client.settlement` — settling cleared cycles.
 - `X402Flow` — the helper for `402`-protected HTTP resources.
 
 <Warning>

@@ -72,4 +72,4 @@ export const GET = withPaywall(handler, client.rpc, PAYWALL_CONFIG);
 | `4MICA_AUTH_URL` / `4MICA_AUTH_REFRESH_MARGIN_SECS` | — | SIWE auth endpoint / refresh margin. |
 
 Next.js auto-loads a git-ignored `.env.local` from this directory. After a
-cleared cycle, claim on-chain with `client.recipient.claimNetCredit(cycleId)`.
+cleared cycle, claim on-chain with `client.settlement.claim(cycleId).send()`.

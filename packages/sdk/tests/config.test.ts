@@ -15,10 +15,10 @@ describe("ConfigBuilder", () => {
     delete process.env["4MICA_WALLET_PRIVATE_KEY"];
     delete process.env["4MICA_ETHEREUM_HTTP_RPC_URL"];
     delete process.env["4MICA_CONTRACT_ADDRESS"];
-    delete process.env["4MICA_ADMIN_API_KEY"];
     delete process.env["4MICA_AUTH_URL"];
     delete process.env["4MICA_AUTH_REFRESH_MARGIN_SECS"];
     delete process.env["4MICA_BEARER_TOKEN"];
+    delete process.env["4MICA_FACILITATOR_URL"];
   });
 
   it("reads from env", () => {
@@ -77,11 +77,30 @@ describe("ConfigBuilder", () => {
     expect(cfg.authRefreshMarginSecs).toBe(90);
   });
 
-  it("reads bearer token", () => {
+  it("reads bearer token, which replaces SIWE auth", () => {
     process.env["4MICA_RPC_URL"] = "https://example.com";
     process.env["4MICA_WALLET_PRIVATE_KEY"] = "11".repeat(32);
     process.env["4MICA_BEARER_TOKEN"] = "token";
     const cfg = new ConfigBuilder().fromEnv().build();
     expect(cfg.bearerToken).toBe("token");
+    expect(cfg.authUrl).toBeUndefined();
+  });
+
+  it("disableAuth clears the auth endpoint", () => {
+    const cfg = new ConfigBuilder()
+      .rpcUrl("https://example.com")
+      .walletPrivateKey("11".repeat(32))
+      .disableAuth()
+      .build();
+    expect(cfg.authUrl).toBeUndefined();
+    expect(cfg.authRefreshMarginSecs).toBeUndefined();
+  });
+
+  it("reads the facilitator url from the environment", () => {
+    process.env["4MICA_RPC_URL"] = "https://example.com";
+    process.env["4MICA_WALLET_PRIVATE_KEY"] = "11".repeat(32);
+    process.env["4MICA_FACILITATOR_URL"] = "https://facilitator.example";
+    const cfg = new ConfigBuilder().fromEnv().build();
+    expect(cfg.facilitatorUrl).toBe("https://facilitator.example");
   });
 });

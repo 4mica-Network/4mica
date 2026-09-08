@@ -1,10 +1,10 @@
 import {
   Client,
   ConfigBuilder,
-  type PaymentRequirementsV1,
+  PaymentRequirementsV2 as SdkPaymentRequirementsV2,
   X402Flow,
-  type X402PaymentRequired,
-  type X402ResourceInfo,
+  X402PaymentRequired,
+  X402ResourceInfo,
 } from '@4mica/sdk'
 import type {
   Network,
@@ -32,7 +32,7 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
 
   private static async createX402Flow(signer: Account, rpcUrl: string): Promise<X402Flow> {
     const cfg = new ConfigBuilder().rpcUrl(rpcUrl).signer(signer).build()
-    const client = await Client.new(cfg)
+    const client = await Client.connect(cfg)
 
     return X402Flow.fromClient(client)
   }
@@ -72,7 +72,7 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
 
     if (x402Version === 1) {
       const signed = await x402Flow.signPayment(
-        paymentRequirements as unknown as PaymentRequirementsV1,
+        paymentRequirements as unknown as Record<string, unknown>,
         this.signer.address
       )
       return {
@@ -89,21 +89,19 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
           ? (paymentRequirements.extra.resource as Record<string, unknown>)
           : {}
 
-      const resource: X402ResourceInfo = {
-        url: String(resourcePayload.url ?? ''),
-        description: String(resourcePayload.description ?? ''),
-        mimeType: String(resourcePayload.mimeType ?? ''),
-      }
-      const paymentRequired: X402PaymentRequired = {
-        x402Version: 2,
-        resource,
-        accepts: [paymentRequirements],
-      }
-      const signed = await x402Flow.signPaymentV2(
-        paymentRequired,
-        paymentRequirements,
-        this.signer.address
+      const accepted = SdkPaymentRequirementsV2.fromRaw(
+        paymentRequirements as unknown as Record<string, unknown>
       )
+      const paymentRequired = new X402PaymentRequired({
+        x402Version: 2,
+        resource: new X402ResourceInfo({
+          url: String(resourcePayload.url ?? ''),
+          description: String(resourcePayload.description ?? ''),
+          mimeType: String(resourcePayload.mimeType ?? ''),
+        }),
+        accepts: [accepted],
+      })
+      const signed = await x402Flow.signPaymentV2(paymentRequired, accepted, this.signer.address)
 
       return {
         x402Version: 2,

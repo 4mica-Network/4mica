@@ -16,7 +16,6 @@ const pw = createPaywall(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://recipient.example/tab",
 });
 
 export async function loader({ request }: { request: Request }) {

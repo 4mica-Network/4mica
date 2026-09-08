@@ -1,46 +1,40 @@
-import { config as loadEnv } from "dotenv";
 import {
   Client,
   ConfigBuilder,
-  PaymentRequirements,
+  PaymentRequirementsV1,
   X402Flow,
-} from "sdk-4mica";
+} from "@4mica/sdk";
+import { config as loadEnv } from "dotenv";
 
 loadEnv({ path: ".env", override: false });
 
 const payerKey =
   process.env.PAYER_KEY ?? process.env["4MICA_WALLET_PRIVATE_KEY"];
-const userAddress = process.env.USER_ADDRESS;
 const resourceUrl = process.env.RESOURCE_URL;
 
-if (!payerKey || !userAddress || !resourceUrl) {
+if (!payerKey || !resourceUrl) {
   throw new Error(
-    "PAYER_KEY (or 4MICA_WALLET_PRIVATE_KEY), USER_ADDRESS, and RESOURCE_URL must be set",
+    "PAYER_KEY (or 4MICA_WALLET_PRIVATE_KEY) and RESOURCE_URL must be set",
   );
 }
-
-// Values are guaranteed above, so capture non-nullable versions for later use.
-const payerKeyRequired = payerKey!;
-const userAddressRequired = userAddress!;
-const resourceUrlRequired = resourceUrl!;
 
 async function main(): Promise<void> {
   console.log("--- x402 / 4mica flow (TypeScript SDK) ---");
 
-  const cfg = new ConfigBuilder().walletPrivateKey(payerKeyRequired).build();
-  const client = await Client.new(cfg);
+  const cfg = new ConfigBuilder().walletPrivateKey(payerKey as string).build();
+  const client = await Client.connect(cfg);
 
   try {
     const flow = X402Flow.fromClient(client);
-    const requirements = PaymentRequirements.fromRaw(
-      (await (await fetch(resourceUrlRequired)).json()).accepts?.[0] as Record<
-        string,
-        unknown
-      >,
+    // The 402 body advertises the requirements; the claim is signed straight
+    // from them — no tab step, the reqId is a random local nonce.
+    const requirements = PaymentRequirementsV1.fromRaw(
+      (await (await fetch(resourceUrl as string)).json())
+        .accepts?.[0] as Record<string, unknown>,
     );
-    const payment = await flow.signPayment(requirements, userAddressRequired);
+    const payment = await flow.signPayment(requirements, client.signerAddress);
     console.log(`X-PAYMENT: ${payment.header}\n`);
-    const resp = await fetch(resourceUrlRequired, {
+    const resp = await fetch(resourceUrl as string, {
       headers: { "X-PAYMENT": payment.header },
     });
     console.log(await resp.text());

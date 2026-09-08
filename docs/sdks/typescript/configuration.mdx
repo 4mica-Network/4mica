@@ -5,7 +5,7 @@ description: "Initialize a 4Mica client with ConfigBuilder, environment variable
 
 # Configuration
 
-`@4mica/sdk` needs a signing key and can use sensible defaults for everything else. Build a `Config` with `ConfigBuilder`, then pass it to `Client.new`.
+`@4mica/sdk` needs a signing key and can use sensible defaults for everything else. Build a `Config` with `ConfigBuilder`, then pass it to `Client.connect`.
 
 ## Options
 
@@ -17,8 +17,8 @@ description: "Initialize a 4Mica client with ConfigBuilder, environment variable
 | `rpcUrl`               | No                               | Override the core API URL directly (for self-hosted deployments).       |
 | `ethereumHttpRpcUrl`   | No                               | Ethereum JSON-RPC endpoint. Fetched from core when omitted.             |
 | `contractAddress`      | No                               | Core4Mica contract address. Fetched from core when omitted.             |
-| `adminApiKey`          | No                               | API key for admin RPCs.                                                 |
-| `bearerToken`          | No                               | Static bearer token for auth. Disables SIWE auth.                       |
+| `facilitatorUrl`       | No                               | Facilitator that sponsors gas. Without one, every operation is self-funded. |
+| `bearerToken`          | No                               | Static bearer token for auth. Replaces SIWE auth.                       |
 | `authUrl`              | No                               | SIWE auth endpoint. Defaults to `rpcUrl` when auth is enabled.          |
 | `authRefreshMarginSecs`| No                               | Seconds before expiry at which the session refreshes. Defaults to 60.   |
 
@@ -41,7 +41,7 @@ const cfg = new ConfigBuilder()
   .walletPrivateKey("0x...")
   .build();
 
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
 `build()` throws a `ConfigError` when a signer or wallet key is missing, a URL is invalid, or the auth refresh margin is not a finite non-negative number.
@@ -57,7 +57,7 @@ Call `fromEnv()` to load configuration from the environment.
 # 4MICA_RPC_URL="https://base.sepolia.api.4mica.xyz/"
 4MICA_ETHEREUM_HTTP_RPC_URL="http://localhost:8545"
 4MICA_CONTRACT_ADDRESS="0x..."
-4MICA_ADMIN_API_KEY="ak_..."
+4MICA_FACILITATOR_URL="https://x402.4mica.xyz"
 4MICA_BEARER_TOKEN="Bearer <access_token>"
 4MICA_AUTH_URL="https://ethereum.sepolia.api.4mica.xyz/"
 4MICA_AUTH_REFRESH_MARGIN_SECS="60"
@@ -67,7 +67,7 @@ Call `fromEnv()` to load configuration from the environment.
 import { Client, ConfigBuilder } from "@4mica/sdk";
 
 const cfg = new ConfigBuilder().fromEnv().build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
 <Note>
@@ -86,7 +86,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 const signer = privateKeyToAccount(process.env.PAYER_KEY as `0x${string}`);
 const cfg = new ConfigBuilder().signer(signer).build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
 ### Coinbase CDP wallet
@@ -104,12 +104,12 @@ const signer = await createCdpAccount({
 });
 
 const cfg = new ConfigBuilder().network("base-sepolia").signer(signer).build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 ```
 
 ## SIWE authentication
 
-Auth is enabled by default. Enable automatic SIWE refresh, or pass a static bearer token.
+Auth is enabled by default, and the first authenticated RPC call logs in automatically. Connecting never triggers a login — the bootstrap routes are public.
 
 ```ts
 import { Client, ConfigBuilder } from "@4mica/sdk";
@@ -117,19 +117,23 @@ import { Client, ConfigBuilder } from "@4mica/sdk";
 const cfg = new ConfigBuilder()
   .walletPrivateKey("0x...")
   .rpcUrl("https://api.4mica.xyz/")
-  .enableAuth()
   .build();
 
-const client = await Client.new(cfg);
-await client.login(); // optional: the first RPC call also triggers auth
+const client = await Client.connect(cfg);
+await client.login(); // optional: pre-warm the session
 ```
 
-Or use a static token instead of SIWE:
+Use a static token instead of SIWE, or turn credentials off entirely:
 
 ```ts
 const cfg = new ConfigBuilder()
   .walletPrivateKey("0x...")
   .bearerToken("Bearer <access_token>")
+  .build();
+
+const anonymous = new ConfigBuilder()
+  .walletPrivateKey("0x...")
+  .disableAuth()
   .build();
 ```
 

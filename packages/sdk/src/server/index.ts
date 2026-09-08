@@ -26,7 +26,11 @@ export type {
 export { createPaywall } from "@/server/paywall";
 export type {
   PaymentRequirementsExtra,
+  ValidationExtra,
+} from "@/x402/models";
+export {
   PaymentRequirementsV2,
+  SCHEME_4MICA_CREDIT,
   X402PaymentRequired,
   X402ResourceInfo,
 } from "@/x402/models";

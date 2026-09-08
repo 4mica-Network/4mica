@@ -13,8 +13,18 @@ export type BlsSignatureInput =
   | { bytes?: unknown }
   | { signature?: unknown };
 
+export type BlsLongSignatures = {
+  hash(message: Uint8Array, DST?: string): unknown;
+  verify(signature: unknown, message: unknown, publicKey: unknown): boolean;
+};
+
 export type BlsModule = {
   bls12_381: {
+    longSignatures?: BlsLongSignatures;
+    G1?: {
+      ProjectivePoint?: { fromHex(bytes: Uint8Array | string): unknown };
+      Point?: { fromHex(bytes: Uint8Array | string): unknown };
+    };
     G2: {
       ProjectivePoint?: {
         fromHex(bytes: Uint8Array | string): {

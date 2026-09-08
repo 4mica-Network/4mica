@@ -37,7 +37,7 @@ export function buildConfig(options: CreateClientOptions = {}): Config {
 export async function createClient(
   options: CreateClientOptions = {},
 ): Promise<Client> {
-  return Client.new(buildConfig(options));
+  return Client.connect(buildConfig(options));
 }
 
 /**

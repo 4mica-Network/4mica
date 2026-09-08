@@ -81,4 +81,4 @@ app.get("/premium", paywall(client.rpc, PAYWALL_CONFIG), handler);
 
 Put these in a local `.env` (git-ignored) and load it (`node --env-file=.env …`,
 `tsx --env-file=.env …`, or your shell). After a cleared cycle, claim on-chain
-with `client.recipient.claimNetCredit(cycleId)`.
+with `client.settlement.claim(cycleId).send()`.

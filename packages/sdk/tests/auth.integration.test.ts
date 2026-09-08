@@ -59,7 +59,7 @@ describeIntegration("Auth integration", () => {
       .enableAuth()
       .build();
 
-    const client = await Client.new(cfg);
+    const client = await Client.connect(cfg);
     try {
       const tokens = await client.login();
       expect(tokens.accessToken).toBeTruthy();
@@ -93,7 +93,7 @@ describeIntegration("Auth integration", () => {
       .bearerToken(bearerToken)
       .build();
 
-    const client = await Client.new(cfg);
+    const client = await Client.connect(cfg);
     try {
       const userAddress = privateKeyToAccount(privateKey as Hex).address;
       const asset =

@@ -19,19 +19,11 @@ export const PAYWALL_CONFIG: PaywallConfig = {
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "http://localhost:__PORT__/session",
   description: "Premium market data feed",
 };
 
 const app = express();
 app.use(express.json());
-
-app.post("/session", (_req, res) => {
-  res.json({
-    userAddress: "0x2222222222222222222222222222222222222222",
-    nextReqId: "0x1",
-  });
-});
 
 app.get("/premium", paywall(verifier, PAYWALL_CONFIG), (_req, res) => {
   res.json({ ok: true, data: "🔓 premium market data unlocked" });
@@ -41,7 +33,6 @@ function listen(port: number, attemptsLeft = 20) {
   const server = app.listen(port);
   server.once("listening", () => {
     const url = `http://localhost:${port}`;
-    PAYWALL_CONFIG.tabEndpoint = `${url}/session`;
     writeFileSync(PORT_FILE, url);
     console.log(`[seller-express] listening on ${url}`);
     console.log(`  GET /premium is paywalled — run the buyer to pay for it.`);

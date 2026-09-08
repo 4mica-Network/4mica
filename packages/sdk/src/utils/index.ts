@@ -85,5 +85,54 @@ export function serializeU256(value: number | bigint | string): string {
 }
 
 export function hexFromBytes(bytes: Uint8Array): Hex {
-  return `0x${Buffer.from(bytes).toString("hex")}`;
+  let hex = "";
+  for (const byte of bytes) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return `0x${hex}`;
+}
+
+export function bytesFromHex(value: string): Uint8Array {
+  const hex =
+    value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+  if (hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) {
+    throw new ValidationError(`invalid hex bytes: ${value}`);
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+/** Normalize a 32-byte value to lowercase `0x`-prefixed hex. */
+export function normalizeBytes32Hex(value: string): Hex {
+  const hex = String(value).trim().toLowerCase();
+  const stripped = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (!/^[0-9a-f]{64}$/.test(stripped)) {
+    throw new ValidationError(`invalid bytes32 hex: ${value}`);
+  }
+  return `0x${stripped}`;
+}
+
+/** Normalize `0x`-prefixed hex of arbitrary length (validator params blobs). */
+export function normalizeHexBytes(value: string): Hex {
+  const hex = String(value).trim();
+  const stripped =
+    hex.startsWith("0x") || hex.startsWith("0X") ? hex.slice(2) : hex;
+  if (stripped.length % 2 !== 0 || /[^0-9a-fA-F]/.test(stripped)) {
+    throw new ValidationError(`invalid hex bytes: ${value}`);
+  }
+  return `0x${stripped.toLowerCase()}`;
+}
+
+/** A cryptographically random unsigned 256-bit integer. */
+export function randomU256(): bigint {
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  let value = 0n;
+  for (const byte of bytes) {
+    value = (value << 8n) | BigInt(byte);
+  }
+  return value;
 }

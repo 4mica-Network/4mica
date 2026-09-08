@@ -123,8 +123,6 @@ ${commentLine(paidToParts, "#")}
 ${pythonCall}
 data = response.json()`;
 
-  const tabEndpoint = listing.x402Endpoint ?? `${PLACEHOLDER.baseUrl}/x402`;
-
   // The wire amount is the raw number, not the "$0.01" display form, and it is
   // denominated in the asset's base units. Omitted entirely when the seller
   // published only a display label, rather than guessed at.
@@ -142,12 +140,11 @@ curl -i -X ${endpoint.method} "${url}"
 #       "payTo": "${listing.payToAddress}",
 #       "asset": ${
     listing.assetAddress === null ? "null" : `"${listing.assetAddress}"`
-  },${
+  }${
     wireAmount === null
       ? ""
-      : `\n#       "maxAmountRequired": "${trimAmount(wireAmount)}",`
+      : `,\n#       "maxAmountRequired": "${trimAmount(wireAmount)}"`
   }
-#       "extra": { "tabEndpoint": "${tabEndpoint}" }
 #     }
 #   ]
 # }
@@ -164,7 +161,7 @@ curl -X ${endpoint.method} "${url}" \\
 // Every paid response carries its settled payment on this header.
 const receipt = response.headers.get("X-PAYMENT-RESPONSE");
 
-const client = await Client.new(
+const client = await Client.connect(
   new ConfigBuilder()
     .network("${sdkName}")
     .walletPrivateKey(process.env.PRIVATE_KEY)
@@ -173,7 +170,7 @@ const client = await Client.new(
 
 try {
   // One entry per asset: collateral, locked credit, pending withdrawal.
-  const positions = await client.user.getUser();
+  const positions = await client.account.assets();
   console.log({ receipt, positions });
 } finally {
   await client.aclose();

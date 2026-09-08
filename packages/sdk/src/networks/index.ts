@@ -26,17 +26,14 @@ export const NETWORKS: Record<string, NetworkInfo> = {
   base: {
     caip2: "eip155:8453",
     rpcUrl: "https://base.api.4mica.xyz/",
-    publicRpcUrl: "https://base-rpc.publicnode.com",
   },
   "base-sepolia": {
     caip2: "eip155:84532",
     rpcUrl: "https://base.sepolia.api.4mica.xyz/",
-    publicRpcUrl: "https://base-sepolia-rpc.publicnode.com",
   },
   "ethereum-sepolia": {
     caip2: "eip155:11155111",
     rpcUrl: "https://ethereum.sepolia.api.4mica.xyz/",
-    publicRpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
   },
 } as const;
 
@@ -50,12 +47,4 @@ const NETWORKS_BY_CAIP2: Record<string, NetworkInfo> = Object.fromEntries(
  */
 export function resolveNetworkRpcUrl(network: string): string | undefined {
   return NETWORKS[network]?.rpcUrl ?? NETWORKS_BY_CAIP2[network]?.rpcUrl;
-}
-
-/**
- * Resolve a CAIP-2 identifier to a reliable public Ethereum RPC URL.
- * Returns `undefined` for unknown networks.
- */
-export function resolvePublicRpcUrl(caip2: string): string | undefined {
-  return NETWORKS_BY_CAIP2[caip2]?.publicRpcUrl;
 }

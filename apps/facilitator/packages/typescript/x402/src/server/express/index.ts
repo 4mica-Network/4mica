@@ -13,29 +13,6 @@ import { FourMicaFacilitatorClient } from '../facilitator.js'
 import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../scheme.js'
 import { ExpressAdapter } from './adapter.js'
 
-/**
- * Configuration for payment tab handling
- */
-interface TabConfig {
-  /**
-   * The full URL endpoint for opening payment tabs. This URL is injected into
-   * paymentRequirements.extra and clients use it to open a payment tab.
-   * When a request matches this endpoint's path, the middleware will parse
-   * the request body and call the 4mica facilitator to open a tab.
-   *
-   * @example "https://api.example.com/x402/tab"
-   */
-  advertisedEndpoint: string
-
-  /**
-   * The lifetime of the payment tab in seconds. Defines how long the tab
-   * remains valid before expiring.
-   *
-   * @example 3600 // 1 hour
-   */
-  ttlSeconds?: number
-}
-
 interface ResourceServerInternals {
   register: (network: Network, server: SchemeNetworkServer) => unknown
   hasExtension: (extension: string) => boolean
@@ -51,8 +28,8 @@ function getHTTPServerInternals(httpServer: x402HTTPResourceServer): HTTPServerI
   return httpServer as unknown as HTTPServerInternals
 }
 
-function registerNetworkServers(httpServer: x402HTTPResourceServer, tabEndpoint: string) {
-  const schemeServer = new FourMicaEvmScheme(tabEndpoint)
+function registerNetworkServers(httpServer: x402HTTPResourceServer) {
+  const schemeServer = new FourMicaEvmScheme()
   const server = getHTTPServerInternals(httpServer)
   SUPPORTED_NETWORKS.forEach((network) => {
     server.ResourceServer.register(network, schemeServer)
@@ -67,20 +44,6 @@ function checkIfBazaarNeeded(routes: RoutesConfig): boolean {
   return Object.values(routes).some((routeConfig) => {
     return !!(routeConfig.extensions && 'bazaar' in routeConfig.extensions)
   })
-}
-
-interface OpenTabHttpError {
-  status: number
-  response: unknown
-}
-
-function isOpenTabHttpError(error: unknown): error is OpenTabHttpError {
-  if (typeof error !== 'object' || error === null) {
-    return false
-  }
-
-  const candidate = error as { status?: unknown; response?: unknown }
-  return typeof candidate.status === 'number' && 'response' in candidate
 }
 
 /**
@@ -104,7 +67,6 @@ export interface SchemeRegistration {
  * Use this when you need to configure HTTP-level hooks.
  *
  * @param httpServer - Pre-configured x402HTTPResourceServer instance
- * @param tabConfig - Configuration for payment tab handling (endpoint URL and TTL)
  * @param paywallConfig - Optional configuration for the built-in paywall UI
  * @param paywall - Optional custom paywall provider (overrides default)
  * @param syncFacilitatorOnStart - Whether to sync with the facilitator on startup (defaults to true)
@@ -120,21 +82,16 @@ export interface SchemeRegistration {
  * const httpServer = new x402HTTPResourceServer(resourceServer, routes)
  *   .onProtectedRequest(requestHook);
  *
- * app.use(paymentMiddlewareFromHTTPServer(
- *   httpServer,
- *   { advertisedEndpoint: "https://api.example.com/x402/tab" },
- * )); * ```
+ * app.use(paymentMiddlewareFromHTTPServer(httpServer));
+ * ```
  */
 export function paymentMiddlewareFromHTTPServer(
   httpServer: x402HTTPResourceServer,
-  tabConfig: TabConfig,
   paywallConfig?: PaywallConfig,
   paywall?: PaywallProvider,
   syncFacilitatorOnStart: boolean = true
 ) {
-  const facilitatorClient = new FourMicaFacilitatorClient()
-
-  registerNetworkServers(httpServer, tabConfig.advertisedEndpoint)
+  registerNetworkServers(httpServer)
 
   // Register custom paywall provider if provided
   if (paywall) {
@@ -163,39 +120,6 @@ export function paymentMiddlewareFromHTTPServer(
   }
 
   return async (req: Request, res: Response, next: NextFunction) => {
-    // Check if this request is for the tab opening endpoint
-    try {
-      const advertisedUrl = new URL(tabConfig.advertisedEndpoint)
-      if (req.path === advertisedUrl.pathname) {
-        // Parse the request body
-        const { userAddress, paymentRequirements, x402Version } = req.body
-
-        try {
-          // Call the facilitator to open the tab
-          const openTabResponse = await facilitatorClient.openTab(
-            userAddress,
-            paymentRequirements,
-            tabConfig.ttlSeconds,
-            x402Version
-          )
-
-          // Return the response
-          return res.json(openTabResponse)
-        } catch (error) {
-          if (isOpenTabHttpError(error)) {
-            return res.status(error.status).json(error.response)
-          }
-          console.error('Failed to open tab:', error)
-          return res.status(500).json({
-            error: 'Failed to open tab',
-            details: error instanceof Error ? error.message : 'Unknown error',
-          })
-        }
-      }
-    } catch (urlError) {
-      console.error('Invalid advertisedEndpoint URL:', urlError)
-    }
-
     // Create adapter and context
     const adapter = new ExpressAdapter(req)
     const context: HTTPRequestContext = {
@@ -392,7 +316,6 @@ export function paymentMiddlewareFromHTTPServer(
  *
  * @param routes - Route configurations for protected endpoints
  * @param server - Pre-configured x402ResourceServer instance
- * @param tabConfig - Configuration for payment tab handling (endpoint URL and TTL)
  * @param paywallConfig - Optional configuration for the built-in paywall UI
  * @param paywall - Optional custom paywall provider (overrides default)
  * @param syncFacilitatorOnStart - Whether to sync with the facilitator on startup (defaults to true)
@@ -405,17 +328,12 @@ export function paymentMiddlewareFromHTTPServer(
  * const server = new x402ResourceServer(myFacilitatorClient)
  *   .register(NETWORK, new ExactEvmScheme());
  *
- * app.use(paymentMiddleware(
- *   routes,
- *   server,
- *   { advertisedEndpoint: "https://api.example.com/x402/tab" },
- * ));
+ * app.use(paymentMiddleware(routes, server));
  * ```
  */
 export function paymentMiddleware(
   routes: RoutesConfig,
   server: x402ResourceServer,
-  tabConfig: TabConfig,
   paywallConfig?: PaywallConfig,
   paywall?: PaywallProvider,
   syncFacilitatorOnStart: boolean = true
@@ -423,13 +341,7 @@ export function paymentMiddleware(
   // Create the x402 HTTP server instance with the resource server
   const httpServer = new x402HTTPResourceServer(server, routes)
 
-  return paymentMiddlewareFromHTTPServer(
-    httpServer,
-    tabConfig,
-    paywallConfig,
-    paywall,
-    syncFacilitatorOnStart
-  )
+  return paymentMiddlewareFromHTTPServer(httpServer, paywallConfig, paywall, syncFacilitatorOnStart)
 }
 
 /**
@@ -439,7 +351,6 @@ export function paymentMiddleware(
  * This function creates and configures the x402ResourceServer internally.
  *
  * @param routes - Route configurations for protected endpoints
- * @param tabConfig - Configuration for payment tab handling
  * @param facilitatorClients - Optional facilitator client(s) for payment processing
  * @param schemes - Optional array of scheme registrations for server-side payment processing
  * @param paywallConfig - Optional configuration for the built-in paywall UI
@@ -451,15 +362,11 @@ export function paymentMiddleware(
  * ```typescript
  * import { paymentMiddlewareFromConfig } from "@x402/express";
  *
- * app.use(paymentMiddlewareFromConfig(
- *   routes,
- *   { advertisedEndpoint: "https://api.example.com/x402/tab" },
- * ));
+ * app.use(paymentMiddlewareFromConfig(routes));
  * ```
  */
 export function paymentMiddlewareFromConfig(
   routes: RoutesConfig,
-  tabConfig: TabConfig,
   facilitatorClients?: FacilitatorClient | FacilitatorClient[],
   schemes?: SchemeRegistration[],
   paywallConfig?: PaywallConfig,
@@ -486,14 +393,7 @@ export function paymentMiddlewareFromConfig(
 
   // Use the direct paymentMiddleware with the configured server
   // Note: paymentMiddleware handles dynamic bazaar registration
-  return paymentMiddleware(
-    routes,
-    ResourceServer,
-    tabConfig,
-    paywallConfig,
-    paywall,
-    syncFacilitatorOnStart
-  )
+  return paymentMiddleware(routes, ResourceServer, paywallConfig, paywall, syncFacilitatorOnStart)
 }
 
 export { ExpressAdapter } from './adapter.js'
