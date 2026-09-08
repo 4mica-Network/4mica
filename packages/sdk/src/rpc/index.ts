@@ -189,7 +189,9 @@ export class RpcProxy {
    * Fetch a participant's committed position + Merkle proof for a settlement
    * cycle.
    *
-   * @param cycleId - On-chain `bytes32` cycle identifier or the text id.
+   * @param cycleId - The cycle's text id (`{asset}:{period_start}`, as
+   *   returned in `cycle_id_text`). Core resolves the path segment by text id
+   *   only; the on-chain `bytes32` id is not accepted here.
    * @param participant - Participant address.
    */
   async getClearingParticipantProof(

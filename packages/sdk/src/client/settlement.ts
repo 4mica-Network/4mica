@@ -57,8 +57,9 @@ export class SettlementClient {
   }
 
   /**
-   * Start a net-debit payment for `cycleId` (the text id or the 0x-prefixed
-   * on-chain id). Nothing happens until a terminal runs.
+   * Start a net-debit payment for `cycleId` (the cycle's text id, as
+   * returned in `cycle_id_text`; core does not resolve the on-chain `bytes32`
+   * id). Nothing happens until a terminal runs.
    */
   pay(cycleId: string): PayBuilder {
     return new PayBuilder(this.ctx, String(cycleId));

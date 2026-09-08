@@ -75,6 +75,19 @@ describe("RpcProxy", () => {
     expect(cert.signature).toBe("0x03");
   });
 
+  it("parses the unprefixed certificate hex core emits", async () => {
+    // core's `HexBytes` serializes lowercase hex with no `0x` prefix.
+    const fetchMock = vi.fn<FetchFn>(
+      async () =>
+        new Response(JSON.stringify({ claims: "0102", signature: "03" }), {
+          status: 200,
+        }),
+    );
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    const cert = await proxy.issueGuarantee({ claims: {} });
+    expect(Array.from(cert.claimsBytes())).toEqual([1, 2]);
+  });
+
   it("surfaces api errors with status and message", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input) => {
       expect(input.toString()).toContain("action=claim_net_credit");
