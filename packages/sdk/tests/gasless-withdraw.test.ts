@@ -144,7 +144,7 @@ describe("gasless withdrawals", () => {
     ).rejects.toThrow(InvalidParamsError);
   });
 
-  it("verify hits the verify route only", async () => {
+  it("request verify hits the verify route only", async () => {
     const paths: string[] = [];
     const client = withdrawClient((path) => {
       paths.push(path);
@@ -160,5 +160,63 @@ describe("gasless withdrawals", () => {
       .authorization(authorization)
       .verify();
     expect(paths).toEqual(["/withdraw/verify"]);
+  });
+
+  it("cancel verify hits the verify route only", async () => {
+    const seen: { paths: string[]; body?: Record<string, unknown> } = {
+      paths: [],
+    };
+    const client = withdrawClient((path, body) => {
+      seen.paths.push(path);
+      seen.body = body;
+      return { json: { isValid: true } };
+    });
+    const authorization = await client.cancel(TOKEN_ADDRESS).gasless().sign();
+    await client
+      .cancel(TOKEN_ADDRESS)
+      .gasless()
+      .authorization(authorization)
+      .verify();
+    expect(seen.paths).toEqual(["/withdraw/verify"]);
+    expect(seen.body?.action).toBe("cancel");
+    const auth = seen.body?.authorization as Record<string, unknown>;
+    expect(auth.user).toBe(TEST_ADDRESS);
+    expect(auth.amount).toBeUndefined();
+  });
+
+  it("finalize verify hits the verify route only", async () => {
+    const seen: { paths: string[]; body?: Record<string, unknown> } = {
+      paths: [],
+    };
+    const client = withdrawClient((path, body) => {
+      seen.paths.push(path);
+      seen.body = body;
+      return { json: { isValid: true } };
+    });
+    await client.finalize(TOKEN_ADDRESS).gasless().verify();
+    expect(seen.paths).toEqual(["/withdraw/verify"]);
+    expect(seen.body).toEqual({
+      action: "finalize",
+      user: TEST_ADDRESS,
+      asset: TOKEN_ADDRESS,
+    });
+  });
+
+  it("finalize verify surfaces a refusal by the clock", async () => {
+    const client = withdrawClient(() => ({
+      json: {
+        isValid: false,
+        invalidReason: "grace period not elapsed",
+        errorCode: "SIMULATION_REVERTED",
+      },
+    }));
+    const failure = await client
+      .finalize(TOKEN_ADDRESS)
+      .gasless()
+      .verify()
+      .catch((err) => err);
+    expect(failure).toBeInstanceOf(FacilitatorRejectedError);
+    expect(failure.code).toBe("SIMULATION_REVERTED");
+    expect(failure.message).toMatch(/grace period not elapsed/);
   });
 });

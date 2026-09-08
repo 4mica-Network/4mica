@@ -30,10 +30,6 @@ app.use(
         },
         description: "Access to premium content",
       },
-    },
-    // Payment tab config
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
     }
   )
 );
@@ -115,7 +111,7 @@ console.log(data);
 
 ## Server Configuration
 
-### `paymentMiddlewareFromConfig(routes, tabConfig, ...options)`
+### `paymentMiddlewareFromConfig(routes, ...options)`
 
 The recommended middleware factory for most use cases. Automatically configures the 4mica facilitator and registers the `FourMicaEvmScheme` for all supported networks.
 
@@ -137,38 +133,27 @@ The recommended middleware factory for most use cases. Automatically configures 
 }
 ```
 
-2. **`tabConfig`** (required): Payment tab configuration
+2. **`facilitatorClients`** (optional): Additional facilitator client(s) for other payment schemes
+3. **`schemes`** (optional): Additional scheme registrations for other networks/schemes
+4. **`paywallConfig`** (optional): Configuration for the built-in paywall UI
+5. **`paywall`** (optional): Custom paywall provider
+6. **`syncFacilitatorOnStart`** (optional): Whether to sync with facilitator on startup (defaults to true)
 
-```typescript
-{
-  // Full URL endpoint for opening payment tabs
-  // This is injected into paymentRequirements.extra and clients use it to open tabs
-  advertisedEndpoint: "https://api.example.com/tabs/open",
-  
-  // Lifetime of payment tabs in seconds
-  ttlSeconds: 3600, // optional, defaults to facilitator's default
-}
-```
+#### Validation-gated payments
 
-3. **`facilitatorClients`** (optional): Additional facilitator client(s) for other payment schemes
-4. **`schemes`** (optional): Additional scheme registrations for other networks/schemes
-5. **`paywallConfig`** (optional): Configuration for the built-in paywall UI
-6. **`paywall`** (optional): Custom paywall provider
-7. **`syncFacilitatorOnStart`** (optional): Whether to sync with facilitator on startup (defaults to true)
-
-#### V2 Requirements Extra
-
-When using x402 V2, `paymentRequirements.extra` must include the validation policy fields expected by the 4mica SDKs and facilitator:
+To gate a payment on an external validator, advertise a nested `validation`
+object in `paymentRequirements.extra`. The payer signs the same requirement
+into their claims, and the guarantee only becomes payable once the validator
+approves it:
 
 ```typescript
 const extra = {
-  validationRegistryAddress: '0x3333333333333333333333333333333333333333',
-  validatorAddress: '0x4444444444444444444444444444444444444444',
-  validatorAgentId: '7',
-  minValidationScore: 80,
-  jobHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  requiredValidationTag: 'hard-finality', // optional
-  tabEndpoint: 'https://api.example.com/tabs/open',
+  validation: {
+    validator: 'validator-id',         // must be on core's allowlist
+    subject: '0x…32-byte hash…',       // what the validator must approve
+    deadline: 1700000600,              // optional; core tightens it to the cycle cutoff
+    params: '0x…',                     // optional validator-specific policy bytes
+  },
 }
 ```
 
@@ -208,17 +193,7 @@ const resourceServer = new x402ResourceServer([
 ])
   .register("eip155:8453", new ExactEvmScheme()); // Add Base mainnet with exact scheme
 
-app.use(
-  paymentMiddleware(
-    routes,
-    resourceServer,
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 3600,
-    },
-    paywallConfig
-  )
-);
+app.use(paymentMiddleware(routes, resourceServer, paywallConfig));
 ```
 
 #### Using `paymentMiddlewareFromHTTPServer` with HTTP Hooks
@@ -242,16 +217,7 @@ const httpServer = new x402HTTPResourceServer(resourceServer, routes)
     console.log("Protected request:", context.path);
   });
 
-app.use(
-  paymentMiddlewareFromHTTPServer(
-    httpServer,
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 3600,
-    },
-    paywallConfig
-  )
-);
+app.use(paymentMiddlewareFromHTTPServer(httpServer, paywallConfig));
 ```
 
 ## Client Configuration
@@ -325,10 +291,6 @@ app.use(
         },
         description: "Computation service",
       },
-    },
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 7200, // 2 hours
     }
   )
 );
@@ -386,18 +348,16 @@ main();
 
 1. **Server Setup**: The middleware automatically registers the `FourMicaEvmScheme` and injects the 4mica facilitator client, so you don't need to configure them manually.
 
-2. **Tab Management**: When a client requests a protected resource, the middleware handles the tab lifecycle:
-   - The `advertisedEndpoint` is injected into `paymentRequirements.extra.tabEndpoint`
-   - Clients use this endpoint to open payment tabs
-   - The middleware automatically processes tab opening requests when they arrive at the advertised endpoint
-
-3. **Payment Flow**:
+2. **Payment Flow** (tab-free):
    - Client makes initial request to protected resource
    - Server responds with `402 Payment Required` including payment requirements
-   - Client requests a tab from the advertised endpoint
-   - Client signs a payment guarantee using the 4mica SDK
+   - Client signs a payment guarantee straight from those requirements using
+     the 4mica SDK — a random 32-byte `reqId` is minted locally; there is no
+     server round-trip before signing
    - Client retries the request with the payment payload
-   - Server verifies and settles the payment via the 4mica facilitator
+   - Server verifies and settles the payment via the 4mica facilitator, which
+     issues the BLS guarantee certificate and binds it to the open settlement
+     cycle
    - Server returns the protected resource
 
 ## License

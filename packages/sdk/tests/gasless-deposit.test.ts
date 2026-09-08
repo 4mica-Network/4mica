@@ -3,17 +3,19 @@
  * `sdk-rust/tests/gasless_deposit.rs` and the Python suite.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DepositClient } from "@/client/deposit";
 import { TokenRoute } from "@/client/model";
 import type { ContractGateway } from "@/contract";
 import {
+  Erc20AllowanceRequiredError,
   FacilitatorRejectedError,
   InvalidParamsError,
   OutcomeUnknownError,
   Permit2AllowanceRequiredError,
 } from "@/errors";
 import {
+  CONTRACT_ADDRESS,
   type FacilitatorHandler,
   makeCtx,
   TEST_ADDRESS,
@@ -39,7 +41,16 @@ const rejection = (code: string, extra: Record<string, unknown> = {}) => ({
 const depositClient = (
   handler: FacilitatorHandler,
   gateway?: Partial<ContractGateway>,
-) => new DepositClient(makeCtx({ handler, gateway }));
+  tokenDomain?: string | null,
+) => new DepositClient(makeCtx({ handler, gateway, tokenDomain }));
+
+const mined = async () => ({ transactionHash: "0xtx", status: "success" });
+
+/** EIP-3009 is refused outright and Permit2 lacks an allowance the token cannot sign for. */
+const noGaslessRoute: FacilitatorHandler = (_path, body) =>
+  body.assetTransferMethod === "eip3009"
+    ? rejection("SIMULATION_REVERTED")
+    : rejection("PERMIT2_ALLOWANCE_REQUIRED");
 
 describe("gasless deposits", () => {
   it("eip3009 send posts the wire shape", async () => {
@@ -216,5 +227,99 @@ describe("gasless deposits", () => {
     await expect(client.of(null, AMOUNT).gasless().send()).rejects.toThrow(
       InvalidParamsError,
     );
+  });
+
+  it("auto route falls through to self-funded when no gasless scheme is left", async () => {
+    const methods: string[] = [];
+    const erc20Allowance = vi.fn(async () => AMOUNT);
+    const deposit = vi.fn(mined);
+    const client = depositClient(
+      (path, body) => {
+        methods.push(String(body.assetTransferMethod));
+        return noGaslessRoute(path, body);
+      },
+      { erc20Allowance: erc20Allowance as never, deposit: deposit as never },
+    );
+
+    const receipt = await client.of(TOKEN_ADDRESS, AMOUNT).send();
+
+    expect(methods).toEqual(["eip3009", "permit2"]);
+    expect(receipt.route).toBe(TokenRoute.SelfFunded);
+    expect(deposit).toHaveBeenCalledTimes(1);
+    // The fallback needs an allowance the gasless routes never did. It is
+    // read once, here; the gateway does not read it again.
+    expect(erc20Allowance).toHaveBeenCalledTimes(1);
+  });
+
+  it("a fallback without an ERC-20 allowance is refused, not broadcast", async () => {
+    const deposit = vi.fn(mined);
+    const client = depositClient(noGaslessRoute, {
+      erc20Allowance: (async () => 0n) as never,
+      deposit: deposit as never,
+    });
+
+    const failure = await client
+      .of(TOKEN_ADDRESS, AMOUNT)
+      .send()
+      .catch((err) => err);
+
+    expect(failure).toBeInstanceOf(Erc20AllowanceRequiredError);
+    expect(failure.needed).toBe(AMOUNT);
+    expect(failure.spender.toLowerCase()).toBe(CONTRACT_ADDRESS.toLowerCase());
+    expect(deposit).not.toHaveBeenCalled();
+  });
+
+  it("a token with no published domain deposits over permit2", async () => {
+    const methods: string[] = [];
+    const client = depositClient(
+      (_path, body) => {
+        methods.push(String(body.assetTransferMethod));
+        return success();
+      },
+      undefined,
+      null,
+    );
+
+    const receipt = await client.of(TOKEN_ADDRESS, AMOUNT).send();
+
+    // No EIP-3009 digest can be built without the token's domain, so that
+    // scheme is skipped without a wasted request; Permit2's domain derives
+    // from the chain id.
+    expect(methods).toEqual(["permit2"]);
+    expect(receipt.route).toBe(TokenRoute.Permit2);
+  });
+
+  it("a missing allowance without a token domain cannot be sponsored", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const client = depositClient(
+      (_path, body) => {
+        bodies.push(body);
+        if (!("eip2612Permit" in body)) {
+          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
+            error: "approve permit2 first",
+            permit2Allowance: { eip2612Nonce: "7" },
+          });
+        }
+        return success();
+      },
+      undefined,
+      null,
+    );
+
+    const failure = await client
+      .of(TOKEN_ADDRESS, AMOUNT)
+      .permit2()
+      .sponsorApproval()
+      .send()
+      .catch((err) => err);
+
+    expect(failure).toBeInstanceOf(Permit2AllowanceRequiredError);
+    expect(failure.eip2612Nonce).toBeUndefined();
+    // Re-thrown without the nonce, and without re-wrapping the message.
+    expect(failure.reason).toBe("approve permit2 first");
+    expect(failure.message).toBe(
+      "permit2 requires a prior approve(PERMIT2, ...): approve permit2 first",
+    );
+    expect(bodies).toHaveLength(1);
   });
 });

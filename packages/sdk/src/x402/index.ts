@@ -175,9 +175,12 @@ export class X402Flow {
     }
 
     const url = `${facilitatorUrl.replace(/\/+$/, "")}/settle`;
+    // Called as a free function: a browser's `window.fetch` throws
+    // "Illegal invocation" when invoked with any other receiver.
+    const fetchFn = this.fetchFn;
     let response: Response;
     try {
-      response = await this.fetchFn(url, {
+      response = await fetchFn(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

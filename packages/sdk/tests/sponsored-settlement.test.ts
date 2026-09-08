@@ -3,11 +3,16 @@
  * mirroring `sdk-rust/tests/sponsored_settlement.rs` and the Python suite.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TokenRoute } from "@/client/model";
 import { SettlementClient } from "@/client/settlement";
 import type { ContractGateway } from "@/contract";
-import { FacilitatorRejectedError, InvalidParamsError } from "@/errors";
+import {
+  Erc20AllowanceRequiredError,
+  FacilitatorRejectedError,
+  InvalidParamsError,
+  Permit2AllowanceRequiredError,
+} from "@/errors";
 import { ClearingSettlementActionResponse } from "@/models";
 import type { RpcProxy } from "@/rpc";
 import {
@@ -26,8 +31,13 @@ const success = (extra: Record<string, unknown> = {}) => ({
   json: { success: true, txHash: TX_HASH, ...extra },
 });
 
-const rejection = (code: string) => ({
-  json: { success: false, errorCode: code, error: code.toLowerCase() },
+const rejection = (code: string, extra: Record<string, unknown> = {}) => ({
+  json: {
+    success: false,
+    errorCode: code,
+    error: code.toLowerCase(),
+    ...extra,
+  },
 });
 
 const payAction = (asset: string = TOKEN_ADDRESS) =>
@@ -62,15 +72,23 @@ function settlementClient(options: {
   handler: FacilitatorHandler;
   asset?: string;
   gateway?: Partial<ContractGateway>;
+  tokenDomain?: string | null;
 }): SettlementClient {
   const rpc = {
     getClearingPayNetDebitAction: async () => payAction(options.asset),
     getClearingClaimNetCreditAction: async () => claimAction(),
   } as unknown as RpcProxy;
   return new SettlementClient(
-    makeCtx({ handler: options.handler, gateway: options.gateway, rpc }),
+    makeCtx({
+      handler: options.handler,
+      gateway: options.gateway,
+      tokenDomain: options.tokenDomain,
+      rpc,
+    }),
   );
 }
+
+const mined = async () => ({ transactionHash: "0xtx", status: "success" });
 
 describe("sponsored settlement — pay", () => {
   it("eip3009 pay pins the nonce to the cycle id and posts the wire shape", async () => {
@@ -192,6 +210,157 @@ describe("sponsored settlement — pay", () => {
       .authorization(authorization)
       .verify();
     expect(paths).toEqual(["/clearing/pay/verify"]);
+  });
+
+  it("sponsored permit2 pay signs the missing approval and retries", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const settlement = settlementClient({
+      handler: (_path, body) => {
+        bodies.push(body);
+        if (!("eip2612Permit" in body)) {
+          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
+            permit2Allowance: { eip2612Nonce: "3" },
+          });
+        }
+        return success();
+      },
+    });
+
+    const receipt = await settlement
+      .pay(CYCLE_ID)
+      .permit2()
+      .sponsorApproval()
+      .send();
+
+    expect(receipt.route).toBe(TokenRoute.SponsoredPermit2);
+    expect(bodies.map((body) => body.assetTransferMethod)).toEqual([
+      "permit2",
+      "permit2",
+    ]);
+    for (const body of bodies) {
+      const authorization = body.permit2Authorization as Record<
+        string,
+        unknown
+      >;
+      // The Permit2 nonce is uint256(cycleId).
+      expect(BigInt(String(authorization.nonce))).toBe(BigInt(CYCLE_ID));
+    }
+    const permit = bodies[1]?.eip2612Permit as Record<string, unknown>;
+    expect(Object.keys(permit).sort()).toEqual([
+      "deadline",
+      "r",
+      "s",
+      "v",
+      "value",
+    ]);
+  });
+
+  it("auto pay falls back to self-funded when the allowance cannot be sponsored", async () => {
+    const methods: string[] = [];
+    const erc20Allowance = vi.fn(async () => 1_000_000n);
+    const payNetDebit = vi.fn(mined);
+    const settlement = settlementClient({
+      handler: (_path, body) => {
+        methods.push(String(body.assetTransferMethod));
+        return body.assetTransferMethod === "eip3009"
+          ? rejection("SIMULATION_REVERTED")
+          : rejection("PERMIT2_ALLOWANCE_REQUIRED");
+      },
+      gateway: {
+        erc20Allowance: erc20Allowance as never,
+        payNetDebit: payNetDebit as never,
+      },
+    });
+
+    const receipt = await settlement.pay(CYCLE_ID).send();
+
+    expect(methods).toEqual(["eip3009", "permit2"]);
+    expect(receipt.route).toBe(TokenRoute.SelfFunded);
+    expect(erc20Allowance).toHaveBeenCalledWith(TOKEN_ADDRESS, CLEARING_HOUSE);
+    expect(payNetDebit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a pay fallback without an ERC-20 allowance is refused, not broadcast", async () => {
+    const payNetDebit = vi.fn(mined);
+    const settlement = settlementClient({
+      handler: (_path, body) =>
+        body.assetTransferMethod === "eip3009"
+          ? rejection("SIMULATION_REVERTED")
+          : rejection("PERMIT2_ALLOWANCE_REQUIRED"),
+      gateway: {
+        erc20Allowance: (async () => 0n) as never,
+        payNetDebit: payNetDebit as never,
+      },
+    });
+
+    const failure = await settlement
+      .pay(CYCLE_ID)
+      .send()
+      .catch((err) => err);
+
+    expect(failure).toBeInstanceOf(Erc20AllowanceRequiredError);
+    expect(failure.needed).toBe(5000n);
+    expect(failure.spender).toBe(CLEARING_HOUSE);
+    expect(payNetDebit).not.toHaveBeenCalled();
+  });
+
+  it("a missing allowance without a token domain falls back to self-funding", async () => {
+    const methods: string[] = [];
+    const payNetDebit = vi.fn(mined);
+    const settlement = settlementClient({
+      handler: (_path, body) => {
+        methods.push(String(body.assetTransferMethod));
+        return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
+          permit2Allowance: { eip2612Nonce: "3" },
+        });
+      },
+      gateway: {
+        erc20Allowance: (async () => 1_000_000n) as never,
+        payNetDebit: payNetDebit as never,
+      },
+      tokenDomain: null,
+    });
+
+    const receipt = await settlement.pay(CYCLE_ID).send();
+
+    // Neither the EIP-3009 digest nor the EIP-2612 permit can be built
+    // without the token's domain: one Permit2 attempt, then the debtor's
+    // own transaction.
+    expect(methods).toEqual(["permit2"]);
+    expect(receipt.route).toBe(TokenRoute.SelfFunded);
+    expect(payNetDebit).toHaveBeenCalledTimes(1);
+  });
+
+  it("sponsored permit2 pay gives up when the token has no permit", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const settlement = settlementClient({
+      handler: (_path, body) => {
+        bodies.push(body);
+        if (!("eip2612Permit" in body)) {
+          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
+            error: "approve permit2 first",
+            permit2Allowance: { eip2612Nonce: "3" },
+          });
+        }
+        return success();
+      },
+      tokenDomain: null,
+    });
+
+    const failure = await settlement
+      .pay(CYCLE_ID)
+      .permit2()
+      .sponsorApproval()
+      .send()
+      .catch((err) => err);
+
+    expect(failure).toBeInstanceOf(Permit2AllowanceRequiredError);
+    expect(failure.eip2612Nonce).toBeUndefined();
+    // Re-thrown without the nonce, and without re-wrapping the message.
+    expect(failure.message).toBe(
+      "permit2 requires a prior approve(PERMIT2, ...): approve permit2 first",
+    );
+    expect(bodies).toHaveLength(1);
   });
 });
 

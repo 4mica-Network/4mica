@@ -391,7 +391,7 @@ Notes:
 Settlement is **cycle-based**: core nets each participant's obligations for a clearing cycle into a
 single net-debit or net-credit committed to an on-chain Merkle root. Participants settle by fetching
 their prepared clearing action (contract address, amount, and Merkle proof) from core, then calling
-the `ClearingHouse`. `cycleId` is the on-chain `bytes32` cycle identifier (the text form works too).
+the `ClearingHouse`. `cycleId` is core's text cycle id (`cycle_id_text` in clearing proofs and actions, `"{asset}:{period_start}"`); core does not resolve the on-chain `bytes32` id in this path.
 
 #### `client.deposit`
 

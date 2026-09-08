@@ -3,10 +3,10 @@
  *
  * Mirrors `crates/rpc/src/proxy.rs`: the paths here are exactly the routes
  * core serves (`core/src/http.rs`); anything else is another service's
- * endpoint. GETs retry on 429/5xx; POSTs never do — they may have acted.
+ * endpoint. GETs retry on 429/5xx, except `health`, whose 503 is an answer
+ * rather than an outage; POSTs never retry — they may have acted.
  */
 
-import { ADMIN_API_KEY_HEADER } from "@/constants";
 import { RpcError } from "@/errors";
 import { normalizeBaseUrl, requestJson } from "@/http";
 import {
@@ -33,13 +33,11 @@ const RETRY_BASE_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface RequestOptions {
-  admin?: boolean;
   authed?: boolean;
 }
 
 export class RpcProxy {
   private baseUrl: string;
-  private adminApiKey?: string;
   private bearerToken?: string;
   private bearerTokenProvider?: BearerTokenProvider;
   private fetchFn: FetchFn;
@@ -51,11 +49,6 @@ export class RpcProxy {
 
   async aclose(): Promise<void> {
     // no-op for symmetry with the Python SDK
-  }
-
-  withAdminApiKey(key: string): RpcProxy {
-    this.adminApiKey = key;
-    return this;
   }
 
   withBearerToken(token: string): RpcProxy {
@@ -74,9 +67,6 @@ export class RpcProxy {
     const headers: Record<string, string> = {
       "x-4mica-sdk": SDK_CLIENT_HEADER_VALUE,
     };
-    if (options.admin && this.adminApiKey) {
-      headers[ADMIN_API_KEY_HEADER] = this.adminApiKey;
-    }
     if (options.authed === false) {
       return headers;
     }
@@ -104,6 +94,16 @@ export class RpcProxy {
     return `Bearer ${trimmed}`;
   }
 
+  private errorsFor(path: string) {
+    return {
+      decodeError: (message: string) => new RpcError(message),
+      httpError: (message: string, response: Response, body: unknown) =>
+        new RpcError(message, { status: response.status, body }),
+      wrapTransportError: (err: unknown) =>
+        new RpcError(`request to ${path} failed: ${String(err)}`),
+    };
+  }
+
   private async get<T>(path: string, options: RequestOptions = {}): Promise<T> {
     let lastError: RpcError | undefined;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -118,13 +118,7 @@ export class RpcProxy {
             headers: await this.headers(options),
             method: "GET",
           },
-          {
-            decodeError: (message) => new RpcError(message),
-            httpError: (message, response, body) =>
-              new RpcError(message, { status: response.status, body }),
-            wrapTransportError: (err) =>
-              new RpcError(`request to ${path} failed: ${String(err)}`),
-          },
+          this.errorsFor(path),
         );
       } catch (err) {
         if (
@@ -157,13 +151,7 @@ export class RpcProxy {
         method: "POST",
         body: JSON.stringify(body),
       },
-      {
-        decodeError: (message) => new RpcError(message),
-        httpError: (message, response, body) =>
-          new RpcError(message, { status: response.status, body }),
-        wrapTransportError: (err) =>
-          new RpcError(`request to ${path} failed: ${String(err)}`),
-      },
+      this.errorsFor(path),
     );
   }
 
@@ -183,9 +171,16 @@ export class RpcProxy {
   }
 
   async health(): Promise<Record<string, unknown>> {
-    return this.get<Record<string, unknown>>("/core/health", {
-      authed: false,
-    });
+    const path = "/core/health";
+    return requestJson<Record<string, unknown>>(
+      this.fetchFn,
+      `${this.baseUrl}${path}`,
+      { headers: await this.headers({ authed: false }), method: "GET" },
+      {
+        ...this.errorsFor(path),
+        isSuccess: (response) => response.ok || response.status === 503,
+      },
+    );
   }
 
   async issueGuarantee(body: unknown): Promise<BLSCert> {
@@ -200,7 +195,9 @@ export class RpcProxy {
    * Fetch a participant's committed position + Merkle proof for a settlement
    * cycle.
    *
-   * @param cycleId - On-chain `bytes32` cycle identifier or the text id.
+   * @param cycleId - The cycle's text id (`{asset}:{period_start}`, as
+   *   returned in `cycle_id_text`). Core resolves the path segment by text id
+   *   only; the on-chain `bytes32` id is not accepted here.
    * @param participant - Participant address.
    */
   async getClearingParticipantProof(
@@ -267,6 +264,7 @@ export class RpcProxy {
       : AssetBalanceInfo.fromRpc(raw);
   }
 
+  /** Operator-only: the session wallet must hold core's admin role. */
   async updateUserSuspension(
     userAddress: string,
     suspended: boolean,
@@ -274,7 +272,6 @@ export class RpcProxy {
     const data = await this.post<Record<string, unknown>>(
       `/core/users/${userAddress}/suspension`,
       { suspended },
-      { admin: true },
     );
     return UserSuspensionStatus.fromRpc(data);
   }

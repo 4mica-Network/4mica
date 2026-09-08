@@ -3,7 +3,9 @@
  *
  * Core serializes snake_case JSON (`SiweTemplate` in `auth/` is the one
  * camelCase exception); `fromRpc` parsers accept both spellings defensively.
- * U256 amounts serialize as 0x-prefixed hex, matching the Rust types.
+ * U256 amounts arrive either as 0x-prefixed hex (`UserTransactionInfo`,
+ * `AssetBalanceInfo`) or as decimal strings (clearing proofs and actions);
+ * `parseU256` accepts both.
  */
 
 import { InvalidParamsError } from "@/errors";

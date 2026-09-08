@@ -3,7 +3,6 @@ export * from "@/authorizations";
 export * from "@/bls";
 export * from "@/client";
 export * from "@/config";
-export * from "@/constants";
 export * from "@/contract";
 export * from "@/digest";
 export * from "@/errors";

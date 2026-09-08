@@ -57,8 +57,9 @@ export class SettlementClient {
   }
 
   /**
-   * Start a net-debit payment for `cycleId` (the text id or the 0x-prefixed
-   * on-chain id). Nothing happens until a terminal runs.
+   * Start a net-debit payment for `cycleId` (the cycle's text id, as
+   * returned in `cycle_id_text`; core does not resolve the on-chain `bytes32`
+   * id). Nothing happens until a terminal runs.
    */
   pay(cycleId: string): PayBuilder {
     return new PayBuilder(this.ctx, String(cycleId));
@@ -493,7 +494,7 @@ async function paySponsoredPermit2With(
         // Without a token domain separator the approval cannot be sponsored
         // from here — the same dead end as a token with no EIP-2612 surface,
         // and reported the same way.
-        throw new Permit2AllowanceRequiredError(rejection.message, undefined);
+        throw new Permit2AllowanceRequiredError(rejection.reason);
       }
       throw err;
     }

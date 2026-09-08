@@ -1,17 +1,3 @@
-/**
- * Depositing collateral, over whichever route is cheapest for the payer.
- *
- * `deposit.of(asset, amount)` captures the intent, a route pin (`gasless()`,
- * `eip3009()`, `permit2()`, `selfFunded()`) narrows how, and a terminal
- * (`send()`, `sign()`, `verify()`, `approve()`) does it. Gasless routes have
- * the payer sign an authorization that the facilitator redeems and pays gas
- * for — attach one signed elsewhere with `authorization(...)` — while the
- * self-funded route is the payer's own transaction. Every route credits the
- * authorization's signer, so the choice only changes who pays;
- * `DepositReceipt.route` reports which one ran. Port of
- * `sdk-rust/src/client/deposit.rs`.
- */
-
 import type {
   Eip2612Permit,
   Permit2Authorization,
@@ -38,17 +24,10 @@ import { parseU256 } from "@/utils";
 
 export class DepositClient {
   constructor(private ctx: ClientCtx) {}
-
-  /**
-   * Whether a gasless route is available at all — callers that want to decide
-   * for themselves rather than let the auto route fall back can branch on
-   * this instead of on an error.
-   */
   isGaslessAvailable(): boolean {
     return this.ctx.facilitator.isConfigured();
   }
 
-  /** Start a deposit of `amount` in `asset` (`null`/`undefined` for native ETH). */
   of(
     asset: Asset | string | null | undefined,
     amount: number | bigint | string,
@@ -68,10 +47,6 @@ abstract class DepositBase {
     }
   }
 
-  /**
-   * The ERC-20 behind a gasless pin. Native ETH has no gasless route — no
-   * authorization scheme covers it.
-   */
   protected erc20Token(): string {
     if (this.asset.isNative) {
       throw new InvalidParamsError(
@@ -82,47 +57,26 @@ abstract class DepositBase {
   }
 }
 
-/** A deposit being built; nothing happens until a terminal runs. */
 export class DepositBuilder extends DepositBase {
-  /**
-   * Pin "any gasless scheme": EIP-3009 first, then Permit2 with the approval
-   * sponsored, with no self-funded fallback.
-   */
   gasless(): GaslessDeposit {
     return new GaslessDeposit(this.ctx, this.asset, this.amount);
   }
-
-  /** Pin the EIP-3009 route, failing rather than trying another scheme. */
   eip3009(): Eip3009Deposit {
     return new Eip3009Deposit(this.ctx, this.asset, this.amount);
   }
-
-  /** Pin the Permit2 route, failing rather than trying another scheme. */
   permit2(): Permit2Deposit {
     return new Permit2Deposit(this.ctx, this.asset, this.amount);
   }
 
-  /** Pin the payer's own transaction. */
   selfFunded(): SelfFundedDeposit {
     return new SelfFundedDeposit(this.ctx, this.asset, this.amount);
   }
 
-  /**
-   * Deposit over the cheapest route available: EIP-3009, then Permit2 with
-   * the approval sponsored where the token allows it, then the payer's own
-   * transaction when no gasless route applies — native ETH, no facilitator
-   * configured, or a token whose Permit2 approval cannot be sponsored.
-   */
   async send(waitOptions?: TxReceiptWaitOptions): Promise<DepositReceipt> {
     if (this.asset.isNative || !this.ctx.facilitator.isConfigured()) {
       return this.selfFunded().send(waitOptions);
     }
     const token = this.asset.address;
-
-    // EIP-3009 is the cheapest route, but nothing says up front whether a
-    // token implements it — a domain separator only proves EIP-712, which
-    // EIP-2612 has too. So try it and read the answer off the rejection,
-    // which costs no gas.
     try {
       return await sendEip3009(this.ctx, token, this.amount);
     } catch (rejection) {
@@ -135,10 +89,7 @@ export class DepositBuilder extends DepositBase {
       return await sendSponsoredPermit2(this.ctx, token, this.amount);
     } catch (rejection) {
       if (rejection instanceof Permit2AllowanceRequiredError) {
-        // The approval cannot be sponsored, so gaslessness is off the table
-        // either way; paying for the deposit directly is one transaction
-        // rather than an approval plus a deposit.
-        return fallbackToSelfFunded(this.ctx, token, this.amount, waitOptions);
+        return sendSelfFunded(this.ctx, this.asset, this.amount, waitOptions);
       }
       throw rejection;
     }
@@ -146,10 +97,6 @@ export class DepositBuilder extends DepositBase {
 }
 
 export class GaslessDeposit extends DepositBase {
-  /**
-   * Deposit gaslessly, over whichever scheme the token supports. Fails rather
-   * than falling back to the payer's own transaction.
-   */
   async send(): Promise<DepositReceipt> {
     const token = this.erc20Token();
     try {
@@ -164,19 +111,9 @@ export class GaslessDeposit extends DepositBase {
 }
 
 export class Eip3009Deposit extends DepositBase {
-  /**
-   * Sign the EIP-3009 authorization without submitting it. Redeem by
-   * attaching it to a fresh builder:
-   * `deposit.of(asset, amount).eip3009().authorization(auth).send()`.
-   */
   async sign(): Promise<ReceiveAuthorization> {
     return sig.eip3009Authorization(this.ctx, this.erc20Token(), this.amount);
   }
-
-  /**
-   * Attach an EIP-3009 authorization signed elsewhere — a hardware wallet,
-   * another process, or an earlier session.
-   */
   authorization(authorization: ReceiveAuthorization): AuthorizedEip3009Deposit {
     return new AuthorizedEip3009Deposit(
       this.ctx,
@@ -185,32 +122,18 @@ export class Eip3009Deposit extends DepositBase {
       authorization,
     );
   }
-
-  /**
-   * Deposit gaslessly with an EIP-3009 authorization. Requires a token
-   * implementing EIP-3009 (USDC and similar); for anything else pin
-   * `permit2()`.
-   */
   async send(): Promise<DepositReceipt> {
     return sendEip3009(this.ctx, this.erc20Token(), this.amount);
   }
 }
 
 export class Permit2Deposit extends DepositBase {
-  /**
-   * Upgrade the pin to sign the missing Permit2 approval (EIP-2612) rather
-   * than fail on it.
-   */
   sponsorApproval(): SponsoredPermit2Deposit {
     return new SponsoredPermit2Deposit(this.ctx, this.asset, this.amount);
   }
-
-  /** Sign the Permit2 authorization without submitting it. */
   async sign(): Promise<Permit2Authorization> {
     return sig.permit2Authorization(this.ctx, this.erc20Token(), this.amount);
   }
-
-  /** Attach a Permit2 authorization signed elsewhere. */
   authorization(authorization: Permit2Authorization): AuthorizedPermit2Deposit {
     return new AuthorizedPermit2Deposit(
       this.ctx,
@@ -219,13 +142,6 @@ export class Permit2Deposit extends DepositBase {
       authorization,
     );
   }
-
-  /**
-   * Deposit gaslessly through Permit2. Works for any ERC-20, but is not
-   * gasless on its own: without the payer's one-time on-chain
-   * `approve(PERMIT2, ...)` this fails with Permit2AllowanceRequiredError;
-   * `sponsorApproval()` covers that approval too, where the token allows it.
-   */
   async send(): Promise<DepositReceipt> {
     const token = this.erc20Token();
     const authorization = await sig.permit2Authorization(
@@ -245,13 +161,6 @@ export class Permit2Deposit extends DepositBase {
 }
 
 export class SponsoredPermit2Deposit extends DepositBase {
-  /**
-   * Deposit through Permit2, signing the missing approval rather than
-   * transacting for it. Fails with Permit2AllowanceRequiredError for tokens
-   * with no EIP-2612 surface. No `sign()` on this pin: the permit needs the
-   * payer's current EIP-2612 nonce, which only arrives with the facilitator's
-   * rejection.
-   */
   async send(): Promise<DepositReceipt> {
     return sendSponsoredPermit2(this.ctx, this.erc20Token(), this.amount);
   }
@@ -266,21 +175,12 @@ export class AuthorizedEip3009Deposit extends DepositBase {
   ) {
     super(ctx, asset, amount);
   }
-
-  /**
-   * Preflight: runs every check a real submission would run, without spending
-   * anyone's gas — worth doing before handing an authorization to a
-   * user-facing flow, since it tells a permanently unusable authorization
-   * apart from a transient failure.
-   */
   async verify(): Promise<void> {
     await verifyRequest(
       this.ctx,
       eip3009Request(this.erc20Token(), this.amount, this.auth),
     );
   }
-
-  /** Deposit with the attached authorization. The submitter needs no signer of their own. */
   async send(): Promise<DepositReceipt> {
     const token = this.erc20Token();
     return submit(
@@ -303,16 +203,12 @@ export class AuthorizedPermit2Deposit extends DepositBase {
   ) {
     super(ctx, asset, amount);
   }
-
-  /** Preflight: runs every check a real submission would run, without spending anyone's gas. */
   async verify(): Promise<void> {
     await verifyRequest(
       this.ctx,
       permit2Request(this.erc20Token(), this.amount, this.auth, undefined),
     );
   }
-
-  /** Deposit with the attached authorization. The submitter needs no signer of their own. */
   async send(): Promise<DepositReceipt> {
     const token = this.erc20Token();
     return submit(
@@ -327,10 +223,6 @@ export class AuthorizedPermit2Deposit extends DepositBase {
 }
 
 export class SelfFundedDeposit extends DepositBase {
-  /**
-   * Grant the Core4Mica contract the allowance a self-funded ERC-20 deposit
-   * pulls. Returns `undefined` when the standing allowance covers it.
-   */
   async approve(waitOptions?: TxReceiptWaitOptions) {
     if (this.asset.isNative) {
       throw new InvalidParamsError(
@@ -341,27 +233,8 @@ export class SelfFundedDeposit extends DepositBase {
     const gateway = await this.ctx.gateway();
     return gateway.approveErc20(this.asset.address, this.amount, waitOptions);
   }
-
-  /**
-   * Deposit with the payer's own transaction, reported in the same shape as a
-   * gasless one. For ERC-20 deposits, grant the allowance with
-   * {@link approve} first.
-   */
   async send(waitOptions?: TxReceiptWaitOptions): Promise<DepositReceipt> {
-    const gateway = await this.ctx.gateway();
-    const receipt = await gateway.deposit(
-      this.amount,
-      this.asset.erc20Token,
-      waitOptions,
-    );
-    return {
-      txHash: receipt.transactionHash,
-      route: TokenRoute.SelfFunded,
-      account: this.ctx.signerAddress,
-      asset: this.asset.address,
-      amount: this.amount,
-      raw: receipt,
-    };
+    return sendSelfFunded(this.ctx, this.asset, this.amount, waitOptions);
   }
 }
 
@@ -386,8 +259,6 @@ async function sendSponsoredPermit2(
   token: string,
   amount: bigint,
 ): Promise<DepositReceipt> {
-  // Try the plain route first: the payer may already have approved, in which
-  // case a permit is pointless and only costs the submitter a no-op.
   const authorization = await sig.permit2Authorization(ctx, token, amount);
   try {
     return await submit(
@@ -411,11 +282,7 @@ async function sendSponsoredPermit2(
       permit = await sig.eip2612Permit(ctx, token, rejection.eip2612Nonce);
     } catch (err) {
       if (err instanceof MissingTokenDomainSeparatorError) {
-        // The permit digest needs the token's domain separator; without one
-        // the approval cannot be sponsored from here — the nonce advertised
-        // that sponsoring *could* work, which has just been disproven, so it
-        // is stripped.
-        throw new Permit2AllowanceRequiredError(rejection.message, undefined);
+        throw new Permit2AllowanceRequiredError(rejection.reason);
       }
       throw err;
     }
@@ -431,34 +298,33 @@ async function sendSponsoredPermit2(
   }
 }
 
-/**
- * Taken only after every gasless route was refused. Pre-checks the ERC-20
- * allowance the fallback needs and the gasless routes never did, so a payer
- * who has not approved the contract is told exactly that instead of getting
- * an opaque revert from inside the token.
- */
-async function fallbackToSelfFunded(
+async function sendSelfFunded(
   ctx: ClientCtx,
-  token: string,
+  asset: Asset,
   amount: bigint,
   waitOptions?: TxReceiptWaitOptions,
 ): Promise<DepositReceipt> {
   const gateway = await ctx.gateway();
-  const allowance = await gateway.erc20Allowance(token, ctx.contractAddress);
-  if (allowance < amount) {
-    throw new Erc20AllowanceRequiredError({
-      token,
-      spender: ctx.contractAddress,
-      allowance,
-      needed: amount,
-    });
+  if (!asset.isNative) {
+    const allowance = await gateway.erc20Allowance(
+      asset.address,
+      ctx.contractAddress,
+    );
+    if (allowance < amount) {
+      throw new Erc20AllowanceRequiredError({
+        token: asset.address,
+        spender: ctx.contractAddress,
+        allowance,
+        needed: amount,
+      });
+    }
   }
-  const receipt = await gateway.deposit(amount, token, waitOptions);
+  const receipt = await gateway.deposit(amount, asset.erc20Token, waitOptions);
   return {
     txHash: receipt.transactionHash,
     route: TokenRoute.SelfFunded,
     account: ctx.signerAddress,
-    asset: token,
+    asset: asset.address,
     amount,
     raw: receipt,
   };
@@ -515,13 +381,8 @@ async function submit(
     );
   }
 
-  // from/asset/amount are echoed for reconciliation; a facilitator that omits
-  // them has not changed what the contract did, but one that echoes a
-  // different deposit has, and the receipt is refused rather than made to
-  // describe it.
   const echoedAmount = response.amount;
   if (echoedAmount !== null && echoedAmount !== undefined) {
-    // An echo that cannot be read is no confirmation that it matched.
     let parsedAmount: bigint | undefined;
     try {
       parsedAmount = BigInt(String(echoedAmount));

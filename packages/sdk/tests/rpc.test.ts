@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { ADMIN_API_KEY_HEADER } from "@/constants";
 import { RpcError } from "@/errors";
 import type { FetchFn } from "@/rpc";
 import { RpcProxy } from "@/rpc";
@@ -76,6 +75,19 @@ describe("RpcProxy", () => {
     expect(cert.signature).toBe("0x03");
   });
 
+  it("parses the unprefixed certificate hex core emits", async () => {
+    // core's `HexBytes` serializes lowercase hex with no `0x` prefix.
+    const fetchMock = vi.fn<FetchFn>(
+      async () =>
+        new Response(JSON.stringify({ claims: "0102", signature: "03" }), {
+          status: 200,
+        }),
+    );
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    const cert = await proxy.issueGuarantee({ claims: {} });
+    expect(Array.from(cert.claimsBytes())).toEqual([1, 2]);
+  });
+
   it("surfaces api errors with status and message", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input) => {
       expect(input.toString()).toContain("action=claim_net_credit");
@@ -134,8 +146,36 @@ describe("RpcProxy", () => {
       return new Response(JSON.stringify({ error: "nope" }), { status: 404 });
     });
     const proxy = new RpcProxy("http://example.com", fetchMock);
-    await expect(proxy.health()).rejects.toThrow(RpcError);
+    await expect(proxy.getSupportedTokens()).rejects.toThrow(RpcError);
     expect(calls).toBe(1);
+  });
+
+  it("returns the health report on 503 without retrying", async () => {
+    // Core answers 503 with the same report body when a dependency is down.
+    const report = {
+      status: "unhealthy",
+      db: "ok",
+      chain_rpc: "unhealthy",
+      settlement_timing: "ok",
+    };
+    let calls = 0;
+    const fetchMock = vi.fn<FetchFn>(async (input) => {
+      calls += 1;
+      expect(input.toString().endsWith("/core/health")).toBe(true);
+      return new Response(JSON.stringify(report), { status: 503 });
+    });
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    await expect(proxy.health()).resolves.toEqual(report);
+    expect(calls).toBe(1);
+  });
+
+  it("fails health on a status that is not an answer", async () => {
+    const fetchMock = vi.fn<FetchFn>(
+      async () =>
+        new Response(JSON.stringify({ error: "nope" }), { status: 404 }),
+    );
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    await expect(proxy.health()).rejects.toThrow(RpcError);
   });
 
   it("never retries POSTs — they may have acted", async () => {
@@ -204,21 +244,21 @@ describe("RpcProxy", () => {
     await proxy.listRecipientPayments("0xr");
   });
 
-  it("sends the admin api key only on admin routes", async () => {
+  it("authorizes the suspension route with the session bearer only", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input, init) => {
       const headers = init?.headers as Record<string, string>;
+      expect(headers["x-api-key"]).toBeUndefined();
       if (input.toString().includes("/suspension")) {
-        expect(headers[ADMIN_API_KEY_HEADER]).toBe("key");
+        expect(headers.Authorization).toBe("Bearer token");
         return new Response(
           JSON.stringify({ user_address: "0xu", suspended: true }),
           { status: 200 },
         );
       }
-      expect(headers[ADMIN_API_KEY_HEADER]).toBeUndefined();
       return new Response(JSON.stringify(PARAMS), { status: 200 });
     });
-    const proxy = new RpcProxy("http://example.com", fetchMock).withAdminApiKey(
-      "key",
+    const proxy = new RpcProxy("http://example.com", fetchMock).withBearerToken(
+      "token",
     );
     await proxy.getPublicParams();
     const status = await proxy.updateUserSuspension("0xu", true);
