@@ -25,7 +25,7 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.10",
-          network: "eip155:11155111", // Ethereum Sepolia
+          network: "eip155:84532", // Base Sepolia
           payTo: "0xYourAddress",
         },
         description: "Access to premium content",
@@ -65,7 +65,7 @@ const scheme = await FourMicaEvmScheme.create(account);
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
+      network: "eip155:84532", // Base Sepolia
       client: scheme,
     },
   ],
@@ -97,7 +97,7 @@ const scheme = await FourMicaEvmScheme.create(account);
 const api = wrapAxiosWithPaymentFromConfig(axios.create(), {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
+      network: "eip155:84532", // Base Sepolia
       client: scheme,
     },
   ],
@@ -125,7 +125,7 @@ The recommended middleware factory for most use cases. Automatically configures 
     accepts: {
       scheme: "4mica-credit",
       price: "$0.10",
-      network: "eip155:11155111", // or "eip155:80002" for Polygon Amoy
+      network: "eip155:84532", // or "eip155:8453" for Base mainnet
       payTo: "0xRecipientAddress",
     },
     description: "What the user is paying for",
@@ -159,8 +159,14 @@ const extra = {
 
 #### Supported Networks
 
-- `eip155:11155111` - Ethereum Sepolia
-- `eip155:80002` - Polygon Amoy
+- `eip155:8453` - Base
+- `eip155:84532` - Base Sepolia
+- `eip155:11155111` - Ethereum Sepolia (x402 v1 only)
+
+A `price` such as `"$0.10"` resolves to the stablecoin 4mica core lists for the network
+(`GET /core/tokens`), so the advertised `asset` is always one core accepts. Pass
+`{ coreUrls: { "eip155:84532": "http://localhost:3000/" } }` to `new FourMicaEvmScheme(...)` and
+register it through the `schemes` parameter to point a network at a self-hosted core.
 
 ### Advanced Server Usage
 
@@ -228,18 +234,18 @@ app.use(paymentMiddlewareFromHTTPServer(httpServer, paywallConfig));
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 
-const sepoliaScheme = await FourMicaEvmScheme.create(sepoliaAccount);
-const amoyScheme = await FourMicaEvmScheme.create(amoyAccount);
+const baseSepoliaScheme = await FourMicaEvmScheme.create(baseSepoliaAccount);
+const baseScheme = await FourMicaEvmScheme.create(baseAccount);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
-      client: sepoliaScheme,
+      network: "eip155:84532", // Base Sepolia
+      client: baseSepoliaScheme,
     },
     {
-      network: "eip155:80002", // Polygon Amoy
-      client: amoyScheme,
+      network: "eip155:8453", // Base mainnet
+      client: baseScheme,
     },
   ],
 });
@@ -254,7 +260,7 @@ import { FourMicaEvmScheme } from "@4mica/x402/client";
 const scheme = await FourMicaEvmScheme.create(account);
 
 const client = new x402Client()
-  .register("eip155:11155111", scheme);
+  .register("eip155:84532", scheme);
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 ```
@@ -277,7 +283,7 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.05",
-          network: "eip155:11155111",
+          network: "eip155:84532",
           payTo: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
         },
         description: "API data access",
@@ -286,7 +292,7 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.20",
-          network: "eip155:11155111",
+          network: "eip155:84532",
           payTo: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
         },
         description: "Computation service",
@@ -320,7 +326,7 @@ async function main() {
   const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [
       {
-        network: "eip155:11155111",
+        network: "eip155:84532",
         client: scheme,
       },
     ],

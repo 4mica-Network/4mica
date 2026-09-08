@@ -1,6 +1,7 @@
 import {
   Client,
   ConfigBuilder,
+  resolveNetworkRpcUrl,
   PaymentRequirementsV2 as SdkPaymentRequirementsV2,
   X402Flow,
   X402PaymentRequired,
@@ -14,12 +15,6 @@ import type {
 } from '@x402/core/types'
 import type { Account } from 'viem/accounts'
 import { SUPPORTED_NETWORKS } from '../server/scheme.js'
-
-const NETWORK_RPC_URLS: Record<Network, string> = {
-  'eip155:11155111': 'https://ethereum.sepolia.api.4mica.xyz',
-  'eip155:84532': 'https://base.sepolia.api.4mica.xyz',
-  'eip155:8453': 'https://base.api.4mica.xyz',
-}
 
 export class FourMicaEvmScheme implements SchemeNetworkClient {
   readonly scheme = '4mica-credit'
@@ -41,7 +36,7 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
     const x402Flows = new Map<string, X402Flow>()
 
     for (const network of SUPPORTED_NETWORKS) {
-      const rpcUrl = NETWORK_RPC_URLS[network]
+      const rpcUrl = resolveNetworkRpcUrl(network)
       if (!rpcUrl) continue
 
       x402Flows.set(rpcUrl, await FourMicaEvmScheme.createX402Flow(signer, rpcUrl))
@@ -59,9 +54,12 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
       throw new Error('Network is required in PaymentRequirements')
     }
 
-    const rpcUrl = (paymentRequirements.extra?.rpcUrl as string) ?? NETWORK_RPC_URLS[network]
+    // `extra.rpcUrl` lets a resource server point payers at a self-hosted core;
+    // otherwise the hosted deployment for the network is used.
+    const rpcUrl =
+      (paymentRequirements.extra?.rpcUrl as string | undefined) ?? resolveNetworkRpcUrl(network)
     if (!rpcUrl) {
-      throw new Error(`No RPC URL configured for network ${network}`)
+      throw new Error(`No core API URL known for network ${network}`)
     }
 
     let x402Flow = this.x402Flows.get(rpcUrl)

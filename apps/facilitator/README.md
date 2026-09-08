@@ -24,7 +24,7 @@ certificate to the recipient.
 
 ### Quick integration (resource servers)
 
-- Configure the 4mica facilitator (for example `https://x402.4mica.xyz/`). Your `402 Payment Required` responses should advertise `scheme = "4mica-credit"`, a supported `network`, and set `payTo` / `asset` / `maxAmountRequired` (v1) or `amount` (v2). To gate the payment on a validation outcome, also advertise `paymentRequirements.extra.validation = { validator, subject, deadline?, params? }`.
+- Configure the 4mica facilitator (for example `https://x402.4mica.xyz/`). Your `402 Payment Required` responses should advertise `scheme = "4mica-credit"`, a supported `network`, and set `payTo` / `asset` (an address from core's `GET /core/tokens` for that network) / `amount` (`maxAmountRequired` under x402 v1). To gate the payment on a validation outcome, also advertise `paymentRequirements.extra.validation = { validator, subject, deadline?, params? }`.
 - Clients sign a payment guarantee claim straight from your `paymentRequirements` — no round-trip to you or the facilitator first — producing the x402 `paymentPayload` that they send on the retried request for the protected resource. You never construct this payload yourself; you only need to validate and consume it.
 - When a request arrives with a payment payload, send it together with the original `paymentRequirements` to the facilitator's `/verify` and `/settle` endpoints. Use `/verify` as an optional preflight check before doing work, and `/settle` once you are ready to accept credit: it issues the BLS guarantee certificate via 4mica core, which binds it to the open settlement cycle for that asset. That is the whole integration — there are no endpoints for you to implement.
 
@@ -37,23 +37,28 @@ certificate to the recipient.
   ```
 
   ```python
-  import asyncio
-  from fourmica_sdk import Client, ConfigBuilder, PaymentRequirementsV1, X402Flow
+  import asyncio, base64, json
+  from fourmica_sdk import Client, ConfigBuilder, X402Flow, X402PaymentRequired
 
   payer_key = "0x..."    # wallet private key
   user_address = "0x..." # address to embed in the claims
 
   async def main():
-      cfg = ConfigBuilder().wallet_private_key(payer_key).rpc_url("https://api.4mica.xyz/").build()
+      cfg = (
+          ConfigBuilder()
+          .wallet_private_key(payer_key)
+          .rpc_url("https://base.sepolia.api.4mica.xyz/")
+          .build()
+      )
       client = await Client.connect(cfg)
       flow = X402Flow.from_client(client)
 
-      # Fetch the recipient's paymentRequirements from its 402 response
-      req_raw = fetch_requirements_somehow()[0]
-      requirements = PaymentRequirementsV1.from_raw(req_raw)
+      # The 402 response carries the challenge in its `payment-required` header (base64 JSON)
+      challenge = X402PaymentRequired.from_raw(json.loads(base64.b64decode(header)))
+      accepted = next(a for a in challenge.accepts if a.scheme == "4mica-credit")
 
-      payment = await flow.sign_payment(requirements, user_address)
-      headers = {"X-PAYMENT": payment.header}  # client retry header (decode to paymentPayload for /verify)
+      payment = await flow.sign_payment_v2(challenge, accepted, user_address)
+      headers = {"PAYMENT-SIGNATURE": payment.header}  # retry header (decode to paymentPayload for /verify)
       await client.aclose()
 
   asyncio.run(main())
@@ -66,19 +71,21 @@ certificate to the recipient.
   ```
 
   ```ts
-  import { Client, ConfigBuilder, X402Flow } from "@4mica/sdk";
+  import { Client, ConfigBuilder, X402Flow, X402PaymentRequired } from "@4mica/sdk";
 
   async function run() {
-    const cfg = new ConfigBuilder().walletPrivateKey("0x...").build();
+    const cfg = new ConfigBuilder().walletPrivateKey("0x...").network("base-sepolia").build();
     const client = await Client.connect(cfg);
     const flow = X402Flow.fromClient(client);
 
-    // Raw requirement objects from the 402 response are accepted directly —
-    // they are parsed and validated by the flow.
-    const reqRaw = fetchRequirementsSomehow()[0];
+    // The 402 response carries the challenge in its `payment-required` header (base64 JSON).
+    const challenge = X402PaymentRequired.fromRaw(
+      JSON.parse(Buffer.from(header, "base64").toString("utf8"))
+    );
+    const accepted = challenge.accepts.find((a) => a.scheme === "4mica-credit")!;
 
-    const payment = await flow.signPayment(reqRaw, client.signerAddress);
-    const headers = { "X-PAYMENT": payment.header }; // decode to paymentPayload for /verify
+    const payment = await flow.signPaymentV2(challenge, accepted, client.signerAddress);
+    const headers = { "PAYMENT-SIGNATURE": payment.header }; // decode to paymentPayload for /verify
     await client.aclose();
   }
 
@@ -86,8 +93,14 @@ certificate to the recipient.
   ```
 
 - Rust SDK: `cargo add sdk-4mica` and call
-  `X402Flow::sign_payment(requirements, user_address)` to obtain the same `payment.header` for the
-  retry request.
+  `X402Flow::sign_payment_v2(payment_required, accepted, user_address)` to obtain the same
+  `payment.header` for the retry request.
+- x402 v1 (JSON body with `accepts`, `X-PAYMENT` retry header) is still served. Call the v1
+  sibling — `signPayment(requirements, userAddress)` / `sign_payment(requirements, user_address)` —
+  with the v1 requirements entry instead.
+- With `@4mica/x402` and `@x402/fetch` none of this is hand-written:
+  `wrapFetchWithPaymentFromConfig(fetch, { schemes: [{ network: "eip155:84532", client: await FourMicaEvmScheme.create(account) }] })`
+  handles the 402, the signing and the retry (see `packages/typescript/x402/README.md`).
 
 ### Demo example
 
@@ -95,7 +108,7 @@ You can pair the client with `examples/server/mock_paid_api.py`, a FastAPI serve
 paywalled endpoint. Start it with `python examples/server/mock_paid_api.py` (set `PORT` to override
 the default `9000`). The mock resource will call the facilitator's `/verify` endpoint (defaulting to
 `https://x402.4mica.xyz/`; override with `FACILITATOR_URL`) whenever it receives a payment payload
-(for example decoded from an `X-PAYMENT` header).
+(the mock speaks x402 v1, so it reads the `X-PAYMENT` header).
 
 The bundled Rust example shows how to sign a payment
 header with `sdk-4mica`:
@@ -110,54 +123,21 @@ Python counterpart lives in `examples/python_client/client.py` (install deps wit
 examples/python_client/requirements.txt`). A TypeScript version lives in `examples/ts_client`
 (`npm install && npm start`).
 
-### Payment payload schema (v1)
-
-`paymentPayload` is a JSON envelope, sent base64-encoded in the `X-PAYMENT` header:
-
-```json
-{
-  "x402Version": 1,
-  "scheme": "4mica-credit",
-  "network": "eip155:80002",
-  "payload": {
-    "claims": {
-      "version": "v1",
-      "user_address": "<0x-prefixed checksum string>",
-      "recipient_address": "<0x-prefixed checksum string>",
-      "req_id": "<0x-prefixed 32-byte value>",
-      "amount": "<0x-prefixed u256 value>",
-      "asset_address": "<0x-prefixed checksum string>",
-      "timestamp": 1716500000
-    },
-    "signature": "<0x-prefixed wallet signature>",
-    "scheme": "eip712"
-  }
-}
-```
-
-`req_id` is a random 32-byte value the client mints locally — uniqueness is all core asks, so no
-server round-trip is needed before signing. When the requirements carry `extra.validation`, the
-claims additionally embed the same requirement as a nested `validation` object
-(`{ "validator", "subject", "deadline"?, "params"? }`), and the facilitator cross-checks both
-sides.
-
 ### Payment payload schema (v2)
 
-x402 V2 changes only the envelope, not the claims: the requirements entry the payer accepted moves
-under `accepted`, an optional `resource` block may accompany it, and the header is
-`PAYMENT-SIGNATURE` instead of `X-PAYMENT`. The claims inside stay `"version": "v1"` — the x402
-protocol version is decoupled from the guarantee claims version. Validation gating travels as
-`extra.validation` on the requirements and as the nested `validation` object inside the signed
-claims. The facilitator derives the expected chain id from the CAIP-2 payment network.
-
-`paymentPayload` for x402 V2, base64-encoded in the `PAYMENT-SIGNATURE` header:
+`paymentPayload` is a JSON envelope, sent base64-encoded in the `PAYMENT-SIGNATURE` header. The
+requirements entry the payer accepted travels under `accepted`, an optional `resource` block may
+accompany it, and the claims inside are `"version": "v1"` — the x402 protocol version is decoupled
+from the guarantee claims version. Validation gating travels as `extra.validation` on the
+requirements and as the nested `validation` object inside the signed claims. The facilitator
+derives the expected chain id from the CAIP-2 payment network.
 
 ```json
 {
   "x402Version": 2,
   "accepted": {
     "scheme": "4mica-credit",
-    "network": "eip155:80002",
+    "network": "eip155:84532",
     "amount": "<decimal or 0x value>",
     "payTo": "<0x-prefixed checksum string>",
     "asset": "<0x-prefixed checksum string>",
@@ -188,6 +168,38 @@ claims. The facilitator derives the expected chain id from the CAIP-2 payment ne
     "scheme": "eip712"
   },
   "resource": { "url": "/your/resource" }
+}
+```
+
+`req_id` is a random 32-byte value the client mints locally — uniqueness is all core asks, so no
+server round-trip is needed before signing. When the requirements carry `extra.validation`, the
+claims additionally embed the same requirement as a nested `validation` object
+(`{ "validator", "subject", "deadline"?, "params"? }`), and the facilitator cross-checks both
+sides.
+
+### Payment payload schema (v1, legacy)
+
+x402 v1 changes only the envelope, not the claims: it is flat, names `scheme` and `network`
+directly, and is sent base64-encoded in the `X-PAYMENT` header:
+
+```json
+{
+  "x402Version": 1,
+  "scheme": "4mica-credit",
+  "network": "eip155:84532",
+  "payload": {
+    "claims": {
+      "version": "v1",
+      "user_address": "<0x-prefixed checksum string>",
+      "recipient_address": "<0x-prefixed checksum string>",
+      "req_id": "<0x-prefixed 32-byte value>",
+      "amount": "<0x-prefixed u256 value>",
+      "asset_address": "<0x-prefixed checksum string>",
+      "timestamp": 1716500000
+    },
+    "signature": "<0x-prefixed wallet signature>",
+    "scheme": "eip712"
+  }
 }
 ```
 
@@ -557,7 +569,7 @@ sequenceDiagram
 
     Note over P: Build and sign claims<br/>{ reqId (random 32 bytes),<br/>  amount, timestamp,<br/>  userAddress, payTo, asset,<br/>  validation? }<br/>EIP-712 ECDSA sign
 
-    P->>R: GET /api/resource<br/>X-PAYMENT: base64(paymentPayload)
+    P->>R: GET /api/resource<br/>PAYMENT-SIGNATURE: base64(paymentPayload)
     R->>F: POST /verify<br/>{ paymentPayload, paymentRequirements }
     F-->>R: { isValid: true }
 
@@ -624,8 +636,8 @@ The facilitator can transparently replace the EIP-3009/x402 debit flow. The key 
    ```jsonc
    {
      "scheme": "4mica-credit",
-     "network": "eip155:80002",
-     "maxAmountRequired": "<decimal or 0x amount>",
+     "network": "eip155:84532",
+     "amount": "<decimal or 0x amount>",             // `maxAmountRequired` under x402 v1
      "resource": "/your/resource",
      "description": "Describe the protected work",
      "mimeType": "application/json",
@@ -643,7 +655,7 @@ The facilitator can transparently replace the EIP-3009/x402 debit flow. The key 
    `extra.validation` — match the signed claims exactly, so keep them synchronized.
 
 3. **Expect credit certificates during settlement** – `/verify` still performs structural checks and
-   `/settle` now returns `{ success, networkId: "eip155:80002", certificate: { claims, signature } }`.
+   `/settle` now returns `{ success, networkId: "eip155:84532", certificate: { claims, signature } }`.
    Core binds each issued certificate to the open settlement cycle for its asset; when the cycle
    commits, your net credit becomes claimable on-chain. Persist the certificate if you want an
    audit trail of what the cycle netted.
@@ -675,8 +687,9 @@ Payers sign guarantees instead of EIP-3009 transfers. Use the official SDK `sdk-
 3. **Post collateral** – before requesting credit, ensure the payer has collateral using
    `client.user.deposit(...)` (or `approve_erc20` + `deposit` for tokens). Refer to the SDK README
    for concrete examples.
-4. **Sign guarantee claims** – hand the recipient's `paymentRequirements` from the 402 response
-   straight to `X402Flow::sign_payment`. The flow derives the claims (`userAddress`, `payTo`,
+4. **Sign guarantee claims** – hand the decoded `payment-required` challenge and the `accepts`
+   entry you chose to `X402Flow::sign_payment_v2` (`sign_payment` for a v1 body). The flow derives
+   the claims (`userAddress`, `payTo`,
    `asset`, `amount`, a timestamp, the `validation` requirement when the requirements carry one),
    mints a random 32-byte `req_id`, and signs — no server round-trip first.
 
@@ -685,14 +698,14 @@ Payers sign guarantees instead of EIP-3009 transfers. Use the official SDK `sdk-
 
    let flow = X402Flow::new(client)?;
    let payment = flow
-       .sign_payment(payment_requirements, user_address)
+       .sign_payment_v2(payment_required, accepted, user_address)
        .await?;
    ```
 
 5. **Send the payment payload** – `payment.header` is the finished
-   `{ x402Version: 1, scheme: "4mica-credit", network: "eip155:80002", payload: { claims,
-   signature, scheme: "eip712" } }` envelope, base64-encoded and ready for the `X-PAYMENT` header
-   of the retried HTTP request (see `examples/rust_client/main.rs` or
+   `{ x402Version: 2, accepted, payload: { claims, signature, scheme: "eip712" }, resource }`
+   envelope, base64-encoded and ready for the `PAYMENT-SIGNATURE` header of the retried HTTP
+   request (a v1 signature goes in `X-PAYMENT`; see `examples/rust_client/main.rs` or
    `examples/python_client/client.py`).
 6. **Settle through the cycle** – recipients call `/settle` to obtain the BLS certificate, which
    core binds to the open settlement cycle for the asset. There is no per-payment on-chain
@@ -714,19 +727,19 @@ export PORT=8080
 export X402_SCHEME=4mica-credit
 # List of supported networks (JSON). Each entry must include
 # `{ "network", "coreApiUrl", "authWalletPrivateKey" }` where `network` is a
-# CAIP-2 identifier (e.g., `eip155:80002`).
-export X402_NETWORKS='[{"network":"eip155:80002","coreApiUrl":"https://api.4mica.xyz/","authWalletPrivateKey":"0x..."}]'
+# CAIP-2 identifier (e.g., `eip155:84532`).
+export X402_NETWORKS='[{"network":"eip155:84532","coreApiUrl":"https://base.sepolia.api.4mica.xyz/","authWalletPrivateKey":"0x..."}]'
 # Legacy single-network fallback if X402_NETWORKS is unset
-export X402_NETWORK=eip155:80002
+export X402_NETWORK=eip155:84532
 
 # 4mica public API – used to fetch operator parameters. REQUIRED: there is no
 # default, so an unconfigured facilitator refuses to start rather than pointing
 # itself at a live core API.
-export X402_CORE_API_URL=https://api.4mica.xyz/
+export X402_CORE_API_URL=https://base.sepolia.api.4mica.xyz/
 # SIWE key used to authenticate against the core API. REQUIRED, per network.
 export X402_AUTH_WALLET_PRIVATE_KEY=0x...
 # Optional: defaults to the network's own coreApiUrl, and 60s respectively.
-export X402_AUTH_URL=https://api.4mica.xyz/
+export X402_AUTH_URL=https://base.sepolia.api.4mica.xyz/
 export X402_AUTH_REFRESH_MARGIN_SECS=60
 
 # Gasless deposits (optional). Without a relayer key, /deposit returns NO_RELAYER and the rest of
