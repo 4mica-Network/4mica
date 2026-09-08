@@ -115,9 +115,10 @@ receipt = await client.settlement.claim(cycle_id).creditor("0xThem...").send()
 action = await client.settlement.pay(cycle_id).action()
 ```
 
-`cycle_id` is either core's text id (`"{asset}:{period_start}"`) or the
-0x-prefixed on-chain id — both appear in verified guarantee claims and
-clearing responses.
+`cycle_id` is core's text id (`"{asset}:{period_start}"`, returned as
+`cycle_id_text` in clearing responses). Core resolves this path by text id
+only; the 0x-prefixed on-chain id carried in guarantee claims is not accepted
+here.
 
 ### Collateral
 
@@ -205,8 +206,10 @@ pip install -e ".[dev,cdp]"
 ruff check . && pytest -q
 ```
 
-Contract ABIs under `fourmica_sdk/contract/abi/` are vendored from the
-`4mica-core` repo's forge artifacts (`scripts/refresh_abis.sh`). Wire-format
+Contract ABIs under `fourmica_sdk/contract/abi/` are copies of the monorepo's
+`contracts/abi/*.json`, vendored from the `4mica-core` repo's forge artifacts
+by `scripts/refresh-abis.sh` at the repo root (which refreshes every SDK at
+once; `scripts/refresh_abis.sh` here just forwards to it). Wire-format
 parity with the Rust SDK and the contracts is pinned by two fixtures:
 `tests/fixtures/guarantee_vectors.json` (shared with the Rust and Solidity
 suites) and `tests/fixtures/digest_vectors.json` (regenerate with

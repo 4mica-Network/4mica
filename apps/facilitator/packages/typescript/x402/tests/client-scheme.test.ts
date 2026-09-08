@@ -3,6 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FourMicaEvmScheme } from '../src/client/scheme.js'
 
+/** `createX402Flow` is private static; widen the class so the spy is typed. */
+function spyOnCreateX402Flow() {
+  return vi.spyOn(
+    FourMicaEvmScheme as unknown as {
+      createX402Flow: (...args: unknown[]) => Promise<unknown>
+    },
+    'createX402Flow'
+  )
+}
+
 describe('FourMicaEvmScheme', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -19,7 +29,7 @@ describe('FourMicaEvmScheme', () => {
       },
     })
 
-    vi.spyOn(FourMicaEvmScheme as never, 'createX402Flow' as never).mockResolvedValue({
+    spyOnCreateX402Flow().mockResolvedValue({
       signPayment: vi.fn(),
       signPaymentV2,
     } as never)
@@ -79,7 +89,7 @@ describe('FourMicaEvmScheme', () => {
   })
 
   it('rejects unsupported x402 versions', async () => {
-    vi.spyOn(FourMicaEvmScheme as never, 'createX402Flow' as never).mockResolvedValue({
+    spyOnCreateX402Flow().mockResolvedValue({
       signPayment: vi.fn(),
       signPaymentV2: vi.fn(),
     } as never)
