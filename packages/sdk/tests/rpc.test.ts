@@ -219,7 +219,6 @@ describe("RpcProxy", () => {
   it("authorizes the suspension route with the session bearer only", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input, init) => {
       const headers = init?.headers as Record<string, string>;
-      // Core has no API-key path: the admin role lives on the SIWE session.
       expect(headers["x-api-key"]).toBeUndefined();
       if (input.toString().includes("/suspension")) {
         expect(headers.Authorization).toBe("Bearer token");

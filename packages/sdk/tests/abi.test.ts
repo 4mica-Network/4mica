@@ -4,12 +4,7 @@ import { describe, expect, it } from "vitest";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
 import { core4micaAbi } from "@/abi/core4mica";
 
-/**
- * The checked-in TypeScript ABIs are generated from `contracts/abi/*.json`
- * (forge output vendored from 4mica-core) by `scripts/refresh-abis.sh`. This
- * pins them to that source so a hand edit or a stale regeneration fails here
- * rather than as an undecodable revert at runtime.
- */
+/** The generated ABIs must match `contracts/abi/*.json` exactly. */
 function loadSource(name: string): Abi {
   const url = new URL(`../../../contracts/abi/${name}.json`, import.meta.url);
   return (JSON.parse(readFileSync(url, "utf8")) as { abi: Abi }).abi;
@@ -23,7 +18,7 @@ function functionNames(abi: Abi): Set<string> {
   );
 }
 
-/** Every Core4Mica function the SDK invokes by name (`contract.read.X` / `write.X`). */
+/** Functions the SDK calls by name. */
 const CORE_FUNCTIONS = [
   "deposit",
   "depositStablecoin",
@@ -46,7 +41,6 @@ const CORE_FUNCTIONS = [
   "stablecoinAToken",
 ];
 
-/** Every ClearingHouse function the SDK invokes by name. */
 const CLEARING_FUNCTIONS = ["payNetDebit", "claimNetCreditFor"];
 
 describe("vendored contract ABIs", () => {

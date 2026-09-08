@@ -258,11 +258,7 @@ export class RpcProxy {
       : AssetBalanceInfo.fromRpc(raw);
   }
 
-  /**
-   * Operator-only: core authorizes this by the admin role on the SIWE session
-   * behind the bearer token, so call {@link Client.login} with an admin wallet
-   * first. There is no API-key path.
-   */
+  /** Operator-only: the session wallet must hold core's admin role. */
   async updateUserSuspension(
     userAddress: string,
     suspended: boolean,

@@ -1,8 +1,3 @@
-/**
- * Everything the sub-clients share: configuration, connections, and the
- * metadata resolved once at connect time. Port of `sdk-rust/src/client/ctx.rs`.
- */
-
 import {
   type Account,
   createPublicClient,
@@ -47,23 +42,14 @@ export class ClientCtx {
   readonly publicParams: CorePublicParameters;
   readonly contractAddress: string;
   readonly chainId: number;
-  /** Operator BLS public key (48-byte compressed G1). */
   readonly operatorPublicKey: Uint8Array;
   readonly ethereumHttpRpcUrl?: string;
-  /** Domain separator guarantees are issued under at the current version. */
   readonly guaranteeDomain: Uint8Array;
-  /** Domain separator per supported guarantee version. */
   readonly guaranteeDomains: Map<number, Uint8Array>;
   readonly signer: Account;
   readonly paymentSigner: PaymentSigner;
-  /**
-   * Facilitator that sponsors gas; unconfigured, every gasless call fails
-   * with FacilitatorNotConfiguredError and the auto routes self-fund.
-   */
   readonly facilitator: Facilitator;
-  /** Core4Mica's own EIP-712 domain separator (withdrawal authorizations). */
   readonly coreDomainSeparator: Hex;
-  /** Permit2's domain separator for this chain. */
   readonly permit2DomainSeparator: Hex;
   private gatewayInstance?: ContractGateway;
   private gatewayPromise?: Promise<ContractGateway>;
@@ -93,9 +79,6 @@ export class ClientCtx {
     this.signer = init.cfg.signer;
     this.paymentSigner = new PaymentSigner(init.cfg.signer);
     this.facilitator = new Facilitator(init.cfg.facilitatorUrl);
-    // Prefer what core publishes (read from the contract, so right across a
-    // domain change); fall back to deriving it, sound because the contract
-    // fixes its domain as EIP712("Core4Mica", "1").
     this.coreDomainSeparator = init.publicParams.coreDomainSeparator
       ? (normalizeBytes32Hex(init.publicParams.coreDomainSeparator) as Hex)
       : deriveCoreDomainSeparator(this.chainId, this.contractAddress);
@@ -110,8 +93,6 @@ export class ClientCtx {
     let guaranteeDomain: Uint8Array;
     let guaranteeDomains: Map<number, Uint8Array>;
     try {
-      // Bootstrap stays unauthenticated: public-params is a public route, so
-      // fetching it must never trigger a SIWE login.
       publicParams = await rpc.getPublicParams();
 
       if (publicParams.publicKey.length !== BLS_G1_COMPRESSED_BYTES) {
@@ -164,15 +145,6 @@ export class ClientCtx {
     });
   }
 
-  /**
-   * The domain separator for every guarantee version this deployment supports,
-   * so certs can be verified whichever version issued them. Requests are
-   * always signed at {@link GUARANTEE_CLAIMS_VERSION}, so that one must be
-   * supported and enabled.
-   *
-   * Takes what core publishes and reads the contract only when core publishes
-   * nothing — the one path here that needs an Ethereum endpoint.
-   */
   private static async fetchGuaranteeMetadata(
     publicParams: CorePublicParameters,
     contractAddress: string,

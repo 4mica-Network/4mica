@@ -1,5 +1,3 @@
-/** Reading the signer's own balances and positions. */
-
 import type { ClientCtx } from "@/client/ctx";
 import {
   Asset,
@@ -11,8 +9,6 @@ import { parseU256 } from "@/utils";
 
 export class AccountClient {
   constructor(private ctx: ClientCtx) {}
-
-  /** The signer's position in every asset the contract knows them by. */
   async assets(): Promise<AssetPosition[]> {
     const gateway = await this.ctx.gateway();
     const raw = await gateway.getUserAssets();
@@ -24,7 +20,6 @@ export class AccountClient {
     }));
   }
 
-  /** Collateral deposited in `asset`, before any yield. */
   async principalBalance(asset?: Asset | string | null): Promise<bigint> {
     const gateway = await this.ctx.gateway();
     return gateway.principalBalance(
@@ -33,7 +28,6 @@ export class AccountClient {
     );
   }
 
-  /** What the signer could withdraw from `asset` right now. */
   async withdrawableBalance(asset?: Asset | string | null): Promise<bigint> {
     const gateway = await this.ctx.gateway();
     return gateway.withdrawableBalance(
@@ -42,11 +36,6 @@ export class AccountClient {
     );
   }
 
-  /**
-   * The signer's full position in a yield-bearing stablecoin: principal,
-   * yield and how it is split, plus the pool-level totals the split is
-   * derived from.
-   */
   async stablecoinPosition(token: string): Promise<StablecoinPosition> {
     const gateway = await this.ctx.gateway();
     const user = this.ctx.signerAddress;
@@ -73,12 +62,6 @@ export class AccountClient {
     };
   }
 
-  /**
-   * The signer's balance in `asset` as guarantees are accounted against it,
-   * including how much is currently locked. `null` when the signer holds
-   * nothing in that asset. Lags the chain: a fresh deposit appears once it
-   * has been observed and confirmed.
-   */
   async assetBalance(
     asset?: Asset | string | null,
   ): Promise<AssetBalanceInfo | null> {

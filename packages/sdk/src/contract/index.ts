@@ -55,12 +55,10 @@ import { normalizeAddress, parseU256 } from "@/utils";
 
 export type { TxReceiptWaitOptions } from "@/contract/models";
 
-/** A decoded revert argument as a string (addresses, bytes32 nonces / cycle ids). */
 function revertStr(value: unknown): string {
   return String(value ?? "");
 }
 
-/** A decoded revert argument as a uint (viem hands them over as bigint). */
 function revertU256(value: unknown): bigint {
   return typeof value === "bigint" ? value : parseU256(String(value ?? 0));
 }
