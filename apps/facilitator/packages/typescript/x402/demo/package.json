@@ -10,7 +10,7 @@
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
-    "@4mica/sdk": "catalog:",
+    "@4mica/sdk": "workspace:^",
     "@4mica/x402": "workspace:*",
     "@x402/fetch": "catalog:",
     "dotenv": "catalog:",

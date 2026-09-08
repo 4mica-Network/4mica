@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "dotenv": "catalog:",
-    "sdk-4mica": "0.2.0"
+    "@4mica/sdk": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "catalog:node26",

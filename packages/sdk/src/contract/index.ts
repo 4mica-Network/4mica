@@ -23,12 +23,25 @@ import type {
 } from "@/contract/models";
 import {
   AaveNotConfiguredError,
+  AlreadyClaimedError,
+  AlreadyPaidError,
   AmountZeroError,
+  AuthorizationAlreadyUsedError,
+  AuthorizationCycleMismatchError,
+  AuthorizationExpiredError,
+  AuthorizationNotYetValidError,
+  ClaimExceedsFundedLiquidityError,
   ContractError,
-  Erc20AllowanceRequiredError,
+  CycleNotFoundError,
+  EscrowScaledUnderflowError,
+  ExactPaymentRequiredError,
   GracePeriodNotElapsedError,
   InsufficientAvailableError,
+  InvalidCycleStatusError,
+  InvalidProofError,
   NoWithdrawalRequestedError,
+  PaymentFinalityPendingError,
+  PaymentWindowElapsedError,
   RevertedOnChainError,
   StablecoinWithdrawShortfallError,
   TransferFailedError,
@@ -40,6 +53,14 @@ import {
 import { normalizeAddress, parseU256 } from "@/utils";
 
 export type { TxReceiptWaitOptions } from "@/contract/models";
+
+function revertStr(value: unknown): string {
+  return String(value ?? "");
+}
+
+function revertU256(value: unknown): bigint {
+  return typeof value === "bigint" ? value : parseU256(String(value ?? 0));
+}
 
 /**
  * Map a decoded Core4Mica / ClearingHouse custom error to its typed SDK
@@ -88,6 +109,51 @@ function decodeRevert(error: unknown, context: string): ContractError | null {
     case "ZeroCollateralCredit":
       return new ZeroCollateralCreditError(
         `${context}: deposit too small to mint scaled collateral`,
+      );
+    case "EscrowScaledUnderflow":
+      return new EscrowScaledUnderflowError(
+        `${context}: escrow holds less scaled collateral than needed`,
+      );
+    case "AuthorizationExpired":
+      return new AuthorizationExpiredError(revertU256(args[0]));
+    case "AuthorizationNotYetValid":
+      return new AuthorizationNotYetValidError(revertU256(args[0]));
+    case "AuthorizationAlreadyUsed":
+      return new AuthorizationAlreadyUsedError(
+        revertStr(args[0]),
+        revertStr(args[1]),
+      );
+    case "InvalidProof":
+      return new InvalidProofError(`${context}: invalid clearing proof`);
+    case "CycleNotFound":
+      return new CycleNotFoundError(revertStr(args[0]));
+    case "InvalidCycleStatus":
+      return new InvalidCycleStatusError(
+        revertStr(args[0]),
+        Number(args[1] ?? 0),
+      );
+    case "AlreadyPaid":
+      return new AlreadyPaidError(revertStr(args[0]), revertStr(args[1]));
+    case "AlreadyClaimed":
+      return new AlreadyClaimedError(revertStr(args[0]), revertStr(args[1]));
+    case "PaymentWindowElapsed":
+      return new PaymentWindowElapsedError(revertU256(args[0]));
+    case "PaymentFinalityPending":
+      return new PaymentFinalityPendingError(revertU256(args[0]));
+    case "ExactPaymentRequired":
+      return new ExactPaymentRequiredError(
+        revertU256(args[0]),
+        revertU256(args[1]),
+      );
+    case "ClaimExceedsFundedLiquidity":
+      return new ClaimExceedsFundedLiquidityError(
+        revertU256(args[0]),
+        revertU256(args[1]),
+      );
+    case "AuthorizationCycleMismatch":
+      return new AuthorizationCycleMismatchError(
+        revertStr(args[0]),
+        revertStr(args[1]),
       );
     case undefined:
       break;
@@ -402,24 +468,6 @@ export class ContractGateway {
     let hash: Hex;
 
     if (erc20Token) {
-      // Pre-check allowance to surface a clear error before hitting the contract.
-      const account = this.walletClient.account;
-      if (account) {
-        const erc20 = this.erc20(erc20Token);
-        const allowance = (await (erc20 as Erc20Contract).read.allowance([
-          account.address,
-          this.contract.address,
-        ])) as bigint;
-        if (allowance < parsedAmount) {
-          throw new Erc20AllowanceRequiredError({
-            token: erc20Token,
-            spender: this.contract.address,
-            allowance,
-            needed: parsedAmount,
-          });
-        }
-      }
-
       try {
         hash = await this.enqueueTx(() =>
           this.contract.write.depositStablecoin(

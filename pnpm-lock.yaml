@@ -6,9 +6,6 @@ settings:
 
 catalogs:
   default:
-    '@4mica/sdk':
-      specifier: ^1.3.1
-      version: 1.3.1
     '@arethetypeswrong/cli':
       specifier: ^0.18.2
       version: 0.18.4
@@ -657,12 +654,12 @@ importers:
 
   apps/facilitator/examples/ts_client:
     dependencies:
+      '@4mica/sdk':
+        specifier: workspace:^
+        version: link:../../../../packages/sdk
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
-      sdk-4mica:
-        specifier: 0.2.0
-        version: 0.2.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     devDependencies:
       '@types/node':
         specifier: catalog:node26
@@ -677,8 +674,8 @@ importers:
   apps/facilitator/packages/typescript/x402:
     dependencies:
       '@4mica/sdk':
-        specifier: 'catalog:'
-        version: 1.3.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
+        specifier: workspace:^
+        version: link:../../../../../packages/sdk
       '@x402/core':
         specifier: 'catalog:'
         version: 2.23.0
@@ -717,8 +714,8 @@ importers:
   apps/facilitator/packages/typescript/x402/demo:
     dependencies:
       '@4mica/sdk':
-        specifier: 'catalog:'
-        version: 1.3.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
+        specifier: workspace:^
+        version: link:../../../../../../packages/sdk
       '@4mica/x402':
         specifier: workspace:*
         version: link:..
@@ -1678,10 +1675,6 @@ importers:
         version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
 packages:
-
-  '@4mica/sdk@1.3.1':
-    resolution: {integrity: sha512-7bfWVQwF1Ftl261+wfjV2OTVgakM3kynPGN9E+dJHCvpkIfvGBnDyS9HnequJ6sDubTqkSmYzez65QsRQ8un+A==}
-    engines: {node: '>=18'}
 
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
@@ -9923,10 +9916,6 @@ packages:
   scule@1.3.0:
     resolution: {integrity: sha512-6FtHJEvt+pVMIB9IBY+IcCJ6Z5f1iQnytgyfKMhDKgmzYG+TeH/wx1y3l27rshSbLiSanrR9ffZDrEsmjlQF2g==}
 
-  sdk-4mica@0.2.0:
-    resolution: {integrity: sha512-CxugCffv9aFNxedIicshnn73krabsvG7TGJIQP2cdjXBCO6QHjDrDON74pIAYeid4StJLGwcrtPpJoGe5ed6qA==}
-    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-
   section-matter@1.0.0:
     resolution: {integrity: sha512-vfD3pmTzGpufjScBh50YHKzEu2lxBWhVEHsNGoEXmCmn2hKGfeNLYMzCJpe8cD7gqX7TJluOVpBkAequ6dgMmA==}
     engines: {node: '>=4'}
@@ -11224,21 +11213,6 @@ packages:
 
 snapshots:
 
-  '@4mica/sdk@1.3.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)':
-    dependencies:
-      '@noble/curves': 2.2.0
-      '@quillai-network/wachai-validation-sdk': 0.1.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-      viem: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
-    optionalDependencies:
-      '@coinbase/cdp-sdk': 1.51.2(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - debug
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-      - zod
-
   '@adobe/css-tools@4.5.0': {}
 
   '@adraffy/ens-normalize@1.11.1': {}
@@ -11760,8 +11734,8 @@ snapshots:
 
   '@coinbase/cdp-sdk@1.51.2(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
-      '@solana-program/system': 0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))
-      '@solana-program/token': 0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/system': 0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))
+      '@solana-program/token': 0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@solana/kit': 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       abitype: 1.0.6(typescript@5.9.3)(zod@3.25.76)
       axios: 1.16.0
@@ -13999,7 +13973,7 @@ snapshots:
     dependencies:
       '@solana/kit': 6.10.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
@@ -14012,7 +13986,7 @@ snapshots:
     dependencies:
       '@solana/kit': 6.10.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
-  '@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))':
+  '@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/kit': 5.5.1(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
 
@@ -21193,13 +21167,6 @@ snapshots:
   screenfull@5.2.0: {}
 
   scule@1.3.0: {}
-
-  sdk-4mica@0.2.0(bufferutil@4.1.0)(utf-8-validate@5.0.10):
-    dependencies:
-      ethers: 6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
 
   section-matter@1.0.0:
     dependencies:

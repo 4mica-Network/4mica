@@ -130,6 +130,17 @@ describe("CorePublicParameters", () => {
     expect(params.validators).toEqual(["validator-a"]);
   });
 
+  it("parses the byte-array public key core emits", () => {
+    // core serializes `public_key: Vec<u8>` as a JSON array of numbers, not
+    // as a hex string.
+    const bytes = Array.from({ length: 48 }, (_, i) => i);
+    const params = CorePublicParameters.fromRpc({
+      ...raw(),
+      public_key: bytes,
+    });
+    expect(Array.from(params.publicKey)).toEqual(bytes);
+  });
+
   it("defaults supported versions when core publishes none", () => {
     const { supported_guarantee_versions: _omit, ...rest } = raw();
     const params = CorePublicParameters.fromRpc(rest);
@@ -226,5 +237,12 @@ describe("token and balance models", () => {
     );
     const cert = BLSCert.fromRpc({ claims: "0x0102", signature: "0x03" });
     expect(Array.from(cert.claimsBytes())).toEqual([1, 2]);
+  });
+
+  it("accepts the unprefixed certificate hex core emits", () => {
+    // core's `HexBytes` serializes lowercase hex with no `0x` prefix.
+    const cert = BLSCert.fromRpc({ claims: "0102", signature: "03" });
+    expect(Array.from(cert.claimsBytes())).toEqual([1, 2]);
+    expect(cert.signature).toBe("03");
   });
 });

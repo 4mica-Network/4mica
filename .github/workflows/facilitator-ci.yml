@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/facilitator/**"
+      - "packages/sdk/**"
       - "packages/sdk-python/**"
       - ".github/workflows/facilitator-ci.yml"
   workflow_dispatch:
@@ -51,6 +52,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # @4mica/x402 consumes the workspace SDK; build it before typechecking
+      # or testing anything that imports its declarations.
+      - name: Build workspace SDK
+        run: pnpm --filter @4mica/sdk build
 
       - name: Lint
         run: pnpm --filter "./apps/facilitator/**" run lint

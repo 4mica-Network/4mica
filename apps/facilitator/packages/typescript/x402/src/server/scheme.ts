@@ -16,10 +16,9 @@ export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532',
  */
 export class FourMicaEvmScheme implements SchemeNetworkServer {
   readonly scheme = '4mica-credit'
-  // The 4mica-credit scheme settles against a tab, not an on-wire asset
-  // transfer, so it only declares the SDK plumbing ATM. `authorization`
-  // (verify before the handler, settle after) mirrors the credit model:
-  // the claim is verified up front and recorded once the resource is served.
+  // No on-wire assetTransferMethod: a claim is a claim. The signed payment is
+  // verified before the handler runs and settled (guarantee issued) after it
+  // — the library's authorization flow.
   readonly defaultAssetTransferMethod = SDK_DEFAULT_ASSET_TRANSFER_METHOD
   readonly paymentFlows: Readonly<Record<string, PaymentFlowConfig>> = {
     [SDK_DEFAULT_ASSET_TRANSFER_METHOD]: {
@@ -28,8 +27,6 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     },
   }
   private moneyParsers: MoneyParser[] = []
-
-  constructor(readonly advertisedTabEndpoint: string) {}
 
   /**
    * Register a custom money parser in the parser chain.
@@ -116,14 +113,10 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     },
     extensionKeys: string[]
   ): Promise<PaymentRequirements> {
-    // Mark unused parameters to satisfy linter
+    // Nothing to add since the tab step was removed from the protocol: a
+    // client signs its claim straight from the requirements.
     void supportedKind
     void extensionKeys
-
-    if (!paymentRequirements.extra) {
-      paymentRequirements.extra = {}
-    }
-    paymentRequirements.extra.tabEndpoint = this.advertisedTabEndpoint
 
     return Promise.resolve(paymentRequirements)
   }
