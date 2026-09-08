@@ -26,7 +26,7 @@ cp .env.example .env
 | `PAY_TO_ADDRESS` | server | Recipient of the payments. |
 | `PRIVATE_KEY` | client, deposit | Payer wallet key, `0x`-prefixed. |
 | `API_URL` | client | Server base URL. `http://localhost:3000` by default. |
-| `FACILITATOR_URL` | deposit | Facilitator that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty to deposit self-funded. |
+| `FACILITATOR_URL` | server, deposit | Facilitator the server verifies and settles through, and that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty for the deposit to go self-funded. |
 | `DEPOSIT_AMOUNT` | deposit | USDC to deposit. `2` by default. |
 | `PORT` | server | Listen port. `3000` by default. |
 | `CORE_URL` | all | A self-hosted core for `NETWORK`. Unset, the hosted deployment for the network is used. |
