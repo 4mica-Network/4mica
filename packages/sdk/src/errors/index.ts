@@ -430,10 +430,13 @@ export class OutcomeUnknownError extends SponsorshipError {}
  * rather than transacted.
  */
 export class Permit2AllowanceRequiredError extends SponsorshipError {
+  /** The facilitator's own wording, without this SDK's prefix. */
+  readonly reason: string;
   readonly eip2612Nonce?: bigint;
 
-  constructor(message: string, eip2612Nonce?: bigint) {
-    super(`permit2 requires a prior approve(PERMIT2, ...): ${message}`);
+  constructor(reason: string, eip2612Nonce?: bigint) {
+    super(`permit2 requires a prior approve(PERMIT2, ...): ${reason}`);
+    this.reason = reason;
     this.eip2612Nonce = eip2612Nonce;
   }
 }

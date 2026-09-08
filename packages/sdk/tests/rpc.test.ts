@@ -146,8 +146,36 @@ describe("RpcProxy", () => {
       return new Response(JSON.stringify({ error: "nope" }), { status: 404 });
     });
     const proxy = new RpcProxy("http://example.com", fetchMock);
-    await expect(proxy.health()).rejects.toThrow(RpcError);
+    await expect(proxy.getSupportedTokens()).rejects.toThrow(RpcError);
     expect(calls).toBe(1);
+  });
+
+  it("returns the health report on 503 without retrying", async () => {
+    // Core answers 503 with the same report body when a dependency is down.
+    const report = {
+      status: "unhealthy",
+      db: "ok",
+      chain_rpc: "unhealthy",
+      settlement_timing: "ok",
+    };
+    let calls = 0;
+    const fetchMock = vi.fn<FetchFn>(async (input) => {
+      calls += 1;
+      expect(input.toString().endsWith("/core/health")).toBe(true);
+      return new Response(JSON.stringify(report), { status: 503 });
+    });
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    await expect(proxy.health()).resolves.toEqual(report);
+    expect(calls).toBe(1);
+  });
+
+  it("fails health on a status that is not an answer", async () => {
+    const fetchMock = vi.fn<FetchFn>(
+      async () =>
+        new Response(JSON.stringify({ error: "nope" }), { status: 404 }),
+    );
+    const proxy = new RpcProxy("http://example.com", fetchMock);
+    await expect(proxy.health()).rejects.toThrow(RpcError);
   });
 
   it("never retries POSTs — they may have acted", async () => {

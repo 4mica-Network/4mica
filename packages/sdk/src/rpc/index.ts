@@ -3,7 +3,8 @@
  *
  * Mirrors `crates/rpc/src/proxy.rs`: the paths here are exactly the routes
  * core serves (`core/src/http.rs`); anything else is another service's
- * endpoint. GETs retry on 429/5xx; POSTs never do — they may have acted.
+ * endpoint. GETs retry on 429/5xx, except `health`, whose 503 is an answer
+ * rather than an outage; POSTs never retry — they may have acted.
  */
 
 import { RpcError } from "@/errors";
@@ -93,6 +94,16 @@ export class RpcProxy {
     return `Bearer ${trimmed}`;
   }
 
+  private errorsFor(path: string) {
+    return {
+      decodeError: (message: string) => new RpcError(message),
+      httpError: (message: string, response: Response, body: unknown) =>
+        new RpcError(message, { status: response.status, body }),
+      wrapTransportError: (err: unknown) =>
+        new RpcError(`request to ${path} failed: ${String(err)}`),
+    };
+  }
+
   private async get<T>(path: string, options: RequestOptions = {}): Promise<T> {
     let lastError: RpcError | undefined;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -107,13 +118,7 @@ export class RpcProxy {
             headers: await this.headers(options),
             method: "GET",
           },
-          {
-            decodeError: (message) => new RpcError(message),
-            httpError: (message, response, body) =>
-              new RpcError(message, { status: response.status, body }),
-            wrapTransportError: (err) =>
-              new RpcError(`request to ${path} failed: ${String(err)}`),
-          },
+          this.errorsFor(path),
         );
       } catch (err) {
         if (
@@ -146,13 +151,7 @@ export class RpcProxy {
         method: "POST",
         body: JSON.stringify(body),
       },
-      {
-        decodeError: (message) => new RpcError(message),
-        httpError: (message, response, body) =>
-          new RpcError(message, { status: response.status, body }),
-        wrapTransportError: (err) =>
-          new RpcError(`request to ${path} failed: ${String(err)}`),
-      },
+      this.errorsFor(path),
     );
   }
 
@@ -172,9 +171,16 @@ export class RpcProxy {
   }
 
   async health(): Promise<Record<string, unknown>> {
-    return this.get<Record<string, unknown>>("/core/health", {
-      authed: false,
-    });
+    const path = "/core/health";
+    return requestJson<Record<string, unknown>>(
+      this.fetchFn,
+      `${this.baseUrl}${path}`,
+      { headers: await this.headers({ authed: false }), method: "GET" },
+      {
+        ...this.errorsFor(path),
+        isSuccess: (response) => response.ok || response.status === 503,
+      },
+    );
   }
 
   async issueGuarantee(body: unknown): Promise<BLSCert> {

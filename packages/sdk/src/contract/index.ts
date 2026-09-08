@@ -33,7 +33,6 @@ import {
   ClaimExceedsFundedLiquidityError,
   ContractError,
   CycleNotFoundError,
-  Erc20AllowanceRequiredError,
   EscrowScaledUnderflowError,
   ExactPaymentRequiredError,
   GracePeriodNotElapsedError,
@@ -469,24 +468,6 @@ export class ContractGateway {
     let hash: Hex;
 
     if (erc20Token) {
-      // Pre-check allowance to surface a clear error before hitting the contract.
-      const account = this.walletClient.account;
-      if (account) {
-        const erc20 = this.erc20(erc20Token);
-        const allowance = (await (erc20 as Erc20Contract).read.allowance([
-          account.address,
-          this.contract.address,
-        ])) as bigint;
-        if (allowance < parsedAmount) {
-          throw new Erc20AllowanceRequiredError({
-            token: erc20Token,
-            spender: this.contract.address,
-            allowance,
-            needed: parsedAmount,
-          });
-        }
-      }
-
       try {
         hash = await this.enqueueTx(() =>
           this.contract.write.depositStablecoin(

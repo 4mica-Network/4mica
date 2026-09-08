@@ -89,7 +89,7 @@ export class DepositBuilder extends DepositBase {
       return await sendSponsoredPermit2(this.ctx, token, this.amount);
     } catch (rejection) {
       if (rejection instanceof Permit2AllowanceRequiredError) {
-        return fallbackToSelfFunded(this.ctx, token, this.amount, waitOptions);
+        return sendSelfFunded(this.ctx, this.asset, this.amount, waitOptions);
       }
       throw rejection;
     }
@@ -234,20 +234,7 @@ export class SelfFundedDeposit extends DepositBase {
     return gateway.approveErc20(this.asset.address, this.amount, waitOptions);
   }
   async send(waitOptions?: TxReceiptWaitOptions): Promise<DepositReceipt> {
-    const gateway = await this.ctx.gateway();
-    const receipt = await gateway.deposit(
-      this.amount,
-      this.asset.erc20Token,
-      waitOptions,
-    );
-    return {
-      txHash: receipt.transactionHash,
-      route: TokenRoute.SelfFunded,
-      account: this.ctx.signerAddress,
-      asset: this.asset.address,
-      amount: this.amount,
-      raw: receipt,
-    };
+    return sendSelfFunded(this.ctx, this.asset, this.amount, waitOptions);
   }
 }
 
@@ -295,7 +282,7 @@ async function sendSponsoredPermit2(
       permit = await sig.eip2612Permit(ctx, token, rejection.eip2612Nonce);
     } catch (err) {
       if (err instanceof MissingTokenDomainSeparatorError) {
-        throw new Permit2AllowanceRequiredError(rejection.message, undefined);
+        throw new Permit2AllowanceRequiredError(rejection.reason);
       }
       throw err;
     }
@@ -311,28 +298,33 @@ async function sendSponsoredPermit2(
   }
 }
 
-async function fallbackToSelfFunded(
+async function sendSelfFunded(
   ctx: ClientCtx,
-  token: string,
+  asset: Asset,
   amount: bigint,
   waitOptions?: TxReceiptWaitOptions,
 ): Promise<DepositReceipt> {
   const gateway = await ctx.gateway();
-  const allowance = await gateway.erc20Allowance(token, ctx.contractAddress);
-  if (allowance < amount) {
-    throw new Erc20AllowanceRequiredError({
-      token,
-      spender: ctx.contractAddress,
-      allowance,
-      needed: amount,
-    });
+  if (!asset.isNative) {
+    const allowance = await gateway.erc20Allowance(
+      asset.address,
+      ctx.contractAddress,
+    );
+    if (allowance < amount) {
+      throw new Erc20AllowanceRequiredError({
+        token: asset.address,
+        spender: ctx.contractAddress,
+        allowance,
+        needed: amount,
+      });
+    }
   }
-  const receipt = await gateway.deposit(amount, token, waitOptions);
+  const receipt = await gateway.deposit(amount, asset.erc20Token, waitOptions);
   return {
     txHash: receipt.transactionHash,
     route: TokenRoute.SelfFunded,
     account: ctx.signerAddress,
-    asset: token,
+    asset: asset.address,
     amount,
     raw: receipt,
   };

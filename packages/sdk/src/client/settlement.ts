@@ -494,7 +494,7 @@ async function paySponsoredPermit2With(
         // Without a token domain separator the approval cannot be sponsored
         // from here — the same dead end as a token with no EIP-2612 surface,
         // and reported the same way.
-        throw new Permit2AllowanceRequiredError(rejection.message, undefined);
+        throw new Permit2AllowanceRequiredError(rejection.reason);
       }
       throw err;
     }

@@ -39,8 +39,8 @@ export async function requestJson<T>(
     decodeError: DecodeErrorFactory;
     httpError: HttpErrorFactory;
     allowEmptyOk?: boolean;
-    /** Wrap a fetch-level failure (DNS, refused connection, abort) into a typed error. */
     wrapTransportError?: (err: unknown) => Error;
+    isSuccess?: (response: Response) => boolean;
   },
 ): Promise<T> {
   let response: Response;
@@ -76,7 +76,8 @@ export async function requestJson<T>(
     }
   }
 
-  if (!response.ok) {
+  const ok = options.isSuccess ? options.isSuccess(response) : response.ok;
+  if (!ok) {
     const message = `${response.status}: ${extractErrorMessage(payload)}`;
     throw options.httpError(message, response, payload);
   }
