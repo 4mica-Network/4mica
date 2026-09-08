@@ -53,8 +53,9 @@ class SettlementClient:
         return self._ctx.facilitator.is_configured()
 
     def pay(self, cycle_id: str) -> "PayBuilder":
-        """Starts a net-debit payment for *cycle_id* (the text id or the
-        0x-prefixed on-chain id). Nothing happens until a terminal runs."""
+        """Starts a net-debit payment for *cycle_id* (the cycle's text id, as
+        returned in ``cycle_id_text``; core does not resolve the on-chain
+        ``bytes32`` id). Nothing happens until a terminal runs."""
         return PayBuilder(self._ctx, str(cycle_id))
 
     def claim(self, cycle_id: str) -> "ClaimBuilder":
