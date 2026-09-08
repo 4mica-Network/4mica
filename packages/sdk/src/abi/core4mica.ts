@@ -1,3 +1,15 @@
+/**
+ * Core4Mica contract ABI.
+ *
+ * Users deposit collateral, request/cancel/finalize withdrawals, and read
+ * their positions here. The `*WithAuthorization` / `*WithPermit2` entries
+ * are the gasless variants a facilitator submits on a user's behalf; the
+ * error entries let viem decode every revert by name.
+ *
+ * GENERATED FILE — do not edit by hand. Regenerate with
+ * `scripts/refresh-abis.sh` at the repo root.
+ * Source: 4mica-core e94c9c9137e938ae334368c083bf5785ede784bd (2026-08-28)
+ */
 import type { Abi } from "viem";
 
 export const core4micaAbi = [
@@ -41,6 +53,11 @@ export const core4micaAbi = [
         type: "address[]",
         internalType: "address[]",
       },
+      {
+        name: "minGracePeriod_",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
     stateMutability: "nonpayable",
   },
@@ -51,6 +68,32 @@ export const core4micaAbi = [
   {
     type: "receive",
     stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "CANCEL_WITHDRAWAL_TYPEHASH",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "DOMAIN_SEPARATOR",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -121,6 +164,19 @@ export const core4micaAbi = [
   },
   {
     type: "function",
+    name: "REQUEST_WITHDRAWAL_TYPEHASH",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "aaveAddressesProvider",
     inputs: [],
     outputs: [
@@ -134,6 +190,24 @@ export const core4micaAbi = [
   },
   {
     type: "function",
+    name: "addStablecoinAsset",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "aToken",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "authority",
     inputs: [],
     outputs: [
@@ -141,6 +215,30 @@ export const core4micaAbi = [
         name: "",
         type: "address",
         internalType: "address",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "authorizationState",
+    inputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "bool",
+        internalType: "bool",
       },
     ],
     stateMutability: "view",
@@ -160,6 +258,51 @@ export const core4micaAbi = [
         name: "asset",
         type: "address",
         internalType: "address",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "cancelWithdrawalWithAuthorization",
+    inputs: [
+      {
+        name: "auth",
+        type: "tuple",
+        internalType: "struct WithdrawalCancelAuthorization",
+        components: [
+          {
+            name: "user",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "asset",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "validAfter",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "validBefore",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "nonce",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "signature",
+            type: "bytes",
+            internalType: "bytes",
+          },
+        ],
       },
     ],
     outputs: [],
@@ -348,6 +491,52 @@ export const core4micaAbi = [
   },
   {
     type: "function",
+    name: "creditCollateral",
+    inputs: [
+      {
+        name: "creditor",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "creditFromEscrowScaled",
+    inputs: [
+      {
+        name: "creditor",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "deposit",
     inputs: [],
     outputs: [],
@@ -373,6 +562,191 @@ export const core4micaAbi = [
   },
   {
     type: "function",
+    name: "depositStablecoinWithAuthorization",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "auth",
+        type: "tuple",
+        internalType: "struct ReceiveAuthorization",
+        components: [
+          {
+            name: "from",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "validAfter",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "validBefore",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "nonce",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "v",
+            type: "uint8",
+            internalType: "uint8",
+          },
+          {
+            name: "r",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "s",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "depositStablecoinWithPermit2",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "p",
+        type: "tuple",
+        internalType: "struct Permit2Authorization",
+        components: [
+          {
+            name: "from",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "nonce",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "deadline",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "signature",
+            type: "bytes",
+            internalType: "bytes",
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "depositToEscrow",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "eip712Domain",
+    inputs: [],
+    outputs: [
+      {
+        name: "fields",
+        type: "bytes1",
+        internalType: "bytes1",
+      },
+      {
+        name: "name",
+        type: "string",
+        internalType: "string",
+      },
+      {
+        name: "version",
+        type: "string",
+        internalType: "string",
+      },
+      {
+        name: "chainId",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "verifyingContract",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "salt",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+      {
+        name: "extensions",
+        type: "uint256[]",
+        internalType: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "escrowScaledBalance",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "finalizeWithdrawal",
     inputs: [
       {
@@ -388,6 +762,24 @@ export const core4micaAbi = [
     type: "function",
     name: "finalizeWithdrawal",
     inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "finalizeWithdrawalFor",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+    ],
     outputs: [],
     stateMutability: "nonpayable",
   },
@@ -456,35 +848,6 @@ export const core4micaAbi = [
         name: "enabled",
         type: "bool",
         internalType: "bool",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "getPaymentStatus",
-    inputs: [
-      {
-        name: "tabId",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [
-      {
-        name: "paid",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "remunerated",
-        type: "bool",
-        internalType: "bool",
-      },
-      {
-        name: "asset",
-        type: "address",
-        internalType: "address",
       },
     ],
     stateMutability: "view",
@@ -669,6 +1032,19 @@ export const core4micaAbi = [
   },
   {
     type: "function",
+    name: "minWithdrawalGracePeriod",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "pause",
     inputs: [],
     outputs: [],
@@ -683,63 +1059,6 @@ export const core4micaAbi = [
         name: "",
         type: "bool",
         internalType: "bool",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "payTabInERC20Token",
-    inputs: [
-      {
-        name: "tabId",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "asset",
-        type: "address",
-        internalType: "address",
-      },
-      {
-        name: "amount",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "recipient",
-        type: "address",
-        internalType: "address",
-      },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "payments",
-    inputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [
-      {
-        name: "paid",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "remunerated",
-        type: "bool",
-        internalType: "bool",
-      },
-      {
-        name: "asset",
-        type: "address",
-        internalType: "address",
       },
     ],
     stateMutability: "view",
@@ -826,13 +1145,21 @@ export const core4micaAbi = [
   },
   {
     type: "function",
-    name: "recordPayment",
+    name: "requestWithdrawal",
     inputs: [
       {
-        name: "tabId",
+        name: "amount",
         type: "uint256",
         internalType: "uint256",
       },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "requestWithdrawal",
+    inputs: [
       {
         name: "asset",
         type: "address",
@@ -849,57 +1176,47 @@ export const core4micaAbi = [
   },
   {
     type: "function",
-    name: "remunerate",
+    name: "requestWithdrawalWithAuthorization",
     inputs: [
       {
-        name: "guaranteeData",
-        type: "bytes",
-        internalType: "bytes",
-      },
-      {
-        name: "signature",
+        name: "auth",
         type: "tuple",
-        internalType: "struct BLS.G2Point",
+        internalType: "struct WithdrawalRequestAuthorization",
         components: [
           {
-            name: "x_c0_a",
+            name: "user",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "asset",
+            type: "address",
+            internalType: "address",
+          },
+          {
+            name: "amount",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "validAfter",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "validBefore",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "nonce",
             type: "bytes32",
             internalType: "bytes32",
           },
           {
-            name: "x_c0_b",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "x_c1_a",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "x_c1_b",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "y_c0_a",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "y_c0_b",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "y_c1_a",
-            type: "bytes32",
-            internalType: "bytes32",
-          },
-          {
-            name: "y_c1_b",
-            type: "bytes32",
-            internalType: "bytes32",
+            name: "signature",
+            type: "bytes",
+            internalType: "bytes",
           },
         ],
       },
@@ -909,34 +1226,13 @@ export const core4micaAbi = [
   },
   {
     type: "function",
-    name: "remunerationGracePeriod",
-    inputs: [],
-    outputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "requestWithdrawal",
+    name: "seizeCollateral",
     inputs: [
       {
-        name: "amount",
-        type: "uint256",
-        internalType: "uint256",
+        name: "debtor",
+        type: "address",
+        internalType: "address",
       },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "requestWithdrawal",
-    inputs: [
       {
         name: "asset",
         type: "address",
@@ -948,7 +1244,42 @@ export const core4micaAbi = [
         internalType: "uint256",
       },
     ],
-    outputs: [],
+    outputs: [
+      {
+        name: "seized",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "seizeUpTo",
+    inputs: [
+      {
+        name: "debtor",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [
+      {
+        name: "seized",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
     stateMutability: "nonpayable",
   },
   {
@@ -1001,64 +1332,10 @@ export const core4micaAbi = [
   },
   {
     type: "function",
-    name: "setRemunerationGracePeriod",
+    name: "setMinWithdrawalGracePeriod",
     inputs: [
       {
-        name: "_gracePeriod",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "setSynchronizationDelay",
-    inputs: [
-      {
-        name: "_synchronizationDelay",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "setTabExpirationTime",
-    inputs: [
-      {
-        name: "_expirationTime",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "setTimingParameters",
-    inputs: [
-      {
-        name: "_remunerationGracePeriod",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "_tabExpirationTime",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "_synchronizationDelay",
-        type: "uint256",
-        internalType: "uint256",
-      },
-      {
-        name: "_withdrawalGracePeriod",
+        name: "_minGracePeriod",
         type: "uint256",
         internalType: "uint256",
       },
@@ -1121,32 +1398,6 @@ export const core4micaAbi = [
         internalType: "address",
       },
     ],
-    outputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "synchronizationDelay",
-    inputs: [],
-    outputs: [
-      {
-        name: "",
-        type: "uint256",
-        internalType: "uint256",
-      },
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "tabExpirationTime",
-    inputs: [],
     outputs: [
       {
         name: "",
@@ -1275,7 +1526,7 @@ export const core4micaAbi = [
             internalType: "bytes32",
           },
           {
-            name: "tabId",
+            name: "cycleId",
             type: "uint256",
             internalType: "uint256",
           },
@@ -1300,11 +1551,6 @@ export const core4micaAbi = [
             internalType: "uint256",
           },
           {
-            name: "totalAmount",
-            type: "uint256",
-            internalType: "uint256",
-          },
-          {
             name: "asset",
             type: "address",
             internalType: "address",
@@ -1323,6 +1569,35 @@ export const core4micaAbi = [
       },
     ],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "withdrawFromEscrow",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "recipient",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "actualWithdrawn",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1387,6 +1662,11 @@ export const core4micaAbi = [
         type: "uint256",
         internalType: "uint256",
       },
+      {
+        name: "gracePeriod",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
     stateMutability: "view",
   },
@@ -1437,6 +1717,25 @@ export const core4micaAbi = [
   },
   {
     type: "event",
+    name: "AuthorizationUsed",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "nonce",
+        type: "bytes32",
+        indexed: true,
+        internalType: "bytes32",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
     name: "CollateralDeposited",
     inputs: [
       {
@@ -1462,6 +1761,37 @@ export const core4micaAbi = [
   },
   {
     type: "event",
+    name: "CollateralSeized",
+    inputs: [
+      {
+        name: "debtor",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "scaledToEscrow",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
     name: "CollateralWithdrawn",
     inputs: [
       {
@@ -1478,6 +1808,105 @@ export const core4micaAbi = [
       },
       {
         name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EIP712DomainChanged",
+    inputs: [],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EscrowCredited",
+    inputs: [
+      {
+        name: "creditor",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "asset",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "scaledFromEscrow",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EscrowDeposited",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "from",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "scaledCredited",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "EscrowWithdrawn",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "recipient",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "scaledBurned",
         type: "uint256",
         indexed: false,
         internalType: "uint256",
@@ -1546,6 +1975,19 @@ export const core4micaAbi = [
   },
   {
     type: "event",
+    name: "MinWithdrawalGracePeriodUpdated",
+    inputs: [
+      {
+        name: "newMinGracePeriod",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
     name: "Paused",
     inputs: [
       {
@@ -1553,31 +1995,6 @@ export const core4micaAbi = [
         type: "address",
         indexed: false,
         internalType: "address",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "PaymentRecorded",
-    inputs: [
-      {
-        name: "tabId",
-        type: "uint256",
-        indexed: true,
-        internalType: "uint256",
-      },
-      {
-        name: "asset",
-        type: "address",
-        indexed: true,
-        internalType: "address",
-      },
-      {
-        name: "amount",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
       },
     ],
     anonymous: false,
@@ -1600,44 +2017,6 @@ export const core4micaAbi = [
       },
       {
         name: "amount",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "RecipientRemunerated",
-    inputs: [
-      {
-        name: "tabId",
-        type: "uint256",
-        indexed: true,
-        internalType: "uint256",
-      },
-      {
-        name: "asset",
-        type: "address",
-        indexed: true,
-        internalType: "address",
-      },
-      {
-        name: "amount",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "RemunerationGracePeriodUpdated",
-    inputs: [
-      {
-        name: "newGracePeriod",
         type: "uint256",
         indexed: false,
         internalType: "uint256",
@@ -1688,69 +2067,6 @@ export const core4micaAbi = [
       },
       {
         name: "nominalAmount",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "SynchronizationDelayUpdated",
-    inputs: [
-      {
-        name: "newExpirationTime",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "TabExpirationTimeUpdated",
-    inputs: [
-      {
-        name: "newExpirationTime",
-        type: "uint256",
-        indexed: false,
-        internalType: "uint256",
-      },
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "TabPaid",
-    inputs: [
-      {
-        name: "tabId",
-        type: "uint256",
-        indexed: true,
-        internalType: "uint256",
-      },
-      {
-        name: "asset",
-        type: "address",
-        indexed: true,
-        internalType: "address",
-      },
-      {
-        name: "user",
-        type: "address",
-        indexed: true,
-        internalType: "address",
-      },
-      {
-        name: "recipient",
-        type: "address",
-        indexed: false,
-        internalType: "address",
-      },
-      {
-        name: "amount",
         type: "uint256",
         indexed: false,
         internalType: "uint256",
@@ -1943,18 +2259,72 @@ export const core4micaAbi = [
   },
   {
     type: "error",
-    name: "DirectTransferNotAllowed",
-    inputs: [],
+    name: "AuthorizationAlreadyUsed",
+    inputs: [
+      {
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "nonce",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
   },
   {
     type: "error",
-    name: "DoubleSpendingDetected",
+    name: "AuthorizationExpired",
+    inputs: [
+      {
+        name: "validBefore",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+  },
+  {
+    type: "error",
+    name: "AuthorizationNotYetValid",
+    inputs: [
+      {
+        name: "validAfter",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+  },
+  {
+    type: "error",
+    name: "DirectTransferNotAllowed",
     inputs: [],
   },
   {
     type: "error",
     name: "EnforcedPause",
     inputs: [],
+  },
+  {
+    type: "error",
+    name: "EscrowScaledUnderflow",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "requested",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "available",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
   },
   {
     type: "error",
@@ -1968,12 +2338,23 @@ export const core4micaAbi = [
   },
   {
     type: "error",
-    name: "GracePeriodNotElapsed",
-    inputs: [],
+    name: "GracePeriodBelowMinimum",
+    inputs: [
+      {
+        name: "provided",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "minimum",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
   },
   {
     type: "error",
-    name: "IllegalValue",
+    name: "GracePeriodNotElapsed",
     inputs: [],
   },
   {
@@ -2020,8 +2401,29 @@ export const core4micaAbi = [
   },
   {
     type: "error",
+    name: "InvalidShortString",
+    inputs: [],
+  },
+  {
+    type: "error",
     name: "InvalidSignature",
     inputs: [],
+  },
+  {
+    type: "error",
+    name: "MinGracePeriodExceedsGrace",
+    inputs: [
+      {
+        name: "minimum",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "gracePeriod",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
   },
   {
     type: "error",
@@ -2099,27 +2501,18 @@ export const core4micaAbi = [
   },
   {
     type: "error",
+    name: "StringTooLong",
+    inputs: [
+      {
+        name: "str",
+        type: "string",
+        internalType: "string",
+      },
+    ],
+  },
+  {
+    type: "error",
     name: "SurplusClaimExceedsAvailable",
-    inputs: [],
-  },
-  {
-    type: "error",
-    name: "TabAlreadyPaid",
-    inputs: [],
-  },
-  {
-    type: "error",
-    name: "TabExpired",
-    inputs: [],
-  },
-  {
-    type: "error",
-    name: "TabNotYetOverdue",
-    inputs: [],
-  },
-  {
-    type: "error",
-    name: "TabPreviouslyRemunerated",
     inputs: [],
   },
   {
@@ -2156,17 +2549,6 @@ export const core4micaAbi = [
   },
   {
     type: "error",
-    name: "UnsupportedTreasuryAsset",
-    inputs: [
-      {
-        name: "asset",
-        type: "address",
-        internalType: "address",
-      },
-    ],
-  },
-  {
-    type: "error",
     name: "UserScaledBalanceUnderflow",
     inputs: [
       {
@@ -2193,7 +2575,39 @@ export const core4micaAbi = [
   },
   {
     type: "error",
+    name: "ValueMismatch",
+    inputs: [
+      {
+        name: "expected",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "actual",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+  },
+  {
+    type: "error",
     name: "ZeroAddress",
     inputs: [],
+  },
+  {
+    type: "error",
+    name: "ZeroCollateralCredit",
+    inputs: [
+      {
+        name: "asset",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
   },
 ] as const satisfies Abi;

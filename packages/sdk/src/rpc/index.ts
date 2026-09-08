@@ -6,7 +6,6 @@
  * endpoint. GETs retry on 429/5xx; POSTs never do — they may have acted.
  */
 
-import { ADMIN_API_KEY_HEADER } from "@/constants";
 import { RpcError } from "@/errors";
 import { normalizeBaseUrl, requestJson } from "@/http";
 import {
@@ -33,13 +32,11 @@ const RETRY_BASE_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface RequestOptions {
-  admin?: boolean;
   authed?: boolean;
 }
 
 export class RpcProxy {
   private baseUrl: string;
-  private adminApiKey?: string;
   private bearerToken?: string;
   private bearerTokenProvider?: BearerTokenProvider;
   private fetchFn: FetchFn;
@@ -51,11 +48,6 @@ export class RpcProxy {
 
   async aclose(): Promise<void> {
     // no-op for symmetry with the Python SDK
-  }
-
-  withAdminApiKey(key: string): RpcProxy {
-    this.adminApiKey = key;
-    return this;
   }
 
   withBearerToken(token: string): RpcProxy {
@@ -74,9 +66,6 @@ export class RpcProxy {
     const headers: Record<string, string> = {
       "x-4mica-sdk": SDK_CLIENT_HEADER_VALUE,
     };
-    if (options.admin && this.adminApiKey) {
-      headers[ADMIN_API_KEY_HEADER] = this.adminApiKey;
-    }
     if (options.authed === false) {
       return headers;
     }
@@ -267,6 +256,11 @@ export class RpcProxy {
       : AssetBalanceInfo.fromRpc(raw);
   }
 
+  /**
+   * Operator-only: core authorizes this by the admin role on the SIWE session
+   * behind the bearer token, so call {@link Client.login} with an admin wallet
+   * first. There is no API-key path.
+   */
   async updateUserSuspension(
     userAddress: string,
     suspended: boolean,
@@ -274,7 +268,6 @@ export class RpcProxy {
     const data = await this.post<Record<string, unknown>>(
       `/core/users/${userAddress}/suspension`,
       { suspended },
-      { admin: true },
     );
     return UserSuspensionStatus.fromRpc(data);
   }

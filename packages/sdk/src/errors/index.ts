@@ -212,6 +212,150 @@ export class ValueMismatchError extends ContractError {}
 /** The deposit was too small to mint any scaled collateral. */
 export class ZeroCollateralCreditError extends ContractError {}
 
+/** The signed authorization's `validBefore` has already passed. */
+export class AuthorizationExpiredError extends ContractError {
+  readonly validBefore: bigint;
+
+  constructor(validBefore: bigint) {
+    super(`authorization expired at ${validBefore}`);
+    this.validBefore = validBefore;
+  }
+}
+
+/** The signed authorization's `validAfter` is still in the future. */
+export class AuthorizationNotYetValidError extends ContractError {
+  readonly validAfter: bigint;
+
+  constructor(validAfter: bigint) {
+    super(`authorization is not valid until ${validAfter}`);
+    this.validAfter = validAfter;
+  }
+}
+
+/** The authorization nonce was already consumed for this user. */
+export class AuthorizationAlreadyUsedError extends ContractError {
+  readonly user: string;
+  readonly nonce: string;
+
+  constructor(user: string, nonce: string) {
+    super(`authorization nonce ${nonce} was already used by ${user}`);
+    this.user = user;
+    this.nonce = nonce;
+  }
+}
+
+/** Escrow holds less scaled collateral than the operation needs. */
+export class EscrowScaledUnderflowError extends ContractError {}
+
+// --- ClearingHouse ------------------------------------------------------
+
+/** The Merkle proof does not place this participant's leaf under the committed root. */
+export class InvalidProofError extends ContractError {}
+
+/** No clearing cycle is committed under this id. */
+export class CycleNotFoundError extends ContractError {
+  readonly cycleId: string;
+
+  constructor(cycleId: string) {
+    super(`clearing cycle ${cycleId} not found`);
+    this.cycleId = cycleId;
+  }
+}
+
+/** The cycle is not in a status that allows this action. */
+export class InvalidCycleStatusError extends ContractError {
+  readonly cycleId: string;
+  readonly status: number;
+
+  constructor(cycleId: string, status: number) {
+    super(`clearing cycle ${cycleId} is in status ${status}`);
+    this.cycleId = cycleId;
+    this.status = status;
+  }
+}
+
+/** This debtor's net debit for the cycle was already paid. */
+export class AlreadyPaidError extends ContractError {
+  readonly cycleId: string;
+  readonly debtor: string;
+
+  constructor(cycleId: string, debtor: string) {
+    super(`${debtor} already paid its net debit for cycle ${cycleId}`);
+    this.cycleId = cycleId;
+    this.debtor = debtor;
+  }
+}
+
+/** This creditor's net credit for the cycle was already claimed. */
+export class AlreadyClaimedError extends ContractError {
+  readonly cycleId: string;
+  readonly creditor: string;
+
+  constructor(cycleId: string, creditor: string) {
+    super(`${creditor} already claimed its net credit for cycle ${cycleId}`);
+    this.cycleId = cycleId;
+    this.creditor = creditor;
+  }
+}
+
+/** The cycle's payment window closed at `deadline`; the debit can no longer be paid. */
+export class PaymentWindowElapsedError extends ContractError {
+  readonly deadline: bigint;
+
+  constructor(deadline: bigint) {
+    super(`payment window elapsed at ${deadline}`);
+    this.deadline = deadline;
+  }
+}
+
+/** Debits may still arrive until `deadline`; claims open after it. */
+export class PaymentFinalityPendingError extends ContractError {
+  readonly deadline: bigint;
+
+  constructor(deadline: bigint) {
+    super(`payment finality pending until ${deadline}`);
+    this.deadline = deadline;
+  }
+}
+
+/** The native value attached did not equal the committed net debit. */
+export class ExactPaymentRequiredError extends ContractError {
+  readonly expected: bigint;
+  readonly actual: bigint;
+
+  constructor(expected: bigint, actual: bigint) {
+    super(`exact payment required: expected ${expected}, got ${actual}`);
+    this.expected = expected;
+    this.actual = actual;
+  }
+}
+
+/** The cycle has less funded liquidity than this claim needs. */
+export class ClaimExceedsFundedLiquidityError extends ContractError {
+  readonly available: bigint;
+  readonly requested: bigint;
+
+  constructor(available: bigint, requested: bigint) {
+    super(
+      `claim of ${requested} exceeds the cycle's funded liquidity of ${available}`,
+    );
+    this.available = available;
+    this.requested = requested;
+  }
+}
+
+/** The gasless authorization was signed for a different cycle. */
+export class AuthorizationCycleMismatchError extends ContractError {
+  readonly nonce: string;
+  readonly cycleId: string;
+
+  constructor(nonce: string, cycleId: string) {
+    super(`authorization nonce ${nonce} is not bound to cycle ${cycleId}`);
+    this.nonce = nonce;
+    this.cycleId = cycleId;
+  }
+}
+
 /**
  * A self-funded token pull needs an ERC-20 allowance that is not in place.
  * Grant it with the matching `approve()` terminal and retry.

@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { ADMIN_API_KEY_HEADER } from "@/constants";
 import { RpcError } from "@/errors";
 import type { FetchFn } from "@/rpc";
 import { RpcProxy } from "@/rpc";
@@ -204,21 +203,22 @@ describe("RpcProxy", () => {
     await proxy.listRecipientPayments("0xr");
   });
 
-  it("sends the admin api key only on admin routes", async () => {
+  it("authorizes the suspension route with the session bearer only", async () => {
     const fetchMock = vi.fn<FetchFn>(async (input, init) => {
       const headers = init?.headers as Record<string, string>;
+      // Core has no API-key path: the admin role lives on the SIWE session.
+      expect(headers["x-api-key"]).toBeUndefined();
       if (input.toString().includes("/suspension")) {
-        expect(headers[ADMIN_API_KEY_HEADER]).toBe("key");
+        expect(headers.Authorization).toBe("Bearer token");
         return new Response(
           JSON.stringify({ user_address: "0xu", suspended: true }),
           { status: 200 },
         );
       }
-      expect(headers[ADMIN_API_KEY_HEADER]).toBeUndefined();
       return new Response(JSON.stringify(PARAMS), { status: 200 });
     });
-    const proxy = new RpcProxy("http://example.com", fetchMock).withAdminApiKey(
-      "key",
+    const proxy = new RpcProxy("http://example.com", fetchMock).withBearerToken(
+      "token",
     );
     await proxy.getPublicParams();
     const status = await proxy.updateUserSuspension("0xu", true);
