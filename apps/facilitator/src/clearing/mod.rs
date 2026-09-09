@@ -597,6 +597,16 @@ pub fn parse_cycle_id(value: &str) -> Result<&str, ClaimError> {
 mod tests {
     use super::*;
     use alloy::primitives::{U256, address};
+    use alloy::transports::RpcError;
+
+    #[test]
+    fn data_less_revert_is_a_simulation_revert() {
+        let payload = serde_json::json!({ "code": 3, "message": "execution reverted" });
+        let err = classify_call_error(alloy::contract::Error::TransportError(RpcError::ErrorResp(
+            serde_json::from_value(payload).expect("error payload"),
+        )));
+        assert_eq!(err.code(), "SIMULATION_REVERTED");
+    }
 
     fn terms(cycle_id: B256) -> ClaimTerms {
         ClaimTerms {
