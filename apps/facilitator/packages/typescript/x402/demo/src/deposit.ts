@@ -63,7 +63,9 @@ async function main() {
     const receipt = await deposit(client, token.address, amount)
     console.log(`Deposit tx: ${receipt.txHash} (route: ${receipt.route})`)
 
-    const after = await collateralOf(client, token.address)
+    // The balance is read from the chain through core's advertised RPC, which can trail the
+    // facilitator's node by a few blocks right after the deposit; wait for it to catch up.
+    const after = await collateralAbove(client, token.address, before)
     console.log(`Collateral after:  ${formatUnits(after, token.decimals)} ${SYMBOL}`)
   } finally {
     await client.aclose()
@@ -94,6 +96,18 @@ async function deposit(client: Client, asset: string, amount: bigint): Promise<D
     await selfFunded.approve()
     return selfFunded.send()
   }
+}
+
+async function collateralAbove(client: Client, asset: string, previous: bigint): Promise<bigint> {
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const current = await collateralOf(client, asset)
+    if (current > previous) return current
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+  }
+  console.warn(
+    'Collateral has not changed after 30s; the read RPC may be lagging. Re-run to check.'
+  )
+  return collateralOf(client, asset)
 }
 
 async function collateralOf(client: Client, asset: string): Promise<bigint> {
