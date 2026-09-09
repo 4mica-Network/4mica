@@ -254,12 +254,16 @@ fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
 
 /// Decodes a contract error into a readable revert reason, or `None` when the EVM never answered.
 ///
-/// Revert data is the reliable discriminator: present means the EVM ran and rejected, absent means
-/// we never got an answer. Matching on `TransportError` instead would misfile every plain
-/// `require(...)` failure as a retryable outage, since a node reports a revert *through* the
-/// transport as JSON-RPC error 3.
+/// Revert data is the primary discriminator: present means the EVM ran and rejected. Absent, the
+/// node may still have answered — a call into a function the target does not implement (a token
+/// without EIP-3009 asked for `receiveWithAuthorization`) reverts with *empty* data, and reaches us
+/// as JSON-RPC error 3 with no `data` field. [`revert_without_data`] catches that case, so it is
+/// reported as `SIMULATION_REVERTED` — which lets an SDK fall back to another route — rather than
+/// as a retryable outage.
 pub(crate) fn classify_core4mica_revert(err: &alloy::contract::Error) -> Option<String> {
-    let data = err.as_revert_data()?;
+    let Some(data) = err.as_revert_data() else {
+        return revert_without_data(err);
+    };
     if let Some(decoded) = err.as_decoded_interface_error::<Core4MicaErrors>() {
         return Some(describe_core4mica_error(&decoded));
     }
@@ -269,6 +273,18 @@ pub(crate) fn classify_core4mica_revert(err: &alloy::contract::Error) -> Option<
         alloy::sol_types::decode_revert_reason(&data)
             .unwrap_or_else(|| format!("revert data 0x{}", hex::encode(&data))),
     )
+}
+
+/// A revert the node reported without revert data: JSON-RPC error 3 (EIP-1474 "execution error"),
+/// or a message that says so. `None` for anything else — a transport failure, a rate limit, a
+/// malformed request — which is genuinely "no answer".
+pub(crate) fn revert_without_data(err: &alloy::contract::Error) -> Option<String> {
+    let alloy::contract::Error::TransportError(transport) = err else {
+        return None;
+    };
+    let payload = transport.as_error_resp()?;
+    let reverted = payload.code == 3 || payload.message.to_ascii_lowercase().contains("revert");
+    reverted.then(|| format!("execution reverted without data: {}", payload.message))
 }
 
 /// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
