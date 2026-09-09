@@ -86,6 +86,8 @@ If the request succeeds, your client received the protected response and the sel
 If you are building the seller side, protect one route with the 4Mica payment middleware. Start with a small test price.
 
 ```ts
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
 app.use(paymentMiddlewareFromConfig({
   "GET /premium-content": {
     accepts: {

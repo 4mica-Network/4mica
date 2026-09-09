@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600" role="img" aria-label="Abstract impasto painting in green, amber, and cream">
+  <defs>
+    <linearGradient id="groundReply" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#173530" />
+      <stop offset="50%" stop-color="#1f4a44" />
+      <stop offset="100%" stop-color="#2a5a4f" />
+    </linearGradient>
+
+    <!--
+      Same three-pass impasto as the two sibling posts (see
+      how-4mica-works/hero.svg for the rationale). New seeds and a lower light
+      angle so this canvas does not share a visible texture with either.
+    -->
+    <filter id="impastoReply" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.021 0.052" numOctaves="4" seed="33" result="warp" />
+      <feDisplacementMap in="SourceGraphic" in2="warp" scale="18" xChannelSelector="R" yChannelSelector="G" result="paint" />
+
+      <feTurbulence type="fractalNoise" baseFrequency="0.15 0.42" numOctaves="3" seed="41" result="tooth" />
+      <feDiffuseLighting in="tooth" surfaceScale="1.7" diffuseConstant="1" lighting-color="#ffffff" result="shade">
+        <feDistantLight azimuth="205" elevation="44" />
+      </feDiffuseLighting>
+      <feSpecularLighting in="tooth" surfaceScale="2.4" specularConstant="0.8" specularExponent="26" lighting-color="#fff3dc" result="gloss">
+        <feDistantLight azimuth="205" elevation="60" />
+      </feSpecularLighting>
+
+      <feComposite in="shade" in2="paint" operator="arithmetic" k1="1.1" k2="0" k3="0" k4="-0.04" result="modelled" />
+      <feComposite in="gloss" in2="modelled" operator="in" result="crests" />
+      <feComposite in="crests" in2="modelled" operator="arithmetic" k1="0" k2="0.5" k3="1" k4="0" result="lit" />
+      <feComposite in="lit" in2="paint" operator="in" />
+    </filter>
+  </defs>
+
+  <g filter="url(#impastoReply)">
+    <!-- Drawn oversize: displacement pulls neighbouring pixels inward. -->
+    <rect x="-90" y="-90" width="1380" height="780" fill="url(#groundReply)" />
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Underpainting: two broad diagonals set the light -->
+      <path d="M-90 500C130 360 280 460 450 330S720 110 920 190s240 140 380 70" stroke="#1d6a55" stroke-width="185" opacity="0.85" />
+      <path d="M-90 140C110 260 290 70 490 160s340 240 550 140 230-170 330-200" stroke="#2f3f6e" stroke-width="160" opacity="0.7" />
+
+      <!-- Ledger green, the dominant colour, across the diagonal -->
+      <path d="M-40 450C150 290 310 480 490 360S770 110 990 200s180 150 290 100" stroke="#3fd39a" stroke-width="98" opacity="0.95" />
+      <path d="M110 680C250 510 340 610 480 460s140-250 290-320" stroke="#3fd39a" stroke-width="56" opacity="0.8" />
+      <path d="M780 -60C850 80 730 200 810 340s210 190 340 160" stroke="#3fd39a" stroke-width="44" opacity="0.7" />
+
+      <!-- Amber crossing the other way -->
+      <path d="M-60 220C130 340 250 150 430 240s240 280 450 180 200-220 370-180" stroke="#f2b233" stroke-width="102" opacity="0.9" />
+      <path d="M250 650C370 490 440 600 600 470s120-240 280-250" stroke="#f2b233" stroke-width="60" opacity="0.75" />
+      <path d="M1090 -50C1020 130 1130 250 1070 410" stroke="#f2b233" stroke-width="46" opacity="0.7" />
+
+      <!-- Indigo keeps the warm pair from flattening -->
+      <path d="M-60 570C110 480 230 600 390 510s190-130 330-80 200 120 340 50" stroke="#4a4fa8" stroke-width="64" opacity="0.9" />
+      <path d="M440 110C550 20 650 130 770 60s140-100 270-60" stroke="#4a4fa8" stroke-width="42" opacity="0.7" />
+      <path d="M70 310C160 250 220 330 310 280" stroke="#4a4fa8" stroke-width="34" opacity="0.8" />
+
+      <!-- Coral, short and high -->
+      <path d="M630 410C750 310 870 420 1000 340s100-150 240-140" stroke="#ff6b57" stroke-width="70" opacity="0.88" />
+      <path d="M-40 70C120 0 260 110 410 50" stroke="#ff6b57" stroke-width="40" opacity="0.7" />
+      <path d="M310 630C410 550 480 640 590 580" stroke="#ff6b57" stroke-width="36" opacity="0.75" />
+
+      <!-- Cream: the topmost, thickest paint -->
+      <path d="M150 390C280 310 390 420 520 350" stroke="#fff1d6" stroke-width="30" opacity="0.95" />
+      <path d="M610 490C720 430 820 510 940 450" stroke="#fff1d6" stroke-width="24" opacity="0.85" />
+      <path d="M850 140C920 90 1010 150 1100 100" stroke="#fff1d6" stroke-width="26" opacity="0.8" />
+      <path d="M340 220C400 180 460 230 530 190" stroke="#fff1d6" stroke-width="18" opacity="0.7" />
+
+      <!-- Loaded-brush dabs -->
+      <path d="M280 170h56" stroke="#f2b233" stroke-width="58" opacity="0.95" />
+      <path d="M800 260h42" stroke="#fff1d6" stroke-width="44" />
+      <path d="M480 510h68" stroke="#3fd39a" stroke-width="52" />
+      <path d="M1030 460h48" stroke="#ff6b57" stroke-width="46" />
+      <path d="M650 50h40" stroke="#4a4fa8" stroke-width="42" opacity="0.9" />
+    </g>
+  </g>
+</svg>
