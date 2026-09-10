@@ -1,4 +1,5 @@
-import { SupportedTokensResponse } from '@4mica/sdk'
+import { CorePublicParameters, SupportedTokensResponse } from '@4mica/sdk'
+import type { Network, PaymentRequirements } from '@x402/core/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../src/server/scheme.js'
@@ -136,5 +137,93 @@ describe('FourMicaEvmScheme default assets', () => {
     for (const network of SUPPORTED_NETWORKS) {
       await expect(scheme.parsePrice('$1.00', network)).resolves.toMatchObject({ asset: USDC })
     }
+  })
+})
+
+const CONTRACT = '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2'
+const PAY_TO = '0x1111111111111111111111111111111111111111'
+const DOMAIN = { name: '4Mica-base-sepolia', version: '1', verifyingContract: CONTRACT }
+
+const publicParams = (chainId = 84532) =>
+  new CorePublicParameters(new Uint8Array(48), CONTRACT, DOMAIN.name, DOMAIN.version, chainId)
+
+/** `loadPublicParams` is private static; widen the class so the spy is typed. */
+function spyOnLoadPublicParams() {
+  return vi.spyOn(
+    FourMicaEvmScheme as unknown as {
+      loadPublicParams: (coreUrl: string) => Promise<CorePublicParameters>
+    },
+    'loadPublicParams'
+  )
+}
+
+const requirements = (extra?: Record<string, unknown>): PaymentRequirements => ({
+  scheme: '4mica-credit',
+  network: 'eip155:84532',
+  asset: USDC,
+  amount: '1000',
+  payTo: PAY_TO,
+  maxTimeoutSeconds: 300,
+  extra: extra ?? {},
+})
+
+const kind = { x402Version: 2, scheme: '4mica-credit', network: 'eip155:84532' as Network }
+
+describe('FourMicaEvmScheme EIP-712 domain hints', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // A payer that finds the domain in the 402 signs without calling core, so
+  // the middleware fetches it once and advertises it on every requirement.
+  it("advertises core's EIP-712 domain in extra alongside whatever is already there", async () => {
+    const load = spyOnLoadPublicParams().mockResolvedValue(publicParams())
+    const validation = { validator: 'validator-id', subject: `0x${'42'.repeat(32)}` }
+
+    const enhanced = await new FourMicaEvmScheme().enhancePaymentRequirements(
+      requirements({ validation }),
+      kind,
+      []
+    )
+
+    expect(enhanced.extra).toEqual({ validation, ...DOMAIN })
+    expect(load).toHaveBeenCalledWith('https://base.sepolia.api.4mica.xyz/')
+  })
+
+  it('asks core for the domain once per network', async () => {
+    const load = spyOnLoadPublicParams().mockResolvedValue(publicParams())
+    const scheme = new FourMicaEvmScheme()
+
+    await scheme.enhancePaymentRequirements(requirements(), kind, [])
+    await scheme.enhancePaymentRequirements(requirements(), kind, [])
+
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a domain the resource server set itself and fills in only missing keys', async () => {
+    const load = spyOnLoadPublicParams().mockResolvedValue(publicParams())
+    const scheme = new FourMicaEvmScheme()
+
+    const complete = requirements({ name: 'Own', version: '9', verifyingContract: PAY_TO })
+    await expect(scheme.enhancePaymentRequirements(complete, kind, [])).resolves.toBe(complete)
+    expect(load).not.toHaveBeenCalled()
+
+    const partial = await scheme.enhancePaymentRequirements(requirements({ name: 'Own' }), kind, [])
+    expect(partial.extra).toEqual({ ...DOMAIN, name: 'Own' })
+  })
+
+  it('rejects a core that serves another chain, without caching the failure', async () => {
+    const load = spyOnLoadPublicParams()
+      .mockResolvedValueOnce(publicParams(8453))
+      .mockResolvedValue(publicParams())
+    const scheme = new FourMicaEvmScheme()
+
+    await expect(scheme.enhancePaymentRequirements(requirements(), kind, [])).rejects.toThrow(
+      /serves chain 8453, not eip155:84532/
+    )
+    await expect(
+      scheme.enhancePaymentRequirements(requirements(), kind, [])
+    ).resolves.toMatchObject({ extra: DOMAIN })
+    expect(load).toHaveBeenCalledTimes(2)
   })
 })

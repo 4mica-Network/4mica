@@ -1,4 +1,5 @@
-import { SupportedTokensResponse } from '@4mica/sdk'
+import { GUARANTEE_CLAIMS_V1_TYPE, SupportedTokensResponse } from '@4mica/sdk'
+import { type Hex, verifyTypedData } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -182,5 +183,83 @@ describe('FourMicaEvmScheme', () => {
         payTo: '0x1111111111111111111111111111111111111111',
       } as never)
     ).rejects.toThrow('Unsupported x402Version: 3')
+  })
+})
+
+describe('FourMicaEvmScheme signing from an advertised domain', () => {
+  const CONTRACT: Hex = '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2'
+  const DOMAIN = { name: '4Mica-base-sepolia', version: '1', verifyingContract: CONTRACT }
+  const BASE = {
+    scheme: '4mica-credit',
+    network: 'eip155:84532',
+    asset: USDC,
+    amount: '1000',
+    payTo: '0x1111111111111111111111111111111111111111',
+    maxTimeoutSeconds: 300,
+  }
+
+  beforeEach(() => {
+    spyOnLoadSupportedTokens()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // The same path mcpc takes: everything needed to sign is in the 402.
+  it('signs locally when the requirements carry the domain, never connecting to core', async () => {
+    const createX402Flow = spyOnCreateX402Flow()
+    const account = privateKeyToAccount(`0x${'11'.repeat(32)}`)
+    const scheme = await FourMicaEvmScheme.create(account, { networks: [] })
+
+    const result = await scheme.createPaymentPayload(2, {
+      ...BASE,
+      extra: { ...DOMAIN, rpcUrl: 'https://never.contacted.example' },
+    } as never)
+
+    expect(createX402Flow).not.toHaveBeenCalled()
+    const payload = result.payload as {
+      claims: Record<string, string | number>
+      signature: Hex
+      scheme: string
+    }
+    expect(payload.scheme).toBe('eip712')
+    expect(payload.claims).toMatchObject({
+      version: 'v1',
+      user_address: account.address.toLowerCase(),
+      recipient_address: BASE.payTo,
+      amount: '0x3e8',
+      asset_address: USDC,
+    })
+
+    const { claims } = payload
+    await expect(
+      verifyTypedData({
+        address: account.address,
+        domain: { ...DOMAIN, chainId: 84532 },
+        types: { SolGuaranteeRequestClaimsV1: GUARANTEE_CLAIMS_V1_TYPE },
+        primaryType: 'SolGuaranteeRequestClaimsV1',
+        message: {
+          user: claims.user_address as Hex,
+          recipient: claims.recipient_address as Hex,
+          reqId: BigInt(claims.req_id),
+          amount: BigInt(claims.amount),
+          asset: claims.asset_address as Hex,
+          timestamp: BigInt(claims.timestamp),
+        },
+        signature: payload.signature,
+      })
+    ).resolves.toBe(true)
+  })
+
+  it('rejects a partial domain instead of guessing the rest', async () => {
+    spyOnCreateX402Flow()
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
+    })
+
+    await expect(
+      scheme.createPaymentPayload(2, { ...BASE, extra: { name: DOMAIN.name } } as never)
+    ).rejects.toThrow(/partial EIP-712 domain in extra \(missing version, verifyingContract\)/)
   })
 })
