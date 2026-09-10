@@ -43,8 +43,10 @@ jobs:
       - name: Build
         run: pnpm turbo run build --filter='@4mica/sdk*' --filter=@4mica/cli --filter=@4mica/x402
 
+      # Same scope: turbo schedules `build` for every package in the graph when a task
+      # depends on it, so an unscoped run would build the apps again.
       - name: Verify package exports
-        run: pnpm check:exports
+        run: pnpm turbo run check:exports --filter='@4mica/sdk*' --filter=@4mica/cli --filter=@4mica/x402
 
       - name: Create Release PR or publish
         uses: changesets/action@v1
