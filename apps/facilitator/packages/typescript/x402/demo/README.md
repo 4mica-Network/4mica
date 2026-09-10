@@ -1,7 +1,9 @@
 # @4mica/x402 Demo
 
 A paywalled Express endpoint and a client that pays for it with `4mica-credit` on Base Sepolia,
-using `@4mica/x402` and `@x402/fetch`.
+using `@4mica/x402` and `@x402/fetch`. Plus an Apify-shaped demo: a mock of Apify's Actor run
+endpoint and an MCP server with one paid tool, both advertising `4mica-credit` next to `upto`
+and `exact`, paid for through [mcpc](https://github.com/apify/mcpc).
 
 ## Setup
 
@@ -23,13 +25,17 @@ cp .env.example .env
 | Variable | Used by | Meaning |
 | --- | --- | --- |
 | `NETWORK` | all | CAIP-2 network. `eip155:84532` (Base Sepolia) by default. |
-| `PAY_TO_ADDRESS` | server | Recipient of the payments. |
-| `PRIVATE_KEY` | client, deposit | Payer wallet key, `0x`-prefixed. |
+| `PAY_TO_ADDRESS` | servers | Recipient of the payments. |
+| `PRIVATE_KEY` | client, deposit, balance | Payer wallet key, `0x`-prefixed. |
 | `API_URL` | client | Server base URL. `http://localhost:3000` by default. |
-| `FACILITATOR_URL` | server, deposit | Facilitator the server verifies and settles through, and that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty for the deposit to go self-funded. |
+| `FACILITATOR_URL` | servers, deposit | Facilitator the servers verify and settle through, and that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty for the deposit to go self-funded. |
 | `DEPOSIT_AMOUNT` | deposit | USDC to deposit. `2` by default. |
 | `PORT` | server | Listen port. `3000` by default. |
 | `CORE_URL` | all | A self-hosted core for `NETWORK`. Unset, the hosted deployment for the network is used. |
+| `ACTOR_PORT` | actor-server | Listen port of the run endpoint. `3002` by default. |
+| `MCP_PORT` | mcp-server | Listen port of the MCP server. `3001` by default. |
+| `ACTOR_PRICE` | actor-server, mcp-server | Price of one run. `$1.00` by default, the figure Apify advertises. |
+| `RUN_SECONDS` | actor-server, mcp-server | How long the fake Actor "runs". `3` by default. |
 
 ## 1. Fund the payer
 
@@ -43,6 +49,9 @@ pnpm run deposit
 The script asks core which USDC it accepts on the network, deposits `DEPOSIT_AMOUNT` of it
 gaslessly through the facilitator (one signature, no ETH), and prints the collateral before and
 after. Without `FACILITATOR_URL` it sends the deposit transaction itself, so the wallet needs gas.
+
+`pnpm run balance` prints the same wallet's collateral as core sees it: total, locked behind
+open guarantees, and free.
 
 ## 2. Start the server
 
@@ -101,6 +110,65 @@ curl http://localhost:3000/
 curl -v http://localhost:3000/api/premium-data
 ```
 
+## The Apify-shaped demo
+
+Two more servers share one seller (`src/apify/`): a real `4mica-credit` entry built by the
+scheme server, with the asset from core's token list and core's EIP-712 domain in `extra`, and
+two shape-only entries in front of it so the 402 reads like Apify's.
+
+- `pnpm run actor-server` (or `pnpm demo:actor` from the package root) mocks
+  `POST /v2/acts/<actor>/run-sync-get-dataset-items`. Unpaid, it answers with Apify's 402: their
+  error body verbatim and a `payment-required` header whose `accepts` are `upto`, `exact`, and
+  `4mica-credit`. Paid, it verifies, "runs" for `RUN_SECONDS`, settles, and returns a five-row
+  dataset with a `payment-response` header.
+- `pnpm run mcp-server` (or `pnpm demo:mcp`) is a Streamable HTTP MCP server at `/mcp` with one
+  tool, `run-actor`. The tool carries `_meta.x402` with the same accepts, the way Apify's MCP
+  server marks paid tools. An unpaid call gets the challenge back as an error result with the
+  `PaymentRequired` in `structuredContent`; a paid call carries the payment in
+  `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header), and the result carries the
+  settlement in `_meta["x402/payment-response"]`.
+
+The `upto` and `exact` entries are shape-only. The 4mica facilitator does not serve them, so a
+payer that picks one is told so and nothing runs. Only the third entry is real.
+
+### Buyer: mcpc
+
+The buyer is the `4mica-credit` branch of the mcpc fork at
+[4mica-Network/mcpc](https://github.com/4mica-Network/mcpc), which signs the scheme with
+`--x402 4mica-credit` and signs afresh on every call, since core accepts a request id once.
+
+The fork pins the Core4Mica contract per network and refuses an accept whose
+`extra.verifyingContract` differs from the pin. Point the servers at the core the fork pins for
+`NETWORK`; for Base Sepolia today that is the staging deployment:
+
+```
+CORE_URL=https://staging.api.4mica.io
+FACILITATOR_URL=https://staging.facilitator.4mica.io
+```
+
+Then, with the fork built and on PATH as `mcpc`:
+
+```bash
+mcpc x402 import $PRIVATE_KEY                 # the same wallet the deposit funded
+mcpc connect http://localhost:3001/mcp @demo --x402 4mica-credit
+mcpc @demo tools-call run-actor query:="x402 isn't good (yet)"
+mcpc @demo tools-call run-actor query:="and again"   # a fresh signature, not a reused one
+```
+
+Without `--x402`, the same call returns the challenge, which `mcpc @demo tools-get run-actor`
+also shows under `_meta.x402`.
+
+### The recording
+
+`bash record.sh` runs the whole script in one command, with both servers up: collateral before,
+the 402 decoded, connect, two paid runs, collateral after. Locked collateral rises by two runs
+and no transaction happens; the guarantees net into one settlement when the cycle commits.
+
+Note what verify does and does not check. The facilitator's `/verify` validates the signed
+guarantee request; whether the payer holds collateral is only known at `/settle`, when core
+issues the guarantee. A run paid by an unfunded wallet therefore verifies, runs, and fails at
+settlement with `user not registered`, exactly as the express middleware would.
+
 ## Running against a local 4mica-core stack
 
 `deployment/dev_stack.sh up` in 4mica-core starts anvil, deploys mock stablecoins and runs core
@@ -129,3 +197,5 @@ address is the first entry of `GET http://localhost:3000/core/tokens`.
 - Verify and settle go to the hosted facilitator at `https://x402.4mica.xyz`.
 - Settlement is per cycle, not per payment: the recipient's net credit becomes claimable on-chain
   when the cycle commits.
+- `pnpm test` runs the unit tests for the Apify-shaped 402, the payment readers, and the MCP
+  result shapes. Nothing in them touches the network.
