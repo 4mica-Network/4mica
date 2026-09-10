@@ -12,12 +12,12 @@ Track product, SDK, protocol, and network changes that affect builders. Changelo
   description="SDK 2.0 and the tab-free protocol on Base Sepolia"
   rss={{
     title: "September 2026 - SDK 2.0 and the tab-free protocol",
-    description: "@4mica/sdk 2.0.0 and @4mica/x402 2.0.0: no tab handshake, settlement cycles, and gasless deposits, live on Base Sepolia."
+    description: "@4mica/sdk 2.0.0-alpha and @4mica/x402 2.0.0-alpha: no tab handshake, settlement cycles, and gasless deposits, live on Base Sepolia."
   }}
 >
   ## SDK 2.0 and the tab-free protocol
 
-  `@4mica/sdk` 2.0.0, its framework packages, and `@4mica/x402` 2.0.0 ship the protocol that
+  `@4mica/sdk` 2.0.0-alpha, its framework packages, and `@4mica/x402` 2.0.0-alpha ship the protocol that
   4Mica core runs today. What changes for you:
 
   - **No tab handshake.** A payer signs its guarantee claim straight from the seller's payment
@@ -34,7 +34,7 @@ Track product, SDK, protocol, and network changes that affect builders. Changelo
     mainnet stays on the previous protocol version until its upgrade; Ethereum Sepolia is legacy,
     x402 v1 only.
 
-  Migration: install the 2.0 packages and remove any tab configuration. Everything else is
+  Migration: install the alpha packages (`pnpm install @4mica/x402@alpha`, `@4mica/sdk@alpha`; `latest` stays on 1.x until Base mainnet upgrades) and remove any tab configuration. Everything else is
   unchanged for a seller using
   `paymentMiddlewareFromConfig` or a buyer using `wrapFetchWithPaymentFromConfig`.
 </Update>
