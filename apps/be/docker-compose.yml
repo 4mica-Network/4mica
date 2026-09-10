@@ -22,6 +22,33 @@ services:
       retries: 5
       start_period: 10s
 
+  redis:
+    image: redis:8-alpine
+    container_name: 4mica-be-redis
+    restart: unless-stopped
+    stop_grace_period: 10s
+    # `noeviction` is mandatory rather than a tuning choice: BullMQ keeps job
+    # and scheduler state in ordinary keys, so an LRU policy would silently
+    # evict live jobs and the drip would just stop, with nothing in the logs.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   migrate:
     build:
       context: ../..
@@ -67,10 +94,21 @@ services:
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       APP_URL: ${APP_URL:-}
+      EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
+      # The onboarding drip. It stays off unless BOTH of these are set — see
+      # src/jobs/onboarding/index.ts.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      UNSUBSCRIBE_SECRET: ${UNSUBSCRIBE_SECRET:-}
+      ONBOARDING_TICK_MS: ${ONBOARDING_TICK_MS:-300000}
+      ONBOARDING_BATCH_SIZE: ${ONBOARDING_BATCH_SIZE:-25}
+      ONBOARDING_STEP_GAP_MS: ${ONBOARDING_STEP_GAP_MS:-259200000}
+      ONBOARDING_DRIP_EPOCH: ${ONBOARDING_DRIP_EPOCH:-2026-09-15T00:00:00.000Z}
     ports:
       - "127.0.0.1:${BE_PORT:-4000}:4000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -84,3 +122,5 @@ services:
 volumes:
   postgres-data:
     name: 4mica-be-postgres-data
+  redis-data:
+    name: 4mica-be-redis-data

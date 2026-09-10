@@ -1,6 +1,7 @@
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import axios, { isAxiosError } from "axios";
 import { EmailClientError, type EmailValidationIssue } from "./errors";
+import type { OnboardingStepId, OnboardingStepPayload } from "./onboarding";
 import type {
   AccountDeletedPayload,
   AccountVerificationPayload,
@@ -168,6 +169,16 @@ export class EmailClient {
 
   sendWelcome(payload: WelcomePayload) {
     return this.send("welcome", payload);
+  }
+
+  /**
+   * One helper for all thirty drip steps rather than thirty wrappers over an
+   * identical shape. The other `sendX` methods earn their names by wrapping
+   * distinct payload types; these would not. Narrowing `id` to the drip subset
+   * is the only thing this adds over calling `send` directly.
+   */
+  sendOnboardingStep(id: OnboardingStepId, payload: OnboardingStepPayload) {
+    return this.send(id, payload);
   }
 
   sendActionRequired(payload: ActionRequiredPayload) {

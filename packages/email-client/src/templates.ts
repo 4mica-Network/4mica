@@ -1,4 +1,5 @@
 import type * as v from "valibot";
+import { onboardingStepSchemas } from "./onboarding";
 import {
   AccountDeletedSchema,
   AccountVerificationSchema,
@@ -15,7 +16,6 @@ import {
   WaitlistConfirmationSchema,
   WaitlistInvitationSchema,
   WeeklyReportSchema,
-  WelcomeSchema,
   WorkspaceInviteSchema,
 } from "./payloads";
 
@@ -26,7 +26,10 @@ import {
  * signatures from it, so the two sides cannot drift apart.
  */
 export const templateSchemas = {
-  welcome: WelcomeSchema,
+  // All thirty onboarding-drip steps, `welcome` (step one) included. Spread
+  // rather than listed so the send order lives in exactly one place — see
+  // ./onboarding.ts.
+  ...onboardingStepSchemas,
   "action-required": ActionRequiredSchema,
   "account-verification": AccountVerificationSchema,
   "waitlist-confirmation": WaitlistConfirmationSchema,

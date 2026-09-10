@@ -38,10 +38,24 @@ const base = BaseEmailSchema.entries;
 
 // --- Onboarding -------------------------------------------------------------
 
-export const WelcomeSchema = v.object({
+/**
+ * Shared by every step of the onboarding drip (see `./onboarding.ts`). One
+ * schema rather than thirty structurally identical ones: they would infer to
+ * thirty identical types, so the duplication buys no type safety.
+ */
+export const OnboardingStepSchema = v.object({
   ...base,
   ctaUrl: v.optional(absoluteUrl),
+  /**
+   * RFC 8058 one-click endpoint. `apps/be` mints it; `apps/email` renders it in
+   * the footer and mirrors it into the `List-Unsubscribe` headers. Optional so
+   * one-off transactional sends need not supply one.
+   */
+  unsubscribeUrl: v.optional(absoluteUrl),
 });
+
+/** Step one of the drip, and still usable as a standalone welcome. */
+export const WelcomeSchema = OnboardingStepSchema;
 
 export const ActionRequiredSchema = v.object({
   ...base,

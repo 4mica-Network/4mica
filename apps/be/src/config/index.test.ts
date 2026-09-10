@@ -76,6 +76,44 @@ describe("parseEnv", () => {
       /RATE_LIMIT_IP_MAX must be numeric/,
     );
   });
+
+  it("leaves the onboarding drip unconfigured by default", () => {
+    const env = parseEnv(VALID);
+
+    expect(env.REDIS_URL).toBe("");
+    expect(env.UNSUBSCRIBE_SECRET).toBe("");
+    expect(env.ONBOARDING_STEP_GAP_MS).toBe(259_200_000);
+  });
+
+  it("rejects a Redis URL that is not a redis:// URL", () => {
+    expect(() =>
+      parseEnv({ ...VALID, REDIS_URL: "http://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a weak unsubscribe secret once the drip is armed", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        REDIS_URL: "redis://127.0.0.1:6379",
+        UNSUBSCRIBE_SECRET: "too-short",
+      }),
+    ).toThrow(/UNSUBSCRIBE_SECRET: must be at least 32 characters/);
+  });
+
+  // Without Redis the drip never runs, so a placeholder secret is harmless and
+  // must not block boot for everyone who has not configured the feature.
+  it("ignores a weak unsubscribe secret when Redis is unset", () => {
+    expect(() =>
+      parseEnv({ ...VALID, UNSUBSCRIBE_SECRET: "too-short" }),
+    ).not.toThrow();
+  });
+
+  it("rejects a non-ISO drip epoch", () => {
+    expect(() =>
+      parseEnv({ ...VALID, ONBOARDING_DRIP_EPOCH: "yesterday" }),
+    ).toThrow(/ONBOARDING_DRIP_EPOCH must be an ISO 8601 timestamp/);
+  });
 });
 
 describe("config", () => {
