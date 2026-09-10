@@ -1,6 +1,6 @@
 {
   "name": "@4mica/example-agent-comedian",
-  "version": "0.0.0",
+  "version": "0.0.1-alpha.0",
   "private": true,
   "type": "module",
   "description": "Comedian agent (seller): sells jokes — free setup, paywalled punchline priced dynamically, adapts to demand and ratings",
