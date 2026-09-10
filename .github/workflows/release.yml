@@ -38,8 +38,10 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Only the packages this workflow publishes. The apps need runtime secrets
+      # (DATABASE_URL and friends) to build and are deployed by their own workflows.
       - name: Build
-        run: pnpm build
+        run: pnpm turbo run build --filter='@4mica/sdk*' --filter=@4mica/cli --filter=@4mica/x402
 
       - name: Verify package exports
         run: pnpm check:exports
