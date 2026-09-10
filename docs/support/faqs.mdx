@@ -157,14 +157,15 @@ asset.
 
 ### Which networks are supported?
 
-Base is the production network, while Base Sepolia and Ethereum Sepolia are
-available for development and compatibility testing.
+Base Sepolia is live on the 2.0 protocol and is where development, demos and
+pilots run today. Base still serves the previous protocol version until its
+upgrade lands, and Ethereum Sepolia is kept for legacy x402 v1 integrations.
 
 4Mica identifies networks with <Tooltip headline="CAIP-2" tip="Chain Agnostic Improvement Proposal 2: a standard format for identifying blockchain networks, such as eip155:8453 for Base.">CAIP-2</Tooltip> IDs:
 
-- Base: `eip155:8453`
-- Base Sepolia: `eip155:84532`
-- Ethereum Sepolia: `eip155:11155111`
+- Base Sepolia: `eip155:84532` (2.0, live)
+- Base: `eip155:8453` (upgrade pending)
+- Ethereum Sepolia: `eip155:11155111` (legacy, x402 v1 only)
 
 Start on Base Sepolia unless your test requires another network. Use the
 current IDs and facilitator URLs in [supported networks](/getting-started/supported-networks).

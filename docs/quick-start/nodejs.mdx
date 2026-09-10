@@ -37,19 +37,19 @@ Install the 4Mica server package when you protect routes. Install the x402 clien
 <CodeGroup>
 
 ```bash npm
-npm install @4mica/x402 @x402/fetch @x402/axios viem
+npm install @4mica/x402@alpha @x402/fetch @x402/axios viem
 ```
 
 ```bash pnpm
-pnpm install @4mica/x402 @x402/fetch @x402/axios viem
+pnpm install @4mica/x402@alpha @x402/fetch @x402/axios viem
 ```
 
 ```bash yarn
-yarn add @4mica/x402 @x402/fetch @x402/axios viem
+yarn add @4mica/x402@alpha @x402/fetch @x402/axios viem
 ```
 
 ```bash bun
-bun add @4mica/x402 @x402/fetch @x402/axios viem
+bun add @4mica/x402@alpha @x402/fetch @x402/axios viem
 ```
 
 </CodeGroup>
@@ -181,17 +181,17 @@ import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { privateKeyToAccount } from "viem/accounts";
 
-const ethSepoliaScheme = await FourMicaEvmScheme.create(
-  privateKeyToAccount("0xEthSepoliaPrivateKey"),
-);
 const baseSepoliaScheme = await FourMicaEvmScheme.create(
   privateKeyToAccount("0xBaseSepoliaPrivateKey"),
+);
+const baseScheme = await FourMicaEvmScheme.create(
+  privateKeyToAccount("0xBasePrivateKey"),
 );
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
-    { network: "eip155:11155111", client: ethSepoliaScheme },
     { network: "eip155:84532", client: baseSepoliaScheme },
+    { network: "eip155:8453", client: baseScheme },
   ],
 });
 ```

@@ -50,7 +50,7 @@ SDK methods over hand-built payloads or signatures.
 ## Resource Server (Recipient) Flow
 1. On the initial request, reply `402 Payment Required` with the requirements: v2 puts base64 of `{ x402Version: 2, accepts: [...], resource }` in the `payment-required` header; v1 puts `accepts` in the JSON body.
 2. Each entry carries `scheme: "4mica-credit"`, a CAIP-2 `network`, `payTo`, `asset` (an address from core's token list for that network), `amount` (v2) or `maxAmountRequired` (v1), and `maxTimeoutSeconds`.
-3. To gate the payment on an external validator, add `extra.validation = { validator, subject, deadline?, params? }`. Nothing else is required in `extra`; there is no tab endpoint.
+3. To gate the payment on an external validator, add `extra.validation = { validator, subject, deadline?, params? }`. The middleware also fills `extra.name`, `extra.version` and `extra.verifyingContract` with core's EIP-712 domain (`eip712_name`, `eip712_version` and `contract_address` from `GET /core/public-params`), so a payer can sign without calling core; a hand-built 402 should copy them in. There is no tab endpoint.
 4. On the paid request, decode `PAYMENT-SIGNATURE` (or legacy `X-PAYMENT`) into `paymentPayload`.
 5. Call facilitator `POST /verify` with `{ x402Version, paymentPayload, paymentRequirements }`.
 6. Do the work only if `isValid` is true.

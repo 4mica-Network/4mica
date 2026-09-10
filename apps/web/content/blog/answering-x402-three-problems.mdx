@@ -1,0 +1,146 @@
+---
+title: Answering the three x402 problems in Jan Čurn's talk
+description: Double-spend, metered billing and the refund round-trip, answered with a collateral-backed x402 scheme that rides in the accepts array, a PR to mcpc, and a demo on Base Sepolia.
+date: 2026-09-09
+author: Mairon Mahzoun
+authorAvatar: /assets/mairon.jpg
+authorRole: CTO & Co-Founder
+category: Engineering
+tags: [x402, apify, settlement]
+thumbnail: /blog/answering-x402-three-problems/hero.svg
+thumbnailAlt: Abstract impasto painting in green, amber, and cream
+keywords: [x402 double-spend, upto scheme, metered billing, batch settlement, Apify x402, collateral-backed payments]
+draft: true
+---
+
+{/* draft: true keeps this page out of the production build until the three
+    placeholder links below (mcpc PR, recording, capture PR) and the mainnet
+    date are real. Flip it to false when they are. */}
+
+At AI Engineer World's Fair, Jan Čurn gave a talk titled
+[x402 isn't good (yet)](https://www.youtube.com/watch?v=h6mi88VrPtQ). It is
+the most useful critique of the protocol so far, because it comes from running
+x402 in front of twenty thousand Actors rather than from a whitepaper. This is
+a reply with code attached.
+
+## His three problems
+
+**Double-spend.** Between the moment a buyer signs a payment and the moment it
+settles, nothing stops the same funds from backing a thousand other
+signatures. The seller does the work and finds out later.
+
+**401 versus 402.** MCP authentication wants a 401 first, x402 wants a 402.
+Servers end up split into one hostname per payment protocol, which he called
+twenty different Amazons.
+
+**Metered billing.** x402 was built for fixed prices. An Actor run lasts
+seconds or hours and its cost is known at the end. The `upto` scheme arrived
+about half a year after it was promised, and it still double-spends. The
+workaround Apify ships today is to charge the maximum, do the work and refund
+the rest: two transactions per job, and the buyer has to trust the seller to
+send the second one.
+
+## What a collateral-backed guarantee changes
+
+The `4mica-credit` scheme replaces the transfer authorization with a signed
+guarantee against collateral the buyer has already deposited with 4Mica core.
+
+**Lock before work.** Each request carries a guarantee for a cap. Core locks
+that amount from the buyer's free collateral at issuance, before the seller
+starts. Two signatures cannot lock the same dollar, so the thousand-signature
+attack fails at the facilitator instead of in the seller's ledger.
+
+**Same host, same header.** The scheme is one more entry in the `accepts` array
+of an ordinary 402 response, verified and settled by a facilitator that serves
+the standard `/verify`, `/settle` and `/supported`. It does not touch the 401
+versus 402 conflict, and it adds no new host to it either.
+
+**Cap at signing, capture at run end.** A run advertised at a $5.00 cap and
+metered at $0.40 is captured for $0.40. The remaining $4.60 is released to the
+buyer in the same request. Nothing expires, nothing is refunded, nothing is
+held for fourteen days. Guarantees then net once per cycle into one on-chain
+movement per participant: agents paying Apify, Apify paying developers, Actors
+calling Actors, all in the same netting.
+
+## What batch-settlement gives, and what it does not
+
+The talk pointed at Coinbase's
+[batch-settlement](https://docs.x402.org/schemes/batch-settlement) as the way
+out, and it is a real answer: the buyer escrows once, signs cumulative vouchers
+off-chain, and the server claims them in batches with a settlement override
+for dynamic prices. That closes double-spend and metering.
+
+Its channel is between one payer and one receiver. A buyer that uses fifty
+sellers funds fifty escrows, and every seller runs a channel manager, a
+receiver signer and channel storage. With a collateral-backed guarantee the
+buyer's deposit is one position usable at every seller, the seller runs
+nothing beyond the facilitator calls it already makes, and settlement is one
+net position per participant per cycle. There is also no approve transaction
+and no ETH float, which `upto` needs for its Permit2 allowance.
+
+## Two facts that make this cheap for Apify
+
+The run endpoint already advertises `upto`, so Apify's ledger already settles
+below an authorization. `4mica-credit` has the same shape as `upto` with locked
+collateral in place of a Permit2 allowance, and one net settlement per cycle
+in place of one transaction per run.
+
+4Mica's facilitator already serves the standard x402 endpoints, and the accepts
+entry carries everything a client needs to sign, including the EIP-712 domain.
+The server side of the integration is one entry in `accepts`. The client side
+already exists.
+
+## Proof
+
+- A PR adding the scheme to [mcpc](https://github.com/apify/mcpc), Apify's own
+  MCP client: opt-in through `--x402 4mica-credit`, about 150 lines, no new
+  dependency, never selected under `auto`.
+  {/* TODO: replace with the PR URL */}
+  [PR link](https://github.com/apify/mcpc/pull/TODO)
+- A two-minute recording of an Actor-style run endpoint that returns Apify's
+  402 shape with a third accepts entry, paid on Base Sepolia. It shows the
+  decoded 402, the signed claims, the facilitator's verify and settle, the
+  dataset, and the buyer's free collateral before and after.
+  {/* TODO: replace with the recording URL */}
+  [Recording](https://4mica.io/blog/TODO)
+- The facilitator's live scheme list:
+  [x402.4mica.xyz/supported](https://x402.4mica.xyz/supported).
+
+## What is not there yet
+
+**Partial capture** is in progress. The guarantee amount is already a cap for
+netting purposes; what is missing is the call that sets the settled value
+below it. The proposed shape, recipient-authenticated and idempotent on
+`capture_id`:
+
+```http
+POST /core/guarantees/{guarantee_id}/capture
+{ "final_amount": "400000", "capture_id": "run_8f3a" }
+
+200 OK
+{ "guarantee_id": "…", "cap_amount": "5000000", "captured_amount": "400000",
+  "released_amount": "4600000", "captured_at": "2026-09-19T10:04:12Z" }
+```
+
+A guarantee that is never captured settles for its cap. The capture window
+closes when the cycle freezes.
+{/* TODO: link the draft PR in 4mica-core once it is open */}
+
+**Settlement latency.** Net positions settle about a day after cycle close.
+Cycle length is per deployment; daily is the default.
+
+**Networks.** Base Sepolia today, with core at
+`https://base.sepolia.api.4mica.xyz/` and the facilitator at
+`https://x402.4mica.xyz/`. Base mainnet moves to this protocol version with the
+core upgrade; we will announce the date here.
+{/* TODO: replace the sentence above with the mainnet upgrade date */}
+
+**Audit.** 23 of 24 findings are fixed; H01 is partially fixed. We would
+rather say that here than have it found later.
+
+## The ask
+
+One `accepts` entry on the run endpoints, a verify call at run start, a
+capture call at run end mapped from the maximum charge per run that Apify
+already lets buyers set. Everything else is on our side. We would rather design
+the capture semantics with the team that owns the ledger than guess at them.

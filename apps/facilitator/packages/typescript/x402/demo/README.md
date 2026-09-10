@@ -118,7 +118,9 @@ PAY_TO_ADDRESS=<any other address>
 ```
 
 The server then prices against the local core's token list, advertises `extra.rpcUrl` so the
-client signs against the same core, and verifies and settles through the local facilitator. Mint
+client signs against the same core, and verifies and settles through the local facilitator. The
+same two variables point the demo at any other deployment, for example the develop-branch alpha
+at `https://staging.api.4mica.io` and `https://staging.facilitator.4mica.io`. Mint
 the payer some mock USDC first (`cast send <usdc> "mint(address,uint256)" <payer> 10000000`); the
 address is the first entry of `GET http://localhost:3000/core/tokens`.
 

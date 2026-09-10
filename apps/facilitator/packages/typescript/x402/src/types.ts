@@ -18,11 +18,23 @@ export type FourMicaValidationExtra = {
 }
 
 /**
+ * The EIP-712 domain of the core a payer signs against, as
+ * `GET /core/public-params` reports it (`eip712_name`, `eip712_version`,
+ * `contract_address`). The chain id is not carried: it is the CAIP-2
+ * reference in `network`, so the two can never disagree.
+ */
+export type FourMicaDomainExtra = {
+  name: string
+  version: string
+  verifyingContract: string
+}
+
+/**
  * Extra fields the 4mica-credit scheme understands on `paymentRequirements`.
  * There is no tab endpoint any more: clients sign their claim straight from
  * the requirements, minting a random `reqId` locally.
  */
-export type FourMicaRequirementsExtra = {
+export type FourMicaRequirementsExtra = Partial<FourMicaDomainExtra> & {
   validation?: FourMicaValidationExtra
   /** Override the 4Mica core API URL the client signs against. */
   rpcUrl?: string

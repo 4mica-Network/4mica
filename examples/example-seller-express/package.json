@@ -1,6 +1,6 @@
 {
   "name": "@4mica/example-seller-express",
-  "version": "0.0.0",
+  "version": "0.0.1-alpha.0",
   "private": true,
   "type": "module",
   "description": "Seller (recipient): gate an Express route behind a 4Mica x402 paywall",
