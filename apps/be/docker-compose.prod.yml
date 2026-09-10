@@ -46,6 +46,44 @@ services:
       - default
       - data
 
+  # Backs the onboarding drip's scheduler only. Sequence state lives in
+  # Postgres, so losing this volume costs nothing but the next tick's schedule,
+  # which is re-upserted at boot.
+  #
+  # On `default` alone: `4mica-internal` exists to keep apps/email reachable by
+  # apps/be, and `4mica-data` is shared with the playground — neither has any
+  # business reaching Redis.
+  redis:
+    image: redis:8-alpine
+    container_name: 4mica-be-redis
+    restart: unless-stopped
+    stop_grace_period: 10s
+    # `noeviction` is mandatory: BullMQ keeps live job state in ordinary keys,
+    # so an LRU policy would silently evict them and the drip would stop with
+    # nothing in the logs.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    # Published to loopback for operator `redis-cli` only. `be` reaches it by
+    # compose service name on the shared `default` network, not through this.
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - default
+
   be:
     build:
       context: ../..
@@ -80,6 +118,18 @@ services:
       EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       APP_URL: ${APP_URL:-}
+      # The onboarding drip. It stays off unless BOTH REDIS_URL and
+      # UNSUBSCRIBE_SECRET are set, so an incomplete rollout sends nothing.
+      #
+      # ONBOARDING_DRIP_EPOCH is the kill switch: users created before it are
+      # never enrolled, so setting it to a future date arms the stack without
+      # sending anything.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      UNSUBSCRIBE_SECRET: ${UNSUBSCRIBE_SECRET:-}
+      ONBOARDING_TICK_MS: ${ONBOARDING_TICK_MS:-300000}
+      ONBOARDING_BATCH_SIZE: ${ONBOARDING_BATCH_SIZE:-25}
+      ONBOARDING_STEP_GAP_MS: ${ONBOARDING_STEP_GAP_MS:-259200000}
+      ONBOARDING_DRIP_EPOCH: ${ONBOARDING_DRIP_EPOCH:-2026-09-15T00:00:00.000Z}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -89,6 +139,8 @@ services:
       - internal
       - data
     depends_on:
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     healthcheck:
@@ -97,6 +149,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  redis-data:
+    name: 4mica-be-prod-redis-data
 
 networks:
   internal:

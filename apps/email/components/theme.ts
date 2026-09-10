@@ -23,6 +23,8 @@ export const fontStack =
 export const brand = {
   name: "4Mica",
   website: links.website,
+  /** Bare host, for prose like "4mica.io/your-handle". */
+  root: links.root,
   app: links.app,
   docs: links.docs,
   support: links.email.support,

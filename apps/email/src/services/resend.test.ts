@@ -140,6 +140,43 @@ describe("sendTemplate", () => {
     });
   });
 
+  it("adds RFC 8058 headers when the payload carries an unsubscribe URL", async () => {
+    configMock.current.email = {
+      ...dryRunConfig.email,
+      dryRun: false,
+      apiKey: "re_test",
+    };
+    send.mockResolvedValue({ data: { id: "msg_unsub" }, error: null });
+    const { sendTemplate } = await importSubject();
+
+    await sendTemplate("onboarding-api-keys", {
+      ...WELCOME,
+      unsubscribeUrl: "https://api.4mica.io/unsubscribe?token=v1.abc.def",
+    });
+
+    const [message] = send.mock.calls[0] as [Record<string, unknown>];
+    expect(message.headers).toEqual({
+      "List-Unsubscribe":
+        "<https://api.4mica.io/unsubscribe?token=v1.abc.def>, <mailto:support@4mica.io?subject=unsubscribe>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+  });
+
+  it("omits unsubscribe headers when no URL is supplied", async () => {
+    configMock.current.email = {
+      ...dryRunConfig.email,
+      dryRun: false,
+      apiKey: "re_test",
+    };
+    send.mockResolvedValue({ data: { id: "msg_plain" }, error: null });
+    const { sendTemplate } = await importSubject();
+
+    await sendTemplate("welcome", WELCOME);
+
+    const [message] = send.mock.calls[0] as [Record<string, unknown>];
+    expect(message).not.toHaveProperty("headers");
+  });
+
   it("throws EmailSendError when Resend returns an error", async () => {
     configMock.current.email = {
       ...dryRunConfig.email,
