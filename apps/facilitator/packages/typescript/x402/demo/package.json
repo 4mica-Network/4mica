@@ -7,20 +7,28 @@
     "server": "tsx src/server.ts",
     "client": "tsx src/client.ts",
     "deposit": "tsx src/deposit.ts",
-    "dev": "tsx watch src/server.ts"
+    "balance": "tsx src/balance.ts",
+    "actor-server": "tsx src/actor-server.ts",
+    "mcp-server": "tsx src/mcp-server.ts",
+    "dev": "tsx watch src/server.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:^",
     "@4mica/x402": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@x402/core": "catalog:",
     "@x402/fetch": "catalog:",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "viem": "catalog:"
+    "viem": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/express": "catalog:",
     "@types/node": "catalog:node26",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

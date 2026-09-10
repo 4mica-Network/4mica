@@ -47,7 +47,10 @@
     "fmt:write": "biome format --write .",
     "demo:server": "pnpm --filter @4mica/x402-demo run server",
     "demo:client": "pnpm --filter @4mica/x402-demo run client",
-    "demo:dev": "pnpm --filter @4mica/x402-demo run dev"
+    "demo:dev": "pnpm --filter @4mica/x402-demo run dev",
+    "demo:actor": "pnpm --filter @4mica/x402-demo run actor-server",
+    "demo:mcp": "pnpm --filter @4mica/x402-demo run mcp-server",
+    "demo:balance": "pnpm --filter @4mica/x402-demo run balance"
   },
   "dependencies": {
     "@x402/core": "catalog:",
