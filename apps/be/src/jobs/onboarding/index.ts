@@ -12,7 +12,6 @@ let queue: Queue | undefined;
 let worker: Worker | undefined;
 let stopping = false;
 
-/** Test seam, mirroring `resetEmailClient` in @services/email. */
 export const resetOnboardingDrip = (): void => {
   queue = undefined;
   worker = undefined;
@@ -20,13 +19,10 @@ export const resetOnboardingDrip = (): void => {
 };
 
 const disabledReason = (app: FastifyInstance): string | null => {
-  if (!config.onboarding.redisUrl) {
-    return "REDIS_URL is unset";
+  if (!config.onboarding.valkeyUrl) {
+    return "VALKEY_URL is unset";
   }
 
-  // Refusing to send without a working unsubscribe link is deliberate: thirty
-  // marketing emails whose opt-out is dead is a CAN-SPAM/GDPR problem, so
-  // "cannot unsubscribe" has to mean "do not send".
   if (!config.onboarding.unsubscribeSecret) {
     return "UNSUBSCRIBE_SECRET is unset";
   }
@@ -38,13 +34,6 @@ const disabledReason = (app: FastifyInstance): string | null => {
   return null;
 };
 
-/**
- * Start the drip. Returns whether it actually started.
- *
- * Must be called from `runServer()` and never from `initApp()` — `initApp` is
- * what every test injects against, and starting a worker there would open a
- * Redis connection in each one.
- */
 export const startOnboardingDrip = async (
   app: FastifyInstance,
 ): Promise<boolean> => {
@@ -55,7 +44,7 @@ export const startOnboardingDrip = async (
     return false;
   }
 
-  const url = config.onboarding.redisUrl as string;
+  const url = config.onboarding.valkeyUrl as string;
 
   queue = createQueue(url);
   worker = createWorker(url, async () =>
@@ -66,9 +55,6 @@ export const startOnboardingDrip = async (
     }),
   );
 
-  // Not optional. An unhandled ioredis error on the worker's connection
-  // surfaces as an `uncaughtException`, which `installShutdownHandlers` turns
-  // into a full shutdown — a brief Redis blip would take the whole API down.
   worker.on("error", (error) => {
     logger.error("onboarding drip: worker connection error", { error });
   });
@@ -95,12 +81,6 @@ export const startOnboardingDrip = async (
   return true;
 };
 
-/**
- * Closed from Fastify's `onClose`, which avvio runs before the Prisma
- * disconnect hook registered earlier in `initApp`, so an in-flight tick still
- * has a database. `stopping` bounds the wait to one in-flight email rather than
- * a whole batch, keeping `worker.close()` inside SHUTDOWN_TIMEOUT_MS.
- */
 export const stopOnboardingDrip = async (): Promise<void> => {
   stopping = true;
 

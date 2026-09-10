@@ -28,7 +28,6 @@ vi.mock("@4mica/db", () => ({
 
 const build = () => initApp([{ plugin: unsubscribeRoutes }]);
 
-/** Mints a real token through the same code path the emails use. */
 const tokenFor = async (userId: string): Promise<string> => {
   const { signUnsubscribeToken } = await import("@services/unsubscribe-token");
 
@@ -42,9 +41,6 @@ describe("unsubscribe", () => {
     transaction.mockResolvedValue([]);
   });
 
-  // The single most important assertion here. Mail scanners and link
-  // previewers GET every URL in a message; if this ever starts mutating,
-  // people get unsubscribed without ever having clicked.
   it("GET does not touch the database", async () => {
     const app = await build();
     const token = await tokenFor("user-1");
@@ -115,9 +111,6 @@ describe("unsubscribe", () => {
     await app.close();
   });
 
-  // RFC 8058 clients POST to the advertised URL with only
-  // `List-Unsubscribe=One-Click` as the body, so the token has to be readable
-  // from the query string or one-click silently does nothing.
   it("POST accepts the token from the query string for one-click", async () => {
     const app = await build();
     const token = await tokenFor("user-1");
@@ -144,8 +137,6 @@ describe("unsubscribe", () => {
       payload: { token: "v1.bogus.bogus" },
     });
 
-    // Reporting failure would make this unauthenticated route an oracle for
-    // valid tokens.
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ unsubscribed: true });
     expect(update).not.toHaveBeenCalled();

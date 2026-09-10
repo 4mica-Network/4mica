@@ -52,7 +52,6 @@ const row = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-/** The last `onboardingEmailQueue.update` argument passed into $transaction. */
 const queueWrite = () =>
   (queueUpdate.mock.calls.at(-1)?.[0] ?? {}) as {
     where: { id: string };
@@ -75,15 +74,12 @@ beforeEach(() => {
   transaction.mockResolvedValue([]);
 });
 
-/** Arrange a single claimed row: due-id select, then the claim read. */
 const claim = (claimed: ReturnType<typeof row>) => {
   queueFindMany
     .mockResolvedValueOnce([{ id: claimed.id }])
     .mockResolvedValueOnce([claimed]);
   queueUpdateMany
-    // reaper
     .mockResolvedValueOnce({ count: 0 })
-    // claim
     .mockResolvedValueOnce({ count: 1 });
 };
 
@@ -222,7 +218,6 @@ describe("runTick", () => {
     expect(sendWrite().error).toContain("boom");
   });
 
-  // One template that renders badly must not wedge every user's sequence.
   it("abandons a step once the attempt budget is spent", async () => {
     claim(row({ attempts: MAX_ATTEMPTS - 1 }));
 
@@ -272,8 +267,6 @@ describe("runTick", () => {
     ).toBeUndefined();
   });
 
-  // Bounds worker.close() to one in-flight email rather than a whole batch,
-  // keeping shutdown inside SHUTDOWN_TIMEOUT_MS.
   it("stops mid-batch when asked to shut down", async () => {
     queueFindMany
       .mockResolvedValueOnce([{ id: "queue-1" }, { id: "queue-2" }])

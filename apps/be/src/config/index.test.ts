@@ -80,14 +80,26 @@ describe("parseEnv", () => {
   it("leaves the onboarding drip unconfigured by default", () => {
     const env = parseEnv(VALID);
 
-    expect(env.REDIS_URL).toBe("");
+    expect(env.VALKEY_URL).toBe("");
     expect(env.UNSUBSCRIBE_SECRET).toBe("");
     expect(env.ONBOARDING_STEP_GAP_MS).toBe(259_200_000);
   });
 
-  it("rejects a Redis URL that is not a redis:// URL", () => {
+  it("accepts a redis:// URL, which is what Valkey speaks", () => {
+    expect(
+      parseEnv({ ...VALID, VALKEY_URL: "redis://valkey:6379" }).VALKEY_URL,
+    ).toBe("redis://valkey:6379");
+  });
+
+  it("rejects a valkey:// URL, which ioredis would misread as a hostname", () => {
     expect(() =>
-      parseEnv({ ...VALID, REDIS_URL: "http://127.0.0.1:6379" }),
+      parseEnv({ ...VALID, VALKEY_URL: "valkey://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a URL that is not a redis:// URL at all", () => {
+    expect(() =>
+      parseEnv({ ...VALID, VALKEY_URL: "http://127.0.0.1:6379" }),
     ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
   });
 
@@ -95,15 +107,13 @@ describe("parseEnv", () => {
     expect(() =>
       parseEnv({
         ...VALID,
-        REDIS_URL: "redis://127.0.0.1:6379",
+        VALKEY_URL: "redis://127.0.0.1:6379",
         UNSUBSCRIBE_SECRET: "too-short",
       }),
     ).toThrow(/UNSUBSCRIBE_SECRET: must be at least 32 characters/);
   });
 
-  // Without Redis the drip never runs, so a placeholder secret is harmless and
-  // must not block boot for everyone who has not configured the feature.
-  it("ignores a weak unsubscribe secret when Redis is unset", () => {
+  it("ignores a weak unsubscribe secret when Valkey is unset", () => {
     expect(() =>
       parseEnv({ ...VALID, UNSUBSCRIBE_SECRET: "too-short" }),
     ).not.toThrow();

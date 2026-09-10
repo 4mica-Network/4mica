@@ -14,8 +14,6 @@ allowBuilds:
   bufferutil: false
   esbuild: true
   keccak: false
-  # Optional native accelerator pulled in by bullmq. The pure-JS path is the
-  # fallback and is plenty fast for a five-minute tick.
   msgpackr-extract: false
   prisma: true
   sharp: false
@@ -75,8 +73,6 @@ catalog:
   ahooks: ^3.9.7
   autoprefixer: ^10.5.0
   axios: ^1.19.0
-  # ioredis is intentionally NOT catalogued: bullmq owns that dependency, and a
-  # direct entry here would let the two skew apart.
   bullmq: ^5.66.0
   changelogen: ^0.6.2
   class-variance-authority: ^0.7.1

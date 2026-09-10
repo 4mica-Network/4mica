@@ -22,12 +22,10 @@ interface Logger {
 }
 
 export interface TickDeps {
-  /** `null` when EMAIL_SERVICE_URL is unset — the tick then does nothing. */
   email: EmailClient | null;
   logger: Logger;
   now?: () => Date;
   batchSize?: number;
-  /** Polled between rows so shutdown does not have to wait out a whole batch. */
   shouldStop?: () => boolean;
 }
 
@@ -54,12 +52,6 @@ const emptySummary = (): TickSummary => ({
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/**
- * One pass of the drip: enrol, reap abandoned locks, claim what is due, send.
- *
- * Deliberately free of BullMQ and Redis so it can be unit tested against a
- * mocked Prisma and a stub email client, with no infrastructure at all.
- */
 export const runTick = async (deps: TickDeps): Promise<TickSummary> => {
   const now = deps.now ?? (() => new Date());
   const batchSize = deps.batchSize ?? config.onboarding.batchSize;
@@ -83,7 +75,6 @@ export const runTick = async (deps: TickDeps): Promise<TickSummary> => {
 
   for (const row of rows) {
     if (shouldStop()) {
-      // Hand the row straight back rather than burning an attempt on it.
       await releaseRow(row.id, now());
       summary.skipped++;
       continue;
@@ -104,7 +95,6 @@ const processRow = async (
   const step = stepAt(row.sequenceIndex);
 
   if (!step) {
-    // Past the end of the sequence: nothing left to send.
     await releaseRow(row.id, now());
     summary.skipped++;
     return;
@@ -125,15 +115,11 @@ const processRow = async (
   const email = row.user.email;
 
   if (!email) {
-    // `User.email` is nullable and the claim filters it out, but a row can lose
-    // its address between claim and send.
     await releaseRow(row.id, now());
     summary.skipped++;
     return;
   }
 
-  // Stable per user and step, so a duplicate claim cannot become a duplicate
-  // delivery: Resend dedupes for 24h and the step gap is far longer.
   const idempotencyKey = `onboarding:${row.userId}:${step.id}`;
 
   const record = (
@@ -153,7 +139,6 @@ const processRow = async (
       step.id as OnboardingStepId,
       {
         to: email,
-        // "" would otherwise beat the schema's "there" default.
         userName: row.user.name || undefined,
         unsubscribeUrl: unsubscribeUrlFor(row.userId) ?? undefined,
         idempotencyKey,
@@ -161,8 +146,6 @@ const processRow = async (
     );
 
     if (!result) {
-      // The client is built with `throwOnError: false`, so a failed send after
-      // its own retries surfaces as null rather than an exception.
       await fail(
         row,
         deps,
