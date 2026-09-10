@@ -83,7 +83,7 @@ export interface SchemeRegistration {
  *
  * @example
  * ```typescript
- * import { paymentMiddlewareFromHTTPServer, x402ResourceServer, x402HTTPResourceServer } from "@x402/express";
+ * import { paymentMiddlewareFromHTTPServer, x402ResourceServer, x402HTTPResourceServer } from "@4mica/x402/server/express";
  *
  * const resourceServer = new x402ResourceServer(facilitatorClient)
  *   .register(NETWORK, new ExactEvmScheme())
@@ -332,7 +332,7 @@ export function paymentMiddlewareFromHTTPServer(
  *
  * @example
  * ```typescript
- * import { paymentMiddleware } from "@x402/express";
+ * import { paymentMiddleware } from "@4mica/x402/server/express";
  *
  * const server = new x402ResourceServer(myFacilitatorClient)
  *   .register(NETWORK, new ExactEvmScheme());
@@ -369,7 +369,7 @@ export function paymentMiddleware(
  *
  * @example
  * ```typescript
- * import { paymentMiddlewareFromConfig } from "@x402/express";
+ * import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
  *
  * app.use(paymentMiddlewareFromConfig(routes));
  * ```

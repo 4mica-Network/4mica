@@ -16,7 +16,7 @@ from .utils import (
     validate_url,
 )
 
-DEFAULT_RPC_URL = "https://ethereum.sepolia.api.4mica.xyz/"
+DEFAULT_RPC_URL = "https://base.sepolia.api.4mica.xyz/"
 
 
 @dataclass

@@ -46,6 +46,12 @@ async function main() {
     const response = await fetchWithPayment(endpoint)
     const data = await response.json()
 
+    // A failed settle comes back as a 402 with an error body, not as a thrown error.
+    if (!response.ok) {
+      console.error(`Request failed with ${response.status}:`, JSON.stringify(data, null, 2))
+      process.exit(1)
+    }
+
     console.log('Request successful!')
     console.log('Response:', JSON.stringify(data, null, 2))
   } catch (error) {

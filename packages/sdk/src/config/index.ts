@@ -11,7 +11,7 @@ import {
 
 export type { Config } from "@/config/models";
 
-export const DEFAULT_RPC_URL = "https://ethereum.sepolia.api.4mica.xyz/";
+export const DEFAULT_RPC_URL = "https://base.sepolia.api.4mica.xyz/";
 
 /**
  * Fluent builder for {@link Config}; hand the result to `Client.connect`.
@@ -38,7 +38,7 @@ export class ConfigBuilder {
   private _authRefreshMarginSecs?: number;
   private _facilitatorUrl?: string;
 
-  /** Set the 4Mica core RPC URL directly. Use {@link network} to select a hosted network by name instead. Defaults to `https://ethereum.sepolia.api.4mica.xyz/`. */
+  /** Set the 4Mica core RPC URL directly. Use {@link network} to select a hosted network by name instead. Defaults to Base Sepolia, `https://base.sepolia.api.4mica.xyz/`. */
   rpcUrl(value: string): ConfigBuilder {
     this._rpcUrl = value;
     return this;

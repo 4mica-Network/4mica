@@ -13,7 +13,7 @@ description: "Initialize a 4Mica client with ConfigBuilder, environment variable
 | ---------------------- | -------------------------------- | ----------------------------------------------------------------------- |
 | `walletPrivateKey`     | Yes, unless `signer` is provided | Private key used for signing.                                           |
 | `signer`               | Yes, unless `walletPrivateKey`   | A pre-built viem `Account`. Mutually exclusive with `walletPrivateKey`. |
-| `network`              | No                               | Network shorthand or CAIP-2 id. Defaults to `ethereum-sepolia`.         |
+| `network`              | No                               | Network shorthand or CAIP-2 id. Defaults to `base-sepolia`.             |
 | `rpcUrl`               | No                               | Override the core API URL directly (for self-hosted deployments).       |
 | `ethereumHttpRpcUrl`   | No                               | Ethereum JSON-RPC endpoint. Fetched from core when omitted.             |
 | `contractAddress`      | No                               | Core4Mica contract address. Fetched from core when omitted.             |
@@ -37,7 +37,7 @@ description: "Initialize a 4Mica client with ConfigBuilder, environment variable
 import { Client, ConfigBuilder } from "@4mica/sdk";
 
 const cfg = new ConfigBuilder()
-  .network("base") // or "ethereum-sepolia" (default)
+  .network("base-sepolia") // the default
   .walletPrivateKey("0x...")
   .build();
 
@@ -59,7 +59,7 @@ Call `fromEnv()` to load configuration from the environment.
 4MICA_CONTRACT_ADDRESS="0x..."
 4MICA_FACILITATOR_URL="https://x402.4mica.xyz"
 4MICA_BEARER_TOKEN="Bearer <access_token>"
-4MICA_AUTH_URL="https://ethereum.sepolia.api.4mica.xyz/"
+4MICA_AUTH_URL="https://base.sepolia.api.4mica.xyz/"
 4MICA_AUTH_REFRESH_MARGIN_SECS="60"
 ```
 
@@ -116,7 +116,7 @@ import { Client, ConfigBuilder } from "@4mica/sdk";
 
 const cfg = new ConfigBuilder()
   .walletPrivateKey("0x...")
-  .rpcUrl("https://api.4mica.xyz/")
+  .rpcUrl("https://base.sepolia.api.4mica.xyz/")
   .build();
 
 const client = await Client.connect(cfg);

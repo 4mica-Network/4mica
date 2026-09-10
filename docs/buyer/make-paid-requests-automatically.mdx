@@ -58,6 +58,10 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 const response = await fetchWithPayment("https://api.example.com/research");
 ```
 
+<Note>
+`@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
+</Note>
+
 After the first paid retry succeeds, check the corresponding wallet activity in [4mica dashboard](https://app.4mica.io).
 
 ## Signing rules

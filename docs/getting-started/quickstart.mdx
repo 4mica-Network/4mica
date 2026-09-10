@@ -10,15 +10,27 @@ After you complete this guide, you will have a wallet ready to pay with 4Mica cr
 4Mica's approach is to deposit collateral once, sign payment guarantees as requests happen, and settle net positions through clearing cycles instead of sending an on-chain transaction for every paid request. To start, you need:
 
 - A wallet private key or supported signer for your agent or service.
-- Testnet ETH for gas if you are using Base Sepolia or Ethereum Sepolia.
-- Collateral in ETH, USDC, or USDT, depending on the network and route.
+- A little Base Sepolia ETH if you deposit self-funded; gasless deposits through the facilitator need none.
+- Collateral in a token core accepts on the network: on Base Sepolia, Aave's test USDC or USDT.
 - [Node.js](https://nodejs.org/) if you want to follow the example below.
 
 Use Base Sepolia (`eip155:84532`) for development. Move to Base (`eip155:8453`) when you are ready for production traffic.
 
 If you do not have these yet, start with a test wallet. Create a new wallet in [MetaMask](https://metamask.io/), [Coinbase Wallet](https://www.coinbase.com/wallet/downloads), [Rabby](https://rabby.io/), or another EVM wallet, then export the private key for that wallet only. Use this key for development and keep your main wallet separate.
 
-Add testnet gas from a [Base Sepolia faucet](https://docs.base.org/base-chain/network-information/network-faucets) or an [Ethereum Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia), then [deposit a small amount of supported collateral](/core-concepts/deposits-and-withdrawals) into 4Mica. For stablecoin testing, use the token and network supported by the route you plan to call.
+Get test collateral from Aave's faucet contract on Base Sepolia. The USDC core accepts there is Aave's
+test token, `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f`, not Circle's, and anyone can mint it:
+
+```bash
+cast send 0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc "mint(address,address,uint256)" \
+  0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f <your address> 10000000 \
+  --rpc-url https://sepolia.base.org --private-key <your key>
+```
+
+That is 10 USDC (six decimals). The same mint is available on the Aave app's testnet faucet page.
+Then [deposit a small amount](/core-concepts/deposits-and-withdrawals) into 4Mica; the deposit is
+gasless through the facilitator, so the wallet needs no ETH for it. `GET /core/tokens` on the
+network's core API lists every accepted token.
 
 
 ```bash
@@ -63,6 +75,10 @@ const response = await fetchWithPayment("https://api.example.com/data");
 const data = await response.json();
 ```
 
+<Note>
+`@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
+</Note>
+
 If the request succeeds, your client received the protected response and the seller received a settled payment guarantee. For the full setup, see the [Buyer Quick Start](/buyer/quick-start).
 
 ## Protect a route
@@ -70,6 +86,8 @@ If the request succeeds, your client received the protected response and the sel
 If you are building the seller side, protect one route with the 4Mica payment middleware. Start with a small test price.
 
 ```ts
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
 app.use(paymentMiddlewareFromConfig({
   "GET /premium-content": {
     accepts: {
