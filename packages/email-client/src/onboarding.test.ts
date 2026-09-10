@@ -20,9 +20,6 @@ describe("onboarding drip contract", () => {
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_IDS.length);
   });
 
-  // Sequence positions are persisted as OnboardingEmailQueue.sequenceIndex, so
-  // a digit in an id is not the only way to break ordering — but it is the one
-  // the existing kebab-case contract test would catch late.
   it("uses digit-free kebab-case ids", () => {
     for (const id of ONBOARDING_STEP_IDS) {
       expect(id).toMatch(/^[a-z]+(-[a-z]+)*$/);

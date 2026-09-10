@@ -177,9 +177,6 @@ export const runServer = async (): Promise<FastifyInstance> => {
     appLogger.info(`Swagger UI: http://localhost:${config.env.PORT}/docs`);
   }
 
-  // Started after listen() so a slow or unreachable Redis cannot hold up the
-  // health check going green. Never started from initApp(): that is what the
-  // tests inject against.
   await startOnboardingDrip(app);
 
   return app;

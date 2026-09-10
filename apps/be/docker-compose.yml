@@ -22,16 +22,13 @@ services:
       retries: 5
       start_period: 10s
 
-  redis:
-    image: redis:8-alpine
-    container_name: 4mica-be-redis
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: 4mica-be-valkey
     restart: unless-stopped
     stop_grace_period: 10s
-    # `noeviction` is mandatory rather than a tuning choice: BullMQ keeps job
-    # and scheduler state in ordinary keys, so an LRU policy would silently
-    # evict live jobs and the drip would just stop, with nothing in the logs.
     command:
-      - redis-server
+      - valkey-server
       - --appendonly
       - "yes"
       - --maxmemory
@@ -39,11 +36,11 @@ services:
       - --maxmemory-policy
       - noeviction
     ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${VALKEY_PORT:-6379}:6379"
     volumes:
-      - redis-data:/data
+      - valkey-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -95,9 +92,7 @@ services:
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       APP_URL: ${APP_URL:-}
       EMAIL_SERVICE_URL: ${EMAIL_SERVICE_URL:-}
-      # The onboarding drip. It stays off unless BOTH of these are set — see
-      # src/jobs/onboarding/index.ts.
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379}
       UNSUBSCRIBE_SECRET: ${UNSUBSCRIBE_SECRET:-}
       ONBOARDING_TICK_MS: ${ONBOARDING_TICK_MS:-300000}
       ONBOARDING_BATCH_SIZE: ${ONBOARDING_BATCH_SIZE:-25}
@@ -108,7 +103,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -122,5 +117,5 @@ services:
 volumes:
   postgres-data:
     name: 4mica-be-postgres-data
-  redis-data:
-    name: 4mica-be-redis-data
+  valkey-data:
+    name: 4mica-be-valkey-data

@@ -1,18 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "@config/index";
 
-/**
- * Signed, stateless unsubscribe tokens.
- *
- * HMAC rather than a stored hash — the same URL has to be regenerable for all
- * thirty emails, including one sent three months ago. A stored *hash* cannot
- * regenerate a URL, and storing the plaintext would break the convention every
- * other secret in `secrets.ts` follows. Signing needs no column and no lookup.
- *
- * The version prefix exists so rotating `UNSUBSCRIBE_SECRET` can become a `v2`
- * with dual verification, rather than invalidating every link already sitting
- * in somebody's inbox.
- */
 const VERSION = "v1";
 
 const b64url = (value: Buffer | string): string =>
@@ -23,7 +11,6 @@ const sign = (userId: string, secret: string): string =>
     .update(`${VERSION}:${userId}`)
     .digest("base64url");
 
-/** `v1.<base64url(userId)>.<base64url(hmac)>`, or null when unconfigured. */
 export const signUnsubscribeToken = (userId: string): string | null => {
   const secret = config.onboarding.unsubscribeSecret;
 
@@ -34,7 +21,6 @@ export const signUnsubscribeToken = (userId: string): string | null => {
   return `${VERSION}.${b64url(userId)}.${sign(userId, secret)}`;
 };
 
-/** The user id the token vouches for, or null if it does not verify. */
 export const verifyUnsubscribeToken = (token: string): string | null => {
   const secret = config.onboarding.unsubscribeSecret;
 
@@ -69,7 +55,6 @@ export const verifyUnsubscribeToken = (token: string): string | null => {
   const candidate = Buffer.from(signature);
   const expected = Buffer.from(sign(userId, secret));
 
-  // Length check first: timingSafeEqual throws on a mismatch.
   if (candidate.length !== expected.length) {
     return null;
   }
@@ -77,7 +62,6 @@ export const verifyUnsubscribeToken = (token: string): string | null => {
   return timingSafeEqual(candidate, expected) ? userId : null;
 };
 
-/** The absolute URL that goes into the email footer and the RFC 8058 header. */
 export const unsubscribeUrlFor = (userId: string): string | null => {
   const token = signUnsubscribeToken(userId);
 

@@ -7,10 +7,6 @@ export interface CallToActionProps {
 }
 
 export const CallToAction = ({ href, label }: CallToActionProps) => (
-  // The button is inline-block, so centring is the parent's job — `textAlign`
-  // on this Section is what does it, and it is the one method every client
-  // honours (`margin: 0 auto` does not work on inline-block, and Outlook
-  // ignores flexbox entirely).
   <Section style={{ margin: "24px 0", textAlign: "center" }}>
     <Button
       href={href}

@@ -26,9 +26,6 @@ import {
  * signatures from it, so the two sides cannot drift apart.
  */
 export const templateSchemas = {
-  // All thirty onboarding-drip steps, `welcome` (step one) included. Spread
-  // rather than listed so the send order lives in exactly one place — see
-  // ./onboarding.ts.
   ...onboardingStepSchemas,
   "action-required": ActionRequiredSchema,
   "account-verification": AccountVerificationSchema,

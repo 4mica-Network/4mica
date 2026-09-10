@@ -43,15 +43,6 @@ const redact = (address: string): string => {
   return `${local.slice(0, 1)}***@${domain}`;
 };
 
-/**
- * RFC 8058 one-click unsubscribe, driven by the payload rather than by the
- * registry: any template whose schema carries `unsubscribeUrl` gets correct
- * headers with no registry entry, the same way routes are derived from
- * `templateIds`.
- *
- * `List-Unsubscribe-Post` is what makes a mail client POST instead of GET,
- * which is why `apps/be` can serve a non-mutating GET at the same URL.
- */
 const unsubscribeHeaders = (
   props: unknown,
 ): Record<string, string> | undefined => {

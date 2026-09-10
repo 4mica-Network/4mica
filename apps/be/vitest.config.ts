@@ -28,9 +28,6 @@ export default defineConfig({
       CLERK_SECRET_KEY: "sk_test_000000000000000000000000000000000000000000",
       PUBLIC_API_URL: "http://api.test",
       APP_URL: "http://app.test",
-      // Not required by `parseEnv` — it defaults to "" like EMAIL_SERVICE_URL.
-      // Set here so route tests can mint a real unsubscribe token: `config` is
-      // evaluated at import time, so `vi.stubEnv` in a `beforeEach` is too late.
       UNSUBSCRIBE_SECRET: "test-unsubscribe-secret-at-least-32-chars",
     },
     server: {

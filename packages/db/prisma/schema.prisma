@@ -178,33 +178,18 @@ enum OnboardingEmailQueueStatus {
   COMPLETED
 }
 
-/**
- * The drip's cursor for one user — at most one row each, so a user can never be
- * in two places in the sequence at once.
- * Postgres, not Redis, is the source of truth here: BullMQ only supplies the
- * repeatable tick, so flushing Redis loses no progress. `lockedUntil`/`lockId`
- * are a claim over the *rows*, which BullMQ's job lock does not cover — a
- * stalled-job redelivery or a second replica mid-deploy can overlap ticks.
- */
 model OnboardingEmailQueue {
   id             String                     @id @default(uuid(7))
   userId         String                     @unique @map("user_id")
   status         OnboardingEmailQueueStatus @default(PENDING)
-  /// Index into `ONBOARDING_STEPS`. Equals the step count once COMPLETED.
   sequenceIndex  Int                        @default(0) @map("sequence_index")
-  /// Template id of the step about to be sent, denormalised from
-  /// `sequenceIndex` so the table is readable without the code-side registry.
   step           String                     @db.VarChar(64)
-  /// Consecutive failures of the *current* step. Reset whenever it advances.
   attempts       Int                        @default(0)
   nextAttemptAt  DateTime                   @default(now()) @map("next_attempt_at")
   lastAttemptAt  DateTime?                  @map("last_attempt_at")
   lastSentAt     DateTime?                  @map("last_sent_at")
   lastProviderId String?                    @map("last_provider_id") @db.VarChar(128)
-  /// Capped deliberately: provider errors run to kilobytes and this column is
-  /// read by operators, not machines.
   lastError      String?                    @map("last_error") @db.VarChar(512)
-  /// Held while a worker owns the row. Expiry is the crash-recovery path.
   lockedUntil    DateTime?                  @map("locked_until")
   lockId         String?                    @map("lock_id") @db.VarChar(64)
   completedAt    DateTime?                  @map("completed_at")
@@ -214,19 +199,11 @@ model OnboardingEmailQueue {
   user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   sends OnboardingEmailSend[]
 
-  /// The claim query: due PENDING rows, oldest first.
   @@index([status, nextAttemptAt])
-  /// The reaper: SENDING rows whose lock has expired.
   @@index([status, lockedUntil])
   @@map("onboarding_email_queue")
 }
 
-/**
- * Append-only audit of every send attempt, successful or not, so retries stay
- * visible after the queue cursor has moved on.
- * `userId` is denormalised rather than a second relation: deleting a user
- * already cascades through `queueId`, and a second cascade path buys nothing.
- */
 model OnboardingEmailSend {
   id             String   @id @default(uuid(7))
   queueId        String   @map("queue_id")
@@ -234,12 +211,9 @@ model OnboardingEmailSend {
   step           String   @db.VarChar(64)
   sequenceIndex  Int      @map("sequence_index")
   attempt        Int
-  /// True when the email service accepted the message.
   succeeded      Boolean  @default(false)
-  /// Resend's message id, when the provider accepted the message.
   providerId     String?  @map("provider_id") @db.VarChar(128)
   error          String?  @db.VarChar(512)
-  /// What was handed to Resend, so a duplicate delivery can be traced back.
   idempotencyKey String   @map("idempotency_key") @db.VarChar(256)
   createdAt      DateTime @default(now()) @map("created_at")
 

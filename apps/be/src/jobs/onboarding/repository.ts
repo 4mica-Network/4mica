@@ -2,10 +2,8 @@ import { prisma } from "@4mica/db";
 import { config } from "@config/index";
 import { ONBOARDING_STEPS } from "./steps";
 
-/** How long a worker may hold a claimed row before the reaper takes it back. */
 export const LOCK_MS = 120_000;
 
-/** Enrolment is bounded per tick so a large backlog drains gradually. */
 const ENROL_LIMIT = 200;
 
 export interface ClaimedRow {
@@ -17,14 +15,6 @@ export interface ClaimedRow {
   user: { id: string; email: string | null; name: string };
 }
 
-/**
- * Only users who can actually be mailed. Applied identically at enrolment and
- * at claim time, so an opt-out between the two is caught by the second pass.
- *
- * Opting out is expressed here rather than by pausing the row: an opted-out
- * user is simply never claimed, so re-enabling the dashboard toggle resumes the
- * sequence with no extra code path.
- */
 const eligibleUser = {
   email: { not: null },
   banned: false,
@@ -33,15 +23,6 @@ const eligibleUser = {
   allowMarketingOnboardingEmails: true,
 } as const;
 
-/**
- * Give queue rows to users who lack one.
- *
- * This is the enrolment path — there is no "user created" hook. Users are
- * created lazily inside `loadUser` on the request critical path, so enrolling
- * there would add a write to every first authenticated request and would still
- * miss everyone who signed up before this shipped. A bounded sweep is
- * idempotent, self-healing, and touches no existing code.
- */
 export const enrolNewUsers = async (): Promise<number> => {
   const candidates = await prisma.user.findMany({
     where: {
@@ -67,15 +48,12 @@ export const enrolNewUsers = async (): Promise<number> => {
       sequenceIndex: 0,
       nextAttemptAt: new Date(user.createdAt.getTime() + first.gapMs),
     })),
-    // The userId unique index is the real guard; this just makes a concurrent
-    // tick a no-op rather than an error.
     skipDuplicates: true,
   });
 
   return created.count;
 };
 
-/** Return rows abandoned by a crashed worker to the pool. */
 export const releaseExpiredLocks = async (now: Date): Promise<number> => {
   const { count } = await prisma.onboardingEmailQueue.updateMany({
     where: { status: "SENDING", lockedUntil: { lt: now } },
@@ -85,14 +63,6 @@ export const releaseExpiredLocks = async (now: Date): Promise<number> => {
   return count;
 };
 
-/**
- * Claim up to `batchSize` due rows for this tick.
- *
- * Two statements rather than one: Prisma has no `UPDATE … RETURNING`, and an
- * unbounded `updateMany` would claim rows this tick will not process. Selecting
- * ids first bounds the claim; the `status`/`lockId` predicates in the update
- * keep it a compare-and-swap, so a concurrent tick cannot take the same row.
- */
 export const claimDueRows = async (
   lockId: string,
   now: Date,
@@ -159,7 +129,6 @@ export interface SendRecord {
 
 const truncate = (value: string): string => value.slice(0, 512);
 
-/** Advance a row to the next step, or finish it. Audit row written atomically. */
 export const recordSuccess = async (
   row: ClaimedRow,
   record: SendRecord,
@@ -200,10 +169,6 @@ export const recordSuccess = async (
   return done;
 };
 
-/**
- * Record a failure and schedule the retry — or, once the attempt budget is
- * spent, give up on this step and move the sequence on.
- */
 export const recordFailure = async (
   row: ClaimedRow,
   record: SendRecord,
@@ -242,7 +207,6 @@ export const recordFailure = async (
   ]);
 };
 
-/** Resynchronise `step` when it disagrees with `sequenceIndex`. */
 export const repairStep = async (
   id: string,
   step: string,
@@ -260,7 +224,6 @@ export const repairStep = async (
   });
 };
 
-/** Release a claimed row without consuming an attempt. */
 export const releaseRow = async (id: string, now: Date): Promise<void> => {
   await prisma.onboardingEmailQueue.update({
     where: { id },

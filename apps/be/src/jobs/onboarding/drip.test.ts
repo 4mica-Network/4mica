@@ -18,7 +18,6 @@ const {
     queueClose,
     workerClose,
     on,
-    // Function expressions, not arrows: these are called with `new`.
     QueueMock: vi.fn(function Queue() {
       return { upsertJobScheduler, close: queueClose };
     }),
@@ -35,7 +34,7 @@ vi.mock("@4mica/db", () => ({
   disconnect: vi.fn(async () => {}),
 }));
 
-const REDIS = "redis://127.0.0.1:6379";
+const VALKEY = "redis://127.0.0.1:6379";
 const SECRET = "b".repeat(48);
 
 const importSubject = async () => {
@@ -44,7 +43,6 @@ const importSubject = async () => {
   return import("./index");
 };
 
-/** A Fastify stand-in: the drip only uses `email` and `addHook`. */
 const fakeApp = (email: unknown = { sendOnboardingStep: vi.fn() }) => ({
   email,
   addHook: vi.fn(),
@@ -53,7 +51,7 @@ const fakeApp = (email: unknown = { sendOnboardingStep: vi.fn() }) => ({
 describe("startOnboardingDrip", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("REDIS_URL", REDIS);
+    vi.stubEnv("VALKEY_URL", VALKEY);
     vi.stubEnv("UNSUBSCRIBE_SECRET", SECRET);
   });
 
@@ -62,8 +60,8 @@ describe("startOnboardingDrip", () => {
     vi.resetModules();
   });
 
-  it("starts nothing when REDIS_URL is unset", async () => {
-    vi.stubEnv("REDIS_URL", "");
+  it("starts nothing when VALKEY_URL is unset", async () => {
+    vi.stubEnv("VALKEY_URL", "");
     const { startOnboardingDrip } = await importSubject();
 
     expect(await startOnboardingDrip(fakeApp() as never)).toBe(false);
@@ -71,8 +69,6 @@ describe("startOnboardingDrip", () => {
     expect(WorkerMock).not.toHaveBeenCalled();
   });
 
-  // Thirty marketing emails whose opt-out link cannot work is a compliance
-  // problem, so "cannot unsubscribe" has to mean "do not send".
   it("refuses to start without an unsubscribe secret", async () => {
     vi.stubEnv("UNSUBSCRIBE_SECRET", "");
     const { startOnboardingDrip } = await importSubject();
@@ -97,8 +93,6 @@ describe("startOnboardingDrip", () => {
     expect(app.addHook).toHaveBeenCalledWith("onClose", expect.any(Function));
   });
 
-  // An unhandled ioredis error becomes an uncaughtException, which the shutdown
-  // handlers turn into a full exit — a Redis blip would take the API down.
   it("handles worker connection errors", async () => {
     const { startOnboardingDrip } = await importSubject();
     await startOnboardingDrip(fakeApp() as never);

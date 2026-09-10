@@ -60,9 +60,6 @@ const define = <K extends TemplateId>(
 ): TemplateDefinition<K> => definition;
 
 export const registry = {
-  // --- Onboarding drip, in send order. The order itself lives in
-  // --- `ONBOARDING_STEP_IDS` (@4mica/email-client); `onboarding.test.ts`
-  // --- fails if these ids drift from it.
   welcome: define<"welcome">({
     summary: "Step 1 — welcome a newly registered user",
     subject: () => `Welcome to ${brand.name}`,

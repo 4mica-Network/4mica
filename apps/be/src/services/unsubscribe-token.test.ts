@@ -10,7 +10,7 @@ const importSubject = async () => {
 
 describe("unsubscribe tokens", () => {
   beforeEach(() => {
-    vi.stubEnv("REDIS_URL", "redis://127.0.0.1:6379");
+    vi.stubEnv("VALKEY_URL", "redis://127.0.0.1:6379");
     vi.stubEnv("UNSUBSCRIBE_SECRET", SECRET);
   });
 
