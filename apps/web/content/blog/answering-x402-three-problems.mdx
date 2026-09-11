@@ -37,38 +37,30 @@ settles, nothing stops the same funds from backing a thousand other
 signatures. The seller does the work and finds out later.
 
 **401 versus 402.** MCP authentication wants a 401 first, x402 wants a 402.
-Servers end up split into one hostname per payment protocol, which he called
-twenty different Amazons.
+Servers end up split into one hostname per payment protocol, "twenty different Amazons".
 
-**Metered billing.** x402 was built for fixed prices. An Actor run lasts
-seconds or hours and its cost is known at the end. The `upto` scheme arrived
-about half a year after it was promised, and it still double-spends. The
-workaround Apify ships today is to charge the maximum, do the work and refund
+**Metered billing.** The `upto` scheme of x402 double-spends. The
+workaround is to charge the maximum, do the work and refund
 the rest: two transactions per job, and the buyer has to trust the seller to
 send the second one.
 
-## What a cryptographic payment guarantee changes
+## What 4Mica changes
 
 The `4mica-credit` scheme replaces the transfer authorization with a signed
 guarantee against collateral the buyer has already deposited with 4Mica core.
 
-**Lock before work.** Each request carries a guarantee for a cap. Core locks
-that amount from the buyer's free collateral at issuance, before the seller
+**Lock before work.** Each request carries a guarantee for an amount. 4Mica locks
+that amount from the buyer's collateral at issuance, before the seller
 starts. Two signatures cannot lock the same dollar, so the thousand-signature
 attack fails at the facilitator instead of in the seller's ledger.
 
-**Same host, same header.** `4mica-credit` is one more entry in the `accepts`
+**Same host, same header.** `4mica-credit` is an entry in the `accepts`
 array of an ordinary 402, verified and settled through a facilitator that
 serves the standard `/verify`, `/settle` and `/supported`. The entry carries
 its EIP-712 domain in `extra`, as Apify's `exact` entry carries its name and
 version, so a client signs from the 402 and a key and never calls 4Mica. It
 adds no host, and it does not solve the 401 versus 402 conflict either,
-because that is decided before any scheme is visible. Inside MCP the conflict
-is already routed around: Apify's server puts the accepts array in each paid
-tool's `_meta`, and the scheme rides in it unchanged. On the plain API, the
-header-only fix he asked for exists in principle: a 401 can carry an OAuth
-challenge and an MPP-style `WWW-Authenticate: Payment` challenge side by side,
-and a guarantee is indifferent to which encoding advertises it.
+but a cryptographic guarantee is indifferent to which encoding advertises it, and which protocol (e.g., x402, MPP, etc.) uses it.
 
 **Cap at signing, exact at the end.** The buyer signs once, for the cap. When
 the run ends, the seller signs a guarantee back to the buyer for the unused
@@ -90,7 +82,7 @@ for dynamic prices. That closes double-spend and metering.
 
 Its channel is between one payer and one receiver. A buyer that uses fifty
 sellers funds fifty escrows, and every seller runs a channel manager, a
-receiver signer and channel storage. With a collateral-backed guarantee the
+receiver signer and channel storage. With 4Mica the
 buyer's deposit is one position usable at every seller, the seller runs
 nothing beyond the facilitator calls it already makes, and settlement is one
 net position per participant per cycle. There is also no approve transaction
@@ -116,8 +108,7 @@ guarantees to 0.016 USDC in one settlement. Second call, fresh signature: a
 guarantee's request id is accepted once, so the fork never reuses one.
 
 - The demo, with a `record.sh` that produces the recording above:
-  [apps/facilitator/packages/typescript/x402/demo](https://github.com/4mica-Network/4mica/tree/mahzoun/feat/x402-demo-netted-refund/apps/facilitator/packages/typescript/x402/demo).
-  {/* TODO after merge: point this at main */}
+  [apps/facilitator/packages/typescript/x402/demo](https://github.com/4mica-Network/4mica/tree/dev/apps/facilitator/packages/typescript/x402/demo).
 - The mcpc branch:
   [4mica-Network/mcpc, `4mica-credit`](https://github.com/4mica-Network/mcpc/tree/4mica-credit).
   Opt-in through `--x402 4mica-credit`, never selected under `auto`, signs
@@ -125,12 +116,16 @@ guarantee's request id is accepted once, so the fork never reuses one.
 - The facilitator's live scheme list:
   [x402.4mica.xyz/supported](https://x402.4mica.xyz/supported).
 - What the recording ran against, all of it the 2.0 alpha on Base Sepolia:
-  the staging core at `https://staging.api.4mica.io/` (`/core/guarantees`,
+  the staging core at
+  [staging.api.4mica.io](https://staging.api.4mica.io/) (`/core/guarantees`,
   `/core/public-params`, `/core/tokens`), the staging facilitator at
-  `https://staging.facilitator.4mica.io/` (`/verify`, `/settle`,
-  `/supported`, and `/deposit` for the gasless deposit), and on npm
-  `@4mica/x402` at `2.0.0-alpha.2` with `@4mica/sdk` at `2.0.0-alpha.0`. Base
-  mainnet follows with the core upgrade.
+  [staging.facilitator.4mica.io](https://staging.facilitator.4mica.io/)
+  (`/verify`, `/settle`, `/supported`, and `/deposit` for the gasless
+  deposit), and on npm
+  [`@4mica/x402` at `2.0.0-alpha.2`](https://www.npmjs.com/package/@4mica/x402/v/2.0.0-alpha.2)
+  with
+  [`@4mica/sdk` at `2.0.0-alpha.0`](https://www.npmjs.com/package/@4mica/sdk/v/2.0.0-alpha.0).
+  Base mainnet follows with the core upgrade.
 
 ## What is not there yet
 
