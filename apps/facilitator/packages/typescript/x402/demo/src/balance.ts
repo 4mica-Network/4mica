@@ -1,22 +1,28 @@
 import 'dotenv/config'
 import { Client, ConfigBuilder } from '@4mica/sdk'
-import { formatUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { formatAmount } from './apify/billing.js'
 
 /**
- * Prints the payer's collateral as core sees it: total, locked behind open guarantees,
- * and free. Run it before and after a paid tool call to watch the lock move by the
- * price of one run and nothing else; no transaction happens until the cycle settles.
+ * Prints a wallet's collateral as core sees it: the total, what is locked behind the
+ * guarantees this wallet signed, and what is free. `WALLET=seller` reads
+ * `SELLER_PRIVATE_KEY` instead of `PRIVATE_KEY`; `FORMAT=json` prints one JSON line for
+ * scripts. Run it before and after a paid run: the
+ * buyer's lock rises by the cap, the seller's by the refund. Core does not list the
+ * guarantees signed *to* a wallet before the cycle commits, so what a wallet is owed is
+ * shown by the certificates in the tool results, not here.
  */
 const NETWORK = process.env.NETWORK || 'eip155:84532'
 const CORE_URL = process.env.CORE_URL
 const SYMBOL = 'USDC'
+const WALLET = process.env.WALLET === 'seller' ? 'seller' : 'buyer'
+const KEY_VAR = WALLET === 'seller' ? 'SELLER_PRIVATE_KEY' : 'PRIVATE_KEY'
 
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY
+  const privateKey = process.env[KEY_VAR]
   if (!privateKey?.startsWith('0x')) {
-    console.error('Error: PRIVATE_KEY environment variable must be set and start with 0x')
-    console.error('Example: PRIVATE_KEY=0x1234... pnpm run balance')
+    console.error(`Error: ${KEY_VAR} environment variable must be set and start with 0x`)
+    console.error(`Example: ${KEY_VAR}=0x1234... pnpm run balance`)
     process.exit(1)
   }
 
@@ -36,16 +42,33 @@ async function main() {
       const listed = tokens.map((entry) => entry.symbol).join(', ') || 'none'
       throw new Error(`core on ${NETWORK} lists no ${SYMBOL} (listed: ${listed})`)
     }
+    const units = { decimals: token.decimals, symbol: SYMBOL }
 
     const balance = await client.rpc.getUserAssetBalance(account.address, token.address)
     const total = balance?.total ?? 0n
     const locked = balance?.locked ?? 0n
-    const fmt = (value: bigint) => `${formatUnits(value, token.decimals ?? 6)} ${SYMBOL}`
 
-    console.log(`Account:    ${account.address}`)
-    console.log(`Collateral: ${fmt(total)}`)
-    console.log(`Locked:     ${fmt(locked)}  (behind open guarantees this cycle)`)
-    console.log(`Free:       ${fmt(total - locked)}`)
+    if (process.env.FORMAT === 'json') {
+      // At least two decimals, so "5.00" not "5"; still a number for jq.
+      const plain = (value: bigint) => formatAmount(value, units).split(' ')[0]
+      console.log(
+        JSON.stringify({
+          wallet: WALLET,
+          address: account.address,
+          collateral: plain(total),
+          locked: plain(locked),
+          free: plain(total - locked),
+        })
+      )
+      return
+    }
+
+    console.log(`Wallet:     ${WALLET} ${account.address}`)
+    console.log(`Collateral: ${formatAmount(total, units)}`)
+    console.log(
+      `Locked:     ${formatAmount(locked, units)}  (behind the guarantees this wallet signed)`
+    )
+    console.log(`Free:       ${formatAmount(total - locked, units)}`)
   } finally {
     await client.aclose()
   }

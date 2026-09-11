@@ -1,11 +1,24 @@
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements } from '@4mica/x402'
 import { decodePaymentSignatureHeader, encodePaymentRequiredHeader } from '@x402/core/http'
 import type { SettleResponse } from '@x402/core/types'
+import { getAddress, isAddress } from 'viem'
+import {
+  billingSummary,
+  type RefundReceipt,
+  type RunBilling,
+  type RunParties,
+  receipt,
+  refundSummary,
+  type TokenInfo,
+} from './billing.js'
+import { type DatasetItem, listDataset } from './dataset.js'
 
 /** MCP `_meta` key a payer puts the decoded payment payload under (x402 MCP transport). */
 export const MCP_PAYMENT_META_KEY = 'x402/payment'
 /** MCP `_meta` key the settlement response travels back under. */
 export const MCP_PAYMENT_RESPONSE_META_KEY = 'x402/payment-response'
+/** HTTP header the refund receipt travels back under, next to `payment-response`. */
+export const REFUND_HEADER = 'payment-refund'
 
 /** Apify's 402 body, verbatim, so a client written against their API parses ours. */
 export const APIFY_PAYMENT_REQUIRED_BODY = {
@@ -124,6 +137,18 @@ export function readPaymentPayload({ header, meta }: PaymentSources): PaymentPay
   return decoded
 }
 
+/**
+ * The buyer: the `user_address` in the signed claims of a `4mica-credit` payment, which is
+ * what the facilitator verified and core bound the guarantee to. Read from the payload
+ * rather than the verify or settle response, since not every facilitator echoes it back.
+ */
+export function payerOf(payload: PaymentPayload): string | undefined {
+  const claims = payload.payload?.claims
+  if (!isRecord(claims)) return undefined
+  const candidate = claims.user_address ?? claims.userAddress
+  return typeof candidate === 'string' && isAddress(candidate) ? getAddress(candidate) : undefined
+}
+
 function isPaymentPayload(value: unknown): value is PaymentPayload {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -169,12 +194,50 @@ export function paymentRequiredToolResult(paymentRequired: PaymentRequired): Too
   }
 }
 
-/** A paid run's result: the dataset, with the settlement response in `_meta`. */
-export function paidToolResult(items: unknown[], settlement: SettleResponse): ToolResult {
+/**
+ * The cap's settlement with x402's `amount` set to what the run cost once the refund is
+ * netted: the field `upto` uses for "settled below the authorized maximum".
+ */
+export function settledFor(settlement: SettleResponse, billing: RunBilling): SettleResponse {
+  return { ...settlement, amount: billing.charged }
+}
+
+/**
+ * What goes in `_meta["x402/payment-response"]`: the three fields a client acts on. The
+ * full settlement, certificate included, is in `structuredContent.settlement`.
+ */
+export function paymentResponseMeta(
+  settlement: SettleResponse,
+  billing: RunBilling
+): Pick<SettleResponse, 'success' | 'network' | 'amount'> {
+  return { success: settlement.success, network: settlement.network, amount: billing.charged }
+}
+
+/** The `payment-refund` header value: the receipt as JSON, without the certificate. */
+export function refundHeader(receipt: RefundReceipt): string {
+  return JSON.stringify(refundSummary(receipt))
+}
+
+/**
+ * A paid run's result: the three-line receipt, then the dataset as a list. Everything a
+ * program needs is in `structuredContent`: the items, the billing with the refund's
+ * settlement, and the cap's settlement. `_meta` carries only the netted payment response.
+ */
+export function paidToolResult(
+  items: DatasetItem[],
+  settlement: SettleResponse,
+  billing: RunBilling,
+  refund: RefundReceipt | undefined,
+  token: TokenInfo,
+  parties: RunParties
+): ToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify(items, null, 2) }],
-    structuredContent: { items },
-    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: settlement },
+    content: [
+      { type: 'text', text: receipt(billing, refund, token, parties) },
+      { type: 'text', text: listDataset(items) },
+    ],
+    structuredContent: { items, billing: billingSummary(billing, refund), settlement },
+    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: paymentResponseMeta(settlement, billing) },
   }
 }
 

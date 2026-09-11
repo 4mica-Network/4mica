@@ -19,12 +19,15 @@ const FACILITATOR_URL = process.env.FACILITATOR_URL ?? 'https://x402.4mica.xyz'
 // In whole tokens (e.g. "2" = 2 USDC); converted with the decimals core reports.
 const DEPOSIT_AMOUNT = process.env.DEPOSIT_AMOUNT || '2'
 const SYMBOL = 'USDC'
+// WALLET=seller funds the seller wallet of the Apify-shaped demo, which pays the refunds.
+const WALLET = process.env.WALLET === 'seller' ? 'seller' : 'buyer'
+const KEY_VAR = WALLET === 'seller' ? 'SELLER_PRIVATE_KEY' : 'PRIVATE_KEY'
 
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY
+  const privateKey = process.env[KEY_VAR]
   if (!privateKey || !privateKey.startsWith('0x')) {
-    console.error('Error: PRIVATE_KEY environment variable must be set and start with 0x')
-    console.error('Example: PRIVATE_KEY=0x1234... pnpm deposit')
+    console.error(`Error: ${KEY_VAR} environment variable must be set and start with 0x`)
+    console.error(`Example: ${KEY_VAR}=0x1234... pnpm run deposit`)
     process.exit(1)
   }
 
@@ -50,7 +53,7 @@ async function main() {
     }
     const amount = parseUnits(DEPOSIT_AMOUNT, token.decimals)
 
-    console.log(`Account: ${account.address}`)
+    console.log(`Account: ${WALLET} ${account.address}`)
     console.log(`${SYMBOL} on ${NETWORK}: ${token.address}`)
 
     const before = await collateralOf(client, token.address)

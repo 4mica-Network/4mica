@@ -3,7 +3,8 @@
 A paywalled Express endpoint and a client that pays for it with `4mica-credit` on Base Sepolia,
 using `@4mica/x402` and `@x402/fetch`. Plus an Apify-shaped demo: a mock of Apify's Actor run
 endpoint and an MCP server with one paid tool, both advertising `4mica-credit` next to `upto`
-and `exact`, paid for through [mcpc](https://github.com/apify/mcpc).
+and `exact`, paid for through [mcpc](https://github.com/apify/mcpc), with the unused part of
+each run's cap paid back to the buyer as a guarantee.
 
 ## Setup
 
@@ -25,16 +26,19 @@ cp .env.example .env
 | Variable | Used by | Meaning |
 | --- | --- | --- |
 | `NETWORK` | all | CAIP-2 network. `eip155:84532` (Base Sepolia) by default. |
-| `PAY_TO_ADDRESS` | servers | Recipient of the payments. |
-| `PRIVATE_KEY` | client, deposit, balance | Payer wallet key, `0x`-prefixed. |
+| `PAY_TO_ADDRESS` | server | Recipient of the express demo's payments. |
+| `PRIVATE_KEY` | client, deposit, balance | Buyer wallet key, `0x`-prefixed. |
+| `SELLER_PRIVATE_KEY` | actor-server, mcp-server, balance | Seller wallet key, `0x`-prefixed. It receives the caps and pays the refunds, so it needs collateral too. |
 | `API_URL` | client | Server base URL. `http://localhost:3000` by default. |
 | `FACILITATOR_URL` | servers, deposit | Facilitator the servers verify and settle through, and that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty for the deposit to go self-funded. |
 | `DEPOSIT_AMOUNT` | deposit | USDC to deposit. `2` by default. |
+| `WALLET` | balance, deposit | `seller` to act as the seller wallet; the buyer wallet otherwise. |
 | `PORT` | server | Listen port. `3000` by default. |
 | `CORE_URL` | all | A self-hosted core for `NETWORK`. Unset, the hosted deployment for the network is used. |
 | `ACTOR_PORT` | actor-server | Listen port of the run endpoint. `3002` by default. |
 | `MCP_PORT` | mcp-server | Listen port of the MCP server. `3001` by default. |
-| `ACTOR_PRICE` | actor-server, mcp-server | Price of one run. `$1.00` by default, the figure Apify advertises. |
+| `ACTOR_PRICE` | actor-server, mcp-server | The cap on one run. `$0.01` by default; `$1.00` is the figure Apify advertises. |
+| `RESULT_PRICE` | actor-server, mcp-server | The price of one result. `$0.0016` by default, so a five-result run costs `$0.008` of the cap and `$0.002` comes back. |
 | `RUN_SECONDS` | actor-server, mcp-server | How long the fake Actor "runs". `3` by default. |
 
 ## 1. Fund the payer
@@ -50,8 +54,8 @@ The script asks core which USDC it accepts on the network, deposits `DEPOSIT_AMO
 gaslessly through the facilitator (one signature, no ETH), and prints the collateral before and
 after. Without `FACILITATOR_URL` it sends the deposit transaction itself, so the wallet needs gas.
 
-`pnpm run balance` prints the same wallet's collateral as core sees it: total, locked behind
-open guarantees, and free.
+`pnpm run balance` prints the same wallet's collateral as core sees it: the total, what is locked
+behind the guarantees it signed, and what is free. `FORMAT=json` prints it as one JSON line.
 
 ## 2. Start the server
 
@@ -119,17 +123,54 @@ two shape-only entries in front of it so the 402 reads like Apify's.
 - `pnpm run actor-server` (or `pnpm demo:actor` from the package root) mocks
   `POST /v2/acts/<actor>/run-sync-get-dataset-items`. Unpaid, it answers with Apify's 402: their
   error body verbatim and a `payment-required` header whose `accepts` are `upto`, `exact`, and
-  `4mica-credit`. Paid, it verifies, "runs" for `RUN_SECONDS`, settles, and returns a five-row
-  dataset with a `payment-response` header.
+  `4mica-credit`. Paid, it verifies, "runs" for `RUN_SECONDS`, settles, refunds, and returns a
+  five-row dataset with a `payment-response` header whose `amount` is what the run cost, and a
+  `payment-refund` header for the guarantee that paid the rest back.
 - `pnpm run mcp-server` (or `pnpm demo:mcp`) is a Streamable HTTP MCP server at `/mcp` with one
   tool, `run-actor`. The tool carries `_meta.x402` with the same accepts, the way Apify's MCP
   server marks paid tools. An unpaid call gets the challenge back as an error result with the
   `PaymentRequired` in `structuredContent`; a paid call carries the payment in
-  `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header), and the result carries the
-  settlement in `_meta["x402/payment-response"]`.
+  `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header). The result reads at a glance: a
+  three-line receipt (cap, charged, refunded), then the dataset as a list. `structuredContent`
+  carries the items, the billing with the refund guarantee's settlement, and the cap's
+  settlement; the certificates in those settlements are core's signed word that both guarantees
+  were issued. `_meta["x402/payment-response"]` carries only `success`, `network` and `amount`,
+  the last being what the run cost.
 
 The `upto` and `exact` entries are shape-only. The 4mica facilitator does not serve them, so a
 payer that picks one is told so and nothing runs. Only the third entry is real.
+
+### Cap, then refund
+
+The buyer signs the cap (`ACTOR_PRICE`) before the run, the way `upto` authorizes a maximum.
+The run is metered per result (`RESULT_PRICE`), and after it the seller pays the unused part of
+the cap back as an ordinary `4mica-credit` guarantee from itself to the buyer, signed with
+`SELLER_PRIVATE_KEY` under the same domain and settled through the same facilitator. Core nets
+the two guarantees when the cycle commits, so one run of five results at `$0.0016` settles at
+`$0.008` of a `$0.01` cap, with no refund transaction and no new primitive. The cent-scale
+defaults keep a 2 USDC deposit good for hundreds of runs; `ACTOR_PRICE=$1.00` mirrors Apify's
+advertised figure.
+
+Three things follow:
+
+- **The buyer's lock stays at the cap until the cycle commits.** The refund is a credit to the
+  buyer, not a release of its collateral; the net position is the cap minus the refund.
+- **The seller needs collateral of its own.** A refund guarantee locks that much of the
+  seller's collateral until the cycle commits, and core does not count incoming credits toward
+  free balance. Fund the seller wallet for the refunds it will issue in a cycle:
+- **What a wallet is owed is not visible in core before the cycle commits.** Core has no listing
+  of open-cycle guarantees by recipient (`/core/recipients/<addr>/payments` reads the legacy
+  transaction table), so the balance script shows locks only. The buyer's proof of the refund is
+  the certificate under `structuredContent.billing.refunded.settlement`, which the SDK's
+  `verifyGuarantee` checks against the operator's key.
+
+```bash
+WALLET=seller pnpm run deposit     # deposits DEPOSIT_AMOUNT from SELLER_PRIVATE_KEY
+WALLET=seller pnpm run balance
+```
+
+A run whose seller has no free collateral still settles at the cap; the refund fails, the log and
+the tool result say so, and the cap stands.
 
 ### Buyer: mcpc
 
@@ -160,9 +201,11 @@ also shows under `_meta.x402`.
 
 ### The recording
 
-`bash record.sh` runs the whole script in one command, with both servers up: collateral before,
-the 402 decoded, connect, two paid runs, collateral after. Locked collateral rises by two runs
-and no transaction happens; the guarantees net into one settlement when the cycle commits.
+`bash record.sh` runs the whole script in one command, with both servers up, and is written to be
+read at a glance: both wallets before, the three ways to pay from the 402 as a table, one line for
+the connection, the two paid runs as mcpc prints them (a receipt and five results each), and both
+wallets after with the change in each lock and the net that the cycle will settle. Nothing moves
+on-chain until the cycle commits, and then only the net.
 
 Note what verify does and does not check. The facilitator's `/verify` validates the signed
 guarantee request; whether the payer holds collateral is only known at `/settle`, when core
@@ -183,6 +226,7 @@ PORT=3100                        # core already listens on 3000
 API_URL=http://localhost:3100
 PRIVATE_KEY=<a funded anvil account>
 PAY_TO_ADDRESS=<any other address>
+SELLER_PRIVATE_KEY=<another funded anvil account>
 ```
 
 The server then prices against the local core's token list, advertises `extra.rpcUrl` so the
@@ -197,5 +241,8 @@ address is the first entry of `GET http://localhost:3000/core/tokens`.
 - Verify and settle go to the hosted facilitator at `https://x402.4mica.xyz`.
 - Settlement is per cycle, not per payment: the recipient's net credit becomes claimable on-chain
   when the cycle commits.
-- `pnpm test` runs the unit tests for the Apify-shaped 402, the payment readers, and the MCP
-  result shapes. Nothing in them touches the network.
+- A refund only nets against its cap if both land in the same cycle. A run that crosses the cycle
+  boundary refunds into the next one, and the buyer's collateral covers the whole cap in the
+  first.
+- `pnpm test` runs the unit tests for the Apify-shaped 402, the payment readers, the metering and
+  refund shapes, and the MCP result shapes. Nothing in them touches the network.
