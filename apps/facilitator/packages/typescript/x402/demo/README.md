@@ -37,8 +37,8 @@ cp .env.example .env
 | `CORE_URL` | all | A self-hosted core for `NETWORK`. Unset, the hosted deployment for the network is used. |
 | `ACTOR_PORT` | actor-server | Listen port of the run endpoint. `3002` by default. |
 | `MCP_PORT` | mcp-server | Listen port of the MCP server. `3001` by default. |
-| `ACTOR_PRICE` | actor-server, mcp-server | The cap on one run. `$1.00` by default, the figure Apify advertises. |
-| `RESULT_PRICE` | actor-server, mcp-server | The price of one result. `$0.02` by default, so a five-result run costs `$0.10` of the cap. |
+| `ACTOR_PRICE` | actor-server, mcp-server | The cap on one run. `$0.01` by default; `$1.00` is the figure Apify advertises. |
+| `RESULT_PRICE` | actor-server, mcp-server | The price of one result. `$0.0016` by default, so a five-result run costs `$0.008` of the cap and `$0.002` comes back. |
 | `RUN_SECONDS` | actor-server, mcp-server | How long the fake Actor "runs". `3` by default. |
 
 ## 1. Fund the payer
@@ -55,7 +55,7 @@ gaslessly through the facilitator (one signature, no ETH), and prints the collat
 after. Without `FACILITATOR_URL` it sends the deposit transaction itself, so the wallet needs gas.
 
 `pnpm run balance` prints the same wallet's collateral as core sees it: the total, what is locked
-behind the guarantees it signed, and what is free.
+behind the guarantees it signed, and what is free. `FORMAT=json` prints it as one JSON line.
 
 ## 2. Start the server
 
@@ -130,10 +130,12 @@ two shape-only entries in front of it so the 402 reads like Apify's.
   tool, `run-actor`. The tool carries `_meta.x402` with the same accepts, the way Apify's MCP
   server marks paid tools. An unpaid call gets the challenge back as an error result with the
   `PaymentRequired` in `structuredContent`; a paid call carries the payment in
-  `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header), and the result carries one line on
-  what the run cost, the dataset, the billing in `structuredContent`, the netted settlement in
-  `_meta["x402/payment-response"]`, and the refund guarantee's settlement in `_meta["4mica/refund"]`,
-  whose certificate is core's signed word that the buyer holds a guarantee for that amount.
+  `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header). The result reads at a glance: a
+  three-line receipt (cap, charged, refunded), then the dataset as a list. `structuredContent`
+  carries the items, the billing with the refund guarantee's settlement, and the cap's
+  settlement; the certificates in those settlements are core's signed word that both guarantees
+  were issued. `_meta["x402/payment-response"]` carries only `success`, `network` and `amount`,
+  the last being what the run cost.
 
 The `upto` and `exact` entries are shape-only. The 4mica facilitator does not serve them, so a
 payer that picks one is told so and nothing runs. Only the third entry is real.
@@ -144,8 +146,10 @@ The buyer signs the cap (`ACTOR_PRICE`) before the run, the way `upto` authorize
 The run is metered per result (`RESULT_PRICE`), and after it the seller pays the unused part of
 the cap back as an ordinary `4mica-credit` guarantee from itself to the buyer, signed with
 `SELLER_PRIVATE_KEY` under the same domain and settled through the same facilitator. Core nets
-the two guarantees when the cycle commits, so one run of five results at `$0.02` settles at
-`$0.10` of a `$1.00` cap, with no refund transaction and no new primitive.
+the two guarantees when the cycle commits, so one run of five results at `$0.0016` settles at
+`$0.008` of a `$0.01` cap, with no refund transaction and no new primitive. The cent-scale
+defaults keep a 2 USDC deposit good for hundreds of runs; `ACTOR_PRICE=$1.00` mirrors Apify's
+advertised figure.
 
 Three things follow:
 
@@ -157,8 +161,8 @@ Three things follow:
 - **What a wallet is owed is not visible in core before the cycle commits.** Core has no listing
   of open-cycle guarantees by recipient (`/core/recipients/<addr>/payments` reads the legacy
   transaction table), so the balance script shows locks only. The buyer's proof of the refund is
-  the certificate in `_meta["4mica/refund"]`, which the SDK's `verifyGuarantee` checks against the
-  operator's key.
+  the certificate under `structuredContent.billing.refunded.settlement`, which the SDK's
+  `verifyGuarantee` checks against the operator's key.
 
 ```bash
 WALLET=seller pnpm run deposit     # deposits DEPOSIT_AMOUNT from SELLER_PRIVATE_KEY
@@ -197,9 +201,11 @@ also shows under `_meta.x402`.
 
 ### The recording
 
-`bash record.sh` runs the whole script in one command, with both servers up: both wallets before,
-the 402 decoded, connect, two paid runs, both wallets after. The buyer's lock rises by two caps and
-the seller's by two refunds; nothing moves on-chain until the cycle commits, and then only the net.
+`bash record.sh` runs the whole script in one command, with both servers up, and is written to be
+read at a glance: both wallets before, the three ways to pay from the 402 as a table, one line for
+the connection, the two paid runs as mcpc prints them (a receipt and five results each), and both
+wallets after with the change in each lock and the net that the cycle will settle. Nothing moves
+on-chain until the cycle commits, and then only the net.
 
 Note what verify does and does not check. The facilitator's `/verify` validates the signed
 guarantee request; whether the payer holds collateral is only known at `/settle`, when core

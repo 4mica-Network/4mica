@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# The recording, in one command: both wallets before, Apify's 402 decoded, two paid
-# `run-actor` calls through mcpc (a cap signed, the unused part refunded, with core's
-# certificate for the refund in the result), both wallets after.
+# The recording, in one command, written to be read at a glance: both wallets before,
+# the three ways to pay from Apify's 402, one line for the connection, two paid
+# `run-actor` calls through mcpc (a cap signed, the unused part refunded, the receipt
+# on top of each result), and both wallets after with what changed and what the cycle
+# will net.
 #
 # Needs both servers running (`pnpm run actor-server` and `pnpm run mcp-server`), the
 # mcpc fork built and on PATH as `mcpc` (or MCPC=<path>), its wallet imported from the
@@ -16,12 +18,23 @@ MCPC=${MCPC:-mcpc}
 QUERY=${QUERY:-"x402 isn't good (yet)"}
 RUN="$ACTOR_URL/v2/acts/demo~scraper/run-sync-get-dataset-items"
 
-step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
-balances() {
-  pnpm --silent run balance
-  echo
-  WALLET=seller pnpm --silent run balance
+BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+# A numbered headline, and one dim line saying what to look for.
+step() { printf '\n%s%s%s\n%s%s%s\n\n' "$BOLD" "$1" "$RESET" "$DIM" "$2" "$RESET"; }
+# One JSON line per wallet: {wallet, address, collateral, locked, free}.
+balance_json() { FORMAT=json WALLET=$1 pnpm --silent run balance; }
+# "  buyer   0x5Ef6…6a88   locked 5.00 USDC   free 0.99 USDC"
+show_balance() {
+  jq -r '"  \(.wallet)\(if .wallet == "buyer" then "  " else " " end)  \(.address[0:6])…\(.address[-4:])   locked \(.locked) USDC   free \(.free) USDC"' <<<"$1"
 }
+# "  buyer   locked 5.00 → 5.02 USDC   (+0.02, two caps signed)"
+show_change() {
+  jq -rn --argjson a "$1" --argjson b "$2" --arg why "$3" '
+    def r6: . * 1e6 | round / 1e6;
+    (($b.locked | tonumber) - ($a.locked | tonumber)) | r6 as $d |
+    "  \($a.wallet)\(if $a.wallet == "buyer" then "  " else " " end)  locked \($a.locked) → \($b.locked) USDC   (\(if $d >= 0 then "+" else "" end)\($d), \($why))"'
+}
+
 # Name what is missing before the first step, rather than letting `set -e` exit silently.
 require_server() {
   if ! curl -sf -m 5 "$2/health" >/dev/null; then
@@ -36,25 +49,40 @@ for tool in jq base64; do
   command -v "$tool" >/dev/null || { echo "$tool is needed to decode the 402" >&2; exit 1; }
 done
 
-step "1. Before: the buyer and the seller, as core sees them"
-balances
+step "1/6  Before" "Two wallets with collateral in 4mica core. Locked is what their open guarantees hold."
+BUYER_BEFORE=$(balance_json buyer)
+SELLER_BEFORE=$(balance_json seller)
+show_balance "$BUYER_BEFORE"
+show_balance "$SELLER_BEFORE"
 
-step "2. Apify's 402, decoded: upto, exact, and 4mica-credit"
+step "2/6  The Actor's 402: three ways to pay" "Apify's own upto and exact, plus 4mica-credit: a collateral-backed guarantee, signed from the 402 alone."
 curl -s -D - -o /dev/null -X POST "$RUN" \
   -H 'content-type: application/json' -d "{\"query\":\"$QUERY\"}" |
   grep -i '^payment-required:' | cut -d' ' -f2 | tr -d '\r' | base64 --decode |
-  jq '{x402Version, accepts: [.accepts[] | {scheme, amount, maxTimeoutSeconds, extra}]}'
+  jq -r '.accepts[] |
+    "  \((.scheme + "              ")[0:14]) \((.amount | tonumber) / 1e6) USDC cap   window \(.maxTimeoutSeconds)s" +
+    (if .scheme == "4mica-credit" then "   ← paid with this" else "" end)'
 
-step "3. Connect through mcpc, paying with 4mica-credit"
-"$MCPC" connect "$MCP_URL/mcp" @demo --x402 4mica-credit
+step "3/6  Connect through mcpc, Apify's CLI" "The fork signs 4mica-credit only when asked for it, and signs afresh on every call."
+"$MCPC" connect "$MCP_URL/mcp" @demo --x402 4mica-credit --json |
+  jq -r '(if type == "array" then .[0] else . end) |
+    "  connected to \(.serverInfo.name // "the demo")   tools: \((.toolNames // []) | join(", "))   paying with 4mica-credit"'
 
-step "4. First run: the cap signed, verified, run, settled, and the unused part refunded"
+step "4/6  First run" "mcpc signs the cap. The seller verifies, runs, settles, then pays the unused part back as a guarantee."
 "$MCPC" @demo tools-call run-actor query:="$QUERY"
 
-step "5. Second run: a fresh signature, never a reused one"
+step "5/6  Second run" "A fresh signature, never a reused one. Same cap, same refund."
 "$MCPC" @demo tools-call run-actor query:="$QUERY, again"
 
-step "6. After: the buyer's lock rose by two caps, the seller's by two refunds. Core nets both pairs to two runs' actual cost when the cycle commits, in one settlement, with no refund transaction"
-balances
+step "6/6  After" "Each lock grew by what that wallet signed. Nothing moved on-chain."
+BUYER_AFTER=$(balance_json buyer)
+SELLER_AFTER=$(balance_json seller)
+show_change "$BUYER_BEFORE" "$BUYER_AFTER" "two caps signed"
+show_change "$SELLER_BEFORE" "$SELLER_AFTER" "two refunds signed"
+jq -rn --argjson bb "$BUYER_BEFORE" --argjson ba "$BUYER_AFTER" --argjson sb "$SELLER_BEFORE" --argjson sa "$SELLER_AFTER" '
+  def r6: . * 1e6 | round / 1e6;
+  ((($ba.locked | tonumber) - ($bb.locked | tonumber)) - (($sa.locked | tonumber) - ($sb.locked | tonumber))) | r6 |
+  "\n  When the cycle commits, core nets the four guarantees to \(.) USDC in one settlement: no refund transaction, no per-run transaction."'
+echo "  Proof: the certificates in each result's structuredContent, signed by core's operator key."
 
 "$MCPC" @demo close >/dev/null

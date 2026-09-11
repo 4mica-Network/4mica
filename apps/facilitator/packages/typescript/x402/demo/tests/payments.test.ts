@@ -8,7 +8,6 @@ import {
   EXACT_MAX_TIMEOUT_SECONDS,
   MCP_PAYMENT_META_KEY,
   MCP_PAYMENT_RESPONSE_META_KEY,
-  MCP_REFUND_META_KEY,
   paidToolResult,
   payerOf,
   paymentRequiredFor,
@@ -26,6 +25,7 @@ import {
 const PAY_TO = '0x4aAbE17C239eF71c3A26bA7C2b3e0AeBbfC1DF26'
 const NETWORK = 'eip155:84532' as const
 const USDC = { decimals: 6, symbol: 'USDC' }
+const BUYER = '0x5Ef6a28a5686Df09592B1A1E43FD0BA5Ee3B6a88'
 
 const CREDIT_ENTRY: PaymentRequirements = {
   scheme: '4mica-credit',
@@ -163,34 +163,37 @@ describe('MCP shapes', () => {
     expect(JSON.parse(result.content[0]?.text ?? '')).toEqual(challenge)
   })
 
-  it('returns the billing line, the dataset and the netted settlement once paid', () => {
+  it('returns the receipt, the dataset list, and the settlements once paid', () => {
     const items = fakeDataset('4mica')
-    const settlement = { success: true, transaction: '', network: NETWORK, payer: '0xpayer' }
+    const settlement = { success: true, transaction: '', network: NETWORK, payer: BUYER }
     const billing = meterRun('1000000', '20000', items.length)
-    const refund = { amount: billing.refund, from: PAY_TO, to: '0xpayer', settlement }
-    const result = paidToolResult(items, settlement, billing, refund, USDC)
+    const refund = { amount: billing.refund, from: PAY_TO, to: BUYER, settlement }
+    const parties = { buyer: BUYER, seller: PAY_TO }
+    const result = paidToolResult(items, settlement, billing, refund, USDC, parties)
     expect(result.isError).toBeUndefined()
-    expect(result.content[0]?.text).toContain('Refunded 0.90 USDC to 0xpayer')
-    expect(JSON.parse(result.content[1]?.text ?? '')).toEqual(items)
+    expect(result.content[0]?.text).toContain('Refunded  0.90 USDC')
+    expect(result.content[1]?.text).toMatch(/^5 results:\n1\. 4mica: result 1 {2}https:/)
     expect(result.structuredContent).toEqual({
       items,
-      billing: { ...billing, refunded: { amount: '900000', from: PAY_TO, to: '0xpayer' } },
+      billing: {
+        ...billing,
+        refunded: { amount: '900000', from: PAY_TO, to: BUYER, settlement },
+      },
+      settlement,
     })
-    expect(result._meta?.[MCP_PAYMENT_RESPONSE_META_KEY]).toEqual({
-      ...settlement,
-      amount: '100000',
+    expect(result._meta).toEqual({
+      [MCP_PAYMENT_RESPONSE_META_KEY]: { success: true, network: NETWORK, amount: '100000' },
     })
-    expect(result._meta?.[MCP_REFUND_META_KEY]).toBe(settlement)
   })
 
   it('says the cap stands when no refund was issued', () => {
     const items = fakeDataset('4mica')
     const settlement = { success: true, transaction: '', network: NETWORK }
     const billing = meterRun('1000000', '20000', items.length)
-    const result = paidToolResult(items, settlement, billing, undefined, USDC)
-    expect(result.content[0]?.text).toContain('could not be issued, so the cap stands')
+    const result = paidToolResult(items, settlement, billing, undefined, USDC, { seller: PAY_TO })
+    expect(result.content[0]?.text).toContain('could not be issued; the cap stands')
     expect(result.structuredContent?.billing).toMatchObject({ refunded: null })
-    expect(result._meta?.[MCP_REFUND_META_KEY]).toBeUndefined()
+    expect(Object.keys(result._meta ?? {})).toEqual([MCP_PAYMENT_RESPONSE_META_KEY])
   })
 })
 

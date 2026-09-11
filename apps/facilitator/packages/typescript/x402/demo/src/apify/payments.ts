@@ -4,19 +4,19 @@ import type { SettleResponse } from '@x402/core/types'
 import { getAddress, isAddress } from 'viem'
 import {
   billingSummary,
-  describeBilling,
   type RefundReceipt,
   type RunBilling,
+  type RunParties,
+  receipt,
   refundSummary,
   type TokenInfo,
 } from './billing.js'
+import { type DatasetItem, listDataset } from './dataset.js'
 
 /** MCP `_meta` key a payer puts the decoded payment payload under (x402 MCP transport). */
 export const MCP_PAYMENT_META_KEY = 'x402/payment'
 /** MCP `_meta` key the settlement response travels back under. */
 export const MCP_PAYMENT_RESPONSE_META_KEY = 'x402/payment-response'
-/** MCP `_meta` key the refund guarantee's settlement (with core's certificate) travels back under. */
-export const MCP_REFUND_META_KEY = '4mica/refund'
 /** HTTP header the refund receipt travels back under, next to `payment-response`. */
 export const REFUND_HEADER = 'payment-refund'
 
@@ -202,34 +202,42 @@ export function settledFor(settlement: SettleResponse, billing: RunBilling): Set
   return { ...settlement, amount: billing.charged }
 }
 
+/**
+ * What goes in `_meta["x402/payment-response"]`: the three fields a client acts on. The
+ * full settlement, certificate included, is in `structuredContent.settlement`.
+ */
+export function paymentResponseMeta(
+  settlement: SettleResponse,
+  billing: RunBilling
+): Pick<SettleResponse, 'success' | 'network' | 'amount'> {
+  return { success: settlement.success, network: settlement.network, amount: billing.charged }
+}
+
 /** The `payment-refund` header value: the receipt as JSON, without the certificate. */
 export function refundHeader(receipt: RefundReceipt): string {
   return JSON.stringify(refundSummary(receipt))
 }
 
 /**
- * A paid run's result: one line on what it cost and what came back, then the dataset.
- * The billing sits in `structuredContent`; `_meta` carries the netted settlement of the
- * cap and, when a refund was issued, its settlement too, whose certificate is core's
- * signed word that the buyer holds a guarantee for that amount.
+ * A paid run's result: the three-line receipt, then the dataset as a list. Everything a
+ * program needs is in `structuredContent`: the items, the billing with the refund's
+ * settlement, and the cap's settlement. `_meta` carries only the netted payment response.
  */
 export function paidToolResult(
-  items: unknown[],
+  items: DatasetItem[],
   settlement: SettleResponse,
   billing: RunBilling,
   refund: RefundReceipt | undefined,
-  token: TokenInfo
+  token: TokenInfo,
+  parties: RunParties
 ): ToolResult {
   return {
     content: [
-      { type: 'text', text: describeBilling(billing, refund, token) },
-      { type: 'text', text: JSON.stringify(items, null, 2) },
+      { type: 'text', text: receipt(billing, refund, token, parties) },
+      { type: 'text', text: listDataset(items) },
     ],
-    structuredContent: { items, billing: billingSummary(billing, refund) },
-    _meta: {
-      [MCP_PAYMENT_RESPONSE_META_KEY]: settledFor(settlement, billing),
-      ...(refund ? { [MCP_REFUND_META_KEY]: refund.settlement } : {}),
-    },
+    structuredContent: { items, billing: billingSummary(billing, refund), settlement },
+    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: paymentResponseMeta(settlement, billing) },
   }
 }
 

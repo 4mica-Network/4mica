@@ -2,11 +2,12 @@ import type { PaymentRequirements } from '@4mica/x402'
 import { describe, expect, it } from 'vitest'
 import {
   billingSummary,
-  describeBilling,
   formatAmount,
   meterRun,
+  receipt,
   refundRequirements,
   refundSummary,
+  shortAddress,
 } from '../src/apify/billing.js'
 
 const SELLER = '0x4aAbE17C239eF71c3A26bA7C2b3e0AeBbfC1DF26'
@@ -42,6 +43,15 @@ describe('meterRun', () => {
     expect(billing.refund).toBe('0')
   })
 
+  it('works at cent scale: a $0.01 cap, five results at $0.0016', () => {
+    const billing = meterRun('10000', '1600', 5)
+    expect(billing.charged).toBe('8000')
+    expect(billing.refund).toBe('2000')
+    expect(formatAmount(billing.charged, USDC)).toBe('0.008 USDC')
+    expect(formatAmount(billing.refund, USDC)).toBe('0.002 USDC')
+    expect(formatAmount(billing.pricePerResult, USDC)).toBe('0.0016 USDC')
+  })
+
   it('charges nothing for a run that produced nothing', () => {
     const billing = meterRun('1000000', '20000', 0)
     expect(billing.charged).toBe('0')
@@ -72,7 +82,7 @@ describe('receipts', () => {
     const billing = meterRun('1000000', '20000', 5)
     expect(billingSummary(billing, receipt)).toEqual({
       ...billing,
-      refunded: { amount: '900000', from: SELLER, to: BUYER },
+      refunded: { amount: '900000', from: SELLER, to: BUYER, settlement: SETTLEMENT },
     })
     expect(billingSummary(billing, undefined)).toEqual({ ...billing, refunded: null })
   })
@@ -88,26 +98,46 @@ describe('formatAmount', () => {
   })
 })
 
-describe('describeBilling', () => {
-  const billing = meterRun('1000000', '20000', 5)
+describe('receipt', () => {
+  const billing = meterRun('10000', '1600', 5)
+  const parties = { buyer: BUYER, seller: SELLER }
 
-  it('says what was charged and what went back', () => {
-    const receipt = { amount: '900000', from: SELLER, to: BUYER, settlement: SETTLEMENT }
-    expect(describeBilling(billing, receipt, USDC)).toBe(
-      `Charged 0.10 USDC of the 1.00 USDC cap: 5 results at 0.02 USDC. Refunded 0.90 USDC to ${BUYER} as a 4mica-credit guarantee; cap and refund net to 0.10 USDC when the cycle commits.`
+  it('is three lines: the cap, the metering, the refund', () => {
+    const refund = { amount: '2000', from: SELLER, to: BUYER, settlement: SETTLEMENT }
+    const lines = receipt(billing, refund, USDC, parties).split('\n')
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toContain('Cap       0.01 USDC')
+    expect(lines[0]).toContain(
+      `from buyer ${shortAddress(BUYER)} to seller ${shortAddress(SELLER)}`
     )
+    expect(lines[1]).toContain('Charged   0.008 USDC')
+    expect(lines[1]).toContain('5 results at 0.0016 USDC')
+    expect(lines[2]).toContain('Refunded  0.002 USDC')
+    expect(lines[2]).toContain('net to 0.008 USDC when the cycle commits')
   })
 
-  it('says so when the refund could not be issued', () => {
-    expect(describeBilling(billing, undefined, USDC)).toContain(
-      'The 0.90 USDC refund could not be issued, so the cap stands.'
-    )
+  it('says the cap stands when the refund could not be issued', () => {
+    const lines = receipt(billing, undefined, USDC, parties).split('\n')
+    expect(lines[2]).toContain('the 0.002 USDC refund could not be issued; the cap stands')
   })
 
   it('says so when the run used the whole cap', () => {
-    const whole = meterRun('1000000', '300000', 5)
-    expect(describeBilling(whole, undefined, USDC)).toBe(
-      'Charged 1.00 USDC of the 1.00 USDC cap: 5 results at 0.30 USDC. The run used the whole cap; nothing to refund.'
+    const whole = meterRun('10000', '3000', 5)
+    const lines = receipt(whole, undefined, USDC, parties).split('\n')
+    expect(lines[1]).toContain('Charged   0.01 USDC')
+    expect(lines[2]).toContain('the run used the whole cap')
+  })
+
+  it('does not invent a buyer when the payment named none', () => {
+    expect(receipt(billing, undefined, USDC, { seller: SELLER })).toContain(
+      `from the buyer to seller ${shortAddress(SELLER)}`
     )
+  })
+})
+
+describe('shortAddress', () => {
+  it('keeps enough to tell two addresses apart', () => {
+    expect(shortAddress(BUYER)).toBe('0x1111…1111')
+    expect(shortAddress(SELLER)).toBe('0x4aAb…DF26')
   })
 })

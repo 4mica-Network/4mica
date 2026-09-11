@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { SettleResponse } from '@x402/core/types'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
-import { describeBilling } from './apify/billing.js'
+import { receipt } from './apify/billing.js'
 import { fakeDataset, simulateRun } from './apify/dataset.js'
 import {
   errorToolResult,
@@ -83,8 +83,9 @@ function createMcpServer(seller: DemoSeller, resource: ResourceInfo, env: Seller
 
       const billing = seller.meter(items.length)
       const refund = await refundAfterRun(seller, buyer, billing, resource)
-      console.log(describeBilling(billing, refund, seller.token))
-      return paidToolResult(items, settlement, billing, refund, seller.token)
+      const parties = { buyer, seller: seller.address }
+      console.log(receipt(billing, refund, seller.token, parties))
+      return paidToolResult(items, settlement, billing, refund, seller.token, parties)
     }
   )
 

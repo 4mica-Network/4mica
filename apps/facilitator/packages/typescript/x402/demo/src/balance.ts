@@ -6,7 +6,8 @@ import { formatAmount } from './apify/billing.js'
 /**
  * Prints a wallet's collateral as core sees it: the total, what is locked behind the
  * guarantees this wallet signed, and what is free. `WALLET=seller` reads
- * `SELLER_PRIVATE_KEY` instead of `PRIVATE_KEY`. Run it before and after a paid run: the
+ * `SELLER_PRIVATE_KEY` instead of `PRIVATE_KEY`; `FORMAT=json` prints one JSON line for
+ * scripts. Run it before and after a paid run: the
  * buyer's lock rises by the cap, the seller's by the refund. Core does not list the
  * guarantees signed *to* a wallet before the cycle commits, so what a wallet is owed is
  * shown by the certificates in the tool results, not here.
@@ -46,6 +47,21 @@ async function main() {
     const balance = await client.rpc.getUserAssetBalance(account.address, token.address)
     const total = balance?.total ?? 0n
     const locked = balance?.locked ?? 0n
+
+    if (process.env.FORMAT === 'json') {
+      // At least two decimals, so "5.00" not "5"; still a number for jq.
+      const plain = (value: bigint) => formatAmount(value, units).split(' ')[0]
+      console.log(
+        JSON.stringify({
+          wallet: WALLET,
+          address: account.address,
+          collateral: plain(total),
+          locked: plain(locked),
+          free: plain(total - locked),
+        })
+      )
+      return
+    }
 
     console.log(`Wallet:     ${WALLET} ${account.address}`)
     console.log(`Collateral: ${formatAmount(total, units)}`)

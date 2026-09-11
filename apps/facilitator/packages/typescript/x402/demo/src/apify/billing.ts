@@ -72,12 +72,19 @@ export function refundSummary(receipt: RefundReceipt): {
   return { amount: receipt.amount, from: receipt.from, to: receipt.to }
 }
 
-/** The billing a buyer's client gets back: the figures, and the refund if one was issued. */
+/**
+ * The billing a buyer's client gets back: the figures, and the refund if one was issued,
+ * with its settlement, whose certificate is core's signed word that the buyer holds a
+ * guarantee for that amount.
+ */
 export function billingSummary(
   billing: RunBilling,
   refund: RefundReceipt | undefined
 ): Record<string, unknown> {
-  return { ...billing, refunded: refund ? refundSummary(refund) : null }
+  return {
+    ...billing,
+    refunded: refund ? { ...refundSummary(refund), settlement: refund.settlement } : null,
+  }
 }
 
 /** `units` in whole tokens with at least two decimals, so `0.9` prints as `0.90`. */
@@ -87,18 +94,45 @@ export function formatAmount(units: bigint | string, token: TokenInfo): string {
   return `${whole}.${padded} ${token.symbol}`
 }
 
-/** One line a person can read: what the run cost, and what went back. */
-export function describeBilling(
+/** `0x5Ef6…6a88`: enough of an address to tell two apart on screen. */
+export function shortAddress(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`
+}
+
+export interface RunParties {
+  /** The buyer, when the payment named one. */
+  buyer?: string
+  seller: string
+}
+
+/**
+ * The receipt a person reads at a glance: three lines, one per guarantee and one for the
+ * metering between them. The same text goes in the tool result and the server log.
+ */
+export function receipt(
   billing: RunBilling,
   refund: RefundReceipt | undefined,
-  token: TokenInfo
+  token: TokenInfo,
+  parties: RunParties
 ): string {
-  const fmt = (units: string) => formatAmount(units, token)
+  const fmt = (units: string) => formatAmount(units, token).padEnd(12)
+  const buyer = parties.buyer ? `buyer ${shortAddress(parties.buyer)}` : 'the buyer'
+  const seller = shortAddress(parties.seller)
   const results = `${billing.results} result${billing.results === 1 ? '' : 's'}`
-  const charged = `Charged ${fmt(billing.charged)} of the ${fmt(billing.cap)} cap: ${results} at ${fmt(billing.pricePerResult)}.`
-  if (BigInt(billing.refund) === 0n)
-    return `${charged} The run used the whole cap; nothing to refund.`
-  if (!refund)
-    return `${charged} The ${fmt(billing.refund)} refund could not be issued, so the cap stands.`
-  return `${charged} Refunded ${fmt(billing.refund)} to ${refund.to} as a 4mica-credit guarantee; cap and refund net to ${fmt(billing.charged)} when the cycle commits.`
+  const lines = [
+    `Cap       ${fmt(billing.cap)} guarantee from ${buyer} to seller ${seller}`,
+    `Charged   ${fmt(billing.charged)} ${results} at ${formatAmount(billing.pricePerResult, token)}`,
+  ]
+  if (BigInt(billing.refund) === 0n) {
+    lines.push(`Refunded  ${fmt('0')} the run used the whole cap`)
+  } else if (!refund) {
+    lines.push(
+      `Refunded  ${fmt('0')} the ${formatAmount(billing.refund, token)} refund could not be issued; the cap stands`
+    )
+  } else {
+    lines.push(
+      `Refunded  ${fmt(billing.refund)} guarantee from seller back to buyer; the two net to ${formatAmount(billing.charged, token)} when the cycle commits`
+    )
+  }
+  return lines.join('\n')
 }

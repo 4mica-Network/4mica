@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { encodePaymentResponseHeader } from '@x402/core/http'
 import type { SettleResponse } from '@x402/core/types'
 import express from 'express'
-import { describeBilling } from './apify/billing.js'
+import { receipt } from './apify/billing.js'
 import { fakeDataset, simulateRun } from './apify/dataset.js'
 import {
   APIFY_PAYMENT_REQUIRED_BODY,
@@ -90,7 +90,8 @@ async function main() {
 
     const billing = seller.meter(items.length)
     const refund = await refundAfterRun(seller, buyer, billing, resource)
-    console.log(describeBilling(billing, refund, seller.token))
+    const parties = { buyer, seller: seller.address }
+    console.log(receipt(billing, refund, seller.token, parties))
 
     res.setHeader('payment-response', encodePaymentResponseHeader(settledFor(settlement, billing)))
     if (refund) res.setHeader(REFUND_HEADER, refundHeader(refund))

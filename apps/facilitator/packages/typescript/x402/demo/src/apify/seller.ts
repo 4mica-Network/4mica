@@ -246,10 +246,12 @@ export function sellerEnv(): SellerEnv {
     // Base Sepolia by default: the facilitator serves 4mica-credit there for x402 v2.
     network: (process.env.NETWORK || 'eip155:84532') as Network,
     signer: privateKeyToAccount(key as `0x${string}`),
-    // Apify's run endpoint advertises 1000000 (one USDC); the same figure here.
-    price: process.env.ACTOR_PRICE || '$1.00',
-    // A pay-per-event price: five results at $0.02 charge $0.10 of the $1.00 cap.
-    resultPrice: process.env.RESULT_PRICE || '$0.02',
+    // A one-cent cap, so a 2 USDC deposit lasts hundreds of runs. Apify's own run
+    // endpoint advertises $1.00; set ACTOR_PRICE to that to mirror it.
+    price: process.env.ACTOR_PRICE || '$0.01',
+    // A pay-per-event price: five results at $0.0016 charge $0.008 of the $0.01 cap,
+    // and $0.002 comes back.
+    resultPrice: process.env.RESULT_PRICE || '$0.0016',
     coreUrl: process.env.CORE_URL || undefined,
     facilitatorUrl: process.env.FACILITATOR_URL || undefined,
     runSeconds: Number(process.env.RUN_SECONDS ?? 3),
