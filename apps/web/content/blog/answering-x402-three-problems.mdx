@@ -96,18 +96,6 @@ nothing beyond the facilitator calls it already makes, and settlement is one
 net position per participant per cycle. There is also no approve transaction
 and no ETH float, which `upto` needs for its Permit2 allowance.
 
-## Two facts that make this cheap for Apify
-
-The run endpoint already advertises `upto`, so Apify's ledger already settles
-below an authorization. `4mica-credit` has the same shape as `upto` with locked
-collateral in place of a Permit2 allowance, and one net settlement per cycle
-in place of one transaction per run.
-
-4Mica's facilitator already serves the standard x402 endpoints, and the accepts
-entry carries everything a client needs to sign. The server side of the
-integration is one entry in `accepts`. The client side exists on a fork of
-Apify's own CLI.
-
 ## The demo
 
 A mock of Apify's Actor run endpoint and an MCP server with one paid tool,
