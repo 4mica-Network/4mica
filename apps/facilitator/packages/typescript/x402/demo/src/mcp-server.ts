@@ -2,8 +2,10 @@ import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import type { SettleResponse } from '@x402/core/types'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
+import { describeBilling } from './apify/billing.js'
 import { fakeDataset, simulateRun } from './apify/dataset.js'
 import {
   errorToolResult,
@@ -13,14 +15,15 @@ import {
   readPaymentPayload,
   toolPaymentMeta,
 } from './apify/payments.js'
-import { DemoSeller, type SellerEnv, sellerEnv } from './apify/seller.js'
+import { DemoSeller, refundAfterRun, type SellerEnv, sellerEnv } from './apify/seller.js'
 
 /**
  * A Streamable HTTP MCP server with one paid tool, `run-actor`, shaped like a tool on
  * Apify's MCP server: `_meta.x402` on the tool advertises the accepts, an unpaid call
  * gets the challenge as an error result, and a paid call carries the payment in
- * `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header). The buyer is mcpc:
- * `mcpc connect http://localhost:3001/mcp @demo --x402 4mica-credit`.
+ * `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header). After the run, the
+ * seller pays the unused part of the cap back as a guarantee to the buyer. The buyer is
+ * mcpc: `mcpc connect http://localhost:3001/mcp @demo --x402 4mica-credit`.
  */
 const PORT = Number(process.env.MCP_PORT || 3001)
 const TOOL_NAME = 'run-actor'
@@ -34,7 +37,7 @@ function createMcpServer(seller: DemoSeller, resource: ResourceInfo, env: Seller
     TOOL_NAME,
     {
       title: 'Run Actor',
-      description: `Runs the ${ACTOR_ID} Actor for a query and returns its dataset. Paid per run with x402.`,
+      description: `Runs the ${ACTOR_ID} Actor for a query and returns its dataset. Paid per run with x402: a cap up front, the unused part refunded after.`,
       inputSchema: { query: z.string().describe('What the Actor should search for') },
       _meta: { x402: toolPaymentMeta(seller.accepts) },
     },
@@ -60,21 +63,27 @@ function createMcpServer(seller: DemoSeller, resource: ResourceInfo, env: Seller
         return errorToolResult(`Payment rejected: ${outcome.reason}`)
       }
       console.log(
-        `verify ok: ${outcome.requirements.scheme} from ${outcome.payer ?? 'unknown payer'} for ${outcome.requirements.amount} on ${outcome.requirements.network}`
+        `verify ok: ${outcome.requirements.scheme} from ${outcome.payer ?? 'unknown payer'} for a ${outcome.requirements.amount} cap on ${outcome.requirements.network}`
       )
 
       console.log(`running ${ACTOR_ID} for "${query}" (${env.runSeconds}s)...`)
       await simulateRun(env.runSeconds)
       const items = fakeDataset(query)
 
+      let settlement: SettleResponse
       try {
-        const settlement = await seller.settle(payload, outcome.requirements)
-        console.log(`settle ok: guarantee issued, payer ${settlement.payer ?? outcome.payer}`)
-        return paidToolResult(items, settlement)
+        settlement = await seller.settle(payload, outcome.requirements)
       } catch (error) {
         console.log(`${TOOL_NAME}: settlement failed: ${(error as Error).message}`)
         return errorToolResult(`Settlement failed: ${(error as Error).message}`)
       }
+      const buyer = settlement.payer ?? outcome.payer
+      console.log(`settle ok: cap guarantee issued, payer ${buyer ?? 'unknown'}`)
+
+      const billing = seller.meter(items.length)
+      const refund = await refundAfterRun(seller, buyer, billing, resource)
+      console.log(describeBilling(billing, refund, seller.token))
+      return paidToolResult(items, settlement, billing, refund, seller.token)
     }
   )
 
@@ -142,7 +151,9 @@ async function main() {
       network: env.network,
       core: env.coreUrl ?? 'hosted',
       facilitator: env.facilitatorUrl ?? 'https://x402.4mica.xyz',
-      price: env.price,
+      seller: seller.address,
+      cap: env.price,
+      resultPrice: env.resultPrice,
       accepts: seller.accepts.map((entry) => entry.scheme),
     })
   })
@@ -153,9 +164,9 @@ async function main() {
 
   app.listen(PORT, () => {
     console.log(`MCP server on ${baseUrl}/mcp`)
-    console.log(`Paid tool: ${TOOL_NAME} (${ACTOR_ID})`)
+    console.log(`Paid tool: ${TOOL_NAME} (${ACTOR_ID}), seller ${seller.address}`)
     console.log(
-      `Payment required: ${env.price} on ${env.network}; accepts ${seller.accepts.map((entry) => entry.scheme).join(', ')}`
+      `Payment required: a ${env.price} cap per run, ${env.resultPrice} per result, on ${env.network}; accepts ${seller.accepts.map((entry) => entry.scheme).join(', ')}`
     )
     console.log(`Buyer: mcpc connect ${baseUrl}/mcp @demo --x402 4mica-credit`)
   })

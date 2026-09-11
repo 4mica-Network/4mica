@@ -1,6 +1,7 @@
 import type { PaymentPayload, PaymentRequirements } from '@4mica/x402'
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from '@x402/core/http'
 import { describe, expect, it } from 'vitest'
+import { meterRun } from '../src/apify/billing.js'
 import { fakeDataset } from '../src/apify/dataset.js'
 import {
   APIFY_PAYMENT_REQUIRED_BODY,
@@ -11,7 +12,10 @@ import {
   paymentRequiredFor,
   paymentRequiredHeader,
   paymentRequiredToolResult,
+  REFUND_HEADER,
   readPaymentPayload,
+  refundHeader,
+  settledFor,
   shapeOnlyAccepts,
   toolPaymentMeta,
   UPTO_MAX_TIMEOUT_SECONDS,
@@ -19,6 +23,7 @@ import {
 
 const PAY_TO = '0x4aAbE17C239eF71c3A26bA7C2b3e0AeBbfC1DF26'
 const NETWORK = 'eip155:84532' as const
+const USDC = { decimals: 6, symbol: 'USDC' }
 
 const CREDIT_ENTRY: PaymentRequirements = {
   scheme: '4mica-credit',
@@ -136,13 +141,53 @@ describe('MCP shapes', () => {
     expect(JSON.parse(result.content[0]?.text ?? '')).toEqual(challenge)
   })
 
-  it('returns the dataset with the settlement in _meta once paid', () => {
+  it('returns the billing line, the dataset and the netted settlement once paid', () => {
     const items = fakeDataset('4mica')
     const settlement = { success: true, transaction: '', network: NETWORK, payer: '0xpayer' }
-    const result = paidToolResult(items, settlement)
+    const billing = meterRun('1000000', '20000', items.length)
+    const refund = { amount: billing.refund, from: PAY_TO, to: '0xpayer', settlement }
+    const result = paidToolResult(items, settlement, billing, refund, USDC)
     expect(result.isError).toBeUndefined()
-    expect(result.structuredContent).toEqual({ items })
-    expect(result._meta?.[MCP_PAYMENT_RESPONSE_META_KEY]).toBe(settlement)
+    expect(result.content[0]?.text).toContain('Refunded 0.90 USDC to 0xpayer')
+    expect(JSON.parse(result.content[1]?.text ?? '')).toEqual(items)
+    expect(result.structuredContent).toEqual({
+      items,
+      billing: { ...billing, refunded: { amount: '900000', from: PAY_TO, to: '0xpayer' } },
+    })
+    expect(result._meta?.[MCP_PAYMENT_RESPONSE_META_KEY]).toEqual({
+      ...settlement,
+      amount: '100000',
+    })
+  })
+
+  it('says the cap stands when no refund was issued', () => {
+    const items = fakeDataset('4mica')
+    const settlement = { success: true, transaction: '', network: NETWORK }
+    const billing = meterRun('1000000', '20000', items.length)
+    const result = paidToolResult(items, settlement, billing, undefined, USDC)
+    expect(result.content[0]?.text).toContain('could not be issued, so the cap stands')
+    expect(result.structuredContent?.billing).toMatchObject({ refunded: null })
+  })
+})
+
+describe('HTTP shapes', () => {
+  it('reports what the run cost in the settlement, the way upto does', () => {
+    const settlement = { success: true, transaction: '', network: NETWORK }
+    expect(settledFor(settlement, meterRun('1000000', '20000', 5))).toEqual({
+      ...settlement,
+      amount: '100000',
+    })
+  })
+
+  it('puts the receipt in the payment-refund header without the certificate', () => {
+    const settlement = { success: true, transaction: '', network: NETWORK }
+    const receipt = { amount: '900000', from: PAY_TO, to: '0xpayer', settlement }
+    expect(REFUND_HEADER).toBe('payment-refund')
+    expect(JSON.parse(refundHeader(receipt))).toEqual({
+      amount: '900000',
+      from: PAY_TO,
+      to: '0xpayer',
+    })
   })
 })
 

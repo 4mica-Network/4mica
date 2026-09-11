@@ -1,11 +1,21 @@
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements } from '@4mica/x402'
 import { decodePaymentSignatureHeader, encodePaymentRequiredHeader } from '@x402/core/http'
 import type { SettleResponse } from '@x402/core/types'
+import {
+  billingSummary,
+  describeBilling,
+  type RefundReceipt,
+  type RunBilling,
+  refundSummary,
+  type TokenInfo,
+} from './billing.js'
 
 /** MCP `_meta` key a payer puts the decoded payment payload under (x402 MCP transport). */
 export const MCP_PAYMENT_META_KEY = 'x402/payment'
 /** MCP `_meta` key the settlement response travels back under. */
 export const MCP_PAYMENT_RESPONSE_META_KEY = 'x402/payment-response'
+/** HTTP header the refund receipt travels back under, next to `payment-response`. */
+export const REFUND_HEADER = 'payment-refund'
 
 /** Apify's 402 body, verbatim, so a client written against their API parses ours. */
 export const APIFY_PAYMENT_REQUIRED_BODY = {
@@ -169,12 +179,37 @@ export function paymentRequiredToolResult(paymentRequired: PaymentRequired): Too
   }
 }
 
-/** A paid run's result: the dataset, with the settlement response in `_meta`. */
-export function paidToolResult(items: unknown[], settlement: SettleResponse): ToolResult {
+/**
+ * The cap's settlement with x402's `amount` set to what the run cost once the refund is
+ * netted: the field `upto` uses for "settled below the authorized maximum".
+ */
+export function settledFor(settlement: SettleResponse, billing: RunBilling): SettleResponse {
+  return { ...settlement, amount: billing.charged }
+}
+
+/** The `payment-refund` header value: the receipt as JSON, without the certificate. */
+export function refundHeader(receipt: RefundReceipt): string {
+  return JSON.stringify(refundSummary(receipt))
+}
+
+/**
+ * A paid run's result: one line on what it cost and what came back, then the dataset.
+ * The billing sits in `structuredContent` and the netted settlement in `_meta`.
+ */
+export function paidToolResult(
+  items: unknown[],
+  settlement: SettleResponse,
+  billing: RunBilling,
+  refund: RefundReceipt | undefined,
+  token: TokenInfo
+): ToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify(items, null, 2) }],
-    structuredContent: { items },
-    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: settlement },
+    content: [
+      { type: 'text', text: describeBilling(billing, refund, token) },
+      { type: 'text', text: JSON.stringify(items, null, 2) },
+    ],
+    structuredContent: { items, billing: billingSummary(billing, refund) },
+    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: settledFor(settlement, billing) },
   }
 }
 
