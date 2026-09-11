@@ -43,8 +43,20 @@ cp .env.example .env
 
 ## 1. Fund the payer
 
-A payer needs free collateral in 4mica core before it can sign a guarantee. Hold some Base
-Sepolia USDC in the wallet, then:
+A payer needs free collateral in 4mica core before it can sign a guarantee. On Base Sepolia the
+demo runs on Aave's test USDC, `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f`: it is the USDC the
+staging core lists, and Circle's Base Sepolia USDC is not on that list. Aave's faucet at
+`0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc` mints it to anyone, so with foundry's `cast` and any
+wallet holding a little Base Sepolia ETH for gas:
+
+```bash
+cast send 0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc "mint(address,address,uint256)" \
+  0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f <payer> 10000000 \
+  --rpc-url https://sepolia.base.org --private-key <key>
+```
+
+That mints 10 USDC (six decimals) to `<payer>`; `<key>` only pays the gas and need not be the
+payer's. Then:
 
 ```bash
 pnpm run deposit
@@ -157,7 +169,8 @@ Three things follow:
   buyer, not a release of its collateral; the net position is the cap minus the refund.
 - **The seller needs collateral of its own.** A refund guarantee locks that much of the
   seller's collateral until the cycle commits, and core does not count incoming credits toward
-  free balance. Fund the seller wallet for the refunds it will issue in a cycle:
+  free balance. Fund the seller wallet for the refunds it will issue in a cycle, with the same
+  test USDC minted the same way as the payer's:
 - **What a wallet is owed is not visible in core before the cycle commits.** Core has no listing
   of open-cycle guarantees by recipient (`/core/recipients/<addr>/payments` reads the legacy
   transaction table), so the balance script shows locks only. The buyer's proof of the refund is
@@ -230,11 +243,12 @@ SELLER_PRIVATE_KEY=<another funded anvil account>
 ```
 
 The server then prices against the local core's token list, advertises `extra.rpcUrl` so the
-client signs against the same core, and verifies and settles through the local facilitator. The
-same two variables point the demo at any other deployment, for example the develop-branch alpha
-at `https://staging.api.4mica.io` and `https://staging.facilitator.4mica.io`. Mint
-the payer some mock USDC first (`cast send <usdc> "mint(address,uint256)" <payer> 10000000`); the
-address is the first entry of `GET http://localhost:3000/core/tokens`.
+client signs against the same core, and verifies and settles through the local facilitator. Mint
+the payer some of the stack's mock USDC first (`cast send <usdc> "mint(address,uint256)" <payer>
+10000000`); the address is the first entry of `GET http://localhost:3000/core/tokens`. The same
+two variables point the demo at any other deployment, for example the develop-branch alpha at
+`https://staging.api.4mica.io` and `https://staging.facilitator.4mica.io`, which runs on Aave's
+test USDC from step 1 rather than a mock.
 
 ## Notes
 
