@@ -7,7 +7,7 @@ export interface CallToActionProps {
 }
 
 export const CallToAction = ({ href, label }: CallToActionProps) => (
-  <Section style={{ margin: "24px 0" }}>
+  <Section style={{ margin: "24px 0", textAlign: "center" }}>
     <Button
       href={href}
       style={{

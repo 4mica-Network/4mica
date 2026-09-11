@@ -1,4 +1,5 @@
 import type * as v from "valibot";
+import { onboardingStepSchemas } from "./onboarding";
 import {
   AccountDeletedSchema,
   AccountVerificationSchema,
@@ -15,7 +16,6 @@ import {
   WaitlistConfirmationSchema,
   WaitlistInvitationSchema,
   WeeklyReportSchema,
-  WelcomeSchema,
   WorkspaceInviteSchema,
 } from "./payloads";
 
@@ -26,7 +26,7 @@ import {
  * signatures from it, so the two sides cannot drift apart.
  */
 export const templateSchemas = {
-  welcome: WelcomeSchema,
+  ...onboardingStepSchemas,
   "action-required": ActionRequiredSchema,
   "account-verification": AccountVerificationSchema,
   "waitlist-confirmation": WaitlistConfirmationSchema,

@@ -95,54 +95,54 @@ enum WebhookStatus {
 }
 
 model User {
-  id                             String                @id @default(uuid(7))
-  clerkUserId                    String                @unique @map("clerk_user_id")
-  username                       String?               @unique @db.VarChar(64)
-  name                           String                @default("")
-  email                          String?               @unique @db.VarChar(255)
-  emailVerified                  Boolean               @default(false) @map("email_verified")
-  phoneNumber                    String?               @unique @map("phone_number") @db.VarChar(20)
-  phoneNumberVerified            Boolean               @default(false) @map("phone_number_verified")
-  avatarUrl                      String?               @map("avatar_url")
+  id                             String                   @id @default(uuid(7))
+  clerkUserId                    String                   @unique @map("clerk_user_id")
+  username                       String?                  @unique @db.VarChar(64)
+  name                           String                   @default("")
+  email                          String?                  @unique @db.VarChar(255)
+  emailVerified                  Boolean                  @default(false) @map("email_verified")
+  phoneNumber                    String?                  @unique @map("phone_number") @db.VarChar(20)
+  phoneNumberVerified            Boolean                  @default(false) @map("phone_number_verified")
+  avatarUrl                      String?                  @map("avatar_url")
   description                    String?
   bio                            String?
-  private                        Boolean               @default(true)
-  hidden                         Boolean               @default(false)
-  verified                       Boolean               @default(false)
-  locked                         Boolean               @default(false)
-  banned                         Boolean               @default(false)
-  theme                          String                @default("dark")
-  appTheme                       String                @default("dark") @map("app_theme")
-  language                       String                @default("en")
-  timeZone                       String                @default("UTC") @map("time_zone")
-  privacyMode                    Boolean               @default(false) @map("privacy_mode")
-  twoFactorEnabled               Boolean               @default(false) @map("two_factor_enabled")
-  defaultHome                    String                @default("overview") @map("default_home")
-  disableBranding                Boolean               @default(false) @map("disable_branding")
-  allowCustomBrandColor          Boolean               @default(false) @map("allow_custom_brand_color")
-  primaryBrandColor              String                @default("") @map("primary_brand_color")
-  secondaryBrandColor            String                @default("") @map("secondary_brand_color")
-  allowSEOIndexing               Boolean               @default(false) @map("allow_seo_indexing")
-  allowNotification              Boolean               @default(true) @map("allow_notification")
-  allowSMS                       Boolean               @default(false) @map("allow_sms")
-  notificationPlacement          NotificationPlacement @default(bottomRight) @map("notification_placement")
-  allowMonthlyEmails             Boolean               @default(true) @map("allow_monthly_emails")
-  allowInviteAcceptedEmails      Boolean               @default(true) @map("allow_invite_accepted_emails")
-  allowChangelogNewsletterEmails Boolean               @default(true) @map("allow_changelog_newsletter_emails")
-  allowMarketingOnboardingEmails Boolean               @default(true) @map("allow_marketing_onboarding_emails")
-  allowPrivacyLegalEmails        Boolean               @default(true) @map("allow_privacy_legal_emails")
-  allowDpaEmails                 Boolean               @default(true) @map("allow_dpa_emails")
-  allowEmailVisibility           Boolean               @default(true) @map("allow_email_visibility")
-  allowPhoneNumberVisibility     Boolean               @default(true) @map("allow_phone_number_visibility")
-  completeOnboarding             Boolean               @default(false) @map("complete_onboarding")
-  isSeeded                       Boolean               @default(false) @map("is_seeded")
-  lastViewed                     String?               @map("last_viewed")
-  lastLogin                      DateTime              @default(now()) @map("last_login")
-  lastSeenAt                     DateTime              @default(now()) @map("last_seen_at")
-  usageTime                      Int                   @default(0) @map("usage_time")
-  createdAt                      DateTime              @default(now()) @map("created_at")
-  updatedAt                      DateTime              @updatedAt @map("updated_at")
-  deletedAt                      DateTime?             @map("deleted_at")
+  private                        Boolean                  @default(true)
+  hidden                         Boolean                  @default(false)
+  verified                       Boolean                  @default(false)
+  locked                         Boolean                  @default(false)
+  banned                         Boolean                  @default(false)
+  theme                          String                   @default("dark")
+  appTheme                       String                   @default("dark") @map("app_theme")
+  language                       String                   @default("en")
+  timeZone                       String                   @default("UTC") @map("time_zone")
+  privacyMode                    Boolean                  @default(false) @map("privacy_mode")
+  twoFactorEnabled               Boolean                  @default(false) @map("two_factor_enabled")
+  defaultHome                    String                   @default("overview") @map("default_home")
+  disableBranding                Boolean                  @default(false) @map("disable_branding")
+  allowCustomBrandColor          Boolean                  @default(false) @map("allow_custom_brand_color")
+  primaryBrandColor              String                   @default("") @map("primary_brand_color")
+  secondaryBrandColor            String                   @default("") @map("secondary_brand_color")
+  allowSEOIndexing               Boolean                  @default(false) @map("allow_seo_indexing")
+  allowNotification              Boolean                  @default(true) @map("allow_notification")
+  allowSMS                       Boolean                  @default(false) @map("allow_sms")
+  notificationPlacement          NotificationPlacement    @default(bottomRight) @map("notification_placement")
+  allowMonthlyEmails             Boolean                  @default(true) @map("allow_monthly_emails")
+  allowInviteAcceptedEmails      Boolean                  @default(true) @map("allow_invite_accepted_emails")
+  allowChangelogNewsletterEmails Boolean                  @default(true) @map("allow_changelog_newsletter_emails")
+  allowMarketingOnboardingEmails Boolean                  @default(true) @map("allow_marketing_onboarding_emails")
+  allowPrivacyLegalEmails        Boolean                  @default(true) @map("allow_privacy_legal_emails")
+  allowDpaEmails                 Boolean                  @default(true) @map("allow_dpa_emails")
+  allowEmailVisibility           Boolean                  @default(true) @map("allow_email_visibility")
+  allowPhoneNumberVisibility     Boolean                  @default(true) @map("allow_phone_number_visibility")
+  completeOnboarding             Boolean                  @default(false) @map("complete_onboarding")
+  isSeeded                       Boolean                  @default(false) @map("is_seeded")
+  lastViewed                     String?                  @map("last_viewed")
+  lastLogin                      DateTime                 @default(now()) @map("last_login")
+  lastSeenAt                     DateTime                 @default(now()) @map("last_seen_at")
+  usageTime                      Int                      @default(0) @map("usage_time")
+  createdAt                      DateTime                 @default(now()) @map("created_at")
+  updatedAt                      DateTime                 @updatedAt @map("updated_at")
+  deletedAt                      DateTime?                @map("deleted_at")
   business                       Business?
   apiKeys                        ApiKey[]
   webhooks                       Webhook[]
@@ -150,6 +150,7 @@ model User {
   apiListings                    ApiListing[]
   bannerInteractions             BannerInteraction[]
   emailVerificationTokens        EmailVerificationToken[]
+  onboardingQueue                OnboardingEmailQueue?
 
   @@index([email])
   @@map("users")
@@ -168,6 +169,59 @@ model EmailVerificationToken {
 
   @@index([userId])
   @@map("email_verification_tokens")
+}
+
+enum OnboardingEmailQueueStatus {
+  PENDING
+  SENDING
+  PAUSED
+  COMPLETED
+}
+
+model OnboardingEmailQueue {
+  id             String                     @id @default(uuid(7))
+  userId         String                     @unique @map("user_id")
+  status         OnboardingEmailQueueStatus @default(PENDING)
+  sequenceIndex  Int                        @default(0) @map("sequence_index")
+  step           String                     @db.VarChar(64)
+  attempts       Int                        @default(0)
+  nextAttemptAt  DateTime                   @default(now()) @map("next_attempt_at")
+  lastAttemptAt  DateTime?                  @map("last_attempt_at")
+  lastSentAt     DateTime?                  @map("last_sent_at")
+  lastProviderId String?                    @map("last_provider_id") @db.VarChar(128)
+  lastError      String?                    @map("last_error") @db.VarChar(512)
+  lockedUntil    DateTime?                  @map("locked_until")
+  lockId         String?                    @map("lock_id") @db.VarChar(64)
+  completedAt    DateTime?                  @map("completed_at")
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sends OnboardingEmailSend[]
+
+  @@index([status, nextAttemptAt])
+  @@index([status, lockedUntil])
+  @@map("onboarding_email_queue")
+}
+
+model OnboardingEmailSend {
+  id             String   @id @default(uuid(7))
+  queueId        String   @map("queue_id")
+  userId         String   @map("user_id")
+  step           String   @db.VarChar(64)
+  sequenceIndex  Int      @map("sequence_index")
+  attempt        Int
+  succeeded      Boolean  @default(false)
+  providerId     String?  @map("provider_id") @db.VarChar(128)
+  error          String?  @db.VarChar(512)
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(256)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  queue OnboardingEmailQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([queueId])
+  @@map("onboarding_email_sends")
 }
 
 model ApiKey {
@@ -220,9 +274,9 @@ model ApiListing {
   /// (`paymentRequirements.extra.tabEndpoint`).
   x402Endpoint  String?         @map("x402_endpoint") @db.VarChar(2048)
 
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
-  deletedAt   DateTime?        @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   endpoints ApiEndpoint[]

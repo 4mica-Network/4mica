@@ -5,6 +5,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyInstance } from "fastify";
 import { loadUser } from "./auth/user-store";
 import { config } from "./config/index";
+import { startOnboardingDrip } from "./jobs/onboarding/index";
 import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { registerRateLimit } from "./plugins/rate-limit";
@@ -175,6 +176,8 @@ export const runServer = async (): Promise<FastifyInstance> => {
   if (config.isDev) {
     appLogger.info(`Swagger UI: http://localhost:${config.env.PORT}/docs`);
   }
+
+  await startOnboardingDrip(app);
 
   return app;
 };

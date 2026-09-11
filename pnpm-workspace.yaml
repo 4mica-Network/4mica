@@ -14,6 +14,7 @@ allowBuilds:
   bufferutil: false
   esbuild: true
   keccak: false
+  msgpackr-extract: false
   prisma: true
   sharp: false
   unrs-resolver: false
@@ -73,6 +74,7 @@ catalog:
   ahooks: ^3.9.7
   autoprefixer: ^10.5.0
   axios: ^1.19.0
+  bullmq: ^5.66.0
   changelogen: ^0.6.2
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1

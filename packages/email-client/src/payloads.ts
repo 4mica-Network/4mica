@@ -38,10 +38,13 @@ const base = BaseEmailSchema.entries;
 
 // --- Onboarding -------------------------------------------------------------
 
-export const WelcomeSchema = v.object({
+export const OnboardingStepSchema = v.object({
   ...base,
   ctaUrl: v.optional(absoluteUrl),
+  unsubscribeUrl: v.optional(absoluteUrl),
 });
+
+export const WelcomeSchema = OnboardingStepSchema;
 
 export const ActionRequiredSchema = v.object({
   ...base,

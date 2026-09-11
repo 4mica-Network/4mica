@@ -11,6 +11,7 @@
       "@auth/*": ["./src/auth/*"],
       "@config/*": ["./src/config/*"],
       "@controllers/*": ["./src/controllers/*"],
+      "@jobs/*": ["./src/jobs/*"],
       "@lifecycle/*": ["./src/lifecycle/*"],
       "@logger/*": ["./src/logger/*"],
       "@plugins/*": ["./src/plugins/*"],

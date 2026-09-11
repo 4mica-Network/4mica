@@ -51,6 +51,28 @@ const EnvSchema = v.object({
       v.startsWith("http", "PUBLIC_API_URL must be an http(s) URL"),
     ),
   ]),
+  VALKEY_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith(
+        "redis",
+        "VALKEY_URL must be a redis:// or rediss:// URL — Valkey speaks the Redis protocol, and ioredis misreads valkey:// as a hostname",
+      ),
+    ),
+  ]),
+  UNSUBSCRIBE_SECRET: v.string(),
+  ONBOARDING_TICK_MS: numeric("ONBOARDING_TICK_MS", 10_000, 3_600_000),
+  ONBOARDING_BATCH_SIZE: numeric("ONBOARDING_BATCH_SIZE", 1, 500),
+  ONBOARDING_STEP_GAP_MS: numeric(
+    "ONBOARDING_STEP_GAP_MS",
+    60_000,
+    2_592_000_000,
+  ),
+  ONBOARDING_DRIP_EPOCH: v.pipe(
+    v.string(),
+    v.isoTimestamp("ONBOARDING_DRIP_EPOCH must be an ISO 8601 timestamp"),
+  ),
   SHUTDOWN_DRAIN_MS: numeric("SHUTDOWN_DRAIN_MS", 0, 60_000),
   SHUTDOWN_TIMEOUT_MS: numeric("SHUTDOWN_TIMEOUT_MS", 1_000, 120_000),
   RATE_LIMIT_ENABLED: v.picklist(
@@ -80,6 +102,13 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     CLERK_AUTHORIZED_PARTIES: source.CLERK_AUTHORIZED_PARTIES ?? "",
     EMAIL_SERVICE_URL: source.EMAIL_SERVICE_URL ?? "",
     PUBLIC_API_URL: source.PUBLIC_API_URL ?? "",
+    VALKEY_URL: source.VALKEY_URL ?? "",
+    UNSUBSCRIBE_SECRET: source.UNSUBSCRIBE_SECRET ?? "",
+    ONBOARDING_TICK_MS: source.ONBOARDING_TICK_MS ?? "300000",
+    ONBOARDING_BATCH_SIZE: source.ONBOARDING_BATCH_SIZE ?? "25",
+    ONBOARDING_STEP_GAP_MS: source.ONBOARDING_STEP_GAP_MS ?? "259200000",
+    ONBOARDING_DRIP_EPOCH:
+      source.ONBOARDING_DRIP_EPOCH ?? "2026-09-15T00:00:00.000Z",
     SHUTDOWN_DRAIN_MS: source.SHUTDOWN_DRAIN_MS ?? "5000",
     SHUTDOWN_TIMEOUT_MS: source.SHUTDOWN_TIMEOUT_MS ?? "20000",
     RATE_LIMIT_ENABLED:
@@ -104,6 +133,16 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
   if (result.output.SHUTDOWN_DRAIN_MS >= result.output.SHUTDOWN_TIMEOUT_MS) {
     throw new Error(
       "Invalid environment configuration:\n  - SHUTDOWN_DRAIN_MS: must be less than SHUTDOWN_TIMEOUT_MS",
+    );
+  }
+
+  if (
+    result.output.VALKEY_URL &&
+    result.output.UNSUBSCRIBE_SECRET.length > 0 &&
+    result.output.UNSUBSCRIBE_SECRET.length < 32
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - UNSUBSCRIBE_SECRET: must be at least 32 characters",
     );
   }
 
@@ -140,5 +179,14 @@ export const config = {
     ipMax: env.RATE_LIMIT_IP_MAX,
     userMax: env.RATE_LIMIT_USER_MAX,
     sensitiveMax: env.RATE_LIMIT_SENSITIVE_MAX,
+  },
+  onboarding: {
+    valkeyUrl: env.VALKEY_URL || undefined,
+    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || undefined,
+    enabled: Boolean(env.VALKEY_URL && env.UNSUBSCRIBE_SECRET),
+    tickMs: env.ONBOARDING_TICK_MS,
+    batchSize: env.ONBOARDING_BATCH_SIZE,
+    stepGapMs: env.ONBOARDING_STEP_GAP_MS,
+    epoch: new Date(env.ONBOARDING_DRIP_EPOCH),
   },
 } as const;

@@ -32,6 +32,7 @@
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "axios": "catalog:",
+    "bullmq": "catalog:",
     "dotenv": "catalog:",
     "fastify": "catalog:",
     "valibot": "catalog:",
