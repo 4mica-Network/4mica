@@ -54,9 +54,8 @@ The script asks core which USDC it accepts on the network, deposits `DEPOSIT_AMO
 gaslessly through the facilitator (one signature, no ETH), and prints the collateral before and
 after. Without `FACILITATOR_URL` it sends the deposit transaction itself, so the wallet needs gas.
 
-`pnpm run balance` prints the same wallet's position as core sees it: collateral, what is locked
-behind the guarantees it signed, what is free, what other wallets have signed to it, and the net
-of the two.
+`pnpm run balance` prints the same wallet's collateral as core sees it: the total, what is locked
+behind the guarantees it signed, and what is free.
 
 ## 2. Start the server
 
@@ -132,8 +131,9 @@ two shape-only entries in front of it so the 402 reads like Apify's.
   server marks paid tools. An unpaid call gets the challenge back as an error result with the
   `PaymentRequired` in `structuredContent`; a paid call carries the payment in
   `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header), and the result carries one line on
-  what the run cost, the dataset, the billing in `structuredContent`, and the netted settlement in
-  `_meta["x402/payment-response"]`.
+  what the run cost, the dataset, the billing in `structuredContent`, the netted settlement in
+  `_meta["x402/payment-response"]`, and the refund guarantee's settlement in `_meta["4mica/refund"]`,
+  whose certificate is core's signed word that the buyer holds a guarantee for that amount.
 
 The `upto` and `exact` entries are shape-only. The 4mica facilitator does not serve them, so a
 payer that picks one is told so and nothing runs. Only the third entry is real.
@@ -147,13 +147,18 @@ the cap back as an ordinary `4mica-credit` guarantee from itself to the buyer, s
 the two guarantees when the cycle commits, so one run of five results at `$0.02` settles at
 `$0.10` of a `$1.00` cap, with no refund transaction and no new primitive.
 
-Two things follow, and the balance script shows both:
+Three things follow:
 
 - **The buyer's lock stays at the cap until the cycle commits.** The refund is a credit to the
   buyer, not a release of its collateral; the net position is the cap minus the refund.
 - **The seller needs collateral of its own.** A refund guarantee locks that much of the
   seller's collateral until the cycle commits, and core does not count incoming credits toward
   free balance. Fund the seller wallet for the refunds it will issue in a cycle:
+- **What a wallet is owed is not visible in core before the cycle commits.** Core has no listing
+  of open-cycle guarantees by recipient (`/core/recipients/<addr>/payments` reads the legacy
+  transaction table), so the balance script shows locks only. The buyer's proof of the refund is
+  the certificate in `_meta["4mica/refund"]`, which the SDK's `verifyGuarantee` checks against the
+  operator's key.
 
 ```bash
 WALLET=seller pnpm run deposit     # deposits DEPOSIT_AMOUNT from SELLER_PRIVATE_KEY
@@ -194,8 +199,7 @@ also shows under `_meta.x402`.
 
 `bash record.sh` runs the whole script in one command, with both servers up: both wallets before,
 the 402 decoded, connect, two paid runs, both wallets after. The buyer's lock rises by two caps and
-its incoming by two refunds; the seller's is the mirror image; nothing moves on-chain until the
-cycle commits, and then only the net.
+the seller's by two refunds; nothing moves on-chain until the cycle commits, and then only the net.
 
 Note what verify does and does not check. The facilitator's `/verify` validates the signed
 guarantee request; whether the payer holds collateral is only known at `/settle`, when core

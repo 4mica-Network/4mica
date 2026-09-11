@@ -4,11 +4,12 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { formatAmount } from './apify/billing.js'
 
 /**
- * Prints a wallet's position as core sees it: collateral, what is locked behind the
- * guarantees it signed, what is free, what other wallets have signed to it, and the net
- * of the two, which is what the cycle settles. `WALLET=seller` reads `SELLER_PRIVATE_KEY`
- * instead of `PRIVATE_KEY`. Run it before and after a paid run: the buyer's lock rises by
- * the cap and its incoming by the refund; the seller's is the mirror image.
+ * Prints a wallet's collateral as core sees it: the total, what is locked behind the
+ * guarantees this wallet signed, and what is free. `WALLET=seller` reads
+ * `SELLER_PRIVATE_KEY` instead of `PRIVATE_KEY`. Run it before and after a paid run: the
+ * buyer's lock rises by the cap, the seller's by the refund. Core does not list the
+ * guarantees signed *to* a wallet before the cycle commits, so what a wallet is owed is
+ * shown by the certificates in the tool results, not here.
  */
 const NETWORK = process.env.NETWORK || 'eip155:84532'
 const CORE_URL = process.env.CORE_URL
@@ -46,28 +47,12 @@ async function main() {
     const total = balance?.total ?? 0n
     const locked = balance?.locked ?? 0n
 
-    // Guarantees other wallets signed to this one. Core lists them without an asset; the
-    // demo only ever deals in USDC, so they are summed as such.
-    const payments = await client.rpc.listRecipientPayments(account.address)
-    const incoming = payments.filter((payment) => !payment.failed)
-    const received = incoming.reduce((sum, payment) => sum + payment.amount, 0n)
-    const net = locked - received
-    const direction = net > 0n ? 'pays' : net < 0n ? 'receives' : 'moves nothing'
-    const sign = net < 0n ? '-' : net > 0n ? '+' : ''
-    const magnitude = net < 0n ? -net : net
-
     console.log(`Wallet:     ${WALLET} ${account.address}`)
     console.log(`Collateral: ${formatAmount(total, units)}`)
     console.log(
       `Locked:     ${formatAmount(locked, units)}  (behind the guarantees this wallet signed)`
     )
     console.log(`Free:       ${formatAmount(total - locked, units)}`)
-    console.log(
-      `Incoming:   ${formatAmount(received, units)}  (${incoming.length} guarantee${incoming.length === 1 ? '' : 's'} signed to this wallet)`
-    )
-    console.log(
-      `Net:        ${sign}${formatAmount(magnitude, units)}  (${direction} when the cycle commits, if all of the above sits in the open cycle)`
-    )
   } finally {
     await client.aclose()
   }

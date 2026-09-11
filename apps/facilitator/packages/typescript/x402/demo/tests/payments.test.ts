@@ -8,6 +8,7 @@ import {
   EXACT_MAX_TIMEOUT_SECONDS,
   MCP_PAYMENT_META_KEY,
   MCP_PAYMENT_RESPONSE_META_KEY,
+  MCP_REFUND_META_KEY,
   paidToolResult,
   payerOf,
   paymentRequiredFor,
@@ -179,6 +180,7 @@ describe('MCP shapes', () => {
       ...settlement,
       amount: '100000',
     })
+    expect(result._meta?.[MCP_REFUND_META_KEY]).toBe(settlement)
   })
 
   it('says the cap stands when no refund was issued', () => {
@@ -188,6 +190,7 @@ describe('MCP shapes', () => {
     const result = paidToolResult(items, settlement, billing, undefined, USDC)
     expect(result.content[0]?.text).toContain('could not be issued, so the cap stands')
     expect(result.structuredContent?.billing).toMatchObject({ refunded: null })
+    expect(result._meta?.[MCP_REFUND_META_KEY]).toBeUndefined()
   })
 })
 

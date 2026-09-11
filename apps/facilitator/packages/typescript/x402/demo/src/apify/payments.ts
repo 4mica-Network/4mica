@@ -15,6 +15,8 @@ import {
 export const MCP_PAYMENT_META_KEY = 'x402/payment'
 /** MCP `_meta` key the settlement response travels back under. */
 export const MCP_PAYMENT_RESPONSE_META_KEY = 'x402/payment-response'
+/** MCP `_meta` key the refund guarantee's settlement (with core's certificate) travels back under. */
+export const MCP_REFUND_META_KEY = '4mica/refund'
 /** HTTP header the refund receipt travels back under, next to `payment-response`. */
 export const REFUND_HEADER = 'payment-refund'
 
@@ -207,7 +209,9 @@ export function refundHeader(receipt: RefundReceipt): string {
 
 /**
  * A paid run's result: one line on what it cost and what came back, then the dataset.
- * The billing sits in `structuredContent` and the netted settlement in `_meta`.
+ * The billing sits in `structuredContent`; `_meta` carries the netted settlement of the
+ * cap and, when a refund was issued, its settlement too, whose certificate is core's
+ * signed word that the buyer holds a guarantee for that amount.
  */
 export function paidToolResult(
   items: unknown[],
@@ -222,7 +226,10 @@ export function paidToolResult(
       { type: 'text', text: JSON.stringify(items, null, 2) },
     ],
     structuredContent: { items, billing: billingSummary(billing, refund) },
-    _meta: { [MCP_PAYMENT_RESPONSE_META_KEY]: settledFor(settlement, billing) },
+    _meta: {
+      [MCP_PAYMENT_RESPONSE_META_KEY]: settledFor(settlement, billing),
+      ...(refund ? { [MCP_REFUND_META_KEY]: refund.settlement } : {}),
+    },
   }
 }
 
