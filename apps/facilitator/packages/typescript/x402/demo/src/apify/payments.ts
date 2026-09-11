@@ -1,6 +1,7 @@
 import type { Network, PaymentPayload, PaymentRequired, PaymentRequirements } from '@4mica/x402'
 import { decodePaymentSignatureHeader, encodePaymentRequiredHeader } from '@x402/core/http'
 import type { SettleResponse } from '@x402/core/types'
+import { getAddress, isAddress } from 'viem'
 import {
   billingSummary,
   describeBilling,
@@ -132,6 +133,18 @@ export function readPaymentPayload({ header, meta }: PaymentSources): PaymentPay
     throw new Error('PAYMENT-SIGNATURE is not an x402 payment payload')
   }
   return decoded
+}
+
+/**
+ * The buyer: the `user_address` in the signed claims of a `4mica-credit` payment, which is
+ * what the facilitator verified and core bound the guarantee to. Read from the payload
+ * rather than the verify or settle response, since not every facilitator echoes it back.
+ */
+export function payerOf(payload: PaymentPayload): string | undefined {
+  const claims = payload.payload?.claims
+  if (!isRecord(claims)) return undefined
+  const candidate = claims.user_address ?? claims.userAddress
+  return typeof candidate === 'string' && isAddress(candidate) ? getAddress(candidate) : undefined
 }
 
 function isPaymentPayload(value: unknown): value is PaymentPayload {

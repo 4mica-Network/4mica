@@ -6,6 +6,7 @@ import { describeBilling } from './apify/billing.js'
 import { fakeDataset, simulateRun } from './apify/dataset.js'
 import {
   APIFY_PAYMENT_REQUIRED_BODY,
+  payerOf,
   paymentRequiredHeader,
   REFUND_HEADER,
   readPaymentPayload,
@@ -65,8 +66,9 @@ async function main() {
       res.json({ error: { type: 'x402-payment-invalid', message: outcome.reason } })
       return
     }
+    const buyer = payerOf(payload) ?? outcome.payer
     console.log(
-      `verify ok: ${outcome.requirements.scheme} from ${outcome.payer ?? 'unknown payer'} for a ${outcome.requirements.amount} cap on ${outcome.requirements.network}`
+      `verify ok: ${outcome.requirements.scheme} from ${buyer ?? 'unknown payer'} for a ${outcome.requirements.amount} cap on ${outcome.requirements.network}`
     )
 
     const query = typeof req.body?.query === 'string' ? req.body.query : actorId
@@ -84,7 +86,6 @@ async function main() {
       })
       return
     }
-    const buyer = settlement.payer ?? outcome.payer
     console.log(`settle ok: cap guarantee issued, payer ${buyer ?? 'unknown'}`)
 
     const billing = seller.meter(items.length)

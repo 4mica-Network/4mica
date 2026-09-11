@@ -10,6 +10,7 @@ import { fakeDataset, simulateRun } from './apify/dataset.js'
 import {
   errorToolResult,
   paidToolResult,
+  payerOf,
   paymentRequiredToolResult,
   type ResourceInfo,
   readPaymentPayload,
@@ -62,8 +63,9 @@ function createMcpServer(seller: DemoSeller, resource: ResourceInfo, env: Seller
         console.log(`${TOOL_NAME}: payment rejected: ${outcome.reason}`)
         return errorToolResult(`Payment rejected: ${outcome.reason}`)
       }
+      const buyer = payerOf(payload) ?? outcome.payer
       console.log(
-        `verify ok: ${outcome.requirements.scheme} from ${outcome.payer ?? 'unknown payer'} for a ${outcome.requirements.amount} cap on ${outcome.requirements.network}`
+        `verify ok: ${outcome.requirements.scheme} from ${buyer ?? 'unknown payer'} for a ${outcome.requirements.amount} cap on ${outcome.requirements.network}`
       )
 
       console.log(`running ${ACTOR_ID} for "${query}" (${env.runSeconds}s)...`)
@@ -77,7 +79,6 @@ function createMcpServer(seller: DemoSeller, resource: ResourceInfo, env: Seller
         console.log(`${TOOL_NAME}: settlement failed: ${(error as Error).message}`)
         return errorToolResult(`Settlement failed: ${(error as Error).message}`)
       }
-      const buyer = settlement.payer ?? outcome.payer
       console.log(`settle ok: cap guarantee issued, payer ${buyer ?? 'unknown'}`)
 
       const billing = seller.meter(items.length)

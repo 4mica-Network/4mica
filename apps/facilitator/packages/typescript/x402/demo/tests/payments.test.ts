@@ -9,6 +9,7 @@ import {
   MCP_PAYMENT_META_KEY,
   MCP_PAYMENT_RESPONSE_META_KEY,
   paidToolResult,
+  payerOf,
   paymentRequiredFor,
   paymentRequiredHeader,
   paymentRequiredToolResult,
@@ -120,6 +121,26 @@ describe('readPaymentPayload', () => {
     expect(() => readPaymentPayload({ header: 'not base64 json' })).toThrow(/base64/)
     const notAPayment = Buffer.from(JSON.stringify({ hello: 'world' })).toString('base64')
     expect(() => readPaymentPayload({ header: notAPayment })).toThrow(/payment payload/)
+  })
+})
+
+describe('payerOf', () => {
+  it('reads the buyer from the signed claims, checksummed', () => {
+    const payload = signedPayload()
+    payload.payload = {
+      ...payload.payload,
+      claims: { req_id: '1', user_address: '0x5ef6a28a5686df09592b1a1e43fd0ba5ee3b6a88' },
+    }
+    expect(payerOf(payload)).toBe('0x5Ef6a28a5686Df09592B1A1E43FD0BA5Ee3B6a88')
+  })
+
+  it('accepts the camel-case spelling and rejects anything that is not an address', () => {
+    const payload = signedPayload()
+    payload.payload = { ...payload.payload, claims: { userAddress: `0x${'a'.repeat(40)}` } }
+    expect(payerOf(payload)?.toLowerCase()).toBe(`0x${'a'.repeat(40)}`)
+    payload.payload = { ...payload.payload, claims: { user_address: 'not-an-address' } }
+    expect(payerOf(payload)).toBeUndefined()
+    expect(payerOf(signedPayload())).toBeUndefined()
   })
 })
 
