@@ -126,20 +126,13 @@ guarantee's request id is accepted once, so the fork never reuses one.
   Both wallets' collateral is Aave's test USDC, minted from Aave's faucet as
   the demo README describes. Base mainnet follows with the 4Mica upgrade.
 
-## What is not there yet
+## Notes
 
-**Change from the seller's own pocket.** Today the refund guarantee locks that
-much of the seller's free collateral until the cycle nets, so a seller needs a
-float roughly equal to the unused caps in a cycle. The next 4Mica release
-removes the float: 4Mica will count the guarantees a wallet holds as collateral
+In the upcoming 4Mica release 4Mica will count the guarantees a wallet holds as collateral
 for the guarantees it signs. A seller holding a 1 USDC guarantee from a buyer
 can sign up to 1 USDC back against it, no deposit needed, and netting
 collapses the pair to what the run cost. The refund is then the cap's own
-backing returned, and the seller's balance never enters. Two rules keep it
-safe: only finalized incoming guarantees count, never ones still pending
-validation, and a guarantee drawn on a receivable has to land in the same
-cycle as the receivable. A run the seller never settles costs the buyer
-nothing, because the cap is only issued at settlement, after the run.
+backing returned, and the seller's balance never enters.
 
 The trust model is the same as `upto`'s: the seller settles any amount up to
 the cap the buyer authorized. The evidence and dispute semantics on top of
