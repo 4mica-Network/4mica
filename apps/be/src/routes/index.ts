@@ -5,6 +5,7 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { unsubscribeRoutes } from "./unsubscribe";
 import { verificationRoutes } from "./verification";
+import { walletRoutes } from "./wallets";
 
 export interface RouteRegistration {
   plugin: FastifyPluginCallback;
@@ -18,6 +19,7 @@ export const routes: RouteRegistration[] = [
   { plugin: developerRoutes },
   { plugin: bannerRoutes },
   { plugin: unsubscribeRoutes },
+  { plugin: walletRoutes },
 ];
 
 export {
@@ -27,4 +29,5 @@ export {
   meRoutes,
   unsubscribeRoutes,
   verificationRoutes,
+  walletRoutes,
 };

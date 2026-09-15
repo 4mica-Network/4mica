@@ -46,3 +46,15 @@ export const generateWebhookSecret = (): GeneratedSecret =>
 
 export const generateEmailVerificationToken = (): GeneratedSecret =>
   generate(EMAIL_VERIFICATION_PREFIX);
+
+/**
+ * A SIWE challenge nonce.
+ *
+ * Returned raw rather than as a `GeneratedSecret` because, unlike the tokens
+ * above, this is not a bearer credential: the signature over it is the secret,
+ * and the nonce itself is only a lookup key. Hashing it would buy nothing and
+ * make the row unfindable from the value the client sends back. Base64url keeps
+ * it inside VarChar(64).
+ */
+export const generateWalletNonce = (): string =>
+  randomBytes(32).toString("base64url");

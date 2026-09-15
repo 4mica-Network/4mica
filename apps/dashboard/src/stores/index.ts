@@ -4,11 +4,13 @@ import bannerReducer from "./banner/reducer";
 import developerReducer from "./developer/reducer";
 import rootSaga from "./rootSaga";
 import userReducer from "./user/reducer";
+import walletReducer from "./wallet/reducer";
 
 const rootReducer = combineReducers({
   user: userReducer,
   developer: developerReducer,
   banner: bannerReducer,
+  wallet: walletReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

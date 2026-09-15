@@ -218,6 +218,69 @@ export const bannerResponseSchema = {
   },
 } as const;
 
+const paymentNetworkEnum = {
+  type: "string",
+  enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+} as const;
+
+export const walletResponseSchema = {
+  type: "object",
+  required: ["id", "label", "address", "network", "role", "status"],
+  properties: {
+    id: str,
+    label: str,
+    description: nullStr,
+    address: str,
+    network: paymentNetworkEnum,
+    role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
+    status: { type: "string", enum: ["ACTIVE", "PAUSED", "RETIRED"] },
+    isDefault: bool,
+    verifiedAt: date,
+    verificationMethod: {
+      type: "string",
+      enum: ["EOA_SIGNATURE", "ERC1271"],
+    },
+    verifiedChainId: int,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const walletListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: walletResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+/**
+ * The serializer strips anything not listed, which is the backstop that keeps a
+ * widened `select` in the repository from ever leaking challenge internals.
+ */
+export const walletNonceResponseSchema = {
+  type: "object",
+  required: ["nonce", "message", "expiresAt"],
+  properties: {
+    nonce: str,
+    /** The exact EIP-4361 text the client must sign, built server-side. */
+    message: str,
+    expiresAt: date,
+  },
+} as const;
+
+export const batchDeleteResponseSchema = {
+  type: "object",
+  required: ["deleted", "notFound"],
+  properties: {
+    deleted: { type: "array", items: str },
+    notFound: { type: "array", items: str },
+  },
+} as const;
+
 export const verificationSentResponseSchema = {
   type: "object",
   required: ["sent"],

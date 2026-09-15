@@ -24,7 +24,11 @@ export function AppShell() {
         </button>
       </div>
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="w-full px-6 py-6">
+        {/* min-h-full + flex column so a page can hand a child `flex-1` and
+            have it fill the viewport — an empty state that stops a third of
+            the way down reads as a rendering bug rather than a deliberate one.
+            Short pages are unaffected: block content still flows from the top. */}
+        <div className="flex min-h-full w-full flex-col px-6 py-6">
           <Outlet />
         </div>
       </main>
