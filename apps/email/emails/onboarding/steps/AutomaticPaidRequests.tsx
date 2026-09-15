@@ -26,7 +26,7 @@ export const AutomaticPaidRequests = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      Your application logic stops containing payment logic, which is the point.
+      Your application logic stops containing payment logic.
     </Text>
 
     <CallToAction

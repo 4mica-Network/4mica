@@ -1,5 +1,5 @@
 import type { TemplateProps } from "@4mica/email-client";
-import { brand, Layout, styles } from "@components/index";
+import { brand, Layout, Signature, styles } from "@components/index";
 import { Heading, Text } from "react-email";
 
 export const WaitlistConfirmation = ({
@@ -11,8 +11,7 @@ export const WaitlistConfirmation = ({
 
     <Text style={styles.paragraph}>
       Thanks for signing up, {userName}. We're opening {brand.name} in batches
-      so every new team gets a proper onboarding, and you'll hear from us the
-      moment your invite is ready.
+      so every new team gets a proper onboarding.
     </Text>
 
     {position ? (
@@ -21,9 +20,12 @@ export const WaitlistConfirmation = ({
       </Text>
     ) : null}
 
-    <Text style={styles.muted}>
-      Nothing to do for now — we'll email this address with your invite link.
+    <Text style={styles.paragraph}>
+      Nothing to do for now — we'll email this address the moment your invite is
+      ready.
     </Text>
+
+    <Signature />
   </Layout>
 );
 

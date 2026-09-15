@@ -23,9 +23,7 @@ export const Receipt = ({
   >
     <Heading style={styles.heading}>Your receipt</Heading>
 
-    <Text style={styles.paragraph}>
-      Thanks {userName}. Here's a copy of your receipt for your records.
-    </Text>
+    <Text style={styles.paragraph}>Thanks {userName}.</Text>
 
     <DetailList
       rows={[

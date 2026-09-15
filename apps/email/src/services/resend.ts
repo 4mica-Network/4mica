@@ -80,7 +80,9 @@ export const sendTemplate = async <K extends TemplateId>(
   const headers = unsubscribeHeaders(props);
 
   const message = {
-    from: config.email.from,
+    from: template.fromName
+      ? `${template.fromName} <${config.email.address}>`
+      : config.email.from,
     to: [props.to],
     replyTo: template.replyTo ?? config.email.replyTo,
     subject,

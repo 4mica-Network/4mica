@@ -26,10 +26,10 @@ export const CliAndExamples = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      There are also two example agents worth a look: one sells jokes and
-      paywalls the punchline with per-category pricing, and one buys them on a
-      budget, rates them, and adapts what it buys. Together they are a complete
-      agent-to-agent payment loop you can run locally.
+      There are also two example agents: one sells jokes and paywalls the
+      punchline with per-category pricing, and one buys them on a budget, rates
+      them, and adapts what it buys. Together they are a complete agent-to-agent
+      payment loop you can run locally.
     </Text>
 
     <CallToAction

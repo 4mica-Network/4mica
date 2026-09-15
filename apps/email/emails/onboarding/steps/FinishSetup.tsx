@@ -22,8 +22,9 @@ export const FinishSetup = ({
     </Heading>
 
     <Text style={styles.paragraph}>
-      Your dashboard has a short checklist, and it is genuinely the fastest path
-      to a working integration:
+      If you do nothing else this week, do these three. They are all under
+      Settings, and together they are the whole gap between an account and an
+      endpoint that takes money:
     </Text>
 
     <Text style={styles.paragraph}>
@@ -31,11 +32,6 @@ export const FinishSetup = ({
       request. <strong>2. Add a webhook endpoint</strong>, so you know when
       payments settle. <strong>3. Verify your business</strong>, which is
       required before you can receive payouts.
-    </Text>
-
-    <Text style={styles.paragraph}>
-      All three live under Settings. None of them take more than a minute or
-      two.
     </Text>
 
     <CallToAction

@@ -12,7 +12,7 @@ export const AccountVerification = ({
 
     <Text style={styles.paragraph}>
       Hi {userName}, welcome to {brand.name}. Confirm this is your address and
-      your account is verified — that's all we need.
+      your account is verified.
     </Text>
 
     <CallToAction href={verifyUrl} label="Verify my email" />

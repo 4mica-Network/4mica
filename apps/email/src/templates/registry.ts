@@ -1,5 +1,6 @@
 import type { TemplateId, TemplateProps } from "@4mica/email-client";
-import { brand, formatMoney } from "@components/index";
+import { ONBOARDING_STEP_IDS } from "@4mica/email-client";
+import { brand, formatMoney, sender } from "@components/index";
 import Announcement from "@emails/marketing/Announcement";
 import WeeklyReport from "@emails/marketing/WeeklyReport";
 import AccountVerification from "@emails/onboarding/AccountVerification";
@@ -53,6 +54,11 @@ export interface TemplateDefinition<K extends TemplateId> {
   subject: (props: TemplateProps<K>) => string;
   component: (props: TemplateProps<K>) => ReactElement;
   replyTo?: string;
+  /**
+   * Overrides the From display name for templates written in a person's voice.
+   * The sending address is unchanged — only what the inbox shows as the sender.
+   */
+  fromName?: string;
 }
 
 const define = <K extends TemplateId>(
@@ -353,6 +359,26 @@ export const registry = {
 
 export type Registry = typeof registry;
 
+/**
+ * The templates written in a person's voice, and so sent under a person's name.
+ * Derived from `ONBOARDING_STEP_IDS` so a new onboarding step picks this up
+ * automatically; transactional mail is deliberately absent and keeps the
+ * product's From name.
+ */
+const PERSONAL_TEMPLATE_IDS: ReadonlySet<string> = new Set<string>([
+  ...ONBOARDING_STEP_IDS,
+  "waitlist-confirmation",
+  "waitlist-invitation",
+]);
+
 export const getTemplate = <K extends TemplateId>(
   id: K,
-): TemplateDefinition<K> => registry[id] as TemplateDefinition<K>;
+): TemplateDefinition<K> => {
+  const definition = registry[id] as TemplateDefinition<K>;
+
+  if (!PERSONAL_TEMPLATE_IDS.has(id)) {
+    return definition;
+  }
+
+  return { ...definition, fromName: definition.fromName ?? sender.fromName };
+};

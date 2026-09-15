@@ -4,9 +4,46 @@ import {
   isBlacklistedUsername,
   isReservedSegment,
   isValidUsername,
+  LinkConfig,
   reservedSegments,
   usernameUnavailableReason,
 } from "./index";
+
+describe("base resolution", () => {
+  const PROD = "https://4mica.io";
+
+  it("falls back to the canonical origin when nothing is set", () => {
+    const { links } = new LinkConfig({});
+
+    expect(links.website).toBe(PROD);
+    expect(links.app).toBe(PROD);
+  });
+
+  // Vite sets BASE_URL to its asset base ("/" by default) and it leaks into
+  // process.env under vitest. Accepting it produced links like "https://" and
+  // "https:/" — every URL in every email silently lost its host.
+  it.each([
+    "/",
+    "/app/",
+    "   ",
+  ])("ignores the host-less base %j that Vite sets", (value) => {
+    const { links } = new LinkConfig({ BASE_URL: value });
+
+    expect(links.website).toBe(PROD);
+  });
+
+  it("still honours a real override", () => {
+    const { links } = new LinkConfig({ BASE_URL: "https://staging.4mica.io" });
+
+    expect(links.website).toBe("https://staging.4mica.io");
+  });
+
+  it("assumes https for a bare host", () => {
+    const { links } = new LinkConfig({ NEXT_PUBLIC_BASE_URL: "4mica.dev" });
+
+    expect(links.website).toBe("https://4mica.dev");
+  });
+});
 
 describe("blacklistedUsernames", () => {
   // A blacklist entry that cannot match USERNAME_PATTERN is dead weight: no

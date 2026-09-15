@@ -20,9 +20,8 @@ export const ProfileAndHandle = ({
     <Heading style={styles.heading}>Claim your handle, {userName}</Heading>
 
     <Text style={styles.paragraph}>
-      Every account gets a public profile at {brand.root}/&lt;your-handle&gt;.
-      It is how other agents and buyers discover you, so it is worth a couple of
-      minutes.
+      This one takes two minutes, but it is how buyers find you. Every account
+      gets a public profile at {brand.root}/&lt;your-handle&gt;.
     </Text>
 
     <Text style={styles.paragraph}>
@@ -32,8 +31,8 @@ export const ProfileAndHandle = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      There is also branding: a primary and secondary colour, and the option to
-      turn off {brand.name} branding entirely.
+      Branding lives there too: a primary and secondary colour, and the option
+      to turn off {brand.name} branding entirely.
     </Text>
 
     <CallToAction

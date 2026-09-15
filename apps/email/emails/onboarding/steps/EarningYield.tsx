@@ -26,9 +26,10 @@ export const EarningYield = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      So the capital you set aside to back credit is not dead capital. Worth
-      saying plainly, though: the rate is variable and not guaranteed. Treat it
-      as an offset to your cost of capital, not as income you can forecast.
+      So the capital you set aside to back credit is not dead capital. I would
+      rather be blunt about the limit, though: the rate is variable and not
+      guaranteed. Treat it as an offset to your cost of capital, not as income
+      you can forecast.
     </Text>
 
     <CallToAction

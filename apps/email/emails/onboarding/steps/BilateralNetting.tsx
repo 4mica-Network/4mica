@@ -27,9 +27,8 @@ export const BilateralNetting = ({
 
     <Text style={styles.paragraph}>
       Do that across every pair of participants and a cycle's worth of traffic
-      reduces to one net figure per participant. That is the whole reason
-      micropayments stop being absurd: the on-chain cost is paid once per cycle,
-      not once per call.
+      reduces to one net figure each — so the on-chain cost is paid once per
+      cycle, not once per call.
     </Text>
 
     <CallToAction

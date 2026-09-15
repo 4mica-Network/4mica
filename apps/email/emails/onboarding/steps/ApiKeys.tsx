@@ -20,10 +20,11 @@ export const ApiKeys = ({
     <Heading style={styles.heading}>Your API key, {userName}</Heading>
 
     <Text style={styles.paragraph}>
-      API keys authenticate server-to-server requests. Create one under Settings
-      → Developer, give it a name you will recognise later, and copy it
-      immediately — the plaintext is shown exactly once and stored only as a
-      hash, so we cannot show it to you again.
+      This is the first thing you will touch and the easiest one to get wrong,
+      so let me be precise about it. API keys authenticate server-to-server
+      requests. Create one under Settings → Developer, give it a name you will
+      recognise later, and copy it immediately — the plaintext is shown exactly
+      once and stored only as a hash, so we cannot show it to you again.
     </Text>
 
     <Text style={styles.paragraph}>
@@ -33,8 +34,8 @@ export const ApiKeys = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      Never ship a key in client-side code. It belongs on your server, in an
-      environment variable.
+      One rule I will not soften: a key belongs on your server, in an
+      environment variable, never in client-side code.
     </Text>
 
     <CallToAction

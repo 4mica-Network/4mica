@@ -26,8 +26,7 @@ export const FrameworkQuickstarts = ({
 
     <Text style={styles.paragraph}>
       Adapters exist for several of these; a few are still in progress, and
-      where one is not ready yet the runtime-neutral paywall covers you in the
-      meantime.
+      where one is not ready the runtime-neutral paywall covers you.
     </Text>
 
     <CallToAction

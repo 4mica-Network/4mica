@@ -4,6 +4,7 @@ import {
   CallToAction,
   Layout,
   palette,
+  Signature,
   styles,
   unsubscribeNote,
 } from "@components/index";
@@ -21,15 +22,15 @@ export const GoLiveAndSupport = ({
     <Heading style={styles.heading}>Going live</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, the go-live guides are the last thing to read: real
-      collateral, real limits, monitoring, and what to check before you switch
-      networks.
+      {userName}, this is the last of these emails. The go-live guides are the
+      last thing to read: real collateral, real limits, monitoring, and what to
+      check before you switch networks.
     </Text>
 
     <Text style={styles.paragraph}>
       On pricing: it starts at 0.5% of net settled volume, charged once per
       cycle when a cycle settles, and it steps down as your volume grows. Your
-      rate is confirmed in writing before you go live — nothing is a surprise.
+      rate is confirmed in writing before you go live.
     </Text>
 
     <Text style={styles.paragraph}>
@@ -38,8 +39,11 @@ export const GoLiveAndSupport = ({
         {brand.support}
       </Link>
       . There is a live status page for uptime, a changelog for what has
-      shipped, and our work is on GitHub if you would rather open an issue.
+      shipped, and our work is on GitHub if you would rather open an issue. I
+      would like to hear what you build on this.
     </Text>
+
+    <Signature />
 
     <CallToAction
       href={ctaUrl ?? `${brand.docs}/seller/go-live`}

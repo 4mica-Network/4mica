@@ -20,9 +20,9 @@ export const TypescriptSdk = ({
     <Heading style={styles.heading}>Working with the SDK</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, the TypeScript SDK is organised by capability: deposit,
-      withdraw, payment, settlement, account and tokens. You reach for the one
-      you need rather than learning the whole surface.
+      {userName}, the TypeScript SDK is organised by capability — deposit,
+      withdraw, payment, settlement, account and tokens — so you reach for the
+      one you need rather than learning the whole surface.
     </Text>
 
     <Text style={styles.paragraph}>

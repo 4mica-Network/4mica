@@ -20,7 +20,7 @@ export const ProofAndDisputes = ({
     <Heading style={styles.heading}>Disputes</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, disputes happen. The useful thing is that both sides hold
+      {userName}, when a payment is disputed both sides already hold
       cryptographic evidence of what was agreed: a signed guarantee naming the
       amount, the recipient and the specific request.
     </Text>

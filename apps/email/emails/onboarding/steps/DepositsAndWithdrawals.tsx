@@ -27,8 +27,8 @@ export const DepositsAndWithdrawals = ({
 
     <Text style={styles.paragraph}>
       Withdrawals are request-and-finalize: you ask, a grace period runs, then
-      you finalize. Open obligations block a withdrawal, which is what stops
-      collateral disappearing out from under a guarantee somebody is relying on.
+      you finalize. Open obligations block a withdrawal, so collateral cannot
+      disappear out from under a guarantee someone is relying on.
     </Text>
 
     <CallToAction

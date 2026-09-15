@@ -20,7 +20,7 @@ export const SubscriptionExpiration = ({
     <Text style={styles.paragraph}>
       {userName}, your <strong>{planName}</strong> subscription ends on{" "}
       {formatDate(expiresAt)}. After that your agents keep their configuration
-      but stop transacting, so it's worth renewing before then.
+      but stop transacting.
     </Text>
 
     <DetailList

@@ -20,10 +20,11 @@ export const HowPaymentsWork = ({
     <Heading style={styles.heading}>HTTP 402, put to work</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, x402 revives the long-reserved HTTP 402 status code. A server
-      answers an unpaid request with 402 and a description of what payment it
-      wants; the client pays and retries with an X-PAYMENT header; the server
-      verifies and serves.
+      {userName}, let me show you the mechanism your endpoint is plugging into,
+      because it is simpler than people expect. x402 revives the long-reserved
+      HTTP 402 status code: your server answers an unpaid request with 402 and a
+      description of what payment it wants; the client pays and retries with an
+      X-PAYMENT header; your server verifies and serves.
     </Text>
 
     <Text style={styles.paragraph}>
@@ -34,8 +35,8 @@ export const HowPaymentsWork = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      If you already speak x402, this is not a new stack — it is one more scheme
-      in the list you already advertise.
+      If you already speak x402, this is one more scheme in the list you already
+      advertise, not a new stack.
     </Text>
 
     <CallToAction

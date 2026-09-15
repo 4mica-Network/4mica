@@ -20,9 +20,9 @@ export const SellerQuickStart = ({
     <Heading style={styles.heading}>Selling with x402</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, on the selling side you put a price on a route, verify payment
-      before doing the work, and get paid each cycle. No signup funnel, no
-      subscription, no invoicing — the caller pays per call.
+      {userName}, this is the one that matters most if you are here to take
+      money. You put a price on a route, verify payment before doing the work,
+      and get paid each cycle. No signup funnel, no subscription, no invoicing.
     </Text>
 
     <Text style={styles.paragraph}>

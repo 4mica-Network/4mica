@@ -20,16 +20,15 @@ export const TestInSandbox = ({
     <Heading style={styles.heading}>Test in the sandbox</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, testnets are free and unmetered — there are no fees on them,
-      so you can hammer your integration as hard as you like while you are
-      working things out.
+      {userName}, testnets are free and unmetered, so you can hammer your
+      integration as hard as you like.
     </Text>
 
     <Text style={styles.paragraph}>
       Run the full flow there first: deposit, spend, close a cycle, settle. The
       failure modes you want to meet in a sandbox are the ones around cycle
-      boundaries and withdrawal timing, and you will not see those in a
-      five-minute test.
+      boundaries and withdrawal timing, and a five-minute test will not show you
+      any of them. Give it a full cycle before you trust it.
     </Text>
 
     <CallToAction

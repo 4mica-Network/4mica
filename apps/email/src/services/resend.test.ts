@@ -22,6 +22,7 @@ const dryRunConfig = {
     dryRun: true,
     apiKey: "",
     from: "4Mica <no-reply@4mica.io>",
+    address: "no-reply@4mica.io",
     replyTo: "support@4mica.io",
   },
 };
@@ -88,7 +89,9 @@ describe("sendTemplate", () => {
       Record<string, unknown>,
       Record<string, unknown>,
     ];
-    expect(message.from).toBe("4Mica <no-reply@4mica.io>");
+    // `welcome` is an onboarding email, so it goes out under Mairon's name at
+    // the same sending address.
+    expect(message.from).toBe("Mairon from 4Mica <no-reply@4mica.io>");
     expect(message.to).toEqual(["ada@4mica.io"]);
     expect(message.replyTo).toBe("support@4mica.io");
     expect(message.subject).toBe("Welcome to 4Mica");
@@ -119,6 +122,8 @@ describe("sendTemplate", () => {
 
     const [message] = send.mock.calls[0] as [Record<string, unknown>];
     expect(message.replyTo).toBe("billing@4mica.io");
+    // A receipt is transactional — it keeps the product's From name.
+    expect(message.from).toBe("4Mica <no-reply@4mica.io>");
   });
 
   it("forwards an idempotency key so a retry cannot double-send", async () => {

@@ -26,8 +26,7 @@ export const BuyerQuickStart = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      It runs against a testnet, so nothing costs real money while you are
-      finding your footing.
+      It runs against a testnet, so nothing costs real money.
     </Text>
 
     <CallToAction

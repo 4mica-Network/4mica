@@ -26,9 +26,9 @@ export const PaymentMiddleware = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      There is a runtime-neutral version that works anywhere, plus framework
-      middleware where it helps. It is edge-safe, so it runs in workers and edge
-      functions as well as on a server.
+      There is a runtime-neutral version plus framework middleware where it
+      helps. It is edge-safe, so it runs in workers and edge functions as well
+      as on a server.
     </Text>
 
     <CallToAction

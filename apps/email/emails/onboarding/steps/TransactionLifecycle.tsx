@@ -20,9 +20,10 @@ export const TransactionLifecycle = ({
     <Heading style={styles.heading}>One payment, end to end</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, a buyer signs an EIP-712 payment guarantee that binds the
-      payer, recipient, amount, asset and request id. It travels in the
-      X-PAYMENT header.
+      {userName}, follow a single payment all the way through and the rest of
+      the system stops being mysterious. It starts with the buyer signing an
+      EIP-712 guarantee that binds the payer, recipient, amount, asset and
+      request id. It travels in the X-PAYMENT header.
     </Text>
 
     <Text style={styles.paragraph}>

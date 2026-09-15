@@ -27,8 +27,7 @@ export const CollateralRatios = ({
 
     <Text style={styles.paragraph}>
       If your agents are hitting limits sooner than you expect, the ratio — not
-      a spending cap — is usually the reason. It is worth understanding before
-      you tune anything else.
+      a spending cap — is usually the reason.
     </Text>
 
     <CallToAction

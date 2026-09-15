@@ -25,9 +25,10 @@ export const PricingAndMonetization = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      Because settlement is netted, the amount you can sensibly charge goes down
-      a long way — pricing that would be eaten alive by per-transaction gas
-      becomes workable.
+      The part worth sitting with: because settlement is netted, the floor on
+      what you can sensibly charge drops a long way. Prices that per-transaction
+      gas would eat alive become workable, which means you can charge for things
+      you had written off as unchargeable.
     </Text>
 
     <CallToAction

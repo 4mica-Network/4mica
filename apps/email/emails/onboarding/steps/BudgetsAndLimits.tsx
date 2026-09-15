@@ -20,16 +20,16 @@ export const BudgetsAndLimits = ({
     <Heading style={styles.heading}>Budgets and spending limits</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, an agent with a payment method and no limits is a bad idea.{" "}
-      {brand.name} supports caps per request, per task, per time window, per
+      {userName}, I would not hand an agent a payment method without limits on
+      it. {brand.name} supports caps per request, per task, per time window, per
       seller, per category, and per network or asset.
     </Text>
 
     <Text style={styles.paragraph}>
       You can also require an approval gate above a threshold, and stop an agent
-      mid-task. Two things worth reading carefully: costs that are hidden
-      downstream of the call you approved, and the fact that refunds are your
-      policy to define, not something the protocol decides for you.
+      mid-task. Two things to read carefully: costs hidden downstream of the
+      call you approved, and refunds, which are your policy to define rather
+      than something the protocol decides for you.
     </Text>
 
     <CallToAction

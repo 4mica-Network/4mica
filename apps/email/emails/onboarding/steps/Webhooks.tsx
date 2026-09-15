@@ -20,10 +20,10 @@ export const Webhooks = ({
     <Heading style={styles.heading}>Webhooks</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, rather than polling, subscribe. You can receive events for
-      payments succeeding, failing or being refunded; payouts paid or failed;
-      disputes created or resolved; agents created, updated or suspended; and
-      credit limits changing.
+      {userName}, if you are planning to poll us for payment status, do this
+      instead. You can receive events for payments succeeding, failing or being
+      refunded; payouts paid or failed; disputes created or resolved; agents
+      created, updated or suspended; and credit limits changing.
     </Text>
 
     <Text style={styles.paragraph}>

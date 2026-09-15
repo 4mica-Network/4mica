@@ -26,8 +26,8 @@ export const PaymentProofAndAudit = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      That matters for reconciliation, for disputes, and for the ordinary
-      business of explaining to someone else where the money went.
+      That is what you reconcile against, what you argue a dispute with, and
+      what you hand someone who asks where the money went.
     </Text>
 
     <CallToAction

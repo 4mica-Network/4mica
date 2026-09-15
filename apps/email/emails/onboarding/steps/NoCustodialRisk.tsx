@@ -3,6 +3,7 @@ import {
   brand,
   CallToAction,
   Layout,
+  Signature,
   styles,
   unsubscribeNote,
 } from "@components/index";
@@ -26,10 +27,13 @@ export const NoCustodialRisk = ({
     </Text>
 
     <Text style={styles.paragraph}>
-      This is a design decision rather than a policy: trust is enforced by
-      contracts and cryptography, so it does not depend on us behaving well,
-      staying solvent, or continuing to exist.
+      We built it this way on purpose. Trust is enforced by contracts and
+      cryptography, so it does not depend on us behaving well, staying solvent,
+      or continuing to exist — and you should not have to take my word for any
+      of those.
     </Text>
+
+    <Signature />
 
     <CallToAction
       href={ctaUrl ?? `${brand.docs}/core-concepts/no-custodial-risk`}

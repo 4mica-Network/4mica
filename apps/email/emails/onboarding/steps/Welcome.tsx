@@ -3,6 +3,8 @@ import {
   brand,
   CallToAction,
   Layout,
+  Signature,
+  sender,
   styles,
   unsubscribeNote,
 } from "@components/index";
@@ -15,29 +17,37 @@ export const Welcome = ({
 }: TemplateProps<"welcome">) => (
   <Layout
     footerNote={unsubscribeNote(unsubscribeUrl)}
-    preview="The credit layer for the agentic economy"
+    preview="Payment infrastructure for accepting payments per call"
   >
     <Heading style={styles.heading}>
       Welcome to {brand.name}, {userName}
     </Heading>
 
     <Text style={styles.paragraph}>
-      {brand.name} is the credit and clearing layer for x402 payments. Your
-      agents pay on credit against collateral you deposit once, requests clear
-      off-chain in milliseconds, and balances settle net on-chain at the end of
-      each cycle.
+      I am {sender.firstName}, one of the founders here, and I work on the
+      protocol. I wanted to tell you what you have just signed up for before
+      anything else lands in your inbox.
     </Text>
 
     <Text style={styles.paragraph}>
-      That means thousands of API payments become one settlement instead of
-      thousands of transactions — and your collateral earns yield while it sits
-      there.
+      {brand.name} is payment infrastructure. You use it to accept payments —
+      per API call, per request, in stablecoins, from your customers and from
+      the agents acting on their behalf.
     </Text>
 
     <Text style={styles.paragraph}>
-      Over the next few weeks we will walk you through the whole thing, one
-      short email at a time. This first one just points you at the door.
+      The interesting part is underneath. Payments clear off-chain in
+      milliseconds and settle net on-chain once per cycle, so you are not paying
+      a transaction fee on every call. That is what makes charging a fraction of
+      a cent per request a real option rather than a thought experiment.
     </Text>
+
+    <Text style={styles.paragraph}>
+      Over the next few weeks I will teach you the rest of it, one short email
+      at a time.
+    </Text>
+
+    <Signature />
 
     <CallToAction href={ctaUrl ?? brand.app} label="Open your dashboard" />
   </Layout>

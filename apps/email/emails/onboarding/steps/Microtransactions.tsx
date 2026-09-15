@@ -3,6 +3,7 @@ import {
   brand,
   CallToAction,
   Layout,
+  Signature,
   styles,
   unsubscribeNote,
 } from "@components/index";
@@ -22,8 +23,9 @@ export const Microtransactions = ({
     </Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, the reason micropayments have never worked is arithmetic: if
-      clearing a payment costs more than the payment, the model collapses.
+      {userName}, micropayments have never worked, and the reason is arithmetic
+      rather than ambition: if clearing a payment costs more than the payment,
+      the model collapses. This is the problem I started {brand.name} to solve.
     </Text>
 
     <Text style={styles.paragraph}>
@@ -31,6 +33,8 @@ export const Microtransactions = ({
       once per call. A million calls settle as one movement, so the per-call
       overhead approaches nothing.
     </Text>
+
+    <Signature />
 
     <CallToAction
       href={ctaUrl ?? `${brand.docs}/seller/microtransactions`}

@@ -22,6 +22,7 @@ export const BusinessAndKyb = ({
     </Heading>
 
     <Text style={styles.paragraph}>
+      This is the one I would start today, even though you do not need it yet.
       Settings → Business holds your legal entity: registered name, business
       type, registration and tax numbers, address, and the support email and
       phone your customers will see.
@@ -30,7 +31,7 @@ export const BusinessAndKyb = ({
     <Text style={styles.paragraph}>
       It also carries your KYB status, which moves from Unverified to Pending to
       Verified (or Rejected). Verification is required before you can receive
-      payouts, and it is the step most likely to hold up a launch — so start it
+      payouts, and it is the step most likely to hold up a launch — start it
       early rather than the week you go live.
     </Text>
 

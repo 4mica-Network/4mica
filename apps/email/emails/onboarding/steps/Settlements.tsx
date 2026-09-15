@@ -20,16 +20,16 @@ export const Settlements = ({
     <Heading style={styles.heading}>Settlement</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, when a cycle closes, net positions are committed on-chain. Net
-      debtors pay their position; net creditors claim theirs. Both are proved
-      against the committed set, so nobody has to trust the arithmetic — they
-      can check it.
+      {userName}, this is the moment the money actually moves, and it happens
+      once per cycle rather than once per call. When a cycle closes, net
+      positions are committed on-chain. Net debtors pay their position; net
+      creditors claim theirs. Both are proved against the committed set, so
+      nobody has to trust the arithmetic — they can check it.
     </Text>
 
     <Text style={styles.paragraph}>
       Payment and finality windows follow, and defaults are covered by the
-      defaulter's collateral. That is the point of requiring collateral in the
-      first place.
+      defaulter's collateral.
     </Text>
 
     <CallToAction
