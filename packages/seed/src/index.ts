@@ -50,6 +50,40 @@ const AGENTS = [
   },
 ] as const;
 
+/**
+ * Wallets the seeded account has "linked".
+ *
+ * Addresses are lowercase because that is how the API stores them — a CHECK
+ * constraint on `wallets.address` rejects mixed case outright, and the unique
+ * index is case-sensitive.
+ *
+ * The first one reuses the agent's address on the same network, which is the
+ * realistic shape: the payer wallet an agent signs with is a wallet the owner
+ * has proved control of.
+ */
+const WALLETS = [
+  {
+    label: "Atlas payer",
+    description: "Signs payment guarantees for the Atlas research agent.",
+    address: "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04",
+    network: "BASE_SEPOLIA",
+    role: "PAYER",
+    status: "ACTIVE",
+    isDefault: false,
+    verifiedChainId: 84532,
+  },
+  {
+    label: "Settlement treasury",
+    description: "Receives settlement for the credit-limits listing.",
+    address: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
+    network: "BASE_SEPOLIA",
+    role: "RECIPIENT",
+    status: "ACTIVE",
+    isDefault: true,
+    verifiedChainId: 84532,
+  },
+] as const;
+
 /** Canonical USDC on Base Sepolia. */
 const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
@@ -220,6 +254,17 @@ const seed = async (): Promise<void> => {
     },
   });
 
+  // Same reasoning as the agents above: a wallet is keyed on its address, so an
+  // edited fixture must lose the stale row before the upsert runs, or the
+  // partial unique index on (owner_id, network) WHERE is_default can collide
+  // with a default that should no longer exist.
+  await prisma.wallet.deleteMany({
+    where: {
+      ownerId: owner.id,
+      address: { notIn: WALLETS.map((wallet) => wallet.address) },
+    },
+  });
+
   for (const agent of AGENTS) {
     const fields = {
       ownerId: owner.id,
@@ -237,6 +282,38 @@ const seed = async (): Promise<void> => {
       where: { walletAddress: agent.walletAddress },
       update: fields,
       create: { walletAddress: agent.walletAddress, ...fields },
+    });
+  }
+
+  for (const wallet of WALLETS) {
+    const fields = {
+      label: wallet.label,
+      description: wallet.description,
+      role: wallet.role,
+      status: wallet.status,
+      isDefault: wallet.isDefault,
+      // A seeded wallet stands in for one that was linked by signature, so it
+      // carries a verifiedAt like any real row — there is no unverified state.
+      verifiedAt: new Date(),
+      verificationMethod: "EOA_SIGNATURE" as const,
+      verifiedChainId: wallet.verifiedChainId,
+    };
+
+    await prisma.wallet.upsert({
+      where: {
+        ownerId_address_network: {
+          ownerId: owner.id,
+          address: wallet.address,
+          network: wallet.network,
+        },
+      },
+      update: fields,
+      create: {
+        ownerId: owner.id,
+        address: wallet.address,
+        network: wallet.network,
+        ...fields,
+      },
     });
   }
 
@@ -332,8 +409,9 @@ const seed = async (): Promise<void> => {
     });
   }
 
-  const [agents, listings, endpoints, banners] = await Promise.all([
+  const [agents, wallets, listings, endpoints, banners] = await Promise.all([
     prisma.agent.count(),
+    prisma.wallet.count(),
     prisma.apiListing.count(),
     prisma.apiEndpoint.count(),
     prisma.banner.count(),
@@ -343,7 +421,7 @@ const seed = async (): Promise<void> => {
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(API_LISTINGS.length, "api listing")} and ${plural(BANNERS.length, "banner")} (${agents} agent rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} and ${plural(BANNERS.length, "banner")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows total).`,
   );
 };
 

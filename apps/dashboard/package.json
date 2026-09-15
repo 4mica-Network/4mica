@@ -19,18 +19,22 @@
     "@4mica/ui": "workspace:*",
     "@4mica/url": "workspace:*",
     "@clerk/clerk-react": "catalog:",
+    "@hookform/resolvers": "catalog:",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",
     "i18next": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-hook-form": "catalog:",
     "react-i18next": "catalog:",
     "react-redux": "catalog:",
     "react-router-dom": "catalog:",
     "react-toastify": "catalog:",
     "redux": "catalog:",
-    "redux-saga": "catalog:"
+    "redux-saga": "catalog:",
+    "viem": "catalog:",
+    "zod": "catalog:zod4"
   },
   "devDependencies": {
     "@4mica/tailwind-config": "workspace:*",

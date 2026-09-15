@@ -30,6 +30,10 @@ export { Link, type LinkProps } from "./components/link";
 // `useModalA11y` is deliberately not re-exported, for the same reason as
 // `useTabContext` below.
 export { Modal, type ModalProps } from "./components/modal";
+export {
+  Pagination,
+  type PaginationProps,
+} from "./components/pagination";
 export { type Option, Select, type SelectProps } from "./components/select";
 export {
   Spinner,

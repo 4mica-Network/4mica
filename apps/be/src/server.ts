@@ -120,6 +120,10 @@ export const initApp = async (
             name: "banners",
             description: "Dashboard promo banners and interaction tracking",
           },
+          {
+            name: "wallets",
+            description: "On-chain wallets the account has proved control of",
+          },
         ],
         components: {
           securitySchemes: {

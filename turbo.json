@@ -6,104 +6,57 @@
       "persistent": true
     },
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**",
-        "dist/**"
-      ]
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "start": {
       "cache": false
     },
     "lint": {
-      "dependsOn": [
-        "^lint"
-      ]
+      "dependsOn": ["^lint"]
     },
     "test": {
-      "dependsOn": [
-        "^build",
-        "^test"
-      ],
+      "dependsOn": ["^build", "^test"],
       "outputs": []
     },
     "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ]
+      "dependsOn": ["^typecheck"]
     },
     "check:exports": {
-      "dependsOn": [
-        "build"
-      ]
+      "dependsOn": ["build"]
     },
     "clean": {
       "cache": false
     },
     "seed": {
       "cache": false,
-      "dependsOn": [
-        "@4mica/db#build"
-      ],
-      "passThroughEnv": [
-        "DATABASE_URL"
-      ]
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "@4mica/db#build": {
-      "inputs": [
-        "prisma/schema.prisma",
-        "prisma.config.ts",
-        "package.json"
-      ],
-      "outputs": [
-        "src/generated/**"
-      ],
-      "passThroughEnv": [
-        "DATABASE_URL"
-      ]
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts", "package.json"],
+      "outputs": ["src/generated/**"],
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "@4mica/db#typecheck": {
-      "dependsOn": [
-        "@4mica/db#build"
-      ]
+      "dependsOn": ["@4mica/db#build"]
     },
     "@4mica/be#dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": [
-        "@4mica/db#build"
-      ],
-      "passThroughEnv": [
-        "DATABASE_URL"
-      ]
+      "dependsOn": ["@4mica/db#build"],
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "@4mica/playground#dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": [
-        "@4mica/db#build",
-        "@4mica/ui#build"
-      ],
-      "passThroughEnv": [
-        "DATABASE_URL"
-      ]
+      "dependsOn": ["@4mica/db#build", "@4mica/ui#build"],
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "@4mica/playground#build": {
-      "dependsOn": [
-        "^build",
-        "@4mica/db#build"
-      ],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**"
-      ],
-      "passThroughEnv": [
-        "DATABASE_URL",
-        "CLERK_SECRET_KEY"
-      ],
+      "dependsOn": ["^build", "@4mica/db#build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "passThroughEnv": ["DATABASE_URL", "CLERK_SECRET_KEY"],
       "env": [
         "NEXT_PUBLIC_BASE_URL",
         "NEXT_PUBLIC_APP_URL",
@@ -112,17 +65,11 @@
       ]
     },
     "@4mica/playground#typecheck": {
-      "dependsOn": [
-        "@4mica/db#build"
-      ]
+      "dependsOn": ["@4mica/db#build"]
     },
     "@4mica/dashboard#build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**"
-      ],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
       "env": [
         "VITE_CLERK_PUBLISHABLE_KEY",
         "VITE_API_URL",
