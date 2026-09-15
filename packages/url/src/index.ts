@@ -21,31 +21,51 @@ const defaultEnv = (): Env => {
     : {};
 };
 
+/**
+ * The production origin. Doubles as the fallback for an unset `BASE_URL` and as
+ * the fixed origin for assets that have to resolve off-machine (see
+ * `links.assets`).
+ */
+const CANONICAL_BASE = "https://4mica.io";
+
 const stripTrailingSlash = (url: string): string => url.replace(/\/$/, "");
 const toRoot = (url: string): string => url.replace(/^https?:\/\//, "");
 
 const resolveUrl = (url: string): string =>
   url.startsWith("http") ? url : `https://${url}`;
 
-// Treat unset AND empty/whitespace-only env vars as absent. Docker's
-// `ENV FOO=$FOO` with no build arg sets FOO to "", which `??` would keep,
-// producing an invalid base like "https:/".
-const firstNonEmpty = (...values: (string | undefined)[]): string | undefined =>
-  values.find((value) => value != null && value.trim() !== "");
+// A usable base needs a host. Vite sets `BASE_URL` to its own asset base —
+// "/" by default — and that is a path, not an origin: it would resolve to
+// "https://" and silently strip the host from every link in the app.
+const hasHost = (value: string): boolean =>
+  value
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .trim() !== "";
+
+// Treat unset, empty/whitespace-only AND host-less env vars as absent.
+// Docker's `ENV FOO=$FOO` with no build arg sets FOO to "", which `??` would
+// keep, producing an invalid base like "https:/".
+const firstUsableBase = (
+  ...values: (string | undefined)[]
+): string | undefined =>
+  values.find(
+    (value) => value != null && value.trim() !== "" && hasHost(value),
+  );
 
 const resolveBases = (env: Env): Bases => {
   const base = stripTrailingSlash(
     resolveUrl(
-      firstNonEmpty(
+      firstUsableBase(
         env.NEXT_PUBLIC_BASE_URL,
         env.VITE_BASE_URL,
         env.BASE_URL,
-      ) ?? "https://4mica.io",
+      ) ?? CANONICAL_BASE,
     ),
   );
   const appBase = stripTrailingSlash(
     resolveUrl(
-      firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
+      firstUsableBase(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
         base,
     ),
   );
@@ -607,6 +627,15 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     signin: `${appBase}/sign-in`,
     signup: `${appBase}/sign-up`,
     waitlist: `${appBase}/waitlist`,
+    /**
+     * Absolute, env-independent URLs for images embedded in emails. These must
+     * not follow `base`: a recipient's mail client can never reach a dev
+     * `BASE_URL`, so a localhost override would ship broken images.
+     */
+    assets: {
+      base: CANONICAL_BASE,
+      logo: `${CANONICAL_BASE}${routes.logo}`,
+    },
     docs: "https://docs.4mica.io",
     docsChangelog: "https://docs.4mica.io/updates/changelogs",
     status: "https://status.4mica.io",

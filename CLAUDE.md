@@ -66,6 +66,8 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 - **Monorepo layout**: `apps/*` are the applications; `packages/*` are shared libraries and config consumed as `@4mica/*` workspace deps (`url`, `db`, `seed`, `ui`, `http`, `auth`, `email-client`, `sdk*`, `cli`, `tailwind-config`, `tsconfig`). Turbo orchestrates tasks. **Every third-party version goes in the `pnpm-workspace.yaml` catalog** and packages reference `"catalog:"` — do not run `pnpm add`, which writes a pinned literal (`.npmrc` sets `save-exact`). `biome.json` is the single lint/format source of truth (line width 80, enforced sorted CSS classes in `className`/`cn()`) — not ESLint/Prettier.
 
+  **`turbo.json`'s `test` task depends on `^build` as well as `^test` — do not drop the `^build`.** Most workspace packages ship raw TS (their `exports` point at `src/`), but `@4mica/sdk` publishes a built `dist/` and its `exports` field points there, so the `apps/facilitator/**` tests import the *build*, not the source. `dist/` is gitignored, so without `^build` a fresh clone or any `pnpm clean` makes `pnpm test` fail inside `@4mica/x402` with `TypeError: Cannot read properties of undefined` — whatever the missing or stale build happened not to export. The failure names the consumer, not the stale package, so it reads as a bug in the wrong place.
+
 - **`apps/web` is a static export**: Next.js 16 App Router, React 19, `output: "export"` with `images.unoptimized` → builds to `apps/web/out`. There is no SSR or server runtime; avoid patterns that require one.
 
 - **Provider nesting** in `app/layout.tsx`: `ThemeProvider` (localStorage + a pre-paint script to avoid FOUC) wraps `GlobalNetworkBackground` and the page content.

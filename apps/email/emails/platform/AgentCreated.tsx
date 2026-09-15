@@ -12,8 +12,8 @@ export const AgentCreated = ({
     <Heading style={styles.heading}>{agentName} is registered</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, your agent is live. Give it a credit limit and it can start
-      transacting immediately.
+      {userName}, give it a credit limit and it can start transacting
+      immediately.
     </Text>
 
     <DetailList

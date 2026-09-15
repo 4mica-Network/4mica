@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "email:preview": "email dev --dir emails --port 3200",
+    "email:preview": "EMAIL_LOGO_URL=/static/logo_transparent.png email dev --dir emails --port 3200",
     "email:up": "docker network create 4mica-internal 2>/dev/null || true && docker compose up -d --build",
     "email:down": "docker compose down",
     "clean": "rm -rf dist logs .turbo .react-email"

@@ -43,6 +43,27 @@ const redact = (address: string): string => {
   return `${local.slice(0, 1)}***@${domain}`;
 };
 
+const unsubscribeHeaders = (
+  props: unknown,
+): Record<string, string> | undefined => {
+  const url =
+    typeof props === "object" &&
+    props !== null &&
+    "unsubscribeUrl" in props &&
+    typeof props.unsubscribeUrl === "string"
+      ? props.unsubscribeUrl
+      : undefined;
+
+  if (!url) {
+    return undefined;
+  }
+
+  return {
+    "List-Unsubscribe": `<${url}>, <mailto:${config.email.replyTo}?subject=unsubscribe>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+};
+
 export const sendTemplate = async <K extends TemplateId>(
   id: K,
   props: TemplateProps<K>,
@@ -56,13 +77,18 @@ export const sendTemplate = async <K extends TemplateId>(
     render(element, { plainText: true }),
   ]);
 
+  const headers = unsubscribeHeaders(props);
+
   const message = {
-    from: config.email.from,
+    from: template.fromName
+      ? `${template.fromName} <${config.email.address}>`
+      : config.email.from,
     to: [props.to],
     replyTo: template.replyTo ?? config.email.replyTo,
     subject,
     html,
     text,
+    ...(headers ? { headers } : {}),
   };
 
   if (config.email.dryRun) {

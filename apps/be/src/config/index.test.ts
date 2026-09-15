@@ -76,6 +76,54 @@ describe("parseEnv", () => {
       /RATE_LIMIT_IP_MAX must be numeric/,
     );
   });
+
+  it("leaves the onboarding drip unconfigured by default", () => {
+    const env = parseEnv(VALID);
+
+    expect(env.VALKEY_URL).toBe("");
+    expect(env.UNSUBSCRIBE_SECRET).toBe("");
+    expect(env.ONBOARDING_STEP_GAP_MS).toBe(259_200_000);
+  });
+
+  it("accepts a redis:// URL, which is what Valkey speaks", () => {
+    expect(
+      parseEnv({ ...VALID, VALKEY_URL: "redis://valkey:6379" }).VALKEY_URL,
+    ).toBe("redis://valkey:6379");
+  });
+
+  it("rejects a valkey:// URL, which ioredis would misread as a hostname", () => {
+    expect(() =>
+      parseEnv({ ...VALID, VALKEY_URL: "valkey://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a URL that is not a redis:// URL at all", () => {
+    expect(() =>
+      parseEnv({ ...VALID, VALKEY_URL: "http://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a weak unsubscribe secret once the drip is armed", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        VALKEY_URL: "redis://127.0.0.1:6379",
+        UNSUBSCRIBE_SECRET: "too-short",
+      }),
+    ).toThrow(/UNSUBSCRIBE_SECRET: must be at least 32 characters/);
+  });
+
+  it("ignores a weak unsubscribe secret when Valkey is unset", () => {
+    expect(() =>
+      parseEnv({ ...VALID, UNSUBSCRIBE_SECRET: "too-short" }),
+    ).not.toThrow();
+  });
+
+  it("rejects a non-ISO drip epoch", () => {
+    expect(() =>
+      parseEnv({ ...VALID, ONBOARDING_DRIP_EPOCH: "yesterday" }),
+    ).toThrow(/ONBOARDING_DRIP_EPOCH must be an ISO 8601 timestamp/);
+  });
 });
 
 describe("config", () => {

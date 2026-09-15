@@ -6,6 +6,13 @@ export {
 } from "./client";
 export { EmailClientError, type EmailValidationIssue } from "./errors";
 export {
+  isOnboardingStepId,
+  ONBOARDING_STEP_IDS,
+  type OnboardingStepId,
+  type OnboardingStepPayload,
+  onboardingStepSchemas,
+} from "./onboarding";
+export {
   type AccountDeletedPayload,
   AccountDeletedSchema,
   type AccountVerificationPayload,
@@ -23,6 +30,7 @@ export {
   type DisputeCreatedPayload,
   DisputeCreatedSchema,
   type Money,
+  OnboardingStepSchema,
   type PaymentSucceededPayload,
   PaymentSucceededSchema,
   type PayoutPaidPayload,
