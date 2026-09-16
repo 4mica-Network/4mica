@@ -52,11 +52,6 @@ const walletState = (over: Record<string, unknown> = {}) => ({
   wallet: { ...INITIAL_STATE, ...over },
 });
 
-/**
- * Runs the saga through redux-saga's own runtime rather than stepping the
- * generator by hand, so `call` rejection and `select` behave exactly as they do
- * under the store's middleware.
- */
 const record = async <TArgs extends unknown[]>(
   saga: (...args: TArgs) => Generator,
   state: unknown,
@@ -166,7 +161,6 @@ describe("createWallet saga", () => {
       network: payload.network,
     });
 
-    // Signs the server's message verbatim — never one the client composed.
     expect(signMessage).toHaveBeenCalledWith(
       payload.address,
       CHALLENGE.message,
@@ -211,7 +205,6 @@ describe("createWallet saga", () => {
     });
 
     expect(types(dispatched)).toEqual([actionTypes.WALLET_ACTION_FAILED]);
-    // Dismissing a popup is a choice, not an error worth shouting about.
     expect(notifyError).not.toHaveBeenCalled();
   });
 
@@ -239,8 +232,6 @@ describe("createWallet saga", () => {
       meta: CREATE_META,
     });
 
-    // The list is server-paged, so `total` and the page come from a re-fetch
-    // rather than being spliced locally.
     expect(types(dispatched)).toContain(actionTypes.FETCH_WALLETS_REQUESTED);
   });
 });
@@ -254,8 +245,6 @@ describe("auth failures", () => {
   });
 
   it("never echoes the API's auth copy at the user", async () => {
-    // What apps/be actually returns on 401. It names an implementation detail
-    // and gives a signed-in person nothing to act on.
     getWallets.mockRejectedValue(
       new HttpError(401, "Unauthorized", {
         error: "unauthorized",

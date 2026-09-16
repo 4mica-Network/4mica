@@ -51,7 +51,6 @@ import {
 const PENDING_KEY = "createWallet";
 const TOTAL_STEPS = CREATE_STEP_FIELDS.length;
 
-/** "Wallet 7a9f…6a04" — recognisable without the user typing anything. */
 const suggestedLabel = (address: string) => `Wallet ${shortenAddress(address)}`;
 
 export function CreateWalletModal({
@@ -96,7 +95,6 @@ export function CreateWalletModal({
 
   const values = watch();
 
-  /** Adopt whatever the wallet reports, so the form mirrors reality. */
   const adopt = useCallback(
     (address: string, chainId: number | null) => {
       setValue("address", address, { shouldValidate: true, shouldDirty: true });
@@ -110,9 +108,6 @@ export function CreateWalletModal({
     [setValue],
   );
 
-  // Reset on OPEN, not just on close. A stale error from an earlier attempt —
-  // or from a failed list fetch — would otherwise greet the user inside a modal
-  // they have not interacted with yet.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -123,7 +118,6 @@ export function CreateWalletModal({
     setWalletChainId(null);
     dispatch(clearWalletIssues());
 
-    // Skip the connect click entirely when the wallet is already authorized.
     void (async () => {
       const [account, chainId] = await Promise.all([
         currentAccount(),
@@ -137,8 +131,6 @@ export function CreateWalletModal({
     })();
   }, [isOpen, reset, dispatch, adopt]);
 
-  // Follow the wallet while the modal is open: switching account or chain in
-  // MetaMask should move the form, not strand it on a stale address.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -184,10 +176,6 @@ export function CreateWalletModal({
     }
   };
 
-  /**
-   * Distinct from handleConnect: it asks the wallet to reopen its account
-   * picker. Reconnecting alone would just hand back the same address.
-   */
   const handleSwitchAccount = async () => {
     setConnectError(null);
     setIsConnecting(true);
@@ -228,7 +216,6 @@ export function CreateWalletModal({
     if (!valid) {
       return;
     }
-    // Suggest a name only once, and only if they have not typed one.
     if (step === 0 && !values.label && values.address) {
       setValue("label", suggestedLabel(values.address), {
         shouldValidate: true,
@@ -249,11 +236,6 @@ export function CreateWalletModal({
     );
   };
 
-  /**
-   * An error on an earlier step is invisible from the last one, so send the
-   * user back to the first step that actually has a problem rather than
-   * refusing to submit with nothing on screen to explain why.
-   */
   const onInvalid = (invalid: Record<string, unknown>) => {
     const firstBadStep = CREATE_STEP_FIELDS.findIndex((fields) =>
       fields.some((field) => field in invalid),
@@ -278,7 +260,6 @@ export function CreateWalletModal({
     }
   }, [isSaving, error, issues, onClose]);
 
-  // The API's issues[] win over the local mirror — it is the authority.
   const fieldError = (field: keyof CreateWalletValues) => {
     if (issues[field]) {
       return issues[field];
@@ -290,13 +271,6 @@ export function CreateWalletModal({
   const detectedNetwork = networkForChainId(walletChainId);
   const isOnChosenChain = walletChainId === NETWORKS[values.network].chainId;
 
-  /**
-   * Catches the common "I already added this" before a pointless signature.
-   *
-   * Only the current page is in the store, so this can miss — the server's 409
-   * is still the authority. It can never produce a false positive, which is
-   * what matters for a warning that blocks the button.
-   */
   const alreadyLinked = existing.some(
     (item) =>
       item.address.toLowerCase() === values.address.toLowerCase() &&
@@ -435,13 +409,6 @@ export function CreateWalletModal({
                   )}
                 </div>
 
-                {/*
-                  Always offer the network picker, not only on an unsupported
-                  chain. A wallet is keyed on (address, network), so the same
-                  address on a second network is a legitimate new wallet — and
-                  without this the only way to reach it is to change chains in
-                  the wallet by hand.
-                */}
                 <div className="flex flex-col gap-2">
                   <p className="text-ink-muted text-xs">
                     {detectedNetwork
@@ -619,8 +586,6 @@ export function CreateWalletModal({
               />
             </FieldRow>
 
-            {/* Signing uses whichever chain the wallet is on. Say so before the
-                popup appears rather than letting it surprise them. */}
             {!isOnChosenChain && detectedNetwork && (
               <p className="mt-2 text-ink-subtle text-xs">
                 {t("wallet.create.fields.network.mismatch", {

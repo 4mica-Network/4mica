@@ -62,8 +62,6 @@ export default function walletReducer(
         total: payload.total,
         page: payload.page,
         limit: payload.limit,
-        // Drop ticks for rows that are no longer on screen, so a batch action
-        // can never touch something the user cannot see.
         selectedIds: state.selectedIds.filter((id) => ids.has(id)),
         isLoading: false,
         hasLoaded: true,
@@ -91,11 +89,6 @@ export default function walletReducer(
         validationIssues: {},
       };
 
-    /**
-     * The list is server-paged, so a mutation clears its pending flag and the
-     * saga re-fetches. Splicing the array locally would desync `total` and
-     * leave the current page a row short.
-     */
     case actionTypes.CREATE_WALLET_SUCCEEDED:
     case actionTypes.UPDATE_WALLET_SUCCEEDED:
     case actionTypes.DELETE_WALLET_SUCCEEDED:
@@ -116,7 +109,6 @@ export default function walletReducer(
       return {
         ...state,
         filters: { ...state.filters, ...patch },
-        // Page 3 of the old filter is rarely a page of the new one.
         page: 1,
         selectedIds: [],
       };

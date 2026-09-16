@@ -53,12 +53,6 @@ describe("WalletRow", () => {
     );
   });
 
-  /**
-   * The bug this guards: @4mica/ui's Checkbox renders `w-full` on its own
-   * button, which as a flex item claimed the entire row and starved the name,
-   * tags and address of width — the tags collapsed to slivers and the address
-   * wrapped mid-string. `cn` is tailwind-merge, so passing `w-auto` removes it.
-   */
   it("does not let the checkbox claim the full row width", () => {
     renderRow();
     const box = screen.getByTestId("wallet-select-wallet_1-checkbox");
@@ -75,7 +69,6 @@ describe("WalletRow", () => {
       "Receives settlement for the credit-limits listing.",
     );
 
-    // Name: larger and the brightest ink. Description: smaller and muted.
     expect(name.className).toMatch(/text-base/);
     expect(name.className).toMatch(/text-ink-strong/);
     expect(name.className).toMatch(/font-semibold/);
@@ -84,10 +77,6 @@ describe("WalletRow", () => {
     expect(description.className).toMatch(/text-ink-muted/);
   });
 
-  /**
-   * A tablet has no hover, so controls hidden behind `opacity-0` would be
-   * permanently invisible there. They may only be hover-gated from `lg` up.
-   */
   it("keeps the row controls visible where there is no hover", () => {
     renderRow();
     const controls = screen
@@ -115,14 +104,10 @@ describe("WalletRow", () => {
     expect(screen.getByText("wallet.role.both")).toBeInTheDocument();
     expect(screen.getByText("Base Sepolia")).toBeInTheDocument();
 
-    // The address is a tag now, not a bare line with a separator dot.
-    // Tag appends "-tag" to the testid it is given, as Checkbox appends
-    // "-checkbox" — the shared convention across @4mica/ui.
     const address = screen.getByTestId("wallet-address-wallet_1-tag");
     expect(address).toHaveTextContent("0x7a9f…6a04");
     expect(address.className).toMatch(/font-mono/);
 
-    // The tag row sits after the description in document order.
     const description = screen.getByText(
       "Receives settlement for the credit-limits listing.",
     );
@@ -132,7 +117,6 @@ describe("WalletRow", () => {
     ).toBeTruthy();
   });
 
-  /** Only copy and the overflow menu stay on the row itself. */
   it("exposes exactly two controls on the row", () => {
     renderRow();
 
@@ -141,7 +125,6 @@ describe("WalletRow", () => {
       .closest("div") as HTMLElement;
     expect(controls.querySelectorAll("button")).toHaveLength(2);
 
-    // Edit and remove live behind the menu, so they are absent until opened.
     expect(screen.queryByTestId("wallet-edit-wallet_1")).toBeNull();
     expect(screen.queryByTestId("wallet-delete-wallet_1")).toBeNull();
   });
@@ -176,7 +159,6 @@ describe("WalletRow", () => {
     ).toHaveTextContent("wallet.row.resume");
   });
 
-  /** A retired wallet is terminal, so there is nothing to resume. */
   it("hides the pause action for a retired wallet", () => {
     renderRow({ status: "RETIRED" });
     openMenu();

@@ -47,8 +47,6 @@ vi.mock("@4mica/db", () => ({
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     wallet,
     walletNonce,
-    // The list handler runs count+findMany in one transaction, and create runs
-    // an interactive one — support both shapes.
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({ wallet, walletNonce })
@@ -62,8 +60,6 @@ const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const OTHER_ID = "019fce62-0000-7000-8000-00000000ffff";
 const WALLET_ID = "019fce62-1111-7000-8000-000000000000";
 
-// A throwaway key: the test needs to produce a real secp256k1 signature so the
-// verification path is exercised for real rather than mocked away.
 const TEST_KEY =
   "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
 const signer = privateKeyToAccount(TEST_KEY);
@@ -133,7 +129,6 @@ const challenge = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-/** Signs exactly what the server will rebuild and verify. */
 const signChallenge = async (row: ReturnType<typeof challenge>) =>
   signer.signMessage({
     message: buildWalletLinkMessage({
@@ -279,14 +274,12 @@ describe("wallet routes", () => {
       });
 
       expect(res.statusCode).toBe(201);
-      // No lookup at all — a "taken" answer here would be an enumeration oracle.
       expect(wallet.findFirst).not.toHaveBeenCalled();
       expect(wallet.findMany).not.toHaveBeenCalled();
 
       const body = res.json();
       expect(body.message).toContain("urn:4mica:purpose:wallet-link");
       expect(body.message).toContain(`urn:4mica:user:${USER_ID}`);
-      // Checksummed in the message the wallet displays, lowercase in storage.
       expect(body.message).toContain(signer.address);
       expect(walletNonce.create.mock.calls[0][0].data.address).toBe(ADDRESS);
       await app.close();
@@ -361,13 +354,11 @@ describe("wallet routes", () => {
         payload,
       });
       expect(first.statusCode).toBe(201);
-      // The guard is the predicate, not a prior read.
       expect(walletNonce.updateMany.mock.calls[0][0].where).toMatchObject({
         id: row.id,
         consumedAt: null,
       });
 
-      // Second attempt: the CAS matches nothing because it is already spent.
       walletNonce.updateMany.mockResolvedValue({ count: 0 });
       wallet.create.mockClear();
 
@@ -496,7 +487,6 @@ describe("wallet routes", () => {
     it("rejects an address whose EIP-55 checksum is wrong", async () => {
       const app = await initApp([{ plugin: walletRoutes }]);
 
-      // Flip the case of one character so the checksum no longer holds.
       const broken = `0xAbC${signer.address.slice(5)}`;
       const res = await app.inject({
         method: "POST",

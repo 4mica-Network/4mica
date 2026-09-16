@@ -94,31 +94,18 @@ enum WebhookStatus {
   DISABLED
 }
 
-/**
- * Which side of a payment a wallet stands on. A single organization can operate
- * both, so BOTH is the default rather than a missing value.
- */
 enum WalletRole {
   PAYER
   RECIPIENT
   BOTH
 }
 
-/**
- * The subset of the lifecycle in docs/core-concepts/wallet.mdx that this app
- * owns. Funded/Registered are economic states derived from Core, not stored.
- */
 enum WalletStatus {
   ACTIVE
   PAUSED
   RETIRED
 }
 
-/**
- * How control of the address was proved. ERC-1271 needs an RPC client to call
- * `isValidSignature`, which apps/be has no config for, so v1 only ever writes
- * EOA_SIGNATURE — the member exists so adding Safe support is not a migration.
- */
 enum WalletVerificationMethod {
   EOA_SIGNATURE
   ERC1271
@@ -442,33 +429,19 @@ model BannerInteraction {
   @@map("banner_interactions")
 }
 
-/**
- * A wallet the account owner has proved control of, used as a payer identity or
- * a paywall's `payTo` address.
- * 4Mica is non-custodial, so this row is a *routing label* over a public
- * address — no key material is ever generated, transmitted or stored. Economic
- * state (total/locked/available collateral, pending withdrawals) is read from
- * Core against `address`, never cached here.
- */
 model Wallet {
   id          String         @id @default(uuid(7))
   ownerId     String         @map("owner_id")
   label       String         @db.VarChar(120)
   description String?        @db.VarChar(280)
-  /// Always lowercase. A CHECK constraint enforces it, because VarChar(42) does
-  /// not stop `0xABC…` and the unique index below is case-sensitive.
   address     String         @db.VarChar(42)
-  /// Wallet state is network-specific: the same address on Base and Base
-  /// Sepolia are different economic identities, so the key is (address, network).
   network     PaymentNetwork
   role        WalletRole     @default(BOTH)
   status      WalletStatus   @default(ACTIVE)
   isDefault   Boolean        @default(false) @map("is_default")
 
-  /// Set once, when the SIWE signature verified. There is no unverified wallet.
   verifiedAt         DateTime                 @map("verified_at")
   verificationMethod WalletVerificationMethod @default(EOA_SIGNATURE) @map("verification_method")
-  /// The chain id named in the signed message, kept so a link can be audited.
   verifiedChainId    Int                      @map("verified_chain_id")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -476,37 +449,23 @@ model Wallet {
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  /// Per-owner, deliberately not global. A wallet is a label over a public
-  /// address, so global uniqueness would permanently lock out a Safe whose
-  /// co-owners both use 4Mica, and would turn any pre-check into an
-  /// address-enumeration oracle over on-chain-public data.
   @@unique([ownerId, address, network])
   @@index([ownerId, createdAt(sort: Desc)])
   @@index([address, network])
   @@map("wallets")
 }
 
-/**
- * A single-use SIWE challenge proving control of `address`.
- * Mirrors EmailVerificationToken's shape, but stores the message *components*
- * rather than the rendered string: the server rebuilds the text at verify time,
- * so no refactor can ever let a client supply the message that gets verified.
- */
 model WalletNonce {
   id      String         @id @default(uuid(7))
   userId  String         @map("user_id")
   address String         @db.VarChar(42)
   network PaymentNetwork
-  /// Not hashed, unlike the email token: the nonce is not a bearer credential —
-  /// the signature is the secret, and this is only the lookup key.
   nonce   String         @unique @db.VarChar(64)
 
   chainId   Int      @map("chain_id")
   domain    String   @db.VarChar(255)
   uri       String   @db.VarChar(2048)
   issuedAt  DateTime @map("issued_at")
-  /// Authoritative expiry. The copy inside the rendered message is for the
-  /// wallet popup to display; verification always reads this column.
   expiresAt DateTime @map("expires_at")
 
   attempts   Int       @default(0)

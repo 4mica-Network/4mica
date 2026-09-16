@@ -43,9 +43,6 @@ const toIssueMap = (error: unknown): Record<string, string> => {
 
 const toMessage = (error: unknown, fallback: string): string => {
   if (error instanceof HttpError) {
-    // Auth copy is written for an API consumer, not a signed-in person staring
-    // at a dashboard — "A valid Clerk session token is required" names an
-    // implementation detail and gives them nothing to act on.
     if (error.status === 401 || error.status === 403) {
       return t(
         "store.wallet.sessionExpired",
@@ -73,8 +70,6 @@ function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
   yield put(walletActionFailed(message, toIssueMap(error), meta));
 
-  // A dismissed popup is a choice, not a failure — surfacing it under the field
-  // is enough without also shouting about it in a toast.
   if (!(error instanceof WalletRejectedError)) {
     notifyError({
       title: t("store.wallet.failedTitle", "Something went wrong"),
@@ -113,12 +108,6 @@ export function* fetchWallets(): Generator {
   }
 }
 
-/**
- * The whole link handshake lives here so the modal stays a form.
- *
- * Challenge, sign, create — and the signature is passed straight from the
- * wallet to the API without ever entering the store.
- */
 export function* createWallet(action: {
   type: string;
   payload: {
@@ -137,7 +126,6 @@ export function* createWallet(action: {
       api.createWalletChallenge({ address, network }),
     )) as Awaited<ReturnType<typeof api.createWalletChallenge>>;
 
-    // Signs the server's message verbatim; we never rebuild it here.
     const signature = (yield call(() =>
       signMessage(address, challenge.message),
     )) as string;
@@ -237,8 +225,6 @@ export function* batchDeleteWallets(action: {
 
 export default [
   takeLatest(actionTypes.FETCH_WALLETS_REQUESTED, fetchWallets),
-  // Re-fetch whenever the view changes, rather than making every caller
-  // remember to dispatch twice.
   takeLatest(actionTypes.SET_WALLET_FILTERS, fetchWallets),
   takeLatest(actionTypes.SET_WALLET_PAGE, fetchWallets),
   takeEvery(actionTypes.CREATE_WALLET_REQUESTED, createWallet),

@@ -109,8 +109,6 @@ export function EditWalletModal({
     );
   };
 
-  // A retired wallet is terminal — bringing one back needs a fresh signature,
-  // which is a link, not an edit. The server enforces this too.
   const isRetired = wallet?.status === "RETIRED";
 
   return (

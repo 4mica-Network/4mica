@@ -42,7 +42,6 @@ export const selectWalletError = (state: RootState): string | null =>
 export const selectWalletIssues = (state: RootState): Record<string, string> =>
   state.wallet.validationIssues;
 
-/** True only when every row on the current page is ticked. */
 export const selectAreAllWalletsSelected = (state: RootState): boolean =>
   state.wallet.items.length > 0 &&
   state.wallet.items.every((item) =>

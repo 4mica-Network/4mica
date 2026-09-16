@@ -257,16 +257,11 @@ export const walletListResponseSchema = {
   },
 } as const;
 
-/**
- * The serializer strips anything not listed, which is the backstop that keeps a
- * widened `select` in the repository from ever leaking challenge internals.
- */
 export const walletNonceResponseSchema = {
   type: "object",
   required: ["nonce", "message", "expiresAt"],
   properties: {
     nonce: str,
-    /** The exact EIP-4361 text the client must sign, built server-side. */
     message: str,
     expiresAt: date,
   },

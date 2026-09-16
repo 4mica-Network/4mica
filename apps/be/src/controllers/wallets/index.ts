@@ -33,19 +33,12 @@ import {
   UpdateWalletSchema,
 } from "./schema";
 
-/**
- * The SIWE `domain` and `uri` are the dashboard origin the user is actually
- * looking at, and come from server config — never from the request body, or a
- * caller could have the wallet popup display any site it liked.
- */
 const siweOrigin = () => {
   const appUrl = config.appUrl;
   let domain = appUrl;
   try {
     domain = new URL(appUrl).host;
-  } catch {
-    // config.appUrl is validated at boot; this is belt and braces.
-  }
+  } catch {}
   return { domain, uri: appUrl };
 };
 
@@ -68,8 +61,6 @@ export const listWalletsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  // Offset pagination makes Postgres generate and discard every skipped row, so
-  // an unbounded `page` is a cheap way to tie up a connection.
   if ((parsed.data.page - 1) * parsed.data.limit > MAX_OFFSET) {
     return invalidBody(reply, [
       { path: "page", message: "is beyond the last page" },
@@ -91,18 +82,6 @@ export const getWalletHandler: RouteHandler = async (request, reply) => {
   return wallet ? reply.send(wallet) : notFound(reply, "wallet");
 };
 
-/**
- * Issues a challenge for ANY syntactically valid address, unconditionally.
- *
- * No existence check and no 409 here: addresses are public on-chain and Clerk
- * signup is unlimited, so a "that address is taken" answer would turn this into
- * an enumeration oracle mapping on-chain addresses to 4Mica accounts. Only
- * POST /me/wallets may conflict, and only once a signature has proved the
- * caller holds the key.
- *
- * This is the opposite of checkUsernameHandler, which is an intentional oracle
- * over a deliberately public handle namespace. Addresses are not that.
- */
 export const createWalletNonceHandler: RouteHandler = async (
   request,
   reply,
@@ -140,7 +119,6 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
   const data = parsed.data;
   const challenge = await findWalletNonce(userId, data.nonce);
 
-  // Expiry is read from the column, never parsed back out of the message.
   if (
     !challenge ||
     challenge.consumedAt !== null ||
@@ -155,8 +133,6 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
     return invalidChallenge(reply);
   }
 
-  // Rebuilt from the stored components rather than read back from a stored
-  // string, so no future change can let a caller choose the text it signed.
   const message = buildWalletLinkMessage({
     domain: challenge.domain,
     uri: challenge.uri,
@@ -170,8 +146,6 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
 
   let verified = false;
   try {
-    // Verified outside any transaction, and `recoverMessageAddress` throws on a
-    // malformed signature rather than returning false.
     verified = await verifyMessage({
       address: challenge.address as `0x${string}`,
       message,
@@ -226,11 +200,6 @@ export const createWalletHandler: RouteHandler = async (request, reply) => {
   }
 };
 
-/**
- * A wallet may be paused and resumed, and may be retired once. Coming back from
- * RETIRED is not an edit: `verifiedAt` only ever proved control at that instant,
- * so re-activating an address needs a fresh signature.
- */
 type WalletStatusValue = "ACTIVE" | "PAUSED" | "RETIRED";
 
 const ALLOWED_TRANSITIONS: Record<
@@ -268,7 +237,6 @@ export const updateWalletHandler: RouteHandler = async (request, reply) => {
       issues: [{ path: "status", message: "is not a permitted transition" }],
     });
 
-  // A paused or retired wallet must not be the one payments route to.
   const effectiveStatus = next.status ?? current.status;
   if (next.isDefault === true && effectiveStatus !== "ACTIVE") {
     return reply.code(409).send({

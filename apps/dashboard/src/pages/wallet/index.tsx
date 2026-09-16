@@ -55,11 +55,7 @@ export function Wallet() {
   }, [dispatch]);
 
   const hasFilters = Boolean(filters.q || filters.status || filters.network);
-  // Only blank the list on the very first load; later fetches redraw in place
-  // so the toolbar does not jump while you type.
   const showSpinner = isLoading && !hasLoaded;
-  // A failed first load must not render as "No wallets yet" — that tells the
-  // user something false about their account.
   const showError = Boolean(error) && !hasLoaded && !isLoading;
 
   const confirmDelete = () => {
@@ -101,8 +97,6 @@ export function Wallet() {
         </Button>
       </div>
 
-      {/* flex-1 + min-h-0 so the empty and error states below can stretch to
-          the bottom of the viewport instead of hugging the header. */}
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {hasLoaded && (wallets.length > 0 || hasFilters) && (
           <WalletToolbar onBatchDelete={() => setIsBatchDeleteOpen(true)} />
@@ -114,8 +108,6 @@ export function Wallet() {
           </div>
         ) : showError ? (
           <EmptyState
-            // flex-1 rather than a centering wrapper: the card itself should
-            // fill the space, matching the empty state below it.
             className="flex-1"
             icon={<TriangleAlert className="h-5 w-5" />}
             title={t("wallet.errorState.title")}
@@ -171,9 +163,6 @@ export function Wallet() {
             data-testid="wallet-empty"
           />
         ) : (
-          // One frame around the group with `divide-y` separators: the rows
-          // butt together as a single table, and `overflow-hidden` is what
-          // clips the corners so only the first and last rows are rounded.
           <div className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10">
             {wallets.map((wallet) => (
               <WalletRow

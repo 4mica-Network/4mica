@@ -25,12 +25,6 @@ const idParamSchema = {
   properties: { id: { type: "string" } },
 } as const;
 
-/**
- * Declared so ajv's `coerceTypes` turns `page=2` into a number and so the
- * params show up in the OpenAPI doc. The handler still parses with valibot,
- * which is the authority — the same doubled validation `/me/username-available`
- * uses.
- */
 const listQuerySchema = {
   type: "object",
   properties: {
@@ -53,8 +47,6 @@ const listQuerySchema = {
 export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   const base = guards(app);
 
-  // Everything that mints a challenge or changes a payout destination gets the
-  // tighter budget, not just the nonce endpoint.
   const strict = {
     onRequest: base.onRequest,
     preHandler: [...base.preHandler, sensitiveRateLimit(app)],
@@ -187,8 +179,6 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
     deleteWalletHandler,
   );
 
-  // POST rather than DELETE because the body carries the ids, and the shared
-  // HttpClient the dashboard uses sends no body on DELETE.
   app.post(
     "/me/wallets/batch-delete",
     {

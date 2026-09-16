@@ -27,15 +27,6 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     }
   }, [dispatch, isSignedIn, tokenReady, userId]);
 
-  /**
-   * Children do not mount until the token provider is installed.
-   *
-   * React runs child effects before parent effects, so any page that fetches
-   * on mount would otherwise fire before the effect above — sending a request
-   * with no Authorization header and getting back a 401 that has nothing to do
-   * with the user's actual session. Holding the subtree for one frame is the
-   * difference between "loading" and a spurious auth error on every such page.
-   */
   if (!tokenReady) {
     return <FullScreenLoader messageKey="auth.loading" />;
   }

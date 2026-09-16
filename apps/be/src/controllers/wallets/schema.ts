@@ -1,11 +1,6 @@
 import * as v from "valibot";
 import { isAddress } from "viem";
 
-/**
- * Networks, as a literal union rather than the generated Prisma enum, so the
- * DTO layer stays free of Prisma types (the convention apps/playground follows
- * in src/schema/params.ts).
- */
 export const PaymentNetworkSchema = v.picklist([
   "BASE",
   "BASE_SEPOLIA",
@@ -16,15 +11,6 @@ export const WalletRoleSchema = v.picklist(["PAYER", "RECIPIENT", "BOTH"]);
 
 export const WalletStatusSchema = v.picklist(["ACTIVE", "PAUSED", "RETIRED"]);
 
-/**
- * Validate the RAW input, then normalize — never the other way round.
- *
- * viem's `isAddress` short-circuits with `if (address.toLowerCase() === address)
- * return true` *before* it runs the strict checksum test, so lowercasing first
- * would silently accept a mistyped mixed-case address that fails EIP-55. The
- * whole point of the checksum is to catch that typo before it becomes a payout
- * address.
- */
 const address = v.pipe(
   v.string(),
   v.trim(),
@@ -59,11 +45,6 @@ export const CreateWalletSchema = v.object({
   ),
 });
 
-/**
- * `address` and `network` are absent by construction: re-pointing a wallet at a
- * different address would carry the old proof across to an unproven one. That
- * is a new wallet, not an edit.
- */
 export const UpdateWalletSchema = v.partial(
   v.object({
     label,
@@ -78,11 +59,7 @@ export const MAX_BATCH_DELETE = 100;
 
 export const BatchDeleteWalletsSchema = v.object({
   ids: v.pipe(
-    v.array(
-      // Not cosmetic: a non-uuid inside `{ in: ids }` makes Prisma throw P2023,
-      // which would surface as a 500 rather than a validation error.
-      v.pipe(v.string(), v.uuid("must be a wallet id")),
-    ),
+    v.array(v.pipe(v.string(), v.uuid("must be a wallet id"))),
     v.minLength(1, "select at least one wallet"),
     v.maxLength(MAX_BATCH_DELETE),
     v.transform((ids) => [...new Set(ids)]),
@@ -91,14 +68,8 @@ export const BatchDeleteWalletsSchema = v.object({
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
-/** Caps how deep an offset scan can go, so `?page=1e9` cannot tie up Postgres. */
 export const MAX_OFFSET = 10_000;
 
-/**
- * Query params arrive as strings. The route declares a matching JSON Schema so
- * ajv's `coerceTypes` handles the common case, but this parses defensively on
- * its own so the handler is correct regardless of how it is called.
- */
 const positiveInt = (fallback: number, max: number) =>
   v.optional(
     v.pipe(

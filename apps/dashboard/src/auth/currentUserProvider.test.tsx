@@ -27,11 +27,6 @@ vi.mock("react-i18next", () => ({
 
 const { CurrentUserProvider } = await import("./CurrentUserProvider");
 
-/**
- * Stands in for any page that fetches on mount — the wallet page does exactly
- * this. It records whichever token was resolvable at the moment its effect
- * ran, which is the value that used to come back null.
- */
 function PageThatFetchesOnMount({
   record,
 }: {
@@ -64,9 +59,6 @@ describe("CurrentUserProvider", () => {
       </CurrentUserProvider>,
     );
 
-    // React runs child effects before parent effects, so a page mounted
-    // eagerly would fire its request with no Authorization header and get back
-    // a 401 that has nothing to do with the real session.
     expect(await screen.findByTestId("page")).toBeInTheDocument();
     await vi.waitFor(() => {
       expect(seen).toHaveLength(1);
@@ -75,8 +67,6 @@ describe("CurrentUserProvider", () => {
   });
 
   it("shows the loader instead of children while the token is not ready", () => {
-    // The provider is installed in an effect, so the very first render pass
-    // must not contain the subtree.
     const { container } = render(
       <CurrentUserProvider>
         <div data-testid="page" />

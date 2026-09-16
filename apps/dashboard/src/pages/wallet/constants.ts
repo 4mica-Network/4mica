@@ -4,15 +4,6 @@ import type {
   WalletStatus,
 } from "@stores/wallet/type";
 
-/**
- * Chain ids and explorers per network.
- *
- * Values mirror `NETWORKS` in packages/sdk/src/networks, duplicated rather than
- * imported because @4mica/sdk pulls in a chain client the dashboard has no
- * other reason to bundle — the same trade-off apps/playground documents in
- * src/lib/snippets/networks.ts. `satisfies` makes a new network a compile error
- * here rather than a blank label in the UI.
- */
 export const NETWORKS = {
   BASE: {
     label: "Base",
@@ -58,7 +49,6 @@ export const NETWORK_OPTIONS = (Object.keys(NETWORKS) as PaymentNetwork[]).map(
   (value) => ({ value, title: NETWORKS[value].label }),
 );
 
-/** Reverse lookup, so a wallet's reported chain id can preselect the network. */
 export const networkForChainId = (
   chainId: number | null,
 ): PaymentNetwork | null => {
@@ -71,7 +61,6 @@ export const networkForChainId = (
   return match ?? null;
 };
 
-/** Shaped for `wallet_addEthereumChain`, for wallets that lack the network. */
 export const chainDefinition = (network: PaymentNetwork) => {
   const meta = NETWORKS[network];
   return {
@@ -106,7 +95,6 @@ export const explorerAddressUrl = (
   address: string,
 ): string => `${NETWORKS[network].explorer}/address/${address}`;
 
-/** `0x1234…cdef` — enough to recognise, short enough for a row. */
 export const shortenAddress = (address: string): string =>
   address.length <= 12
     ? address

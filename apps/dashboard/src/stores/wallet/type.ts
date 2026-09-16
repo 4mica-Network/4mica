@@ -29,7 +29,6 @@ export interface Wallet {
   id: string;
   label: string;
   description: string | null;
-  /** Stored lowercase; render with `toChecksumAddress` where it matters. */
   address: string;
   network: PaymentNetwork;
   role: WalletRole;
@@ -42,7 +41,6 @@ export interface Wallet {
   updatedAt: string;
 }
 
-/** The message the server built and the client must sign verbatim. */
 export interface WalletChallenge {
   nonce: string;
   message: string;
@@ -73,13 +71,8 @@ export type WalletState = {
   page: number;
   limit: number;
   filters: WalletFilters;
-  /** Ids ticked for a batch action. Cleared whenever the page changes. */
   selectedIds: string[];
   isLoading: boolean;
-  /**
-   * Sticky once the first fetch lands, so re-filtering redraws rows in place
-   * rather than blanking the list under the toolbar.
-   */
   hasLoaded: boolean;
   pending: Record<string, boolean>;
   error: string | null;

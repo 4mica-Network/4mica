@@ -13,8 +13,6 @@ const { dispatch, state } = vi.hoisted(() => ({
 
 vi.mock("@stores/hooks", () => ({
   useAppDispatch: () => dispatch,
-  // Each selector is a plain function over RootState in this codebase, so a
-  // hand-built slice is enough to drive the component.
   useAppSelector: (selector: (s: unknown) => unknown) =>
     selector({
       wallet: {
@@ -76,8 +74,6 @@ describe("CreateWalletModal", () => {
   });
 
   it("clears a stale error when it opens", async () => {
-    // A failed list fetch leaves an error on the slice. Opening the modal must
-    // not greet the user with it — they have not done anything yet.
     state.error = "Couldn't load your wallets.";
 
     render(<CreateWalletModal isOpen onClose={() => {}} />);
@@ -112,12 +108,6 @@ describe("CreateWalletModal", () => {
     expect(connectWallet).not.toHaveBeenCalled();
   });
 
-  /**
-   * The dead end this guards: "Switch account" used to call connectWallet,
-   * which is `eth_requestAccounts`. Once the site already holds the permission
-   * that resolves instantly with the SAME address and opens no picker — so
-   * someone who had added their only connected address could never add another.
-   */
   it("reopens the wallet's account picker instead of reconnecting", async () => {
     const first = "0x7A9f3C4B2e8d5a1f6C0b4e9d2a8C3F5B7e1d6A04";
     const second = "0x4f2C8b6D1e9A3f5c7B0d2E4a6C8f1B3d5E7a9C02";
@@ -132,7 +122,6 @@ describe("CreateWalletModal", () => {
     await vi.waitFor(() => {
       expect(requestAccountSwitch).toHaveBeenCalled();
     });
-    // Reconnecting alone would have handed back `first` again.
     expect(connectWallet).not.toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(screen.getByTestId("create-wallet-address")).toHaveTextContent(
@@ -149,8 +138,6 @@ describe("CreateWalletModal", () => {
     render(<CreateWalletModal isOpen onClose={() => {}} />);
     await screen.findByTestId("create-wallet-address");
 
-    // Previously the picker only appeared on an unsupported chain, which left
-    // no route to the same address on a second network.
     for (const network of ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"]) {
       expect(
         screen.getByTestId(`create-wallet-network-${network}`),
@@ -175,7 +162,6 @@ describe("CreateWalletModal", () => {
     render(<CreateWalletModal isOpen onClose={() => {}} />);
     await screen.findByTestId("create-wallet-address");
 
-    // Detected chain is 84532 (Base Sepolia), which is the taken pair.
     await vi.waitFor(() => {
       expect(screen.getByTestId("create-wallet-continue")).toBeDisabled();
     });

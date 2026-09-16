@@ -3,29 +3,19 @@ import { cn } from "../../lib/cn";
 import { Button } from "../button";
 
 export interface PaginationProps {
-  /** 1-based. */
   page: number;
   perPage: number;
   total: number;
   onPrev: () => void;
   onNext: () => void;
   className?: string;
-  /** Labels, so the caller owns translation. */
   labels?: {
-    /** e.g. "1-20 of 43" — the range is passed in already formatted. */
     previous?: string;
     next?: string;
   };
   "data-testid"?: string;
 }
 
-/**
- * Prev/next pager for a server-paged list.
- *
- * Deliberately not a numbered pager: the caller knows only the current page and
- * the total, and rendering page numbers invites deep offsets that the API caps
- * anyway.
- */
 export const Pagination = ({
   page,
   perPage,

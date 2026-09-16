@@ -94,7 +94,6 @@ describe("wallet reducer", () => {
       }),
     );
 
-    // wallet_1 is no longer on screen, so a batch delete must not reach it.
     expect(state.selectedIds).toEqual(["wallet_2"]);
   });
 

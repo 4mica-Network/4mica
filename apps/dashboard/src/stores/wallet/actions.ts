@@ -7,7 +7,6 @@ import type {
   WalletStatus,
 } from "./type";
 
-/** Identifies which row is busy, so only that row shows a spinner. */
 export interface PendingMeta {
   pendingKey: string;
 }
@@ -35,11 +34,6 @@ export const fetchWalletsFailed = (message: string) => ({
   payload: { message },
 });
 
-/**
- * The saga owns the whole link flow — request a challenge, ask the wallet to
- * sign it, then create — so the component dispatches once and watches
- * `pending`. `signature` is never in the store.
- */
 export const createWallet = (payload: {
   label: string;
   description?: string | null;
@@ -106,7 +100,6 @@ export const batchDeleteWalletsSucceeded = (
   meta,
 });
 
-/** Any filter change resets to page 1 — see the reducer. */
 export const setWalletFilters = (payload: Partial<WalletFilters>) => ({
   type: actionTypes.SET_WALLET_FILTERS,
   payload,

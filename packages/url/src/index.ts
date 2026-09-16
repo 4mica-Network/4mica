@@ -638,7 +638,6 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     },
     docs: "https://docs.4mica.io",
     docsChangelog: "https://docs.4mica.io/updates/changelogs",
-    /** Concept pages the dashboard links to from its empty and help states. */
     docsWallet: "https://docs.4mica.io/core-concepts/wallet",
     docsDeposits:
       "https://docs.4mica.io/core-concepts/deposits-and-withdrawals",

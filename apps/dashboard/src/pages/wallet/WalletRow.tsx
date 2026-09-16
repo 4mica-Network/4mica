@@ -66,16 +66,10 @@ export function WalletRow({
       await navigator.clipboard.writeText(wallet.address);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access can be denied (insecure origin, permissions policy).
-      // The address is already on screen, so failing quietly is enough.
-    }
+    } catch {}
   };
 
   return (
-    // No border or rounding of its own: the list container draws one frame
-    // around the whole group and `divide-y` supplies the separators, so rows
-    // read as one table rather than a stack of cards.
     <div
       className={cn(
         "group flex w-full items-start gap-3 bg-surface px-4 py-3.5 transition-colors sm:items-center",
@@ -83,11 +77,6 @@ export function WalletRow({
       )}
       data-testid={`wallet-row-${wallet.id}`}
     >
-      {/*
-        w-auto overrides the component's own `w-full`, which as a flex item
-        would otherwise claim the whole row and starve everything beside it of
-        width — collapsing the tags to slivers and wrapping the address.
-      */}
       <Checkbox
         variant="square"
         className="mt-0.5 w-auto shrink-0 sm:mt-0"
@@ -104,14 +93,12 @@ export function WalletRow({
           {wallet.label}
         </span>
 
-        {/* Secondary: present but visibly subordinate to the name. */}
         {wallet.description && (
           <p className="min-w-0 truncate text-ink-muted text-sm">
             {wallet.description}
           </p>
         )}
 
-        {/* Every attribute as a tag, on one wrapping line below the text. */}
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
           {wallet.isDefault && (
             <Tag size="sm" variant="default">
@@ -144,11 +131,6 @@ export function WalletRow({
         </div>
       </div>
 
-      {/*
-        Visible by default and hover-revealed only from `lg` up: a tablet has no
-        hover, so hiding the controls behind one would leave them unreachable.
-        focus-within keeps them available to keyboard users on wide screens.
-      */}
       <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
@@ -170,8 +152,6 @@ export function WalletRow({
           </Button>
         </Tooltip>
 
-        {/* The ref lives on a wrapper: Button renders a plain <button> and does
-            not forward one, and Dropdown only needs an element to anchor to. */}
         <span ref={menuAnchor} className="inline-flex">
           <Button
             type="button"
@@ -219,8 +199,6 @@ export function WalletRow({
               {t("wallet.row.viewOnExplorer")}
             </a>
 
-            {/* Only an active wallet can be a payment destination, which is
-                what the server enforces too. */}
             {!wallet.isDefault && wallet.status === "ACTIVE" && (
               <button
                 type="button"

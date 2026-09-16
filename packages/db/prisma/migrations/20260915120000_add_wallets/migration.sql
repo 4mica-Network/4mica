@@ -70,22 +70,11 @@ ALTER TABLE "wallets" ADD CONSTRAINT "wallets_owner_id_fkey" FOREIGN KEY ("owner
 -- AddForeignKey
 ALTER TABLE "wallet_nonces" ADD CONSTRAINT "wallet_nonces_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Hand-written below this line: Prisma's schema language cannot express CHECK
--- constraints or partial unique indexes, so `prisma migrate dev` will not
--- reproduce them. Keep them when regenerating this migration.
-
--- Addresses are compared with a case-sensitive unique index, so a mixed-case
--- insert from any future code path would silently create a duplicate wallet.
--- VarChar(42) alone does not prevent that.
 ALTER TABLE "wallets" ADD CONSTRAINT "wallets_address_lowercase"
     CHECK ("address" ~ '^0x[0-9a-f]{40}$');
 
 ALTER TABLE "wallet_nonces" ADD CONSTRAINT "wallet_nonces_address_lowercase"
     CHECK ("address" ~ '^0x[0-9a-f]{40}$');
 
--- At most one default wallet per owner per network. A default payer on BASE
--- says nothing about ETHEREUM_SEPOLIA, so the scope includes the network.
--- Postgres evaluates unique indexes per statement rather than at commit, so the
--- repository clears the current default before setting the new one.
 CREATE UNIQUE INDEX "wallets_owner_network_default_key"
     ON "wallets" ("owner_id", "network") WHERE "is_default";

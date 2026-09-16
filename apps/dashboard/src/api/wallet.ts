@@ -10,10 +10,6 @@ import type {
 } from "@stores/wallet/type";
 import { httpClient } from "./client";
 
-/**
- * The index signature is what `HttpRequestConfig["params"]` expects; the named
- * keys keep callers honest about which params exist.
- */
 export interface ListWalletsParams
   extends Record<string, string | number | boolean | undefined> {
   page?: number;
@@ -38,10 +34,6 @@ export const getWallet = (id: string) =>
     method: HttpMethod.GET,
   });
 
-/**
- * Step one of linking: the server builds the message and we sign exactly what
- * it returns. The client never composes the text it asks the user to sign.
- */
 export const createWalletChallenge = (data: {
   address: string;
   network: PaymentNetwork;
@@ -89,7 +81,6 @@ export const deleteWallet = (id: string) =>
     method: HttpMethod.DELETE,
   });
 
-/** POST, not DELETE: the shared HttpClient sends no body on DELETE. */
 export const batchDeleteWallets = (ids: string[]) =>
   httpClient.request<BatchDeleteResult, { ids: string[] }>({
     url: "/me/wallets/batch-delete",

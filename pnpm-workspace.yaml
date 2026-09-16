@@ -149,10 +149,5 @@ catalogs:
     '@types/node': ^26.1.1
   typescript-latest:
     typescript: ^5.9.0
-  # @hookform/resolvers declares no `zod` dependency of its own, so TypeScript
-  # resolves the `zod` inside its .d.ts to pnpm's hoisted copy — which is v4,
-  # pulled in transitively by the x402 demo. A consumer on the root `zod: ^3`
-  # catalog therefore hands a v3 ZodObject to a signature typed against v4 and
-  # fails to compile. Anything pairing zod with the resolver uses this catalog.
   zod4:
     zod: ^4.4.3

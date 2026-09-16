@@ -35,8 +35,6 @@ export function WalletToolbar({
     selectIsWalletPending("batchDeleteWallets"),
   );
 
-  // Typing is local; the store (and the request) only moves once you pause —
-  // the same debounce the username step uses.
   const [search, setSearch] = useState(filters.q);
 
   useEffect(() => {
@@ -102,8 +100,6 @@ export function WalletToolbar({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      {/* Bounded rather than flex-1: a search box stretched across a wide
-          viewport looks like an empty field, not an input. */}
       <div className="min-w-0 sm:w-80">
         <InputField
           value={search}
@@ -116,12 +112,6 @@ export function WalletToolbar({
         />
       </div>
 
-      {/*
-        Each Select is wrapped rather than given a width class: its own root is
-        a hardcoded `w-full` div and only the inner trigger receives className,
-        so an unwrapped Select claims the full row and wraps onto its own line.
-        The wrapper is what actually bounds it.
-      */}
       <div className="flex gap-3">
         <div className="w-full sm:w-40">
           <Select

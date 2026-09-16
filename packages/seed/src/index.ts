@@ -50,17 +50,6 @@ const AGENTS = [
   },
 ] as const;
 
-/**
- * Wallets the seeded account has "linked".
- *
- * Addresses are lowercase because that is how the API stores them — a CHECK
- * constraint on `wallets.address` rejects mixed case outright, and the unique
- * index is case-sensitive.
- *
- * The first one reuses the agent's address on the same network, which is the
- * realistic shape: the payer wallet an agent signs with is a wallet the owner
- * has proved control of.
- */
 const WALLETS = [
   {
     label: "Atlas payer",
@@ -254,10 +243,6 @@ const seed = async (): Promise<void> => {
     },
   });
 
-  // Same reasoning as the agents above: a wallet is keyed on its address, so an
-  // edited fixture must lose the stale row before the upsert runs, or the
-  // partial unique index on (owner_id, network) WHERE is_default can collide
-  // with a default that should no longer exist.
   await prisma.wallet.deleteMany({
     where: {
       ownerId: owner.id,
@@ -292,8 +277,6 @@ const seed = async (): Promise<void> => {
       role: wallet.role,
       status: wallet.status,
       isDefault: wallet.isDefault,
-      // A seeded wallet stands in for one that was linked by signature, so it
-      // carries a verifiedAt like any real row — there is no unverified state.
       verifiedAt: new Date(),
       verificationMethod: "EOA_SIGNATURE" as const,
       verifiedChainId: wallet.verifiedChainId,

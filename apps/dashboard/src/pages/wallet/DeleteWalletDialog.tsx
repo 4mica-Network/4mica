@@ -6,10 +6,6 @@ import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { shortenAddress } from "./constants";
 
-/**
- * Confirms both the single and the batch delete. `wallet` is the single-row
- * target; `count` drives the batch copy when there is no single target.
- */
 export function DeleteWalletDialog({
   wallet,
   count,
