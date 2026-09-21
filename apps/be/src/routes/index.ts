@@ -1,4 +1,6 @@
 import type { FastifyPluginCallback } from "fastify";
+import { agentRoutes } from "./agents";
+import { apiListingRoutes } from "./api-listings";
 import { bannerRoutes } from "./banners";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
@@ -20,9 +22,13 @@ export const routes: RouteRegistration[] = [
   { plugin: bannerRoutes },
   { plugin: unsubscribeRoutes },
   { plugin: walletRoutes },
+  { plugin: apiListingRoutes },
+  { plugin: agentRoutes },
 ];
 
 export {
+  agentRoutes,
+  apiListingRoutes,
   bannerRoutes,
   developerRoutes,
   healthRoutes,

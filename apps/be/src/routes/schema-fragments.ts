@@ -267,6 +267,127 @@ export const walletNonceResponseSchema = {
   },
 } as const;
 
+const visibilityEnum = {
+  type: "string",
+  enum: ["PRIVATE", "UNLISTED", "PUBLIC"],
+} as const;
+
+const httpMethodEnum = {
+  type: "string",
+  enum: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+} as const;
+
+const nullableNetworkEnum = {
+  type: "string",
+  nullable: true,
+  enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA", null],
+} as const;
+
+export const apiEndpointResponseSchema = {
+  type: "object",
+  required: ["id", "method", "path"],
+  properties: {
+    id: str,
+    method: httpMethodEnum,
+    path: str,
+    summary: nullStr,
+    // A string, not a number: Decimal(38,18) does not survive an IEEE-754
+    // double, and this one is a price.
+    priceAmount: nullStr,
+    sortOrder: int,
+  },
+} as const;
+
+export const apiListingResponseSchema = {
+  type: "object",
+  required: ["id", "slug", "name", "visibility"],
+  properties: {
+    id: str,
+    slug: str,
+    name: str,
+    summary: nullStr,
+    description: nullStr,
+    baseUrl: nullStr,
+    docsUrl: nullStr,
+    category: nullStr,
+    tags: { type: "array", items: str },
+    priceLabel: nullStr,
+    visibility: visibilityEnum,
+    publishedAt: nullDate,
+    walletId: nullStr,
+    network: nullableNetworkEnum,
+    payToAddress: nullStr,
+    assetAddress: nullStr,
+    priceAmount: nullStr,
+    priceCurrency: nullStr,
+    x402Endpoint: nullStr,
+    createdAt: date,
+    updatedAt: date,
+    endpoints: { type: "array", items: apiEndpointResponseSchema },
+  },
+} as const;
+
+export const apiListingListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: apiListingResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+/**
+ * Both wallet addresses are present here because this is the OWNER's view of
+ * their own agent. The public projection lives in apps/playground and omits
+ * `walletAddress` and `creditLimit` on purpose.
+ */
+export const agentResponseSchema = {
+  type: "object",
+  required: ["id", "name", "status", "visibility", "network"],
+  properties: {
+    id: str,
+    slug: nullStr,
+    name: str,
+    headline: nullStr,
+    description: nullStr,
+    avatarUrl: nullStr,
+    docsUrl: nullStr,
+    status: { type: "string", enum: ["PENDING", "ACTIVE", "SUSPENDED"] },
+    visibility: visibilityEnum,
+    network: paymentNetworkEnum,
+
+    walletAddress: nullStr,
+    payerWalletId: nullStr,
+    creditLimit: str,
+
+    walletId: nullStr,
+    payToAddress: nullStr,
+    assetAddress: nullStr,
+    priceAmount: nullStr,
+    priceCurrency: nullStr,
+    priceLabel: nullStr,
+    endpointUrl: nullStr,
+    x402Endpoint: nullStr,
+
+    publishedAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const agentListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: agentResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
 export const batchDeleteResponseSchema = {
   type: "object",
   required: ["deleted", "notFound"],

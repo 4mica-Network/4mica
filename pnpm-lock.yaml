@@ -1106,6 +1106,31 @@ importers:
         specifier: catalog:typescript-latest
         version: 5.9.3
 
+  examples/example-buyer-live:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 5.9.3
+
   examples/example-buyer-next:
     dependencies:
       '@4mica/sdk':
@@ -1180,6 +1205,40 @@ importers:
       '@4mica/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 5.9.3
+
+  examples/example-seller-live:
+    dependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/sdk-express':
+        specifier: workspace:*
+        version: link:../../packages/sdk-express
+      '@4mica/sdk-node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
+      express:
+        specifier: 'catalog:'
+        version: 5.2.1
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/express':
+        specifier: 'catalog:'
+        version: 5.0.6
       '@types/node':
         specifier: catalog:node24
         version: 24.12.4

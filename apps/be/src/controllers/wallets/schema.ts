@@ -1,25 +1,25 @@
+import {
+  address,
+  DEFAULT_PAGE_SIZE,
+  MAX_BATCH_DELETE,
+  MAX_OFFSET,
+  MAX_PAGE_SIZE,
+  PaymentNetworkSchema,
+  positiveInt,
+} from "@controllers/schema-primitives";
 import * as v from "valibot";
-import { isAddress } from "viem";
 
-export const PaymentNetworkSchema = v.picklist([
-  "BASE",
-  "BASE_SEPOLIA",
-  "ETHEREUM_SEPOLIA",
-]);
+export {
+  DEFAULT_PAGE_SIZE,
+  MAX_BATCH_DELETE,
+  MAX_OFFSET,
+  MAX_PAGE_SIZE,
+  PaymentNetworkSchema,
+};
 
 export const WalletRoleSchema = v.picklist(["PAYER", "RECIPIENT", "BOTH"]);
 
 export const WalletStatusSchema = v.picklist(["ACTIVE", "PAUSED", "RETIRED"]);
-
-const address = v.pipe(
-  v.string(),
-  v.trim(),
-  v.check(
-    (value) => isAddress(value, { strict: true }),
-    "must be a valid EIP-55 checksummed address",
-  ),
-  v.transform((value) => value.toLowerCase()),
-);
 
 const label = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
 
@@ -55,8 +55,6 @@ export const UpdateWalletSchema = v.partial(
   }),
 );
 
-export const MAX_BATCH_DELETE = 100;
-
 export const BatchDeleteWalletsSchema = v.object({
   ids: v.pipe(
     v.array(v.pipe(v.string(), v.uuid("must be a wallet id"))),
@@ -65,23 +63,6 @@ export const BatchDeleteWalletsSchema = v.object({
     v.transform((ids) => [...new Set(ids)]),
   ),
 });
-
-export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;
-export const MAX_OFFSET = 10_000;
-
-const positiveInt = (fallback: number, max: number) =>
-  v.optional(
-    v.pipe(
-      v.union([v.string(), v.number()]),
-      v.transform(Number),
-      v.number(),
-      v.integer(),
-      v.minValue(1),
-      v.maxValue(max),
-    ),
-    fallback,
-  );
 
 export const ListWalletsQuerySchema = v.object({
   page: positiveInt(1, Number.MAX_SAFE_INTEGER),

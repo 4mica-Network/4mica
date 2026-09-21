@@ -21,13 +21,24 @@ const PublicAgentSchema = v.object({
   headline: v.nullable(v.string()),
   description: v.nullable(v.string()),
   avatarUrl: v.nullable(v.string()),
+  docsUrl: v.nullable(v.string()),
   status: v.picklist(["PENDING", "ACTIVE", "SUSPENDED"] as const),
   visibility: VisibilitySchema,
   createdAt: v.string(),
+  publishedAt: v.nullable(v.string()),
   /** The chain this agent signs on. Public — it is not identifying. */
   network: PaymentNetworkSchema,
+
   /** Owner-only. `null` for every other viewer. */
   walletAddress: v.nullable(v.string()),
+
+  payToAddress: v.nullable(v.string()),
+  assetAddress: v.nullable(v.string()),
+  priceAmount: v.nullable(v.string()),
+  priceCurrency: v.nullable(v.string()),
+  priceLabel: v.nullable(v.string()),
+  endpointUrl: v.nullable(v.string()),
+  x402Endpoint: v.nullable(v.string()),
 });
 
 export type PublicAgent = v.InferOutput<typeof PublicAgentSchema>;

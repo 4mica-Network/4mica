@@ -77,4 +77,7 @@ export type WalletState = {
   pending: Record<string, boolean>;
   error: string | null;
   validationIssues: Record<string, string>;
+
+  activeWallets: Wallet[];
+  hasLoadedActiveWallets: boolean;
 };

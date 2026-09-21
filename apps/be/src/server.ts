@@ -124,6 +124,15 @@ export const initApp = async (
             name: "wallets",
             description: "On-chain wallets the account has proved control of",
           },
+          {
+            name: "api-listings",
+            description: "Paywalled APIs the account publishes and is paid for",
+          },
+          {
+            name: "agents",
+            description:
+              "Agent identities the account owns, as payer and as seller",
+          },
         ],
         components: {
           securitySchemes: {

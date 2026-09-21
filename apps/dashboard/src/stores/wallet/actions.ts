@@ -34,6 +34,15 @@ export const fetchWalletsFailed = (message: string) => ({
   payload: { message },
 });
 
+export const fetchActiveWallets = () => ({
+  type: actionTypes.FETCH_ACTIVE_WALLETS_REQUESTED,
+});
+
+export const fetchActiveWalletsSucceeded = (payload: { items: Wallet[] }) => ({
+  type: actionTypes.FETCH_ACTIVE_WALLETS_SUCCEEDED,
+  payload,
+});
+
 export const createWallet = (payload: {
   label: string;
   description?: string | null;

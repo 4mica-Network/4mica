@@ -15,6 +15,8 @@ export const INITIAL_STATE: WalletState = {
   pending: {},
   error: null,
   validationIssues: {},
+  activeWallets: [],
+  hasLoadedActiveWallets: false,
 };
 
 interface WalletAction {
@@ -67,6 +69,11 @@ export default function walletReducer(
         hasLoaded: true,
         error: null,
       };
+    }
+
+    case actionTypes.FETCH_ACTIVE_WALLETS_SUCCEEDED: {
+      const { items } = action.payload as { items: Wallet[] };
+      return { ...state, activeWallets: items, hasLoadedActiveWallets: true };
     }
 
     case actionTypes.FETCH_WALLETS_FAILED:

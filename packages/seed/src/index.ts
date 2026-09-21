@@ -24,6 +24,9 @@ const PROFILE = {
   avatarUrl: null,
 } as const;
 
+/** Canonical USDC on Base Sepolia. */
+const USDC_BASE_SEPOLIA = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+
 /**
  * One agent, fully populated.
  *
@@ -42,11 +45,21 @@ const AGENTS = [
     headline: "Long-horizon market research with cited sources.",
     description:
       "Atlas crawls primary sources, reconciles conflicting numbers and returns a cited brief. It pays per query on the 4Mica credit layer, so a research run needs no prepaid balance and no gas on the request path.",
-    walletAddress: "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04",
     status: "ACTIVE",
     visibility: "PUBLIC",
-    creditLimit: "2500",
     network: "BASE_SEPOLIA",
+
+    walletAddress: "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04",
+    creditLimit: "2500",
+
+    payToAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
+    assetAddress: USDC_BASE_SEPOLIA,
+    priceAmount: "0.002",
+    priceCurrency: "USD",
+    priceLabel: "$0.002 per research run",
+    endpointUrl: "https://agents.4mica.io/atlas/brief",
+    x402Endpoint: "https://agents.4mica.io/atlas/x402",
+    docsUrl: "https://docs.4mica.io/agents/atlas",
   },
 ] as const;
 
@@ -62,6 +75,16 @@ const WALLETS = [
     verifiedChainId: 84532,
   },
   {
+    label: "Atlas earnings",
+    description: "Receives payment for Atlas research runs.",
+    address: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
+    network: "BASE_SEPOLIA",
+    role: "RECIPIENT",
+    status: "ACTIVE",
+    isDefault: false,
+    verifiedChainId: 84532,
+  },
+  {
     label: "Settlement treasury",
     description: "Receives settlement for the credit-limits listing.",
     address: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
@@ -72,9 +95,6 @@ const WALLETS = [
     verifiedChainId: 84532,
   },
 ] as const;
-
-/** Canonical USDC on Base Sepolia. */
-const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
 /**
  * One API listing, fully populated.
@@ -101,7 +121,7 @@ const API_LISTINGS = [
     priceLabel: "$0.01 per call",
     visibility: "PUBLIC",
     network: "BASE_SEPOLIA",
-    payToAddress: "0x4e2b8f6a1c9d3b5e7a0f2d4c6b8a1e3f5c7d9b02",
+    payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.01",
     priceCurrency: "USD",
@@ -250,25 +270,9 @@ const seed = async (): Promise<void> => {
     },
   });
 
-  for (const agent of AGENTS) {
-    const fields = {
-      ownerId: owner.id,
-      slug: agent.slug,
-      name: agent.name,
-      headline: agent.headline,
-      description: agent.description,
-      status: agent.status,
-      visibility: agent.visibility,
-      creditLimit: agent.creditLimit,
-      network: agent.network,
-    };
-
-    await prisma.agent.upsert({
-      where: { walletAddress: agent.walletAddress },
-      update: fields,
-      create: { walletAddress: agent.walletAddress, ...fields },
-    });
-  }
+  const walletIds = new Map<string, string>();
+  const walletKey = (address: string, network: string) =>
+    `${address}:${network}`;
 
   for (const wallet of WALLETS) {
     const fields = {
@@ -282,7 +286,7 @@ const seed = async (): Promise<void> => {
       verifiedChainId: wallet.verifiedChainId,
     };
 
-    await prisma.wallet.upsert({
+    const row = await prisma.wallet.upsert({
       where: {
         ownerId_address_network: {
           ownerId: owner.id,
@@ -297,6 +301,65 @@ const seed = async (): Promise<void> => {
         network: wallet.network,
         ...fields,
       },
+      select: { id: true },
+    });
+
+    walletIds.set(walletKey(wallet.address, wallet.network), row.id);
+  }
+
+  const requireWalletId = (address: string, network: string, use: string) => {
+    const id = walletIds.get(walletKey(address, network));
+    if (!id) {
+      throw new Error(
+        `${use} references ${address} on ${network}, which is not in WALLETS`,
+      );
+    }
+    return id;
+  };
+
+  for (const agent of AGENTS) {
+    const fields = {
+      ownerId: owner.id,
+      slug: agent.slug,
+      name: agent.name,
+      headline: agent.headline,
+      description: agent.description,
+      docsUrl: agent.docsUrl,
+      status: agent.status,
+      visibility: agent.visibility,
+      network: agent.network,
+      publishedAt: new Date(),
+
+      creditLimit: agent.creditLimit,
+      payerWalletId: requireWalletId(
+        agent.walletAddress,
+        agent.network,
+        `agent ${agent.slug} payer wallet`,
+      ),
+
+      walletId: requireWalletId(
+        agent.payToAddress,
+        agent.network,
+        `agent ${agent.slug} recipient wallet`,
+      ),
+      payToAddress: agent.payToAddress,
+      assetAddress: agent.assetAddress,
+      priceAmount: agent.priceAmount,
+      priceCurrency: agent.priceCurrency,
+      priceLabel: agent.priceLabel,
+      endpointUrl: agent.endpointUrl,
+      x402Endpoint: agent.x402Endpoint,
+    };
+
+    await prisma.agent.upsert({
+      where: {
+        walletAddress_network: {
+          walletAddress: agent.walletAddress,
+          network: agent.network,
+        },
+      },
+      update: fields,
+      create: { walletAddress: agent.walletAddress, ...fields },
     });
   }
 
@@ -313,6 +376,11 @@ const seed = async (): Promise<void> => {
       visibility: listing.visibility,
       publishedAt: new Date(),
       network: listing.network,
+      walletId: requireWalletId(
+        listing.payToAddress,
+        listing.network,
+        `listing ${listing.slug} recipient wallet`,
+      ),
       payToAddress: listing.payToAddress,
       assetAddress: listing.assetAddress,
       priceAmount: listing.priceAmount,

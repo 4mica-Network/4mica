@@ -12,6 +12,7 @@ import {
   batchDeleteWalletsSucceeded,
   createWalletSucceeded,
   deleteWalletSucceeded,
+  fetchActiveWalletsSucceeded,
   fetchWallets as fetchWalletsAction,
   fetchWalletsFailed,
   fetchWalletsPending,
@@ -105,6 +106,18 @@ export function* fetchWallets(): Generator {
         ),
       ),
     );
+  }
+}
+
+export function* fetchActiveWallets(): Generator {
+  try {
+    const result = (yield call(() =>
+      api.getWallets({ limit: 100, status: "ACTIVE" }),
+    )) as Awaited<ReturnType<typeof api.getWallets>>;
+
+    yield put(fetchActiveWalletsSucceeded({ items: result.items }));
+  } catch {
+    yield put(fetchActiveWalletsSucceeded({ items: [] }));
   }
 }
 
@@ -225,6 +238,7 @@ export function* batchDeleteWallets(action: {
 
 export default [
   takeLatest(actionTypes.FETCH_WALLETS_REQUESTED, fetchWallets),
+  takeLatest(actionTypes.FETCH_ACTIVE_WALLETS_REQUESTED, fetchActiveWallets),
   takeLatest(actionTypes.SET_WALLET_FILTERS, fetchWallets),
   takeLatest(actionTypes.SET_WALLET_PAGE, fetchWallets),
   takeEvery(actionTypes.CREATE_WALLET_REQUESTED, createWallet),

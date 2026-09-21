@@ -13,12 +13,44 @@ example in real time.
 | [`example-buyer-express`](./example-buyer-express) | Buyer (payer) | — | targets 3000 |
 | [`example-buyer-hono`](./example-buyer-hono) | Buyer (payer) | — | targets 3001 |
 | [`example-buyer-next`](./example-buyer-next) | Buyer (payer) | — | targets 3002 |
+| [`example-seller-live`](./example-seller-live) | Seller (recipient) | Express | 3010 |
+| [`example-buyer-live`](./example-buyer-live) | Buyer (payer) | — | targets 3010 |
 
 A **seller** gates a route (e.g. `GET /premium`) behind the paywall; a **buyer**
-performs the x402 handshake (`402` → sign `X-PAYMENT` → `200`). Out of the box
-they run in **demo mode** with a mock verifier and a locally-built payment
-header — no live credentials required. For the real flow, wire `@4mica/sdk-node`'s
-`createClient()` (reads `4MICA_*` env) as shown in each file's header comment.
+performs the x402 handshake (`402` → sign → `200`).
+
+## Demo mode vs live mode
+
+The six framework examples run in **demo mode**: a mock verifier that returns
+`0xdemoClaims`, and a buyer that hand-builds an envelope signed
+`0xdemoSignature`. Nothing is real, and nothing needs to be — no keys, no
+running core, no collateral. They are for seeing the shape of the handshake and
+for developing the SDK against.
+
+The `*-live` pair is the same flow against a **real core and facilitator**. The
+only difference in the seller is the verifier: `createClient()` from
+`@4mica/sdk-node` instead of the mock, which is the whole point — going live is
+a config change, not a rewrite. The buyer signs a real EIP-712 guarantee and
+prints the BLS certificate it gets back.
+
+Live mode needs a running stack and a payer wallet with collateral:
+
+```bash
+scripts/dev-stack.sh up        # anvil + core + facilitator + the 4Mica apps
+
+cp examples/example-seller-live/.env.example examples/example-seller-live/.env
+cp examples/example-buyer-live/.env.example  examples/example-buyer-live/.env
+# fill in the two 4MICA_WALLET_PRIVATE_KEY values and PAY_TO
+
+pnpm --filter @4mica/example-seller-live dev    # port 3010
+pnpm --filter @4mica/example-buyer-live start
+```
+
+On boot the live seller prints the exact values to paste into the dashboard's
+**APIs → New API** form. Publish that listing and its public page carries a
+copy-paste integration guide — of which `example-buyer-live` is the runnable
+version. See [`docs/LOCAL_STACK.md`](../docs/LOCAL_STACK.md) for the full
+walkthrough.
 
 ## AI agents that trade information
 

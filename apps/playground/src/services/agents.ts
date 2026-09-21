@@ -18,10 +18,20 @@ const AGENT_PUBLIC_SELECT = {
   headline: true,
   description: true,
   avatarUrl: true,
+  docsUrl: true,
   status: true,
   visibility: true,
   createdAt: true,
+  publishedAt: true,
   network: true,
+
+  payToAddress: true,
+  assetAddress: true,
+  priceAmount: true,
+  priceCurrency: true,
+  priceLabel: true,
+  endpointUrl: true,
+  x402Endpoint: true,
 } as const;
 
 /**
@@ -34,6 +44,8 @@ const AGENT_OWNER_SELECT = {
   walletAddress: true,
 } as const;
 
+type Decimalish = { toString(): string } | null;
+
 type AgentRow = {
   id: string;
   slug: string | null;
@@ -41,11 +53,20 @@ type AgentRow = {
   headline: string | null;
   description: string | null;
   avatarUrl: string | null;
+  docsUrl: string | null;
   status: "PENDING" | "ACTIVE" | "SUSPENDED";
   visibility: "PRIVATE" | "UNLISTED" | "PUBLIC";
   createdAt: Date;
+  publishedAt: Date | null;
   network: PaymentNetwork;
-  walletAddress?: string;
+  payToAddress: string | null;
+  assetAddress: string | null;
+  priceAmount: Decimalish;
+  priceCurrency: string | null;
+  priceLabel: string | null;
+  endpointUrl: string | null;
+  x402Endpoint: string | null;
+  walletAddress?: string | null;
 };
 
 const toPublicAgent = (row: AgentRow): PublicAgent => ({
@@ -55,10 +76,21 @@ const toPublicAgent = (row: AgentRow): PublicAgent => ({
   headline: row.headline,
   description: row.description,
   avatarUrl: row.avatarUrl,
+  docsUrl: row.docsUrl,
   status: row.status,
   visibility: row.visibility,
   createdAt: row.createdAt.toISOString(),
+  publishedAt: row.publishedAt?.toISOString() ?? null,
   network: row.network,
+
+  payToAddress: row.payToAddress,
+  assetAddress: row.assetAddress,
+  priceAmount: row.priceAmount?.toString() ?? null,
+  priceCurrency: row.priceCurrency,
+  priceLabel: row.priceLabel,
+  endpointUrl: row.endpointUrl,
+  x402Endpoint: row.x402Endpoint,
+
   // Absent from the public select, so this is null for non-owners by
   // construction rather than by a conditional the caller could forget.
   walletAddress: row.walletAddress ?? null,
@@ -74,6 +106,7 @@ export const listPublicAgents = cache(
     const rows = await prisma.agent.findMany({
       where: {
         ownerId,
+        deletedAt: null,
         ...(includeHidden ? {} : { visibility: "PUBLIC" }),
       },
       select: AGENT_PUBLIC_SELECT,
@@ -102,6 +135,7 @@ export const getPublicAgent = cache(
     const row = await prisma.agent.findFirst({
       where: {
         ownerId,
+        deletedAt: null,
         ...(isOwner
           ? {}
           : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),

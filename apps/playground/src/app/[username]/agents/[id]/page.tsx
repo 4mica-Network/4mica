@@ -126,7 +126,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
         </section>
       )}
 
-      <AgentIntegration agent={agent} />
+      <AgentIntegration agent={agent} isOwner={profile.isOwner} />
     </article>
   );
 }

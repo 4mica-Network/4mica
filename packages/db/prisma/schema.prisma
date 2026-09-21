@@ -43,24 +43,42 @@ enum HttpMethod {
 }
 
 model Agent {
-  id            String           @id @default(uuid(7))
-  ownerId       String?          @map("owner_id")
-  slug          String?          @db.VarChar(64)
-  name          String
-  headline      String?          @db.VarChar(160)
-  description   String?
-  avatarUrl     String?          @map("avatar_url")
-  walletAddress String           @unique @map("wallet_address")
-  status        AgentStatus      @default(PENDING)
-  visibility    PublicVisibility @default(PRIVATE)
-  creditLimit   Decimal          @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  id          String           @id @default(uuid(7))
+  ownerId     String?          @map("owner_id")
+  slug        String?          @db.VarChar(64)
+  name        String
+  headline    String?          @db.VarChar(160)
+  description String?
+  avatarUrl   String?          @map("avatar_url")
+  docsUrl     String?          @map("docs_url") @db.VarChar(2048)
+  status      AgentStatus      @default(PENDING)
+  visibility  PublicVisibility @default(PRIVATE)
   /// The chain this agent signs payment guarantees on.
-  network       PaymentNetwork   @default(ETHEREUM_SEPOLIA)
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  network     PaymentNetwork   @default(ETHEREUM_SEPOLIA)
 
-  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  walletAddress String?  @map("wallet_address") @db.VarChar(42)
+  payerWalletId String?  @map("payer_wallet_id")
+  creditLimit   Decimal  @default(0) @map("credit_limit") @db.Decimal(38, 18)
 
+  walletId      String?  @map("wallet_id")
+  payToAddress  String?  @map("pay_to_address") @db.VarChar(42)
+  assetAddress  String?  @map("asset_address") @db.VarChar(42)
+  priceAmount   Decimal? @map("price_amount") @db.Decimal(38, 18)
+  priceCurrency String?  @map("price_currency") @db.VarChar(16)
+  priceLabel    String?  @map("price_label") @db.VarChar(64)
+  endpointUrl   String?  @map("endpoint_url") @db.VarChar(2048)
+  x402Endpoint  String?  @map("x402_endpoint") @db.VarChar(2048)
+
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  owner       User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  payerWallet Wallet? @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
+  wallet      Wallet? @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+
+  @@unique([walletAddress, network])
   @@unique([ownerId, slug])
   @@index([status])
   @@index([ownerId, visibility])
@@ -281,6 +299,7 @@ model ApiListing {
 
   // --- x402 payment facts. Nullable because a listing can be published as a
   // --- description before its owner has wired up payments.
+  walletId      String?         @map("wallet_id")
   network       PaymentNetwork?
   /// The seller's receiving address. Safe to expose publicly — the x402
   /// handshake advertises it in the 402 response body.
@@ -298,6 +317,7 @@ model ApiListing {
   deletedAt DateTime? @map("deleted_at")
 
   owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  wallet    Wallet?       @relation(fields: [walletId], references: [id], onDelete: SetNull)
   endpoints ApiEndpoint[]
 
   @@unique([ownerId, slug])
@@ -448,6 +468,10 @@ model Wallet {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  apiListings       ApiListing[]
+  agentsAsRecipient Agent[]      @relation("AgentRecipientWallet")
+  agentsAsPayer     Agent[]      @relation("AgentPayerWallet")
 
   @@unique([ownerId, address, network])
   @@index([ownerId, createdAt(sort: Desc)])

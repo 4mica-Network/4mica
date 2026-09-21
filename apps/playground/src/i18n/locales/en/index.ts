@@ -95,6 +95,17 @@ export const en = {
       "Add a network and a receiving address to this listing to show integration instructions here.",
 
     // Agent
+    agentBuyerHeading: "Call this agent",
+    agentBuyerLead:
+      "Pay per call with credit-backed guarantees. The client answers the 402, signs a guarantee, and retries — you get the response.",
+    agentCallTitle: "Send it a request",
+    agentCallLead:
+      "Wrap the fetch you already use, then post your prompt to the agent's endpoint.",
+    agentNotSellable: "This agent is not accepting 4Mica payments yet.",
+    agentNotSellableOwner:
+      "Add a receiving wallet and an endpoint URL to this agent to show payment instructions here.",
+
+    agentRunHeading: "Run this agent",
     agentLead:
       "This agent pays for the requests it makes. Wire it up once and every call it issues is credit-backed.",
     payTitle: "Pay as this agent",

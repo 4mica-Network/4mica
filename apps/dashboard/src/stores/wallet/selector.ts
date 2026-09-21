@@ -42,6 +42,19 @@ export const selectWalletError = (state: RootState): string | null =>
 export const selectWalletIssues = (state: RootState): Record<string, string> =>
   state.wallet.validationIssues;
 
+export const selectSellerWallets = (state: RootState): Wallet[] =>
+  state.wallet.activeWallets.filter(
+    (wallet) => wallet.role === "RECIPIENT" || wallet.role === "BOTH",
+  );
+
+export const selectPayerWallets = (state: RootState): Wallet[] =>
+  state.wallet.activeWallets.filter(
+    (wallet) => wallet.role === "PAYER" || wallet.role === "BOTH",
+  );
+
+export const selectHasLoadedActiveWallets = (state: RootState): boolean =>
+  state.wallet.hasLoadedActiveWallets;
+
 export const selectAreAllWalletsSelected = (state: RootState): boolean =>
   state.wallet.items.length > 0 &&
   state.wallet.items.every((item) =>
