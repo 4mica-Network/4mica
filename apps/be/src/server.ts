@@ -133,6 +133,10 @@ export const initApp = async (
             description:
               "Agent identities the account owns, as payer and as seller",
           },
+          {
+            name: "payments",
+            description: "x402 payments this account sent or received",
+          },
         ],
         components: {
           securitySchemes: {
@@ -140,6 +144,13 @@ export const initApp = async (
               type: "http",
               scheme: "bearer",
               bearerFormat: "JWT",
+            },
+            apiKeyAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "4mica_sk_…",
+              description:
+                "A key from Settings → Developer. Used by services calling 4Mica without a signed-in user.",
             },
           },
         },

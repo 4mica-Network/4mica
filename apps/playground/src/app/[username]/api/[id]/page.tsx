@@ -3,12 +3,14 @@ import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ApiIntegration } from "@/components/IntegrationSection/ApiIntegration";
+import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages, t } from "@/i18n";
 import { parseIdOrSlug, parseUsername } from "@/schema/params";
 import { getPublicApiListing } from "@/services/api-listings";
+import { getPayerState } from "@/services/payer";
 import { getPublicProfile } from "@/services/profile";
 import { buildApiListingMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
@@ -57,6 +59,7 @@ export default async function ApiListingPage({
   }
 
   const { listing, profile } = resolved;
+  const payerState = await getPayerState(listing.network);
 
   return (
     <article className="flex flex-col gap-6">
@@ -130,6 +133,10 @@ export default async function ApiListingPage({
           </h2>
           <Prose text={listing.description} />
         </section>
+      )}
+
+      {!profile.isOwner && (
+        <PayWithFourMica network={listing.network} state={payerState} />
       )}
 
       <ApiIntegration isOwner={profile.isOwner} listing={listing} />

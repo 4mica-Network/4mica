@@ -5,6 +5,7 @@ import { bannerRoutes } from "./banners";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
+import { paymentRoutes } from "./payments";
 import { unsubscribeRoutes } from "./unsubscribe";
 import { verificationRoutes } from "./verification";
 import { walletRoutes } from "./wallets";
@@ -24,6 +25,7 @@ export const routes: RouteRegistration[] = [
   { plugin: walletRoutes },
   { plugin: apiListingRoutes },
   { plugin: agentRoutes },
+  { plugin: paymentRoutes },
 ];
 
 export {
@@ -33,6 +35,7 @@ export {
   developerRoutes,
   healthRoutes,
   meRoutes,
+  paymentRoutes,
   unsubscribeRoutes,
   verificationRoutes,
   walletRoutes,

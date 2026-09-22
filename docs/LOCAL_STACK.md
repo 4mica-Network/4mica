@@ -173,7 +173,7 @@ advertise an address that has been proved this way, which is why the listing
 form asks you to *pick* a wallet rather than type an address.
 
 Give it the role **Recipient** or **Both**, and put it on the chain your stack
-is running (`eip155:31337` locally — see the note in §7 if the network picker
+is running (`eip155:31337` locally — see the note in §8 if the network picker
 does not offer it).
 
 ### b. Create the API
@@ -250,9 +250,57 @@ difference between demo mode and live mode.
 The facilitator log shows `/verify` then `/settle`, in that order. Always that
 order: verify gates the work, settle takes the credit.
 
+### Make it show up in the dashboard
+
+4Mica is **not in the payment path** — your service calls the facilitator
+directly — so nothing appears in anyone's history until your service says so.
+That is one extra call, and the example already makes it:
+
+```bash
+# Dashboard → Settings → Developer → new key
+FOURMICA_API_KEY=4mica_sk_…
+FOURMICA_API_URL=http://localhost:4000
+LISTING_SLUG=live-quotes        # attributes the payment to that listing
+ASSET_DECIMALS=18               # 6 for USDC
+```
+
+Restart the seller, pay again, and the payment appears under **Payments** for
+*both* sides. It is reported once, by the seller, and the buyer sees the same
+row because their wallet is the payer on it — visibility is by proved wallet
+address, not by who filed it.
+
+The report is idempotent on `reqId`, which the payer mints once per payment, so
+a retry after a timeout updates the row rather than double-counting. It is also
+fire-and-forget: the buyer has already been served, and a reporting failure
+must never turn a successful payment into an error.
+
+Without a key the paywall still works. The payments are simply invisible, and
+the seller boots with a warning saying so.
+
 ---
 
-## 6. Agents
+## 6. Following your own progress
+
+The dashboard home page carries two checklists — one for getting paid, one for
+paying — and both read real state rather than a stored "step" counter:
+
+| Step | Considered done when |
+| --- | --- |
+| Link a wallet | any wallet exists |
+| Let it receive / pay | one is ACTIVE with the matching role |
+| Publish an API or agent | one is PUBLIC |
+| Make your profile public | `isProfileRenderable` passes |
+| First payment | a settled payment exists in that direction |
+
+A checklist that tracked its own state would drift from reality the first time
+someone deleted a wallet. This one cannot.
+
+The public listing page carries the mirror image: a **Pay for this with 4Mica**
+panel aimed at whoever is reading it, which changes with what they are missing
+— no account, no paying wallet, a wallet on the wrong chain, or ready. It is
+hidden from the owner, who is not the person who needs it.
+
+## 7. Agents
 
 An agent has **two halves that are not interchangeable**, and conflating them
 is the mistake the schema, the API and the UI are all shaped to prevent:
@@ -273,7 +321,7 @@ another, and 4Mica settles per chain.
 
 ---
 
-## 7. Things that will bite you
+## 8. Things that will bite you
 
 **A bare anvil chain is `eip155:31337`, which is not a `PaymentNetwork`.** The
 enum in `packages/db` has `BASE`, `BASE_SEPOLIA` and `ETHEREUM_SEPOLIA` only —

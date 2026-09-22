@@ -1,7 +1,11 @@
 import { Link } from "@4mica/ui";
+import { fetchAgents } from "@stores/agent/actions";
+import { fetchApiListings } from "@stores/apiListing/actions";
 import { fetchDeveloper } from "@stores/developer/actions";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { fetchPaymentSummary } from "@stores/payment/actions";
 import { selectUser } from "@stores/user/selector";
+import { fetchWallets } from "@stores/wallet/actions";
 import { useLocalStorageState } from "ahooks";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";
@@ -40,8 +44,14 @@ export function IntegrationChecklist() {
 
   const { collapsed, dismissed } = prefs ?? DEFAULT_PREFS;
 
+  // The widget is mounted app-wide, so this is the one place that guarantees
+  // the checklist reflects reality no matter which page the user landed on.
   useEffect(() => {
     dispatch(fetchDeveloper());
+    dispatch(fetchWallets());
+    dispatch(fetchApiListings());
+    dispatch(fetchAgents());
+    dispatch(fetchPaymentSummary());
   }, [dispatch]);
 
   // Nothing left to guide them through, so stop taking up the corner.
@@ -97,7 +107,9 @@ export function IntegrationChecklist() {
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <ul className="flex flex-col border-overlay/10 border-t px-4 py-2">
+              {/* Capped so eight items cannot run off a short viewport; the
+                  header and footer stay put while the list scrolls. */}
+              <ul className="flex max-h-[45vh] flex-col overflow-y-auto border-overlay/10 border-t px-4 py-2">
                 {items.map((item) => (
                   <ChecklistItem key={item.id} item={item} />
                 ))}

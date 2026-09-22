@@ -165,6 +165,44 @@ const SAMPLE_VIDEO =
 
 const inNinetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
+const PAYMENTS = [
+  { monthsAgo: 4, direction: "in", amount: "0.01", status: "SETTLED", day: 4 },
+  { monthsAgo: 4, direction: "in", amount: "0.01", status: "SETTLED", day: 19 },
+  { monthsAgo: 3, direction: "in", amount: "0.05", status: "SETTLED", day: 2 },
+  { monthsAgo: 3, direction: "in", amount: "0.01", status: "FAILED", day: 8 },
+  { monthsAgo: 2, direction: "in", amount: "0.05", status: "SETTLED", day: 11 },
+  { monthsAgo: 2, direction: "in", amount: "0.01", status: "SETTLED", day: 14 },
+  {
+    monthsAgo: 2,
+    direction: "out",
+    amount: "0.002",
+    status: "SETTLED",
+    day: 21,
+  },
+  { monthsAgo: 1, direction: "in", amount: "0.05", status: "SETTLED", day: 3 },
+  { monthsAgo: 1, direction: "in", amount: "0.05", status: "SETTLED", day: 9 },
+  { monthsAgo: 1, direction: "in", amount: "0.01", status: "SETTLED", day: 17 },
+  {
+    monthsAgo: 1,
+    direction: "out",
+    amount: "0.002",
+    status: "SETTLED",
+    day: 23,
+  },
+  { monthsAgo: 0, direction: "in", amount: "0.05", status: "SETTLED", day: 2 },
+  { monthsAgo: 0, direction: "in", amount: "0.05", status: "SETTLED", day: 5 },
+  { monthsAgo: 0, direction: "in", amount: "0.01", status: "PENDING", day: 6 },
+  {
+    monthsAgo: 0,
+    direction: "out",
+    amount: "0.002",
+    status: "SETTLED",
+    day: 7,
+  },
+] as const;
+
+const CUSTOMER_ADDRESS = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
+
 const BANNERS = [
   {
     slug: "series-a-1m",
@@ -460,19 +498,70 @@ const seed = async (): Promise<void> => {
     });
   }
 
-  const [agents, wallets, listings, endpoints, banners] = await Promise.all([
-    prisma.agent.count(),
-    prisma.wallet.count(),
-    prisma.apiListing.count(),
-    prisma.apiEndpoint.count(),
-    prisma.banner.count(),
-  ]);
+  const TREASURY = "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02";
+  const ATLAS_PAYER = "0x7a9f3c4b2e8d5a1f6c0b4e9d2a8c3f5b7e1d6a04";
+
+  const listingRow = await prisma.apiListing.findFirst({
+    where: { ownerId: owner.id, slug: API_LISTINGS[0].slug },
+    select: { id: true },
+  });
+
+  await prisma.payment.deleteMany({
+    where: { ownerId: owner.id, reqId: { startsWith: "0xseed" } },
+  });
+
+  const now = new Date();
+  for (const [index, entry] of PAYMENTS.entries()) {
+    const when = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - entry.monthsAgo,
+        entry.day,
+        12,
+      ),
+    );
+    const incoming = entry.direction === "in";
+
+    await prisma.payment.create({
+      data: {
+        ownerId: owner.id,
+        listingId: incoming ? (listingRow?.id ?? null) : null,
+        payerAddress: incoming ? CUSTOMER_ADDRESS : ATLAS_PAYER,
+        recipientAddress: incoming ? TREASURY : CUSTOMER_ADDRESS,
+        network: "BASE_SEPOLIA",
+        assetAddress: USDC_BASE_SEPOLIA,
+        amount: entry.amount,
+        status: entry.status,
+        failureReason:
+          entry.status === "FAILED"
+            ? "The payer had no free collateral for this asset."
+            : null,
+        reqId: `0xseed${index.toString(16).padStart(4, "0")}`,
+        resource: incoming
+          ? `${API_LISTINGS[0].baseUrl}/limits`
+          : "https://agents.4mica.io/atlas/brief",
+        description: incoming ? "Credit limit lookup" : "Research run",
+        settledAt: entry.status === "SETTLED" ? when : null,
+        createdAt: when,
+      },
+    });
+  }
+
+  const [agents, wallets, listings, endpoints, banners, payments] =
+    await Promise.all([
+      prisma.agent.count(),
+      prisma.wallet.count(),
+      prisma.apiListing.count(),
+      prisma.apiEndpoint.count(),
+      prisma.banner.count(),
+      prisma.payment.count(),
+    ]);
 
   const plural = (count: number, noun: string) =>
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} and ${plural(BANNERS.length, "banner")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")} and ${plural(PAYMENTS.length, "payment")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows, ${payments} payment rows total).`,
   );
 };
 

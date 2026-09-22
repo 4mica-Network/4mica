@@ -74,9 +74,10 @@ model Agent {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  owner       User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  payerWallet Wallet? @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
-  wallet      Wallet? @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  payerWallet Wallet?   @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
+  wallet      Wallet?   @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+  payments    Payment[]
 
   @@unique([walletAddress, network])
   @@unique([ownerId, slug])
@@ -188,6 +189,7 @@ model User {
   onboardingQueue                OnboardingEmailQueue?
   wallets                        Wallet[]
   walletNonces                   WalletNonce[]
+  reportedPayments               Payment[]
 
   @@index([email])
   @@map("users")
@@ -319,6 +321,7 @@ model ApiListing {
   owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   wallet    Wallet?       @relation(fields: [walletId], references: [id], onDelete: SetNull)
   endpoints ApiEndpoint[]
+  payments  Payment[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
@@ -346,6 +349,68 @@ model ApiEndpoint {
   @@unique([listingId, method, path])
   @@index([listingId])
   @@map("api_endpoints")
+}
+
+enum PaymentStatus {
+  PENDING
+  SETTLED
+  FAILED
+}
+
+/**
+ * One x402 payment, as reported by the resource server that took it.
+ *
+ * 4Mica is not in the payment path — the seller's own service calls the
+ * facilitator directly — so this is a reported ledger, not an authoritative
+ * one. It exists because core cannot answer the questions a dashboard needs:
+ * core has no payer-side query at all, and no idea which listing was paid.
+ *
+ * `ownerId` is whoever reported the row, which is the seller. Visibility is
+ * NOT scoped to it: both sides see a payment by matching `payerAddress` or
+ * `recipientAddress` against the wallets they have proved they control, so one
+ * row serves the buyer and the seller without being stored twice.
+ */
+model Payment {
+  id      String @id @default(uuid(7))
+  ownerId String @map("owner_id")
+
+  listingId String? @map("listing_id")
+  agentId   String? @map("agent_id")
+
+  payerAddress     String         @map("payer_address") @db.VarChar(42)
+  recipientAddress String         @map("recipient_address") @db.VarChar(42)
+  network          PaymentNetwork
+  /// ERC-20 paid in. Null means the chain's native asset.
+  assetAddress     String?        @map("asset_address") @db.VarChar(42)
+  amount           Decimal        @db.Decimal(38, 18)
+
+  status        PaymentStatus @default(PENDING)
+  failureReason String?       @map("failure_reason") @db.VarChar(280)
+
+  /// Minted by the payer, one per payment, and rejected as a duplicate by
+  /// core. That makes it the natural idempotency key for reporting.
+  reqId              String  @map("req_id") @db.VarChar(66)
+  guaranteeClaims    String? @map("guarantee_claims")
+  guaranteeSignature String? @map("guarantee_signature")
+  txHash             String? @map("tx_hash") @db.VarChar(66)
+
+  /// The URL that was paid for, and a human label for the line item.
+  resource    String? @db.VarChar(2048)
+  description String? @db.VarChar(280)
+
+  settledAt DateTime? @map("settled_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@unique([ownerId, reqId])
+  @@index([ownerId, createdAt(sort: Desc)])
+  @@index([payerAddress, createdAt(sort: Desc)])
+  @@index([recipientAddress, createdAt(sort: Desc)])
+  @@map("payments")
 }
 
 model Webhook {

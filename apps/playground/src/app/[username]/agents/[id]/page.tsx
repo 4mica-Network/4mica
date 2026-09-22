@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { AgentIntegration } from "@/components/IntegrationSection/AgentIntegration";
+import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages, t } from "@/i18n";
 import { parseIdOrSlug, parseUsername } from "@/schema/params";
 import { getPublicAgent } from "@/services/agents";
+import { getPayerState } from "@/services/payer";
 import { getPublicProfile } from "@/services/profile";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
@@ -67,6 +69,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
   }
 
   const { agent, profile } = resolved;
+  const payerState = await getPayerState(agent.network);
 
   return (
     <article className="flex flex-col gap-6">
@@ -124,6 +127,10 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
           </h2>
           <Prose text={agent.description} />
         </section>
+      )}
+
+      {!profile.isOwner && (
+        <PayWithFourMica network={agent.network} state={payerState} />
       )}
 
       <AgentIntegration agent={agent} isOwner={profile.isOwner} />

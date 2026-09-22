@@ -388,6 +388,109 @@ export const agentListResponseSchema = {
   },
 } as const;
 
+const paymentStatusEnum = {
+  type: "string",
+  enum: ["PENDING", "SETTLED", "FAILED"],
+} as const;
+
+export const paymentResponseSchema = {
+  type: "object",
+  required: ["id", "payerAddress", "recipientAddress", "amount", "status"],
+  properties: {
+    id: str,
+    listingId: nullStr,
+    agentId: nullStr,
+    payerAddress: str,
+    recipientAddress: str,
+    network: paymentNetworkEnum,
+    assetAddress: nullStr,
+    amount: str,
+    status: paymentStatusEnum,
+    failureReason: nullStr,
+    reqId: str,
+    txHash: nullStr,
+    resource: nullStr,
+    description: nullStr,
+    settledAt: nullStr,
+    createdAt: date,
+    updatedAt: date,
+    listingSlug: nullStr,
+    listingName: nullStr,
+    agentSlug: nullStr,
+    agentName: nullStr,
+    direction: { type: "string", enum: ["sent", "received"] },
+  },
+} as const;
+
+export const paymentListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: paymentResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+const paymentTotalsSchema = {
+  type: "object",
+  required: ["count", "settledCount", "pendingCount", "failedCount"],
+  properties: {
+    count: int,
+    settledCount: int,
+    pendingCount: int,
+    failedCount: int,
+    volume: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          assetAddress: nullStr,
+          network: str,
+          amount: str,
+        },
+      },
+    },
+  },
+} as const;
+
+export const paymentSummaryResponseSchema = {
+  type: "object",
+  required: ["sent", "received"],
+  properties: {
+    sent: paymentTotalsSchema,
+    received: paymentTotalsSchema,
+  },
+} as const;
+
+const monthlyBucketSchema = {
+  type: "object",
+  required: ["month", "settledCount", "failedCount"],
+  properties: {
+    month: str,
+    settledCount: int,
+    failedCount: int,
+    volume: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { assetAddress: nullStr, network: str, amount: str },
+      },
+    },
+  },
+} as const;
+
+export const paymentStatsResponseSchema = {
+  type: "object",
+  required: ["months", "received", "sent"],
+  properties: {
+    months: { type: "array", items: str },
+    received: { type: "array", items: monthlyBucketSchema },
+    sent: { type: "array", items: monthlyBucketSchema },
+  },
+} as const;
+
 export const batchDeleteResponseSchema = {
   type: "object",
   required: ["deleted", "notFound"],

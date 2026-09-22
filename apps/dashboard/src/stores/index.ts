@@ -4,6 +4,7 @@ import agentReducer from "./agent/reducer";
 import apiListingReducer from "./apiListing/reducer";
 import bannerReducer from "./banner/reducer";
 import developerReducer from "./developer/reducer";
+import paymentReducer from "./payment/reducer";
 import rootSaga from "./rootSaga";
 import userReducer from "./user/reducer";
 import walletReducer from "./wallet/reducer";
@@ -15,6 +16,7 @@ const rootReducer = combineReducers({
   wallet: walletReducer,
   apiListing: apiListingReducer,
   agent: agentReducer,
+  payment: paymentReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

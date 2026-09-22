@@ -120,6 +120,44 @@ export const en = {
       "This agent cannot sign payments until it is active. The setup below still applies.",
   },
 
+  payWith: {
+    heading: "Pay for this with 4Mica",
+    lead: "Credit-backed payments per request. No subscription, no invoice, and no gas on the request path.",
+
+    readyTitle: "Your account is ready to pay.",
+    readyAction: "Check your collateral",
+
+    signedOut: {
+      accountTitle: "Create a 4Mica account",
+      accountBody: "Free, and takes about a minute.",
+      walletTitle: "Link and fund a wallet",
+      walletBody:
+        "Prove you control an address, then deposit collateral. Your credit is extended against it.",
+      walletBodyOn:
+        "Prove you control an address on {{network}}, then deposit collateral. Your credit is extended against it.",
+      payTitle: "Copy the code below",
+      payBody:
+        "Wrap the fetch you already use. The client answers the 402, signs, and retries for you.",
+      cta: "Create an account",
+    },
+
+    noWallet: {
+      walletTitle: "Link a paying wallet",
+      walletBody:
+        "You have an account, but no wallet that can sign payments yet.",
+      walletBodyOn:
+        "You have an account, but no wallet on {{network}} that can sign payments yet.",
+      fundTitle: "Deposit collateral",
+      fundBody: "Credit is extended against what you deposit, not per request.",
+      cta: "Go to wallets",
+    },
+
+    wrongNetwork: {
+      title: "Add a wallet on {{network}}",
+      body: "Your paying wallets are on {{networks}}. A wallet proved on one chain cannot settle on another.",
+    },
+  },
+
   visibility: {
     public: "Public",
     unlisted: "Unlisted",
