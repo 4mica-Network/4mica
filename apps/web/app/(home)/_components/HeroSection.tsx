@@ -115,7 +115,7 @@ export default function HeroSection() {
                 className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
               >
                 <a
-                  href={links.docs}
+                  href={links.docsQuickstart}
                   target="_blank"
                   rel="noreferrer"
                   className="btn btn-primary btn-lg btn-no-lift hero-cta-primary w-full whitespace-nowrap font-semibold sm:w-auto"

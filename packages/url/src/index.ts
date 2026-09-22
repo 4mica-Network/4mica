@@ -637,6 +637,12 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
       logo: `${CANONICAL_BASE}${routes.logo}`,
     },
     docs: "https://docs.4mica.io",
+    /**
+     * For CTAs that promise action ("Start Building"), not for a generic
+     * "Docs" nav link — those should keep pointing at `docs`, whose root
+     * resolves to the conceptual Introduction page.
+     */
+    docsQuickstart: "https://docs.4mica.io/getting-started/quickstart",
     docsChangelog: "https://docs.4mica.io/updates/changelogs",
     status: "https://status.4mica.io",
     facilitator: "https://x402.4mica.xyz",
