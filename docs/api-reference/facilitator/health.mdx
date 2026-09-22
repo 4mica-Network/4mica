@@ -15,26 +15,26 @@ Use this endpoint for liveness probes and basic service monitoring.
 
 <RequestExample>
 ```bash cURL
-curl "https://x402.4mica.xyz/health"
+curl "https://staging.facilitator.4mica.io/health"
 ```
 ```javascript title="Fetch"
-const response = await fetch("https://x402.4mica.xyz/health");
+const response = await fetch("https://staging.facilitator.4mica.io/health");
 console.log(await response.json());
 ```
 ```javascript title="Axios"
 import axios from "axios";
-const { data } = await axios.get("https://x402.4mica.xyz/health");
+const { data } = await axios.get("https://staging.facilitator.4mica.io/health");
 console.log(data);
 ```
 ```python Python
 import requests
-print(requests.get("https://x402.4mica.xyz/health").json())
+print(requests.get("https://staging.facilitator.4mica.io/health").json())
 ```
 ```go Go
 package main
 import ("fmt"; "io"; "net/http")
 func main() {
-  response, _ := http.Get("https://x402.4mica.xyz/health")
+  response, _ := http.Get("https://staging.facilitator.4mica.io/health")
   defer response.Body.Close()
   body, _ := io.ReadAll(response.Body)
   fmt.Println(string(body))

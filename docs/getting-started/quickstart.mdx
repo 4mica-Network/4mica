@@ -68,7 +68,11 @@ import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { privateKeyToAccount } from "viem/accounts";
 
 const account = privateKeyToAccount(process.env.PRIVATE_KEY);
-const scheme = await FourMicaEvmScheme.create(account);
+const scheme = await FourMicaEvmScheme.create(account, {
+  // The 2.0 protocol runs at staging.api.4mica.io while Base Sepolia's
+  // permanent host is upgraded; the package default still points at the old one.
+  coreUrls: { "eip155:84532": "https://staging.api.4mica.io" },
+});
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [{ network: "eip155:84532", client: scheme }],
@@ -89,18 +93,34 @@ If the request succeeds, your client received the protected response and the sel
 If you are building the seller side, protect one route with the 4Mica payment middleware. Start with a small test price.
 
 ```ts
+import { FourMicaEvmScheme, FourMicaFacilitatorClient } from "@4mica/x402/server";
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 
-app.use(paymentMiddlewareFromConfig({
-  "GET /premium-content": {
-    accepts: {
-      scheme: "4mica-credit",
-      price: "$0.10",
-      network: "eip155:84532",
-      payTo: "0xYourAddress",
+// Staging hosts while Base Sepolia's permanent ones are upgraded; the
+// package defaults still point at the old deployment.
+const network = "eip155:84532";
+const coreUrl = "https://staging.api.4mica.io";
+const facilitatorUrl = "https://staging.facilitator.4mica.io";
+
+app.use(
+  paymentMiddlewareFromConfig(
+    {
+      "GET /premium-content": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: "$0.10",
+          network,
+          payTo: "0xYourAddress",
+          // Tells payers which core to sign against, so a buyer on the
+          // package default still lands on the right deployment.
+          extra: { rpcUrl: coreUrl },
+        },
+      },
     },
-  },
-}));
+    new FourMicaFacilitatorClient({ url: facilitatorUrl }),
+    [{ network, server: new FourMicaEvmScheme({ coreUrls: { [network]: coreUrl } }) }],
+  ),
+);
 ```
 
 The middleware returns HTTP 402 responses, verifies payment payloads, settles guarantees, and serves the protected route after payment succeeds. For the full setup, see the [Seller Quick Start](/seller/quick-start).

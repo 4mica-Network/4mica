@@ -62,6 +62,14 @@ The default network is Base Sepolia. Select another with `.network()` or the `4M
 | `base-sepolia`     | `eip155:84532`    | `https://base.sepolia.api.4mica.xyz/`     |
 | `ethereum-sepolia` | `eip155:11155111` | `https://ethereum.sepolia.api.4mica.xyz/` (legacy, x402 v1 only) |
 
+<Warning>
+The `base-sepolia` entry above is the package's built-in default and still points at the previous
+deployment. The 2.0 protocol runs at `https://staging.api.4mica.io/` while that host is upgraded, so
+set `.rpcUrl("https://staging.api.4mica.io/")` (or `4MICA_RPC_URL`) and
+`.facilitatorUrl("https://staging.facilitator.4mica.io")` explicitly until then. This note goes away
+when the permanent hosts serve 2.0.
+</Warning>
+
 Read network details from the exported `NETWORKS` constant:
 
 ```ts

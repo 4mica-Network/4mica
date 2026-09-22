@@ -24,12 +24,12 @@ description: "Create a nonce and SIWE message template for wallet authentication
 
 <RequestExample>
 ```bash cURL
-curl -X POST "https://base.sepolia.api.4mica.xyz/auth/nonce" \
+curl -X POST "https://staging.api.4mica.io/auth/nonce" \
   -H "Content-Type: application/json" \
   -d '{"address":"0x1111111111111111111111111111111111111111"}'
 ```
 ```javascript title="Fetch"
-const response = await fetch("https://base.sepolia.api.4mica.xyz/auth/nonce", {
+const response = await fetch("https://staging.api.4mica.io/auth/nonce", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ address: "0x1111111111111111111111111111111111111111" }),
@@ -39,14 +39,14 @@ console.log(await response.json());
 ```javascript title="Axios"
 import axios from "axios";
 const { data } = await axios.post(
-  "https://base.sepolia.api.4mica.xyz/auth/nonce",
+  "https://staging.api.4mica.io/auth/nonce",
   { address: "0x1111111111111111111111111111111111111111" },
 );
 console.log(data);
 ```
 ```python Python
 import requests
-url = "https://base.sepolia.api.4mica.xyz/auth/nonce"
+url = "https://staging.api.4mica.io/auth/nonce"
 print(requests.post(url, json={"address": "0x1111111111111111111111111111111111111111"}).json())
 ```
 ```go Go
@@ -54,7 +54,7 @@ package main
 import ("bytes"; "fmt"; "io"; "net/http")
 func main() {
   body := []byte(`{"address":"0x1111111111111111111111111111111111111111"}`)
-  response, _ := http.Post("https://base.sepolia.api.4mica.xyz/auth/nonce", "application/json", bytes.NewReader(body))
+  response, _ := http.Post("https://staging.api.4mica.io/auth/nonce", "application/json", bytes.NewReader(body))
   defer response.Body.Close()
   result, _ := io.ReadAll(response.Body)
   fmt.Println(string(result))

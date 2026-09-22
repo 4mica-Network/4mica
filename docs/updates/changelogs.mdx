@@ -29,10 +29,11 @@ Track product, SDK, protocol, and network changes that affect builders. Changelo
     sponsored Permit2 approval for tokens without it.
   - **Prices resolve against core.** A `"$0.10"` price advertises the stablecoin core lists for the
     network, and the client accepts it under `@x402/fetch` spend controls.
-  - **Base Sepolia first.** The SDKs now default to Base Sepolia, core at
-    `https://base.sepolia.api.4mica.xyz/` and the facilitator at `https://x402.4mica.xyz/`. Base
-    mainnet stays on the previous protocol version until its upgrade; Ethereum Sepolia is legacy,
-    x402 v1 only.
+  - **Base Sepolia first.** The SDKs now default to Base Sepolia. While its permanent hosts are
+    upgraded, the 2.0 protocol runs at `https://staging.api.4mica.io/` (core) and
+    `https://staging.facilitator.4mica.io/` (facilitator); pass them explicitly, since the
+    packages' built-in defaults still point at the previous deployment. Base mainnet stays on the
+    previous protocol version until its upgrade; Ethereum Sepolia is legacy, x402 v1 only.
 
   Migration: install the alpha packages (`pnpm install @4mica/x402@alpha`, `@4mica/sdk@alpha`; `latest` stays on 1.x until Base mainnet upgrades) and remove any tab configuration. Everything else is
   unchanged for a seller using

@@ -13,26 +13,26 @@ description: "Check the operator database and chain RPC dependencies."
 
 <RequestExample>
 ```bash cURL
-curl "https://base.sepolia.api.4mica.xyz/core/health"
+curl "https://staging.api.4mica.io/core/health"
 ```
 ```javascript title="Fetch"
-const response = await fetch("https://base.sepolia.api.4mica.xyz/core/health");
+const response = await fetch("https://staging.api.4mica.io/core/health");
 console.log(await response.json());
 ```
 ```javascript title="Axios"
 import axios from "axios";
-const { data } = await axios.get("https://base.sepolia.api.4mica.xyz/core/health");
+const { data } = await axios.get("https://staging.api.4mica.io/core/health");
 console.log(data);
 ```
 ```python Python
 import requests
-print(requests.get("https://base.sepolia.api.4mica.xyz/core/health").json())
+print(requests.get("https://staging.api.4mica.io/core/health").json())
 ```
 ```go Go
 package main
 import ("fmt"; "io"; "net/http")
 func main() {
-  response, _ := http.Get("https://base.sepolia.api.4mica.xyz/core/health")
+  response, _ := http.Get("https://staging.api.4mica.io/core/health")
   defer response.Body.Close()
   body, _ := io.ReadAll(response.Body)
   fmt.Println(string(body))

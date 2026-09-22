@@ -48,7 +48,7 @@ guarantees begin in `PENDING_VALIDATION`.
 
 <RequestExample>
 ```bash cURL
-curl -X POST "https://base.sepolia.api.4mica.xyz/core/guarantees" \
+curl -X POST "https://staging.api.4mica.io/core/guarantees" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -67,7 +67,7 @@ curl -X POST "https://base.sepolia.api.4mica.xyz/core/guarantees" \
 ```
 ```javascript title="Fetch"
 const response = await fetch(
-  "https://base.sepolia.api.4mica.xyz/core/guarantees",
+  "https://staging.api.4mica.io/core/guarantees",
   {
     method: "POST",
     headers: {
@@ -82,7 +82,7 @@ console.log(await response.json());
 ```javascript title="Axios"
 import axios from "axios";
 const { data } = await axios.post(
-  "https://base.sepolia.api.4mica.xyz/core/guarantees",
+  "https://staging.api.4mica.io/core/guarantees",
   { claims, signature, scheme: "eip712" },
   { headers: { Authorization: `Bearer ${process.env.ACCESS_TOKEN}` } },
 );
@@ -93,7 +93,7 @@ import os
 import requests
 body = {"claims": claims, "signature": signature, "scheme": "eip712"}
 headers = {"Authorization": f"Bearer {os.environ['ACCESS_TOKEN']}"}
-url = "https://base.sepolia.api.4mica.xyz/core/guarantees"
+url = "https://staging.api.4mica.io/core/guarantees"
 print(requests.post(url, json=body, headers=headers).json())
 ```
 ```go Go
@@ -105,7 +105,7 @@ func main() {
   })
   request, _ := http.NewRequest(
     "POST",
-    "https://base.sepolia.api.4mica.xyz/core/guarantees",
+    "https://staging.api.4mica.io/core/guarantees",
     bytes.NewReader(body),
   )
   request.Header.Set("Authorization", "Bearer "+os.Getenv("ACCESS_TOKEN"))

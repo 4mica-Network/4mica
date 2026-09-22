@@ -12,8 +12,8 @@ Use the network ID in payment requirements, SDK configuration, and scheme regist
 ```txt
 Base Sepolia
 Network ID: eip155:84532
-Core API URL: https://base.sepolia.api.4mica.xyz/
-Facilitator URL: https://x402.4mica.xyz/
+Core API URL: https://staging.api.4mica.io/
+Facilitator URL: https://staging.facilitator.4mica.io/
 Accepted collateral: USDC 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, USDT 0x0a215D8ba66387DCA84B284D18c3B4ec3de6E54a (Aave test tokens)
 Use for: Development, examples, demos, integration testing, and pilots
 
@@ -27,6 +27,13 @@ Network ID: eip155:11155111
 Core API URL: https://ethereum.sepolia.api.4mica.xyz/
 Use for: Legacy, x402 v1 only
 ```
+
+<Warning>
+The Base Sepolia hosts above are where the 2.0 protocol runs today, while the network's permanent
+hosts are upgraded. The SDK and `@4mica/x402` defaults for `eip155:84532` still point at the
+previous deployment, so pass these URLs explicitly (`rpcUrl` / `coreUrls` and `facilitatorUrl`)
+as the [quickstart](/getting-started/quickstart) does. This page changes when the upgrade lands.
+</Warning>
 
 The Base Sepolia tokens are Aave's testnet tokens, minted through Aave's public faucet contract
 rather than a Circle faucet; see the [quickstart](/getting-started/quickstart) for the one-line mint.
