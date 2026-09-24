@@ -1,21 +1,22 @@
-import { Tag, Link as UiLink } from "@4mica/ui";
-import { ExternalLink } from "lucide-react";
+import { Tag } from "@4mica/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { CopyValue } from "@/components/CopyValue";
 import { AgentIntegration } from "@/components/IntegrationSection/AgentIntegration";
+import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { PriceHeadline } from "@/components/PriceHeadline";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
+import { RevealLink } from "@/components/RevealLink";
+import { SupportSection } from "@/components/SupportSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages, t } from "@/i18n";
+import { buildAgentDescriptor } from "@/lib/descriptor";
 import { isSellable } from "@/lib/snippets/agent";
-import { parseIdOrSlug, parseUsername } from "@/schema/params";
-import { getPublicAgent } from "@/services/agents";
 import { getPayerState } from "@/services/payer";
-import { getPublicProfile } from "@/services/profile";
+import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
 import { formatDate } from "@/utils/formatDate";
@@ -32,33 +33,10 @@ const STATUS_LABEL = {
   SUSPENDED: messages.agent.statusSuspended,
 } as const;
 
-const resolve = async (raw: { username: string; id: string }) => {
-  const username = parseUsername(raw.username);
-  const ref = parseIdOrSlug(raw.id);
-
-  if (!username || !ref) {
-    return null;
-  }
-
-  const result = await getPublicProfile(username);
-
-  if (!result) {
-    return null;
-  }
-
-  const agent = await getPublicAgent(
-    result.ownerId,
-    ref,
-    result.profile.isOwner,
-  );
-
-  return agent ? { profile: result.profile, agent } : null;
-};
-
 export async function generateMetadata({
   params,
 }: ProfileChildPageProps): Promise<Metadata> {
-  const resolved = await resolve(await params);
+  const resolved = await resolveAgent(await params);
 
   return resolved
     ? buildAgentMetadata(resolved.profile, resolved.agent)
@@ -66,7 +44,7 @@ export async function generateMetadata({
 }
 
 export default async function AgentPage({ params }: ProfileChildPageProps) {
-  const resolved = await resolve(await params);
+  const resolved = await resolveAgent(await params);
 
   if (!resolved) {
     notFound();
@@ -74,9 +52,12 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
 
   const { agent, profile } = resolved;
   const payerState = await getPayerState(agent.network);
+  const descriptor = buildAgentDescriptor(agent, profile);
 
   return (
     <article className="flex flex-col gap-10">
+      <JsonLd descriptor={descriptor} />
+
       <ProfileNav
         className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
         displayName={profile.name || profile.username}
@@ -160,14 +141,9 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
                 {messages.agent.docsLabel}
               </dt>
               <dd className="min-w-0 flex-1">
-                <UiLink
-                  className="text-sm"
-                  external
-                  href={agent.docsUrl}
-                  icon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}
-                >
+                <RevealLink external href={agent.docsUrl}>
                   {messages.common.viewDocs}
-                </UiLink>
+                </RevealLink>
               </dd>
             </div>
           )}
@@ -188,6 +164,8 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
       )}
 
       <AgentIntegration agent={agent} isOwner={profile.isOwner} />
+
+      <SupportSection profile={profile} resourceName={agent.name} />
     </article>
   );
 }

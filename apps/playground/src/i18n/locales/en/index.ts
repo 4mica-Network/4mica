@@ -81,6 +81,15 @@ export const en = {
       "The routes this API exposes. The first one is what the code below calls.",
   },
 
+  support: {
+    heading: "Do you need help?",
+    askSeller: "Ask {{name}}",
+    askTeam: "Ask the 4Mica team",
+    readDocs: "Read the docs",
+    emailSubject: "Question about {{resource}}",
+    supportSubject: "Integration help with {{resource}}",
+  },
+
   integration: {
     heading: "Integration",
     copy: "Copy",

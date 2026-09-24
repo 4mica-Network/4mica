@@ -71,6 +71,7 @@ server {
 
   location = /robots.txt           { proxy_pass $mica_web; }
   location = /sitemap.xml          { proxy_pass $mica_web; }
+  location = /sitemap-profiles.xml { proxy_pass $mica_playground; }
   location = /llms.txt             { proxy_pass $mica_web; }
   location = /favicon.ico          { proxy_pass $mica_web; }
   location = /icon.png             { proxy_pass $mica_web; }
@@ -80,6 +81,8 @@ server {
   location ~ ^/(about|agents|blog|careers|docs|dpa|interactive-protocol|leadership|legal|partners|pricing|privacy|register|roadmap|solution|solutions|status|team|terms|waitlist)(/|$) {
     proxy_pass $mica_web;
   }
+
+  location ~ ^/[^/]+/llms\.txt$ { proxy_pass $mica_playground; }
 
   # RSC payloads. `output: "export"` writes one beside every page — /index.txt,
   # /about.txt, /__next._tree.txt — and the client fetches them to prefetch a

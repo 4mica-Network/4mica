@@ -1,50 +1,28 @@
-import { Tag, Link as UiLink } from "@4mica/ui";
-import { ExternalLink } from "lucide-react";
+import { Tag } from "@4mica/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CopyValue } from "@/components/CopyValue";
 import { ApiIntegration } from "@/components/IntegrationSection/ApiIntegration";
+import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { PriceHeadline } from "@/components/PriceHeadline";
 import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
+import { RevealLink } from "@/components/RevealLink";
+import { SupportSection } from "@/components/SupportSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
-import { parseIdOrSlug, parseUsername } from "@/schema/params";
-import { getPublicApiListing } from "@/services/api-listings";
+import { buildApiListingDescriptor } from "@/lib/descriptor";
 import { getPayerState } from "@/services/payer";
-import { getPublicProfile } from "@/services/profile";
+import { resolveApiListing } from "@/services/resource";
 import { buildApiListingMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
 import { formatDate } from "@/utils/formatDate";
 
-const resolve = async (raw: { username: string; id: string }) => {
-  const username = parseUsername(raw.username);
-  const ref = parseIdOrSlug(raw.id);
-
-  if (!username || !ref) {
-    return null;
-  }
-
-  const result = await getPublicProfile(username);
-
-  if (!result) {
-    return null;
-  }
-
-  const listing = await getPublicApiListing(
-    result.ownerId,
-    ref,
-    result.profile.isOwner,
-  );
-
-  return listing ? { profile: result.profile, listing } : null;
-};
-
 export async function generateMetadata({
   params,
 }: ProfileChildPageProps): Promise<Metadata> {
-  const resolved = await resolve(await params);
+  const resolved = await resolveApiListing(await params);
 
   return resolved
     ? buildApiListingMetadata(resolved.profile, resolved.listing)
@@ -54,7 +32,7 @@ export async function generateMetadata({
 export default async function ApiListingPage({
   params,
 }: ProfileChildPageProps) {
-  const resolved = await resolve(await params);
+  const resolved = await resolveApiListing(await params);
 
   if (!resolved) {
     notFound();
@@ -62,9 +40,12 @@ export default async function ApiListingPage({
 
   const { listing, profile } = resolved;
   const payerState = await getPayerState(listing.network);
+  const descriptor = buildApiListingDescriptor(listing, profile);
 
   return (
     <article className="flex flex-col gap-10">
+      <JsonLd descriptor={descriptor} />
+
       <ProfileNav
         className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
         displayName={profile.name || profile.username}
@@ -140,14 +121,9 @@ export default async function ApiListingPage({
                 {messages.api.docsLabel}
               </dt>
               <dd className="min-w-0 flex-1">
-                <UiLink
-                  className="text-sm"
-                  external
-                  href={listing.docsUrl}
-                  icon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}
-                >
+                <RevealLink external href={listing.docsUrl}>
                   {messages.common.viewDocs}
-                </UiLink>
+                </RevealLink>
               </dd>
             </div>
           )}
@@ -200,6 +176,8 @@ export default async function ApiListingPage({
       )}
 
       <ApiIntegration isOwner={profile.isOwner} listing={listing} />
+
+      <SupportSection profile={profile} resourceName={listing.name} />
 
       {listing.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 border-overlay/10 border-t pt-6">

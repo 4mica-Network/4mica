@@ -12,7 +12,7 @@ import { type Prisma, prisma } from "./db";
  * and the price to any anonymous caller in the 402 response, so they are public
  * facts by protocol design.
  */
-const API_LISTING_PUBLIC_SELECT = {
+export const API_LISTING_PUBLIC_SELECT = {
   id: true,
   slug: true,
   name: true,
@@ -83,7 +83,7 @@ type ApiListingRow = {
 const toAmount = (value: Decimalish): string | null =>
   value === null ? null : value.toString();
 
-const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
+export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   id: row.id,
   ref: row.slug,
   name: row.name,

@@ -45,6 +45,7 @@ interface MetadataInput {
   username: string;
   indexable: boolean;
   keywords?: string[];
+  descriptorPath?: string;
 }
 
 const build = ({
@@ -54,6 +55,7 @@ const build = ({
   username,
   indexable,
   keywords,
+  descriptorPath,
 }: MetadataInput): Metadata => {
   const clamped = clampDescription(description);
   const ogImage = `/api/og/${username}`;
@@ -63,7 +65,12 @@ const build = ({
     description: clamped,
     keywords,
     robots: robotsFor(indexable),
-    alternates: { canonical: path },
+    alternates: {
+      canonical: path,
+      ...(descriptorPath
+        ? { types: { "application/json": descriptorPath } }
+        : {}),
+    },
     openGraph: {
       title,
       description: clamped,
@@ -115,6 +122,7 @@ export const buildAgentMetadata = (
       agent.description ||
       `${agent.name}, an agent operated by @${profile.username} on 4Mica.`,
     path: `/${profile.username}/agents/${agent.ref}`,
+    descriptorPath: `/${profile.username}/agents/${agent.ref}/x402.json`,
     username: profile.username,
     indexable:
       profile.allowSEOIndexing &&
@@ -133,6 +141,7 @@ export const buildApiListingMetadata = (
       listing.description ||
       `${listing.name}, an API published by @${profile.username} on 4Mica.`,
     path: `/${profile.username}/api/${listing.ref}`,
+    descriptorPath: `/${profile.username}/api/${listing.ref}/x402.json`,
     username: profile.username,
     indexable:
       profile.allowSEOIndexing &&

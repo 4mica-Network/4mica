@@ -11,7 +11,7 @@ import { prisma } from "./db";
  * profile with its on-chain activity. Widening this select is a product
  * decision, not a refactor.
  */
-const AGENT_PUBLIC_SELECT = {
+export const AGENT_PUBLIC_SELECT = {
   id: true,
   slug: true,
   name: true,
@@ -69,7 +69,7 @@ type AgentRow = {
   walletAddress?: string | null;
 };
 
-const toPublicAgent = (row: AgentRow): PublicAgent => ({
+export const toPublicAgent = (row: AgentRow): PublicAgent => ({
   id: row.id,
   ref: row.slug ?? row.id,
   name: row.name,

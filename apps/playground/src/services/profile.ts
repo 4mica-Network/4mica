@@ -14,7 +14,7 @@ import { getViewer } from "./viewer";
  *
  * Module-private on purpose: nothing outside this file gets the raw row.
  */
-const PROFILE_SELECT = {
+export const PROFILE_SELECT = {
   id: true,
   username: true,
   name: true,

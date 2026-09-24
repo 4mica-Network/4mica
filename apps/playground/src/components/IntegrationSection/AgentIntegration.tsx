@@ -1,8 +1,8 @@
-import { Tag, Link as UiLink } from "@4mica/ui";
-import { ExternalLink } from "lucide-react";
+import { Tag } from "@4mica/ui";
 import { CodeBlock } from "@/components/CodeBlock";
 import { CodeTabs } from "@/components/CodeTabs";
 import { Disclosure, DisclosureList } from "@/components/Disclosure";
+import { RevealLink } from "@/components/RevealLink";
 import { messages } from "@/i18n";
 import {
   buildAgentBuyerSnippets,
@@ -174,14 +174,9 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
         </DisclosureList>
       </div>
 
-      <UiLink
-        className="self-start text-sm"
-        external
-        href={links.docs}
-        icon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}
-      >
+      <RevealLink className="self-start" external href={links.docs}>
         {messages.integration.viewDocs}
-      </UiLink>
+      </RevealLink>
     </section>
   );
 }

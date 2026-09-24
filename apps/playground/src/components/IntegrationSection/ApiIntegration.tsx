@@ -1,8 +1,7 @@
-import { Link as UiLink } from "@4mica/ui";
-import { ExternalLink } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
 import { CodeTabs } from "@/components/CodeTabs";
 import { Disclosure, DisclosureList } from "@/components/Disclosure";
+import { RevealLink } from "@/components/RevealLink";
 import { messages } from "@/i18n";
 import { buildApiListingSnippets } from "@/lib/snippets/api-listing";
 import { links } from "@/services/links";
@@ -106,14 +105,9 @@ export function ApiIntegration({ listing, isOwner }: ApiIntegrationProps) {
         </Disclosure>
       </DisclosureList>
 
-      <UiLink
-        className="self-start text-sm"
-        external
-        href={links.docs}
-        icon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}
-      >
+      <RevealLink className="self-start" external href={links.docs}>
         {messages.integration.viewDocs}
-      </UiLink>
+      </RevealLink>
     </section>
   );
 }
