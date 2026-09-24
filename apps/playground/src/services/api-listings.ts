@@ -5,13 +5,6 @@ import type { PublicApiListing } from "@/schema/api-listing";
 import type { HttpMethod, PaymentNetwork } from "@/schema/params";
 import { type Prisma, prisma } from "./db";
 
-/**
- * `ownerId` is omitted so a listing can never correlate two profiles.
- *
- * The payment columns ARE selected: x402 advertises `payTo`, `asset`, `network`
- * and the price to any anonymous caller in the 402 response, so they are public
- * facts by protocol design.
- */
 export const API_LISTING_PUBLIC_SELECT = {
   id: true,
   slug: true,
@@ -39,15 +32,10 @@ export const API_LISTING_PUBLIC_SELECT = {
       summary: true,
       priceAmount: true,
     },
-    // Deterministic: the snippet builder demonstrates endpoints[0], so a tie
-    // here would make the generated code unstable between renders.
     orderBy: [{ sortOrder: "asc" }, { path: "asc" }],
   },
-  // `satisfies` rather than `as const`, which would make the nested `orderBy`
-  // array readonly and so unassignable to Prisma's input type.
 } satisfies Prisma.ApiListingSelect;
 
-/** Prisma Decimal is not serialisable across the RSC boundary. */
 type Decimalish = { toString(): string } | null;
 
 type ApiEndpointRow = {

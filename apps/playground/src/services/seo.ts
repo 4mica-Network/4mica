@@ -7,10 +7,6 @@ export const SITE_NAME = "4Mica";
 
 const DESCRIPTION_LIMIT = 160;
 
-/**
- * Sentence-aware clamp, ported from apps/web/seo/pages.ts so both sites
- * truncate identically.
- */
 const clampDescription = (text: string): string => {
   if (text.length <= DESCRIPTION_LIMIT) return text;
 
@@ -28,11 +24,6 @@ const clampDescription = (text: string): string => {
   return `${cut.slice(0, cut.lastIndexOf(" ")).trimEnd()}…`;
 };
 
-/**
- * Robots directives are driven by the user's own `allowSEOIndexing` setting.
- * An UNLISTED resource is always noindex regardless of the profile setting —
- * it is reachable by direct link only.
- */
 const robotsFor = (indexable: boolean): Metadata["robots"] =>
   indexable
     ? { index: true, follow: true }
@@ -90,7 +81,6 @@ const build = ({
   };
 };
 
-/** Metadata for a profile that does not exist or is not publicly visible. */
 export const notFoundMetadata = (): Metadata => ({
   title: `Profile not found · ${SITE_NAME}`,
   description: "This 4Mica profile is not available.",
@@ -106,7 +96,6 @@ export const buildProfileMetadata = (profile: PublicProfile): Metadata =>
       `${profile.name || profile.username} on 4Mica — agents and APIs for the agentic economy.`,
     path: `/${profile.username}`,
     username: profile.username,
-    // An owner-preview render must never be indexed, even if the flag is on.
     indexable: profile.allowSEOIndexing && profile.isPublished,
     keywords: [profile.username, "4Mica", "agent", "API", "agentic economy"],
   });

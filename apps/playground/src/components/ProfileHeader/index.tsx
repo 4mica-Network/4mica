@@ -2,10 +2,6 @@ import { Avatar } from "@/components/Avatar";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import type { PublicProfile } from "@/types";
 
-/**
- * Deliberately just the face and the name. The handle is already in the URL,
- * and everything else the profile knows lives on the rows below it.
- */
 export function ProfileHeader({ profile }: { profile: PublicProfile }) {
   return (
     <header className="flex flex-col gap-4">

@@ -1,13 +1,3 @@
-/**
- * Compile-time message catalogue, following apps/web/i18n rather than
- * apps/dashboard's react-i18next.
- *
- * react-i18next init()s a module-scope singleton — per-process mutable state
- * shared across concurrent SSR requests — and forces "use client" on every
- * component that translates anything, which would defeat server rendering on a
- * read-mostly page. A frozen object has none of those problems and costs
- * nothing at runtime.
- */
 export const en = {
   common: {
     brandName: "4Mica",
