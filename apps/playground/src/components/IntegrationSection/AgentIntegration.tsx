@@ -2,15 +2,14 @@ import { Tag, Link as UiLink } from "@4mica/ui";
 import { ExternalLink } from "lucide-react";
 import { CodeBlock } from "@/components/CodeBlock";
 import { CodeTabs } from "@/components/CodeTabs";
+import { Disclosure, DisclosureList } from "@/components/Disclosure";
 import { messages } from "@/i18n";
 import {
   buildAgentBuyerSnippets,
   buildAgentSnippets,
 } from "@/lib/snippets/agent";
-import { networkInfo } from "@/lib/snippets/networks";
 import { links } from "@/services/links";
 import type { PublicAgent } from "@/types";
-import { Step, StepList } from "./Step";
 
 export interface AgentIntegrationProps {
   agent: PublicAgent;
@@ -20,15 +19,21 @@ export interface AgentIntegrationProps {
 export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
   const buyer = buildAgentBuyerSnippets(agent);
   const runner = buildAgentSnippets(agent);
-  const network = networkInfo(agent.network);
 
   return (
-    <section className="flex flex-col gap-8">
-      <div className="flex flex-col gap-5">
+    <section className="flex flex-col gap-10">
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="font-semibold text-ink-strong text-lg">
-            {messages.integration.agentBuyerHeading}
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
+              {messages.integration.agentBuyerHeading}
+            </h2>
+            {agent.status !== "ACTIVE" && (
+              <Tag size="sm" variant="warning">
+                {messages.integration.inactiveAgent}
+              </Tag>
+            )}
+          </div>
           <p className="text-ink-muted text-sm">
             {buyer
               ? messages.integration.agentBuyerLead
@@ -38,44 +43,17 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
           </p>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Tag size="sm" variant="neutral">
-              {network.label}
-            </Tag>
-            {buyer && (
-              <Tag size="sm" variant="neutral">
-                {agent.assetAddress === null
-                  ? messages.integration.nativeAsset
-                  : messages.integration.erc20}
-              </Tag>
-            )}
-            {agent.status !== "ACTIVE" && (
-              <Tag size="sm" variant="warning">
-                {messages.integration.inactiveAgent}
-              </Tag>
-            )}
-          </div>
-          {/* Which token, not just that it is one — a buyer cannot approve an
-              allowance without the address. */}
-          {agent.assetAddress && (
-            <p className="break-all font-mono text-ink-subtle text-xs">
-              {agent.assetAddress}
-            </p>
-          )}
-        </div>
-
         {buyer && (
-          <StepList>
-            <Step
+          <DisclosureList>
+            <Disclosure
               index={1}
               lead={messages.integration.installLead}
               title={messages.integration.installTitle}
             >
-              <CodeBlock code={buyer.install} lang="bash" label="Terminal" />
-            </Step>
+              <CodeBlock code={buyer.install} label="Terminal" lang="bash" />
+            </Disclosure>
 
-            <Step
+            <Disclosure
               index={2}
               lead={messages.integration.agentCallLead}
               title={messages.integration.agentCallTitle}
@@ -117,9 +95,9 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
                   },
                 ]}
               />
-            </Step>
+            </Disclosure>
 
-            <Step
+            <Disclosure
               index={3}
               lead={messages.integration.receiptLead}
               title={messages.integration.receiptTitle}
@@ -129,14 +107,14 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
                 lang="typescript"
                 showLineNumbers
               />
-            </Step>
-          </StepList>
+            </Disclosure>
+          </DisclosureList>
         )}
       </div>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="font-semibold text-ink-strong text-lg">
+          <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
             {messages.integration.agentRunHeading}
           </h2>
           <p className="text-ink-muted text-sm">
@@ -144,16 +122,16 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
           </p>
         </div>
 
-        <StepList>
-          <Step
+        <DisclosureList>
+          <Disclosure
             index={1}
             lead={messages.integration.installLead}
             title={messages.integration.installTitle}
           >
-            <CodeBlock code={runner.install} lang="bash" label="Terminal" />
-          </Step>
+            <CodeBlock code={runner.install} label="Terminal" lang="bash" />
+          </Disclosure>
 
-          <Step
+          <Disclosure
             index={2}
             lead={messages.integration.payLead}
             title={messages.integration.payTitle}
@@ -164,13 +142,13 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
               showLineNumbers
             />
             {isOwner && (
-              <p className="text-ink-subtle text-xs">
+              <p className="pt-2 text-ink-subtle text-xs">
                 {messages.integration.walletOwnerOnly}
               </p>
             )}
-          </Step>
+          </Disclosure>
 
-          <Step
+          <Disclosure
             index={3}
             lead={messages.integration.collateralLead}
             title={messages.integration.collateralTitle}
@@ -180,9 +158,9 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
               lang="typescript"
               showLineNumbers
             />
-          </Step>
+          </Disclosure>
 
-          <Step
+          <Disclosure
             index={4}
             lead={messages.integration.receiptLead}
             title={messages.integration.receiptTitle}
@@ -192,12 +170,12 @@ export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
               lang="typescript"
               showLineNumbers
             />
-          </Step>
-        </StepList>
+          </Disclosure>
+        </DisclosureList>
       </div>
 
       <UiLink
-        className="text-sm"
+        className="self-start text-sm"
         external
         href={links.docs}
         icon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}

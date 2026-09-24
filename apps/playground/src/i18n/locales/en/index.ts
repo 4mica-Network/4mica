@@ -49,13 +49,15 @@ export const en = {
   },
 
   agent: {
-    status: "Status",
     statusPending: "Pending",
     statusActive: "Active",
     statusSuspended: "Suspended",
     operatedBy: "Operated by @{{username}}",
     aboutHeading: "About this agent",
     registered: "Registered",
+    endpointLabel: "Endpoint",
+    paidTo: "Paid to",
+    docsLabel: "Docs",
   },
 
   api: {
@@ -63,9 +65,20 @@ export const en = {
     category: "Category",
     pricing: "Pricing",
     published: "Published {{date}}",
+    publishedLabel: "Published",
+    docsLabel: "Docs",
+    paidTo: "Paid to",
     aboutHeading: "About this API",
     tagsHeading: "Tags",
     noTags: "No tags yet",
+
+    perRequest: "per request",
+    priceUnset: "Pricing not set",
+    settlesOn: "Settles on {{network}}",
+
+    endpointsHeading: "Endpoints",
+    endpointsLead:
+      "The routes this API exposes. The first one is what the code below calls.",
   },
 
   integration: {
@@ -86,8 +99,6 @@ export const en = {
     receiptTitle: "See your transactions",
     receiptLead:
       "Each paid response carries its settled payment. Pair it with your own task log to make the spend auditable.",
-    endpointsTitle: "Priced endpoints",
-    noEndpoints: "No priced endpoints yet",
     nativeAsset: "Native asset",
     erc20: "ERC-20",
     notPayable: "This API is not accepting 4Mica payments yet.",

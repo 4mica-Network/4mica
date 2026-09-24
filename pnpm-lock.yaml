@@ -820,6 +820,9 @@ importers:
       '@prisma/client':
         specifier: 'catalog:'
         version: 7.9.1(prisma@7.9.1(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(magicast@0.5.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3)
+      framer-motion:
+        specifier: 'catalog:'
+        version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       lucide-react:
         specifier: 'catalog:'
         version: 1.23.0(react@19.2.7)
