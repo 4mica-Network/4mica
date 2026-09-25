@@ -4,6 +4,7 @@ import i18n from "@i18n";
 import { notifyError, notifySuccess } from "@utils/notification";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
 import {
+  faqsChanged,
   fetchTrustFailed,
   fetchTrustPending,
   fetchTrustSucceeded,
@@ -66,16 +67,18 @@ export function* fetchTrust(action: {
   try {
     yield put(fetchTrustPending());
 
-    const [policy, summary, reviews, reports] = (yield all([
+    const [policy, summary, reviews, reports, faqs] = (yield all([
       call(() => api.getPolicy(kind, id)),
       call(() => api.getTrustSummary(kind, id)),
       call(() => api.getReviews(kind, id)),
       call(() => api.getReports(kind, id)),
+      call(() => api.getFaqs(kind, id)),
     ])) as [
       Awaited<ReturnType<typeof api.getPolicy>>,
       Awaited<ReturnType<typeof api.getTrustSummary>>,
       Awaited<ReturnType<typeof api.getReviews>>,
       Awaited<ReturnType<typeof api.getReports>>,
+      Awaited<ReturnType<typeof api.getFaqs>>,
     ];
 
     yield put(
@@ -84,6 +87,7 @@ export function* fetchTrust(action: {
         summary,
         reviews: reviews.data,
         reports: reports.data,
+        faqs: faqs.data,
       }),
     );
   } catch (error) {
@@ -171,8 +175,87 @@ export function* updateReport(action: {
   }
 }
 
+function* refreshFaqs(resource: ResourceRef, pendingKey: string) {
+  const result = (yield call(() =>
+    api.getFaqs(resource.kind, resource.id),
+  )) as Awaited<ReturnType<typeof api.getFaqs>>;
+
+  yield put(faqsChanged(result.data, pendingKey));
+}
+
+export function* createFaq(action: {
+  type: string;
+  payload: { resource: ResourceRef; faq: { question: string; answer: string } };
+  meta: PendingMeta;
+}): Generator {
+  const { resource, faq } = action.payload;
+
+  try {
+    yield call(() => api.createFaq(resource.kind, resource.id, faq));
+    yield* refreshFaqs(resource, action.meta.pendingKey);
+  } catch (error) {
+    yield* fail(error, "Couldn't add that question.", action.meta);
+  }
+}
+
+export function* updateFaq(action: {
+  type: string;
+  payload: {
+    resource: ResourceRef;
+    faqId: string;
+    faq: { question: string; answer: string };
+  };
+  meta: PendingMeta;
+}): Generator {
+  const { resource, faqId, faq } = action.payload;
+
+  try {
+    yield call(() => api.updateFaq(resource.kind, resource.id, faqId, faq));
+    yield* refreshFaqs(resource, action.meta.pendingKey);
+  } catch (error) {
+    yield* fail(error, "Couldn't save that question.", action.meta);
+  }
+}
+
+export function* deleteFaq(action: {
+  type: string;
+  payload: { resource: ResourceRef; faqId: string };
+  meta: PendingMeta;
+}): Generator {
+  const { resource, faqId } = action.payload;
+
+  try {
+    yield call(() => api.deleteFaq(resource.kind, resource.id, faqId));
+    yield* refreshFaqs(resource, action.meta.pendingKey);
+  } catch (error) {
+    yield* fail(error, "Couldn't remove that question.", action.meta);
+  }
+}
+
+export function* reorderFaqs(action: {
+  type: string;
+  payload: { resource: ResourceRef; ids: string[] };
+  meta: PendingMeta;
+}): Generator {
+  const { resource, ids } = action.payload;
+
+  try {
+    const result = (yield call(() =>
+      api.reorderFaqs(resource.kind, resource.id, ids),
+    )) as Awaited<ReturnType<typeof api.reorderFaqs>>;
+
+    yield put(faqsChanged(result.data, action.meta.pendingKey));
+  } catch (error) {
+    yield* fail(error, "Couldn't reorder those questions.", action.meta);
+  }
+}
+
 export default [
   takeLatest(actionTypes.FETCH_TRUST_REQUESTED, fetchTrust),
+  takeEvery(actionTypes.CREATE_FAQ_REQUESTED, createFaq),
+  takeEvery(actionTypes.UPDATE_FAQ_REQUESTED, updateFaq),
+  takeEvery(actionTypes.DELETE_FAQ_REQUESTED, deleteFaq),
+  takeLatest(actionTypes.REORDER_FAQS_REQUESTED, reorderFaqs),
   takeEvery(actionTypes.SAVE_POLICY_REQUESTED, savePolicy),
   takeEvery(actionTypes.REPLY_TO_REVIEW_REQUESTED, replyToReview),
   takeEvery(actionTypes.UPDATE_REPORT_REQUESTED, updateReport),

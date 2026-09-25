@@ -278,6 +278,37 @@ const AGENT_POLICY = {
   statusUrl: null,
 } as const;
 
+const LISTING_FAQS = [
+  {
+    question: "What happens if a call times out?",
+    answer:
+      "Anything over 10s is cut off and refunded on the next settlement cycle. You are never charged for a response you did not get.",
+  },
+  {
+    question: "Do you rate limit?",
+    answer:
+      "60 requests per minute per payer address. Burst above that and you get a 429 with a Retry-After header — 429s are never charged.",
+  },
+  {
+    question: "Is there a sandbox I can try first?",
+    answer:
+      "Yes. https://api.4mica.io/sandbox/limits returns the same shape with fixture data and costs nothing.",
+  },
+] as const;
+
+const AGENT_FAQS = [
+  {
+    question: "How long does a brief take?",
+    answer:
+      "Most finish inside 90 seconds. A brief spanning more than 20 sources can take four minutes.",
+  },
+  {
+    question: "What happens if it finds no sources?",
+    answer:
+      "It returns an empty result rather than inventing citations, and the run is refunded in full.",
+  },
+] as const;
+
 const LISTING_REPORT = {
   reviewer: 1,
   reason: "NOT_WORKING",
@@ -714,9 +745,31 @@ const seed = async (): Promise<void> => {
         },
       });
     }
+    await prisma.faqItem.deleteMany({ where: { listingId: listingRow.id } });
+    for (const [index, entry] of LISTING_FAQS.entries()) {
+      await prisma.faqItem.create({
+        data: {
+          listingId: listingRow.id,
+          question: entry.question,
+          answer: entry.answer,
+          sortOrder: index,
+        },
+      });
+    }
   }
 
   if (agentRow) {
+    await prisma.faqItem.deleteMany({ where: { agentId: agentRow.id } });
+    for (const [index, entry] of AGENT_FAQS.entries()) {
+      await prisma.faqItem.create({
+        data: {
+          agentId: agentRow.id,
+          question: entry.question,
+          answer: entry.answer,
+          sortOrder: index,
+        },
+      });
+    }
     for (const entry of AGENT_REVIEWS) {
       const authorId = reviewers[entry.reviewer].id;
       await prisma.review.upsert({

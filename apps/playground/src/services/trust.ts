@@ -22,6 +22,8 @@ const REVIEW_SELECT = {
 } as const;
 
 const POLICY_SELECT = {
+  policyEnabled: true,
+  faqEnabled: true,
   refundPolicy: true,
   uptimeTarget: true,
   supportResponse: true,
@@ -107,13 +109,33 @@ export const getPolicy = cache(async (kind: ResourceKind, id: string) => {
     select: POLICY_SELECT,
   });
 
-  if (!row) {
+  if (!row || !row.policyEnabled) {
     return null;
   }
 
-  const hasAny = Object.values(row).some((value) => value !== null);
+  const { policyEnabled, faqEnabled, ...fields } = row;
+  const hasAny = Object.values(fields).some((value) => value !== null);
 
-  return hasAny ? row : null;
+  return hasAny ? fields : null;
+});
+
+export const listFaqs = cache(async (kind: ResourceKind, id: string) => {
+  const settings = await prisma.resourcePolicy.findFirst({
+    where: targetOf(kind, id),
+    select: { faqEnabled: true },
+  });
+
+  if (settings && !settings.faqEnabled) {
+    return [];
+  }
+
+  const rows = await prisma.faqItem.findMany({
+    where: targetOf(kind, id),
+    select: { id: true, question: true, answer: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  return rows;
 });
 
 export const hasSettledPayment = async (

@@ -17,10 +17,9 @@ import {
   Route,
   Trash2,
 } from "lucide-react";
-import type { KeyboardEvent, MouseEvent } from "react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
@@ -43,7 +42,6 @@ export function ApiListingRow({
 }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
 
   const isPending = useAppSelector(
     selectIsApiListingPending(`apiListing:${listing.id}`),
@@ -60,48 +58,30 @@ export function ApiListingRow({
     listing.priceLabel,
   );
 
-  const openDetail = (event: MouseEvent | KeyboardEvent) => {
-    if (
-      event.target instanceof Element &&
-      event.target.closest('a, button, input, [role="menu"], [role="dialog"]')
-    ) {
-      return;
-    }
-
-    navigate(`/apps/${listing.id}`);
-  };
-
   return (
     <div
       className={cn(
-        "group flex w-full cursor-pointer items-start gap-3 bg-surface px-4 py-3.5 transition-colors",
+        "group relative flex w-full cursor-pointer items-start gap-3 bg-surface px-4 py-3.5 transition-colors",
         isSelected ? "bg-overlay/10" : "hover:bg-overlay/5",
       )}
       data-testid={`api-listing-row-${listing.id}`}
-      onClick={openDetail}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          openDetail(event);
-        }
-      }}
-      role="button"
-      tabIndex={0}
     >
       <Checkbox
         variant="square"
-        className="mt-0.5 w-auto shrink-0"
+        className="relative z-10 mt-0.5 w-auto shrink-0"
         checked={isSelected}
         onChange={() => dispatch(toggleApiListingSelected(listing.id))}
         data-testid={`api-listing-select-${listing.id}`}
       />
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span
-          className="min-w-0 truncate font-semibold text-base text-ink-strong"
+        <Link
+          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline"
           data-testid={`api-listing-name-${listing.id}`}
+          to={`/apps/${listing.id}`}
         >
           {listing.name}
-        </span>
+        </Link>
 
         {listing.summary && (
           <p className="min-w-0 truncate text-ink-muted text-sm">
@@ -150,7 +130,7 @@ export function ApiListingRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
         <span ref={menuAnchor} className="inline-flex">
@@ -176,18 +156,15 @@ export function ApiListingRow({
           onClickOutside={() => setMenuOpen(false)}
         >
           <div className="flex w-60 flex-col py-1">
-            <button
-              type="button"
+            <Link
               className={cn(menuItem, "text-ink-body")}
-              onClick={() => {
-                setMenuOpen(false);
-                navigate(`/apps/${listing.id}`);
-              }}
               data-testid={`api-listing-edit-${listing.id}`}
+              onClick={() => setMenuOpen(false)}
+              to={`/apps/${listing.id}`}
             >
               <Pencil className="h-4 w-4" />
               {t("apiListing.row.edit")}
-            </button>
+            </Link>
 
             <button
               type="button"

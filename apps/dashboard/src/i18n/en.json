@@ -781,5 +781,18 @@
   "appDetail.visibility.title": "Visibility",
   "appDetail.visibility.description": "Public listings appear on your profile and in the 4Mica directory. Unlisted is reachable by direct link only.",
   "appDetail.endpointsLead": "The routes this API exposes. The first one is what the generated snippets call.",
-  "appDetail.editEndpoints": "Edit endpoints"
+  "appDetail.editEndpoints": "Edit endpoints",
+  "appDetail.hiddenFromBuyers": "Off — buyers do not see this section on your public page.",
+  "appDetail.noEndpoints": "No routes listed yet. Buyers still call the base URL.",
+  "appDetail.reviewsLead": "You can reply to any review. You cannot edit or remove one.",
+  "appDetail.faq.title": "FAQs",
+  "appDetail.faq.lead": "Answer the questions buyers ask before they pay. Drag to reorder — this is the order they appear in.",
+  "appDetail.faq.add": "Add question",
+  "appDetail.faq.remove": "Remove question",
+  "appDetail.faq.reorder": "Drag to reorder",
+  "appDetail.faq.questionPlaceholder": "e.g. What happens if a call times out?",
+  "appDetail.faq.answerPlaceholder": "Answer it the way you would in support.",
+  "agentDetail.title": "Agent",
+  "agentDetail.backToAgents": "Back to agents",
+  "agentDetail.notFound": "That agent is no longer available."
 }

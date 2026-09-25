@@ -19,6 +19,8 @@ export type ReportReason = (typeof REPORT_REASON)[keyof typeof REPORT_REASON];
 
 export interface ResourcePolicy {
   id: string;
+  policyEnabled: boolean;
+  faqEnabled: boolean;
   refundPolicy: string | null;
   uptimeTarget: string | null;
   supportResponse: string | null;
@@ -34,16 +36,27 @@ export interface ResourcePolicy {
 }
 
 export interface PolicyInput {
-  refundPolicy: string | null;
-  uptimeTarget: string | null;
-  supportResponse: string | null;
-  supportEmail: string | null;
-  rateLimit: string | null;
-  dataRetention: string | null;
-  testEndpoint: string | null;
-  termsUrl: string | null;
-  privacyUrl: string | null;
-  statusUrl: string | null;
+  policyEnabled?: boolean;
+  faqEnabled?: boolean;
+  refundPolicy?: string | null;
+  uptimeTarget?: string | null;
+  supportResponse?: string | null;
+  supportEmail?: string | null;
+  rateLimit?: string | null;
+  dataRetention?: string | null;
+  testEndpoint?: string | null;
+  termsUrl?: string | null;
+  privacyUrl?: string | null;
+  statusUrl?: string | null;
+}
+
+export interface Faq {
+  id: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ReviewAuthor {
@@ -89,6 +102,7 @@ export interface TrustSummary {
 
 export interface TrustState {
   policy: ResourcePolicy | null;
+  faqs: Faq[];
   summary: TrustSummary | null;
   reviews: Review[];
   reports: Report[];

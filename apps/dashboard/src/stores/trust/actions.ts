@@ -1,5 +1,6 @@
 import actionTypes from "./actionTypes";
 import type {
+  Faq,
   PolicyInput,
   Report,
   ReportStatus,
@@ -30,6 +31,7 @@ export const fetchTrustPending = () => ({
 
 export const fetchTrustSucceeded = (payload: {
   policy: ResourcePolicy | null;
+  faqs: Faq[];
   summary: TrustSummary;
   reviews: Review[];
   reports: Report[];
@@ -100,3 +102,40 @@ export const clearTrustIssues = () => ({
 });
 
 export const resetTrust = () => ({ type: actionTypes.RESET_TRUST });
+
+export const createFaq = (
+  resource: ResourceRef,
+  faq: { question: string; answer: string },
+) => ({
+  type: actionTypes.CREATE_FAQ_REQUESTED,
+  payload: { resource, faq },
+  meta: { pendingKey: "faq:new" },
+});
+
+export const updateFaq = (
+  resource: ResourceRef,
+  faqId: string,
+  faq: { question: string; answer: string },
+) => ({
+  type: actionTypes.UPDATE_FAQ_REQUESTED,
+  payload: { resource, faqId, faq },
+  meta: { pendingKey: `faq:${faqId}` },
+});
+
+export const deleteFaq = (resource: ResourceRef, faqId: string) => ({
+  type: actionTypes.DELETE_FAQ_REQUESTED,
+  payload: { resource, faqId },
+  meta: { pendingKey: `faq:${faqId}` },
+});
+
+export const reorderFaqs = (resource: ResourceRef, ids: string[]) => ({
+  type: actionTypes.REORDER_FAQS_REQUESTED,
+  payload: { resource, ids },
+  meta: { pendingKey: "faq:order" },
+});
+
+export const faqsChanged = (faqs: Faq[], pendingKey: string) => ({
+  type: actionTypes.FAQS_CHANGED,
+  payload: { faqs },
+  meta: { pendingKey },
+});

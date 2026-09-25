@@ -1,8 +1,9 @@
 import actionTypes from "./actionTypes";
-import type { Report, ResourcePolicy, Review, TrustState } from "./type";
+import type { Faq, Report, ResourcePolicy, Review, TrustState } from "./type";
 
 export const INITIAL_STATE: TrustState = {
   policy: null,
+  faqs: [],
   summary: null,
   reviews: [],
   reports: [],
@@ -48,7 +49,7 @@ export default function trustReducer(
     case actionTypes.FETCH_TRUST_SUCCEEDED: {
       const payload = action.payload as Pick<
         TrustState,
-        "policy" | "summary" | "reviews" | "reports"
+        "policy" | "summary" | "reviews" | "reports" | "faqs"
       >;
       return {
         ...state,
@@ -68,6 +69,10 @@ export default function trustReducer(
     case actionTypes.SAVE_POLICY_REQUESTED:
     case actionTypes.REPLY_TO_REVIEW_REQUESTED:
     case actionTypes.UPDATE_REPORT_REQUESTED:
+    case actionTypes.CREATE_FAQ_REQUESTED:
+    case actionTypes.UPDATE_FAQ_REQUESTED:
+    case actionTypes.DELETE_FAQ_REQUESTED:
+    case actionTypes.REORDER_FAQS_REQUESTED:
       return {
         ...state,
         error: null,
@@ -103,6 +108,13 @@ export default function trustReducer(
         pending: setPending(state.pending, `report:${report.id}`, false),
       };
     }
+
+    case actionTypes.FAQS_CHANGED:
+      return {
+        ...state,
+        faqs: (action.payload as { faqs: Faq[] }).faqs,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
 
     case actionTypes.TRUST_ACTION_FAILED: {
       const { message, issues } = action.payload as {

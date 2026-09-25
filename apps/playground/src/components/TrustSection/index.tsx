@@ -1,3 +1,4 @@
+import { FaqSection } from "@/components/FaqSection";
 import { ReportDialog } from "@/components/ReportDialog";
 import { ReviewComposer } from "@/components/ReviewComposer";
 import { ReviewList } from "@/components/ReviewList";
@@ -9,6 +10,7 @@ import {
   getPolicy,
   getTrustSummary,
   getViewerReview,
+  listFaqs,
   listReviews,
 } from "@/services/trust";
 import { getViewer } from "@/services/viewer";
@@ -29,10 +31,11 @@ export async function TrustSection({
   publishedAt,
 }: TrustSectionProps) {
   const viewer = await getViewer();
-  const [summary, policy, reviews] = await Promise.all([
+  const [summary, policy, reviews, faqs] = await Promise.all([
     getTrustSummary(kind, id),
     getPolicy(kind, id),
     listReviews(kind, id),
+    listFaqs(kind, id),
   ]);
 
   const existing = viewer ? await getViewerReview(kind, id, viewer.id) : null;
@@ -52,6 +55,8 @@ export async function TrustSection({
   return (
     <div className="flex flex-col gap-8">
       <TrustPanel policy={policy} publishedAt={publishedAt} summary={summary} />
+
+      <FaqSection faqs={faqs} />
 
       <section className="flex flex-col gap-4">
         <h2 className="font-semibold text-ink-strong text-lg tracking-tight">

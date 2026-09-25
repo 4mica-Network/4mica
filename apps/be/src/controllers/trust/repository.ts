@@ -1,5 +1,6 @@
 import { type Prisma, prisma } from "@4mica/db";
 import type {
+  FaqItemInput,
   ListReportsQuery,
   ListReviewsQuery,
   UpsertPolicyInput,
@@ -32,6 +33,8 @@ const target = (kind: ResourceKind, id: string) =>
 
 export const POLICY_SELECT = {
   id: true,
+  policyEnabled: true,
+  faqEnabled: true,
   refundPolicy: true,
   uptimeTarget: true,
   supportResponse: true,
@@ -230,4 +233,82 @@ export const trustSummary = async (
     openReports,
     unansweredReviews: unanswered,
   };
+};
+
+export const FAQ_SELECT = {
+  id: true,
+  question: true,
+  answer: true,
+  sortOrder: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.FaqItemSelect;
+
+export const listFaqs = (kind: ResourceKind, id: string) =>
+  prisma.faqItem.findMany({
+    where: target(kind, id),
+    select: FAQ_SELECT,
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+export const createFaq = async (
+  kind: ResourceKind,
+  id: string,
+  input: FaqItemInput,
+) => {
+  const last = await prisma.faqItem.findFirst({
+    where: target(kind, id),
+    select: { sortOrder: true },
+    orderBy: { sortOrder: "desc" },
+  });
+
+  return prisma.faqItem.create({
+    data: {
+      ...target(kind, id),
+      ...input,
+      sortOrder: (last?.sortOrder ?? -1) + 1,
+    },
+    select: FAQ_SELECT,
+  });
+};
+
+export const findFaq = (kind: ResourceKind, id: string, faqId: string) =>
+  prisma.faqItem.findFirst({
+    where: { id: faqId, ...target(kind, id) },
+    select: { id: true },
+  });
+
+export const updateFaq = (faqId: string, input: FaqItemInput) =>
+  prisma.faqItem.update({
+    where: { id: faqId },
+    data: input,
+    select: FAQ_SELECT,
+  });
+
+export const deleteFaq = (faqId: string) =>
+  prisma.faqItem.delete({ where: { id: faqId } });
+
+export const reorderFaqs = async (
+  kind: ResourceKind,
+  id: string,
+  ids: string[],
+) => {
+  const owned = await prisma.faqItem.findMany({
+    where: { ...target(kind, id), id: { in: ids } },
+    select: { id: true },
+  });
+  const ownedIds = new Set(owned.map((row) => row.id));
+
+  await prisma.$transaction(
+    ids
+      .filter((faqId) => ownedIds.has(faqId))
+      .map((faqId, index) =>
+        prisma.faqItem.update({
+          where: { id: faqId },
+          data: { sortOrder: index },
+        }),
+      ),
+  );
+
+  return listFaqs(kind, id);
 };

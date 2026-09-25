@@ -1,6 +1,7 @@
 import { HttpMethod } from "@4mica/http";
 import type { ResourceKind } from "@stores/trust/actions";
 import type {
+  Faq,
   PolicyInput,
   Report,
   ReportStatus,
@@ -77,4 +78,46 @@ export const updateReport = (
     url: `${base(kind, id)}/reports/${encodeURIComponent(reportId)}`,
     method: HttpMethod.PATCH,
     data: { status, resolutionNote },
+  });
+
+export const getFaqs = (kind: ResourceKind, id: string) =>
+  httpClient.request<{ data: Faq[] }>({
+    url: `${base(kind, id)}/faqs`,
+    method: HttpMethod.GET,
+  });
+
+export const createFaq = (
+  kind: ResourceKind,
+  id: string,
+  data: { question: string; answer: string },
+) =>
+  httpClient.request<{ faq: Faq }, typeof data>({
+    url: `${base(kind, id)}/faqs`,
+    method: HttpMethod.POST,
+    data,
+  });
+
+export const updateFaq = (
+  kind: ResourceKind,
+  id: string,
+  faqId: string,
+  data: { question: string; answer: string },
+) =>
+  httpClient.request<{ faq: Faq }, typeof data>({
+    url: `${base(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
+    method: HttpMethod.PATCH,
+    data,
+  });
+
+export const deleteFaq = (kind: ResourceKind, id: string, faqId: string) =>
+  httpClient.request<null>({
+    url: `${base(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
+    method: HttpMethod.DELETE,
+  });
+
+export const reorderFaqs = (kind: ResourceKind, id: string, ids: string[]) =>
+  httpClient.request<{ data: Faq[] }, { ids: string[] }>({
+    url: `${base(kind, id)}/faqs/order`,
+    method: HttpMethod.PUT,
+    data: { ids },
   });

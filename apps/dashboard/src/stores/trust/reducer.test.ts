@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  faqsChanged,
   fetchTrustSucceeded,
   replyToReviewSucceeded,
   savePolicySucceeded,
@@ -8,7 +9,7 @@ import {
 } from "./actions";
 import actionTypes from "./actionTypes";
 import reducer, { INITIAL_STATE } from "./reducer";
-import type { Report, ResourcePolicy, Review, TrustSummary } from "./type";
+import type { Faq, Report, ResourcePolicy, Review, TrustSummary } from "./type";
 
 const summary: TrustSummary = {
   ratingCount: 2,
@@ -58,6 +59,7 @@ describe("trustReducer", () => {
         summary,
         reviews: [review()],
         reports: [report()],
+        faqs: [],
       }),
     );
 
@@ -154,6 +156,31 @@ describe("trustReducer", () => {
     );
     expect(saved.pending.savePolicy).toBeUndefined();
     expect(saved.policy?.id).toBe("p");
+  });
+
+  const faq = (id: string, sortOrder: number): Faq => ({
+    id,
+    question: id.toUpperCase(),
+    answer: id,
+    sortOrder,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-01T00:00:00.000Z",
+  });
+
+  it("swaps the whole faq list on a reorder", () => {
+    const state = {
+      ...INITIAL_STATE,
+      faqs: [faq("a", 0), faq("b", 1)],
+      pending: { "faq:order": true },
+    };
+
+    const next = reducer(
+      state,
+      faqsChanged([faq("b", 0), faq("a", 1)], "faq:order"),
+    );
+
+    expect(next.faqs.map((faq) => faq.id)).toEqual(["b", "a"]);
+    expect(next.pending["faq:order"]).toBeUndefined();
   });
 
   it("resets when the page unmounts so another app never shows stale data", () => {

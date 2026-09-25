@@ -27,7 +27,6 @@ import { AgentRow } from "./AgentRow";
 import { AgentToolbar } from "./AgentToolbar";
 import { CreateAgentModal } from "./CreateAgentModal";
 import { DeleteAgentDialog } from "./DeleteAgentDialog";
-import { EditAgentModal } from "./EditAgentModal";
 
 export function Agents() {
   const { t } = useTranslation();
@@ -46,7 +45,6 @@ export function Agents() {
   useTitle(`${t("page.agents.title")} - ${t("org")}`);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Agent | null>(null);
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
 
@@ -167,12 +165,7 @@ export function Agents() {
         ) : (
           <div className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10">
             {agents.map((agent) => (
-              <AgentRow
-                key={agent.id}
-                agent={agent}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-              />
+              <AgentRow key={agent.id} agent={agent} onDelete={setDeleting} />
             ))}
           </div>
         )}
@@ -199,8 +192,6 @@ export function Agents() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
-
-      <EditAgentModal agent={editing} onClose={() => setEditing(null)} />
 
       <DeleteAgentDialog
         agent={deleting}

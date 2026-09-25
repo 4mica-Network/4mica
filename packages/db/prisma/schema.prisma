@@ -81,6 +81,7 @@ model Agent {
   reviews     Review[]
   reports     Report[]
   policy      ResourcePolicy?
+  faqs        FaqItem[]
 
   @@unique([walletAddress, network])
   @@unique([ownerId, slug])
@@ -330,6 +331,7 @@ model ApiListing {
   reviews   Review[]
   reports   Report[]
   policy    ResourcePolicy?
+  faqs      FaqItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
@@ -655,6 +657,9 @@ model ResourcePolicy {
   listingId String? @unique @map("listing_id")
   agentId   String? @unique @map("agent_id")
 
+  policyEnabled Boolean @default(true) @map("policy_enabled")
+  faqEnabled    Boolean @default(true) @map("faq_enabled")
+
   refundPolicy    String? @map("refund_policy") @db.VarChar(2000)
   uptimeTarget    String? @map("uptime_target") @db.VarChar(120)
   supportResponse String? @map("support_response") @db.VarChar(120)
@@ -674,4 +679,24 @@ model ResourcePolicy {
   agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("resource_policies")
+}
+
+model FaqItem {
+  id        String  @id @default(uuid(7))
+  listingId String? @map("listing_id")
+  agentId   String? @map("agent_id")
+
+  question  String @db.VarChar(280)
+  answer    String @db.VarChar(2000)
+  sortOrder Int    @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, sortOrder])
+  @@index([agentId, sortOrder])
+  @@map("faq_items")
 }

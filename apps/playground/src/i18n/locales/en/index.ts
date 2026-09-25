@@ -74,6 +74,10 @@ export const en = {
       "The routes this API exposes. The first one is what the code below calls.",
   },
 
+  faq: {
+    heading: "Questions the seller has answered",
+  },
+
   trust: {
     heading: "Before you pay",
     noRatingsTitle: "No ratings yet",

@@ -44,6 +44,8 @@ const nullableEmail = () =>
   );
 
 export const UpsertPolicySchema = v.object({
+  policyEnabled: v.optional(v.boolean()),
+  faqEnabled: v.optional(v.boolean()),
   refundPolicy: nullableText(2000),
   uptimeTarget: nullableText(120),
   supportResponse: nullableText(120),
@@ -86,3 +88,29 @@ export const ListReportsQuerySchema = v.object({
 export type UpsertPolicyInput = v.InferOutput<typeof UpsertPolicySchema>;
 export type ListReviewsQuery = v.InferOutput<typeof ListReviewsQuerySchema>;
 export type ListReportsQuery = v.InferOutput<typeof ListReportsQuerySchema>;
+
+export const FaqItemSchema = v.object({
+  question: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, "cannot be empty"),
+    v.maxLength(280, "must be 280 characters or shorter"),
+  ),
+  answer: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, "cannot be empty"),
+    v.maxLength(2000, "must be 2000 characters or shorter"),
+  ),
+});
+
+export const ReorderFaqsSchema = v.object({
+  ids: v.pipe(
+    v.array(v.string()),
+    v.minLength(1, "select at least one"),
+    v.maxLength(100),
+    v.transform((ids) => [...new Set(ids)]),
+  ),
+});
+
+export type FaqItemInput = v.InferOutput<typeof FaqItemSchema>;

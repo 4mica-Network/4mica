@@ -7,21 +7,29 @@ import {
 } from "@controllers/shared";
 import type { RouteHandler } from "fastify";
 import {
+  createFaq,
+  deleteFaq,
+  findFaq,
   findReport,
   findReview,
   getPolicy,
+  listFaqs,
   listReports,
   listReviews,
   ownsResource,
   type ResourceKind,
+  reorderFaqs,
   replyToReview,
   trustSummary,
+  updateFaq,
   updateReport,
   upsertPolicy,
 } from "./repository";
 import {
+  FaqItemSchema,
   ListReportsQuerySchema,
   ListReviewsQuerySchema,
+  ReorderFaqsSchema,
   ReplyToReviewSchema,
   UpdateReportSchema,
   UpsertPolicySchema,
@@ -146,4 +154,62 @@ export const updateReportHandler = (kind: ResourceKind): RouteHandler =>
         parsed.data.resolutionNote,
       ),
     });
+  });
+
+export const listFaqsHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, async (id, _request, reply) =>
+    reply.send({ data: await listFaqs(kind, id) }),
+  );
+
+export const createFaqHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, async (id, request, reply) => {
+    const parsed = parseBody(FaqItemSchema, request.body);
+    if (!parsed.success) {
+      return invalidBody(reply, parsed.issues);
+    }
+
+    return reply
+      .code(201)
+      .send({ faq: await createFaq(kind, id, parsed.data) });
+  });
+
+export const updateFaqHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, async (id, request, reply) => {
+    const parsed = parseBody(FaqItemSchema, request.body);
+    if (!parsed.success) {
+      return invalidBody(reply, parsed.issues);
+    }
+
+    const { faqId } = request.params as { faqId: string };
+    const faq = await findFaq(kind, id, faqId);
+
+    if (!faq) {
+      return notFound(reply, "question");
+    }
+
+    return reply.send({ faq: await updateFaq(faq.id, parsed.data) });
+  });
+
+export const deleteFaqHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, async (id, request, reply) => {
+    const { faqId } = request.params as { faqId: string };
+    const faq = await findFaq(kind, id, faqId);
+
+    if (!faq) {
+      return notFound(reply, "question");
+    }
+
+    await deleteFaq(faq.id);
+
+    return reply.code(204).send();
+  });
+
+export const reorderFaqsHandler = (kind: ResourceKind): RouteHandler =>
+  withOwnedResource(kind, async (id, request, reply) => {
+    const parsed = parseBody(ReorderFaqsSchema, request.body);
+    if (!parsed.success) {
+      return invalidBody(reply, parsed.issues);
+    }
+
+    return reply.send({ data: await reorderFaqs(kind, id, parsed.data.ids) });
   });

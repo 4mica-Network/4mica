@@ -1,4 +1,4 @@
-import { Button, Spinner, Tag } from "@4mica/ui";
+import { Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   clearApiListingIssues,
@@ -16,8 +16,8 @@ import { selectSellerWallets } from "@stores/wallet/selector";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { EditableCard } from "@/components/EditableCard";
 import {
-  Card,
   FieldRow,
   Select,
   SettingsSection,
@@ -48,11 +48,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
   const wallets = useAppSelector(selectSellerWallets);
 
   const {
-    handleSubmit,
     setValue,
     watch,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ApiListingValues>({
     resolver: zodResolver(editApiListingSchema),
     mode: "onBlur",
@@ -144,12 +143,17 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
   };
 
   return (
-    <form className="flex flex-col gap-8" onSubmit={handleSubmit(onValid)}>
+    <div className="flex flex-col gap-10">
       <SettingsSection
         description={t("appDetail.details.description")}
         title={t("appDetail.details.title")}
       >
-        <Card>
+        <EditableCard
+          isDirty={isDirty}
+          isSaving={isSaving}
+          onReset={() => reset()}
+          onSave={() => onValid(values)}
+        >
           <div className="flex flex-col divide-y divide-overlay/10">
             <FieldRow
               htmlFor="app-name"
@@ -210,14 +214,19 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
               />
             </FieldRow>
           </div>
-        </Card>
+        </EditableCard>
       </SettingsSection>
 
       <SettingsSection
         description={t("appDetail.payment.description")}
         title={t("appDetail.payment.title")}
       >
-        <Card>
+        <EditableCard
+          isDirty={isDirty}
+          isSaving={isSaving}
+          onReset={() => reset()}
+          onSave={() => onValid(values)}
+        >
           <div className="flex flex-col divide-y divide-overlay/10">
             <FieldRow
               description={t("apiListing.create.fields.wallet.description")}
@@ -321,14 +330,19 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
               />
             </FieldRow>
           </div>
-        </Card>
+        </EditableCard>
       </SettingsSection>
 
       <SettingsSection
         description={t("appDetail.visibility.description")}
         title={t("appDetail.visibility.title")}
       >
-        <Card>
+        <EditableCard
+          isDirty={isDirty}
+          isSaving={isSaving}
+          onReset={() => reset()}
+          onSave={() => onValid(values)}
+        >
           <FieldRow
             htmlFor="app-visibility"
             title={t("apiListing.create.fields.visibility.title")}
@@ -350,16 +364,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
               value={values.visibility}
             />
           </FieldRow>
-        </Card>
+        </EditableCard>
       </SettingsSection>
 
       {error && <p className="text-danger text-sm">{error}</p>}
-
-      <Button className="self-start" disabled={isSaving} type="submit">
-        <span className="flex items-center justify-center text-sm">
-          {isSaving ? <Spinner size="sm" /> : t("apiListing.edit.save")}
-        </span>
-      </Button>
-    </form>
+    </div>
   );
 }

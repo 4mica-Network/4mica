@@ -1,5 +1,6 @@
-import { Button, InputField } from "@4mica/ui";
+import { InputField } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import type { ResourceRef } from "@stores/trust/actions";
 import { savePolicy } from "@stores/trust/actions";
 import {
   selectIsTrustPending,
@@ -7,43 +8,37 @@ import {
   selectTrustIssues,
 } from "@stores/trust/selector";
 import type { PolicyInput } from "@stores/trust/type";
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { EditableCard } from "@/components/EditableCard";
+import { useDraft } from "@/hooks/useDraft";
 
-const EMPTY: PolicyInput = {
-  refundPolicy: "",
-  uptimeTarget: "",
-  supportResponse: "",
-  supportEmail: "",
-  rateLimit: "",
-  dataRetention: "",
-  testEndpoint: "",
-  termsUrl: "",
-  privacyUrl: "",
-  statusUrl: "",
-};
+type PolicyFieldKey =
+  | "refundPolicy"
+  | "uptimeTarget"
+  | "supportResponse"
+  | "supportEmail"
+  | "rateLimit"
+  | "dataRetention"
+  | "testEndpoint"
+  | "termsUrl"
+  | "privacyUrl"
+  | "statusUrl";
 
-const FIELDS = [
+const FIELDS: { key: PolicyFieldKey; multiline: boolean }[] = [
   { key: "refundPolicy", multiline: true },
-  { key: "dataRetention", multiline: true },
   { key: "uptimeTarget", multiline: false },
   { key: "supportResponse", multiline: false },
   { key: "supportEmail", multiline: false },
   { key: "rateLimit", multiline: false },
+  { key: "dataRetention", multiline: true },
   { key: "testEndpoint", multiline: false },
   { key: "termsUrl", multiline: false },
   { key: "privacyUrl", multiline: false },
   { key: "statusUrl", multiline: false },
-] as const satisfies readonly { key: keyof PolicyInput; multiline: boolean }[];
+];
 
-export function PolicyForm({
-  kind,
-  id,
-}: {
-  kind: "listing" | "agent";
-  id: string;
-}) {
+export function PolicyForm({ resource }: { resource: ResourceRef }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -51,58 +46,56 @@ export function PolicyForm({
   const issues = useAppSelector(selectTrustIssues);
   const isSaving = useAppSelector(selectIsTrustPending("savePolicy"));
 
-  const [values, setValues] = useState<PolicyInput>(EMPTY);
+  const initial = useMemo(
+    () =>
+      Object.fromEntries(
+        FIELDS.map(({ key }) => [key, policy?.[key] ?? ""]),
+      ) as Record<PolicyFieldKey, string>,
+    [policy],
+  );
 
-  useEffect(() => {
-    if (!policy) {
-      setValues(EMPTY);
-      return;
+  const { draft, set, changes, isDirty, reset } = useDraft(initial);
+
+  const save = () => {
+    const payload: PolicyInput = {};
+    for (const key of Object.keys(changes) as PolicyFieldKey[]) {
+      payload[key] = draft[key].trim() === "" ? null : draft[key].trim();
     }
-
-    setValues({
-      refundPolicy: policy.refundPolicy ?? "",
-      uptimeTarget: policy.uptimeTarget ?? "",
-      supportResponse: policy.supportResponse ?? "",
-      supportEmail: policy.supportEmail ?? "",
-      rateLimit: policy.rateLimit ?? "",
-      dataRetention: policy.dataRetention ?? "",
-      testEndpoint: policy.testEndpoint ?? "",
-      termsUrl: policy.termsUrl ?? "",
-      privacyUrl: policy.privacyUrl ?? "",
-      statusUrl: policy.statusUrl ?? "",
-    });
-  }, [policy]);
-
-  const set = (key: keyof PolicyInput, value: string) =>
-    setValues((current) => ({ ...current, [key]: value }));
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    dispatch(savePolicy({ kind, id }, values));
+    dispatch(savePolicy(resource, payload));
   };
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit}>
-      <p className="text-ink-muted text-sm">{t("appDetail.policyLead")}</p>
-
-      {FIELDS.map(({ key, multiline }) => (
-        <InputField
-          error={issues[key]}
-          key={key}
-          label={t(`appDetail.policy.${key}`)}
-          maxLength={multiline ? 2000 : 320}
-          onChange={(event) => set(key, event.target.value)}
-          placeholder={t(`appDetail.policyHint.${key}`)}
-          value={values[key] ?? ""}
-          {...(multiline
-            ? ({ variant: "textarea", rows: 3 } as const)
-            : ({ variant: "input" } as const))}
-        />
-      ))}
-
-      <Button className="self-start" disabled={isSaving} type="submit">
-        {t("appDetail.savePolicy")}
-      </Button>
-    </form>
+    <EditableCard
+      isDirty={isDirty}
+      isSaving={isSaving}
+      onReset={reset}
+      onSave={save}
+    >
+      <div className="flex flex-col divide-y divide-overlay/10">
+        {FIELDS.map(({ key, multiline }) => (
+          <div className="py-3 first:pt-0 last:pb-0" key={key}>
+            <label
+              className="font-medium text-ink-strong text-sm"
+              htmlFor={`policy-${key}`}
+            >
+              {t(`appDetail.policy.${key}`)}
+            </label>
+            <div className="mt-2">
+              <InputField
+                error={issues[key]}
+                id={`policy-${key}`}
+                maxLength={multiline ? 2000 : 320}
+                onChange={(event) => set(key, event.target.value)}
+                placeholder={t(`appDetail.policyHint.${key}`)}
+                value={draft[key]}
+                {...(multiline
+                  ? ({ variant: "textarea", rows: 3 } as const)
+                  : ({ variant: "input" } as const))}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </EditableCard>
   );
 }

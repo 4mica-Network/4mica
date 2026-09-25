@@ -1,9 +1,14 @@
 import {
+  createFaqHandler,
+  deleteFaqHandler,
   getPolicyHandler,
+  listFaqsHandler,
   listReportsHandler,
   listReviewsHandler,
+  reorderFaqsHandler,
   replyToReviewHandler,
   trustSummaryHandler,
+  updateFaqHandler,
   updateReportHandler,
   upsertPolicyHandler,
 } from "@controllers/trust/index";
@@ -13,6 +18,8 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   errorResponseSchema,
+  faqListResponseSchema,
+  faqResponseSchema,
   limitedResponses,
   policyResponseSchema,
   reportListResponseSchema,
@@ -54,9 +61,28 @@ const reportQuerySchema = {
   },
 } as const;
 
+const faqBodySchema = {
+  type: "object",
+  required: ["question", "answer"],
+  properties: {
+    question: { type: "string", maxLength: 280 },
+    answer: { type: "string", maxLength: 2000 },
+  },
+} as const;
+
+const reorderBodySchema = {
+  type: "object",
+  required: ["ids"],
+  properties: {
+    ids: { type: "array", items: { type: "string" }, maxItems: 100 },
+  },
+} as const;
+
 const policyBodySchema = {
   type: "object",
   properties: {
+    policyEnabled: { type: "boolean" },
+    faqEnabled: { type: "boolean" },
     refundPolicy: { type: "string", nullable: true, maxLength: 2000 },
     uptimeTarget: { type: "string", nullable: true, maxLength: 120 },
     supportResponse: { type: "string", nullable: true, maxLength: 120 },
@@ -259,6 +285,112 @@ export const trustRoutes: FastifyPluginCallback = (app, _opts, done) => {
         },
       },
       updateReportHandler(kind),
+    );
+
+    app.get(
+      `${prefix}/:id/faqs`,
+      {
+        ...base,
+        schema: {
+          tags: [tag],
+          summary: `List the published questions for one ${noun}`,
+          security: [{ bearerAuth: [] }],
+          params: idParamSchema,
+          response: {
+            200: faqListResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            ...limitedResponses,
+          },
+        },
+      },
+      listFaqsHandler(kind),
+    );
+
+    app.post(
+      `${prefix}/:id/faqs`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Add a question and answer",
+          security: [{ bearerAuth: [] }],
+          params: idParamSchema,
+          body: faqBodySchema,
+          response: {
+            201: faqResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            ...limitedResponses,
+          },
+        },
+      },
+      createFaqHandler(kind),
+    );
+
+    app.put(
+      `${prefix}/:id/faqs/order`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Reorder the published questions",
+          security: [{ bearerAuth: [] }],
+          params: idParamSchema,
+          body: reorderBodySchema,
+          response: {
+            200: faqListResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            ...limitedResponses,
+          },
+        },
+      },
+      reorderFaqsHandler(kind),
+    );
+
+    app.patch(
+      `${prefix}/:id/faqs/:faqId`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Edit a question",
+          security: [{ bearerAuth: [] }],
+          params: childParamSchema("faqId"),
+          body: faqBodySchema,
+          response: {
+            200: faqResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            ...limitedResponses,
+          },
+        },
+      },
+      updateFaqHandler(kind),
+    );
+
+    app.delete(
+      `${prefix}/:id/faqs/:faqId`,
+      {
+        ...strict,
+        schema: {
+          tags: [tag],
+          summary: "Remove a question",
+          security: [{ bearerAuth: [] }],
+          params: childParamSchema("faqId"),
+          response: {
+            204: { type: "null" },
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            ...limitedResponses,
+          },
+        },
+      },
+      deleteFaqHandler(kind),
     );
   }
 

@@ -540,6 +540,8 @@ export const policyResponseSchema = {
       nullable: true,
       properties: {
         id: str,
+        policyEnabled: bool,
+        faqEnabled: bool,
         refundPolicy: nullStr,
         uptimeTarget: nullStr,
         supportResponse: nullStr,
@@ -648,4 +650,29 @@ export const trustSummaryResponseSchema = {
       },
     },
   },
+} as const;
+
+const faqSchema = {
+  type: "object",
+  required: ["id", "question", "answer"],
+  properties: {
+    id: str,
+    question: str,
+    answer: str,
+    sortOrder: int,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const faqListResponseSchema = {
+  type: "object",
+  required: ["data"],
+  properties: { data: { type: "array", items: faqSchema } },
+} as const;
+
+export const faqResponseSchema = {
+  type: "object",
+  required: ["faq"],
+  properties: { faq: faqSchema },
 } as const;

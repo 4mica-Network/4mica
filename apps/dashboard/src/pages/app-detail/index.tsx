@@ -1,26 +1,30 @@
-import { Button, Spinner, TabGroup, Tag } from "@4mica/ui";
+import { Button, Spinner, Tag } from "@4mica/ui";
 import { fetchApiListings } from "@stores/apiListing/actions";
 import {
   selectApiListings,
   selectHasLoadedApiListings,
 } from "@stores/apiListing/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchTrust, resetTrust } from "@stores/trust/actions";
+import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
 import {
   selectIsTrustPending,
+  selectPolicy,
   selectTrustSummary,
 } from "@stores/trust/selector";
 import { useTitle } from "ahooks";
 import { ArrowLeft, ShieldAlert, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
+import { SettingsSection } from "@/components/form";
 import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
-import { EndpointsEditor } from "../apps/EndpointsEditor";
 import { DetailsForm } from "./DetailsForm";
+import { EndpointsSection } from "./EndpointsSection";
+import { FaqEditor } from "./FaqEditor";
 import { PolicyForm } from "./PolicyForm";
 import { ReportsPanel } from "./ReportsPanel";
 import { ReviewsPanel } from "./ReviewsPanel";
+import { ToggleSection } from "./ToggleSection";
 
 export function AppDetail() {
   const { t } = useTranslation();
@@ -30,12 +34,11 @@ export function AppDetail() {
   const listings = useAppSelector(selectApiListings);
   const hasLoaded = useAppSelector(selectHasLoadedApiListings);
   const summary = useAppSelector(selectTrustSummary);
-  const isLoadingTrust = useAppSelector(selectIsTrustPending("trust"));
-
-  const [activeTab, setActiveTab] = useState("details");
-  const [editingEndpoints, setEditingEndpoints] = useState(false);
+  const policy = useAppSelector(selectPolicy);
+  const isSavingPolicy = useAppSelector(selectIsTrustPending("savePolicy"));
 
   const listing = listings.find((row) => row.id === id) ?? null;
+  const resource = { kind: "listing" as const, id };
 
   useTitle(
     listing
@@ -54,7 +57,7 @@ export function AppDetail() {
       return;
     }
 
-    dispatch(fetchTrust({ kind: "listing", id }));
+    dispatch(fetchTrust(resource));
 
     return () => {
       dispatch(resetTrust());
@@ -80,62 +83,27 @@ export function AppDetail() {
     );
   }
 
-  const tabs = [
-    {
-      id: "details",
-      label: t("appDetail.tabs.details"),
-      content: () => <DetailsForm listing={listing} />,
-    },
-    {
-      id: "endpoints",
-      label: `${t("appDetail.tabs.endpoints")} (${listing.endpoints.length})`,
-      content: () => (
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-ink-muted text-sm">
-            {t("appDetail.endpointsLead")}
-          </p>
-          <Button
-            intent="outline"
-            onClick={() => setEditingEndpoints(true)}
-            size="sm"
-          >
-            {t("appDetail.editEndpoints")}
-          </Button>
-        </div>
-      ),
-    },
-    {
-      id: "policy",
-      label: t("appDetail.tabs.policy"),
-      content: () => <PolicyForm id={id} kind="listing" />,
-    },
-    {
-      id: "reviews",
-      label: summary?.ratingCount
-        ? `${t("appDetail.tabs.reviews")} (${summary.ratingCount})`
-        : t("appDetail.tabs.reviews"),
-      content: () => <ReviewsPanel id={id} kind="listing" />,
-    },
-    {
-      id: "reports",
-      label: summary?.openReports
-        ? `${t("appDetail.tabs.reports")} (${summary.openReports})`
-        : t("appDetail.tabs.reports"),
-      content: () => <ReportsPanel id={id} kind="listing" />,
-    },
-  ];
+  const policyEnabled = policy?.policyEnabled ?? true;
+  const faqEnabled = policy?.faqEnabled ?? true;
 
   return (
-    <div className="flex size-full min-h-0 flex-col">
-      <div className="flex w-full flex-1 animate-fade-in flex-col overflow-y-auto pr-3 pb-10">
-        <div className="mx-auto flex w-full flex-col gap-6 lg:max-w-3xl">
-          <Button asChild className="self-start" intent="ghost" size="sm">
-            <Link to="/apps">
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              {t("appDetail.backToApps")}
-            </Link>
-          </Button>
+    <div className="relative flex size-full min-h-0 flex-col">
+      <div className="pointer-events-none sticky top-0 z-20 -mb-10">
+        <Button
+          asChild
+          className="pointer-events-auto"
+          intent="ghost"
+          size="sm"
+        >
+          <Link to="/apps">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            {t("appDetail.backToApps")}
+          </Link>
+        </Button>
+      </div>
 
+      <div className="flex w-full flex-1 animate-fade-in flex-col overflow-y-auto pr-3 pb-16">
+        <div className="mx-auto flex w-full flex-col gap-10 pt-12 lg:max-w-3xl">
           <header className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-semibold text-2xl text-ink-strong tracking-tight">
@@ -172,25 +140,51 @@ export function AppDetail() {
             />
           </header>
 
-          {isLoadingTrust && !summary ? (
-            <div className="flex justify-center py-10">
-              <Spinner />
-            </div>
-          ) : (
-            <TabGroup
-              activeTab={activeTab}
-              contentClassName="pt-6"
-              onTabChange={setActiveTab}
-              tabs={tabs}
-            />
-          )}
+          <DetailsForm listing={listing} />
+
+          <EndpointsSection listing={listing} />
+
+          <ToggleSection
+            checked={policyEnabled}
+            description={t("appDetail.policyLead")}
+            id="policy-enabled"
+            isSaving={isSavingPolicy}
+            onToggle={(checked) =>
+              dispatch(savePolicy(resource, { policyEnabled: checked }))
+            }
+            title={t("appDetail.tabs.policy")}
+          >
+            <PolicyForm resource={resource} />
+          </ToggleSection>
+
+          <ToggleSection
+            checked={faqEnabled}
+            description={t("appDetail.faq.lead")}
+            id="faq-enabled"
+            isSaving={isSavingPolicy}
+            onToggle={(checked) =>
+              dispatch(savePolicy(resource, { faqEnabled: checked }))
+            }
+            title={t("appDetail.faq.title")}
+          >
+            <FaqEditor resource={resource} />
+          </ToggleSection>
+
+          <SettingsSection
+            description={t("appDetail.reviewsLead")}
+            title={t("appDetail.tabs.reviews")}
+          >
+            <ReviewsPanel id={id} kind="listing" />
+          </SettingsSection>
+
+          <SettingsSection
+            description={t("appDetail.reportsLead")}
+            title={t("appDetail.tabs.reports")}
+          >
+            <ReportsPanel id={id} kind="listing" />
+          </SettingsSection>
         </div>
       </div>
-
-      <EndpointsEditor
-        listing={editingEndpoints ? listing : null}
-        onClose={() => setEditingEndpoints(false)}
-      />
     </div>
   );
 }

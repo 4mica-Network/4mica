@@ -13,6 +13,7 @@ const {
   resourcePolicy,
   review,
   report,
+  faqItem,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -38,6 +39,13 @@ const {
     count: vi.fn(),
     update: vi.fn(),
   },
+  faqItem: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -53,9 +61,10 @@ vi.mock("@4mica/db", () => ({
     resourcePolicy,
     review,
     report,
+    faqItem,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
-        ? (arg as (tx: unknown) => unknown)({ review, report })
+        ? (arg as (tx: unknown) => unknown)({ review, report, faqItem })
         : Promise.all(arg as Promise<unknown>[]),
     ),
   },
@@ -488,6 +497,136 @@ describe("agents share the same surface", () => {
     expect(resourcePolicy.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ agentId: "agent-1" }),
+      }),
+    );
+    await instance.close();
+  });
+});
+
+describe("faqs", () => {
+  const FAQ_ID = "019fce62-6666-7000-8000-000000000000";
+
+  it("appends a new question after the last one", async () => {
+    faqItem.findFirst.mockResolvedValue({ sortOrder: 2 });
+    faqItem.create.mockResolvedValue({
+      id: FAQ_ID,
+      question: "q",
+      answer: "a",
+    });
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "POST",
+      url: `/me/api-listings/${LISTING_ID}/faqs`,
+      headers: AUTH,
+      payload: { question: "Does it rate limit?", answer: "60/min." },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(faqItem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ listingId: LISTING_ID, sortOrder: 3 }),
+      }),
+    );
+    await instance.close();
+  });
+
+  it("starts at zero when there are none", async () => {
+    faqItem.findFirst.mockResolvedValue(null);
+    faqItem.create.mockResolvedValue({
+      id: FAQ_ID,
+      question: "q",
+      answer: "a",
+    });
+    const instance = await app();
+
+    await instance.inject({
+      method: "POST",
+      url: `/me/api-listings/${LISTING_ID}/faqs`,
+      headers: AUTH,
+      payload: { question: "First?", answer: "Yes." },
+    });
+
+    expect(faqItem.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ sortOrder: 0 }),
+      }),
+    );
+    await instance.close();
+  });
+
+  it("rejects an empty question", async () => {
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "POST",
+      url: `/me/api-listings/${LISTING_ID}/faqs`,
+      headers: AUTH,
+      payload: { question: "   ", answer: "something" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    await instance.close();
+  });
+
+  it("reorders only the questions that belong to this listing", async () => {
+    faqItem.findMany
+      .mockResolvedValueOnce([{ id: "a" }, { id: "b" }])
+      .mockResolvedValueOnce([]);
+    faqItem.update.mockResolvedValue({});
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "PUT",
+      url: `/me/api-listings/${LISTING_ID}/faqs/order`,
+      headers: AUTH,
+      payload: { ids: ["b", "a", "someone-elses"] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(faqItem.update).toHaveBeenCalledTimes(2);
+    expect(faqItem.update).toHaveBeenNthCalledWith(1, {
+      where: { id: "b" },
+      data: { sortOrder: 0 },
+    });
+    await instance.close();
+  });
+
+  it("404s when deleting a question from another listing", async () => {
+    faqItem.findFirst.mockResolvedValue(null);
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "DELETE",
+      url: `/me/api-listings/${LISTING_ID}/faqs/${FAQ_ID}`,
+      headers: AUTH,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(faqItem.delete).not.toHaveBeenCalled();
+    await instance.close();
+  });
+});
+
+describe("disclosure toggles", () => {
+  it("saves the policy and faq switches", async () => {
+    resourcePolicy.findFirst.mockResolvedValue({ id: "p1" });
+    resourcePolicy.update.mockResolvedValue({ id: "p1" });
+    const instance = await app();
+
+    await instance.inject({
+      method: "PUT",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: AUTH,
+      payload: { policyEnabled: false, faqEnabled: true },
+    });
+
+    expect(resourcePolicy.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          policyEnabled: false,
+          faqEnabled: true,
+        }),
       }),
     );
     await instance.close();
