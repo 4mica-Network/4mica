@@ -1,13 +1,3 @@
-/**
- * Compile-time message catalogue, following apps/web/i18n rather than
- * apps/dashboard's react-i18next.
- *
- * react-i18next init()s a module-scope singleton — per-process mutable state
- * shared across concurrent SSR requests — and forces "use client" on every
- * component that translates anything, which would defeat server rendering on a
- * read-mostly page. A frozen object has none of those problems and costs
- * nothing at runtime.
- */
 export const en = {
   common: {
     brandName: "4Mica",
@@ -49,13 +39,15 @@ export const en = {
   },
 
   agent: {
-    status: "Status",
     statusPending: "Pending",
     statusActive: "Active",
     statusSuspended: "Suspended",
     operatedBy: "Operated by @{{username}}",
     aboutHeading: "About this agent",
     registered: "Registered",
+    endpointLabel: "Endpoint",
+    paidTo: "Paid to",
+    docsLabel: "Docs",
   },
 
   api: {
@@ -63,9 +55,92 @@ export const en = {
     category: "Category",
     pricing: "Pricing",
     published: "Published {{date}}",
+    publishedLabel: "Published",
+    docsLabel: "Docs",
+    paidTo: "Paid to",
     aboutHeading: "About this API",
     tagsHeading: "Tags",
     noTags: "No tags yet",
+
+    perRequest: "per request",
+    priceUnset: "Pricing not set",
+    settlesOn: "Settles on {{network}}",
+
+    endpointsHeading: "Endpoints",
+    noEndpointsTitle: "No routes published",
+    noEndpointsBody:
+      "You have not listed the individual routes yet. Buyers still call the base URL above; adding routes makes the generated snippets specific.",
+    endpointsLead:
+      "The routes this API exposes. The first one is what the code below calls.",
+  },
+
+  faq: {
+    heading: "Questions the seller has answered",
+  },
+
+  trust: {
+    heading: "Before you pay",
+    noRatingsTitle: "No ratings yet",
+    noRatings:
+      "No one has rated this yet. Check the seller's policies below, and prefer a listing whose owner has answered questions.",
+    ratingCountOne: "{{count}} rating",
+    ratingCountOther: "{{count}} ratings",
+    verifiedCount: "{{count}} from verified buyers",
+    verifiedPurchase: "Verified purchase",
+    hasVerifiedBuyers: "Paid buyers have rated this",
+    listedSince: "Listed since {{date}}",
+    noPolicy: "No published policy",
+
+    refundLabel: "If a call fails",
+    uptimeLabel: "Uptime target",
+    supportLabel: "Support response",
+    rateLimitLabel: "Rate limit",
+    dataLabel: "Your data",
+
+    reviewsHeading: "What buyers say",
+    noReviews: "No reviews yet",
+    noReviewsBody:
+      "Be the first to say whether this returned what you paid for.",
+    ownerReplied: "{{name}} replied",
+    signInToReview: "Sign in to rate this.",
+    signInToReport: "Sign in to report this.",
+
+    rateN: "Rate {{count}} out of 5",
+    titlePlaceholder: "Sum it up in a line (optional)",
+    bodyPlaceholder: "Did it return what you paid for? How fast? (optional)",
+    postReview: "Post rating",
+    updateReview: "Update rating",
+    deleteReview: "Remove",
+    saved: "Saved",
+
+    reportAction: "Report this listing",
+    reportSubmit: "Send report",
+    reportPlaceholder: "What happened? Include a request id if you have one.",
+    reportNote: "Goes to the owner and to 4Mica. Nothing is published.",
+    reportThanks:
+      "Thanks — the owner and 4Mica can see this now. Nothing about it is shown publicly.",
+    reasonScam: "Scam",
+    reasonNotWorking: "Does not work",
+    reasonMisleadingPricing: "Misleading pricing",
+    reasonSpam: "Spam",
+    reasonOther: "Something else",
+
+    errorSignedOut: "Sign in first.",
+    errorOwnResource: "You cannot rate your own listing.",
+    errorInvalidReview: "Check the rating and try again.",
+    errorInvalidReport: "Choose a reason and try again.",
+    errorAlreadyReported: "You already have an open report on this.",
+    errorNotFound: "That listing is no longer available.",
+    errorNoRating: "Pick a star rating first.",
+    errorGeneric: "That did not go through. Try again.",
+  },
+
+  support: {
+    heading: "Do you need help?",
+    askSeller: "Ask {{name}}",
+    askTeam: "Ask the 4Mica team",
+    emailSubject: "Question about {{resource}}",
+    supportSubject: "Integration help with {{resource}}",
   },
 
   integration: {
@@ -86,8 +161,6 @@ export const en = {
     receiptTitle: "See your transactions",
     receiptLead:
       "Each paid response carries its settled payment. Pair it with your own task log to make the spend auditable.",
-    endpointsTitle: "Priced endpoints",
-    noEndpoints: "No priced endpoints yet",
     nativeAsset: "Native asset",
     erc20: "ERC-20",
     notPayable: "This API is not accepting 4Mica payments yet.",
@@ -95,6 +168,17 @@ export const en = {
       "Add a network and a receiving address to this listing to show integration instructions here.",
 
     // Agent
+    agentBuyerHeading: "Call this agent",
+    agentBuyerLead:
+      "Pay per call with credit-backed guarantees. The client answers the 402, signs a guarantee, and retries — you get the response.",
+    agentCallTitle: "Send it a request",
+    agentCallLead:
+      "Wrap the fetch you already use, then post your prompt to the agent's endpoint.",
+    agentNotSellable: "This agent is not accepting 4Mica payments yet.",
+    agentNotSellableOwner:
+      "Add a receiving wallet and an endpoint URL to this agent to show payment instructions here.",
+
+    agentRunHeading: "Run this agent",
     agentLead:
       "This agent pays for the requests it makes. Wire it up once and every call it issues is credit-backed.",
     payTitle: "Pay as this agent",
@@ -107,6 +191,44 @@ export const en = {
       "The agent's wallet address is only shown to you, the owner.",
     inactiveAgent:
       "This agent cannot sign payments until it is active. The setup below still applies.",
+  },
+
+  payWith: {
+    heading: "Pay for this with 4Mica",
+    lead: "Credit-backed payments per request. No subscription, no invoice, and no gas on the request path.",
+
+    readyTitle: "Your account is ready to pay.",
+    readyAction: "Check your collateral",
+
+    signedOut: {
+      accountTitle: "Create a 4Mica account",
+      accountBody: "Free, and takes about a minute.",
+      walletTitle: "Link and fund a wallet",
+      walletBody:
+        "Prove you control an address, then deposit collateral. Your credit is extended against it.",
+      walletBodyOn:
+        "Prove you control an address on {{network}}, then deposit collateral. Your credit is extended against it.",
+      payTitle: "Copy the code below",
+      payBody:
+        "Wrap the fetch you already use. The client answers the 402, signs, and retries for you.",
+      cta: "Create an account",
+    },
+
+    noWallet: {
+      walletTitle: "Link a paying wallet",
+      walletBody:
+        "You have an account, but no wallet that can sign payments yet.",
+      walletBodyOn:
+        "You have an account, but no wallet on {{network}} that can sign payments yet.",
+      fundTitle: "Deposit collateral",
+      fundBody: "Credit is extended against what you deposit, not per request.",
+      cta: "Go to wallets",
+    },
+
+    wrongNetwork: {
+      title: "Add a wallet on {{network}}",
+      body: "Your paying wallets are on {{networks}}. A wallet proved on one chain cannot settle on another.",
+    },
   },
 
   visibility: {

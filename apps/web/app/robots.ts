@@ -5,11 +5,12 @@ export const dynamic = "force-static";
 
 const DISALLOW_PATHS = ["/api/"];
 
-const SITEMAP_PATH = "/sitemap.xml";
+const SITEMAP_PATHS = ["/sitemap.xml", "/sitemap-profiles.xml"];
 
 const isProductionEnvironment = () => process.env.NODE_ENV === "production";
 
-const getSitemapUrl = () => new URL(SITEMAP_PATH, links.website).toString();
+const getSitemapUrls = () =>
+  SITEMAP_PATHS.map((path) => new URL(path, links.website).toString());
 
 export default function robots(): MetadataRoute.Robots {
   if (!isProductionEnvironment()) {
@@ -26,7 +27,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: DISALLOW_PATHS,
       },
     ],
-    sitemap: getSitemapUrl(),
+    sitemap: getSitemapUrls(),
     host: links.website,
   };
 }

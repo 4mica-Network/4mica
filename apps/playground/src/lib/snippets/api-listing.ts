@@ -1,11 +1,11 @@
 import type { PublicApiEndpoint, PublicApiListing } from "@/schema/api-listing";
 import { networkInfo } from "./networks";
 import {
+  buildCurlHandshake,
   commentLine,
   formatPrice,
   joinUrl,
   PLACEHOLDER,
-  trimAmount,
 } from "./shared";
 
 export interface ApiListingSnippets {
@@ -128,33 +128,14 @@ data = response.json()`;
   // published only a display label, rather than guessed at.
   const wireAmount = endpoint.priceAmount ?? listing.priceAmount;
 
-  const curl = `# 1. An unpaid request answers 402 with the payment requirements.
-curl -i -X ${endpoint.method} "${url}"
-
-# {
-#   "x402Version": 1,
-#   "accepts": [
-#     {
-#       "scheme": "4mica-credit",
-#       "network": "${caip2}",
-#       "payTo": "${listing.payToAddress}",
-#       "asset": ${
-    listing.assetAddress === null ? "null" : `"${listing.assetAddress}"`
-  }${
-    wireAmount === null
-      ? ""
-      : `,\n#       "maxAmountRequired": "${trimAmount(wireAmount)}"`
-  }
-#     }
-#   ]
-# }
-# "asset": null means the chain's native asset. Amounts on the wire are in
-# the asset's base units.
-
-# 2. Sign a guarantee for those requirements, then retry with the header.
-#    The SDK does steps 1 and 2 for you — this is the wire format.
-curl -X ${endpoint.method} "${url}" \\
-  -H "X-PAYMENT: $PAYMENT_HEADER"`;
+  const curl = buildCurlHandshake({
+    method: endpoint.method,
+    url,
+    caip2,
+    payTo: listing.payToAddress,
+    assetAddress: listing.assetAddress,
+    wireAmount,
+  });
 
   const receipt = `import { Client, ConfigBuilder } from "@4mica/sdk";
 

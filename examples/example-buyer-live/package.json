@@ -1,0 +1,21 @@
+{
+  "name": "@4mica/example-buyer-live",
+  "version": "0.0.1-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "Buyer (payer): discover a published API listing and pay for it over x402",
+  "scripts": {
+    "start": "tsx src/buyer.ts"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "dotenv": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

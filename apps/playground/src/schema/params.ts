@@ -6,18 +6,6 @@ import {
 } from "@4mica/url";
 import * as v from "valibot";
 
-/**
- * Route-param validation. This is the only thing standing between a raw URL
- * segment and a Prisma `where` clause. The bounds and the character class come
- * from @4mica/url, which is also what apps/be validates writes against — so a
- * handle the API accepts can never be unreachable here.
- */
-
-/**
- * Handles are addressed bare (`/mo`). A leading `@` is accepted and stripped
- * for compatibility with the dashboard's older `/@mo` links; middleware.ts
- * redirects those to the canonical form before a page ever sees them.
- */
 const UsernameParamSchema = v.pipe(
   v.string(),
   v.trim(),
@@ -27,7 +15,6 @@ const UsernameParamSchema = v.pipe(
   v.regex(USERNAME_PATTERN, USERNAME_MESSAGE),
 );
 
-/** A uuid(7) primary key or a per-owner slug. Same character class. */
 const IdOrSlugParamSchema = v.pipe(
   v.string(),
   v.trim(),
@@ -37,10 +24,6 @@ const IdOrSlugParamSchema = v.pipe(
   v.regex(USERNAME_PATTERN, "identifier contains unsupported characters"),
 );
 
-/**
- * Parse without throwing, so pages read `if (!x) notFound()` rather than
- * wrapping every await in a try/catch.
- */
 export const safeParam = <TSchema extends v.GenericSchema>(
   schema: TSchema,
   value: unknown,
@@ -55,7 +38,6 @@ export const parseUsername = (value: unknown): string | null =>
 export const parseIdOrSlug = (value: unknown): string | null =>
   safeParam(IdOrSlugParamSchema, value);
 
-/** Visibility values a public reader is allowed to resolve at a direct URL. */
 export const VisibilitySchema = v.picklist([
   "PRIVATE",
   "UNLISTED",
@@ -64,11 +46,6 @@ export const VisibilitySchema = v.picklist([
 
 export type Visibility = v.InferOutput<typeof VisibilitySchema>;
 
-/**
- * Mirrors the `PaymentNetwork` enum in packages/db. Kept as a literal union
- * rather than imported from the generated client so the DTO layer stays free
- * of Prisma types — the same reason `VisibilitySchema` is written out above.
- */
 export const PaymentNetworkSchema = v.picklist([
   "BASE",
   "BASE_SEPOLIA",
@@ -77,7 +54,6 @@ export const PaymentNetworkSchema = v.picklist([
 
 export type PaymentNetwork = v.InferOutput<typeof PaymentNetworkSchema>;
 
-/** Mirrors the `HttpMethod` enum in packages/db. */
 export const HttpMethodSchema = v.picklist([
   "GET",
   "POST",

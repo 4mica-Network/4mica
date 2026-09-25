@@ -3,6 +3,7 @@ import { AccountSettings } from "@/pages/account";
 import { AgentAdvanced } from "@/pages/agent-advanced";
 import { AgentDetail } from "@/pages/agent-detail";
 import { Agents } from "@/pages/agents";
+import { AppDetail } from "@/pages/app-detail";
 import { Apps } from "@/pages/apps";
 import { Balances } from "@/pages/balances";
 import { BusinessSettings } from "@/pages/business";
@@ -38,6 +39,7 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "agents/:id", component: AgentDetail },
   { path: "agents/:id/advanced", component: AgentAdvanced },
   { path: "apps", component: Apps },
+  { path: "apps/:id", component: AppDetail },
   { path: "help", component: Help },
 ];
 

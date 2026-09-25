@@ -26,6 +26,7 @@
     "@clerk/nextjs": "catalog:",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "framer-motion": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "react": "catalog:",

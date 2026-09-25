@@ -1,7 +1,11 @@
 import { Link } from "@4mica/ui";
+import { fetchAgents } from "@stores/agent/actions";
+import { fetchApiListings } from "@stores/apiListing/actions";
 import { fetchDeveloper } from "@stores/developer/actions";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { fetchPaymentSummary } from "@stores/payment/actions";
 import { selectUser } from "@stores/user/selector";
+import { fetchWallets } from "@stores/wallet/actions";
 import { useLocalStorageState } from "ahooks";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";
@@ -15,9 +19,42 @@ import { useChecklist } from "./useChecklist";
 interface ChecklistPrefs {
   collapsed: boolean;
   dismissed: boolean;
+  /** Which set of steps the dismissal was for. */
+  version?: number;
 }
 
-const DEFAULT_PREFS: ChecklistPrefs = { collapsed: false, dismissed: false };
+/**
+ * Bump whenever the steps change.
+ *
+ * A dismissal means "I have read these", not "never show me anything again".
+ * Without a version, someone who dismissed an earlier, shorter checklist would
+ * never see the steps added later — the guidance would be there and silently
+ * unreachable, which is worse than not having written it.
+ */
+export const CHECKLIST_VERSION = 2;
+
+const DEFAULT_PREFS: ChecklistPrefs = {
+  collapsed: false,
+  dismissed: false,
+  version: CHECKLIST_VERSION,
+};
+
+/**
+ * A dismissal only silences the steps it was made against, so adding a step
+ * brings the widget back once. Completing everything hides it for good, which
+ * needs no version.
+ */
+export const shouldShowChecklist = (
+  prefs: ChecklistPrefs,
+  done: number,
+  total: number,
+): boolean => {
+  if (done === total) {
+    return false;
+  }
+
+  return !(prefs.dismissed && prefs.version === CHECKLIST_VERSION);
+};
 
 /**
  * Sits at z-40, below react-toastify's 9999 — a transient alert should be able
@@ -40,12 +77,17 @@ export function IntegrationChecklist() {
 
   const { collapsed, dismissed } = prefs ?? DEFAULT_PREFS;
 
+  // The widget is mounted app-wide, so this is the one place that guarantees
+  // the checklist reflects reality no matter which page the user landed on.
   useEffect(() => {
     dispatch(fetchDeveloper());
+    dispatch(fetchWallets());
+    dispatch(fetchApiListings());
+    dispatch(fetchAgents());
+    dispatch(fetchPaymentSummary());
   }, [dispatch]);
 
-  // Nothing left to guide them through, so stop taking up the corner.
-  if (dismissed || done === total) {
+  if (!shouldShowChecklist(prefs ?? DEFAULT_PREFS, done, total)) {
     return null;
   }
 
@@ -57,7 +99,13 @@ export function IntegrationChecklist() {
 
           <button
             type="button"
-            onClick={() => setPrefs({ collapsed: !collapsed, dismissed })}
+            onClick={() =>
+              setPrefs({
+                collapsed: !collapsed,
+                dismissed,
+                version: CHECKLIST_VERSION,
+              })
+            }
             aria-expanded={!collapsed}
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
@@ -79,7 +127,13 @@ export function IntegrationChecklist() {
 
           <button
             type="button"
-            onClick={() => setPrefs({ collapsed, dismissed: true })}
+            onClick={() =>
+              setPrefs({
+                collapsed,
+                dismissed: true,
+                version: CHECKLIST_VERSION,
+              })
+            }
             aria-label={t("checklist.dismiss")}
             className="shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong"
           >
@@ -97,7 +151,9 @@ export function IntegrationChecklist() {
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <ul className="flex flex-col border-overlay/10 border-t px-4 py-2">
+              {/* Capped so eight items cannot run off a short viewport; the
+                  header and footer stay put while the list scrolls. */}
+              <ul className="flex max-h-[45vh] flex-col overflow-y-auto border-overlay/10 border-t px-4 py-2">
                 {items.map((item) => (
                   <ChecklistItem key={item.id} item={item} />
                 ))}

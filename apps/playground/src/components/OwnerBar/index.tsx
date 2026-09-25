@@ -11,11 +11,6 @@ export interface OwnerBarProps {
   username: string;
 }
 
-/**
- * Shown only to the owner of a profile that is still private, to explain why
- * nobody else can see the page. Once published there is no bar at all — the
- * owner sees the same page as the public.
- */
 export function OwnerBar({ username }: OwnerBarProps) {
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);

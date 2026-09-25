@@ -36,6 +36,7 @@
     "dotenv": "catalog:",
     "fastify": "catalog:",
     "valibot": "catalog:",
+    "viem": "catalog:",
     "winston": "catalog:",
     "winston-daily-rotate-file": "catalog:"
   },

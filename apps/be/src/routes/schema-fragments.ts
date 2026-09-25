@@ -218,6 +218,288 @@ export const bannerResponseSchema = {
   },
 } as const;
 
+const paymentNetworkEnum = {
+  type: "string",
+  enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+} as const;
+
+export const walletResponseSchema = {
+  type: "object",
+  required: ["id", "label", "address", "network", "role", "status"],
+  properties: {
+    id: str,
+    label: str,
+    description: nullStr,
+    address: str,
+    network: paymentNetworkEnum,
+    role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
+    status: { type: "string", enum: ["ACTIVE", "PAUSED", "RETIRED"] },
+    isDefault: bool,
+    verifiedAt: date,
+    verificationMethod: {
+      type: "string",
+      enum: ["EOA_SIGNATURE", "ERC1271"],
+    },
+    verifiedChainId: int,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const walletListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: walletResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+export const walletNonceResponseSchema = {
+  type: "object",
+  required: ["nonce", "message", "expiresAt"],
+  properties: {
+    nonce: str,
+    message: str,
+    expiresAt: date,
+  },
+} as const;
+
+const visibilityEnum = {
+  type: "string",
+  enum: ["PRIVATE", "UNLISTED", "PUBLIC"],
+} as const;
+
+const httpMethodEnum = {
+  type: "string",
+  enum: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+} as const;
+
+const nullableNetworkEnum = {
+  type: "string",
+  nullable: true,
+  enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA", null],
+} as const;
+
+export const apiEndpointResponseSchema = {
+  type: "object",
+  required: ["id", "method", "path"],
+  properties: {
+    id: str,
+    method: httpMethodEnum,
+    path: str,
+    summary: nullStr,
+    // A string, not a number: Decimal(38,18) does not survive an IEEE-754
+    // double, and this one is a price.
+    priceAmount: nullStr,
+    sortOrder: int,
+  },
+} as const;
+
+export const apiListingResponseSchema = {
+  type: "object",
+  required: ["id", "slug", "name", "visibility"],
+  properties: {
+    id: str,
+    slug: str,
+    name: str,
+    summary: nullStr,
+    description: nullStr,
+    baseUrl: nullStr,
+    docsUrl: nullStr,
+    category: nullStr,
+    tags: { type: "array", items: str },
+    priceLabel: nullStr,
+    visibility: visibilityEnum,
+    publishedAt: nullDate,
+    walletId: nullStr,
+    network: nullableNetworkEnum,
+    payToAddress: nullStr,
+    assetAddress: nullStr,
+    priceAmount: nullStr,
+    priceCurrency: nullStr,
+    x402Endpoint: nullStr,
+    createdAt: date,
+    updatedAt: date,
+    endpoints: { type: "array", items: apiEndpointResponseSchema },
+  },
+} as const;
+
+export const apiListingListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: apiListingResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+/**
+ * Both wallet addresses are present here because this is the OWNER's view of
+ * their own agent. The public projection lives in apps/playground and omits
+ * `walletAddress` and `creditLimit` on purpose.
+ */
+export const agentResponseSchema = {
+  type: "object",
+  required: ["id", "name", "status", "visibility", "network"],
+  properties: {
+    id: str,
+    slug: nullStr,
+    name: str,
+    headline: nullStr,
+    description: nullStr,
+    avatarUrl: nullStr,
+    docsUrl: nullStr,
+    status: { type: "string", enum: ["PENDING", "ACTIVE", "SUSPENDED"] },
+    visibility: visibilityEnum,
+    network: paymentNetworkEnum,
+
+    walletAddress: nullStr,
+    payerWalletId: nullStr,
+    creditLimit: str,
+
+    walletId: nullStr,
+    payToAddress: nullStr,
+    assetAddress: nullStr,
+    priceAmount: nullStr,
+    priceCurrency: nullStr,
+    priceLabel: nullStr,
+    endpointUrl: nullStr,
+    x402Endpoint: nullStr,
+
+    publishedAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const agentListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: agentResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+const paymentStatusEnum = {
+  type: "string",
+  enum: ["PENDING", "SETTLED", "FAILED"],
+} as const;
+
+export const paymentResponseSchema = {
+  type: "object",
+  required: ["id", "payerAddress", "recipientAddress", "amount", "status"],
+  properties: {
+    id: str,
+    listingId: nullStr,
+    agentId: nullStr,
+    payerAddress: str,
+    recipientAddress: str,
+    network: paymentNetworkEnum,
+    assetAddress: nullStr,
+    amount: str,
+    status: paymentStatusEnum,
+    failureReason: nullStr,
+    reqId: str,
+    txHash: nullStr,
+    resource: nullStr,
+    description: nullStr,
+    settledAt: nullStr,
+    createdAt: date,
+    updatedAt: date,
+    listingSlug: nullStr,
+    listingName: nullStr,
+    agentSlug: nullStr,
+    agentName: nullStr,
+    direction: { type: "string", enum: ["sent", "received"] },
+  },
+} as const;
+
+export const paymentListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: paymentResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+const paymentTotalsSchema = {
+  type: "object",
+  required: ["count", "settledCount", "pendingCount", "failedCount"],
+  properties: {
+    count: int,
+    settledCount: int,
+    pendingCount: int,
+    failedCount: int,
+    volume: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          assetAddress: nullStr,
+          network: str,
+          amount: str,
+        },
+      },
+    },
+  },
+} as const;
+
+export const paymentSummaryResponseSchema = {
+  type: "object",
+  required: ["sent", "received"],
+  properties: {
+    sent: paymentTotalsSchema,
+    received: paymentTotalsSchema,
+  },
+} as const;
+
+const monthlyBucketSchema = {
+  type: "object",
+  required: ["month", "settledCount", "failedCount"],
+  properties: {
+    month: str,
+    settledCount: int,
+    failedCount: int,
+    volume: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { assetAddress: nullStr, network: str, amount: str },
+      },
+    },
+  },
+} as const;
+
+export const paymentStatsResponseSchema = {
+  type: "object",
+  required: ["months", "received", "sent"],
+  properties: {
+    months: { type: "array", items: str },
+    received: { type: "array", items: monthlyBucketSchema },
+    sent: { type: "array", items: monthlyBucketSchema },
+  },
+} as const;
+
+export const batchDeleteResponseSchema = {
+  type: "object",
+  required: ["deleted", "notFound"],
+  properties: {
+    deleted: { type: "array", items: str },
+    notFound: { type: "array", items: str },
+  },
+} as const;
+
 export const verificationSentResponseSchema = {
   type: "object",
   required: ["sent"],
@@ -247,4 +529,150 @@ export const errorResponseSchema = {
 export const limitedResponses = {
   429: errorResponseSchema,
   503: errorResponseSchema,
+} as const;
+
+export const policyResponseSchema = {
+  type: "object",
+  required: ["policy"],
+  properties: {
+    policy: {
+      type: "object",
+      nullable: true,
+      properties: {
+        id: str,
+        policyEnabled: bool,
+        faqEnabled: bool,
+        refundPolicy: nullStr,
+        uptimeTarget: nullStr,
+        supportResponse: nullStr,
+        supportEmail: nullStr,
+        rateLimit: nullStr,
+        dataRetention: nullStr,
+        testEndpoint: nullStr,
+        termsUrl: nullStr,
+        privacyUrl: nullStr,
+        statusUrl: nullStr,
+        createdAt: date,
+        updatedAt: date,
+      },
+    },
+  },
+} as const;
+
+const reviewSchema = {
+  type: "object",
+  required: ["id", "rating"],
+  properties: {
+    id: str,
+    rating: int,
+    title: nullStr,
+    body: nullStr,
+    verifiedPurchase: bool,
+    ownerReply: nullStr,
+    ownerRepliedAt: nullDate,
+    hiddenAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+    author: {
+      type: "object",
+      properties: { username: nullStr, name: str, avatarUrl: nullStr },
+    },
+  },
+} as const;
+
+export const reviewListResponseSchema = {
+  type: "object",
+  required: ["data", "page", "limit", "total"],
+  properties: {
+    data: { type: "array", items: reviewSchema },
+    page: int,
+    limit: int,
+    total: int,
+  },
+} as const;
+
+export const reviewResponseSchema = {
+  type: "object",
+  required: ["review"],
+  properties: { review: reviewSchema },
+} as const;
+
+const reportSchema = {
+  type: "object",
+  required: ["id", "reason", "status"],
+  properties: {
+    id: str,
+    reason: str,
+    detail: nullStr,
+    status: str,
+    acknowledgedAt: nullDate,
+    resolvedAt: nullDate,
+    resolutionNote: nullStr,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const reportListResponseSchema = {
+  type: "object",
+  required: ["data", "page", "limit", "total"],
+  properties: {
+    data: { type: "array", items: reportSchema },
+    page: int,
+    limit: int,
+    total: int,
+  },
+} as const;
+
+export const reportResponseSchema = {
+  type: "object",
+  required: ["report"],
+  properties: { report: reportSchema },
+} as const;
+
+export const trustSummaryResponseSchema = {
+  type: "object",
+  required: ["ratingCount", "ratingAverage"],
+  properties: {
+    ratingCount: int,
+    ratingAverage: { type: "number", nullable: true },
+    verifiedCount: int,
+    openReports: int,
+    unansweredReviews: int,
+    distribution: {
+      type: "object",
+      properties: {
+        "1": int,
+        "2": int,
+        "3": int,
+        "4": int,
+        "5": int,
+      },
+    },
+  },
+} as const;
+
+const faqSchema = {
+  type: "object",
+  required: ["id", "question", "answer"],
+  properties: {
+    id: str,
+    question: str,
+    answer: str,
+    sortOrder: int,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const faqListResponseSchema = {
+  type: "object",
+  required: ["data"],
+  properties: { data: { type: "array", items: faqSchema } },
+} as const;
+
+export const faqResponseSchema = {
+  type: "object",
+  required: ["faq"],
+  properties: { faq: faqSchema },
 } as const;

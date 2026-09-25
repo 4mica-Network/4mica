@@ -284,6 +284,7 @@ export function TextArea({
   placeholder,
   disabled,
   error,
+  maxLength,
 }: {
   id: string;
   value: string;
@@ -292,6 +293,7 @@ export function TextArea({
   placeholder?: string;
   disabled?: boolean;
   error?: string;
+  maxLength?: number;
 }) {
   return (
     <InputField
@@ -302,6 +304,7 @@ export function TextArea({
       disabled={disabled}
       placeholder={placeholder}
       error={error}
+      maxLength={maxLength}
       allowResizing
       onChange={(e) => onChange(e.target.value)}
     />

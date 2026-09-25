@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   creator: SITE_NAME,
   publisher: SITE_NAME,
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    shortcut: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/icon.png" }],
+  },
 };
 
 export const viewport: Viewport = {

@@ -120,6 +120,23 @@ export const initApp = async (
             name: "banners",
             description: "Dashboard promo banners and interaction tracking",
           },
+          {
+            name: "wallets",
+            description: "On-chain wallets the account has proved control of",
+          },
+          {
+            name: "api-listings",
+            description: "Paywalled APIs the account publishes and is paid for",
+          },
+          {
+            name: "agents",
+            description:
+              "Agent identities the account owns, as payer and as seller",
+          },
+          {
+            name: "payments",
+            description: "x402 payments this account sent or received",
+          },
         ],
         components: {
           securitySchemes: {
@@ -127,6 +144,13 @@ export const initApp = async (
               type: "http",
               scheme: "bearer",
               bearerFormat: "JWT",
+            },
+            apiKeyAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "4mica_sk_…",
+              description:
+                "A key from Settings → Developer. Used by services calling 4Mica without a signed-in user.",
             },
           },
         },

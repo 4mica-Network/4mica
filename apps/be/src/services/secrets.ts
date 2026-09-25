@@ -46,3 +46,6 @@ export const generateWebhookSecret = (): GeneratedSecret =>
 
 export const generateEmailVerificationToken = (): GeneratedSecret =>
   generate(EMAIL_VERIFICATION_PREFIX);
+
+export const generateWalletNonce = (): string =>
+  randomBytes(32).toString("base64url");

@@ -24,7 +24,7 @@ export function AppShell() {
         </button>
       </div>
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="w-full px-6 py-6">
+        <div className="flex min-h-full w-full flex-col px-6 py-6">
           <Outlet />
         </div>
       </main>
