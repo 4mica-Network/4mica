@@ -67,15 +67,74 @@ export const en = {
     settlesOn: "Settles on {{network}}",
 
     endpointsHeading: "Endpoints",
+    noEndpointsTitle: "No routes published",
+    noEndpointsBody:
+      "You have not listed the individual routes yet. Buyers still call the base URL above; adding routes makes the generated snippets specific.",
     endpointsLead:
       "The routes this API exposes. The first one is what the code below calls.",
+  },
+
+  trust: {
+    heading: "Before you pay",
+    noRatingsTitle: "No ratings yet",
+    noRatings:
+      "No one has rated this yet. Check the seller's policies below, and prefer a listing whose owner has answered questions.",
+    ratingCountOne: "{{count}} rating",
+    ratingCountOther: "{{count}} ratings",
+    verifiedCount: "{{count}} from verified buyers",
+    verifiedPurchase: "Verified purchase",
+    hasVerifiedBuyers: "Paid buyers have rated this",
+    listedSince: "Listed since {{date}}",
+    noPolicy: "No published policy",
+
+    refundLabel: "If a call fails",
+    uptimeLabel: "Uptime target",
+    supportLabel: "Support response",
+    rateLimitLabel: "Rate limit",
+    dataLabel: "Your data",
+
+    reviewsHeading: "What buyers say",
+    noReviews: "No reviews yet",
+    noReviewsBody:
+      "Be the first to say whether this returned what you paid for.",
+    ownerReplied: "{{name}} replied",
+    signInToReview: "Sign in to rate this.",
+    signInToReport: "Sign in to report this.",
+
+    rateN: "Rate {{count}} out of 5",
+    titlePlaceholder: "Sum it up in a line (optional)",
+    bodyPlaceholder: "Did it return what you paid for? How fast? (optional)",
+    postReview: "Post rating",
+    updateReview: "Update rating",
+    deleteReview: "Remove",
+    saved: "Saved",
+
+    reportAction: "Report this listing",
+    reportSubmit: "Send report",
+    reportPlaceholder: "What happened? Include a request id if you have one.",
+    reportNote: "Goes to the owner and to 4Mica. Nothing is published.",
+    reportThanks:
+      "Thanks — the owner and 4Mica can see this now. Nothing about it is shown publicly.",
+    reasonScam: "Scam",
+    reasonNotWorking: "Does not work",
+    reasonMisleadingPricing: "Misleading pricing",
+    reasonSpam: "Spam",
+    reasonOther: "Something else",
+
+    errorSignedOut: "Sign in first.",
+    errorOwnResource: "You cannot rate your own listing.",
+    errorInvalidReview: "Check the rating and try again.",
+    errorInvalidReport: "Choose a reason and try again.",
+    errorAlreadyReported: "You already have an open report on this.",
+    errorNotFound: "That listing is no longer available.",
+    errorNoRating: "Pick a star rating first.",
+    errorGeneric: "That did not go through. Try again.",
   },
 
   support: {
     heading: "Do you need help?",
     askSeller: "Ask {{name}}",
     askTeam: "Ask the 4Mica team",
-    readDocs: "Read the docs",
     emailSubject: "Question about {{resource}}",
     supportSubject: "Integration help with {{resource}}",
   },

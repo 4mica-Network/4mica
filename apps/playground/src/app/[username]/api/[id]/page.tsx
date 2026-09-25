@@ -1,7 +1,9 @@
 import { Tag } from "@4mica/ui";
+import { Route } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CopyValue } from "@/components/CopyValue";
+import { EmptyState } from "@/components/EmptyState";
 import { ApiIntegration } from "@/components/IntegrationSection/ApiIntegration";
 import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
@@ -10,6 +12,7 @@ import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { RevealLink } from "@/components/RevealLink";
 import { SupportSection } from "@/components/SupportSection";
+import { TrustSection } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildApiListingDescriptor } from "@/lib/descriptor";
@@ -17,6 +20,7 @@ import { getPayerState } from "@/services/payer";
 import { resolveApiListing } from "@/services/resource";
 import { buildApiListingMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
+import { bareHost } from "@/utils/bareHost";
 import { formatDate } from "@/utils/formatDate";
 
 export async function generateMetadata({
@@ -122,7 +126,7 @@ export default async function ApiListingPage({
               </dt>
               <dd className="min-w-0 flex-1">
                 <RevealLink external href={listing.docsUrl}>
-                  {messages.common.viewDocs}
+                  {bareHost(listing.docsUrl)}
                 </RevealLink>
               </dd>
             </div>
@@ -139,7 +143,7 @@ export default async function ApiListingPage({
         </section>
       )}
 
-      {listing.endpoints.length > 0 && (
+      {(listing.endpoints.length > 0 || profile.isOwner) && (
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
@@ -150,26 +154,42 @@ export default async function ApiListingPage({
             </p>
           </div>
 
-          <ul className="flex flex-col border-overlay/10 border-t">
-            {listing.endpoints.map((endpoint) => (
-              <li
-                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-overlay/10 border-b py-3"
-                key={endpoint.id}
-              >
-                <code className="font-mono text-ink-strong text-sm">
-                  <span className="text-ink-subtle">{endpoint.method}</span>{" "}
-                  {endpoint.path}
-                </code>
-                {endpoint.summary && (
-                  <span className="min-w-0 flex-1 text-ink-muted text-sm">
-                    {endpoint.summary}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {listing.endpoints.length === 0 ? (
+            <EmptyState
+              description={messages.api.noEndpointsBody}
+              icon={<Route className="h-4 w-4" />}
+              title={messages.api.noEndpointsTitle}
+            />
+          ) : (
+            <ul className="flex flex-col border-overlay/10 border-t">
+              {listing.endpoints.map((endpoint) => (
+                <li
+                  className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-overlay/10 border-b py-3"
+                  key={endpoint.id}
+                >
+                  <code className="font-mono text-ink-strong text-sm">
+                    <span className="text-ink-subtle">{endpoint.method}</span>{" "}
+                    {endpoint.path}
+                  </code>
+                  {endpoint.summary && (
+                    <span className="min-w-0 flex-1 text-ink-muted text-sm">
+                      {endpoint.summary}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
+
+      <TrustSection
+        id={listing.id}
+        kind="listing"
+        profile={profile}
+        publishedAt={listing.publishedAt}
+        resourceRef={listing.ref}
+      />
 
       {!profile.isOwner && (
         <PayWithFourMica network={listing.network} state={payerState} />

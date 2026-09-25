@@ -530,3 +530,122 @@ export const limitedResponses = {
   429: errorResponseSchema,
   503: errorResponseSchema,
 } as const;
+
+export const policyResponseSchema = {
+  type: "object",
+  required: ["policy"],
+  properties: {
+    policy: {
+      type: "object",
+      nullable: true,
+      properties: {
+        id: str,
+        refundPolicy: nullStr,
+        uptimeTarget: nullStr,
+        supportResponse: nullStr,
+        supportEmail: nullStr,
+        rateLimit: nullStr,
+        dataRetention: nullStr,
+        testEndpoint: nullStr,
+        termsUrl: nullStr,
+        privacyUrl: nullStr,
+        statusUrl: nullStr,
+        createdAt: date,
+        updatedAt: date,
+      },
+    },
+  },
+} as const;
+
+const reviewSchema = {
+  type: "object",
+  required: ["id", "rating"],
+  properties: {
+    id: str,
+    rating: int,
+    title: nullStr,
+    body: nullStr,
+    verifiedPurchase: bool,
+    ownerReply: nullStr,
+    ownerRepliedAt: nullDate,
+    hiddenAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+    author: {
+      type: "object",
+      properties: { username: nullStr, name: str, avatarUrl: nullStr },
+    },
+  },
+} as const;
+
+export const reviewListResponseSchema = {
+  type: "object",
+  required: ["data", "page", "limit", "total"],
+  properties: {
+    data: { type: "array", items: reviewSchema },
+    page: int,
+    limit: int,
+    total: int,
+  },
+} as const;
+
+export const reviewResponseSchema = {
+  type: "object",
+  required: ["review"],
+  properties: { review: reviewSchema },
+} as const;
+
+const reportSchema = {
+  type: "object",
+  required: ["id", "reason", "status"],
+  properties: {
+    id: str,
+    reason: str,
+    detail: nullStr,
+    status: str,
+    acknowledgedAt: nullDate,
+    resolvedAt: nullDate,
+    resolutionNote: nullStr,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const reportListResponseSchema = {
+  type: "object",
+  required: ["data", "page", "limit", "total"],
+  properties: {
+    data: { type: "array", items: reportSchema },
+    page: int,
+    limit: int,
+    total: int,
+  },
+} as const;
+
+export const reportResponseSchema = {
+  type: "object",
+  required: ["report"],
+  properties: { report: reportSchema },
+} as const;
+
+export const trustSummaryResponseSchema = {
+  type: "object",
+  required: ["ratingCount", "ratingAverage"],
+  properties: {
+    ratingCount: int,
+    ratingAverage: { type: "number", nullable: true },
+    verifiedCount: int,
+    openReports: int,
+    unansweredReviews: int,
+    distribution: {
+      type: "object",
+      properties: {
+        "1": int,
+        "2": int,
+        "3": int,
+        "4": int,
+        "5": int,
+      },
+    },
+  },
+} as const;

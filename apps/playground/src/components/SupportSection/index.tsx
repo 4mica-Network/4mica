@@ -46,10 +46,6 @@ export function SupportSection({ profile, resourceName }: SupportSectionProps) {
         >
           {messages.support.askTeam}
         </RevealLink>
-
-        <RevealLink className="py-1" external href={links.docs}>
-          {messages.support.readDocs}
-        </RevealLink>
       </div>
     </section>
   );

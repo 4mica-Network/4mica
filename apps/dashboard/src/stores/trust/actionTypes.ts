@@ -1,0 +1,23 @@
+import { mirrorKeys } from "@stores/utils";
+
+const trustActions = mirrorKeys([
+  "FETCH_TRUST_REQUESTED",
+  "FETCH_TRUST_PENDING",
+  "FETCH_TRUST_SUCCEEDED",
+  "FETCH_TRUST_FAILED",
+
+  "SAVE_POLICY_REQUESTED",
+  "SAVE_POLICY_SUCCEEDED",
+
+  "REPLY_TO_REVIEW_REQUESTED",
+  "REPLY_TO_REVIEW_SUCCEEDED",
+
+  "UPDATE_REPORT_REQUESTED",
+  "UPDATE_REPORT_SUCCEEDED",
+
+  "TRUST_ACTION_FAILED",
+  "CLEAR_TRUST_ISSUES",
+  "RESET_TRUST",
+] as const);
+
+export default trustActions;

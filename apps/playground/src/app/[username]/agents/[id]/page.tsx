@@ -11,6 +11,7 @@ import { ProfileNav } from "@/components/ProfileNav";
 import { Prose } from "@/components/Prose";
 import { RevealLink } from "@/components/RevealLink";
 import { SupportSection } from "@/components/SupportSection";
+import { TrustSection } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages, t } from "@/i18n";
 import { buildAgentDescriptor } from "@/lib/descriptor";
@@ -19,6 +20,7 @@ import { getPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
+import { bareHost } from "@/utils/bareHost";
 import { formatDate } from "@/utils/formatDate";
 
 const STATUS_VARIANT = {
@@ -142,7 +144,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
               </dt>
               <dd className="min-w-0 flex-1">
                 <RevealLink external href={agent.docsUrl}>
-                  {messages.common.viewDocs}
+                  {bareHost(agent.docsUrl)}
                 </RevealLink>
               </dd>
             </div>
@@ -158,6 +160,14 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
           <Prose text={agent.description} />
         </section>
       )}
+
+      <TrustSection
+        id={agent.id}
+        kind="agent"
+        profile={profile}
+        publishedAt={agent.publishedAt}
+        resourceRef={agent.ref}
+      />
 
       {!profile.isOwner && (
         <PayWithFourMica network={agent.network} state={payerState} />

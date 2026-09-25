@@ -203,6 +203,88 @@ const PAYMENTS = [
 
 const CUSTOMER_ADDRESS = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 
+const REVIEWERS = [
+  {
+    clerkUserId: "user_seed_buyer_dana",
+    username: "dana-builds",
+    name: "Dana Okafor",
+    email: "dana@example.com",
+  },
+  {
+    clerkUserId: "user_seed_buyer_linus",
+    username: "linus-ships",
+    name: "Linus Marek",
+    email: "linus@example.com",
+  },
+] as const;
+
+const LISTING_REVIEWS = [
+  {
+    reviewer: 0,
+    rating: 5,
+    title: "Settled every call, no surprises",
+    body: "Ran about 400 lookups over two weeks. Median latency around 280ms and the 402 handshake never needed a retry. The certificate in X-PAYMENT-RESPONSE matches what my ledger recorded.",
+    verifiedPurchase: true,
+    ownerReply: null,
+  },
+  {
+    reviewer: 1,
+    rating: 3,
+    title: "Works, but the docs lagged the API",
+    body: "The response added a field that the docs did not mention, which broke my parser for a day. Support answered the next morning.",
+    verifiedPurchase: true,
+    ownerReply:
+      "Fair — the docs are regenerated from the schema now, so this cannot drift again. Thanks for the nudge.",
+  },
+] as const;
+
+const AGENT_REVIEWS = [
+  {
+    reviewer: 0,
+    rating: 4,
+    title: "Good citations, slow on long briefs",
+    body: "Sources check out and it declines rather than inventing one when it cannot find anything. A 20-page brief took closer to four minutes than the one it advertises.",
+    verifiedPurchase: false,
+    ownerReply: null,
+  },
+] as const;
+
+const LISTING_POLICY = {
+  refundPolicy:
+    "Any 5xx, timeout, or empty body is refunded automatically within one settlement cycle — you do not need to ask. Email us for anything the automation misses.",
+  uptimeTarget: "99.9% monthly, measured at the edge",
+  supportResponse: "Within one business day",
+  supportEmail: "api-support@4mica.io",
+  rateLimit: "60 requests/minute per payer address",
+  dataRetention:
+    "Request payloads are held for 24 hours for debugging, then deleted. We never train on them.",
+  testEndpoint: "https://api.4mica.io/sandbox/limits",
+  termsUrl: "https://4mica.io/terms",
+  privacyUrl: "https://4mica.io/privacy",
+  statusUrl: "https://status.4mica.io",
+} as const;
+
+const AGENT_POLICY = {
+  refundPolicy:
+    "If a brief comes back with no usable sources we refund the run in full.",
+  uptimeTarget: "99.5% monthly",
+  supportResponse: "Within two business days",
+  supportEmail: null,
+  rateLimit: "10 concurrent briefs per payer",
+  dataRetention: "Prompts are retained for 7 days, then deleted.",
+  testEndpoint: null,
+  termsUrl: "https://4mica.io/terms",
+  privacyUrl: "https://4mica.io/privacy",
+  statusUrl: null,
+} as const;
+
+const LISTING_REPORT = {
+  reviewer: 1,
+  reason: "NOT_WORKING",
+  detail:
+    "Three calls in a row returned 502 around 09:00 UTC. Request id 0x8f21. Charged for one of them.",
+} as const;
+
 const BANNERS = [
   {
     slug: "series-a-1m",
@@ -545,6 +627,132 @@ const seed = async (): Promise<void> => {
         createdAt: when,
       },
     });
+  }
+
+  const agentRow = await prisma.agent.findFirst({
+    where: { ownerId: owner.id, slug: AGENTS[0].slug },
+    select: { id: true },
+  });
+
+  const reviewers = [];
+  for (const entry of REVIEWERS) {
+    const fields = {
+      username: entry.username,
+      name: entry.name,
+      email: entry.email,
+      emailVerified: true,
+      private: false,
+      completeOnboarding: true,
+      isSeeded: true,
+    };
+
+    reviewers.push(
+      await prisma.user.upsert({
+        where: { clerkUserId: entry.clerkUserId },
+        update: fields,
+        create: { clerkUserId: entry.clerkUserId, ...fields },
+        select: { id: true },
+      }),
+    );
+  }
+
+  if (listingRow) {
+    for (const entry of LISTING_REVIEWS) {
+      const authorId = reviewers[entry.reviewer].id;
+      await prisma.review.upsert({
+        where: { listingId_authorId: { listingId: listingRow.id, authorId } },
+        update: {
+          rating: entry.rating,
+          title: entry.title,
+          body: entry.body,
+          verifiedPurchase: entry.verifiedPurchase,
+          ownerReply: entry.ownerReply,
+          ownerRepliedAt: entry.ownerReply ? new Date() : null,
+        },
+        create: {
+          listingId: listingRow.id,
+          authorId,
+          rating: entry.rating,
+          title: entry.title,
+          body: entry.body,
+          verifiedPurchase: entry.verifiedPurchase,
+          ownerReply: entry.ownerReply,
+          ownerRepliedAt: entry.ownerReply ? new Date() : null,
+        },
+      });
+    }
+
+    const existingPolicy = await prisma.resourcePolicy.findFirst({
+      where: { listingId: listingRow.id },
+      select: { id: true },
+    });
+
+    if (existingPolicy) {
+      await prisma.resourcePolicy.update({
+        where: { id: existingPolicy.id },
+        data: LISTING_POLICY,
+      });
+    } else {
+      await prisma.resourcePolicy.create({
+        data: { listingId: listingRow.id, ...LISTING_POLICY },
+      });
+    }
+
+    const reporterId = reviewers[LISTING_REPORT.reviewer].id;
+    const openReport = await prisma.report.findFirst({
+      where: { listingId: listingRow.id, reporterId },
+      select: { id: true },
+    });
+
+    if (!openReport) {
+      await prisma.report.create({
+        data: {
+          listingId: listingRow.id,
+          reporterId,
+          reason: LISTING_REPORT.reason,
+          detail: LISTING_REPORT.detail,
+        },
+      });
+    }
+  }
+
+  if (agentRow) {
+    for (const entry of AGENT_REVIEWS) {
+      const authorId = reviewers[entry.reviewer].id;
+      await prisma.review.upsert({
+        where: { agentId_authorId: { agentId: agentRow.id, authorId } },
+        update: {
+          rating: entry.rating,
+          title: entry.title,
+          body: entry.body,
+          verifiedPurchase: entry.verifiedPurchase,
+        },
+        create: {
+          agentId: agentRow.id,
+          authorId,
+          rating: entry.rating,
+          title: entry.title,
+          body: entry.body,
+          verifiedPurchase: entry.verifiedPurchase,
+        },
+      });
+    }
+
+    const existingAgentPolicy = await prisma.resourcePolicy.findFirst({
+      where: { agentId: agentRow.id },
+      select: { id: true },
+    });
+
+    if (existingAgentPolicy) {
+      await prisma.resourcePolicy.update({
+        where: { id: existingAgentPolicy.id },
+        data: AGENT_POLICY,
+      });
+    } else {
+      await prisma.resourcePolicy.create({
+        data: { agentId: agentRow.id, ...AGENT_POLICY },
+      });
+    }
   }
 
   const [agents, wallets, listings, endpoints, banners, payments] =

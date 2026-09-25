@@ -56,9 +56,9 @@ model Agent {
   /// The chain this agent signs payment guarantees on.
   network     PaymentNetwork   @default(ETHEREUM_SEPOLIA)
 
-  walletAddress String?  @map("wallet_address") @db.VarChar(42)
-  payerWalletId String?  @map("payer_wallet_id")
-  creditLimit   Decimal  @default(0) @map("credit_limit") @db.Decimal(38, 18)
+  walletAddress String? @map("wallet_address") @db.VarChar(42)
+  payerWalletId String? @map("payer_wallet_id")
+  creditLimit   Decimal @default(0) @map("credit_limit") @db.Decimal(38, 18)
 
   walletId      String?  @map("wallet_id")
   payToAddress  String?  @map("pay_to_address") @db.VarChar(42)
@@ -74,10 +74,13 @@ model Agent {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
-  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  payerWallet Wallet?   @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
-  wallet      Wallet?   @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
+  owner       User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  payerWallet Wallet?         @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
+  wallet      Wallet?         @relation("AgentRecipientWallet", fields: [walletId], references: [id], onDelete: SetNull)
   payments    Payment[]
+  reviews     Review[]
+  reports     Report[]
+  policy      ResourcePolicy?
 
   @@unique([walletAddress, network])
   @@unique([ownerId, slug])
@@ -184,6 +187,8 @@ model User {
   webhooks                       Webhook[]
   agents                         Agent[]
   apiListings                    ApiListing[]
+  reviews                        Review[]
+  reports                        Report[]
   bannerInteractions             BannerInteraction[]
   emailVerificationTokens        EmailVerificationToken[]
   onboardingQueue                OnboardingEmailQueue?
@@ -318,10 +323,13 @@ model ApiListing {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  wallet    Wallet?       @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  owner     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  wallet    Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
   endpoints ApiEndpoint[]
   payments  Payment[]
+  reviews   Review[]
+  reports   Report[]
+  policy    ResourcePolicy?
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
@@ -566,4 +574,104 @@ model WalletNonce {
   @@index([userId])
   @@index([expiresAt])
   @@map("wallet_nonces")
+}
+
+enum ReportReason {
+  SCAM
+  NOT_WORKING
+  MISLEADING_PRICING
+  SPAM
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+model Review {
+  id        String  @id @default(uuid(7))
+  listingId String? @map("listing_id")
+  agentId   String? @map("agent_id")
+  authorId  String  @map("author_id")
+
+  rating Int
+  title  String? @db.VarChar(120)
+  body   String? @db.VarChar(2000)
+
+  verifiedPurchase Boolean @default(false) @map("verified_purchase")
+
+  ownerReply     String?   @map("owner_reply") @db.VarChar(2000)
+  ownerRepliedAt DateTime? @map("owner_replied_at")
+
+  hiddenAt     DateTime? @map("hidden_at")
+  hiddenReason String?   @map("hidden_reason") @db.VarChar(280)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  author  User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, authorId])
+  @@unique([agentId, authorId])
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+model Report {
+  id         String  @id @default(uuid(7))
+  listingId  String? @map("listing_id")
+  agentId    String? @map("agent_id")
+  reporterId String  @map("reporter_id")
+
+  reason ReportReason
+  detail String?      @db.VarChar(2000)
+  status ReportStatus @default(OPEN)
+
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note") @db.VarChar(2000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  listing  ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent    Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  reporter User        @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("reports")
+}
+
+model ResourcePolicy {
+  id        String  @id @default(uuid(7))
+  listingId String? @unique @map("listing_id")
+  agentId   String? @unique @map("agent_id")
+
+  refundPolicy    String? @map("refund_policy") @db.VarChar(2000)
+  uptimeTarget    String? @map("uptime_target") @db.VarChar(120)
+  supportResponse String? @map("support_response") @db.VarChar(120)
+  supportEmail    String? @map("support_email") @db.VarChar(320)
+  rateLimit       String? @map("rate_limit") @db.VarChar(120)
+  dataRetention   String? @map("data_retention") @db.VarChar(2000)
+  testEndpoint    String? @map("test_endpoint") @db.VarChar(2048)
+
+  termsUrl   String? @map("terms_url") @db.VarChar(2048)
+  privacyUrl String? @map("privacy_url") @db.VarChar(2048)
+  statusUrl  String? @map("status_url") @db.VarChar(2048)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("resource_policies")
 }

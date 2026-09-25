@@ -25,11 +25,11 @@ const profile = (over: Partial<PublicProfile> = {}): PublicProfile =>
   }) as PublicProfile;
 
 describe("SupportSection", () => {
-  it("asks one plain question and offers three ways in", () => {
+  it("asks one plain question and offers two ways in", () => {
     render(<SupportSection profile={profile()} resourceName="Dad's Joke" />);
 
     expect(screen.getByText(messages.support.heading)).toBeInTheDocument();
-    expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 
   it("names the seller and prefills a subject about the listing", () => {
@@ -81,7 +81,7 @@ describe("SupportSection", () => {
     expect(container.querySelector('a[href^="tel:"]')).toBeNull();
   });
 
-  it("always offers the 4Mica team and the docs", () => {
+  it("always offers the 4Mica team", () => {
     render(<SupportSection profile={profile()} resourceName="Dad's Joke" />);
 
     expect(
@@ -90,10 +90,14 @@ describe("SupportSection", () => {
       "href",
       expect.stringContaining("mailto:support@4mica.io?subject="),
     );
-    expect(screen.getByRole("link", { name: /Read the docs/ })).toHaveAttribute(
-      "target",
-      "_blank",
-    );
+  });
+
+  it("does not repeat the 4Mica docs link the integration section already has", () => {
+    render(<SupportSection profile={profile()} resourceName="Dad's Joke" />);
+
+    expect(
+      screen.queryByRole("link", { name: /docs/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("stays off the brand link colours, which are hard to read in a list", () => {

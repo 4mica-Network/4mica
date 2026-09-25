@@ -17,8 +17,10 @@ import {
   Route,
   Trash2,
 } from "lucide-react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
@@ -32,17 +34,16 @@ const menuItem =
 
 export function ApiListingRow({
   listing,
-  onEdit,
   onEditEndpoints,
   onDelete,
 }: {
   listing: ApiListing;
-  onEdit: (listing: ApiListing) => void;
   onEditEndpoints: (listing: ApiListing) => void;
   onDelete: (listing: ApiListing) => void;
 }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
 
   const isPending = useAppSelector(
     selectIsApiListingPending(`apiListing:${listing.id}`),
@@ -59,13 +60,32 @@ export function ApiListingRow({
     listing.priceLabel,
   );
 
+  const openDetail = (event: MouseEvent | KeyboardEvent) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('a, button, input, [role="menu"], [role="dialog"]')
+    ) {
+      return;
+    }
+
+    navigate(`/apps/${listing.id}`);
+  };
+
   return (
     <div
       className={cn(
-        "group flex w-full items-start gap-3 bg-surface px-4 py-3.5 transition-colors",
+        "group flex w-full cursor-pointer items-start gap-3 bg-surface px-4 py-3.5 transition-colors",
         isSelected ? "bg-overlay/10" : "hover:bg-overlay/5",
       )}
       data-testid={`api-listing-row-${listing.id}`}
+      onClick={openDetail}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          openDetail(event);
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
       <Checkbox
         variant="square"
@@ -160,8 +180,8 @@ export function ApiListingRow({
               type="button"
               className={cn(menuItem, "text-ink-body")}
               onClick={() => {
-                onEdit(listing);
                 setMenuOpen(false);
+                navigate(`/apps/${listing.id}`);
               }}
               data-testid={`api-listing-edit-${listing.id}`}
             >

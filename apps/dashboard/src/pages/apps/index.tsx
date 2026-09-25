@@ -27,7 +27,6 @@ import { ApiListingRow } from "./ApiListingRow";
 import { ApiListingToolbar } from "./ApiListingToolbar";
 import { CreateApiListingModal } from "./CreateApiListingModal";
 import { DeleteApiListingDialog } from "./DeleteApiListingDialog";
-import { EditApiListingModal } from "./EditApiListingModal";
 import { EndpointsEditor } from "./EndpointsEditor";
 
 export function Apps() {
@@ -47,7 +46,6 @@ export function Apps() {
   useTitle(`${t("page.apps.title")} - ${t("org")}`);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<ApiListing | null>(null);
   const [editingEndpoints, setEditingEndpoints] = useState<ApiListing | null>(
     null,
   );
@@ -174,7 +172,6 @@ export function Apps() {
               <ApiListingRow
                 key={listing.id}
                 listing={listing}
-                onEdit={setEditing}
                 onEditEndpoints={setEditingEndpoints}
                 onDelete={setDeleting}
               />
@@ -204,8 +201,6 @@ export function Apps() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
       />
-
-      <EditApiListingModal listing={editing} onClose={() => setEditing(null)} />
 
       <EndpointsEditor
         listing={editingEndpoints}
