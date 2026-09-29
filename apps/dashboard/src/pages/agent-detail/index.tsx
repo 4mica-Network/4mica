@@ -1,20 +1,15 @@
-import { Button, Spinner, Tag } from "@4mica/ui";
+import { Button, Spinner } from "@4mica/ui";
 import { fetchAgents } from "@stores/agent/actions";
 import { selectAgents, selectHasLoadedAgents } from "@stores/agent/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
-import {
-  selectIsTrustPending,
-  selectPolicy,
-  selectTrustSummary,
-} from "@stores/trust/selector";
+import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
 import { useTitle } from "ahooks";
-import { ArrowLeft, ShieldAlert, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
+import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/form";
-import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
 import { FaqEditor } from "../app-detail/FaqEditor";
 import { PolicyForm } from "../app-detail/PolicyForm";
 import { ReportsPanel } from "../app-detail/ReportsPanel";
@@ -28,7 +23,6 @@ export function AgentDetail() {
 
   const agents = useAppSelector(selectAgents);
   const hasLoaded = useAppSelector(selectHasLoadedAgents);
-  const summary = useAppSelector(selectTrustSummary);
   const policy = useAppSelector(selectPolicy);
   const isSavingPolicy = useAppSelector(selectIsTrustPending("savePolicy"));
 
@@ -82,97 +76,49 @@ export function AgentDetail() {
   const faqEnabled = policy?.faqEnabled ?? true;
 
   return (
-    <div className="relative flex size-full min-h-0 flex-col">
-      <div className="pointer-events-none sticky top-0 z-20 -mb-10">
-        <Button
-          asChild
-          className="pointer-events-auto"
-          intent="ghost"
-          size="sm"
+    <div className="flex w-full animate-fade-in flex-col pb-16">
+      <BackBar label={t("agentDetail.backToAgents")} to="/agents" />
+
+      <div className="mx-auto flex w-full flex-col gap-10 lg:max-w-3xl">
+        <ToggleSection
+          checked={policyEnabled}
+          description={t("appDetail.policyLead")}
+          id="agent-policy-enabled"
+          isSaving={isSavingPolicy}
+          onToggle={(checked) =>
+            dispatch(savePolicy(resource, { policyEnabled: checked }))
+          }
+          title={t("appDetail.tabs.policy")}
         >
-          <Link to="/agents">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            {t("agentDetail.backToAgents")}
-          </Link>
-        </Button>
-      </div>
+          <PolicyForm resource={resource} />
+        </ToggleSection>
 
-      <div className="flex w-full flex-1 animate-fade-in flex-col overflow-y-auto pr-3 pb-16">
-        <div className="mx-auto flex w-full flex-col gap-10 pt-12 lg:max-w-3xl">
-          <header className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-semibold text-2xl text-ink-strong tracking-tight">
-                {agent.name}
-              </h1>
+        <ToggleSection
+          checked={faqEnabled}
+          description={t("appDetail.faq.lead")}
+          id="agent-faq-enabled"
+          isSaving={isSavingPolicy}
+          onToggle={(checked) =>
+            dispatch(savePolicy(resource, { faqEnabled: checked }))
+          }
+          title={t("appDetail.faq.title")}
+        >
+          <FaqEditor resource={resource} />
+        </ToggleSection>
 
-              {summary && summary.ratingCount > 0 && (
-                <Tag size="sm" variant="neutral">
-                  <Star className="mr-1 h-3 w-3 fill-warning text-warning" />
-                  {(summary.ratingAverage ?? 0).toFixed(1)} ·{" "}
-                  {summary.ratingCount}
-                </Tag>
-              )}
+        <SettingsSection
+          description={t("appDetail.reviewsLead")}
+          title={t("appDetail.tabs.reviews")}
+        >
+          <ReviewsPanel id={id} kind="agent" />
+        </SettingsSection>
 
-              {summary && summary.openReports > 0 && (
-                <Tag size="sm" variant="warning">
-                  <ShieldAlert className="mr-1 h-3 w-3" />
-                  {t("appDetail.openReports", { count: summary.openReports })}
-                </Tag>
-              )}
-            </div>
-
-            {agent.headline && (
-              <p className="text-ink-muted text-sm">{agent.headline}</p>
-            )}
-
-            <IntegrationGuideLink
-              isPayable={agent.payToAddress !== null}
-              kind="agent"
-              ref={agent.slug ?? agent.id}
-              visibility={agent.visibility}
-            />
-          </header>
-
-          <ToggleSection
-            checked={policyEnabled}
-            description={t("appDetail.policyLead")}
-            id="agent-policy-enabled"
-            isSaving={isSavingPolicy}
-            onToggle={(checked) =>
-              dispatch(savePolicy(resource, { policyEnabled: checked }))
-            }
-            title={t("appDetail.tabs.policy")}
-          >
-            <PolicyForm resource={resource} />
-          </ToggleSection>
-
-          <ToggleSection
-            checked={faqEnabled}
-            description={t("appDetail.faq.lead")}
-            id="agent-faq-enabled"
-            isSaving={isSavingPolicy}
-            onToggle={(checked) =>
-              dispatch(savePolicy(resource, { faqEnabled: checked }))
-            }
-            title={t("appDetail.faq.title")}
-          >
-            <FaqEditor resource={resource} />
-          </ToggleSection>
-
-          <SettingsSection
-            description={t("appDetail.reviewsLead")}
-            title={t("appDetail.tabs.reviews")}
-          >
-            <ReviewsPanel id={id} kind="agent" />
-          </SettingsSection>
-
-          <SettingsSection
-            description={t("appDetail.reportsLead")}
-            title={t("appDetail.tabs.reports")}
-          >
-            <ReportsPanel id={id} kind="agent" />
-          </SettingsSection>
-        </div>
+        <SettingsSection
+          description={t("appDetail.reportsLead")}
+          title={t("appDetail.tabs.reports")}
+        >
+          <ReportsPanel id={id} kind="agent" />
+        </SettingsSection>
       </div>
     </div>
   );
