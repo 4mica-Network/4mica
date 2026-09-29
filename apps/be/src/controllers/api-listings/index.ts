@@ -18,7 +18,6 @@ import {
   createApiListing,
   getApiListing,
   listApiListings,
-  replaceApiEndpoints,
   softDeleteApiListing,
   takenSlugs,
   updateApiListing,
@@ -27,7 +26,6 @@ import {
   BatchDeleteApiListingsSchema,
   CreateApiListingSchema,
   ListApiListingsQuerySchema,
-  ReplaceApiEndpointsSchema,
   UpdateApiListingSchema,
 } from "./schema";
 
@@ -36,15 +34,6 @@ const slugTaken = (reply: FastifyReply) =>
     error: "slug_taken",
     message: "You already have a listing at that address.",
     issues: [{ path: "slug", message: "is already in use on your profile" }],
-  });
-
-const endpointDuplicated = (reply: FastifyReply) =>
-  reply.code(409).send({
-    error: "endpoint_duplicated",
-    message: "Two endpoints share the same method and path.",
-    issues: [
-      { path: "endpoints", message: "contains the same method and path twice" },
-    ],
   });
 
 export const listApiListingsHandler: RouteHandler = async (request, reply) => {
@@ -121,7 +110,8 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
       name: data.name,
       summary: data.summary ?? null,
       description: data.description ?? null,
-      baseUrl: data.baseUrl ?? null,
+      url: data.url ?? null,
+      method: data.method,
       docsUrl: data.docsUrl ?? null,
       category: data.category ?? null,
       tags: data.tags,
@@ -135,7 +125,6 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
       priceAmount: data.priceAmount ?? null,
       priceCurrency: data.priceCurrency ?? null,
       x402Endpoint: data.x402Endpoint ?? null,
-      endpoints: data.endpoints ?? [],
     });
 
     appLogger.info("Listing created", {
@@ -204,37 +193,6 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
   } catch (error) {
     if (isUniqueViolation(error)) {
       return slugTaken(reply);
-    }
-    throw error;
-  }
-};
-
-export const replaceApiEndpointsHandler: RouteHandler = async (
-  request,
-  reply,
-) => {
-  const userId = requireUserId(request, reply);
-  if (!userId) {
-    return reply;
-  }
-
-  const parsed = parseBody(ReplaceApiEndpointsSchema, request.body);
-  if (!parsed.success) {
-    return invalidBody(reply, parsed.issues);
-  }
-
-  const { id } = request.params as { id: string };
-
-  try {
-    const updated = await replaceApiEndpoints(
-      userId,
-      id,
-      parsed.data.endpoints,
-    );
-    return updated ? reply.send(updated) : notFound(reply, "listing");
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      return endpointDuplicated(reply);
     }
     throw error;
   }

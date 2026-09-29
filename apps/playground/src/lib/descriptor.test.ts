@@ -35,7 +35,8 @@ const listing = (over: Partial<PublicApiListing> = {}): PublicApiListing =>
     name: "Dad's Joke",
     summary: "One more joke",
     description: null,
-    baseUrl: "https://api.example.com",
+    url: "https://api.example.com/joke",
+    method: "GET",
     docsUrl: null,
     category: "Search",
     tags: ["jokes"],
@@ -48,15 +49,6 @@ const listing = (over: Partial<PublicApiListing> = {}): PublicApiListing =>
     priceAmount: "0.020000000000000000",
     priceCurrency: "USD",
     x402Endpoint: null,
-    endpoints: [
-      {
-        id: "e1",
-        method: "GET",
-        path: "/joke",
-        summary: null,
-        priceAmount: null,
-      },
-    ],
     ...over,
   }) as PublicApiListing;
 
@@ -86,7 +78,7 @@ const agent = (over: Partial<PublicAgent> = {}): PublicAgent =>
   }) as PublicAgent;
 
 describe("buildApiListingDescriptor", () => {
-  it("joins the base url with the first endpoint so the url is callable", () => {
+  it("exposes the listing url and method as the callable resource", () => {
     const result = buildApiListingDescriptor(listing(), profile());
 
     expect(result.resource).toEqual({
@@ -137,11 +129,8 @@ describe("buildApiListingDescriptor", () => {
     expect(result.integration).toBeNull();
   });
 
-  it("is not invocable without a base url", () => {
-    const result = buildApiListingDescriptor(
-      listing({ baseUrl: null }),
-      profile(),
-    );
+  it("is not invocable without a url", () => {
+    const result = buildApiListingDescriptor(listing({ url: null }), profile());
 
     expect(result.payable).toBe(true);
     expect(result.invocable).toBe(false);

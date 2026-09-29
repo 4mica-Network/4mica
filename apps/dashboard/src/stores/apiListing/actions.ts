@@ -1,4 +1,4 @@
-import type { ApiEndpointInput, ApiListingInput } from "@api/apiListing";
+import type { ApiListingInput } from "@api/apiListing";
 import actionTypes from "./actionTypes";
 import type { ApiListing, ApiListingFilters } from "./type";
 
@@ -31,9 +31,7 @@ export const fetchApiListingsFailed = (message: string) => ({
   payload: { message },
 });
 
-export const createApiListing = (
-  payload: ApiListingInput & { endpoints?: ApiEndpointInput[] },
-) => ({
+export const createApiListing = (payload: ApiListingInput) => ({
   type: actionTypes.CREATE_API_LISTING_REQUESTED,
   payload,
   meta: { pendingKey: "createApiListing" },
@@ -62,24 +60,6 @@ export const updateApiListingSucceeded = (
   meta: PendingMeta,
 ) => ({
   type: actionTypes.UPDATE_API_LISTING_SUCCEEDED,
-  payload: listing,
-  meta,
-});
-
-export const replaceApiEndpoints = (payload: {
-  id: string;
-  endpoints: ApiEndpointInput[];
-}) => ({
-  type: actionTypes.REPLACE_API_ENDPOINTS_REQUESTED,
-  payload,
-  meta: { pendingKey: rowKey(payload.id) },
-});
-
-export const replaceApiEndpointsSucceeded = (
-  listing: ApiListing,
-  meta: PendingMeta,
-) => ({
-  type: actionTypes.REPLACE_API_ENDPOINTS_SUCCEEDED,
   payload: listing,
   meta,
 });

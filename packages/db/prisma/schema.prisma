@@ -295,7 +295,8 @@ model ApiListing {
   name        String           @db.VarChar(120)
   summary     String?          @db.VarChar(280)
   description String?
-  baseUrl     String?          @map("base_url") @db.VarChar(2048)
+  url         String?          @db.VarChar(2048)
+  method      HttpMethod       @default(GET)
   docsUrl     String?          @map("docs_url") @db.VarChar(2048)
   category    String?          @db.VarChar(64)
   tags        String[]
@@ -324,14 +325,13 @@ model ApiListing {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  owner     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  wallet    Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
-  endpoints ApiEndpoint[]
-  payments  Payment[]
-  reviews   Review[]
-  reports   Report[]
-  policy    ResourcePolicy?
-  faqs      FaqItem[]
+  owner    User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  wallet   Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  payments Payment[]
+  reviews  Review[]
+  reports  Report[]
+  policy   ResourcePolicy?
+  faqs     FaqItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
@@ -342,24 +342,6 @@ model ApiListing {
  * One priced route on an `ApiListing`. Exists so an integration snippet can
  * name a real method and path instead of a placeholder.
  */
-model ApiEndpoint {
-  id          String     @id @default(uuid(7))
-  listingId   String     @map("listing_id")
-  method      HttpMethod @default(GET)
-  path        String     @db.VarChar(512)
-  summary     String?    @db.VarChar(280)
-  /// Overrides the listing price for this route when set.
-  priceAmount Decimal?   @map("price_amount") @db.Decimal(38, 18)
-  sortOrder   Int        @default(0) @map("sort_order")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-
-  listing ApiListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@unique([listingId, method, path])
-  @@index([listingId])
-  @@map("api_endpoints")
-}
 
 enum PaymentStatus {
   PENDING
@@ -369,12 +351,10 @@ enum PaymentStatus {
 
 /**
  * One x402 payment, as reported by the resource server that took it.
- *
  * 4Mica is not in the payment path — the seller's own service calls the
  * facilitator directly — so this is a reported ledger, not an authoritative
  * one. It exists because core cannot answer the questions a dashboard needs:
  * core has no payer-side query at all, and no idea which listing was paid.
- *
  * `ownerId` is whoever reported the row, which is the seller. Visibility is
  * NOT scoped to it: both sides see a payment by matching `payerAddress` or
  * `recipientAddress` against the wallets they have proved they control, so one

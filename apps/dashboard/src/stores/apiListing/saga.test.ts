@@ -23,7 +23,6 @@ vi.mock("@api/apiListing", () => ({
   getApiListing: vi.fn(),
   createApiListing: createApiListingRequest,
   updateApiListing: updateApiListingRequest,
-  replaceApiEndpoints: vi.fn(),
   publishApiListing: publishApiListingRequest,
   unpublishApiListing: unpublishApiListingRequest,
   deleteApiListing: deleteApiListingRequest,

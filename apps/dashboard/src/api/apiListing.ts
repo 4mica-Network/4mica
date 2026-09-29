@@ -30,7 +30,8 @@ export interface ApiListingInput {
   slug?: string;
   summary?: string | null;
   description?: string | null;
-  baseUrl?: string | null;
+  url?: string | null;
+  method?: HttpMethodName;
   docsUrl?: string | null;
   category?: string | null;
   tags?: string[];
@@ -41,14 +42,6 @@ export interface ApiListingInput {
   priceAmount?: string | null;
   priceCurrency?: string | null;
   x402Endpoint?: string | null;
-}
-
-export interface ApiEndpointInput {
-  method: HttpMethodName;
-  path: string;
-  summary?: string | null;
-  priceAmount?: string | null;
-  sortOrder?: number;
 }
 
 export const getApiListings = (params: ListApiListingsParams = {}) =>
@@ -64,9 +57,7 @@ export const getApiListing = (id: string) =>
     method: HttpMethod.GET,
   });
 
-export const createApiListing = (
-  data: ApiListingInput & { endpoints?: ApiEndpointInput[] },
-) =>
+export const createApiListing = (data: ApiListingInput) =>
   httpClient.request<ApiListing, typeof data>({
     url: "/me/api-listings",
     method: HttpMethod.POST,
@@ -78,16 +69,6 @@ export const updateApiListing = (id: string, data: Partial<ApiListingInput>) =>
     url: `/me/api-listings/${encodeURIComponent(id)}`,
     method: HttpMethod.PATCH,
     data,
-  });
-
-export const replaceApiEndpoints = (
-  id: string,
-  endpoints: ApiEndpointInput[],
-) =>
-  httpClient.request<ApiListing, { endpoints: ApiEndpointInput[] }>({
-    url: `/me/api-listings/${encodeURIComponent(id)}/endpoints`,
-    method: HttpMethod.PUT,
-    data: { endpoints },
   });
 
 export const publishApiListing = (id: string) =>

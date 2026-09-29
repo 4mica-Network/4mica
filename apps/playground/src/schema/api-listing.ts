@@ -5,23 +5,14 @@ import {
   VisibilitySchema,
 } from "./params";
 
-const PublicApiEndpointSchema = v.object({
-  id: v.string(),
-  method: HttpMethodSchema,
-  path: v.string(),
-  summary: v.nullable(v.string()),
-  priceAmount: v.nullable(v.string()),
-});
-
-export type PublicApiEndpoint = v.InferOutput<typeof PublicApiEndpointSchema>;
-
 const PublicApiListingSchema = v.object({
   id: v.string(),
   ref: v.string(),
   name: v.string(),
   summary: v.nullable(v.string()),
   description: v.nullable(v.string()),
-  baseUrl: v.nullable(v.string()),
+  url: v.nullable(v.string()),
+  method: HttpMethodSchema,
   docsUrl: v.nullable(v.string()),
   category: v.nullable(v.string()),
   tags: v.array(v.string()),
@@ -34,7 +25,6 @@ const PublicApiListingSchema = v.object({
   priceAmount: v.nullable(v.string()),
   priceCurrency: v.nullable(v.string()),
   x402Endpoint: v.nullable(v.string()),
-  endpoints: v.array(PublicApiEndpointSchema),
 });
 
 export type PublicApiListing = v.InferOutput<typeof PublicApiListingSchema>;

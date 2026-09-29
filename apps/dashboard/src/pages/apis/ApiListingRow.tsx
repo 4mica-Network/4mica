@@ -9,14 +9,7 @@ import {
 } from "@stores/apiListing/selector";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import {
-  EyeOff,
-  Globe,
-  MoreHorizontal,
-  Pencil,
-  Route,
-  Trash2,
-} from "lucide-react";
+import { EyeOff, Globe, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -33,11 +26,9 @@ const menuItem =
 
 export function ApiListingRow({
   listing,
-  onEditEndpoints,
   onDelete,
 }: {
   listing: ApiListing;
-  onEditEndpoints: (listing: ApiListing) => void;
   onDelete: (listing: ApiListing) => void;
 }) {
   const { t } = useTranslation();
@@ -78,7 +69,7 @@ export function ApiListingRow({
         <Link
           className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline"
           data-testid={`api-listing-name-${listing.id}`}
-          to={`/apps/${listing.id}`}
+          to={`/apis/${listing.id}`}
         >
           {listing.name}
         </Link>
@@ -112,10 +103,8 @@ export function ApiListingRow({
             </Tag>
           )}
 
-          <Tag size="sm" variant="neutral">
-            {t("apiListing.row.endpointCount", {
-              count: listing.endpoints.length,
-            })}
+          <Tag className="font-mono" size="sm" variant="neutral">
+            {listing.method}
           </Tag>
         </div>
 
@@ -160,24 +149,11 @@ export function ApiListingRow({
               className={cn(menuItem, "text-ink-body")}
               data-testid={`api-listing-edit-${listing.id}`}
               onClick={() => setMenuOpen(false)}
-              to={`/apps/${listing.id}`}
+              to={`/apis/${listing.id}`}
             >
               <Pencil className="h-4 w-4" />
               {t("apiListing.row.edit")}
             </Link>
-
-            <button
-              type="button"
-              className={cn(menuItem, "text-ink-body")}
-              onClick={() => {
-                onEditEndpoints(listing);
-                setMenuOpen(false);
-              }}
-              data-testid={`api-listing-endpoints-${listing.id}`}
-            >
-              <Route className="h-4 w-4" />
-              {t("apiListing.row.editEndpoints")}
-            </button>
 
             {listing.visibility === "PUBLIC" ? (
               <button

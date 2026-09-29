@@ -6,7 +6,7 @@ import { links } from "@/services/links";
 import { isSellable } from "./snippets/agent";
 import { isPayable } from "./snippets/api-listing";
 import { networkInfo } from "./snippets/networks";
-import { formatPrice, joinUrl, trimAmount } from "./snippets/shared";
+import { formatPrice, trimAmount } from "./snippets/shared";
 
 export const DESCRIPTOR_SCHEMA =
   "https://4mica.io/schemas/resource-descriptor/v1";
@@ -34,14 +34,6 @@ export interface DescriptorPayment {
   price: DescriptorPrice;
   wireAmountUnits: "base";
   authoritativeSource: string;
-}
-
-export interface DescriptorEndpoint {
-  method: string;
-  path: string;
-  summary: string | null;
-  url: string | null;
-  price: DescriptorPrice;
 }
 
 export interface DescriptorSeller {
@@ -84,7 +76,6 @@ export interface ResourceDescriptor {
   payable: boolean;
   invocable: boolean;
   resource: { url: string; method: string } | null;
-  endpoints: DescriptorEndpoint[];
   payment: DescriptorPayment | null;
   integration: DescriptorIntegration | null;
   contact: DescriptorContact;
@@ -161,10 +152,7 @@ export const buildApiListingDescriptor = (
 ): ResourceDescriptor => {
   const page = `${links.profile(profile.username)}/api/${listing.ref}`;
   const payable = isPayable(listing);
-  const first = listing.endpoints[0];
-  const resourceUrl = listing.baseUrl
-    ? joinUrl(listing.baseUrl, first?.path ?? "")
-    : null;
+  const resourceUrl = listing.url;
 
   return {
     $schema: DESCRIPTOR_SCHEMA,
@@ -182,20 +170,7 @@ export const buildApiListingDescriptor = (
     seller: sellerOf(profile),
     payable,
     invocable: payable && resourceUrl !== null,
-    resource: resourceUrl
-      ? { url: resourceUrl, method: first?.method ?? "GET" }
-      : null,
-    endpoints: listing.endpoints.map((endpoint) => ({
-      method: endpoint.method,
-      path: endpoint.path,
-      summary: endpoint.summary,
-      url: listing.baseUrl ? joinUrl(listing.baseUrl, endpoint.path) : null,
-      price: priceOf(
-        endpoint.priceAmount ?? listing.priceAmount,
-        listing.priceCurrency,
-        listing.priceLabel,
-      ),
-    })),
+    resource: resourceUrl ? { url: resourceUrl, method: listing.method } : null,
     payment: payable
       ? paymentOf(
           listing.network,
@@ -239,7 +214,6 @@ export const buildAgentDescriptor = (
     resource: agent.endpointUrl
       ? { url: agent.endpointUrl, method: "POST" }
       : null,
-    endpoints: [],
     payment: sellable
       ? paymentOf(
           agent.network,

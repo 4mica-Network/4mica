@@ -25,14 +25,14 @@ import {
   TextInput,
 } from "@/components/form";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
-import { VISIBILITY_OPTIONS } from "../apps/constants";
+import { HTTP_METHODS, VISIBILITY_OPTIONS } from "../apis/constants";
 import {
   type ApiListingValues,
   blankToNull,
   editApiListingSchema,
   NAME_MAX_LENGTH,
   SUMMARY_MAX_LENGTH,
-} from "../apps/validation";
+} from "../apis/validation";
 
 const NO_WALLET = "__none__";
 
@@ -65,7 +65,8 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
       priceAmount: "",
       priceCurrency: "",
       priceLabel: "",
-      baseUrl: "",
+      url: "",
+      method: "GET" as const,
       docsUrl: "",
       x402Endpoint: "",
       category: "",
@@ -89,7 +90,8 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
       priceAmount: listing.priceAmount ?? "",
       priceCurrency: listing.priceCurrency ?? "",
       priceLabel: listing.priceLabel ?? "",
-      baseUrl: listing.baseUrl ?? "",
+      url: listing.url ?? "",
+      method: listing.method,
       docsUrl: listing.docsUrl ?? "",
       x402Endpoint: listing.x402Endpoint ?? "",
       category: listing.category ?? "",
@@ -125,7 +127,8 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
           slug: data.slug || undefined,
           summary: blankToNull(data.summary),
           description: blankToNull(data.description),
-          baseUrl: blankToNull(data.baseUrl),
+          url: blankToNull(data.url),
+          method: data.method,
           docsUrl: blankToNull(data.docsUrl),
           x402Endpoint: blankToNull(data.x402Endpoint),
           category: blankToNull(data.category),
@@ -303,16 +306,34 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
             </FieldRow>
 
             <FieldRow
-              htmlFor="app-base-url"
-              title={t("apiListing.create.fields.baseUrl.title")}
+              htmlFor="app-method"
+              title={t("apiListing.create.fields.method.title")}
+            >
+              <Select
+                error={fieldError("method")}
+                id="app-method"
+                onChange={(value) =>
+                  setValue("method", value as ApiListingValues["method"], {
+                    shouldValidate: true,
+                  })
+                }
+                options={HTTP_METHODS.map((m) => ({ value: m, title: m }))}
+                value={values.method}
+              />
+            </FieldRow>
+
+            <FieldRow
+              htmlFor="app-url"
+              title={t("apiListing.create.fields.url.title")}
             >
               <TextInput
-                error={fieldError("baseUrl")}
-                id="app-base-url"
+                error={fieldError("url")}
+                id="app-url"
                 onChange={(value) =>
-                  setValue("baseUrl", value, { shouldValidate: true })
+                  setValue("url", value, { shouldValidate: true })
                 }
-                value={values.baseUrl ?? ""}
+                placeholder="https://api.example.com/v1/limits"
+                value={values.url ?? ""}
               />
             </FieldRow>
 

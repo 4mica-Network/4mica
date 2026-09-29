@@ -80,7 +80,6 @@ export default function apiListingReducer(
 
     case actionTypes.CREATE_API_LISTING_REQUESTED:
     case actionTypes.UPDATE_API_LISTING_REQUESTED:
-    case actionTypes.REPLACE_API_ENDPOINTS_REQUESTED:
     case actionTypes.PUBLISH_API_LISTING_REQUESTED:
     case actionTypes.DELETE_API_LISTING_REQUESTED:
     case actionTypes.BATCH_DELETE_API_LISTINGS_REQUESTED:
@@ -93,7 +92,6 @@ export default function apiListingReducer(
 
     case actionTypes.CREATE_API_LISTING_SUCCEEDED:
     case actionTypes.UPDATE_API_LISTING_SUCCEEDED:
-    case actionTypes.REPLACE_API_ENDPOINTS_SUCCEEDED:
     case actionTypes.PUBLISH_API_LISTING_SUCCEEDED:
     case actionTypes.DELETE_API_LISTING_SUCCEEDED:
       return {

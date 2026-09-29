@@ -21,8 +21,6 @@ describe("translation catalogue", () => {
 
   describe("plural forms resolve", () => {
     const cases = [
-      ["apiListing.row.endpointCount", 1, "1 endpoint"],
-      ["apiListing.row.endpointCount", 3, "3 endpoints"],
       ["store.apiListing.batchDeletedBody", 1, "1 API was removed."],
       ["store.apiListing.batchDeletedBody", 4, "4 APIs were removed."],
       ["store.agent.batchDeletedBody", 1, "1 agent was removed."],

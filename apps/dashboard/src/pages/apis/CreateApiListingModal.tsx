@@ -17,7 +17,11 @@ import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { links } from "@/lib/links";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
-import { CATEGORY_SUGGESTIONS, VISIBILITY_OPTIONS } from "./constants";
+import {
+  CATEGORY_SUGGESTIONS,
+  HTTP_METHOD_OPTIONS,
+  VISIBILITY_OPTIONS,
+} from "./constants";
 import {
   type ApiListingValues,
   blankToNull,
@@ -80,7 +84,8 @@ export function CreateApiListingModal({
       priceAmount: "",
       priceCurrency: "USD",
       priceLabel: "",
-      baseUrl: "",
+      url: "",
+      method: "GET" as const,
       docsUrl: "",
       x402Endpoint: "",
       category: "",
@@ -124,7 +129,8 @@ export function CreateApiListingModal({
         ...(blankToNull(data.slug) ? { slug: data.slug as string } : {}),
         summary: blankToNull(data.summary),
         description: blankToNull(data.description),
-        baseUrl: blankToNull(data.baseUrl),
+        url: blankToNull(data.url),
+        method: data.method,
         docsUrl: blankToNull(data.docsUrl),
         x402Endpoint: blankToNull(data.x402Endpoint),
         category: blankToNull(data.category),
@@ -450,17 +456,34 @@ export function CreateApiListingModal({
         {step === 2 && (
           <div className="flex flex-col divide-y divide-overlay/10">
             <FieldRow
-              title={t("apiListing.create.fields.baseUrl.title")}
-              description={t("apiListing.create.fields.baseUrl.description")}
-              htmlFor="api-listing-base-url"
+              title={t("apiListing.create.fields.method.title")}
+              htmlFor="api-listing-method"
+            >
+              <Select
+                id="api-listing-method"
+                value={values.method}
+                options={HTTP_METHOD_OPTIONS}
+                error={fieldError("method")}
+                onChange={(value) =>
+                  setValue("method", value as ApiListingValues["method"], {
+                    shouldValidate: true,
+                  })
+                }
+              />
+            </FieldRow>
+
+            <FieldRow
+              title={t("apiListing.create.fields.url.title")}
+              description={t("apiListing.create.fields.url.description")}
+              htmlFor="api-listing-url"
             >
               <TextInput
-                id="api-listing-base-url"
-                value={values.baseUrl ?? ""}
-                placeholder="https://api.example.com/v1"
-                error={fieldError("baseUrl")}
+                id="api-listing-url"
+                value={values.url ?? ""}
+                placeholder="https://api.example.com/v1/limits"
+                error={fieldError("url")}
                 onChange={(value) =>
-                  setValue("baseUrl", value, { shouldValidate: true })
+                  setValue("url", value, { shouldValidate: true })
                 }
               />
             </FieldRow>

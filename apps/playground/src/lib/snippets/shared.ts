@@ -13,14 +13,6 @@ export const PLACEHOLDER = {
   agentWallet: "0xYourAgentWallet",
 } as const;
 
-/** `https://api.x.io/` + `/v1/limits` -> `https://api.x.io/v1/limits`. */
-export const joinUrl = (baseUrl: string, path: string): string => {
-  const base = baseUrl.replace(/\/+$/, "");
-  const suffix = path.replace(/^\/+/, "");
-
-  return suffix ? `${base}/${suffix}` : base;
-};
-
 /**
  * Decimal(38,18) round-trips through Prisma as a string that may carry trailing
  * zeros ("0.010000000000000000"). Show what a human would write.

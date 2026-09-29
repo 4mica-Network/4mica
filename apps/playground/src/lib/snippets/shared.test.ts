@@ -1,24 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentLine, formatPrice, joinUrl, trimAmount } from "./shared";
-
-describe("joinUrl", () => {
-  it("collapses the slashes between base and path", () => {
-    expect(joinUrl("https://api.x.io/v1", "/limits")).toBe(
-      "https://api.x.io/v1/limits",
-    );
-    expect(joinUrl("https://api.x.io/v1/", "limits")).toBe(
-      "https://api.x.io/v1/limits",
-    );
-    expect(joinUrl("https://api.x.io/v1/", "/limits")).toBe(
-      "https://api.x.io/v1/limits",
-    );
-  });
-
-  it("returns the bare base when there is no path", () => {
-    expect(joinUrl("https://api.x.io/v1", "")).toBe("https://api.x.io/v1");
-    expect(joinUrl("https://api.x.io/v1/", "/")).toBe("https://api.x.io/v1");
-  });
-});
+import { commentLine, formatPrice, trimAmount } from "./shared";
 
 describe("trimAmount", () => {
   // Decimal(38,18) round-trips with eighteen decimal places.

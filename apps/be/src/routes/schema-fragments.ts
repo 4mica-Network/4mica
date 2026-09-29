@@ -283,21 +283,6 @@ const nullableNetworkEnum = {
   enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA", null],
 } as const;
 
-export const apiEndpointResponseSchema = {
-  type: "object",
-  required: ["id", "method", "path"],
-  properties: {
-    id: str,
-    method: httpMethodEnum,
-    path: str,
-    summary: nullStr,
-    // A string, not a number: Decimal(38,18) does not survive an IEEE-754
-    // double, and this one is a price.
-    priceAmount: nullStr,
-    sortOrder: int,
-  },
-} as const;
-
 export const apiListingResponseSchema = {
   type: "object",
   required: ["id", "slug", "name", "visibility"],
@@ -307,7 +292,8 @@ export const apiListingResponseSchema = {
     name: str,
     summary: nullStr,
     description: nullStr,
-    baseUrl: nullStr,
+    url: nullStr,
+    method: str,
     docsUrl: nullStr,
     category: nullStr,
     tags: { type: "array", items: str },
@@ -323,7 +309,6 @@ export const apiListingResponseSchema = {
     x402Endpoint: nullStr,
     createdAt: date,
     updatedAt: date,
-    endpoints: { type: "array", items: apiEndpointResponseSchema },
   },
 } as const;
 

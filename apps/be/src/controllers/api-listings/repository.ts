@@ -1,6 +1,6 @@
 import { type Prisma, prisma } from "@4mica/db";
 import { SLUG_MAX_LENGTH } from "@services/slug";
-import type { ApiEndpointInput, ListApiListingsQuery } from "./schema";
+import type { ListApiListingsQuery } from "./schema";
 
 export const API_LISTING_SELECT = {
   id: true,
@@ -8,7 +8,8 @@ export const API_LISTING_SELECT = {
   name: true,
   summary: true,
   description: true,
-  baseUrl: true,
+  url: true,
+  method: true,
   docsUrl: true,
   category: true,
   tags: true,
@@ -24,37 +25,19 @@ export const API_LISTING_SELECT = {
   x402Endpoint: true,
   createdAt: true,
   updatedAt: true,
-  endpoints: {
-    select: {
-      id: true,
-      method: true,
-      path: true,
-      summary: true,
-      priceAmount: true,
-      sortOrder: true,
-    },
-    orderBy: [{ sortOrder: "asc" }, { path: "asc" }],
-  },
 } satisfies Prisma.ApiListingSelect;
 
 type RawApiListing = Prisma.ApiListingGetPayload<{
   select: typeof API_LISTING_SELECT;
 }>;
 
-export type ApiListingRow = Omit<RawApiListing, "priceAmount" | "endpoints"> & {
+export type ApiListingRow = Omit<RawApiListing, "priceAmount"> & {
   priceAmount: string | null;
-  endpoints: (Omit<RawApiListing["endpoints"][number], "priceAmount"> & {
-    priceAmount: string | null;
-  })[];
 };
 
 const toRow = (row: RawApiListing): ApiListingRow => ({
   ...row,
   priceAmount: row.priceAmount?.toString() ?? null,
-  endpoints: row.endpoints.map((endpoint) => ({
-    ...endpoint,
-    priceAmount: endpoint.priceAmount?.toString() ?? null,
-  })),
 });
 
 const escapeLike = (value: string): string =>
@@ -156,21 +139,13 @@ export const takenSlugs = async (ownerId: string): Promise<Set<string>> => {
   return new Set(rows.map((row) => row.slug));
 };
 
-const endpointCreateData = (endpoints: ApiEndpointInput[]) =>
-  endpoints.map((endpoint, index) => ({
-    method: endpoint.method,
-    path: endpoint.path,
-    summary: endpoint.summary ?? null,
-    priceAmount: endpoint.priceAmount ?? null,
-    sortOrder: endpoint.sortOrder || index,
-  }));
-
 export interface CreateApiListingData {
   slug: string;
   name: string;
   summary: string | null;
   description: string | null;
-  baseUrl: string | null;
+  url: string | null;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   docsUrl: string | null;
   category: string | null;
   tags: string[];
@@ -184,23 +159,14 @@ export interface CreateApiListingData {
   priceAmount: string | null;
   priceCurrency: string | null;
   x402Endpoint: string | null;
-  endpoints: ApiEndpointInput[];
 }
 
 export const createApiListing = async (
   ownerId: string,
   data: CreateApiListingData,
 ): Promise<ApiListingRow> => {
-  const { endpoints, ...listing } = data;
-
   const row = await prisma.apiListing.create({
-    data: {
-      ownerId,
-      ...listing,
-      ...(endpoints.length > 0
-        ? { endpoints: { create: endpointCreateData(endpoints) } }
-        : {}),
-    },
+    data: { ownerId, ...data },
     select: API_LISTING_SELECT,
   });
 
@@ -218,37 +184,6 @@ export const updateApiListing = async (
   });
 
   return count > 0 ? getApiListing(ownerId, id) : null;
-};
-
-export const replaceApiEndpoints = async (
-  ownerId: string,
-  id: string,
-  endpoints: ApiEndpointInput[],
-): Promise<ApiListingRow | null> => {
-  const owned = await prisma.apiListing.findFirst({
-    where: { id, ownerId, deletedAt: null },
-    select: { id: true },
-  });
-
-  if (!owned) {
-    return null;
-  }
-
-  await prisma.$transaction([
-    prisma.apiEndpoint.deleteMany({ where: { listingId: owned.id } }),
-    ...(endpoints.length > 0
-      ? [
-          prisma.apiEndpoint.createMany({
-            data: endpointCreateData(endpoints).map((endpoint) => ({
-              ...endpoint,
-              listingId: owned.id,
-            })),
-          }),
-        ]
-      : []),
-  ]);
-
-  return getApiListing(ownerId, id);
 };
 
 export const softDeleteApiListing = async (

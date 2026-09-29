@@ -1,9 +1,7 @@
 import { Tag } from "@4mica/ui";
-import { Route } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CopyValue } from "@/components/CopyValue";
-import { EmptyState } from "@/components/EmptyState";
 import { ApiIntegration } from "@/components/IntegrationSection/ApiIntegration";
 import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
@@ -86,13 +84,16 @@ export default async function ApiListingPage({
         />
 
         <dl className="flex flex-col gap-2 border-overlay/10 border-t pt-4 text-sm">
-          {listing.baseUrl && (
+          {listing.url && (
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <dt className="w-24 shrink-0 text-ink-subtle">
-                {messages.api.baseUrl}
+                {messages.api.endpointLabel}
               </dt>
-              <dd className="min-w-0 flex-1">
-                <CopyValue mono value={listing.baseUrl} />
+              <dd className="flex min-w-0 flex-1 items-baseline gap-2">
+                <Tag className="font-mono" size="sm" variant="neutral">
+                  {listing.method}
+                </Tag>
+                <CopyValue mono value={listing.url} />
               </dd>
             </div>
           )}
@@ -140,46 +141,6 @@ export default async function ApiListingPage({
             {messages.api.aboutHeading}
           </h2>
           <Prose text={listing.description} />
-        </section>
-      )}
-
-      {(listing.endpoints.length > 0 || profile.isOwner) && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
-              {messages.api.endpointsHeading}
-            </h2>
-            <p className="text-ink-muted text-sm">
-              {messages.api.endpointsLead}
-            </p>
-          </div>
-
-          {listing.endpoints.length === 0 ? (
-            <EmptyState
-              description={messages.api.noEndpointsBody}
-              icon={<Route className="h-4 w-4" />}
-              title={messages.api.noEndpointsTitle}
-            />
-          ) : (
-            <ul className="flex flex-col border-overlay/10 border-t">
-              {listing.endpoints.map((endpoint) => (
-                <li
-                  className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-overlay/10 border-b py-3"
-                  key={endpoint.id}
-                >
-                  <code className="font-mono text-ink-strong text-sm">
-                    <span className="text-ink-subtle">{endpoint.method}</span>{" "}
-                    {endpoint.path}
-                  </code>
-                  {endpoint.summary && (
-                    <span className="min-w-0 flex-1 text-ink-muted text-sm">
-                      {endpoint.summary}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
       )}
 

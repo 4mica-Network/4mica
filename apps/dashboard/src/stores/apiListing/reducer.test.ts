@@ -7,7 +7,6 @@ import {
   deleteApiListing,
   fetchApiListingsSucceeded,
   publishApiListing,
-  replaceApiEndpoints,
   setApiListingFilters,
   setApiListingPage,
   setApiListingSelection,
@@ -23,7 +22,8 @@ const listing = (over: Partial<ApiListing> = {}): ApiListing => ({
   name: "Credit Limits API",
   summary: null,
   description: null,
-  baseUrl: null,
+  url: null,
+  method: "GET",
   docsUrl: null,
   category: null,
   tags: [],
@@ -39,7 +39,6 @@ const listing = (over: Partial<ApiListing> = {}): ApiListing => ({
   x402Endpoint: null,
   createdAt: "2026-09-21T00:00:00.000Z",
   updatedAt: "2026-09-21T00:00:00.000Z",
-  endpoints: [],
   ...over,
 });
 
@@ -67,11 +66,10 @@ describe("apiListing reducer", () => {
     expect(state.pending.createApiListing).toBe(true);
   });
 
-  it("shares one pending key between edit, publish and endpoint replacement", () => {
+  it("shares one pending key between edit, publish and delete", () => {
     for (const action of [
       updateApiListing({ id: "listing_1", data: {} }),
       publishApiListing({ id: "listing_1", publish: true }),
-      replaceApiEndpoints({ id: "listing_1", endpoints: [] }),
       deleteApiListing({ id: "listing_1" }),
     ]) {
       expect(reducer(seeded, action).pending).toEqual({

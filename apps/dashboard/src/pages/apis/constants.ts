@@ -19,9 +19,18 @@ export const VISIBILITY_OPTIONS = (
   Object.keys(VISIBILITY_LABEL_KEYS) as PublicVisibility[]
 ).map((value) => ({ value, labelKey: VISIBILITY_LABEL_KEYS[value] }));
 
-export const HTTP_METHOD_OPTIONS = (
-  ["GET", "POST", "PUT", "PATCH", "DELETE"] as HttpMethodName[]
-).map((value) => ({ value, title: value }));
+export const HTTP_METHODS = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+] as const satisfies readonly HttpMethodName[];
+
+export const HTTP_METHOD_OPTIONS = HTTP_METHODS.map((value) => ({
+  value,
+  title: value,
+}));
 
 export const CATEGORY_SUGGESTIONS = [
   "Credit",

@@ -67,7 +67,7 @@ export function useChecklist(): {
       id: "publish",
       title: t("checklist.publish"),
       hint: t("checklist.publishHint"),
-      to: "/apps",
+      to: "/apis",
       done:
         listings.some((listing) => listing.visibility === "PUBLIC") ||
         agents.some((agent) => agent.visibility === "PUBLIC"),

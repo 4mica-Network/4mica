@@ -6,7 +6,7 @@ export {
   VISIBILITY_LABEL_KEYS,
   VISIBILITY_OPTIONS,
   VISIBILITY_TAG_VARIANT,
-} from "@/pages/apps/constants";
+} from "@/pages/apis/constants";
 
 export const STATUS_LABEL_KEYS = {
   PENDING: "agent.status.pending",

@@ -21,22 +21,14 @@ export const HTTP_METHOD = {
 
 export type HttpMethodName = (typeof HTTP_METHOD)[keyof typeof HTTP_METHOD];
 
-export interface ApiEndpoint {
-  id: string;
-  method: HttpMethodName;
-  path: string;
-  summary: string | null;
-  priceAmount: string | null;
-  sortOrder: number;
-}
-
 export interface ApiListing {
   id: string;
   slug: string;
   name: string;
   summary: string | null;
   description: string | null;
-  baseUrl: string | null;
+  url: string | null;
+  method: HttpMethodName;
   docsUrl: string | null;
   category: string | null;
   tags: string[];
@@ -54,7 +46,6 @@ export interface ApiListing {
 
   createdAt: string;
   updatedAt: string;
-  endpoints: ApiEndpoint[];
 }
 
 export interface ApiListingListResponse {

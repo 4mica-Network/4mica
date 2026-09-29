@@ -110,11 +110,11 @@ const API_LISTINGS = [
   {
     slug: "credit-limits",
     name: "Credit Limits API",
-    summary:
-      "Read and reserve credit for an agent before it commits to a trade.",
+    summary: "Available credit for an agent, before it commits to a trade.",
     description:
-      "Check an agent's available credit, place a hold, and release or capture it once the counterparty settles. Holds expire automatically, so a crashed agent never strands its own limit.",
-    baseUrl: "https://api.4mica.io/v1/credit",
+      "Check an agent's available credit before it commits. Pairs with the hold and release routes, which are published as their own APIs.",
+    url: "https://api.4mica.io/v1/credit/limits",
+    method: "GET",
     docsUrl: "https://docs.4mica.io/api-reference/credit-limits",
     category: "Credit",
     tags: ["credit", "settlement", "agents"],
@@ -126,29 +126,45 @@ const API_LISTINGS = [
     priceAmount: "0.01",
     priceCurrency: "USD",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/limits",
-        summary: "Available credit for an agent.",
-        priceAmount: null,
-        sortOrder: 0,
-      },
-      {
-        method: "POST",
-        path: "/holds",
-        summary: "Place a hold against an agent's limit.",
-        priceAmount: "0.05",
-        sortOrder: 1,
-      },
-      {
-        method: "DELETE",
-        path: "/holds/:id",
-        summary: "Release a hold before it expires.",
-        priceAmount: null,
-        sortOrder: 2,
-      },
-    ],
+  },
+  {
+    slug: "credit-holds",
+    name: "Place a Credit Hold",
+    summary: "Reserve part of an agent's limit until the counterparty settles.",
+    description:
+      "Holds expire automatically, so a crashed agent never strands its own limit.",
+    url: "https://api.4mica.io/v1/credit/holds",
+    method: "POST",
+    docsUrl: "https://docs.4mica.io/api-reference/credit-limits",
+    category: "Credit",
+    tags: ["credit", "settlement"],
+    priceLabel: "$0.05 per call",
+    visibility: "PUBLIC",
+    network: "BASE_SEPOLIA",
+    payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
+    assetAddress: USDC_BASE_SEPOLIA,
+    priceAmount: "0.05",
+    priceCurrency: "USD",
+    x402Endpoint: "https://api.4mica.io/v1/credit/x402",
+  },
+  {
+    slug: "credit-holds-release",
+    name: "Release a Credit Hold",
+    summary: "Release a hold before it expires.",
+    description: null,
+    url: "https://api.4mica.io/v1/credit/holds/:id",
+    method: "DELETE",
+    docsUrl: "https://docs.4mica.io/api-reference/credit-limits",
+    category: "Credit",
+    tags: ["credit"],
+    priceLabel: "$0.01 per call",
+    visibility: "PUBLIC",
+    network: "BASE_SEPOLIA",
+    payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
+    assetAddress: USDC_BASE_SEPOLIA,
+    priceAmount: "0.01",
+    priceCurrency: "USD",
+    x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
 ] as const;
 
@@ -406,7 +422,6 @@ const seed = async (): Promise<void> => {
     },
   });
 
-  // `api_endpoints` cascades on its FK, so a dropped listing takes its routes.
   await prisma.apiListing.deleteMany({
     where: {
       ownerId: owner.id,
@@ -519,7 +534,8 @@ const seed = async (): Promise<void> => {
       name: listing.name,
       summary: listing.summary,
       description: listing.description,
-      baseUrl: listing.baseUrl,
+      url: listing.url,
+      method: listing.method,
       docsUrl: listing.docsUrl,
       category: listing.category,
       tags: [...listing.tags],
@@ -539,48 +555,11 @@ const seed = async (): Promise<void> => {
       x402Endpoint: listing.x402Endpoint,
     };
 
-    const row = await prisma.apiListing.upsert({
+    await prisma.apiListing.upsert({
       where: { ownerId_slug: { ownerId: owner.id, slug: listing.slug } },
       update: fields,
       create: { ownerId: owner.id, slug: listing.slug, ...fields },
       select: { id: true },
-    });
-
-    for (const endpoint of listing.endpoints) {
-      const endpointFields = {
-        summary: endpoint.summary,
-        priceAmount: endpoint.priceAmount,
-        sortOrder: endpoint.sortOrder,
-      };
-
-      await prisma.apiEndpoint.upsert({
-        where: {
-          listingId_method_path: {
-            listingId: row.id,
-            method: endpoint.method,
-            path: endpoint.path,
-          },
-        },
-        update: endpointFields,
-        create: {
-          listingId: row.id,
-          method: endpoint.method,
-          path: endpoint.path,
-          ...endpointFields,
-        },
-      });
-    }
-
-    // Drop routes a previous seed created that are no longer in the fixture, so
-    // re-seeding after an edit converges instead of accumulating.
-    await prisma.apiEndpoint.deleteMany({
-      where: {
-        listingId: row.id,
-        NOT: listing.endpoints.map((endpoint) => ({
-          method: endpoint.method,
-          path: endpoint.path,
-        })),
-      },
     });
   }
 
@@ -651,7 +630,7 @@ const seed = async (): Promise<void> => {
             : null,
         reqId: `0xseed${index.toString(16).padStart(4, "0")}`,
         resource: incoming
-          ? `${API_LISTINGS[0].baseUrl}/limits`
+          ? API_LISTINGS[0].url
           : "https://agents.4mica.io/atlas/brief",
         description: incoming ? "Credit limit lookup" : "Research run",
         settledAt: entry.status === "SETTLED" ? when : null,
@@ -808,21 +787,19 @@ const seed = async (): Promise<void> => {
     }
   }
 
-  const [agents, wallets, listings, endpoints, banners, payments] =
-    await Promise.all([
-      prisma.agent.count(),
-      prisma.wallet.count(),
-      prisma.apiListing.count(),
-      prisma.apiEndpoint.count(),
-      prisma.banner.count(),
-      prisma.payment.count(),
-    ]);
+  const [agents, wallets, listings, banners, payments] = await Promise.all([
+    prisma.agent.count(),
+    prisma.wallet.count(),
+    prisma.apiListing.count(),
+    prisma.banner.count(),
+    prisma.payment.count(),
+  ]);
 
   const plural = (count: number, noun: string) =>
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")} and ${plural(PAYMENTS.length, "payment")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${endpoints} endpoint rows, ${banners} banner rows, ${payments} payment rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")} and ${plural(PAYMENTS.length, "payment")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows total).`,
   );
 };
 

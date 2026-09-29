@@ -109,7 +109,7 @@ export const getPolicy = cache(async (kind: ResourceKind, id: string) => {
     select: POLICY_SELECT,
   });
 
-  if (!row || !row.policyEnabled) {
+  if (!row?.policyEnabled) {
     return null;
   }
 

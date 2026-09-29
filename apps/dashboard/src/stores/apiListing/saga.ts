@@ -1,5 +1,5 @@
 import { HttpError } from "@4mica/http";
-import type { ApiEndpointInput, ApiListingInput } from "@api/apiListing";
+import type { ApiListingInput } from "@api/apiListing";
 import * as api from "@api/apiListing";
 import i18n from "@i18n";
 import { notifyError, notifySuccess } from "@utils/notification";
@@ -15,7 +15,6 @@ import {
   fetchApiListingsSucceeded,
   type PendingMeta,
   publishApiListingSucceeded,
-  replaceApiEndpointsSucceeded,
   updateApiListingSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -94,7 +93,7 @@ export function* fetchApiListings(): Generator {
 
 export function* createApiListing(action: {
   type: string;
-  payload: ApiListingInput & { endpoints?: ApiEndpointInput[] };
+  payload: ApiListingInput;
   meta: PendingMeta;
 }): Generator {
   try {
@@ -139,31 +138,6 @@ export function* updateApiListing(action: {
     });
   } catch (error) {
     yield* fail(error, "Couldn't update that API.", action.meta);
-  }
-}
-
-export function* replaceApiEndpoints(action: {
-  type: string;
-  payload: { id: string; endpoints: ApiEndpointInput[] };
-  meta: PendingMeta;
-}): Generator {
-  try {
-    const listing = (yield call(() =>
-      api.replaceApiEndpoints(action.payload.id, action.payload.endpoints),
-    )) as Awaited<ReturnType<typeof api.replaceApiEndpoints>>;
-
-    yield put(replaceApiEndpointsSucceeded(listing, action.meta));
-    yield put(fetchApiListingsAction());
-
-    notifySuccess({
-      title: t("store.apiListing.endpointsSaved", "Endpoints saved"),
-      content: t(
-        "store.apiListing.endpointsSavedBody",
-        "Your integration guide now demonstrates the first endpoint.",
-      ),
-    });
-  } catch (error) {
-    yield* fail(error, "Couldn't save those endpoints.", action.meta);
   }
 }
 
@@ -258,7 +232,6 @@ export default [
   takeLatest(actionTypes.SET_API_LISTING_PAGE, fetchApiListings),
   takeEvery(actionTypes.CREATE_API_LISTING_REQUESTED, createApiListing),
   takeEvery(actionTypes.UPDATE_API_LISTING_REQUESTED, updateApiListing),
-  takeEvery(actionTypes.REPLACE_API_ENDPOINTS_REQUESTED, replaceApiEndpoints),
   takeEvery(actionTypes.PUBLISH_API_LISTING_REQUESTED, publishApiListing),
   takeEvery(actionTypes.DELETE_API_LISTING_REQUESTED, deleteApiListing),
   takeEvery(

@@ -10,11 +10,11 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/form";
-import { FaqEditor } from "../app-detail/FaqEditor";
-import { PolicyForm } from "../app-detail/PolicyForm";
-import { ReportsPanel } from "../app-detail/ReportsPanel";
-import { ReviewsPanel } from "../app-detail/ReviewsPanel";
-import { ToggleSection } from "../app-detail/ToggleSection";
+import { FaqEditor } from "../api-detail/FaqEditor";
+import { PolicyForm } from "../api-detail/PolicyForm";
+import { ReportsPanel } from "../api-detail/ReportsPanel";
+import { ReviewsPanel } from "../api-detail/ReviewsPanel";
+import { ToggleSection } from "../api-detail/ToggleSection";
 
 export function AgentDetail() {
   const { t } = useTranslation();

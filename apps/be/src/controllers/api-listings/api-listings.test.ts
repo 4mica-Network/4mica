@@ -3,33 +3,22 @@ import { apiListingRoutes } from "@routes/api-listings";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 
-const {
-  authenticateRequest,
-  getUser,
-  findUnique,
-  upsert,
-  apiListing,
-  apiEndpoint,
-  wallet,
-} = vi.hoisted(() => ({
-  authenticateRequest: vi.fn(),
-  getUser: vi.fn(),
-  findUnique: vi.fn(),
-  upsert: vi.fn(),
-  apiListing: {
-    findMany: vi.fn(),
-    findFirst: vi.fn(),
-    count: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-  },
-  apiEndpoint: {
-    deleteMany: vi.fn(),
-    createMany: vi.fn(),
-  },
-  wallet: { findFirst: vi.fn() },
-}));
+const { authenticateRequest, getUser, findUnique, upsert, apiListing, wallet } =
+  vi.hoisted(() => ({
+    authenticateRequest: vi.fn(),
+    getUser: vi.fn(),
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+    apiListing: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    wallet: { findFirst: vi.fn() },
+  }));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
@@ -41,11 +30,10 @@ vi.mock("@4mica/db", () => ({
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiListing,
-    apiEndpoint,
     wallet,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
-        ? (arg as (tx: unknown) => unknown)({ apiListing, apiEndpoint, wallet })
+        ? (arg as (tx: unknown) => unknown)({ apiListing, wallet })
         : Promise.all(arg as Promise<unknown>[]),
     ),
   },
@@ -107,7 +95,8 @@ const storedListing = (over: Record<string, unknown> = {}) => ({
   name: "Credit Limits API",
   summary: null,
   description: null,
-  baseUrl: null,
+  url: null,
+  method: "GET",
   docsUrl: null,
   category: null,
   tags: [],
@@ -123,7 +112,6 @@ const storedListing = (over: Record<string, unknown> = {}) => ({
   x402Endpoint: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-  endpoints: [],
   ...over,
 });
 
@@ -134,7 +122,7 @@ describe("api listing routes", () => {
     for (const m of [authenticateRequest, getUser, findUnique, upsert]) {
       m.mockReset();
     }
-    for (const group of [apiListing, apiEndpoint, wallet]) {
+    for (const group of [apiListing, wallet]) {
       for (const fn of Object.values(group)) {
         fn.mockReset();
       }
@@ -152,8 +140,6 @@ describe("api listing routes", () => {
     apiListing.create.mockResolvedValue(storedListing());
     apiListing.update.mockResolvedValue(storedListing());
     apiListing.updateMany.mockResolvedValue({ count: 1 });
-    apiEndpoint.deleteMany.mockResolvedValue({ count: 0 });
-    apiEndpoint.createMany.mockResolvedValue({ count: 0 });
   });
 
   it("requires authentication on every api-listing route", async () => {
@@ -165,7 +151,6 @@ describe("api listing routes", () => {
       ["GET", `/me/api-listings/${LISTING_ID}`],
       ["POST", "/me/api-listings"],
       ["PATCH", `/me/api-listings/${LISTING_ID}`],
-      ["PUT", `/me/api-listings/${LISTING_ID}/endpoints`],
       ["POST", `/me/api-listings/${LISTING_ID}/publish`],
       ["POST", `/me/api-listings/${LISTING_ID}/unpublish`],
       ["DELETE", `/me/api-listings/${LISTING_ID}`],
@@ -588,104 +573,6 @@ describe("api listing routes", () => {
       const written = apiListing.updateMany.mock.calls[0][0].data;
       expect(written.visibility).toBe("PRIVATE");
       expect(written).not.toHaveProperty("publishedAt");
-
-      await instance.close();
-    });
-  });
-
-  describe("endpoints", () => {
-    it("replaces the endpoint set wholesale", async () => {
-      const instance = await app();
-
-      const res = await instance.inject({
-        method: "PUT",
-        url: `/me/api-listings/${LISTING_ID}/endpoints`,
-        headers: AUTH,
-        payload: {
-          endpoints: [
-            { method: "GET", path: "/limits" },
-            { method: "POST", path: "/holds", priceAmount: "0.05" },
-          ],
-        },
-      });
-
-      expect(res.statusCode).toBe(200);
-      expect(apiEndpoint.deleteMany).toHaveBeenCalledWith({
-        where: { listingId: LISTING_ID },
-      });
-      expect(apiEndpoint.createMany.mock.calls[0][0].data).toHaveLength(2);
-
-      await instance.close();
-    });
-
-    it("rejects two endpoints with the same method and path", async () => {
-      const instance = await app();
-
-      const res = await instance.inject({
-        method: "PUT",
-        url: `/me/api-listings/${LISTING_ID}/endpoints`,
-        headers: AUTH,
-        payload: {
-          endpoints: [
-            { method: "GET", path: "/limits" },
-            { method: "GET", path: "/limits" },
-          ],
-        },
-      });
-
-      expect(res.statusCode).toBe(400);
-      expect(res.json().issues[0].path).toBe("endpoints");
-
-      await instance.close();
-    });
-
-    it("requires a leading slash, which the snippet builder assumes", async () => {
-      const instance = await app();
-
-      const res = await instance.inject({
-        method: "PUT",
-        url: `/me/api-listings/${LISTING_ID}/endpoints`,
-        headers: AUTH,
-        payload: { endpoints: [{ method: "GET", path: "limits" }] },
-      });
-
-      expect(res.statusCode).toBe(400);
-
-      await instance.close();
-    });
-
-    it("caps the endpoint list", async () => {
-      const instance = await app();
-
-      const res = await instance.inject({
-        method: "PUT",
-        url: `/me/api-listings/${LISTING_ID}/endpoints`,
-        headers: AUTH,
-        payload: {
-          endpoints: Array.from({ length: 51 }, (_, i) => ({
-            method: "GET",
-            path: `/r${i}`,
-          })),
-        },
-      });
-
-      expect(res.statusCode).toBe(400);
-
-      await instance.close();
-    });
-
-    it("404s when the listing is not the caller's", async () => {
-      apiListing.findFirst.mockResolvedValue(null);
-      const instance = await app();
-
-      const res = await instance.inject({
-        method: "PUT",
-        url: `/me/api-listings/${LISTING_ID}/endpoints`,
-        headers: AUTH,
-        payload: { endpoints: [] },
-      });
-
-      expect(res.statusCode).toBe(404);
 
       await instance.close();
     });

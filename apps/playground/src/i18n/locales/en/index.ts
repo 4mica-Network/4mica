@@ -51,7 +51,7 @@ export const en = {
   },
 
   api: {
-    baseUrl: "Base URL",
+    endpointLabel: "Endpoint",
     category: "Category",
     pricing: "Pricing",
     published: "Published {{date}}",

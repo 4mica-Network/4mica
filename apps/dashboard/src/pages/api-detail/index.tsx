@@ -14,14 +14,13 @@ import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/form";
 import { DetailsForm } from "./DetailsForm";
-import { EndpointsSection } from "./EndpointsSection";
 import { FaqEditor } from "./FaqEditor";
 import { PolicyForm } from "./PolicyForm";
 import { ReportsPanel } from "./ReportsPanel";
 import { ReviewsPanel } from "./ReviewsPanel";
 import { ToggleSection } from "./ToggleSection";
 
-export function AppDetail() {
+export function ApiDetail() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { id = "" } = useParams<{ id: string }>();
@@ -71,7 +70,7 @@ export function AppDetail() {
       <div className="flex flex-col items-start gap-4 py-10">
         <p className="text-ink-muted text-sm">{t("appDetail.notFound")}</p>
         <Button asChild intent="outline" size="sm">
-          <Link to="/apps">{t("appDetail.backToApps")}</Link>
+          <Link to="/apis">{t("appDetail.backToApps")}</Link>
         </Button>
       </div>
     );
@@ -82,12 +81,10 @@ export function AppDetail() {
 
   return (
     <div className="flex w-full animate-fade-in flex-col pb-16">
-      <BackBar label={t("appDetail.backToApps")} to="/apps" />
+      <BackBar label={t("appDetail.backToApps")} to="/apis" />
 
       <div className="mx-auto flex w-full flex-col gap-10 lg:max-w-3xl">
         <DetailsForm listing={listing} />
-
-        <EndpointsSection listing={listing} />
 
         <ToggleSection
           checked={policyEnabled}

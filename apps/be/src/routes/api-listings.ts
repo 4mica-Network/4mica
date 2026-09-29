@@ -5,7 +5,6 @@ import {
   getApiListingHandler,
   listApiListingsHandler,
   publishApiListingHandler,
-  replaceApiEndpointsHandler,
   unpublishApiListingHandler,
   updateApiListingHandler,
 } from "@controllers/api-listings/index";
@@ -129,7 +128,7 @@ export const apiListingRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["api-listings"],
         summary: "Update an API listing",
         description:
-          "Endpoints are not editable here — use PUT /me/api-listings/:id/endpoints, so the route set has exactly one writer. Setting `walletId` to null clears `network` and `payToAddress` together.",
+          "Setting `walletId` to null clears `network` and `payToAddress` together.",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {
@@ -143,28 +142,6 @@ export const apiListingRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     updateApiListingHandler,
-  );
-
-  app.put(
-    "/me/api-listings/:id/endpoints",
-    {
-      ...strict,
-      schema: {
-        tags: ["api-listings"],
-        summary: "Replace the listing's endpoints wholesale",
-        security: [{ bearerAuth: [] }],
-        params: idParamSchema,
-        response: {
-          ...limitedResponses,
-          200: apiListingResponseSchema,
-          400: errorResponseSchema,
-          401: errorResponseSchema,
-          404: errorResponseSchema,
-          409: errorResponseSchema,
-        },
-      },
-    },
-    replaceApiEndpointsHandler,
   );
 
   app.post(

@@ -11,7 +11,8 @@ export const API_LISTING_PUBLIC_SELECT = {
   name: true,
   summary: true,
   description: true,
-  baseUrl: true,
+  url: true,
+  method: true,
   docsUrl: true,
   category: true,
   tags: true,
@@ -24,27 +25,9 @@ export const API_LISTING_PUBLIC_SELECT = {
   priceAmount: true,
   priceCurrency: true,
   x402Endpoint: true,
-  endpoints: {
-    select: {
-      id: true,
-      method: true,
-      path: true,
-      summary: true,
-      priceAmount: true,
-    },
-    orderBy: [{ sortOrder: "asc" }, { path: "asc" }],
-  },
 } satisfies Prisma.ApiListingSelect;
 
 type Decimalish = { toString(): string } | null;
-
-type ApiEndpointRow = {
-  id: string;
-  method: HttpMethod;
-  path: string;
-  summary: string | null;
-  priceAmount: Decimalish;
-};
 
 type ApiListingRow = {
   id: string;
@@ -52,7 +35,8 @@ type ApiListingRow = {
   name: string;
   summary: string | null;
   description: string | null;
-  baseUrl: string | null;
+  url: string | null;
+  method: HttpMethod;
   docsUrl: string | null;
   category: string | null;
   tags: string[];
@@ -65,7 +49,6 @@ type ApiListingRow = {
   priceAmount: Decimalish;
   priceCurrency: string | null;
   x402Endpoint: string | null;
-  endpoints: ApiEndpointRow[];
 };
 
 const toAmount = (value: Decimalish): string | null =>
@@ -77,7 +60,8 @@ export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   name: row.name,
   summary: row.summary,
   description: row.description,
-  baseUrl: row.baseUrl,
+  url: row.url,
+  method: row.method,
   docsUrl: row.docsUrl,
   category: row.category,
   tags: row.tags,
@@ -90,13 +74,6 @@ export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   priceAmount: toAmount(row.priceAmount),
   priceCurrency: row.priceCurrency,
   x402Endpoint: row.x402Endpoint,
-  endpoints: row.endpoints.map((endpoint) => ({
-    id: endpoint.id,
-    method: endpoint.method,
-    path: endpoint.path,
-    summary: endpoint.summary,
-    priceAmount: toAmount(endpoint.priceAmount),
-  })),
 });
 
 export const listPublicApiListings = cache(

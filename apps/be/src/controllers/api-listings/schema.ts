@@ -60,39 +60,13 @@ const tags = v.pipe(
 
 const walletId = v.pipe(v.string(), v.uuid("must be a wallet id"));
 
-const endpointPath = v.pipe(
-  v.string(),
-  v.trim(),
-  v.minLength(1),
-  v.maxLength(512),
-  v.regex(/^\//, "must start with /"),
-);
-
-export const MAX_ENDPOINTS = 50;
-
-export const ApiEndpointSchema = v.object({
-  method: v.optional(HttpMethodSchema, "GET"),
-  path: endpointPath,
-  summary: v.optional(v.nullable(summary)),
-  priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
-  sortOrder: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 0),
-});
-
-const endpointList = v.pipe(
-  v.array(ApiEndpointSchema),
-  v.maxLength(MAX_ENDPOINTS),
-  v.check((rows) => {
-    const seen = new Set(rows.map((row) => `${row.method} ${row.path}`));
-    return seen.size === rows.length;
-  }, "contains the same method and path twice"),
-);
-
 export const CreateApiListingSchema = v.object({
   name,
   slug: v.optional(slug),
   summary: v.optional(v.nullable(summary)),
   description: v.optional(v.nullable(description)),
-  baseUrl: v.optional(v.nullable(httpsUrl)),
+  url: v.optional(v.nullable(httpsUrl)),
+  method: v.optional(HttpMethodSchema, "GET"),
   docsUrl: v.optional(v.nullable(httpsUrl)),
   category: v.optional(v.nullable(category)),
   tags: v.optional(tags, []),
@@ -104,8 +78,6 @@ export const CreateApiListingSchema = v.object({
   priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
   priceCurrency: v.optional(v.nullable(priceCurrency)),
   x402Endpoint: v.optional(v.nullable(httpsUrl)),
-
-  endpoints: v.optional(endpointList),
 });
 
 export const UpdateApiListingSchema = v.partial(
@@ -114,7 +86,8 @@ export const UpdateApiListingSchema = v.partial(
     slug,
     summary: v.nullable(summary),
     description: v.nullable(description),
-    baseUrl: v.nullable(httpsUrl),
+    url: v.nullable(httpsUrl),
+    method: HttpMethodSchema,
     docsUrl: v.nullable(httpsUrl),
     category: v.nullable(category),
     tags,
@@ -128,10 +101,6 @@ export const UpdateApiListingSchema = v.partial(
     x402Endpoint: v.nullable(httpsUrl),
   }),
 );
-
-export const ReplaceApiEndpointsSchema = v.object({
-  endpoints: endpointList,
-});
 
 export const BatchDeleteApiListingsSchema = batchDeleteSchema("a listing id");
 
@@ -154,15 +123,11 @@ export const ListApiListingsQuerySchema = v.object({
   ),
 });
 
-export type ApiEndpointInput = v.InferOutput<typeof ApiEndpointSchema>;
 export type CreateApiListingInput = v.InferOutput<
   typeof CreateApiListingSchema
 >;
 export type UpdateApiListingInput = v.InferOutput<
   typeof UpdateApiListingSchema
->;
-export type ReplaceApiEndpointsInput = v.InferOutput<
-  typeof ReplaceApiEndpointsSchema
 >;
 export type ListApiListingsQuery = v.InferOutput<
   typeof ListApiListingsQuerySchema

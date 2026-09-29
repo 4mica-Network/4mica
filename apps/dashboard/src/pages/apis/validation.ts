@@ -92,7 +92,8 @@ export const apiListingPaymentSchema = z.object({
 });
 
 export const apiListingPublishingSchema = z.object({
-  baseUrl: optionalHttpsUrl,
+  url: optionalHttpsUrl,
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   docsUrl: optionalHttpsUrl,
   x402Endpoint: optionalHttpsUrl,
   category: z
@@ -118,30 +119,16 @@ export type ApiListingValues = z.infer<typeof createApiListingSchema>;
 export const CREATE_STEP_FIELDS = [
   ["name", "slug", "summary", "description"],
   ["walletId", "assetAddress", "priceAmount", "priceCurrency", "priceLabel"],
-  ["baseUrl", "docsUrl", "x402Endpoint", "category", "tags", "visibility"],
+  [
+    "method",
+    "url",
+    "docsUrl",
+    "x402Endpoint",
+    "category",
+    "tags",
+    "visibility",
+  ],
 ] as const satisfies readonly (readonly (keyof ApiListingValues)[])[];
-
-export const endpointSchema = z.object({
-  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
-  path: z
-    .string()
-    .trim()
-    .min(1, "apiListing.errors.pathRequired")
-    .max(512, "apiListing.errors.pathTooLong")
-    .regex(/^\//, "apiListing.errors.pathLeadingSlash"),
-  summary: z.string().trim().max(280).optional().or(z.literal("")),
-  priceAmount: optionalDecimal,
-});
-
-export type EndpointValues = z.infer<typeof endpointSchema>;
-
-export const endpointsSchema = z
-  .array(endpointSchema)
-  .max(MAX_ENDPOINTS, "apiListing.errors.tooManyEndpoints")
-  .refine((rows) => {
-    const seen = new Set(rows.map((row) => `${row.method} ${row.path}`));
-    return seen.size === rows.length;
-  }, "apiListing.errors.duplicateEndpoint");
 
 export const blankToNull = (value: string | undefined | null): string | null =>
   value == null || value.trim() === "" ? null : value.trim();
