@@ -3,6 +3,7 @@ import createSagaMiddleware from "redux-saga";
 import agentReducer from "./agent/reducer";
 import apiListingReducer from "./apiListing/reducer";
 import bannerReducer from "./banner/reducer";
+import customerReducer from "./customer/reducer";
 import developerReducer from "./developer/reducer";
 import paymentReducer from "./payment/reducer";
 import rootSaga from "./rootSaga";
@@ -19,6 +20,7 @@ const rootReducer = combineReducers({
   trust: trustReducer,
   agent: agentReducer,
   payment: paymentReducer,
+  customer: customerReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

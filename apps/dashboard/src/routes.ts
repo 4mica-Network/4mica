@@ -8,6 +8,7 @@ import { Apis } from "@/pages/apis";
 import { Balances } from "@/pages/balances";
 import { BusinessSettings } from "@/pages/business";
 import { ComplianceSettings } from "@/pages/compliance";
+import { CustomerDetail } from "@/pages/customer-detail";
 import { Customers } from "@/pages/customers";
 import { DeveloperSettings } from "@/pages/developer";
 import { Disputes } from "@/pages/disputes";
@@ -35,6 +36,7 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "payments/disputes", component: Disputes },
   { path: "wallet", component: Wallet },
   { path: "customers", component: Customers },
+  { path: "customers/:id", component: CustomerDetail },
   { path: "agents", component: Agents },
   { path: "agents/:id", component: AgentDetail },
   { path: "agents/:id/advanced", component: AgentAdvanced },

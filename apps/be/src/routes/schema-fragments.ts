@@ -485,6 +485,123 @@ export const batchDeleteResponseSchema = {
   },
 } as const;
 
+const spendBucketSchema = {
+  type: "object",
+  required: ["network", "amount"],
+  properties: {
+    network: str,
+    assetAddress: nullStr,
+    amount: str,
+  },
+} as const;
+
+const spendBuckets = { type: "array", items: spendBucketSchema } as const;
+
+export const customerIdentityResponseSchema = {
+  type: "object",
+  required: ["id", "type", "source"],
+  properties: {
+    id: str,
+    type: { type: "string", enum: ["WALLET", "EMAIL", "EXTERNAL"] },
+    network: nullableNetworkEnum,
+    address: nullStr,
+    value: nullStr,
+    source: {
+      type: "string",
+      enum: ["MANUAL", "API", "VERIFIED", "DISCOVERED"],
+    },
+    verifiedAt: nullDate,
+    validFrom: nullDate,
+    validUntil: nullDate,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+/**
+ * `totalSpend` and `recentSpend` are arrays, not scalars, because volume is
+ * grouped by (network, assetAddress) — two different tokens are never summed
+ * into one figure.
+ */
+export const customerResponseSchema = {
+  type: "object",
+  required: ["id", "name", "type", "status"],
+  properties: {
+    id: str,
+    name: str,
+    email: nullStr,
+    type: {
+      type: "string",
+      enum: ["HUMAN", "ORGANIZATION", "AGENT", "WALLET"],
+    },
+    status: { type: "string", enum: ["ACTIVE", "BLOCKED"] },
+    description: nullStr,
+    notes: nullStr,
+    dailyLimit: nullStr,
+    monthlyLimit: nullStr,
+    limitCurrency: str,
+    identities: { type: "array", items: customerIdentityResponseSchema },
+    totalSpend: spendBuckets,
+    recentSpend: spendBuckets,
+    txnCount: int,
+    settledCount: int,
+    failedCount: int,
+    lastActiveAt: nullDate,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const customerListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: customerResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+export const customerOverviewResponseSchema = {
+  type: "object",
+  required: ["txnCount", "settledCount", "failedCount"],
+  properties: {
+    totalSpend: spendBuckets,
+    recentSpend: spendBuckets,
+    txnCount: int,
+    settledCount: int,
+    failedCount: int,
+    lastActiveAt: nullDate,
+    firstSeenAt: nullDate,
+  },
+} as const;
+
+export const customerBreakdownResponseSchema = {
+  type: "object",
+  required: ["items"],
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["kind", "txnCount"],
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["listing", "agent", "unattributed"],
+          },
+          id: nullStr,
+          slug: nullStr,
+          name: nullStr,
+          txnCount: int,
+          volume: spendBuckets,
+        },
+      },
+    },
+  },
+} as const;
+
 export const verificationSentResponseSchema = {
   type: "object",
   required: ["sent"],

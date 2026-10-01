@@ -219,6 +219,56 @@ const PAYMENTS = [
 
 const CUSTOMER_ADDRESS = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 
+/**
+ * The counterparties that pay into the seeded treasury. The first one claims
+ * `CUSTOMER_ADDRESS`, which every incoming payment above was sent from, so its
+ * spend, transaction count and activity are populated without inventing any
+ * new payment rows. Its monthly limit sits above that spend on purpose — the
+ * limits panel should render the within-limit state, not a breach.
+ *
+ * The second has no wallet at all, which is the zero-activity rendering path.
+ */
+const CUSTOMERS = [
+  {
+    name: "Acme Procurement",
+    email: "procurement@acme.example",
+    type: "ORGANIZATION",
+    status: "ACTIVE",
+    description: "Buys credit-limit lookups for its purchasing agents.",
+    notes:
+      "Signed a 12-month commitment in March. Escalate anything over $500 a day to their ops channel.",
+    dailyLimit: "50",
+    monthlyLimit: "500",
+    limitCurrency: "USD",
+    identities: [
+      {
+        type: "WALLET",
+        network: "BASE_SEPOLIA",
+        address: CUSTOMER_ADDRESS,
+        source: "VERIFIED",
+      },
+    ],
+  },
+  {
+    name: "Northwind Research",
+    email: "ops@northwind.example",
+    type: "AGENT",
+    status: "ACTIVE",
+    description: "Evaluating the research agent, no payments yet.",
+    notes: null,
+    dailyLimit: null,
+    monthlyLimit: null,
+    limitCurrency: "USD",
+    identities: [
+      {
+        type: "EMAIL",
+        value: "ops@northwind.example",
+        source: "MANUAL",
+      },
+    ],
+  },
+] as const;
+
 const REVIEWERS = [
   {
     clerkUserId: "user_seed_buyer_dana",
@@ -787,19 +837,76 @@ const seed = async (): Promise<void> => {
     }
   }
 
-  const [agents, wallets, listings, banners, payments] = await Promise.all([
-    prisma.agent.count(),
-    prisma.wallet.count(),
-    prisma.apiListing.count(),
-    prisma.banner.count(),
-    prisma.payment.count(),
-  ]);
+  // Keyed on name, so renaming a fixture leaves a stale row holding the
+  // addresses the new one wants to claim. Clearing first frees them.
+  await prisma.customer.deleteMany({
+    where: { ownerId: owner.id, name: { notIn: CUSTOMERS.map((c) => c.name) } },
+  });
+
+  for (const entry of CUSTOMERS) {
+    const fields = {
+      email: entry.email,
+      type: entry.type,
+      status: entry.status,
+      description: entry.description,
+      notes: entry.notes,
+      dailyLimit: entry.dailyLimit,
+      monthlyLimit: entry.monthlyLimit,
+      limitCurrency: entry.limitCurrency,
+      deletedAt: null,
+    };
+
+    const existing = await prisma.customer.findFirst({
+      where: { ownerId: owner.id, name: entry.name },
+      select: { id: true },
+    });
+
+    const customerRow = existing
+      ? await prisma.customer.update({
+          where: { id: existing.id },
+          data: fields,
+          select: { id: true },
+        })
+      : await prisma.customer.create({
+          data: { ownerId: owner.id, name: entry.name, ...fields },
+          select: { id: true },
+        });
+
+    await prisma.customerPaymentIdentity.deleteMany({
+      where: { customerId: customerRow.id },
+    });
+
+    for (const identity of entry.identities) {
+      await prisma.customerPaymentIdentity.create({
+        data: {
+          ownerId: owner.id,
+          customerId: customerRow.id,
+          type: identity.type,
+          network: "network" in identity ? identity.network : null,
+          address: "address" in identity ? identity.address : null,
+          value: "value" in identity ? identity.value : null,
+          source: identity.source,
+          verifiedAt: identity.source === "VERIFIED" ? new Date() : null,
+        },
+      });
+    }
+  }
+
+  const [agents, wallets, listings, banners, payments, customers] =
+    await Promise.all([
+      prisma.agent.count(),
+      prisma.wallet.count(),
+      prisma.apiListing.count(),
+      prisma.banner.count(),
+      prisma.payment.count(),
+      prisma.customer.count(),
+    ]);
 
   const plural = (count: number, noun: string) =>
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")} and ${plural(PAYMENTS.length, "payment")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
   );
 };
 

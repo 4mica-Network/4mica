@@ -56,15 +56,8 @@ export const initApp = async (
     });
   });
 
-  // Decorated once here so handlers reach the email service through the
-  // instance rather than importing the singleton — the same shape Fastify
-  // plugins use, and the seam a test replaces. `null` when EMAIL_SERVICE_URL is
-  // unset, which every caller must handle: a notification channel being down
-  // is not a reason to fail the request that triggered it.
   app.decorate("email", getEmailClient());
 
-  // Fastify owns database teardown, so `initApp` is self-contained and tests
-  // that call `app.close()` release the client too.
   app.addHook("onClose", async () => {
     const { disconnect } = await import("@4mica/db");
     await disconnect();
@@ -137,6 +130,10 @@ export const initApp = async (
             name: "payments",
             description: "x402 payments this account sent or received",
           },
+          {
+            name: "customers",
+            description: "Counterparties that spend through this account",
+          },
         ],
         components: {
           securitySchemes: {
@@ -179,9 +176,6 @@ export const runServer = async (): Promise<FastifyInstance> => {
     `@4mica/be listening on http://${config.env.HOST}:${config.env.PORT}`,
   );
 
-  // Surfaced at boot because the failure mode is otherwise silent: emails
-  // simply never send, and nothing errors. In production this should always
-  // read as the email service being reachable over 4mica-internal.
   appLogger.info(
     app.email
       ? `Email service configured at ${config.emailServiceUrl}`
