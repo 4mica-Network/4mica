@@ -10,7 +10,6 @@ import { EyeOff, Globe, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
   formatPrice,
@@ -39,7 +38,6 @@ export function AgentRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuAnchor = useRef<HTMLSpanElement>(null);
 
-  const isPayable = agent.payToAddress !== null && agent.endpointUrl !== null;
   const price = formatPrice(
     agent.priceAmount,
     agent.priceCurrency,
@@ -103,16 +101,6 @@ export function AgentRow({
               {shortenAddress(agent.payToAddress)}
             </Tag>
           )}
-        </div>
-
-        <div className="mt-1.5">
-          <IntegrationGuideLink
-            kind="agent"
-            ref={agent.slug ?? agent.id}
-            visibility={agent.visibility}
-            isPayable={isPayable}
-            data-testid={`agent-guide-${agent.id}`}
-          />
         </div>
       </div>
 

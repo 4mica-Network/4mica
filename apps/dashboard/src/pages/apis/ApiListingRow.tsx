@@ -13,7 +13,6 @@ import { EyeOff, Globe, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { IntegrationGuideLink } from "@/components/IntegrationGuideLink";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
   formatPrice,
@@ -106,16 +105,6 @@ export function ApiListingRow({
           <Tag className="font-mono" size="sm" variant="neutral">
             {listing.method}
           </Tag>
-        </div>
-
-        <div className="mt-1.5">
-          <IntegrationGuideLink
-            kind="api"
-            ref={listing.slug}
-            visibility={listing.visibility}
-            isPayable={isPayable}
-            data-testid={`api-listing-guide-${listing.id}`}
-          />
         </div>
       </div>
 
