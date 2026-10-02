@@ -1,6 +1,7 @@
 import type { RootState } from "..";
 import type {
   Customer,
+  CustomerCoupon,
   CustomerCreditBalance,
   CustomerCreditEntry,
   CustomerDetail,
@@ -84,6 +85,9 @@ export const selectDetailCustomer = (state: RootState): Customer | null =>
 export const selectCustomerOverview = (
   state: RootState,
 ): CustomerOverview | null => state.customer.detail.overview;
+
+export const selectCustomerCoupons = (state: RootState): CustomerCoupon[] =>
+  state.customer.detail.coupons;
 
 export const selectCustomerCredit = (
   state: RootState,

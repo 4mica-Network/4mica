@@ -1,19 +1,23 @@
 import {
   addCustomerIdentityHandler,
   batchDeleteCustomersHandler,
+  createCustomerCouponHandler,
   createCustomerHandler,
   customerActivityHandler,
   customerBreakdownHandler,
   customerOverviewHandler,
+  deleteCustomerCouponHandler,
   deleteCustomerHandler,
   getCustomerHandler,
   grantCustomerCreditHandler,
+  listCustomerCouponsHandler,
   listCustomerCreditHandler,
   listCustomersHandler,
   removeCustomerIdentityHandler,
   resetCustomerUsageHandler,
   setCustomerPolicyHandler,
   setCustomerStatusHandler,
+  updateCustomerCouponHandler,
   updateCustomerHandler,
   updateCustomerIdentityHandler,
   zeroCustomerCreditHandler,
@@ -24,6 +28,8 @@ import { guards } from "./guards";
 import {
   batchDeleteResponseSchema,
   customerBreakdownResponseSchema,
+  customerCouponListResponseSchema,
+  customerCouponResponseSchema,
   customerCreditGrantedResponseSchema,
   customerCreditResponseSchema,
   customerListResponseSchema,
@@ -38,6 +44,12 @@ const idParamSchema = {
   type: "object",
   required: ["id"],
   properties: { id: { type: "string" } },
+} as const;
+
+const couponParamSchema = {
+  type: "object",
+  required: ["id", "couponId"],
+  properties: { id: { type: "string" }, couponId: { type: "string" } },
 } as const;
 
 const identityParamSchema = {
@@ -432,6 +444,93 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     zeroCustomerCreditHandler,
+  );
+
+  app.get(
+    "/me/customers/:id/coupons",
+    {
+      ...base,
+      schema: {
+        tags: ["customers"],
+        summary: "Coupons that belong to this customer",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerCouponListResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    listCustomerCouponsHandler,
+  );
+
+  app.post(
+    "/me/customers/:id/coupons",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Give this customer a coupon",
+        description:
+          "The code is unique per account. An expiry must be in the future and a usage limit must be at least one; leaving either out means no expiry and no limit.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          201: customerCouponResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    createCustomerCouponHandler,
+  );
+
+  app.patch(
+    "/me/customers/:id/coupons/:couponId",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Change a coupon's expiry, limit, or revoke it",
+        description:
+          "The code, kind and value are fixed once issued — reissue instead, so a coupon already handed out cannot change what it is worth.",
+        security: [{ bearerAuth: [] }],
+        params: couponParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerCouponResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    updateCustomerCouponHandler,
+  );
+
+  app.delete(
+    "/me/customers/:id/coupons/:couponId",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Remove a coupon",
+        security: [{ bearerAuth: [] }],
+        params: couponParamSchema,
+        response: {
+          ...limitedResponses,
+          204: { type: "null" },
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    deleteCustomerCouponHandler,
   );
 
   app.get(

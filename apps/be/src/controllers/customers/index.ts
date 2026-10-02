@@ -14,13 +14,16 @@ import type { FastifyReply, RouteHandler } from "fastify";
 import {
   addIdentity,
   batchSoftDeleteCustomers,
+  createCoupon,
   createCustomer,
   creditBalance,
   customerActivity,
   customerBreakdown,
   customerOverview,
+  deleteCoupon,
   getCustomer,
   grantCredit,
+  listCoupons,
   listCreditEntries,
   listCustomers,
   ownsCustomer,
@@ -29,12 +32,14 @@ import {
   setCustomerPolicy,
   setCustomerStatus,
   softDeleteCustomer,
+  updateCoupon,
   updateCustomer,
   updateIdentity,
   zeroCredit,
 } from "./repository";
 import {
   BatchDeleteCustomersSchema,
+  CreateCustomerCouponSchema,
   CreateCustomerSchema,
   CustomerActivityQuerySchema,
   CustomerIdentitySchema,
@@ -42,6 +47,7 @@ import {
   ListCustomersQuerySchema,
   SetCustomerPolicySchema,
   SetCustomerStatusSchema,
+  UpdateCustomerCouponSchema,
   UpdateCustomerIdentitySchema,
   UpdateCustomerSchema,
 } from "./schema";
@@ -421,6 +427,116 @@ export const zeroCustomerCreditHandler: RouteHandler = async (
   appLogger.info("Customer credit zeroed", { userId, customerId: id });
 
   return reply.send({ balance, items: entries });
+};
+
+const couponTaken = (reply: FastifyReply) =>
+  reply.code(409).send({
+    error: "coupon_code_taken",
+    message: "You already have a coupon with that code.",
+    issues: [{ path: "code", message: "is already in use on this account" }],
+  });
+
+export const listCustomerCouponsHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  if (!(await ownsCustomer(userId, id))) {
+    return notFound(reply, "customer");
+  }
+
+  return reply.send({ items: await listCoupons(userId, id) });
+};
+
+export const createCustomerCouponHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const parsed = parseBody(CreateCustomerCouponSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id } = request.params as { id: string };
+  if (!(await ownsCustomer(userId, id))) {
+    return notFound(reply, "customer");
+  }
+
+  try {
+    const coupon = await createCoupon(userId, id, parsed.data);
+
+    appLogger.info("Customer coupon created", {
+      userId,
+      customerId: id,
+      code: coupon.code,
+    });
+
+    return reply.code(201).send(coupon);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return couponTaken(reply);
+    }
+    appLogger.error("Customer coupon create failed", { error, userId });
+    throw error;
+  }
+};
+
+export const updateCustomerCouponHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const parsed = parseBody(UpdateCustomerCouponSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id } = request.params as { id: string };
+  const { couponId } = request.params as { couponId: string };
+
+  const coupon = await updateCoupon(userId, id, couponId, parsed.data);
+
+  return coupon ? reply.send(coupon) : notFound(reply, "coupon");
+};
+
+export const deleteCustomerCouponHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  const { couponId } = request.params as { couponId: string };
+
+  const removed = await deleteCoupon(userId, id, couponId);
+
+  if (removed) {
+    appLogger.info("Customer coupon removed", {
+      userId,
+      customerId: id,
+      couponId,
+    });
+    return reply.code(204).send();
+  }
+
+  return notFound(reply, "coupon");
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {

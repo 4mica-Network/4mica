@@ -612,6 +612,36 @@ export const customerCreditGrantedResponseSchema = {
   },
 } as const;
 
+export const customerCouponResponseSchema = {
+  type: "object",
+  required: ["id", "code", "kind", "value", "timesRedeemed"],
+  properties: {
+    id: str,
+    code: str,
+    kind: { type: "string", enum: ["PERCENT", "FIXED"] },
+    value: str,
+    expiresAt: nullDate,
+    usageLimit: { type: "integer", nullable: true },
+    timesRedeemed: int,
+    revokedAt: nullDate,
+    unusableReason: {
+      type: "string",
+      nullable: true,
+      enum: ["revoked", "expired", "exhausted", null],
+    },
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const customerCouponListResponseSchema = {
+  type: "object",
+  required: ["items"],
+  properties: {
+    items: { type: "array", items: customerCouponResponseSchema },
+  },
+} as const;
+
 export const customerListResponseSchema = {
   type: "object",
   required: ["items", "total", "page", "limit"],

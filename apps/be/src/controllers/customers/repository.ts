@@ -1,6 +1,7 @@
 import { type CustomerQuotaPeriod, Prisma, prisma } from "@4mica/db";
 import { walletAddressesFor } from "@controllers/payments/repository";
 import type {
+  CreateCustomerCouponInput,
   CreateCustomerInput,
   CustomerActivityQuery,
   CustomerIdentityInput,
@@ -8,6 +9,7 @@ import type {
   ListCustomersQuery,
   SetCustomerPolicyInput,
   SetCustomerStatusInput,
+  UpdateCustomerCouponInput,
   UpdateCustomerIdentityInput,
 } from "./schema";
 
@@ -844,6 +846,143 @@ export const zeroCredit = async (
   }
 
   return creditBalance(ownerId, customerId);
+};
+
+export const CUSTOMER_COUPON_SELECT = {
+  id: true,
+  code: true,
+  kind: true,
+  value: true,
+  expiresAt: true,
+  usageLimit: true,
+  timesRedeemed: true,
+  revokedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.CustomerCouponSelect;
+
+type RawCoupon = Prisma.CustomerCouponGetPayload<{
+  select: typeof CUSTOMER_COUPON_SELECT;
+}>;
+
+export type CustomerCouponRow = Omit<
+  RawCoupon,
+  "value" | "expiresAt" | "revokedAt" | "createdAt" | "updatedAt"
+> & {
+  value: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Why it cannot be used, or null while it still can be. */
+  unusableReason: "revoked" | "expired" | "exhausted" | null;
+};
+
+const couponUnusableReason = (
+  row: RawCoupon,
+  now = new Date(),
+): CustomerCouponRow["unusableReason"] => {
+  if (row.revokedAt) {
+    return "revoked";
+  }
+  if (row.expiresAt && row.expiresAt <= now) {
+    return "expired";
+  }
+  if (row.usageLimit !== null && row.timesRedeemed >= row.usageLimit) {
+    return "exhausted";
+  }
+  return null;
+};
+
+const toCouponRow = (row: RawCoupon): CustomerCouponRow => ({
+  ...row,
+  value: row.value.toString(),
+  expiresAt: row.expiresAt?.toISOString() ?? null,
+  revokedAt: row.revokedAt?.toISOString() ?? null,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+  unusableReason: couponUnusableReason(row),
+});
+
+export const listCoupons = async (
+  ownerId: string,
+  customerId: string,
+): Promise<CustomerCouponRow[]> => {
+  const rows = await prisma.customerCoupon.findMany({
+    where: { ownerId, customerId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: CUSTOMER_COUPON_SELECT,
+  });
+
+  return rows.map(toCouponRow);
+};
+
+export const createCoupon = async (
+  ownerId: string,
+  customerId: string,
+  input: CreateCustomerCouponInput,
+): Promise<CustomerCouponRow> => {
+  const row = await prisma.customerCoupon.create({
+    data: {
+      ownerId,
+      customerId,
+      code: input.code,
+      kind: input.kind,
+      value: input.value,
+      expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+      usageLimit: input.usageLimit ?? null,
+    },
+    select: CUSTOMER_COUPON_SELECT,
+  });
+
+  return toCouponRow(row);
+};
+
+export const updateCoupon = async (
+  ownerId: string,
+  customerId: string,
+  couponId: string,
+  input: UpdateCustomerCouponInput,
+): Promise<CustomerCouponRow | null> => {
+  const data: Prisma.CustomerCouponUpdateManyMutationInput = {};
+
+  if (input.expiresAt !== undefined) {
+    data.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+  }
+  if (input.usageLimit !== undefined) {
+    data.usageLimit = input.usageLimit;
+  }
+  if (input.revoked !== undefined) {
+    data.revokedAt = input.revoked ? new Date() : null;
+  }
+
+  const { count } = await prisma.customerCoupon.updateMany({
+    where: { id: couponId, customerId, ownerId },
+    data,
+  });
+
+  if (count === 0) {
+    return null;
+  }
+
+  const row = await prisma.customerCoupon.findFirst({
+    where: { id: couponId, customerId, ownerId },
+    select: CUSTOMER_COUPON_SELECT,
+  });
+
+  return row ? toCouponRow(row) : null;
+};
+
+export const deleteCoupon = async (
+  ownerId: string,
+  customerId: string,
+  couponId: string,
+): Promise<boolean> => {
+  const { count } = await prisma.customerCoupon.deleteMany({
+    where: { id: couponId, customerId, ownerId },
+  });
+
+  return count > 0;
 };
 
 export const updateIdentity = async (

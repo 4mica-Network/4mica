@@ -148,6 +148,30 @@ export interface CustomerCreditEntry {
   createdAt: string;
 }
 
+export const CUSTOMER_COUPON_KIND = {
+  PERCENT: "PERCENT",
+  FIXED: "FIXED",
+} as const;
+
+export type CustomerCouponKind =
+  (typeof CUSTOMER_COUPON_KIND)[keyof typeof CUSTOMER_COUPON_KIND];
+
+export type CouponUnusableReason = "revoked" | "expired" | "exhausted" | null;
+
+export interface CustomerCoupon {
+  id: string;
+  code: string;
+  kind: CustomerCouponKind;
+  value: string;
+  expiresAt: string | null;
+  usageLimit: number | null;
+  timesRedeemed: number;
+  revokedAt: string | null;
+  unusableReason: CouponUnusableReason;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CustomerOverview {
   totalSpend: SpendBucket[];
   recentSpend: SpendBucket[];
@@ -192,6 +216,7 @@ export interface CustomerDetail {
   overview: CustomerOverview | null;
   credit: CustomerCreditBalance | null;
   creditEntries: CustomerCreditEntry[];
+  coupons: CustomerCoupon[];
   activity: {
     items: Payment[];
     total: number;

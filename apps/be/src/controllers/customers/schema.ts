@@ -5,6 +5,7 @@ import {
   decimalAmount,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
+  positiveDecimalAmount,
   positiveInt,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
@@ -60,6 +61,14 @@ const futureTimestamp = v.pipe(
 );
 
 const statusReason = v.pipe(v.string(), v.trim(), v.maxLength(280));
+
+const positiveCount = v.pipe(
+  v.union([v.string(), v.number()]),
+  v.transform(Number),
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+);
 
 export const CustomerQuotaUnitSchema = v.picklist(["REQUESTS", "AMOUNT"]);
 
@@ -226,6 +235,46 @@ export const GrantCustomerCreditSchema = v.object({
   reason: v.optional(v.nullable(statusReason)),
 });
 
+export const CustomerCouponKindSchema = v.picklist(["PERCENT", "FIXED"]);
+
+const couponCode = v.pipe(
+  v.string(),
+  v.trim(),
+  v.toUpperCase(),
+  v.minLength(1),
+  v.maxLength(64),
+  v.regex(/^[A-Z0-9][A-Z0-9_-]*$/, "may use letters, numbers, - and _"),
+);
+
+/**
+ * A variant on `kind`, so a percentage is held to 0-100 while a fixed amount
+ * off is not — one schema cannot say both at once.
+ */
+export const CreateCustomerCouponSchema = v.variant("kind", [
+  v.object({
+    kind: v.literal("PERCENT"),
+    code: couponCode,
+    value: percent,
+    expiresAt: v.optional(v.nullable(futureTimestamp)),
+    usageLimit: v.optional(v.nullable(positiveCount)),
+  }),
+  v.object({
+    kind: v.literal("FIXED"),
+    code: couponCode,
+    value: positiveDecimalAmount,
+    expiresAt: v.optional(v.nullable(futureTimestamp)),
+    usageLimit: v.optional(v.nullable(positiveCount)),
+  }),
+]);
+
+export const UpdateCustomerCouponSchema = v.partial(
+  v.object({
+    expiresAt: v.nullable(futureTimestamp),
+    usageLimit: v.nullable(positiveCount),
+    revoked: v.boolean(),
+  }),
+);
+
 export const BatchDeleteCustomersSchema = batchDeleteSchema("a customer id");
 
 export const ListCustomersQuerySchema = v.object({
@@ -282,6 +331,12 @@ export type SetCustomerPolicyInput = v.InferOutput<
 >;
 export type GrantCustomerCreditInput = v.InferOutput<
   typeof GrantCustomerCreditSchema
+>;
+export type CreateCustomerCouponInput = v.InferOutput<
+  typeof CreateCustomerCouponSchema
+>;
+export type UpdateCustomerCouponInput = v.InferOutput<
+  typeof UpdateCustomerCouponSchema
 >;
 export type ListCustomersQuery = v.InferOutput<typeof ListCustomersQuerySchema>;
 export type CustomerActivityQuery = v.InferOutput<

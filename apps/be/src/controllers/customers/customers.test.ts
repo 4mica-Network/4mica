@@ -9,6 +9,7 @@ const {
   findUnique,
   upsert,
   customer,
+  customerCoupon,
   customerCreditEntry,
   customerPaymentIdentity,
   wallet,
@@ -24,6 +25,13 @@ const {
     findFirst: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  customerCoupon: {
+    create: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
   },
@@ -89,6 +97,7 @@ vi.mock("@4mica/db", () => ({
   },
   prisma: {
     customer,
+    customerCoupon,
     customerCreditEntry,
     customerPaymentIdentity,
     wallet,
@@ -112,6 +121,7 @@ const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const CUSTOMER_ID = "019fce62-5555-7000-8000-000000000000";
 const IDENTITY_ID = "019fce62-6666-7000-8000-000000000000";
 const CREDIT_ID = "019fce62-aaaa-7000-8000-000000000000";
+const COUPON_ID = "019fce62-bbbb-7000-8000-000000000000";
 const PAYER = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 
 const AUTH_USER = {
@@ -161,6 +171,20 @@ const storedIdentity = (over: Record<string, unknown> = {}) => ({
   blockedAt: null,
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
   updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+  ...over,
+});
+
+const storedCoupon = (over: Record<string, unknown> = {}) => ({
+  id: COUPON_ID,
+  code: "WELCOME10",
+  kind: "PERCENT",
+  value: decimal("10"),
+  expiresAt: null,
+  usageLimit: null,
+  timesRedeemed: 0,
+  revokedAt: null,
+  createdAt: new Date("2026-10-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-10-01T00:00:00.000Z"),
   ...over,
 });
 
@@ -268,6 +292,7 @@ describe("customer routes", () => {
     }
     for (const group of [
       customer,
+      customerCoupon,
       customerCreditEntry,
       customerPaymentIdentity,
       wallet,
@@ -292,6 +317,11 @@ describe("customer routes", () => {
     customerPaymentIdentity.create.mockResolvedValue(storedIdentity());
     customerPaymentIdentity.updateMany.mockResolvedValue({ count: 1 });
     customerPaymentIdentity.deleteMany.mockResolvedValue({ count: 1 });
+    customerCoupon.findMany.mockResolvedValue([]);
+    customerCoupon.updateMany.mockResolvedValue({ count: 1 });
+    customerCoupon.deleteMany.mockResolvedValue({ count: 1 });
+    customerCoupon.create.mockResolvedValue(storedCoupon());
+    customerCoupon.findFirst.mockResolvedValue(storedCoupon());
     customerCreditEntry.groupBy.mockResolvedValue([]);
     customerCreditEntry.findMany.mockResolvedValue([]);
     customerCreditEntry.create.mockResolvedValue({
@@ -319,6 +349,10 @@ describe("customer routes", () => {
       ["GET", `/me/customers/${CUSTOMER_ID}/credit`],
       ["POST", `/me/customers/${CUSTOMER_ID}/credit`],
       ["DELETE", `/me/customers/${CUSTOMER_ID}/credit`],
+      ["GET", `/me/customers/${CUSTOMER_ID}/coupons`],
+      ["POST", `/me/customers/${CUSTOMER_ID}/coupons`],
+      ["PATCH", `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`],
+      ["DELETE", `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`],
       ["DELETE", `/me/customers/${CUSTOMER_ID}`],
       ["POST", "/me/customers/batch-delete"],
       ["POST", `/me/customers/${CUSTOMER_ID}/identities`],
@@ -1434,6 +1468,287 @@ describe("customer routes", () => {
         });
         expect(response.statusCode, method).toBe(404);
       }
+
+      await instance.close();
+    });
+  });
+
+  describe("coupons", () => {
+    const soon = new Date(Date.now() + 86_400_000).toISOString();
+
+    const create = (payload: Record<string, unknown>) => ({
+      method: "POST" as const,
+      url: `/me/customers/${CUSTOMER_ID}/coupons`,
+      headers: AUTH,
+      payload,
+    });
+
+    it("creates a percentage coupon with an expiry and a limit", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({
+          kind: "PERCENT",
+          code: "welcome10",
+          value: "10",
+          expiresAt: soon,
+          usageLimit: 5,
+        }),
+      );
+
+      expect(response.statusCode).toBe(201);
+      expect(customerCoupon.create.mock.calls[0][0].data).toMatchObject({
+        ownerId: USER_ID,
+        customerId: CUSTOMER_ID,
+        code: "WELCOME10",
+        kind: "PERCENT",
+        value: "10",
+        usageLimit: 5,
+      });
+
+      await instance.close();
+    });
+
+    it("refuses a percentage above 100", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({ kind: "PERCENT", code: "HALF", value: "150" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("allows a fixed amount above 100", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({ kind: "FIXED", code: "BIG", value: "150" }),
+      );
+
+      expect(response.statusCode).toBe(201);
+
+      await instance.close();
+    });
+
+    it("refuses an expiry in the past", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({
+          kind: "PERCENT",
+          code: "OLD",
+          value: "10",
+          expiresAt: "2020-01-01T00:00:00.000Z",
+        }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("expiresAt");
+
+      await instance.close();
+    });
+
+    it("refuses a usage limit below one", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({ kind: "PERCENT", code: "ZERO", value: "10", usageLimit: 0 }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses a code with spaces", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({ kind: "PERCENT", code: "two words", value: "10" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses a second coupon with the same code", async () => {
+      customerCoupon.create.mockRejectedValue(
+        uniqueViolation(["owner_id", "code"]),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(
+        create({ kind: "PERCENT", code: "WELCOME10", value: "10" }),
+      );
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({ error: "coupon_code_taken" });
+
+      await instance.close();
+    });
+
+    it("says why a coupon cannot be used", async () => {
+      customerCoupon.findMany.mockResolvedValue([
+        storedCoupon({ id: "c1", code: "REVOKED", revokedAt: new Date() }),
+        storedCoupon({
+          id: "c2",
+          code: "EXPIRED",
+          expiresAt: new Date("2020-01-01T00:00:00.000Z"),
+        }),
+        storedCoupon({
+          id: "c3",
+          code: "USEDUP",
+          usageLimit: 2,
+          timesRedeemed: 2,
+        }),
+        storedCoupon({ id: "c4", code: "FINE" }),
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/coupons`,
+        headers: AUTH,
+      });
+
+      expect(
+        response
+          .json()
+          .items.map(
+            (item: { unusableReason: string | null }) => item.unusableReason,
+          ),
+      ).toEqual(["revoked", "expired", "exhausted", null]);
+
+      await instance.close();
+    });
+
+    it("counts a coupon revoked even when it is also used up", async () => {
+      customerCoupon.findMany.mockResolvedValue([
+        storedCoupon({
+          revokedAt: new Date(),
+          usageLimit: 1,
+          timesRedeemed: 1,
+        }),
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/coupons`,
+        headers: AUTH,
+      });
+
+      expect(response.json().items[0].unusableReason).toBe("revoked");
+
+      await instance.close();
+    });
+
+    it("revokes and restores a coupon", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+        payload: { revoked: true },
+      });
+      expect(
+        customerCoupon.updateMany.mock.calls[0][0].data.revokedAt,
+      ).toBeInstanceOf(Date);
+
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+        payload: { revoked: false },
+      });
+      expect(customerCoupon.updateMany.mock.calls[1][0].data).toEqual({
+        revokedAt: null,
+      });
+
+      await instance.close();
+    });
+
+    it("will not let an update change what a coupon is worth", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+        payload: { value: "90", kind: "FIXED", code: "OTHER" },
+      });
+
+      expect(customerCoupon.updateMany.mock.calls[0][0].data).toEqual({});
+
+      await instance.close();
+    });
+
+    it("scopes a coupon change to the owner and its customer", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+        payload: { usageLimit: 3 },
+      });
+
+      expect(customerCoupon.updateMany.mock.calls[0][0].where).toEqual({
+        id: COUPON_ID,
+        customerId: CUSTOMER_ID,
+        ownerId: USER_ID,
+      });
+
+      await instance.close();
+    });
+
+    it("404s a coupon that is not the caller's", async () => {
+      customerCoupon.updateMany.mockResolvedValue({ count: 0 });
+      customerCoupon.deleteMany.mockResolvedValue({ count: 0 });
+
+      const instance = await app();
+
+      const patched = await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+        payload: { usageLimit: 3 },
+      });
+      expect(patched.statusCode).toBe(404);
+
+      const removed = await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+      });
+      expect(removed.statusCode).toBe(404);
+
+      await instance.close();
+    });
+
+    it("removes a coupon", async () => {
+      const instance = await app();
+      const response = await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/coupons/${COUPON_ID}`,
+        headers: AUTH,
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      await instance.close();
+    });
+
+    it("serialises the coupon value as a string", async () => {
+      customerCoupon.findMany.mockResolvedValue([
+        storedCoupon({ value: decimal("12.50") }),
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/coupons`,
+        headers: AUTH,
+      });
+
+      expect(response.json().items[0].value).toBe("12.50");
 
       await instance.close();
     });

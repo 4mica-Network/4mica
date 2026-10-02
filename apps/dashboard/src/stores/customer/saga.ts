@@ -1,5 +1,7 @@
 import { HttpError } from "@4mica/http";
 import type {
+  CustomerCouponInput,
+  CustomerCouponPatch,
   CustomerCreditInput,
   CustomerIdentityInput,
   CustomerIdentityPatch,
@@ -26,6 +28,8 @@ import {
   deleteCustomerSucceeded,
   fetchCustomerActivity as fetchCustomerActivityAction,
   fetchCustomerActivitySucceeded,
+  fetchCustomerCoupons as fetchCustomerCouponsAction,
+  fetchCustomerCouponsSucceeded,
   fetchCustomerCredit as fetchCustomerCreditAction,
   fetchCustomerCreditSucceeded,
   fetchCustomerDetailFailed,
@@ -136,6 +140,7 @@ export function* fetchCustomerDetail(action: {
     yield put(fetchCustomerDetailSucceeded({ customer, overview }));
     yield put(fetchCustomerActivityAction(id));
     yield put(fetchCustomerCreditAction(id));
+    yield put(fetchCustomerCouponsAction(id));
   } catch (error) {
     yield put(
       fetchCustomerDetailFailed(
@@ -207,6 +212,87 @@ export function* updateCustomer(action: {
     });
   } catch (error) {
     yield* fail(error, "Couldn't update that customer.", action.meta);
+  }
+}
+
+export function* fetchCustomerCoupons(action: {
+  type: string;
+  payload: { id: string };
+}): Generator {
+  try {
+    const result = (yield call(() =>
+      api.getCustomerCoupons(action.payload.id),
+    )) as Awaited<ReturnType<typeof api.getCustomerCoupons>>;
+
+    yield put(fetchCustomerCouponsSucceeded(result.items));
+  } catch {}
+}
+
+export function* createCustomerCoupon(action: {
+  type: string;
+  payload: { id: string; data: CustomerCouponInput };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    yield call(() =>
+      api.createCustomerCoupon(action.payload.id, action.payload.data),
+    );
+
+    yield put(fetchCustomerCouponsAction(action.payload.id));
+
+    notifySuccess({
+      title: t("store.customer.couponCreated", "Coupon added"),
+      content: t(
+        "store.customer.couponCreatedBody",
+        "This customer can use it until it expires or runs out.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't add that coupon.", action.meta);
+  }
+}
+
+export function* updateCustomerCoupon(action: {
+  type: string;
+  payload: { id: string; couponId: string; data: CustomerCouponPatch };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    yield call(() =>
+      api.updateCustomerCoupon(
+        action.payload.id,
+        action.payload.couponId,
+        action.payload.data,
+      ),
+    );
+
+    yield put(fetchCustomerCouponsAction(action.payload.id));
+  } catch (error) {
+    yield* fail(error, "Couldn't change that coupon.", action.meta);
+  }
+}
+
+export function* deleteCustomerCoupon(action: {
+  type: string;
+  payload: { id: string; couponId: string };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    yield call(() =>
+      api.deleteCustomerCoupon(action.payload.id, action.payload.couponId),
+    );
+
+    yield put(fetchCustomerCouponsAction(action.payload.id));
+
+    notifySuccess({
+      title: t("store.customer.couponRemoved", "Coupon removed"),
+      content: t(
+        "store.customer.couponRemovedBody",
+        "Its code is free to use again.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't remove that coupon.", action.meta);
   }
 }
 

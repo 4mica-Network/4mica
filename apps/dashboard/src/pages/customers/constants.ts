@@ -74,6 +74,17 @@ export const CREDIT_KIND_OPTIONS = (
   ["PROMOTIONAL", "PREPAID", "ADJUSTMENT"] as const
 ).map((value) => ({ value, titleKey: CREDIT_KIND_LABEL_KEYS[value] }));
 
+export const COUPON_KIND_OPTIONS = [
+  { value: "PERCENT", titleKey: "customer.coupon.kindPercent" },
+  { value: "FIXED", titleKey: "customer.coupon.kindFixed" },
+] as const;
+
+export const COUPON_UNUSABLE_LABEL_KEYS = {
+  revoked: "customer.coupon.revoked",
+  expired: "customer.coupon.expired",
+  exhausted: "customer.coupon.exhausted",
+} as const;
+
 export const SORT_OPTIONS = [
   { value: "-totalSpend", titleKey: "customer.sort.spendHigh" },
   { value: "totalSpend", titleKey: "customer.sort.spendLow" },

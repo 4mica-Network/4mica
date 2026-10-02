@@ -3,6 +3,8 @@ import type {
   BatchDeleteResult,
   Customer,
   CustomerActivityResponse,
+  CustomerCoupon,
+  CustomerCouponKind,
   CustomerCreditBalance,
   CustomerCreditEntry,
   CustomerCreditKind,
@@ -163,6 +165,50 @@ export const zeroCustomerCredit = (id: string) =>
     items: CustomerCreditEntry[];
   }>({
     url: `/me/customers/${encodeURIComponent(id)}/credit`,
+    method: HttpMethod.DELETE,
+  });
+
+export interface CustomerCouponInput {
+  kind: CustomerCouponKind;
+  code: string;
+  value: string;
+  expiresAt?: string | null;
+  usageLimit?: number | null;
+}
+
+export interface CustomerCouponPatch {
+  expiresAt?: string | null;
+  usageLimit?: number | null;
+  revoked?: boolean;
+}
+
+export const getCustomerCoupons = (id: string) =>
+  httpClient.request<{ items: CustomerCoupon[] }>({
+    url: `/me/customers/${encodeURIComponent(id)}/coupons`,
+    method: HttpMethod.GET,
+  });
+
+export const createCustomerCoupon = (id: string, data: CustomerCouponInput) =>
+  httpClient.request<CustomerCoupon, typeof data>({
+    url: `/me/customers/${encodeURIComponent(id)}/coupons`,
+    method: HttpMethod.POST,
+    data,
+  });
+
+export const updateCustomerCoupon = (
+  id: string,
+  couponId: string,
+  data: CustomerCouponPatch,
+) =>
+  httpClient.request<CustomerCoupon, typeof data>({
+    url: `/me/customers/${encodeURIComponent(id)}/coupons/${encodeURIComponent(couponId)}`,
+    method: HttpMethod.PATCH,
+    data,
+  });
+
+export const deleteCustomerCoupon = (id: string, couponId: string) =>
+  httpClient.request<void>({
+    url: `/me/customers/${encodeURIComponent(id)}/coupons/${encodeURIComponent(couponId)}`,
     method: HttpMethod.DELETE,
   });
 

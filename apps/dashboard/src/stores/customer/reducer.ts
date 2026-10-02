@@ -1,6 +1,7 @@
 import actionTypes from "./actionTypes";
 import type {
   Customer,
+  CustomerCoupon,
   CustomerCreditBalance,
   CustomerCreditEntry,
   CustomerDetail,
@@ -18,6 +19,7 @@ const EMPTY_DETAIL: CustomerDetail = {
   overview: null,
   credit: null,
   creditEntries: [],
+  coupons: [],
   activity: { items: [], total: 0, page: 1, limit: ACTIVITY_PAGE_SIZE },
   isLoading: false,
   hasLoaded: false,
@@ -101,6 +103,9 @@ export default function customerReducer(
 
     case actionTypes.CREATE_CUSTOMER_REQUESTED:
     case actionTypes.UPDATE_CUSTOMER_REQUESTED:
+    case actionTypes.CREATE_CUSTOMER_COUPON_REQUESTED:
+    case actionTypes.UPDATE_CUSTOMER_COUPON_REQUESTED:
+    case actionTypes.DELETE_CUSTOMER_COUPON_REQUESTED:
     case actionTypes.GRANT_CUSTOMER_CREDIT_REQUESTED:
     case actionTypes.ZERO_CUSTOMER_CREDIT_REQUESTED:
     case actionTypes.SET_CUSTOMER_POLICY_REQUESTED:
@@ -182,6 +187,15 @@ export default function customerReducer(
           "Failed to load that customer.",
         detail: { ...state.detail, isLoading: false, hasLoaded: true },
       };
+
+    case actionTypes.FETCH_CUSTOMER_COUPONS_SUCCEEDED: {
+      const { items } = action.payload as { items: CustomerCoupon[] };
+      return {
+        ...state,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+        detail: { ...state.detail, coupons: items },
+      };
+    }
 
     case actionTypes.FETCH_CUSTOMER_CREDIT_SUCCEEDED: {
       const payload = action.payload as {

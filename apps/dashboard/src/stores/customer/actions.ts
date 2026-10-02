@@ -1,4 +1,6 @@
 import type {
+  CustomerCouponInput,
+  CustomerCouponPatch,
   CustomerCreditInput,
   CustomerIdentityInput,
   CustomerIdentityPatch,
@@ -9,6 +11,7 @@ import type {
 import actionTypes from "./actionTypes";
 import type {
   Customer,
+  CustomerCoupon,
   CustomerCreditBalance,
   CustomerCreditEntry,
   CustomerFilters,
@@ -79,6 +82,44 @@ export const updateCustomerSucceeded = (
   type: actionTypes.UPDATE_CUSTOMER_SUCCEEDED,
   payload: customer,
   meta,
+});
+
+export const fetchCustomerCoupons = (id: string) => ({
+  type: actionTypes.FETCH_CUSTOMER_COUPONS_REQUESTED,
+  payload: { id },
+});
+
+export const fetchCustomerCouponsSucceeded = (items: CustomerCoupon[]) => ({
+  type: actionTypes.FETCH_CUSTOMER_COUPONS_SUCCEEDED,
+  payload: { items },
+});
+
+export const createCustomerCoupon = (payload: {
+  id: string;
+  data: CustomerCouponInput;
+}) => ({
+  type: actionTypes.CREATE_CUSTOMER_COUPON_REQUESTED,
+  payload,
+  meta: { pendingKey: "customerCoupon" },
+});
+
+export const updateCustomerCoupon = (payload: {
+  id: string;
+  couponId: string;
+  data: CustomerCouponPatch;
+}) => ({
+  type: actionTypes.UPDATE_CUSTOMER_COUPON_REQUESTED,
+  payload,
+  meta: { pendingKey: `customerCoupon:${payload.couponId}` },
+});
+
+export const deleteCustomerCoupon = (payload: {
+  id: string;
+  couponId: string;
+}) => ({
+  type: actionTypes.DELETE_CUSTOMER_COUPON_REQUESTED,
+  payload,
+  meta: { pendingKey: `customerCoupon:${payload.couponId}` },
 });
 
 export const fetchCustomerCredit = (id: string) => ({

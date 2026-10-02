@@ -17,6 +17,7 @@ import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/form";
 import { AccessPanel } from "./AccessPanel";
 import { ActivityPanel } from "./ActivityPanel";
+import { CouponsPanel } from "./CouponsPanel";
 import { CreditPanel } from "./CreditPanel";
 import { DetailsForm } from "./DetailsForm";
 import { IdentitiesPanel } from "./IdentitiesPanel";
@@ -106,6 +107,8 @@ export function CustomerDetail() {
         <PolicyPanel customer={customer} />
 
         <CreditPanel customer={customer} />
+
+        <CouponsPanel customer={customer} />
 
         <SettingsSection
           description={t("customer.detail.limitsLead")}

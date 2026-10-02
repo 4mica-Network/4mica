@@ -13,6 +13,7 @@ const storeState = {
     detail: {
       credit: null as unknown,
       creditEntries: [] as unknown[],
+      coupons: [] as unknown[],
     },
   },
 };
@@ -31,6 +32,7 @@ const { IdentitiesPanel } = await import("./IdentitiesPanel");
 const { LimitsPanel } = await import("./LimitsPanel");
 const { PolicyPanel } = await import("./PolicyPanel");
 const { CreditPanel } = await import("./CreditPanel");
+const { CouponsPanel } = await import("./CouponsPanel");
 
 const CARD = /rounded-lg border border-overlay\/10/;
 
@@ -655,5 +657,142 @@ describe("CreditPanel", () => {
     renderPanel();
 
     expect(screen.queryByTestId("customer-credit-ledger")).toBeNull();
+  });
+});
+
+describe("CouponsPanel", () => {
+  const coupon = (over: Record<string, unknown> = {}) => ({
+    id: "coupon_1",
+    code: "WELCOME10",
+    kind: "PERCENT",
+    value: "10",
+    expiresAt: null,
+    usageLimit: null,
+    timesRedeemed: 0,
+    revokedAt: null,
+    unusableReason: null,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+    ...over,
+  });
+
+  beforeEach(() => {
+    dispatch.mockClear();
+    storeState.customer.detail.coupons = [];
+  });
+
+  const renderPanel = () => render(<CouponsPanel customer={customer()} />);
+  const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
+
+  it("says so when there are no coupons", () => {
+    renderPanel();
+
+    expect(screen.getByText("customer.coupon.empty")).toBeInTheDocument();
+  });
+
+  it("lists a coupon with its code and worth", () => {
+    storeState.customer.detail.coupons = [coupon()];
+    renderPanel();
+
+    const row = screen.getByTestId("customer-coupon-coupon_1");
+
+    expect(row.textContent).toContain("WELCOME10");
+    expect(row.textContent).toContain("customer.coupon.offPercent");
+    expect(row.textContent).toContain("customer.coupon.usable");
+  });
+
+  it("says why a coupon cannot be used", () => {
+    storeState.customer.detail.coupons = [
+      coupon({ unusableReason: "expired" }),
+    ];
+    renderPanel();
+
+    expect(screen.getByText("customer.coupon.expired")).toBeInTheDocument();
+  });
+
+  it("creates a coupon with an expiry and a limit", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-coupon-add"));
+
+    const set = (id: string, value: string) =>
+      fireEvent.change(document.getElementById(id) as HTMLInputElement, {
+        target: { value },
+      });
+
+    set("coupon-code", "welcome10");
+    set("coupon-value", "10");
+    set("coupon-expiry", "2026-12-31");
+    set("coupon-limit", "5");
+    fireEvent.click(screen.getByTestId("customer-coupon-save"));
+
+    expect(lastAction()?.payload.data).toEqual({
+      kind: "PERCENT",
+      code: "WELCOME10",
+      value: "10",
+      expiresAt: "2026-12-31T23:59:59.000Z",
+      usageLimit: 5,
+    });
+  });
+
+  it("sends nulls for a coupon with no expiry or limit", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-coupon-add"));
+
+    fireEvent.change(
+      document.getElementById("coupon-code") as HTMLInputElement,
+      {
+        target: { value: "FOREVER" },
+      },
+    );
+    fireEvent.change(
+      document.getElementById("coupon-value") as HTMLInputElement,
+      { target: { value: "5" } },
+    );
+    fireEvent.click(screen.getByTestId("customer-coupon-save"));
+
+    expect(lastAction()?.payload.data).toMatchObject({
+      expiresAt: null,
+      usageLimit: null,
+    });
+  });
+
+  it("will not submit without a code and a value", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-coupon-add"));
+
+    expect(screen.getByTestId("customer-coupon-save")).toBeDisabled();
+  });
+
+  it("revokes and restores a coupon", () => {
+    storeState.customer.detail.coupons = [coupon()];
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("customer-coupon-revoke-coupon_1"));
+    expect(lastAction()?.payload.data).toEqual({ revoked: true });
+
+    storeState.customer.detail.coupons = [
+      coupon({
+        revokedAt: "2026-10-02T00:00:00.000Z",
+        unusableReason: "revoked",
+      }),
+    ];
+    renderPanel();
+
+    fireEvent.click(
+      screen.getAllByTestId("customer-coupon-revoke-coupon_1")[1],
+    );
+    expect(lastAction()?.payload.data).toEqual({ revoked: false });
+  });
+
+  it("removes a coupon", () => {
+    storeState.customer.detail.coupons = [coupon()];
+    renderPanel();
+
+    fireEvent.click(screen.getByTestId("customer-coupon-remove-coupon_1"));
+
+    expect(lastAction()?.payload).toEqual({
+      id: "customer_1",
+      couponId: "coupon_1",
+    });
   });
 });
