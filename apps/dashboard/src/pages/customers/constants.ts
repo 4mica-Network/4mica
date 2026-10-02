@@ -1,4 +1,5 @@
 import type {
+  CustomerCreditKind,
   CustomerIdentitySource,
   CustomerIdentityType,
   CustomerSort,
@@ -62,6 +63,16 @@ export const QUOTA_PERIOD_OPTIONS = [
   { value: "MONTH", titleKey: "customer.policy.periodMonth" },
   { value: "TOTAL", titleKey: "customer.policy.periodTotal" },
 ] as const;
+
+export const CREDIT_KIND_LABEL_KEYS = {
+  PROMOTIONAL: "customer.credit.promotional",
+  PREPAID: "customer.credit.prepaid",
+  ADJUSTMENT: "customer.credit.adjustment",
+} as const satisfies Record<CustomerCreditKind, string>;
+
+export const CREDIT_KIND_OPTIONS = (
+  ["PROMOTIONAL", "PREPAID", "ADJUSTMENT"] as const
+).map((value) => ({ value, titleKey: CREDIT_KIND_LABEL_KEYS[value] }));
 
 export const SORT_OPTIONS = [
   { value: "-totalSpend", titleKey: "customer.sort.spendHigh" },

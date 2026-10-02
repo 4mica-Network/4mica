@@ -202,6 +202,30 @@ export const SetCustomerPolicySchema = v.pipe(
   ),
 );
 
+export const CustomerCreditKindSchema = v.picklist([
+  "PROMOTIONAL",
+  "PREPAID",
+  "ADJUSTMENT",
+]);
+
+/**
+ * A movement, not a balance: the amount is signed so a correction is the same
+ * shape as a grant, and zero is refused because it would change nothing.
+ */
+export const GrantCustomerCreditSchema = v.object({
+  kind: CustomerCreditKindSchema,
+  amount: v.pipe(
+    v.string(),
+    v.trim(),
+    v.regex(
+      /^-?(?!0\d)\d{1,20}(\.\d{1,18})?$/,
+      "must be a decimal amount, as a string",
+    ),
+    v.check((value) => Number(value) !== 0, "must not be zero"),
+  ),
+  reason: v.optional(v.nullable(statusReason)),
+});
+
 export const BatchDeleteCustomersSchema = batchDeleteSchema("a customer id");
 
 export const ListCustomersQuerySchema = v.object({
@@ -255,6 +279,9 @@ export type SetCustomerStatusInput = v.InferOutput<
 >;
 export type SetCustomerPolicyInput = v.InferOutput<
   typeof SetCustomerPolicySchema
+>;
+export type GrantCustomerCreditInput = v.InferOutput<
+  typeof GrantCustomerCreditSchema
 >;
 export type ListCustomersQuery = v.InferOutput<typeof ListCustomersQuerySchema>;
 export type CustomerActivityQuery = v.InferOutput<

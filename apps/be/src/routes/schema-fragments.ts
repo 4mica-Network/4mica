@@ -573,6 +573,45 @@ export const customerResponseSchema = {
   },
 } as const;
 
+const creditBalanceSchema = {
+  type: "object",
+  required: ["total", "promotional", "prepaid"],
+  properties: { total: str, promotional: str, prepaid: str },
+} as const;
+
+const creditEntrySchema = {
+  type: "object",
+  required: ["id", "kind", "amount"],
+  properties: {
+    id: str,
+    kind: {
+      type: "string",
+      enum: ["PROMOTIONAL", "PREPAID", "ADJUSTMENT"],
+    },
+    amount: str,
+    reason: nullStr,
+    createdAt: date,
+  },
+} as const;
+
+export const customerCreditResponseSchema = {
+  type: "object",
+  required: ["balance", "items"],
+  properties: {
+    balance: creditBalanceSchema,
+    items: { type: "array", items: creditEntrySchema },
+  },
+} as const;
+
+export const customerCreditGrantedResponseSchema = {
+  type: "object",
+  required: ["balance", "entry"],
+  properties: {
+    balance: creditBalanceSchema,
+    entry: creditEntrySchema,
+  },
+} as const;
+
 export const customerListResponseSchema = {
   type: "object",
   required: ["items", "total", "page", "limit"],

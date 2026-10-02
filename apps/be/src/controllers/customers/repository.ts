@@ -4,6 +4,7 @@ import type {
   CreateCustomerInput,
   CustomerActivityQuery,
   CustomerIdentityInput,
+  GrantCustomerCreditInput,
   ListCustomersQuery,
   SetCustomerPolicyInput,
   SetCustomerStatusInput,
@@ -712,6 +713,137 @@ export const resetCustomerUsage = async (
   });
 
   return count > 0 ? getCustomer(ownerId, id) : null;
+};
+
+export interface CreditBalance {
+  total: string;
+  promotional: string;
+  prepaid: string;
+}
+
+export interface CustomerCreditRow {
+  id: string;
+  kind: string;
+  amount: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+const ZERO = "0";
+
+/**
+ * The balance is the sum of the ledger, so a grant is never overwritten. The
+ * per-kind figures let the dashboard say what came from a promotion and what
+ * the customer actually paid in; ADJUSTMENT rows move the total only.
+ */
+export const creditBalance = async (
+  ownerId: string,
+  customerId: string,
+): Promise<CreditBalance> => {
+  const rows = await prisma.customerCreditEntry.groupBy({
+    by: ["kind"],
+    where: { ownerId, customerId },
+    _sum: { amount: true },
+  });
+
+  const byKind = new Map(
+    rows.map((row) => [row.kind, row._sum?.amount ?? new Prisma.Decimal(0)]),
+  );
+
+  const total = rows.reduce(
+    (sum, row) => sum.plus(row._sum?.amount ?? 0),
+    new Prisma.Decimal(0),
+  );
+
+  return {
+    total: total.toString(),
+    promotional: (byKind.get("PROMOTIONAL") ?? ZERO).toString(),
+    prepaid: (byKind.get("PREPAID") ?? ZERO).toString(),
+  };
+};
+
+export const listCreditEntries = async (
+  ownerId: string,
+  customerId: string,
+  limit = 50,
+): Promise<CustomerCreditRow[]> => {
+  const rows = await prisma.customerCreditEntry.findMany({
+    where: { ownerId, customerId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit,
+    select: {
+      id: true,
+      kind: true,
+      amount: true,
+      reason: true,
+      createdAt: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    amount: row.amount.toString(),
+    reason: row.reason,
+    createdAt: row.createdAt.toISOString(),
+  }));
+};
+
+export const grantCredit = async (
+  ownerId: string,
+  customerId: string,
+  input: GrantCustomerCreditInput,
+): Promise<CustomerCreditRow> => {
+  const row = await prisma.customerCreditEntry.create({
+    data: {
+      ownerId,
+      customerId,
+      kind: input.kind,
+      amount: input.amount,
+      reason: input.reason ?? null,
+    },
+    select: {
+      id: true,
+      kind: true,
+      amount: true,
+      reason: true,
+      createdAt: true,
+    },
+  });
+
+  return {
+    id: row.id,
+    kind: row.kind,
+    amount: row.amount.toString(),
+    reason: row.reason,
+    createdAt: row.createdAt.toISOString(),
+  };
+};
+
+/**
+ * Zeroing writes the offsetting movement rather than deleting rows, so the
+ * history of what was granted survives the reset.
+ */
+export const zeroCredit = async (
+  ownerId: string,
+  customerId: string,
+  reason: string | null,
+): Promise<CreditBalance> => {
+  const balance = await creditBalance(ownerId, customerId);
+
+  if (Number(balance.total) !== 0) {
+    await prisma.customerCreditEntry.create({
+      data: {
+        ownerId,
+        customerId,
+        kind: "ADJUSTMENT",
+        amount: new Prisma.Decimal(balance.total).negated(),
+        reason,
+      },
+    });
+  }
+
+  return creditBalance(ownerId, customerId);
 };
 
 export const updateIdentity = async (

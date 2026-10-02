@@ -1,5 +1,6 @@
 import { HttpError } from "@4mica/http";
 import type {
+  CustomerCreditInput,
   CustomerIdentityInput,
   CustomerIdentityPatch,
   CustomerInput,
@@ -25,6 +26,8 @@ import {
   deleteCustomerSucceeded,
   fetchCustomerActivity as fetchCustomerActivityAction,
   fetchCustomerActivitySucceeded,
+  fetchCustomerCredit as fetchCustomerCreditAction,
+  fetchCustomerCreditSucceeded,
   fetchCustomerDetailFailed,
   fetchCustomerDetailPending,
   fetchCustomerDetailSucceeded,
@@ -132,6 +135,7 @@ export function* fetchCustomerDetail(action: {
 
     yield put(fetchCustomerDetailSucceeded({ customer, overview }));
     yield put(fetchCustomerActivityAction(id));
+    yield put(fetchCustomerCreditAction(id));
   } catch (error) {
     yield put(
       fetchCustomerDetailFailed(
@@ -203,6 +207,67 @@ export function* updateCustomer(action: {
     });
   } catch (error) {
     yield* fail(error, "Couldn't update that customer.", action.meta);
+  }
+}
+
+export function* fetchCustomerCredit(action: {
+  type: string;
+  payload: { id: string };
+}): Generator {
+  try {
+    const result = (yield call(() =>
+      api.getCustomerCredit(action.payload.id),
+    )) as Awaited<ReturnType<typeof api.getCustomerCredit>>;
+
+    yield put(fetchCustomerCreditSucceeded(result));
+  } catch {}
+}
+
+export function* grantCustomerCredit(action: {
+  type: string;
+  payload: { id: string; data: CustomerCreditInput };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    yield call(() =>
+      api.grantCustomerCredit(action.payload.id, action.payload.data),
+    );
+
+    yield put(fetchCustomerCreditAction(action.payload.id));
+
+    notifySuccess({
+      title: t("store.customer.creditGranted", "Credit updated"),
+      content: t(
+        "store.customer.creditGrantedBody",
+        "Their balance now carries it.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't change that credit.", action.meta);
+  }
+}
+
+export function* zeroCustomerCredit(action: {
+  type: string;
+  payload: { id: string };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    const result = (yield call(() =>
+      api.zeroCustomerCredit(action.payload.id),
+    )) as Awaited<ReturnType<typeof api.zeroCustomerCredit>>;
+
+    yield put(fetchCustomerCreditSucceeded(result));
+
+    notifySuccess({
+      title: t("store.customer.creditZeroed", "Credit cleared"),
+      content: t(
+        "store.customer.creditZeroedBody",
+        "The balance is back to zero and every earlier grant is still on the record.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't clear that credit.", action.meta);
   }
 }
 
@@ -433,6 +498,9 @@ export default [
   takeLatest(actionTypes.SET_CUSTOMER_ACTIVITY_PAGE, refetchActivity),
   takeEvery(actionTypes.CREATE_CUSTOMER_REQUESTED, createCustomer),
   takeEvery(actionTypes.UPDATE_CUSTOMER_REQUESTED, updateCustomer),
+  takeLatest(actionTypes.FETCH_CUSTOMER_CREDIT_REQUESTED, fetchCustomerCredit),
+  takeEvery(actionTypes.GRANT_CUSTOMER_CREDIT_REQUESTED, grantCustomerCredit),
+  takeEvery(actionTypes.ZERO_CUSTOMER_CREDIT_REQUESTED, zeroCustomerCredit),
   takeEvery(actionTypes.SET_CUSTOMER_POLICY_REQUESTED, setCustomerPolicy),
   takeEvery(actionTypes.RESET_CUSTOMER_USAGE_REQUESTED, resetCustomerUsage),
   takeEvery(actionTypes.SET_CUSTOMER_STATUS_REQUESTED, setCustomerStatus),

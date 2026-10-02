@@ -7,6 +7,8 @@ import {
   customerOverviewHandler,
   deleteCustomerHandler,
   getCustomerHandler,
+  grantCustomerCreditHandler,
+  listCustomerCreditHandler,
   listCustomersHandler,
   removeCustomerIdentityHandler,
   resetCustomerUsageHandler,
@@ -14,6 +16,7 @@ import {
   setCustomerStatusHandler,
   updateCustomerHandler,
   updateCustomerIdentityHandler,
+  zeroCustomerCreditHandler,
 } from "@controllers/customers/index";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
@@ -21,6 +24,8 @@ import { guards } from "./guards";
 import {
   batchDeleteResponseSchema,
   customerBreakdownResponseSchema,
+  customerCreditGrantedResponseSchema,
+  customerCreditResponseSchema,
   customerListResponseSchema,
   customerOverviewResponseSchema,
   customerResponseSchema,
@@ -362,6 +367,71 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     removeCustomerIdentityHandler,
+  );
+
+  app.get(
+    "/me/customers/:id/credit",
+    {
+      ...base,
+      schema: {
+        tags: ["customers"],
+        summary: "This customer's credit balance and its movements",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerCreditResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    listCustomerCreditHandler,
+  );
+
+  app.post(
+    "/me/customers/:id/credit",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Grant or take back credit",
+        description:
+          "The amount is signed, so a correction is the same shape as a grant. The balance is the sum of these movements and nothing is ever overwritten.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          201: customerCreditGrantedResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    grantCustomerCreditHandler,
+  );
+
+  app.delete(
+    "/me/customers/:id/credit",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Take the balance back to zero",
+        description:
+          "Writes the offsetting movement rather than deleting rows, so what was granted stays on the record.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerCreditResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    zeroCustomerCreditHandler,
   );
 
   app.get(

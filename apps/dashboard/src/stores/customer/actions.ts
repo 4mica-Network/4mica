@@ -1,4 +1,5 @@
 import type {
+  CustomerCreditInput,
   CustomerIdentityInput,
   CustomerIdentityPatch,
   CustomerInput,
@@ -8,6 +9,8 @@ import type {
 import actionTypes from "./actionTypes";
 import type {
   Customer,
+  CustomerCreditBalance,
+  CustomerCreditEntry,
   CustomerFilters,
   CustomerOverview,
   Payment,
@@ -76,6 +79,34 @@ export const updateCustomerSucceeded = (
   type: actionTypes.UPDATE_CUSTOMER_SUCCEEDED,
   payload: customer,
   meta,
+});
+
+export const fetchCustomerCredit = (id: string) => ({
+  type: actionTypes.FETCH_CUSTOMER_CREDIT_REQUESTED,
+  payload: { id },
+});
+
+export const fetchCustomerCreditSucceeded = (payload: {
+  balance: CustomerCreditBalance;
+  items: CustomerCreditEntry[];
+}) => ({
+  type: actionTypes.FETCH_CUSTOMER_CREDIT_SUCCEEDED,
+  payload,
+});
+
+export const grantCustomerCredit = (payload: {
+  id: string;
+  data: CustomerCreditInput;
+}) => ({
+  type: actionTypes.GRANT_CUSTOMER_CREDIT_REQUESTED,
+  payload,
+  meta: { pendingKey: "customerCredit" },
+});
+
+export const zeroCustomerCredit = (payload: { id: string }) => ({
+  type: actionTypes.ZERO_CUSTOMER_CREDIT_REQUESTED,
+  payload,
+  meta: { pendingKey: "customerCreditZero" },
 });
 
 export const setCustomerPolicy = (payload: {

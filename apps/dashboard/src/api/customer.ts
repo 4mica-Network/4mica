@@ -3,6 +3,9 @@ import type {
   BatchDeleteResult,
   Customer,
   CustomerActivityResponse,
+  CustomerCreditBalance,
+  CustomerCreditEntry,
+  CustomerCreditKind,
   CustomerIdentitySource,
   CustomerIdentityType,
   CustomerListResponse,
@@ -127,6 +130,40 @@ export const resetCustomerUsage = (id: string) =>
   httpClient.request<Customer>({
     url: `/me/customers/${encodeURIComponent(id)}/reset-usage`,
     method: HttpMethod.POST,
+  });
+
+export interface CustomerCreditInput {
+  kind: CustomerCreditKind;
+  amount: string;
+  reason?: string | null;
+}
+
+export const getCustomerCredit = (id: string) =>
+  httpClient.request<{
+    balance: CustomerCreditBalance;
+    items: CustomerCreditEntry[];
+  }>({
+    url: `/me/customers/${encodeURIComponent(id)}/credit`,
+    method: HttpMethod.GET,
+  });
+
+export const grantCustomerCredit = (id: string, data: CustomerCreditInput) =>
+  httpClient.request<
+    { balance: CustomerCreditBalance; entry: CustomerCreditEntry },
+    typeof data
+  >({
+    url: `/me/customers/${encodeURIComponent(id)}/credit`,
+    method: HttpMethod.POST,
+    data,
+  });
+
+export const zeroCustomerCredit = (id: string) =>
+  httpClient.request<{
+    balance: CustomerCreditBalance;
+    items: CustomerCreditEntry[];
+  }>({
+    url: `/me/customers/${encodeURIComponent(id)}/credit`,
+    method: HttpMethod.DELETE,
   });
 
 export const deleteCustomer = (id: string) =>

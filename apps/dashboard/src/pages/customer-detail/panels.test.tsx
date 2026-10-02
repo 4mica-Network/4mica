@@ -5,12 +5,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 
+const storeState = {
+  customer: {
+    pending: {} as Record<string, boolean>,
+    validationIssues: {} as Record<string, string>,
+    error: null as string | null,
+    detail: {
+      credit: null as unknown,
+      creditEntries: [] as unknown[],
+    },
+  },
+};
+
 vi.mock("@stores/hooks", () => ({
   useAppDispatch: () => dispatch,
-  useAppSelector: (selector: (s: unknown) => unknown) =>
-    selector({
-      customer: { pending: {}, validationIssues: {}, error: null },
-    }),
+  useAppSelector: (selector: (s: unknown) => unknown) => selector(storeState),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -21,6 +30,7 @@ const { AccessPanel } = await import("./AccessPanel");
 const { IdentitiesPanel } = await import("./IdentitiesPanel");
 const { LimitsPanel } = await import("./LimitsPanel");
 const { PolicyPanel } = await import("./PolicyPanel");
+const { CreditPanel } = await import("./CreditPanel");
 
 const CARD = /rounded-lg border border-overlay\/10/;
 
@@ -511,5 +521,139 @@ describe("PolicyPanel", () => {
     fireEvent.click(screen.getByTestId("customer-reset-usage"));
 
     expect(lastAction()?.payload).toEqual({ id: "customer_1" });
+  });
+});
+
+describe("CreditPanel", () => {
+  beforeEach(() => {
+    dispatch.mockClear();
+    storeState.customer.detail.credit = null;
+    storeState.customer.detail.creditEntries = [];
+  });
+
+  const renderPanel = () => render(<CreditPanel customer={customer()} />);
+  const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
+
+  it("shows a zero balance when nothing was ever granted", () => {
+    renderPanel();
+
+    const card = screen.getByTestId("customer-credit-balance");
+
+    expect(card.textContent).toContain("0 USD");
+  });
+
+  it("splits the balance into promotional and prepaid", () => {
+    storeState.customer.detail.credit = {
+      total: "25.5",
+      promotional: "5",
+      prepaid: "20.5",
+    };
+
+    renderPanel();
+
+    const card = screen.getByTestId("customer-credit-balance");
+
+    expect(card.textContent).toContain("25.5 USD");
+    expect(card.textContent).toContain("customer.credit.split");
+  });
+
+  it("offers to clear only once there is a balance", () => {
+    renderPanel();
+    expect(screen.queryByTestId("customer-credit-zero")).toBeNull();
+
+    storeState.customer.detail.credit = {
+      total: "5",
+      promotional: "5",
+      prepaid: "0",
+    };
+    renderPanel();
+    expect(
+      screen.getAllByTestId("customer-credit-zero").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("grants credit with the kind, amount and reason given", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-credit-add"));
+
+    fireEvent.change(
+      document.getElementById("credit-amount") as HTMLInputElement,
+      {
+        target: { value: "5.00" },
+      },
+    );
+    fireEvent.change(
+      document.getElementById("credit-reason") as HTMLInputElement,
+      {
+        target: { value: "launch offer" },
+      },
+    );
+    fireEvent.click(screen.getByTestId("customer-credit-save"));
+
+    expect(lastAction()?.payload.data).toEqual({
+      kind: "PROMOTIONAL",
+      amount: "5.00",
+      reason: "launch offer",
+    });
+  });
+
+  it("sends a null reason rather than an empty string", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-credit-add"));
+
+    fireEvent.change(
+      document.getElementById("credit-amount") as HTMLInputElement,
+      {
+        target: { value: "5" },
+      },
+    );
+    fireEvent.click(screen.getByTestId("customer-credit-save"));
+
+    expect(lastAction()?.payload.data.reason).toBeNull();
+  });
+
+  it("will not submit an empty amount", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-credit-add"));
+
+    expect(screen.getByTestId("customer-credit-save")).toBeDisabled();
+  });
+
+  it("lists the ledger with signed amounts", () => {
+    storeState.customer.detail.credit = {
+      total: "3",
+      promotional: "3",
+      prepaid: "0",
+    };
+    storeState.customer.detail.creditEntries = [
+      {
+        id: "e1",
+        kind: "ADJUSTMENT",
+        amount: "-2",
+        reason: "clawback",
+        createdAt: "2026-10-02T00:00:00.000Z",
+      },
+      {
+        id: "e2",
+        kind: "PROMOTIONAL",
+        amount: "5",
+        reason: "launch offer",
+        createdAt: "2026-10-01T00:00:00.000Z",
+      },
+    ];
+
+    renderPanel();
+
+    const ledger = screen.getByTestId("customer-credit-ledger");
+
+    expect(ledger.textContent).toContain("-2");
+    expect(ledger.textContent).toContain("+5");
+    expect(ledger.textContent).toContain("clawback");
+  });
+
+  it("hides the ledger when nothing has moved", () => {
+    renderPanel();
+
+    expect(screen.queryByTestId("customer-credit-ledger")).toBeNull();
   });
 });

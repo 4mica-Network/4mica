@@ -125,6 +125,29 @@ export interface CustomerListResponse {
   limit: number;
 }
 
+export const CUSTOMER_CREDIT_KIND = {
+  PROMOTIONAL: "PROMOTIONAL",
+  PREPAID: "PREPAID",
+  ADJUSTMENT: "ADJUSTMENT",
+} as const;
+
+export type CustomerCreditKind =
+  (typeof CUSTOMER_CREDIT_KIND)[keyof typeof CUSTOMER_CREDIT_KIND];
+
+export interface CustomerCreditBalance {
+  total: string;
+  promotional: string;
+  prepaid: string;
+}
+
+export interface CustomerCreditEntry {
+  id: string;
+  kind: CustomerCreditKind;
+  amount: string;
+  reason: string | null;
+  createdAt: string;
+}
+
 export interface CustomerOverview {
   totalSpend: SpendBucket[];
   recentSpend: SpendBucket[];
@@ -167,6 +190,8 @@ export interface CustomerFilters {
 export interface CustomerDetail {
   customer: Customer | null;
   overview: CustomerOverview | null;
+  credit: CustomerCreditBalance | null;
+  creditEntries: CustomerCreditEntry[];
   activity: {
     items: Payment[];
     total: number;

@@ -9,6 +9,7 @@ const {
   findUnique,
   upsert,
   customer,
+  customerCreditEntry,
   customerPaymentIdentity,
   wallet,
   queryRaw,
@@ -25,6 +26,11 @@ const {
     update: vi.fn(),
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
+  },
+  customerCreditEntry: {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    groupBy: vi.fn(),
   },
   customerPaymentIdentity: {
     create: vi.fn(),
@@ -45,6 +51,14 @@ const {
     minus(other: unknown) {
       const Self = this.constructor as new (v: unknown) => never;
       return new Self(Number(this.raw) - Number(String(other)));
+    }
+    plus(other: unknown) {
+      const Self = this.constructor as new (v: unknown) => never;
+      return new Self(Number(this.raw) + Number(String(other)));
+    }
+    negated() {
+      const Self = this.constructor as new (v: unknown) => never;
+      return new Self(-Number(this.raw));
     }
     isNegative() {
       return Number(this.raw) < 0;
@@ -75,6 +89,7 @@ vi.mock("@4mica/db", () => ({
   },
   prisma: {
     customer,
+    customerCreditEntry,
     customerPaymentIdentity,
     wallet,
     agent: { count: vi.fn() },
@@ -96,6 +111,7 @@ vi.mock("@4mica/db", () => ({
 const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const CUSTOMER_ID = "019fce62-5555-7000-8000-000000000000";
 const IDENTITY_ID = "019fce62-6666-7000-8000-000000000000";
+const CREDIT_ID = "019fce62-aaaa-7000-8000-000000000000";
 const PAYER = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 
 const AUTH_USER = {
@@ -250,7 +266,12 @@ describe("customer routes", () => {
     for (const mock of [authenticateRequest, getUser, findUnique, upsert]) {
       mock.mockReset();
     }
-    for (const group of [customer, customerPaymentIdentity, wallet]) {
+    for (const group of [
+      customer,
+      customerCreditEntry,
+      customerPaymentIdentity,
+      wallet,
+    ]) {
       for (const fn of Object.values(group)) {
         fn.mockReset();
       }
@@ -271,6 +292,15 @@ describe("customer routes", () => {
     customerPaymentIdentity.create.mockResolvedValue(storedIdentity());
     customerPaymentIdentity.updateMany.mockResolvedValue({ count: 1 });
     customerPaymentIdentity.deleteMany.mockResolvedValue({ count: 1 });
+    customerCreditEntry.groupBy.mockResolvedValue([]);
+    customerCreditEntry.findMany.mockResolvedValue([]);
+    customerCreditEntry.create.mockResolvedValue({
+      id: CREDIT_ID,
+      kind: "PROMOTIONAL",
+      amount: decimal("5"),
+      reason: "launch offer",
+      createdAt: new Date("2026-10-01T00:00:00.000Z"),
+    });
     respondToRawQueries();
   });
 
@@ -286,6 +316,9 @@ describe("customer routes", () => {
       ["PATCH", `/me/customers/${CUSTOMER_ID}/status`],
       ["PATCH", `/me/customers/${CUSTOMER_ID}/policy`],
       ["POST", `/me/customers/${CUSTOMER_ID}/reset-usage`],
+      ["GET", `/me/customers/${CUSTOMER_ID}/credit`],
+      ["POST", `/me/customers/${CUSTOMER_ID}/credit`],
+      ["DELETE", `/me/customers/${CUSTOMER_ID}/credit`],
       ["DELETE", `/me/customers/${CUSTOMER_ID}`],
       ["POST", "/me/customers/batch-delete"],
       ["POST", `/me/customers/${CUSTOMER_ID}/identities`],
@@ -1203,6 +1236,204 @@ describe("customer routes", () => {
         minPaymentAmount: "0.01",
         approvalThreshold: "100",
       });
+
+      await instance.close();
+    });
+  });
+
+  describe("credit", () => {
+    const grant = (payload: Record<string, unknown>) => ({
+      method: "POST" as const,
+      url: `/me/customers/${CUSTOMER_ID}/credit`,
+      headers: AUTH,
+      payload,
+    });
+
+    it("sums the ledger into a balance per kind", async () => {
+      customerCreditEntry.groupBy.mockResolvedValue([
+        { kind: "PROMOTIONAL", _sum: { amount: decimal("5") } },
+        { kind: "PREPAID", _sum: { amount: decimal("20.50") } },
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/credit`,
+        headers: AUTH,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().balance).toEqual({
+        total: "25.5",
+        promotional: "5",
+        prepaid: "20.50",
+      });
+
+      await instance.close();
+    });
+
+    it("reports a zero balance on an empty ledger", async () => {
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/credit`,
+        headers: AUTH,
+      });
+
+      expect(response.json().balance).toEqual({
+        total: "0",
+        promotional: "0",
+        prepaid: "0",
+      });
+
+      await instance.close();
+    });
+
+    it("grants credit as a signed movement", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PROMOTIONAL", amount: "5", reason: "launch offer" }),
+      );
+
+      expect(response.statusCode).toBe(201);
+      expect(customerCreditEntry.create.mock.calls[0][0].data).toMatchObject({
+        ownerId: USER_ID,
+        customerId: CUSTOMER_ID,
+        kind: "PROMOTIONAL",
+        amount: "5",
+        reason: "launch offer",
+      });
+
+      await instance.close();
+    });
+
+    it("accepts a negative movement so credit can be taken back", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "ADJUSTMENT", amount: "-2" }),
+      );
+
+      expect(response.statusCode).toBe(201);
+      expect(customerCreditEntry.create.mock.calls[0][0].data.amount).toBe(
+        "-2",
+      );
+
+      await instance.close();
+    });
+
+    it("refuses a movement of zero", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PROMOTIONAL", amount: "0" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses a kind it does not define", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "GIFT", amount: "5" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses an amount that is not a decimal string", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PREPAID", amount: "1,000" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("serialises a granted amount as a string", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PROMOTIONAL", amount: "5" }),
+      );
+
+      expect(response.json().entry.amount).toBe("5");
+
+      await instance.close();
+    });
+
+    it("zeroes the balance by writing the offsetting movement", async () => {
+      customerCreditEntry.groupBy.mockResolvedValue([
+        { kind: "PROMOTIONAL", _sum: { amount: decimal("23.5") } },
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/credit`,
+        headers: AUTH,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(customerCreditEntry.create.mock.calls[0][0].data).toMatchObject({
+        kind: "ADJUSTMENT",
+        reason: "reset",
+      });
+      expect(
+        customerCreditEntry.create.mock.calls[0][0].data.amount.toString(),
+      ).toBe("-23.5");
+
+      await instance.close();
+    });
+
+    it("writes nothing when zeroing an already-zero balance", async () => {
+      const instance = await app();
+      const response = await instance.inject({
+        method: "DELETE",
+        url: `/me/customers/${CUSTOMER_ID}/credit`,
+        headers: AUTH,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("scopes the ledger to the owner", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}/credit`,
+        headers: AUTH,
+      });
+
+      expect(customerCreditEntry.groupBy.mock.calls[0][0].where).toEqual({
+        ownerId: USER_ID,
+        customerId: CUSTOMER_ID,
+      });
+
+      await instance.close();
+    });
+
+    it("404s credit for a customer that is not the caller's", async () => {
+      customer.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+
+      for (const method of ["GET", "POST", "DELETE"] as const) {
+        const response = await instance.inject({
+          method,
+          url: `/me/customers/${CUSTOMER_ID}/credit`,
+          headers: AUTH,
+          payload: { kind: "PROMOTIONAL", amount: "5" },
+        });
+        expect(response.statusCode, method).toBe(404);
+      }
 
       await instance.close();
     });

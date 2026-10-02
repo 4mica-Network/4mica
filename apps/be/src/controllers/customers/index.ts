@@ -15,10 +15,13 @@ import {
   addIdentity,
   batchSoftDeleteCustomers,
   createCustomer,
+  creditBalance,
   customerActivity,
   customerBreakdown,
   customerOverview,
   getCustomer,
+  grantCredit,
+  listCreditEntries,
   listCustomers,
   ownsCustomer,
   removeIdentity,
@@ -28,12 +31,14 @@ import {
   softDeleteCustomer,
   updateCustomer,
   updateIdentity,
+  zeroCredit,
 } from "./repository";
 import {
   BatchDeleteCustomersSchema,
   CreateCustomerSchema,
   CustomerActivityQuerySchema,
   CustomerIdentitySchema,
+  GrantCustomerCreditSchema,
   ListCustomersQuerySchema,
   SetCustomerPolicySchema,
   SetCustomerStatusSchema,
@@ -340,6 +345,82 @@ export const removeCustomerIdentityHandler: RouteHandler = async (
   }
 
   return notFound(reply, "identity");
+};
+
+export const listCustomerCreditHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  if (!(await ownsCustomer(userId, id))) {
+    return notFound(reply, "customer");
+  }
+
+  const [balance, entries] = await Promise.all([
+    creditBalance(userId, id),
+    listCreditEntries(userId, id),
+  ]);
+
+  return reply.send({ balance, items: entries });
+};
+
+export const grantCustomerCreditHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const parsed = parseBody(GrantCustomerCreditSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id } = request.params as { id: string };
+  if (!(await ownsCustomer(userId, id))) {
+    return notFound(reply, "customer");
+  }
+
+  const entry = await grantCredit(userId, id, parsed.data);
+  const balance = await creditBalance(userId, id);
+
+  appLogger.info("Customer credit granted", {
+    userId,
+    customerId: id,
+    kind: entry.kind,
+    amount: entry.amount,
+  });
+
+  return reply.code(201).send({ balance, entry });
+};
+
+export const zeroCustomerCreditHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  if (!(await ownsCustomer(userId, id))) {
+    return notFound(reply, "customer");
+  }
+
+  const balance = await zeroCredit(userId, id, "reset");
+  const entries = await listCreditEntries(userId, id);
+
+  appLogger.info("Customer credit zeroed", { userId, customerId: id });
+
+  return reply.send({ balance, items: entries });
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {
