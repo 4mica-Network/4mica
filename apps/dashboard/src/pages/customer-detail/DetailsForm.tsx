@@ -1,4 +1,3 @@
-import { Button, Spinner } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { updateCustomer } from "@stores/customer/actions";
 import {
@@ -7,10 +6,11 @@ import {
 } from "@stores/customer/selector";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { z } from "zod";
+import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { STATUS_OPTIONS, TYPE_OPTIONS } from "../customers/constants";
 import {
@@ -32,14 +32,17 @@ export function DetailsForm({ customer }: { customer: Customer }) {
   );
   const issues = useAppSelector(selectCustomerIssues);
 
-  const defaults: DetailsValues = {
-    name: customer.name,
-    email: customer.email ?? "",
-    type: customer.type,
-    status: customer.status,
-    description: customer.description ?? "",
-    notes: customer.notes ?? "",
-  };
+  const defaults = useMemo<DetailsValues>(
+    () => ({
+      name: customer.name,
+      email: customer.email ?? "",
+      type: customer.type,
+      status: customer.status,
+      description: customer.description ?? "",
+      notes: customer.notes ?? "",
+    }),
+    [customer],
+  );
 
   const {
     handleSubmit,
@@ -57,7 +60,7 @@ export function DetailsForm({ customer }: { customer: Customer }) {
 
   useEffect(() => {
     reset(defaults);
-  }, [customer.id, customer.updatedAt]);
+  }, [defaults, reset]);
 
   const fieldError = (field: keyof DetailsValues) => {
     if (issues[field]) {
@@ -90,8 +93,13 @@ export function DetailsForm({ customer }: { customer: Customer }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col divide-y divide-overlay/10">
+    <EditableCard
+      isDirty={isDirty}
+      isSaving={isSaving}
+      onSave={handleSubmit(onValid)}
+      onReset={() => reset(defaults)}
+    >
+      <div className="flex flex-col gap-4">
         <FieldRow title={t("customer.fields.name.label")} htmlFor="detail-name">
           <TextInput
             id="detail-name"
@@ -129,7 +137,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
 
         <FieldRow
           title={t("customer.fields.status.label")}
-          description={t("customer.fields.status.description")}
           htmlFor="detail-status"
         >
           <Select
@@ -158,7 +165,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
 
         <FieldRow
           title={t("customer.fields.notes.label")}
-          description={t("customer.fields.notes.description")}
           htmlFor="detail-notes"
         >
           <TextArea
@@ -171,22 +177,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
           />
         </FieldRow>
       </div>
-
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift min-w-28"
-          disabled={isSaving || !isDirty}
-          onClick={handleSubmit(onValid)}
-          data-testid="customer-details-save"
-        >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : t("customer.detail.save")}
-          </span>
-        </Button>
-      </div>
-    </div>
+    </EditableCard>
   );
 }

@@ -103,15 +103,6 @@ export interface CustomerOverview {
   firstSeenAt: string | null;
 }
 
-export interface CustomerBreakdownEntry {
-  kind: "listing" | "agent" | "unattributed";
-  id: string | null;
-  slug: string | null;
-  name: string | null;
-  txnCount: number;
-  volume: SpendBucket[];
-}
-
 export interface CustomerActivityResponse {
   items: Payment[];
   total: number;
@@ -144,7 +135,6 @@ export interface CustomerFilters {
 export interface CustomerDetail {
   customer: Customer | null;
   overview: CustomerOverview | null;
-  breakdown: CustomerBreakdownEntry[];
   activity: {
     items: Payment[];
     total: number;

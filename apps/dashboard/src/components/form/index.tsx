@@ -37,9 +37,11 @@ export const blankToNull = (
 export function Card({
   className,
   children,
+  "data-testid": testId,
 }: {
   className?: string;
   children: ReactNode;
+  "data-testid"?: string;
 }) {
   return (
     <div
@@ -47,6 +49,7 @@ export function Card({
         "rounded-lg border border-overlay/10 bg-surface px-6 py-5",
         className,
       )}
+      data-testid={testId}
     >
       {children}
     </div>
@@ -57,18 +60,26 @@ export function Card({
 export function SettingsSection({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  /** Sits opposite the heading, for a section-level control like "Add". */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col">
-      <h3 className="font-semibold text-base text-ink-strong">{title}</h3>
-      {description && (
-        <p className="mt-1 text-ink-muted text-sm">{description}</p>
-      )}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-base text-ink-strong">{title}</h3>
+          {description && (
+            <p className="mt-1 text-ink-muted text-sm">{description}</p>
+          )}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </section>
   );

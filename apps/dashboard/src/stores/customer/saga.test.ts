@@ -6,7 +6,6 @@ const {
   getCustomers,
   getCustomer,
   getCustomerOverview,
-  getCustomerBreakdown,
   getCustomerActivity,
   createCustomerRequest,
   updateCustomerRequest,
@@ -17,7 +16,6 @@ const {
   getCustomers: vi.fn(),
   getCustomer: vi.fn(),
   getCustomerOverview: vi.fn(),
-  getCustomerBreakdown: vi.fn(),
   getCustomerActivity: vi.fn(),
   createCustomerRequest: vi.fn(),
   updateCustomerRequest: vi.fn(),
@@ -30,7 +28,6 @@ vi.mock("@api/customer", () => ({
   getCustomers,
   getCustomer,
   getCustomerOverview,
-  getCustomerBreakdown,
   getCustomerActivity,
   createCustomer: createCustomerRequest,
   updateCustomer: updateCustomerRequest,
@@ -177,18 +174,16 @@ describe("customer detail saga", () => {
     for (const mock of [
       getCustomer,
       getCustomerOverview,
-      getCustomerBreakdown,
       getCustomerActivity,
     ]) {
       mock.mockReset();
     }
     getCustomer.mockResolvedValue(customer);
     getCustomerOverview.mockResolvedValue({ txnCount: 0 });
-    getCustomerBreakdown.mockResolvedValue({ items: [] });
     getCustomerActivity.mockResolvedValue(activityPage);
   });
 
-  it("loads the record, its totals and its breakdown together", async () => {
+  it("loads the record and its totals together", async () => {
     const dispatched = await record(fetchCustomerDetail, customerState(), {
       type: "",
       payload: { id: "customer_1" },
@@ -196,7 +191,6 @@ describe("customer detail saga", () => {
 
     expect(getCustomer).toHaveBeenCalledWith("customer_1");
     expect(getCustomerOverview).toHaveBeenCalledWith("customer_1");
-    expect(getCustomerBreakdown).toHaveBeenCalledWith("customer_1");
     expect(types(dispatched)).toContain(
       actionTypes.FETCH_CUSTOMER_DETAIL_SUCCEEDED,
     );

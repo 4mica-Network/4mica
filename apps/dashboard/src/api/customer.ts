@@ -3,7 +3,6 @@ import type {
   BatchDeleteResult,
   Customer,
   CustomerActivityResponse,
-  CustomerBreakdownEntry,
   CustomerIdentitySource,
   CustomerIdentityType,
   CustomerListResponse,
@@ -144,10 +143,4 @@ export const getCustomerActivity = (
     url: `/me/customers/${encodeURIComponent(id)}/activity`,
     method: HttpMethod.GET,
     params,
-  });
-
-export const getCustomerBreakdown = (id: string) =>
-  httpClient.request<{ items: CustomerBreakdownEntry[] }>({
-    url: `/me/customers/${encodeURIComponent(id)}/breakdown`,
-    method: HttpMethod.GET,
   });

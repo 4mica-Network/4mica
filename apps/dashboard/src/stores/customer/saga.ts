@@ -118,23 +118,15 @@ export function* fetchCustomerDetail(action: {
   try {
     yield put(fetchCustomerDetailPending());
 
-    const [customer, overview, breakdown] = (yield all([
+    const [customer, overview] = (yield all([
       call(() => api.getCustomer(id)),
       call(() => api.getCustomerOverview(id)),
-      call(() => api.getCustomerBreakdown(id)),
     ])) as [
       Awaited<ReturnType<typeof api.getCustomer>>,
       Awaited<ReturnType<typeof api.getCustomerOverview>>,
-      Awaited<ReturnType<typeof api.getCustomerBreakdown>>,
     ];
 
-    yield put(
-      fetchCustomerDetailSucceeded({
-        customer,
-        overview,
-        breakdown: breakdown.items,
-      }),
-    );
+    yield put(fetchCustomerDetailSucceeded({ customer, overview }));
     yield put(fetchCustomerActivityAction(id));
   } catch (error) {
     yield put(

@@ -1,7 +1,6 @@
 import actionTypes from "./actionTypes";
 import type {
   Customer,
-  CustomerBreakdownEntry,
   CustomerDetail,
   CustomerFilters,
   CustomerOverview,
@@ -15,7 +14,6 @@ export const ACTIVITY_PAGE_SIZE = 10;
 const EMPTY_DETAIL: CustomerDetail = {
   customer: null,
   overview: null,
-  breakdown: [],
   activity: { items: [], total: 0, page: 1, limit: ACTIVITY_PAGE_SIZE },
   isLoading: false,
   hasLoaded: false,
@@ -152,7 +150,6 @@ export default function customerReducer(
       const payload = action.payload as {
         customer: Customer;
         overview: CustomerOverview;
-        breakdown: CustomerBreakdownEntry[];
       };
       return {
         ...state,
@@ -160,7 +157,6 @@ export default function customerReducer(
           ...state.detail,
           customer: payload.customer,
           overview: payload.overview,
-          breakdown: payload.breakdown,
           isLoading: false,
           hasLoaded: true,
         },

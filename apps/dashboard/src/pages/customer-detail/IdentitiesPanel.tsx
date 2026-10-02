@@ -1,4 +1,4 @@
-import { Button, cn, Spinner, Tag } from "@4mica/ui";
+import { Button, Spinner, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   addCustomerIdentity,
@@ -14,7 +14,13 @@ import { ArrowUpRight, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { FieldRow, Select, TextInput } from "@/components/form";
+import {
+  Card,
+  FieldRow,
+  Select,
+  SettingsSection,
+  TextInput,
+} from "@/components/form";
 import {
   explorerAddressUrl,
   NETWORK_OPTIONS,
@@ -46,10 +52,26 @@ function IdentityRow({
 
   return (
     <div
-      className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+      className="flex items-start justify-between gap-4"
       data-testid={`customer-identity-${identity.id}`}
     >
-      <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {identity.address && identity.network ? (
+          <a
+            href={explorerAddressUrl(identity.network, identity.address)}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex min-w-0 items-center gap-1 font-medium text-ink-strong text-sm transition-colors hover:text-brand"
+          >
+            {shortenAddress(identity.address)}
+            <ArrowUpRight className="h-4 w-4 shrink-0" />
+          </a>
+        ) : (
+          <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
+            {identity.value}
+          </span>
+        )}
+
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Tag size="sm" variant="neutral">
             {t(IDENTITY_TYPE_LABEL_KEYS[identity.type])}
@@ -66,24 +88,8 @@ function IdentityRow({
           </Tag>
         </div>
 
-        {identity.address && identity.network ? (
-          <a
-            href={explorerAddressUrl(identity.network, identity.address)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="flex min-w-0 items-center gap-1 font-mono text-ink-body text-sm transition-colors hover:text-ink-strong"
-          >
-            {shortenAddress(identity.address)}
-            <ArrowUpRight className="h-3 w-3 shrink-0" />
-          </a>
-        ) : (
-          <span className="min-w-0 truncate text-ink-body text-sm">
-            {identity.value}
-          </span>
-        )}
-
         {(identity.validFrom || identity.validUntil) && (
-          <span className="text-ink-subtle text-xs">
+          <span className="text-ink-muted text-sm">
             {t("customer.identity.window", {
               from: identity.validFrom
                 ? new Date(identity.validFrom).toLocaleDateString()
@@ -119,20 +125,23 @@ function IdentityRow({
   );
 }
 
-export function IdentitiesPanel({ customer }: { customer: Customer }) {
+function AddIdentityCard({
+  customerId,
+  onDone,
+}: {
+  customerId: string;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const isSaving = useAppSelector(selectIsCustomerPending(PENDING_KEY));
   const issues = useAppSelector(selectCustomerIssues);
 
-  const [isAdding, setIsAdding] = useState(false);
-
   const {
     handleSubmit,
     setValue,
     watch,
-    reset,
     formState: { errors },
   } = useForm<IdentityValues>({
     resolver: zodResolver(identitySchema),
@@ -153,10 +162,9 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
     }
     sawSaving.current = false;
     if (Object.keys(issues).length === 0) {
-      setIsAdding(false);
-      reset();
+      onDone();
     }
-  }, [isSaving, issues, reset]);
+  }, [isSaving, issues, onDone]);
 
   const fieldError = (field: keyof IdentityValues) => {
     if (issues[field]) {
@@ -169,7 +177,7 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
   const onValid = (data: IdentityValues) => {
     dispatch(
       addCustomerIdentity({
-        id: customer.id,
+        id: customerId,
         data:
           data.type === "WALLET"
             ? {
@@ -188,143 +196,161 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {customer.identities.length > 0 ? (
-        <div className="flex flex-col divide-y divide-overlay/10">
-          {customer.identities.map((identity) => (
-            <IdentityRow
-              key={identity.id}
-              customerId={customer.id}
-              identity={identity}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-ink-muted text-sm">{t("customer.identity.empty")}</p>
-      )}
+    <Card data-testid="customer-identity-form">
+      <div className="flex flex-col gap-4">
+        <FieldRow
+          title={t("customer.identity.typeLabel")}
+          htmlFor="identity-type"
+        >
+          <Select
+            id="identity-type"
+            value={values.type}
+            onChange={(value) =>
+              setValue("type", value as never, { shouldValidate: true })
+            }
+            options={IDENTITY_TYPE_OPTIONS.map((option) => ({
+              value: option.value,
+              title: t(option.titleKey),
+            }))}
+          />
+        </FieldRow>
 
-      {isAdding ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-overlay/10 bg-overlay/5 px-4 py-3">
-          <div className="flex flex-col divide-y divide-overlay/10">
+        {values.type === "WALLET" ? (
+          <>
             <FieldRow
-              title={t("customer.identity.typeLabel")}
-              htmlFor="identity-type"
+              title={t("customer.identity.networkLabel")}
+              htmlFor="identity-network"
             >
               <Select
-                id="identity-type"
-                value={values.type}
+                id="identity-network"
+                value={values.network ?? ""}
                 onChange={(value) =>
-                  setValue("type", value as never, { shouldValidate: true })
+                  setValue("network", value as never, {
+                    shouldValidate: true,
+                  })
                 }
-                options={IDENTITY_TYPE_OPTIONS.map((option) => ({
-                  value: option.value,
-                  title: t(option.titleKey),
-                }))}
+                options={[
+                  { value: "", title: t("customer.identity.pickNetwork") },
+                  ...NETWORK_OPTIONS,
+                ]}
+                error={fieldError("network")}
               />
             </FieldRow>
 
-            {values.type === "WALLET" ? (
-              <>
-                <FieldRow
-                  title={t("customer.identity.networkLabel")}
-                  htmlFor="identity-network"
-                >
-                  <Select
-                    id="identity-network"
-                    value={values.network ?? ""}
-                    onChange={(value) =>
-                      setValue("network", value as never, {
-                        shouldValidate: true,
-                      })
-                    }
-                    options={[
-                      { value: "", title: t("customer.identity.pickNetwork") },
-                      ...NETWORK_OPTIONS,
-                    ]}
-                    error={fieldError("network")}
-                  />
-                </FieldRow>
-
-                <FieldRow
-                  title={t("customer.identity.addressLabel")}
-                  description={t("customer.identity.addressDescription")}
-                  htmlFor="identity-address"
-                >
-                  <TextInput
-                    id="identity-address"
-                    value={values.address ?? ""}
-                    onChange={(value) =>
-                      setValue("address", value, { shouldValidate: true })
-                    }
-                    placeholder="0x…"
-                    maxLength={42}
-                    error={fieldError("address")}
-                  />
-                </FieldRow>
-              </>
-            ) : (
-              <FieldRow
-                title={t("customer.identity.valueLabel")}
-                description={t("customer.identity.valueDescription")}
-                htmlFor="identity-value"
-              >
-                <TextInput
-                  id="identity-value"
-                  value={values.value ?? ""}
-                  onChange={(value) =>
-                    setValue("value", value, { shouldValidate: true })
-                  }
-                  maxLength={320}
-                  error={fieldError("value")}
-                />
-              </FieldRow>
-            )}
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              intent="ghost"
-              size="sm"
-              className="btn-no-lift"
-              disabled={isSaving}
-              onClick={() => {
-                setIsAdding(false);
-                reset();
-              }}
+            <FieldRow
+              title={t("customer.identity.addressLabel")}
+              htmlFor="identity-address"
             >
-              {t("customer.identity.cancel")}
-            </Button>
-            <Button
-              type="button"
-              intent="invert"
-              size="sm"
-              className={cn("btn-no-lift min-w-28")}
-              disabled={isSaving}
-              onClick={handleSubmit(onValid)}
-              data-testid="customer-identity-save"
-            >
-              <span className="flex w-full items-center justify-center text-sm">
-                {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
-              </span>
-            </Button>
-          </div>
-        </div>
-      ) : (
+              <TextInput
+                id="identity-address"
+                value={values.address ?? ""}
+                onChange={(value) =>
+                  setValue("address", value, { shouldValidate: true })
+                }
+                placeholder="0x…"
+                maxLength={42}
+                error={fieldError("address")}
+              />
+            </FieldRow>
+          </>
+        ) : (
+          <FieldRow
+            title={t("customer.identity.valueLabel")}
+            htmlFor="identity-value"
+          >
+            <TextInput
+              id="identity-value"
+              value={values.value ?? ""}
+              onChange={(value) =>
+                setValue("value", value, { shouldValidate: true })
+              }
+              maxLength={320}
+              error={fieldError("value")}
+            />
+          </FieldRow>
+        )}
+      </div>
+
+      {/* -mx-6 cancels the card padding so the rule spans the full width. */}
+      <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
         <Button
           type="button"
-          intent="outline"
+          intent="ghost"
           size="sm"
-          className="btn-no-lift self-start"
-          onClick={() => setIsAdding(true)}
-          data-testid="customer-identity-add"
+          disabled={isSaving}
+          onClick={onDone}
         >
-          <span className="flex items-center gap-1.5 text-sm">
-            <Plus className="h-4 w-4" />
-            {t("customer.identity.add")}
+          {t("customer.identity.cancel")}
+        </Button>
+        <Button
+          type="button"
+          intent="invert"
+          size="sm"
+          className="btn-no-lift w-24"
+          disabled={isSaving}
+          onClick={handleSubmit(onValid)}
+          data-testid="customer-identity-save"
+        >
+          <span className="flex w-full items-center justify-center text-sm">
+            {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
           </span>
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+export function IdentitiesPanel({ customer }: { customer: Customer }) {
+  const { t } = useTranslation();
+
+  const [isAdding, setIsAdding] = useState(false);
+
+  return (
+    <SettingsSection
+      title={t("customer.detail.identitiesTitle")}
+      description={t("customer.detail.identitiesLead")}
+      action={
+        !isAdding && (
+          <Button
+            type="button"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift"
+            onClick={() => setIsAdding(true)}
+            data-testid="customer-identity-add"
+          >
+            <span className="flex items-center gap-1.5 text-sm">
+              <Plus className="h-4 w-4" />
+              {t("customer.identity.add")}
+            </span>
+          </Button>
+        )
+      }
+    >
+      <Card>
+        {customer.identities.length === 0 ? (
+          <p className="text-ink-muted text-sm">
+            {t("customer.identity.empty")}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {customer.identities.map((identity) => (
+              <IdentityRow
+                key={identity.id}
+                customerId={customer.id}
+                identity={identity}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {isAdding && (
+        <AddIdentityCard
+          customerId={customer.id}
+          onDone={() => setIsAdding(false)}
+        />
       )}
-    </div>
+    </SettingsSection>
   );
 }

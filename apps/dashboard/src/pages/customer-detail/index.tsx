@@ -4,7 +4,6 @@ import {
   resetCustomerDetail,
 } from "@stores/customer/actions";
 import {
-  selectCustomerBreakdown,
   selectCustomerOverview,
   selectDetailCustomer,
   selectHasLoadedCustomerDetail,
@@ -17,7 +16,6 @@ import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/form";
 import { ActivityPanel } from "./ActivityPanel";
-import { BreakdownPanel } from "./BreakdownPanel";
 import { DetailsForm } from "./DetailsForm";
 import { IdentitiesPanel } from "./IdentitiesPanel";
 import { LimitsPanel } from "./LimitsPanel";
@@ -30,7 +28,6 @@ export function CustomerDetail() {
 
   const customer = useAppSelector(selectDetailCustomer);
   const overview = useAppSelector(selectCustomerOverview);
-  const breakdown = useAppSelector(selectCustomerBreakdown);
   const hasLoaded = useAppSelector(selectHasLoadedCustomerDetail);
 
   useTitle(
@@ -99,12 +96,7 @@ export function CustomerDetail() {
           <DetailsForm customer={customer} />
         </SettingsSection>
 
-        <SettingsSection
-          description={t("customer.detail.identitiesLead")}
-          title={t("customer.detail.identitiesTitle")}
-        >
-          <IdentitiesPanel customer={customer} />
-        </SettingsSection>
+        <IdentitiesPanel customer={customer} />
 
         <SettingsSection
           description={t("customer.detail.limitsLead")}
@@ -118,13 +110,6 @@ export function CustomerDetail() {
           title={t("customer.detail.activityTitle")}
         >
           <ActivityPanel customerId={customer.id} />
-        </SettingsSection>
-
-        <SettingsSection
-          description={t("customer.detail.breakdownLead")}
-          title={t("customer.detail.breakdownTitle")}
-        >
-          <BreakdownPanel entries={breakdown} />
         </SettingsSection>
       </div>
     </div>

@@ -6,7 +6,6 @@ import type {
 import actionTypes from "./actionTypes";
 import type {
   Customer,
-  CustomerBreakdownEntry,
   CustomerFilters,
   CustomerOverview,
   Payment,
@@ -150,7 +149,6 @@ export const fetchCustomerDetailPending = () => ({
 export const fetchCustomerDetailSucceeded = (payload: {
   customer: Customer;
   overview: CustomerOverview;
-  breakdown: CustomerBreakdownEntry[];
 }) => ({
   type: actionTypes.FETCH_CUSTOMER_DETAIL_SUCCEEDED,
   payload,

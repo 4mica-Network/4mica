@@ -1,17 +1,15 @@
 import { Tooltip } from "@4mica/ui";
 import type { CustomerOverview, SpendBucket } from "@stores/customer/type";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Card } from "@/components/form";
 import { trimAmount } from "../payments/constants";
 
 function Amount({ buckets }: { buckets: SpendBucket[] }) {
   const { t } = useTranslation();
 
   if (buckets.length === 0) {
-    return (
-      <span className="font-semibold text-ink-strong text-xl tabular-nums">
-        —
-      </span>
-    );
+    return <span className="font-semibold text-ink-strong text-sm">—</span>;
   }
 
   return (
@@ -19,10 +17,10 @@ function Amount({ buckets }: { buckets: SpendBucket[] }) {
       {buckets.map((bucket) => (
         <span
           key={`${bucket.network}:${bucket.assetAddress ?? "native"}`}
-          className="font-mono font-semibold text-ink-strong text-lg tabular-nums"
+          className="font-semibold text-ink-strong text-sm"
         >
           {trimAmount(bucket.amount)}{" "}
-          <span className="font-normal text-ink-subtle text-xs">
+          <span className="font-normal text-ink-muted">
             {bucket.assetAddress
               ? t("payment.row.erc20")
               : t("payment.row.native")}
@@ -40,25 +38,20 @@ function Tile({
   testId,
 }: {
   title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
   testId: string;
 }) {
   return (
-    <div
-      className="flex flex-col gap-2 rounded-lg border border-overlay/10 bg-surface px-4 py-3.5"
-      data-testid={testId}
-    >
-      <span className="text-ink-subtle text-xs uppercase tracking-wide">
-        {title}
-      </span>
+    <Card className="flex flex-col gap-2 px-4 py-3.5" data-testid={testId}>
+      <span className="text-ink-muted text-sm">{title}</span>
       {children}
       {footer && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           {footer}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -119,7 +112,7 @@ export function OverviewTiles({
           </>
         }
       >
-        <span className="font-mono font-semibold text-ink-strong text-lg tabular-nums">
+        <span className="font-semibold text-ink-strong text-sm">
           {overview.txnCount.toLocaleString()}
         </span>
       </Tile>
@@ -127,17 +120,8 @@ export function OverviewTiles({
       <Tile
         title={t("customer.detail.lastActive")}
         testId="customer-tile-active"
-        footer={
-          overview.firstSeenAt ? (
-            <span className="text-ink-muted">
-              {t("customer.detail.firstSeen", {
-                when: absoluteWhen(overview.firstSeenAt),
-              })}
-            </span>
-          ) : undefined
-        }
       >
-        <span className="font-medium text-ink-strong text-sm">
+        <span className="font-semibold text-ink-strong text-sm">
           {absoluteWhen(overview.lastActiveAt)}
         </span>
       </Tile>

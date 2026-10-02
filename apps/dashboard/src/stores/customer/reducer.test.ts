@@ -139,7 +139,6 @@ describe("customer reducer", () => {
       actions.fetchCustomerDetailSucceeded({
         customer: customer(),
         overview: overview(),
-        breakdown: [],
       }),
     );
 
@@ -158,7 +157,6 @@ describe("customer reducer", () => {
       actions.fetchCustomerDetailSucceeded({
         customer: customer(),
         overview: overview(),
-        breakdown: [],
       }),
     );
     const withRow = reducer(
@@ -184,7 +182,6 @@ describe("customer reducer", () => {
       actions.fetchCustomerDetailSucceeded({
         customer: customer({ id: "customer_1" }),
         overview: overview(),
-        breakdown: [],
       }),
     );
 
