@@ -27,7 +27,6 @@ export const customerDetailsSchema = z.object({
     .optional()
     .or(z.literal("")),
   type: z.enum(["HUMAN", "ORGANIZATION", "AGENT", "WALLET"]),
-  status: z.enum(["ACTIVE", "BLOCKED"]),
   description: z
     .string()
     .trim()
@@ -83,7 +82,7 @@ export const createCustomerSchema = customerDetailsSchema.and(
 export type CustomerValues = z.infer<typeof createCustomerSchema>;
 
 export const CREATE_STEP_FIELDS = [
-  ["name", "email", "type", "status", "description"],
+  ["name", "email", "type", "description"],
   ["network", "address", "dailyLimit", "monthlyLimit", "limitCurrency"],
 ] as const satisfies readonly (readonly (keyof CustomerValues)[])[];
 

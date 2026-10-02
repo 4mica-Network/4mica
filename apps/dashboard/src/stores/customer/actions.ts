@@ -2,6 +2,8 @@ import type {
   CustomerIdentityInput,
   CustomerIdentityPatch,
   CustomerInput,
+  CustomerPolicyInput,
+  CustomerStatusInput,
 } from "@api/customer";
 import actionTypes from "./actionTypes";
 import type {
@@ -16,6 +18,9 @@ export interface PendingMeta {
 }
 
 const rowKey = (id: string) => `customer:${id}`;
+const statusKey = (id: string) => `customerStatus:${id}`;
+const policyKey = (id: string) => `customerPolicy:${id}`;
+const resetKey = (id: string) => `customerUsageReset:${id}`;
 
 export const fetchCustomers = () => ({
   type: actionTypes.FETCH_CUSTOMERS_REQUESTED,
@@ -69,6 +74,48 @@ export const updateCustomerSucceeded = (
   meta: PendingMeta,
 ) => ({
   type: actionTypes.UPDATE_CUSTOMER_SUCCEEDED,
+  payload: customer,
+  meta,
+});
+
+export const setCustomerPolicy = (payload: {
+  id: string;
+  data: CustomerPolicyInput;
+}) => ({
+  type: actionTypes.SET_CUSTOMER_POLICY_REQUESTED,
+  payload,
+  meta: { pendingKey: policyKey(payload.id) },
+});
+
+export const setCustomerPolicySucceeded = (
+  customer: Customer,
+  meta: PendingMeta,
+) => ({
+  type: actionTypes.SET_CUSTOMER_POLICY_SUCCEEDED,
+  payload: customer,
+  meta,
+});
+
+export const resetCustomerUsage = (payload: { id: string }) => ({
+  type: actionTypes.RESET_CUSTOMER_USAGE_REQUESTED,
+  payload,
+  meta: { pendingKey: resetKey(payload.id) },
+});
+
+export const setCustomerStatus = (payload: {
+  id: string;
+  data: CustomerStatusInput;
+}) => ({
+  type: actionTypes.SET_CUSTOMER_STATUS_REQUESTED,
+  payload,
+  meta: { pendingKey: statusKey(payload.id) },
+});
+
+export const setCustomerStatusSucceeded = (
+  customer: Customer,
+  meta: PendingMeta,
+) => ({
+  type: actionTypes.SET_CUSTOMER_STATUS_SUCCEEDED,
   payload: customer,
   meta,
 });

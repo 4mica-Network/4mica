@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { UseFormSetValue } from "react-hook-form";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { NETWORK_OPTIONS } from "@/lib/networks";
-import { STATUS_OPTIONS, TYPE_OPTIONS } from "./constants";
+import { TYPE_OPTIONS } from "./constants";
 import {
   type CustomerValues,
   DESCRIPTION_MAX_LENGTH,
@@ -75,23 +75,6 @@ export function CustomerFormFields({
               title: t(option.titleKey),
             }))}
             error={fieldError("type")}
-          />
-        </FieldRow>
-
-        <FieldRow
-          title={t("customer.fields.status.label")}
-          description={t("customer.fields.status.description")}
-          htmlFor={`${idPrefix}-status`}
-        >
-          <Select
-            id={`${idPrefix}-status`}
-            value={values.status ?? "ACTIVE"}
-            onChange={set("status")}
-            options={STATUS_OPTIONS.map((option) => ({
-              value: option.value,
-              title: t(option.titleKey),
-            }))}
-            error={fieldError("status")}
           />
         </FieldRow>
 

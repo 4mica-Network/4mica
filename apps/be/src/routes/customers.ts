@@ -9,6 +9,9 @@ import {
   getCustomerHandler,
   listCustomersHandler,
   removeCustomerIdentityHandler,
+  resetCustomerUsageHandler,
+  setCustomerPolicyHandler,
+  setCustomerStatusHandler,
   updateCustomerHandler,
   updateCustomerIdentityHandler,
 } from "@controllers/customers/index";
@@ -53,7 +56,7 @@ const listQuerySchema = {
       type: "string",
       enum: ["HUMAN", "ORGANIZATION", "AGENT", "WALLET"],
     },
-    status: { type: "string", enum: ["ACTIVE", "BLOCKED"] },
+    status: { type: "string", enum: ["ACTIVE", "BLOCKED", "SUSPENDED"] },
     network: networkEnum,
     source: {
       type: "string",
@@ -206,6 +209,74 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
     updateCustomerHandler,
   );
 
+  app.patch(
+    "/me/customers/:id/status",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Block, suspend or reactivate a customer",
+        description:
+          "A suspension needs an end date and lapses on its own once that passes. Reactivating clears both the end date and the reason.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    setCustomerStatusHandler,
+  );
+
+  app.patch(
+    "/me/customers/:id/policy",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Set what this customer is charged",
+        description:
+          "A free allowance is a unit, an amount and a period together, or nothing. Writing one starts its window now, so the allowance is never already spent by earlier payments.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    setCustomerPolicyHandler,
+  );
+
+  app.post(
+    "/me/customers/:id/reset-usage",
+    {
+      ...strict,
+      schema: {
+        tags: ["customers"],
+        summary: "Start the free allowance window again",
+        description:
+          "Moves the line usage is counted from to now, so the customer gets a full allowance without their payment history being touched.",
+        security: [{ bearerAuth: [] }],
+        params: idParamSchema,
+        response: {
+          ...limitedResponses,
+          200: customerResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    resetCustomerUsageHandler,
+  );
+
   app.delete(
     "/me/customers/:id",
     {
@@ -258,7 +329,7 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       ...strict,
       schema: {
         tags: ["customers"],
-        summary: "Change an identity's validity window or source",
+        summary: "Block an identity, or change its window or source",
         security: [{ bearerAuth: [] }],
         params: identityParamSchema,
         response: {

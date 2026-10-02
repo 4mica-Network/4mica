@@ -12,6 +12,7 @@ const {
   customerPaymentIdentity,
   wallet,
   queryRaw,
+  FakeDecimal,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -33,6 +34,25 @@ const {
   },
   wallet: { findMany: vi.fn() },
   queryRaw: vi.fn(),
+  // Enough of Prisma.Decimal for the quota arithmetic the repository does.
+  // The raw text is kept so a scale like "10.50" survives, as it does in the
+  // real column.
+  FakeDecimal: class {
+    private readonly raw: string;
+    constructor(value: unknown) {
+      this.raw = String(value);
+    }
+    minus(other: unknown) {
+      const Self = this.constructor as new (v: unknown) => never;
+      return new Self(Number(this.raw) - Number(String(other)));
+    }
+    isNegative() {
+      return Number(this.raw) < 0;
+    }
+    toString() {
+      return this.raw;
+    }
+  },
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -50,6 +70,8 @@ vi.mock("@4mica/db", () => ({
       values,
       separator,
     }),
+    empty: { strings: [], values: [] },
+    Decimal: FakeDecimal,
   },
   prisma: {
     customer,
@@ -108,8 +130,7 @@ const signedOut = () => ({
 
 const AUTH = { authorization: "Bearer good" };
 
-/** A stand-in for `Prisma.Decimal`: anything the mapper can `.toString()`. */
-const decimal = (value: string) => ({ toString: () => value });
+const decimal = (value: string) => new FakeDecimal(value);
 
 const storedIdentity = (over: Record<string, unknown> = {}) => ({
   id: IDENTITY_ID,
@@ -121,6 +142,7 @@ const storedIdentity = (over: Record<string, unknown> = {}) => ({
   verifiedAt: null,
   validFrom: null,
   validUntil: null,
+  blockedAt: null,
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
   updatedAt: new Date("2026-09-01T00:00:00.000Z"),
   ...over,
@@ -132,11 +154,21 @@ const storedCustomer = (over: Record<string, unknown> = {}) => ({
   email: "ops@acme.test",
   type: "ORGANIZATION",
   status: "ACTIVE",
+  statusReason: null,
+  suspendedUntil: null,
   description: null,
   notes: null,
   dailyLimit: null,
   monthlyLimit: decimal("5000"),
   limitCurrency: "USD",
+  freeQuotaUnit: null,
+  freeQuota: null,
+  freeQuotaPeriod: null,
+  quotaResetAt: null,
+  discountPercent: null,
+  discountFixed: null,
+  minPaymentAmount: null,
+  approvalThreshold: null,
   createdAt: new Date("2026-09-01T00:00:00.000Z"),
   updatedAt: new Date("2026-09-01T00:00:00.000Z"),
   identities: [storedIdentity()],
@@ -251,6 +283,9 @@ describe("customer routes", () => {
       ["GET", `/me/customers/${CUSTOMER_ID}`],
       ["POST", "/me/customers"],
       ["PATCH", `/me/customers/${CUSTOMER_ID}`],
+      ["PATCH", `/me/customers/${CUSTOMER_ID}/status`],
+      ["PATCH", `/me/customers/${CUSTOMER_ID}/policy`],
+      ["POST", `/me/customers/${CUSTOMER_ID}/reset-usage`],
       ["DELETE", `/me/customers/${CUSTOMER_ID}`],
       ["POST", "/me/customers/batch-delete"],
       ["POST", `/me/customers/${CUSTOMER_ID}/identities`],
@@ -753,6 +788,421 @@ describe("customer routes", () => {
       });
 
       expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+  });
+
+  describe("access control", () => {
+    const setStatus = (payload: Record<string, unknown>) => ({
+      method: "PATCH" as const,
+      url: `/me/customers/${CUSTOMER_ID}/status`,
+      headers: AUTH,
+      payload,
+    });
+
+    it("blocks a customer and keeps the reason", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setStatus({ status: "BLOCKED", reason: "chargeback fraud" }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toMatchObject({
+        status: "BLOCKED",
+        statusReason: "chargeback fraud",
+        suspendedUntil: null,
+      });
+
+      await instance.close();
+    });
+
+    it("clears the suspension window when reactivating", async () => {
+      const instance = await app();
+      await instance.inject(setStatus({ status: "ACTIVE" }));
+
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        status: "ACTIVE",
+        suspendedUntil: null,
+        statusReason: null,
+      });
+
+      await instance.close();
+    });
+
+    it("suspends until a date it was given", async () => {
+      const until = new Date(Date.now() + 86_400_000).toISOString();
+
+      const instance = await app();
+      const response = await instance.inject(
+        setStatus({ status: "SUSPENDED", suspendedUntil: until }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toMatchObject({
+        status: "SUSPENDED",
+        suspendedUntil: new Date(until),
+      });
+
+      await instance.close();
+    });
+
+    it("refuses a suspension with no end date", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setStatus({ status: "SUSPENDED" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses a suspension that ends in the past", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setStatus({
+          status: "SUSPENDED",
+          suspendedUntil: "2020-01-01T00:00:00.000Z",
+        }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("suspendedUntil");
+
+      await instance.close();
+    });
+
+    it("refuses a status it does not define", async () => {
+      const instance = await app();
+      const response = await instance.inject(setStatus({ status: "RETIRED" }));
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("will not let a plain update reach a status", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+        payload: { status: "BLOCKED", name: "Renamed" },
+      });
+
+      // ajv strips the unknown key and valibot never sees it, so the status
+      // can only move through the route that enforces its shape.
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        name: "Renamed",
+      });
+
+      await instance.close();
+    });
+
+    it("scopes a status change to the owner", async () => {
+      const instance = await app();
+      await instance.inject(setStatus({ status: "BLOCKED" }));
+
+      expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
+        id: CUSTOMER_ID,
+        ownerId: USER_ID,
+        deletedAt: null,
+      });
+
+      await instance.close();
+    });
+
+    it("404s a status change for a customer that is not the caller's", async () => {
+      customer.updateMany.mockResolvedValue({ count: 0 });
+
+      const instance = await app();
+      const response = await instance.inject(setStatus({ status: "BLOCKED" }));
+
+      expect(response.statusCode).toBe(404);
+
+      await instance.close();
+    });
+
+    it("blocks a single identity without touching the customer", async () => {
+      const instance = await app();
+      const response = await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        headers: AUTH,
+        payload: { blocked: true },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(
+        customerPaymentIdentity.updateMany.mock.calls[0][0].data.blockedAt,
+      ).toBeInstanceOf(Date);
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("unblocks an identity by clearing the timestamp", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/customers/${CUSTOMER_ID}/identities/${IDENTITY_ID}`,
+        headers: AUTH,
+        payload: { blocked: false },
+      });
+
+      expect(customerPaymentIdentity.updateMany.mock.calls[0][0].data).toEqual({
+        blockedAt: null,
+      });
+
+      await instance.close();
+    });
+
+    it("serialises the suspension window as a string", async () => {
+      customer.findFirst.mockResolvedValue(
+        storedCustomer({
+          status: "SUSPENDED",
+          suspendedUntil: new Date("2026-12-01T00:00:00.000Z"),
+          statusReason: "late payment",
+        }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(response.json()).toMatchObject({
+        status: "SUSPENDED",
+        suspendedUntil: "2026-12-01T00:00:00.000Z",
+        statusReason: "late payment",
+      });
+
+      await instance.close();
+    });
+  });
+
+  describe("billing policy", () => {
+    const setPolicy = (payload: Record<string, unknown>) => ({
+      method: "PATCH" as const,
+      url: `/me/customers/${CUSTOMER_ID}/policy`,
+      headers: AUTH,
+      payload,
+    });
+
+    it("stores a request allowance and starts its window", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({
+          freeQuotaUnit: "REQUESTS",
+          freeQuota: "500",
+          freeQuotaPeriod: "MONTH",
+        }),
+      );
+
+      expect(response.statusCode).toBe(200);
+
+      const data = customer.updateMany.mock.calls[0][0].data;
+      expect(data).toMatchObject({
+        freeQuotaUnit: "REQUESTS",
+        freeQuota: "500",
+        freeQuotaPeriod: "MONTH",
+      });
+      expect(data.quotaResetAt).toBeInstanceOf(Date);
+
+      await instance.close();
+    });
+
+    it("refuses an allowance with no period", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ freeQuotaUnit: "REQUESTS", freeQuota: "500" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("freeQuota");
+
+      await instance.close();
+    });
+
+    it("refuses a fractional request allowance", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({
+          freeQuotaUnit: "REQUESTS",
+          freeQuota: "10.5",
+          freeQuotaPeriod: "MONTH",
+        }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("accepts a fractional amount allowance", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({
+          freeQuotaUnit: "AMOUNT",
+          freeQuota: "10.5",
+          freeQuotaPeriod: "MONTH",
+        }),
+      );
+
+      expect(response.statusCode).toBe(200);
+
+      await instance.close();
+    });
+
+    it("clears the window when the allowance is removed", async () => {
+      const instance = await app();
+      await instance.inject(
+        setPolicy({
+          freeQuotaUnit: null,
+          freeQuota: null,
+          freeQuotaPeriod: null,
+        }),
+      );
+
+      expect(customer.updateMany.mock.calls[0][0].data).toMatchObject({
+        freeQuotaUnit: null,
+        quotaResetAt: null,
+      });
+
+      await instance.close();
+    });
+
+    it("leaves the window alone when only a discount changes", async () => {
+      const instance = await app();
+      await instance.inject(setPolicy({ discountPercent: "10" }));
+
+      expect("quotaResetAt" in customer.updateMany.mock.calls[0][0].data).toBe(
+        false,
+      );
+
+      await instance.close();
+    });
+
+    it("refuses a discount above 100 percent", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ discountPercent: "120" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("accepts a discount of exactly 100 percent", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ discountPercent: "100" }),
+      );
+
+      expect(response.statusCode).toBe(200);
+
+      await instance.close();
+    });
+
+    it("refuses a negative fixed discount", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ discountFixed: "-5" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("stores a minimum payment and an approval threshold", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ minPaymentAmount: "0.01", approvalThreshold: "100" }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toMatchObject({
+        minPaymentAmount: "0.01",
+        approvalThreshold: "100",
+      });
+
+      await instance.close();
+    });
+
+    it("scopes a policy change to the owner", async () => {
+      const instance = await app();
+      await instance.inject(setPolicy({ discountPercent: "10" }));
+
+      expect(customer.updateMany.mock.calls[0][0].where).toMatchObject({
+        id: CUSTOMER_ID,
+        ownerId: USER_ID,
+        deletedAt: null,
+      });
+
+      await instance.close();
+    });
+
+    it("404s a policy change for a customer that is not the caller's", async () => {
+      customer.updateMany.mockResolvedValue({ count: 0 });
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ discountPercent: "10" }),
+      );
+
+      expect(response.statusCode).toBe(404);
+
+      await instance.close();
+    });
+
+    it("resets usage by moving the window, not by touching payments", async () => {
+      const instance = await app();
+      const response = await instance.inject({
+        method: "POST",
+        url: `/me/customers/${CUSTOMER_ID}/reset-usage`,
+        headers: AUTH,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(Object.keys(customer.updateMany.mock.calls[0][0].data)).toEqual([
+        "quotaResetAt",
+      ]);
+
+      await instance.close();
+    });
+
+    it("serialises the policy amounts as strings", async () => {
+      customer.findFirst.mockResolvedValue(
+        storedCustomer({
+          freeQuotaUnit: "REQUESTS",
+          freeQuota: decimal("500"),
+          freeQuotaPeriod: "MONTH",
+          discountPercent: decimal("10.50"),
+          discountFixed: decimal("1.25"),
+          minPaymentAmount: decimal("0.01"),
+          approvalThreshold: decimal("100"),
+        }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(response.json()).toMatchObject({
+        freeQuota: "500",
+        discountPercent: "10.50",
+        discountFixed: "1.25",
+        minPaymentAmount: "0.01",
+        approvalThreshold: "100",
+      });
 
       await instance.close();
     });

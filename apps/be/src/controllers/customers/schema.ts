@@ -16,7 +16,11 @@ export const CustomerTypeSchema = v.picklist([
   "WALLET",
 ]);
 
-export const CustomerStatusSchema = v.picklist(["ACTIVE", "BLOCKED"]);
+export const CustomerStatusSchema = v.picklist([
+  "ACTIVE",
+  "BLOCKED",
+  "SUSPENDED",
+]);
 
 export const CustomerIdentitySourceSchema = v.picklist([
   "MANUAL",
@@ -45,6 +49,33 @@ const identityValue = v.pipe(
 );
 
 const timestamp = v.pipe(v.string(), v.isoTimestamp());
+
+const futureTimestamp = v.pipe(
+  v.string(),
+  v.isoTimestamp(),
+  v.check(
+    (value) => new Date(value).getTime() > Date.now(),
+    "must be in the future",
+  ),
+);
+
+const statusReason = v.pipe(v.string(), v.trim(), v.maxLength(280));
+
+export const CustomerQuotaUnitSchema = v.picklist(["REQUESTS", "AMOUNT"]);
+
+export const CustomerQuotaPeriodSchema = v.picklist([
+  "DAY",
+  "WEEK",
+  "MONTH",
+  "TOTAL",
+]);
+
+const percent = v.pipe(
+  v.string(),
+  v.trim(),
+  v.regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a percentage"),
+  v.check((value) => Number(value) <= 100, "must not be above 100"),
+);
 
 export const CustomerIdentitySchema = v.variant("type", [
   v.object({
@@ -76,14 +107,29 @@ export const UpdateCustomerIdentitySchema = v.partial(
     source: CustomerIdentitySourceSchema,
     validFrom: v.nullable(timestamp),
     validUntil: v.nullable(timestamp),
+    blocked: v.boolean(),
   }),
 );
+
+export const SetCustomerStatusSchema = v.variant("status", [
+  v.object({
+    status: v.literal("ACTIVE"),
+  }),
+  v.object({
+    status: v.literal("BLOCKED"),
+    reason: v.optional(v.nullable(statusReason)),
+  }),
+  v.object({
+    status: v.literal("SUSPENDED"),
+    suspendedUntil: futureTimestamp,
+    reason: v.optional(v.nullable(statusReason)),
+  }),
+]);
 
 export const CreateCustomerSchema = v.object({
   name,
   email: v.optional(v.nullable(email)),
   type: v.optional(CustomerTypeSchema, "ORGANIZATION"),
-  status: v.optional(CustomerStatusSchema, "ACTIVE"),
   description: v.optional(v.nullable(description)),
   notes: v.optional(v.nullable(notes)),
 
@@ -102,7 +148,6 @@ export const UpdateCustomerSchema = v.partial(
     name,
     email: v.nullable(email),
     type: CustomerTypeSchema,
-    status: CustomerStatusSchema,
     description: v.nullable(description),
     notes: v.nullable(notes),
 
@@ -110,6 +155,51 @@ export const UpdateCustomerSchema = v.partial(
     monthlyLimit: v.nullable(decimalAmount),
     limitCurrency,
   }),
+);
+
+/**
+ * A quota is the (unit, value, period) triple or nothing at all, and the unit
+ * decides whether the value may be fractional — the same rule the database
+ * CHECK enforces, stated once here so a caller gets a 400 rather than a 500.
+ */
+export const SetCustomerPolicySchema = v.pipe(
+  v.partial(
+    v.object({
+      freeQuotaUnit: v.nullable(CustomerQuotaUnitSchema),
+      freeQuota: v.nullable(decimalAmount),
+      freeQuotaPeriod: v.nullable(CustomerQuotaPeriodSchema),
+      discountPercent: v.nullable(percent),
+      discountFixed: v.nullable(decimalAmount),
+      minPaymentAmount: v.nullable(decimalAmount),
+      approvalThreshold: v.nullable(decimalAmount),
+    }),
+  ),
+  v.forward(
+    v.check((input) => {
+      const parts = [
+        input.freeQuotaUnit,
+        input.freeQuota,
+        input.freeQuotaPeriod,
+      ];
+      const touched = parts.filter((part) => part !== undefined);
+      if (touched.length === 0) {
+        return true;
+      }
+      const set = parts.filter((part) => part !== undefined && part !== null);
+      return set.length === 0 || set.length === 3;
+    }, "needs a unit, an amount and a period together"),
+    ["freeQuota"],
+  ),
+  v.forward(
+    v.check(
+      (input) =>
+        input.freeQuotaUnit !== "REQUESTS" ||
+        input.freeQuota == null ||
+        Number.isInteger(Number(input.freeQuota)),
+      "must be a whole number of requests",
+    ),
+    ["freeQuota"],
+  ),
 );
 
 export const BatchDeleteCustomersSchema = batchDeleteSchema("a customer id");
@@ -160,6 +250,12 @@ export type UpdateCustomerIdentityInput = v.InferOutput<
 >;
 export type CreateCustomerInput = v.InferOutput<typeof CreateCustomerSchema>;
 export type UpdateCustomerInput = v.InferOutput<typeof UpdateCustomerSchema>;
+export type SetCustomerStatusInput = v.InferOutput<
+  typeof SetCustomerStatusSchema
+>;
+export type SetCustomerPolicyInput = v.InferOutput<
+  typeof SetCustomerPolicySchema
+>;
 export type ListCustomersQuery = v.InferOutput<typeof ListCustomersQuerySchema>;
 export type CustomerActivityQuery = v.InferOutput<
   typeof CustomerActivityQuerySchema

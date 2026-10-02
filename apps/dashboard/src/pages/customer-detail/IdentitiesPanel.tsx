@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   addCustomerIdentity,
   removeCustomerIdentity,
+  updateCustomerIdentity,
 } from "@stores/customer/actions";
 import {
   selectCustomerIssues,
@@ -10,7 +11,7 @@ import {
 } from "@stores/customer/selector";
 import type { Customer, CustomerIdentity } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { ArrowUpRight, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -86,6 +87,12 @@ function IdentityRow({
           <Tag size="sm" variant={identity.verifiedAt ? "success" : "neutral"}>
             {t(IDENTITY_SOURCE_LABEL_KEYS[identity.source])}
           </Tag>
+
+          {identity.blockedAt && (
+            <Tag size="sm" variant="error">
+              {t("customer.identity.blocked")}
+            </Tag>
+          )}
         </div>
 
         {(identity.validFrom || identity.validUntil) && (
@@ -102,25 +109,58 @@ function IdentityRow({
         )}
       </div>
 
-      <Button
-        type="button"
-        intent="ghost"
-        size="sm"
-        className="btn-no-lift shrink-0 text-danger"
-        disabled={isPending}
-        aria-label={t("customer.identity.remove")}
-        onClick={() =>
-          dispatch(
-            removeCustomerIdentity({
-              id: customerId,
-              identityId: identity.id,
-            }),
-          )
-        }
-        data-testid={`customer-identity-remove-${identity.id}`}
-      >
-        {isPending ? <Spinner size="sm" /> : <Trash2 className="h-4 w-4" />}
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
+
+        <Button
+          type="button"
+          intent="ghost"
+          size="sm"
+          className="btn-no-lift"
+          disabled={isPending}
+          aria-label={
+            identity.blockedAt
+              ? t("customer.identity.unblock")
+              : t("customer.identity.block")
+          }
+          onClick={() =>
+            dispatch(
+              updateCustomerIdentity({
+                id: customerId,
+                identityId: identity.id,
+                data: { blocked: !identity.blockedAt },
+              }),
+            )
+          }
+          data-testid={`customer-identity-block-${identity.id}`}
+        >
+          {identity.blockedAt ? (
+            <ShieldCheck className="h-4 w-4" />
+          ) : (
+            <Ban className="h-4 w-4" />
+          )}
+        </Button>
+
+        <Button
+          type="button"
+          intent="ghost"
+          size="sm"
+          className="btn-no-lift text-danger"
+          disabled={isPending}
+          aria-label={t("customer.identity.remove")}
+          onClick={() =>
+            dispatch(
+              removeCustomerIdentity({
+                id: customerId,
+                identityId: identity.id,
+              }),
+            )
+          }
+          data-testid={`customer-identity-remove-${identity.id}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

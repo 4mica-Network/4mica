@@ -16,12 +16,14 @@ export const TYPE_LABEL_KEYS = {
 export const STATUS_LABEL_KEYS = {
   ACTIVE: "customer.status.active",
   BLOCKED: "customer.status.blocked",
+  SUSPENDED: "customer.status.suspended",
 } as const satisfies Record<CustomerStatus, string>;
 
 export const STATUS_TAG_VARIANT = {
   ACTIVE: "success",
   BLOCKED: "error",
-} as const satisfies Record<CustomerStatus, "success" | "error">;
+  SUSPENDED: "warning",
+} as const satisfies Record<CustomerStatus, "success" | "error" | "warning">;
 
 export const IDENTITY_TYPE_LABEL_KEYS = {
   WALLET: "customer.identity.wallet",
@@ -40,10 +42,26 @@ export const TYPE_OPTIONS = (
   ["HUMAN", "ORGANIZATION", "AGENT", "WALLET"] as const
 ).map((value) => ({ value, titleKey: TYPE_LABEL_KEYS[value] }));
 
-export const STATUS_OPTIONS = (["ACTIVE", "BLOCKED"] as const).map((value) => ({
-  value,
-  titleKey: STATUS_LABEL_KEYS[value],
-}));
+export const STATUS_OPTIONS = (["ACTIVE", "BLOCKED", "SUSPENDED"] as const).map(
+  (value) => ({ value, titleKey: STATUS_LABEL_KEYS[value] }),
+);
+
+export const QUOTA_UNIT_OPTIONS = (["REQUESTS", "AMOUNT"] as const).map(
+  (value) => ({
+    value,
+    titleKey:
+      value === "REQUESTS"
+        ? "customer.policy.unitRequests"
+        : "customer.policy.unitAmount",
+  }),
+);
+
+export const QUOTA_PERIOD_OPTIONS = [
+  { value: "DAY", titleKey: "customer.policy.periodDay" },
+  { value: "WEEK", titleKey: "customer.policy.periodWeek" },
+  { value: "MONTH", titleKey: "customer.policy.periodMonth" },
+  { value: "TOTAL", titleKey: "customer.policy.periodTotal" },
+] as const;
 
 export const SORT_OPTIONS = [
   { value: "-totalSpend", titleKey: "customer.sort.spendHigh" },

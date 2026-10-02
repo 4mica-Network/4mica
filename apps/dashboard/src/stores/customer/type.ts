@@ -16,10 +16,29 @@ export type CustomerType = (typeof CUSTOMER_TYPE)[keyof typeof CUSTOMER_TYPE];
 export const CUSTOMER_STATUS = {
   ACTIVE: "ACTIVE",
   BLOCKED: "BLOCKED",
+  SUSPENDED: "SUSPENDED",
 } as const;
 
 export type CustomerStatus =
   (typeof CUSTOMER_STATUS)[keyof typeof CUSTOMER_STATUS];
+
+export const CUSTOMER_QUOTA_UNIT = {
+  REQUESTS: "REQUESTS",
+  AMOUNT: "AMOUNT",
+} as const;
+
+export type CustomerQuotaUnit =
+  (typeof CUSTOMER_QUOTA_UNIT)[keyof typeof CUSTOMER_QUOTA_UNIT];
+
+export const CUSTOMER_QUOTA_PERIOD = {
+  DAY: "DAY",
+  WEEK: "WEEK",
+  MONTH: "MONTH",
+  TOTAL: "TOTAL",
+} as const;
+
+export type CustomerQuotaPeriod =
+  (typeof CUSTOMER_QUOTA_PERIOD)[keyof typeof CUSTOMER_QUOTA_PERIOD];
 
 export const CUSTOMER_IDENTITY_TYPE = {
   WALLET: "WALLET",
@@ -50,6 +69,7 @@ export interface CustomerIdentity {
   verifiedAt: string | null;
   validFrom: string | null;
   validUntil: string | null;
+  blockedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,11 +90,23 @@ export interface Customer {
   email: string | null;
   type: CustomerType;
   status: CustomerStatus;
+  statusReason: string | null;
+  suspendedUntil: string | null;
   description: string | null;
   notes: string | null;
   dailyLimit: string | null;
   monthlyLimit: string | null;
   limitCurrency: string;
+  freeQuotaUnit: CustomerQuotaUnit | null;
+  freeQuota: string | null;
+  freeQuotaPeriod: CustomerQuotaPeriod | null;
+  quotaResetAt: string | null;
+  quotaUsed: string | null;
+  quotaRemaining: string | null;
+  discountPercent: string | null;
+  discountFixed: string | null;
+  minPaymentAmount: string | null;
+  approvalThreshold: string | null;
   identities: CustomerIdentity[];
   totalSpend: SpendBucket[];
   recentSpend: SpendBucket[];

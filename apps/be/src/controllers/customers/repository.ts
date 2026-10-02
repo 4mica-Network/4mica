@@ -1,10 +1,12 @@
-import { Prisma, prisma } from "@4mica/db";
+import { type CustomerQuotaPeriod, Prisma, prisma } from "@4mica/db";
 import { walletAddressesFor } from "@controllers/payments/repository";
 import type {
   CreateCustomerInput,
   CustomerActivityQuery,
   CustomerIdentityInput,
   ListCustomersQuery,
+  SetCustomerPolicyInput,
+  SetCustomerStatusInput,
   UpdateCustomerIdentityInput,
 } from "./schema";
 
@@ -18,6 +20,7 @@ export const CUSTOMER_IDENTITY_SELECT = {
   verifiedAt: true,
   validFrom: true,
   validUntil: true,
+  blockedAt: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.CustomerPaymentIdentitySelect;
@@ -28,6 +31,16 @@ export const CUSTOMER_SELECT = {
   email: true,
   type: true,
   status: true,
+  statusReason: true,
+  suspendedUntil: true,
+  freeQuotaUnit: true,
+  freeQuota: true,
+  freeQuotaPeriod: true,
+  quotaResetAt: true,
+  discountPercent: true,
+  discountFixed: true,
+  minPaymentAmount: true,
+  approvalThreshold: true,
   description: true,
   notes: true,
   dailyLimit: true,
@@ -63,20 +76,34 @@ export interface CustomerSpend {
 
 export type CustomerIdentityRow = Omit<
   RawIdentity,
-  "verifiedAt" | "validFrom" | "validUntil"
+  "verifiedAt" | "validFrom" | "validUntil" | "blockedAt"
 > & {
   verifiedAt: string | null;
   validFrom: string | null;
   validUntil: string | null;
+  blockedAt: string | null;
 };
+
+type MoneyField =
+  | "dailyLimit"
+  | "monthlyLimit"
+  | "freeQuota"
+  | "discountPercent"
+  | "discountFixed"
+  | "minPaymentAmount"
+  | "approvalThreshold";
 
 export type CustomerRow = Omit<
   RawCustomer,
-  "dailyLimit" | "monthlyLimit" | "identities"
+  MoneyField | "identities" | "suspendedUntil" | "quotaResetAt"
 > & {
-  dailyLimit: string | null;
-  monthlyLimit: string | null;
+  [K in MoneyField]: string | null;
+} & {
+  suspendedUntil: string | null;
+  quotaResetAt: string | null;
   identities: CustomerIdentityRow[];
+  quotaUsed: string | null;
+  quotaRemaining: string | null;
 } & CustomerSpend;
 
 const emptySpend = (): CustomerSpend => ({
@@ -93,16 +120,42 @@ const toIdentityRow = (row: RawIdentity): CustomerIdentityRow => ({
   verifiedAt: row.verifiedAt?.toISOString() ?? null,
   validFrom: row.validFrom?.toISOString() ?? null,
   validUntil: row.validUntil?.toISOString() ?? null,
+  blockedAt: row.blockedAt?.toISOString() ?? null,
 });
 
-const toRow = (row: RawCustomer, spend: CustomerSpend): CustomerRow => {
-  const { dailyLimit, monthlyLimit, identities, ...rest } = row;
+const toRow = (
+  row: RawCustomer,
+  spend: CustomerSpend,
+  quota: QuotaUsage = { used: null, remaining: null },
+): CustomerRow => {
+  const {
+    dailyLimit,
+    monthlyLimit,
+    freeQuota,
+    discountPercent,
+    discountFixed,
+    minPaymentAmount,
+    approvalThreshold,
+    identities,
+    suspendedUntil,
+    quotaResetAt,
+    ...rest
+  } = row;
 
   return {
     ...rest,
     dailyLimit: dailyLimit?.toString() ?? null,
     monthlyLimit: monthlyLimit?.toString() ?? null,
+    freeQuota: freeQuota?.toString() ?? null,
+    discountPercent: discountPercent?.toString() ?? null,
+    discountFixed: discountFixed?.toString() ?? null,
+    minPaymentAmount: minPaymentAmount?.toString() ?? null,
+    approvalThreshold: approvalThreshold?.toString() ?? null,
+    suspendedUntil: suspendedUntil?.toISOString() ?? null,
+    quotaResetAt: quotaResetAt?.toISOString() ?? null,
     identities: identities.map(toIdentityRow),
+    quotaUsed: quota.used,
+    quotaRemaining: quota.remaining,
     ...spend,
   };
 };
@@ -316,6 +369,94 @@ const spendFor = async (
   return byCustomer;
 };
 
+export interface QuotaUsage {
+  used: string | null;
+  remaining: string | null;
+}
+
+/**
+ * Where the current allowance window starts. A TOTAL quota has no window, so
+ * it runs from the last reset (or from the beginning if never reset); the
+ * others start at the current day, week or month, unless a later reset moved
+ * the line forward.
+ */
+export const quotaWindowStart = (
+  period: CustomerQuotaPeriod,
+  resetAt: Date | null,
+  now = new Date(),
+): Date | null => {
+  if (period === "TOTAL") {
+    return resetAt;
+  }
+
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+
+  if (period === "WEEK") {
+    start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+  } else if (period === "MONTH") {
+    start.setUTCDate(1);
+  }
+
+  return resetAt && resetAt > start ? resetAt : start;
+};
+
+/**
+ * Usage is read off the payments the customer has already made, so it cannot
+ * drift from them. REQUESTS counts rows, AMOUNT sums what was settled.
+ */
+const quotaUsageFor = async (
+  ownerId: string,
+  customerId: string,
+  customer: Pick<
+    RawCustomer,
+    "freeQuotaUnit" | "freeQuota" | "freeQuotaPeriod" | "quotaResetAt"
+  >,
+  addresses: string[],
+): Promise<QuotaUsage> => {
+  if (
+    !customer.freeQuotaUnit ||
+    !customer.freeQuota ||
+    !customer.freeQuotaPeriod ||
+    addresses.length === 0
+  ) {
+    return { used: null, remaining: null };
+  }
+
+  const since = quotaWindowStart(
+    customer.freeQuotaPeriod,
+    customer.quotaResetAt,
+  );
+  const owned = Prisma.join(addresses);
+  const matched = matchedPayments(ownerId, owned, Prisma.join([customerId]));
+  const window = since
+    ? Prisma.sql`AND m.created_at >= ${since}`
+    : Prisma.empty;
+
+  const rows = await prisma.$queryRaw<{ used: Prisma.Decimal | null }[]>`
+    WITH matched AS (${matched})
+    SELECT ${
+      customer.freeQuotaUnit === "REQUESTS"
+        ? Prisma.sql`COUNT(*)::numeric`
+        : Prisma.sql`COALESCE(SUM(m.amount) FILTER (WHERE m.status = 'SETTLED'), 0)`
+    } AS used
+      FROM matched m
+     WHERE TRUE ${window}
+  `;
+
+  const used = rows[0]?.used ?? 0;
+  const remaining = customer.freeQuota.minus(used);
+
+  return {
+    used: used.toString(),
+    remaining: (remaining.isNegative()
+      ? new Prisma.Decimal(0)
+      : remaining
+    ).toString(),
+  };
+};
+
 export const listCustomers = async (
   ownerId: string,
   query: ListCustomersQuery,
@@ -408,9 +549,12 @@ export const getCustomer = async (
   }
 
   const addresses = await walletAddressesFor(ownerId);
-  const spend = await spendFor(ownerId, [row.id], addresses);
+  const [spend, quota] = await Promise.all([
+    spendFor(ownerId, [row.id], addresses),
+    quotaUsageFor(ownerId, row.id, row, addresses),
+  ]);
 
-  return toRow(row, spend.get(row.id) ?? emptySpend());
+  return toRow(row, spend.get(row.id) ?? emptySpend(), quota);
 };
 
 export const ownsCustomer = async (
@@ -456,7 +600,6 @@ export const createCustomer = async (
       name: data.name,
       email: data.email ?? null,
       type: data.type,
-      status: data.status,
       description: data.description ?? null,
       notes: data.notes ?? null,
       dailyLimit: data.dailyLimit ?? null,
@@ -503,6 +646,74 @@ export const addIdentity = async (
   return getCustomer(ownerId, customerId);
 };
 
+/**
+ * Moving to ACTIVE clears the suspension window and the reason together: the
+ * database refuses a `suspendedUntil` that outlives a SUSPENDED status, so
+ * leaving it behind would make the row unwritable.
+ */
+export const setCustomerStatus = async (
+  ownerId: string,
+  id: string,
+  input: SetCustomerStatusInput,
+): Promise<CustomerRow | null> => {
+  const data: Prisma.CustomerUpdateManyMutationInput =
+    input.status === "ACTIVE"
+      ? { status: "ACTIVE", suspendedUntil: null, statusReason: null }
+      : input.status === "SUSPENDED"
+        ? {
+            status: "SUSPENDED",
+            suspendedUntil: new Date(input.suspendedUntil),
+            statusReason: input.reason ?? null,
+          }
+        : {
+            status: "BLOCKED",
+            suspendedUntil: null,
+            statusReason: input.reason ?? null,
+          };
+
+  const { count } = await prisma.customer.updateMany({
+    where: { id, ownerId, deletedAt: null },
+    data,
+  });
+
+  return count > 0 ? getCustomer(ownerId, id) : null;
+};
+
+/**
+ * Writing a quota starts its window now, so an allowance never arrives already
+ * spent by payments that predate it. Clearing the quota clears that line too.
+ */
+export const setCustomerPolicy = async (
+  ownerId: string,
+  id: string,
+  input: SetCustomerPolicyInput,
+): Promise<CustomerRow | null> => {
+  const data: Prisma.CustomerUpdateManyMutationInput = { ...input };
+
+  if (input.freeQuotaUnit !== undefined) {
+    data.quotaResetAt = input.freeQuotaUnit === null ? null : new Date();
+  }
+
+  const { count } = await prisma.customer.updateMany({
+    where: { id, ownerId, deletedAt: null },
+    data,
+  });
+
+  return count > 0 ? getCustomer(ownerId, id) : null;
+};
+
+export const resetCustomerUsage = async (
+  ownerId: string,
+  id: string,
+): Promise<CustomerRow | null> => {
+  const { count } = await prisma.customer.updateMany({
+    where: { id, ownerId, deletedAt: null },
+    data: { quotaResetAt: new Date() },
+  });
+
+  return count > 0 ? getCustomer(ownerId, id) : null;
+};
+
 export const updateIdentity = async (
   ownerId: string,
   customerId: string,
@@ -519,6 +730,9 @@ export const updateIdentity = async (
   }
   if (input.validUntil !== undefined) {
     data.validUntil = input.validUntil ? new Date(input.validUntil) : null;
+  }
+  if (input.blocked !== undefined) {
+    data.blockedAt = input.blocked ? new Date() : null;
   }
 
   const { count } = await prisma.customerPaymentIdentity.updateMany({

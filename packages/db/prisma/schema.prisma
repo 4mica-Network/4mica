@@ -198,6 +198,8 @@ model User {
   reportedPayments               Payment[]
   customers                      Customer[]
   customerIdentities             CustomerPaymentIdentity[]
+  customerCoupons                CustomerCoupon[]
+  customerCreditEntries          CustomerCreditEntry[]
 
   @@index([email])
   @@map("users")
@@ -415,6 +417,41 @@ enum CustomerType {
 enum CustomerStatus {
   ACTIVE
   BLOCKED
+  SUSPENDED
+}
+
+/**
+ * What a free allowance is counted in. A request count suits a per-call API;
+ * an amount suits a "first $10 is free" offer. The owner picks per customer,
+ * so every consumer has to read `freeQuotaUnit` before `freeQuota` means
+ * anything.
+ */
+enum CustomerQuotaUnit {
+  REQUESTS
+  AMOUNT
+}
+
+enum CustomerQuotaPeriod {
+  DAY
+  WEEK
+  MONTH
+  TOTAL
+}
+
+enum CustomerCouponKind {
+  PERCENT
+  FIXED
+}
+
+/**
+ * Why a credit row exists. PROMOTIONAL is given away, PREPAID is money the
+ * customer put down, and ADJUSTMENT is a correction — including the offsetting
+ * row a reset writes, so revoking credit never erases what came before.
+ */
+enum CustomerCreditKind {
+  PROMOTIONAL
+  PREPAID
+  ADJUSTMENT
 }
 
 enum CustomerIdentityType {
@@ -442,15 +479,92 @@ model Customer {
   dailyLimit    Decimal?                  @map("daily_limit") @db.Decimal(38, 18)
   monthlyLimit  Decimal?                  @map("monthly_limit") @db.Decimal(38, 18)
   limitCurrency String                    @default("USD") @map("limit_currency") @db.VarChar(16)
-  createdAt     DateTime                  @default(now()) @map("created_at")
-  updatedAt     DateTime                  @updatedAt @map("updated_at")
-  deletedAt     DateTime?                 @map("deleted_at")
-  owner         User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  identities    CustomerPaymentIdentity[]
+
+  /// Why the account blocked or suspended them, shown back to the owner.
+  statusReason   String?   @map("status_reason") @db.VarChar(280)
+  /// Set only while SUSPENDED. Past this moment the suspension has lapsed and
+  /// the customer is treated as active again, without a write.
+  suspendedUntil DateTime? @map("suspended_until")
+
+  /// Null unit means no free allowance. The value is a whole number of
+  /// requests or an amount, depending on the unit.
+  freeQuotaUnit   CustomerQuotaUnit?   @map("free_quota_unit")
+  freeQuota       Decimal?             @map("free_quota") @db.Decimal(38, 18)
+  freeQuotaPeriod CustomerQuotaPeriod? @map("free_quota_period")
+  /// Usage is counted from here rather than kept in a counter, so resetting is
+  /// a single timestamp write and can never drift from the payments it counts.
+  quotaResetAt    DateTime?            @map("quota_reset_at")
+
+  discountPercent   Decimal? @map("discount_percent") @db.Decimal(5, 2)
+  discountFixed     Decimal? @map("discount_fixed") @db.Decimal(38, 18)
+  minPaymentAmount  Decimal? @map("min_payment_amount") @db.Decimal(38, 18)
+  approvalThreshold Decimal? @map("approval_threshold") @db.Decimal(38, 18)
+
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+  deletedAt    DateTime?                 @map("deleted_at")
+  owner        User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  identities   CustomerPaymentIdentity[]
+  coupons      CustomerCoupon[]
+  creditEntries CustomerCreditEntry[]
 
   @@index([ownerId, createdAt(sort: Desc)])
   @@index([ownerId, status])
   @@map("customers")
+}
+
+/**
+ * A discount code that belongs to one customer. Redemptions are counted here
+ * rather than derived, because a coupon is consumed by being used and there is
+ * no payment column that records which code was applied.
+ */
+model CustomerCoupon {
+  id         String @id @default(uuid(7))
+  ownerId    String @map("owner_id")
+  customerId String @map("customer_id")
+
+  code  String             @db.VarChar(64)
+  kind  CustomerCouponKind
+  /// A percentage (0-100) when kind is PERCENT, otherwise an amount off.
+  value Decimal            @db.Decimal(38, 18)
+
+  expiresAt     DateTime? @map("expires_at")
+  usageLimit    Int?      @map("usage_limit")
+  timesRedeemed Int       @default(0) @map("times_redeemed")
+  revokedAt     DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, code])
+  @@index([customerId, createdAt(sort: Desc)])
+  @@map("customer_coupons")
+}
+
+/**
+ * One movement of credit. The balance is the sum of these rows, so a grant is
+ * never overwritten and a reset is an offsetting row rather than a lost record.
+ */
+model CustomerCreditEntry {
+  id         String @id @default(uuid(7))
+  ownerId    String @map("owner_id")
+  customerId String @map("customer_id")
+
+  kind CustomerCreditKind
+  /// Signed: positive grants credit, negative takes it back.
+  amount Decimal @db.Decimal(38, 18)
+  reason String? @db.VarChar(280)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt(sort: Desc)])
+  @@map("customer_credit_entries")
 }
 
 model CustomerPaymentIdentity {
@@ -467,6 +581,9 @@ model CustomerPaymentIdentity {
   verifiedAt DateTime?              @map("verified_at")
   validFrom  DateTime?              @map("valid_from")
   validUntil DateTime?              @map("valid_until")
+  /// Refuses this one address while leaving the customer and its other
+  /// identities alone. Past activity still counts towards the customer.
+  blockedAt  DateTime?              @map("blocked_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

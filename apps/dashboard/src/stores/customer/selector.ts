@@ -45,6 +45,21 @@ export const selectIsCustomerPending =
   (state: RootState): boolean =>
     Boolean(state.customer.pending[key]);
 
+export const selectIsCustomerStatusPending =
+  (id: string) =>
+  (state: RootState): boolean =>
+    Boolean(state.customer.pending[`customerStatus:${id}`]);
+
+export const selectIsCustomerPolicyPending =
+  (id: string) =>
+  (state: RootState): boolean =>
+    Boolean(state.customer.pending[`customerPolicy:${id}`]);
+
+export const selectIsCustomerUsageResetPending =
+  (id: string) =>
+  (state: RootState): boolean =>
+    Boolean(state.customer.pending[`customerUsageReset:${id}`]);
+
 export const selectCustomerError = (state: RootState): string | null =>
   state.customer.error;
 

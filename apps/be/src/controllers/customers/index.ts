@@ -22,6 +22,9 @@ import {
   listCustomers,
   ownsCustomer,
   removeIdentity,
+  resetCustomerUsage,
+  setCustomerPolicy,
+  setCustomerStatus,
   softDeleteCustomer,
   updateCustomer,
   updateIdentity,
@@ -32,6 +35,8 @@ import {
   CustomerActivityQuerySchema,
   CustomerIdentitySchema,
   ListCustomersQuerySchema,
+  SetCustomerPolicySchema,
+  SetCustomerStatusSchema,
   UpdateCustomerIdentitySchema,
   UpdateCustomerSchema,
 } from "./schema";
@@ -129,6 +134,83 @@ export const updateCustomerHandler: RouteHandler = async (request, reply) => {
   const updated = await updateCustomer(userId, id, parsed.data);
 
   return updated ? reply.send(updated) : notFound(reply, "customer");
+};
+
+export const setCustomerStatusHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const parsed = parseBody(SetCustomerStatusSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id } = request.params as { id: string };
+  const updated = await setCustomerStatus(userId, id, parsed.data);
+
+  if (!updated) {
+    return notFound(reply, "customer");
+  }
+
+  appLogger.info("Customer status changed", {
+    userId,
+    customerId: id,
+    status: parsed.data.status,
+  });
+
+  return reply.send(updated);
+};
+
+export const setCustomerPolicyHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const parsed = parseBody(SetCustomerPolicySchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { id } = request.params as { id: string };
+  const updated = await setCustomerPolicy(userId, id, parsed.data);
+
+  if (!updated) {
+    return notFound(reply, "customer");
+  }
+
+  appLogger.info("Customer policy changed", { userId, customerId: id });
+
+  return reply.send(updated);
+};
+
+export const resetCustomerUsageHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const { id } = request.params as { id: string };
+  const updated = await resetCustomerUsage(userId, id);
+
+  if (!updated) {
+    return notFound(reply, "customer");
+  }
+
+  appLogger.info("Customer usage reset", { userId, customerId: id });
+
+  return reply.send(updated);
 };
 
 export const deleteCustomerHandler: RouteHandler = async (request, reply) => {

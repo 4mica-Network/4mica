@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { z } from "zod";
 import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
-import { STATUS_OPTIONS, TYPE_OPTIONS } from "../customers/constants";
+import { TYPE_OPTIONS } from "../customers/constants";
 import {
   blankToNull,
   customerDetailsSchema,
@@ -37,7 +37,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
       name: customer.name,
       email: customer.email ?? "",
       type: customer.type,
-      status: customer.status,
       description: customer.description ?? "",
       notes: customer.notes ?? "",
     }),
@@ -84,7 +83,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
           name: data.name.trim(),
           email: blankToNull(data.email),
           type: data.type,
-          status: data.status,
           description: blankToNull(data.description),
           notes: blankToNull(data.notes),
         },
@@ -129,21 +127,6 @@ export function DetailsForm({ customer }: { customer: Customer }) {
             value={values.type ?? "ORGANIZATION"}
             onChange={set("type")}
             options={TYPE_OPTIONS.map((option) => ({
-              value: option.value,
-              title: t(option.titleKey),
-            }))}
-          />
-        </FieldRow>
-
-        <FieldRow
-          title={t("customer.fields.status.label")}
-          htmlFor="detail-status"
-        >
-          <Select
-            id="detail-status"
-            value={values.status ?? "ACTIVE"}
-            onChange={set("status")}
-            options={STATUS_OPTIONS.map((option) => ({
               value: option.value,
               title: t(option.titleKey),
             }))}

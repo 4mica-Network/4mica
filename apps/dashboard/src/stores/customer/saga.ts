@@ -3,6 +3,8 @@ import type {
   CustomerIdentityInput,
   CustomerIdentityPatch,
   CustomerInput,
+  CustomerPolicyInput,
+  CustomerStatusInput,
 } from "@api/customer";
 import * as api from "@api/customer";
 import i18n from "@i18n";
@@ -31,6 +33,8 @@ import {
   fetchCustomersPending,
   fetchCustomersSucceeded,
   type PendingMeta,
+  setCustomerPolicySucceeded,
+  setCustomerStatusSucceeded,
   updateCustomerSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -202,6 +206,84 @@ export function* updateCustomer(action: {
   }
 }
 
+export function* setCustomerPolicy(action: {
+  type: string;
+  payload: { id: string; data: CustomerPolicyInput };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    const customer = (yield call(() =>
+      api.setCustomerPolicy(action.payload.id, action.payload.data),
+    )) as Awaited<ReturnType<typeof api.setCustomerPolicy>>;
+
+    yield put(setCustomerPolicySucceeded(customer, action.meta));
+
+    notifySuccess({
+      title: t("store.customer.policySaved", "Pricing updated"),
+      content: t(
+        "store.customer.policySavedBody",
+        "Your services will quote this customer at the new terms.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't save that pricing.", action.meta);
+  }
+}
+
+export function* resetCustomerUsage(action: {
+  type: string;
+  payload: { id: string };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    const customer = (yield call(() =>
+      api.resetCustomerUsage(action.payload.id),
+    )) as Awaited<ReturnType<typeof api.resetCustomerUsage>>;
+
+    yield put(setCustomerPolicySucceeded(customer, action.meta));
+
+    notifySuccess({
+      title: t("store.customer.usageReset", "Allowance reset"),
+      content: t(
+        "store.customer.usageResetBody",
+        "They start from a full allowance; their payment history is unchanged.",
+      ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't reset that allowance.", action.meta);
+  }
+}
+
+export function* setCustomerStatus(action: {
+  type: string;
+  payload: { id: string; data: CustomerStatusInput };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    const customer = (yield call(() =>
+      api.setCustomerStatus(action.payload.id, action.payload.data),
+    )) as Awaited<ReturnType<typeof api.setCustomerStatus>>;
+
+    yield put(setCustomerStatusSucceeded(customer, action.meta));
+
+    notifySuccess({
+      title: t("store.customer.statusChanged", "Status updated"),
+      content:
+        customer.status === "ACTIVE"
+          ? t(
+              "store.customer.statusActiveBody",
+              "They can pay your services again.",
+            )
+          : t(
+              "store.customer.statusStoppedBody",
+              "Your services should refuse their payments from now on.",
+            ),
+    });
+  } catch (error) {
+    yield* fail(error, "Couldn't change that status.", action.meta);
+  }
+}
+
 export function* deleteCustomer(action: {
   type: string;
   payload: { id: string };
@@ -351,6 +433,9 @@ export default [
   takeLatest(actionTypes.SET_CUSTOMER_ACTIVITY_PAGE, refetchActivity),
   takeEvery(actionTypes.CREATE_CUSTOMER_REQUESTED, createCustomer),
   takeEvery(actionTypes.UPDATE_CUSTOMER_REQUESTED, updateCustomer),
+  takeEvery(actionTypes.SET_CUSTOMER_POLICY_REQUESTED, setCustomerPolicy),
+  takeEvery(actionTypes.RESET_CUSTOMER_USAGE_REQUESTED, resetCustomerUsage),
+  takeEvery(actionTypes.SET_CUSTOMER_STATUS_REQUESTED, setCustomerStatus),
   takeEvery(actionTypes.DELETE_CUSTOMER_REQUESTED, deleteCustomer),
   takeEvery(actionTypes.BATCH_DELETE_CUSTOMERS_REQUESTED, batchDeleteCustomers),
   takeEvery(actionTypes.ADD_CUSTOMER_IDENTITY_REQUESTED, addCustomerIdentity),

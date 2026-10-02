@@ -97,6 +97,9 @@ export default function customerReducer(
 
     case actionTypes.CREATE_CUSTOMER_REQUESTED:
     case actionTypes.UPDATE_CUSTOMER_REQUESTED:
+    case actionTypes.SET_CUSTOMER_POLICY_REQUESTED:
+    case actionTypes.RESET_CUSTOMER_USAGE_REQUESTED:
+    case actionTypes.SET_CUSTOMER_STATUS_REQUESTED:
     case actionTypes.DELETE_CUSTOMER_REQUESTED:
     case actionTypes.BATCH_DELETE_CUSTOMERS_REQUESTED:
     case actionTypes.ADD_CUSTOMER_IDENTITY_REQUESTED:
@@ -117,6 +120,8 @@ export default function customerReducer(
       };
 
     case actionTypes.UPDATE_CUSTOMER_SUCCEEDED:
+    case actionTypes.SET_CUSTOMER_POLICY_SUCCEEDED:
+    case actionTypes.SET_CUSTOMER_STATUS_SUCCEEDED:
     case actionTypes.CUSTOMER_IDENTITY_CHANGED: {
       const customer = action.payload as Customer;
       return {

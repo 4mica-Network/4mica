@@ -7,6 +7,8 @@ import type {
   CustomerIdentityType,
   CustomerListResponse,
   CustomerOverview,
+  CustomerQuotaPeriod,
+  CustomerQuotaUnit,
   CustomerSort,
   CustomerStatus,
   CustomerType,
@@ -46,11 +48,15 @@ export interface CustomerIdentityInput {
   validUntil?: string | null;
 }
 
+export type CustomerStatusInput =
+  | { status: "ACTIVE" }
+  | { status: "BLOCKED"; reason?: string | null }
+  | { status: "SUSPENDED"; suspendedUntil: string; reason?: string | null };
+
 export interface CustomerInput {
   name: string;
   email?: string | null;
   type?: CustomerType;
-  status?: CustomerStatus;
   description?: string | null;
   notes?: string | null;
   dailyLimit?: string | null;
@@ -63,6 +69,7 @@ export interface CustomerIdentityPatch {
   source?: CustomerIdentitySource;
   validFrom?: string | null;
   validUntil?: string | null;
+  blocked?: boolean;
 }
 
 export const getCustomers = (params: ListCustomersParams = {}) =>
@@ -90,6 +97,36 @@ export const updateCustomer = (id: string, data: Partial<CustomerInput>) =>
     url: `/me/customers/${encodeURIComponent(id)}`,
     method: HttpMethod.PATCH,
     data,
+  });
+
+export const setCustomerStatus = (id: string, data: CustomerStatusInput) =>
+  httpClient.request<Customer, typeof data>({
+    url: `/me/customers/${encodeURIComponent(id)}/status`,
+    method: HttpMethod.PATCH,
+    data,
+  });
+
+export interface CustomerPolicyInput {
+  freeQuotaUnit?: CustomerQuotaUnit | null;
+  freeQuota?: string | null;
+  freeQuotaPeriod?: CustomerQuotaPeriod | null;
+  discountPercent?: string | null;
+  discountFixed?: string | null;
+  minPaymentAmount?: string | null;
+  approvalThreshold?: string | null;
+}
+
+export const setCustomerPolicy = (id: string, data: CustomerPolicyInput) =>
+  httpClient.request<Customer, typeof data>({
+    url: `/me/customers/${encodeURIComponent(id)}/policy`,
+    method: HttpMethod.PATCH,
+    data,
+  });
+
+export const resetCustomerUsage = (id: string) =>
+  httpClient.request<Customer>({
+    url: `/me/customers/${encodeURIComponent(id)}/reset-usage`,
+    method: HttpMethod.POST,
   });
 
 export const deleteCustomer = (id: string) =>
