@@ -304,80 +304,74 @@ describe("LimitsPanel", () => {
   });
 });
 
-describe("AccessPanel", () => {
-  beforeEach(() => {
-    dispatch.mockClear();
-  });
+describe("LimitsPanel", () => {
+  const renderPanel = (over: Partial<Customer> = {}, ov = overview()) =>
+    render(<LimitsPanel customer={customer(over)} overview={ov} />);
 
-  const renderPanel = (over: Partial<Customer> = {}) =>
-    render(<AccessPanel customer={customer(over)} />);
-
-  const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
-
-  it("offers block and suspend while the customer is active", () => {
+  it("lists both limits as rows inside one card", () => {
     renderPanel();
 
-    expect(screen.getByTestId("customer-block")).toBeInTheDocument();
-    expect(screen.getByTestId("customer-suspend-30")).toBeInTheDocument();
-    expect(screen.queryByTestId("customer-unblock")).toBeNull();
+    const rows = ["customer-limit-monthly", "customer-limit-daily"].map((id) =>
+      screen.getByTestId(id),
+    );
+
+    for (const row of rows) {
+      expect(row.className).not.toMatch(CARD);
+    }
+
+    expect(rows[0].closest(`[class*="rounded-lg"]`)).toBe(
+      rows[1].closest(`[class*="rounded-lg"]`),
+    );
   });
 
-  it("offers only reactivate once blocked", () => {
-    renderPanel({ status: "BLOCKED" });
-
-    expect(screen.getByTestId("customer-unblock")).toBeInTheDocument();
-    expect(screen.queryByTestId("customer-block")).toBeNull();
-    expect(screen.queryByTestId("customer-suspend-30")).toBeNull();
-  });
-
-  it("sends the reason the owner typed when blocking", () => {
+  it("measures the monthly limit against the last 30 days", () => {
     renderPanel();
 
-    const field = document.getElementById("access-reason") as HTMLInputElement;
-    fireEvent.change(field, { target: { value: "chargeback fraud" } });
-    fireEvent.click(screen.getByTestId("customer-block"));
+    const card = screen.getByTestId("customer-limit-monthly");
 
-    expect(lastAction()?.payload.data).toEqual({
-      status: "BLOCKED",
-      reason: "chargeback fraud",
-    });
+    expect(card.textContent).toContain("500");
+    expect(card.textContent).toContain("customer.limits.within");
   });
 
-  it("sends a null reason rather than an empty string", () => {
+  it("flags an over-limit customer in the danger colour", () => {
+    renderPanel(
+      {},
+      overview({
+        recentSpend: [
+          { network: "BASE_SEPOLIA", assetAddress: null, amount: "900" },
+        ],
+      }),
+    );
+
+    const card = screen.getByTestId("customer-limit-monthly");
+
+    expect(card.textContent).toContain("customer.limits.over");
+    expect(card.innerHTML).toContain("bg-danger");
+  });
+
+  it("states the daily limit without inventing a daily spend figure", () => {
     renderPanel();
-    fireEvent.click(screen.getByTestId("customer-block"));
 
-    expect(lastAction()?.payload.data.reason).toBeNull();
+    const card = screen.getByTestId("customer-limit-daily");
+
+    expect(card.textContent).toContain("50");
+    expect(card.textContent).not.toContain("customer.limits.within");
+    expect(card.textContent).not.toContain("customer.limits.spent");
   });
 
-  it("suspends with a future end date", () => {
-    renderPanel();
-    fireEvent.click(screen.getByTestId("customer-suspend-7"));
+  it("explains itself in a card when no limits are set", () => {
+    renderPanel({ dailyLimit: null, monthlyLimit: null });
 
-    const data = lastAction()?.payload.data;
+    const empty = screen.getByText("customer.limits.none");
 
-    expect(data.status).toBe("SUSPENDED");
-    expect(new Date(data.suspendedUntil).getTime()).toBeGreaterThan(Date.now());
+    expect(empty.closest("div")?.className).toMatch(CARD);
   });
 
-  it("reactivates without a reason or an end date", () => {
-    renderPanel({ status: "SUSPENDED" });
-    fireEvent.click(screen.getByTestId("customer-unblock"));
+  it("omits a limit card the customer does not have", () => {
+    renderPanel({ dailyLimit: null });
 
-    expect(lastAction()?.payload.data).toEqual({ status: "ACTIVE" });
-  });
-
-  it("shows the reason and window it was given", () => {
-    renderPanel({
-      status: "SUSPENDED",
-      statusReason: "late payment",
-      suspendedUntil: "2026-12-01T00:00:00.000Z",
-    });
-
-    expect(screen.getByText("late payment")).toBeInTheDocument();
-    expect(
-      screen.getByText("customer.access.suspendedUntil"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("customer-limit-monthly")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-limit-daily")).toBeNull();
   });
 });
 
@@ -794,5 +788,136 @@ describe("CouponsPanel", () => {
       id: "customer_1",
       couponId: "coupon_1",
     });
+  });
+});
+
+describe("AccessPanel", () => {
+  beforeEach(() => {
+    dispatch.mockClear();
+  });
+
+  const renderPanel = (over: Partial<Customer> = {}) =>
+    render(<AccessPanel customer={customer(over)} />);
+
+  const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
+
+  /** The library Select is a listbox: open the trigger, then pick by index. */
+  const pickStatus = (index: number) => {
+    fireEvent.click(screen.getByTestId("access-status-select-trigger"));
+    fireEvent.click(screen.getByTestId(`access-status-select-option-${index}`));
+  };
+
+  const ACTIVE = 0;
+  const BLOCKED = 1;
+  const SUSPENDED = 2;
+
+  const save = () =>
+    fireEvent.click(screen.getByTestId("customer-access-save"));
+
+  it("opens on the customer's current status", () => {
+    renderPanel();
+
+    expect(
+      screen.getByTestId("access-status-select-selected").textContent,
+    ).toContain("customer.status.active");
+  });
+
+  it("opens on Blocked for a blocked customer", () => {
+    renderPanel({ status: "BLOCKED" });
+
+    expect(
+      screen.getByTestId("access-status-select-selected").textContent,
+    ).toContain("customer.status.blocked");
+  });
+
+  it("keeps Update disabled until the status changes", () => {
+    renderPanel();
+
+    expect(screen.getByTestId("customer-access-save")).toBeDisabled();
+  });
+
+  it("hides the reason and duration while the customer stays active", () => {
+    renderPanel();
+
+    expect(document.getElementById("access-reason")).toBeNull();
+    expect(screen.queryByTestId("access-suspend-days-select")).toBeNull();
+  });
+
+  it("asks for a reason once a stopping status is picked", () => {
+    renderPanel();
+    pickStatus(BLOCKED);
+
+    expect(document.getElementById("access-reason")).not.toBeNull();
+  });
+
+  it("asks how long only for a suspension", () => {
+    renderPanel();
+    pickStatus(SUSPENDED);
+
+    expect(
+      screen.getByTestId("access-suspend-days-select"),
+    ).toBeInTheDocument();
+  });
+
+  it("blocks with the reason the owner typed", () => {
+    renderPanel();
+    pickStatus(BLOCKED);
+
+    fireEvent.change(
+      document.getElementById("access-reason") as HTMLInputElement,
+      { target: { value: "chargeback fraud" } },
+    );
+    save();
+
+    expect(lastAction()?.payload.data).toEqual({
+      status: "BLOCKED",
+      reason: "chargeback fraud",
+    });
+  });
+
+  it("sends a null reason rather than an empty string", () => {
+    renderPanel();
+    pickStatus(BLOCKED);
+    save();
+
+    expect(lastAction()?.payload.data.reason).toBeNull();
+  });
+
+  it("suspends with a future end date", () => {
+    renderPanel();
+    pickStatus(SUSPENDED);
+    save();
+
+    const data = lastAction()?.payload.data;
+
+    expect(data.status).toBe("SUSPENDED");
+    expect(new Date(data.suspendedUntil).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("reactivates without a reason or an end date", () => {
+    renderPanel({ status: "BLOCKED" });
+    pickStatus(ACTIVE);
+    save();
+
+    expect(lastAction()?.payload.data).toEqual({ status: "ACTIVE" });
+  });
+
+  it("shows the window a suspension runs to", () => {
+    renderPanel({
+      status: "SUSPENDED",
+      suspendedUntil: "2026-12-01T00:00:00.000Z",
+    });
+
+    expect(
+      screen.getByText("customer.access.suspendedUntil"),
+    ).toBeInTheDocument();
+  });
+
+  it("carries the existing reason into the field", () => {
+    renderPanel({ status: "BLOCKED", statusReason: "late payment" });
+
+    expect(
+      (document.getElementById("access-reason") as HTMLInputElement).value,
+    ).toBe("late payment");
   });
 });

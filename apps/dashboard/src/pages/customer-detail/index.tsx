@@ -14,7 +14,6 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
-import { SettingsSection } from "@/components/form";
 import { AccessPanel } from "./AccessPanel";
 import { ActivityPanel } from "./ActivityPanel";
 import { CouponsPanel } from "./CouponsPanel";
@@ -77,7 +76,7 @@ export function CustomerDetail() {
     <div className="flex w-full animate-fade-in flex-col pb-16">
       <BackBar label={t("customer.detail.back")} to="/customers" />
 
-      <div className="mx-auto flex w-full flex-col gap-10 lg:max-w-3xl">
+      <div className="mx-auto flex w-full flex-col gap-6 lg:max-w-3xl">
         <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
@@ -93,12 +92,7 @@ export function CustomerDetail() {
           <OverviewTiles overview={overview} />
         </div>
 
-        <SettingsSection
-          description={t("customer.detail.detailsLead")}
-          title={t("customer.detail.detailsTitle")}
-        >
-          <DetailsForm customer={customer} />
-        </SettingsSection>
+        <DetailsForm customer={customer} />
 
         <AccessPanel customer={customer} />
 
@@ -106,23 +100,13 @@ export function CustomerDetail() {
 
         <PolicyPanel customer={customer} />
 
+        <LimitsPanel customer={customer} overview={overview} />
+
         <CreditPanel customer={customer} />
 
         <CouponsPanel customer={customer} />
 
-        <SettingsSection
-          description={t("customer.detail.limitsLead")}
-          title={t("customer.detail.limitsTitle")}
-        >
-          <LimitsPanel customer={customer} overview={overview} />
-        </SettingsSection>
-
-        <SettingsSection
-          description={t("customer.detail.activityLead")}
-          title={t("customer.detail.activityTitle")}
-        >
-          <ActivityPanel customerId={customer.id} />
-        </SettingsSection>
+        <ActivityPanel customerId={customer.id} />
       </div>
     </div>
   );

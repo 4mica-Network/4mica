@@ -12,20 +12,14 @@ import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { EditableCard } from "@/components/EditableCard";
-import {
-  Card,
-  FieldRow,
-  Select,
-  SettingsSection,
-  TextInput,
-} from "@/components/form";
+import { FieldRow, Select, TextInput } from "@/components/form";
 import { useDraft } from "@/hooks/useDraft";
 import {
   QUOTA_PERIOD_OPTIONS,
   QUOTA_UNIT_OPTIONS,
 } from "../customers/constants";
 import { trimAmount } from "../payments/constants";
+import { SectionCard, SectionFooter, SectionInset } from "./SectionCard";
 
 const blankToNull = (value: string): string | null =>
   value.trim() === "" ? null : value.trim();
@@ -49,7 +43,7 @@ function QuotaUsage({ customer }: { customer: Customer }) {
   const exhausted = used >= quota;
 
   return (
-    <Card className="flex flex-col gap-3" data-testid="customer-quota-usage">
+    <SectionInset className="gap-3" data-testid="customer-quota-usage">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <span className="font-medium text-ink-strong text-sm">
@@ -98,7 +92,7 @@ function QuotaUsage({ customer }: { customer: Customer }) {
               remaining: trimAmount(customer.quotaRemaining ?? "0"),
             })}
       </span>
-    </Card>
+    </SectionInset>
   );
 }
 
@@ -148,125 +142,144 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
   const hasQuota = draft.draft.freeQuotaUnit !== "";
 
   return (
-    <SettingsSection
+    <SectionCard
       title={t("customer.detail.policyTitle")}
       description={t("customer.detail.policyLead")}
+      data-testid="customer-policy"
     >
       <QuotaUsage customer={customer} />
 
-      <EditableCard
-        isDirty={draft.isDirty}
-        isSaving={isSaving}
-        onSave={save}
-        onReset={draft.reset}
-      >
-        <div className="flex flex-col gap-4">
-          <FieldRow
-            title={t("customer.policy.quotaUnit")}
-            htmlFor="policy-quota-unit"
-          >
-            <Select
-              id="policy-quota-unit"
-              value={draft.draft.freeQuotaUnit}
-              onChange={(value) => draft.set("freeQuotaUnit", value)}
-              options={[
-                { value: "", title: t("customer.policy.quotaNone") },
-                ...QUOTA_UNIT_OPTIONS.map((option) => ({
+      <div className="flex flex-col gap-4">
+        <FieldRow
+          title={t("customer.policy.quotaUnit")}
+          htmlFor="policy-quota-unit"
+        >
+          <Select
+            id="policy-quota-unit"
+            value={draft.draft.freeQuotaUnit}
+            onChange={(value) => draft.set("freeQuotaUnit", value)}
+            options={[
+              { value: "", title: t("customer.policy.quotaNone") },
+              ...QUOTA_UNIT_OPTIONS.map((option) => ({
+                value: option.value,
+                title: t(option.titleKey),
+              })),
+            ]}
+          />
+        </FieldRow>
+
+        {hasQuota && (
+          <>
+            <FieldRow
+              title={t("customer.policy.quotaValue")}
+              htmlFor="policy-quota"
+            >
+              <TextInput
+                id="policy-quota"
+                value={draft.draft.freeQuota}
+                onChange={(value) => draft.set("freeQuota", value)}
+                placeholder={
+                  draft.draft.freeQuotaUnit === "REQUESTS" ? "500" : "10.00"
+                }
+                error={issues.freeQuota}
+              />
+            </FieldRow>
+
+            <FieldRow
+              title={t("customer.policy.quotaPeriod")}
+              htmlFor="policy-quota-period"
+            >
+              <Select
+                id="policy-quota-period"
+                value={draft.draft.freeQuotaPeriod}
+                onChange={(value) => draft.set("freeQuotaPeriod", value)}
+                options={QUOTA_PERIOD_OPTIONS.map((option) => ({
                   value: option.value,
                   title: t(option.titleKey),
-                })),
-              ]}
-            />
-          </FieldRow>
+                }))}
+                error={issues.freeQuotaPeriod}
+              />
+            </FieldRow>
+          </>
+        )}
 
-          {hasQuota && (
-            <>
-              <FieldRow
-                title={t("customer.policy.quotaValue")}
-                htmlFor="policy-quota"
-              >
-                <TextInput
-                  id="policy-quota"
-                  value={draft.draft.freeQuota}
-                  onChange={(value) => draft.set("freeQuota", value)}
-                  placeholder={
-                    draft.draft.freeQuotaUnit === "REQUESTS" ? "500" : "10.00"
-                  }
-                  error={issues.freeQuota}
-                />
-              </FieldRow>
+        <FieldRow
+          title={t("customer.policy.discountPercent")}
+          htmlFor="policy-discount-percent"
+        >
+          <TextInput
+            id="policy-discount-percent"
+            value={draft.draft.discountPercent}
+            onChange={(value) => draft.set("discountPercent", value)}
+            placeholder="10"
+            error={issues.discountPercent}
+          />
+        </FieldRow>
 
-              <FieldRow
-                title={t("customer.policy.quotaPeriod")}
-                htmlFor="policy-quota-period"
-              >
-                <Select
-                  id="policy-quota-period"
-                  value={draft.draft.freeQuotaPeriod}
-                  onChange={(value) => draft.set("freeQuotaPeriod", value)}
-                  options={QUOTA_PERIOD_OPTIONS.map((option) => ({
-                    value: option.value,
-                    title: t(option.titleKey),
-                  }))}
-                  error={issues.freeQuotaPeriod}
-                />
-              </FieldRow>
-            </>
-          )}
+        <FieldRow
+          title={t("customer.policy.discountFixed")}
+          htmlFor="policy-discount-fixed"
+        >
+          <TextInput
+            id="policy-discount-fixed"
+            value={draft.draft.discountFixed}
+            onChange={(value) => draft.set("discountFixed", value)}
+            placeholder="0.50"
+            error={issues.discountFixed}
+          />
+        </FieldRow>
 
-          <FieldRow
-            title={t("customer.policy.discountPercent")}
-            htmlFor="policy-discount-percent"
-          >
-            <TextInput
-              id="policy-discount-percent"
-              value={draft.draft.discountPercent}
-              onChange={(value) => draft.set("discountPercent", value)}
-              placeholder="10"
-              error={issues.discountPercent}
-            />
-          </FieldRow>
+        <FieldRow
+          title={t("customer.policy.minPayment")}
+          htmlFor="policy-min-payment"
+        >
+          <TextInput
+            id="policy-min-payment"
+            value={draft.draft.minPaymentAmount}
+            onChange={(value) => draft.set("minPaymentAmount", value)}
+            placeholder="0.01"
+            error={issues.minPaymentAmount}
+          />
+        </FieldRow>
 
-          <FieldRow
-            title={t("customer.policy.discountFixed")}
-            htmlFor="policy-discount-fixed"
-          >
-            <TextInput
-              id="policy-discount-fixed"
-              value={draft.draft.discountFixed}
-              onChange={(value) => draft.set("discountFixed", value)}
-              placeholder="0.50"
-              error={issues.discountFixed}
-            />
-          </FieldRow>
+        <FieldRow
+          title={t("customer.policy.approvalThreshold")}
+          htmlFor="policy-approval"
+        >
+          <TextInput
+            id="policy-approval"
+            value={draft.draft.approvalThreshold}
+            onChange={(value) => draft.set("approvalThreshold", value)}
+            placeholder="100"
+            error={issues.approvalThreshold}
+          />
+        </FieldRow>
+      </div>
 
-          <FieldRow
-            title={t("customer.policy.minPayment")}
-            htmlFor="policy-min-payment"
-          >
-            <TextInput
-              id="policy-min-payment"
-              value={draft.draft.minPaymentAmount}
-              onChange={(value) => draft.set("minPaymentAmount", value)}
-              placeholder="0.01"
-              error={issues.minPaymentAmount}
-            />
-          </FieldRow>
-
-          <FieldRow
-            title={t("customer.policy.approvalThreshold")}
-            htmlFor="policy-approval"
-          >
-            <TextInput
-              id="policy-approval"
-              value={draft.draft.approvalThreshold}
-              onChange={(value) => draft.set("approvalThreshold", value)}
-              placeholder="100"
-              error={issues.approvalThreshold}
-            />
-          </FieldRow>
-        </div>
-      </EditableCard>
-    </SettingsSection>
+      <SectionFooter>
+        <Button
+          type="button"
+          intent="ghost"
+          size="sm"
+          disabled={!draft.isDirty || isSaving}
+          onClick={draft.reset}
+        >
+          {t("settings.discard")}
+        </Button>
+        <Button
+          type="button"
+          intent="invert"
+          size="sm"
+          className="btn-no-lift w-20"
+          disabled={!draft.isDirty || isSaving}
+          onClick={save}
+          data-testid="customer-policy-save"
+        >
+          <span className="flex w-full items-center justify-center text-sm">
+            {isSaving ? <Spinner size="sm" /> : t("settings.update")}
+          </span>
+        </Button>
+      </SectionFooter>
+    </SectionCard>
   );
 }

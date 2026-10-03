@@ -15,13 +15,7 @@ import { ArrowUpRight, Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import {
-  Card,
-  FieldRow,
-  Select,
-  SettingsSection,
-  TextInput,
-} from "@/components/form";
+import { FieldRow, Select, TextInput } from "@/components/form";
 import {
   explorerAddressUrl,
   NETWORK_OPTIONS,
@@ -34,6 +28,7 @@ import {
   IDENTITY_TYPE_OPTIONS,
 } from "../customers/constants";
 import { type IdentityValues, identitySchema } from "../customers/validation";
+import { SectionCard, SectionInset } from "./SectionCard";
 
 const PENDING_KEY = "customerIdentity";
 
@@ -236,7 +231,7 @@ function AddIdentityCard({
   };
 
   return (
-    <Card data-testid="customer-identity-form">
+    <SectionInset data-testid="customer-identity-form">
       <div className="flex flex-col gap-4">
         <FieldRow
           title={t("customer.identity.typeLabel")}
@@ -311,8 +306,7 @@ function AddIdentityCard({
         )}
       </div>
 
-      {/* -mx-6 cancels the card padding so the rule spans the full width. */}
-      <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
+      <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
           intent="ghost"
@@ -336,7 +330,7 @@ function AddIdentityCard({
           </span>
         </Button>
       </div>
-    </Card>
+    </SectionInset>
   );
 }
 
@@ -346,9 +340,10 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
   const [isAdding, setIsAdding] = useState(false);
 
   return (
-    <SettingsSection
+    <SectionCard
       title={t("customer.detail.identitiesTitle")}
       description={t("customer.detail.identitiesLead")}
+      data-testid="customer-identities"
       action={
         !isAdding && (
           <Button
@@ -367,23 +362,19 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
         )
       }
     >
-      <Card>
-        {customer.identities.length === 0 ? (
-          <p className="text-ink-muted text-sm">
-            {t("customer.identity.empty")}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {customer.identities.map((identity) => (
-              <IdentityRow
-                key={identity.id}
-                customerId={customer.id}
-                identity={identity}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
+      {customer.identities.length === 0 ? (
+        <p className="text-ink-muted text-sm">{t("customer.identity.empty")}</p>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {customer.identities.map((identity) => (
+            <IdentityRow
+              key={identity.id}
+              customerId={customer.id}
+              identity={identity}
+            />
+          ))}
+        </div>
+      )}
 
       {isAdding && (
         <AddIdentityCard
@@ -391,6 +382,6 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
           onDone={() => setIsAdding(false)}
         />
       )}
-    </SettingsSection>
+    </SectionCard>
   );
 }

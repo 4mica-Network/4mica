@@ -927,13 +927,8 @@
   "customer.status.suspended": "Suspended",
   "customer.detail.accessTitle": "Access",
   "customer.detail.accessLead": "Whether this customer may pay your services.",
-  "customer.access.block": "Block",
-  "customer.access.reactivate": "Reactivate",
-  "customer.access.suspendDays_one": "Suspend {{count}} day",
-  "customer.access.suspendDays_other": "Suspend {{count}} days",
   "customer.access.reasonLabel": "Reason",
   "customer.access.reasonPlaceholder": "Only your team sees this",
-  "customer.access.reasonGiven": "Reason",
   "customer.access.suspendedUntil": "Suspended until",
   "customer.identity.blocked": "Blocked",
   "customer.identity.block": "Block this address",
@@ -1017,5 +1012,9 @@
   "store.customer.couponCreated": "Coupon added",
   "store.customer.couponCreatedBody": "This customer can use it until it expires or runs out.",
   "store.customer.couponRemoved": "Coupon removed",
-  "store.customer.couponRemovedBody": "Its code is free to use again."
+  "store.customer.couponRemovedBody": "Its code is free to use again.",
+  "customer.access.status": "Status",
+  "customer.access.suspendFor": "Suspend for",
+  "customer.access.days_one": "{{count}} day",
+  "customer.access.days_other": "{{count}} days"
 }

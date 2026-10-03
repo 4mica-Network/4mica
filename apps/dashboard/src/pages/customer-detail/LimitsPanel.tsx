@@ -1,8 +1,8 @@
 import { cn } from "@4mica/ui";
 import type { Customer, CustomerOverview } from "@stores/customer/type";
 import { useTranslation } from "react-i18next";
-import { Card } from "@/components/form";
 import { trimAmount } from "../payments/constants";
+import { SectionCard } from "./SectionCard";
 
 /**
  * Spend against a limit is an indication, not an accounting figure: this sum
@@ -79,36 +79,36 @@ export function LimitsPanel({
 }) {
   const { t } = useTranslation();
 
-  if (!customer.dailyLimit && !customer.monthlyLimit) {
-    return (
-      <Card>
-        <p className="text-ink-muted text-sm">{t("customer.limits.none")}</p>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
-      <div className="flex flex-col gap-5">
-        {customer.monthlyLimit && (
-          <LimitRow
-            label={t("customer.limits.monthly")}
-            limit={customer.monthlyLimit}
-            currency={customer.limitCurrency}
-            spent={overview ? rankingTotal(overview) : undefined}
-            testId="customer-limit-monthly"
-          />
-        )}
+    <SectionCard
+      title={t("customer.detail.limitsTitle")}
+      description={t("customer.detail.limitsLead")}
+      data-testid="customer-limits"
+    >
+      {!customer.dailyLimit && !customer.monthlyLimit ? (
+        <p className="text-ink-muted text-sm">{t("customer.limits.none")}</p>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {customer.monthlyLimit && (
+            <LimitRow
+              label={t("customer.limits.monthly")}
+              limit={customer.monthlyLimit}
+              currency={customer.limitCurrency}
+              spent={overview ? rankingTotal(overview) : undefined}
+              testId="customer-limit-monthly"
+            />
+          )}
 
-        {customer.dailyLimit && (
-          <LimitRow
-            label={t("customer.limits.daily")}
-            limit={customer.dailyLimit}
-            currency={customer.limitCurrency}
-            testId="customer-limit-daily"
-          />
-        )}
-      </div>
-    </Card>
+          {customer.dailyLimit && (
+            <LimitRow
+              label={t("customer.limits.daily")}
+              limit={customer.dailyLimit}
+              currency={customer.limitCurrency}
+              testId="customer-limit-daily"
+            />
+          )}
+        </div>
+      )}
+    </SectionCard>
   );
 }

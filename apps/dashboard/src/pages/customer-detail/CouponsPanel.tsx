@@ -17,18 +17,13 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Card,
-  FieldRow,
-  Select,
-  SettingsSection,
-  TextInput,
-} from "@/components/form";
+import { FieldRow, Select, TextInput } from "@/components/form";
 import {
   COUPON_KIND_OPTIONS,
   COUPON_UNUSABLE_LABEL_KEYS,
 } from "../customers/constants";
 import { trimAmount } from "../payments/constants";
+import { SectionCard, SectionInset } from "./SectionCard";
 
 const asDate = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
@@ -181,7 +176,7 @@ function AddCouponCard({
   };
 
   return (
-    <Card data-testid="customer-coupon-form">
+    <SectionInset data-testid="customer-coupon-form">
       <div className="flex flex-col gap-4">
         <FieldRow title={t("customer.coupon.code")} htmlFor="coupon-code">
           <TextInput
@@ -242,8 +237,7 @@ function AddCouponCard({
         </FieldRow>
       </div>
 
-      {/* -mx-6 cancels the card padding so the rule spans the full width. */}
-      <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
+      <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
           intent="ghost"
@@ -267,7 +261,7 @@ function AddCouponCard({
           </span>
         </Button>
       </div>
-    </Card>
+    </SectionInset>
   );
 }
 
@@ -278,9 +272,10 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
   const [isAdding, setIsAdding] = useState(false);
 
   return (
-    <SettingsSection
+    <SectionCard
       title={t("customer.detail.couponsTitle")}
       description={t("customer.detail.couponsLead")}
+      data-testid="customer-coupons"
       action={
         !isAdding && (
           <Button
@@ -299,21 +294,19 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
         )
       }
     >
-      <Card>
-        {coupons.length === 0 ? (
-          <p className="text-ink-muted text-sm">{t("customer.coupon.empty")}</p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {coupons.map((coupon) => (
-              <CouponRow
-                key={coupon.id}
-                customerId={customer.id}
-                coupon={coupon}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
+      {coupons.length === 0 ? (
+        <p className="text-ink-muted text-sm">{t("customer.coupon.empty")}</p>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {coupons.map((coupon) => (
+            <CouponRow
+              key={coupon.id}
+              customerId={customer.id}
+              coupon={coupon}
+            />
+          ))}
+        </div>
+      )}
 
       {isAdding && (
         <AddCouponCard
@@ -321,6 +314,6 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
           onDone={() => setIsAdding(false)}
         />
       )}
-    </SettingsSection>
+    </SectionCard>
   );
 }

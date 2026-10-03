@@ -13,18 +13,13 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Card,
-  FieldRow,
-  Select,
-  SettingsSection,
-  TextInput,
-} from "@/components/form";
+import { FieldRow, Select, TextInput } from "@/components/form";
 import {
   CREDIT_KIND_LABEL_KEYS,
   CREDIT_KIND_OPTIONS,
 } from "../customers/constants";
 import { trimAmount } from "../payments/constants";
+import { SectionCard, SectionInset } from "./SectionCard";
 
 const when = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, {
@@ -62,7 +57,7 @@ function GrantForm({
   };
 
   return (
-    <Card data-testid="customer-credit-form">
+    <SectionInset data-testid="customer-credit-form">
       <div className="flex flex-col gap-4">
         <FieldRow title={t("customer.credit.kind")} htmlFor="credit-kind">
           <Select
@@ -100,8 +95,7 @@ function GrantForm({
         </FieldRow>
       </div>
 
-      {/* -mx-6 cancels the card padding so the rule spans the full width. */}
-      <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
+      <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
           intent="ghost"
@@ -125,7 +119,7 @@ function GrantForm({
           </span>
         </Button>
       </div>
-    </Card>
+    </SectionInset>
   );
 }
 
@@ -144,9 +138,10 @@ export function CreditPanel({ customer }: { customer: Customer }) {
   const hasBalance = balance !== null && Number(balance.total) !== 0;
 
   return (
-    <SettingsSection
+    <SectionCard
       title={t("customer.detail.creditTitle")}
       description={t("customer.detail.creditLead")}
+      data-testid="customer-credit"
       action={
         !isGranting && (
           <Button
@@ -165,7 +160,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
         )
       }
     >
-      <Card
+      <div
         className="flex flex-col gap-5"
         data-testid="customer-credit-balance"
       >
@@ -205,7 +200,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
             </Button>
           </div>
         )}
-      </Card>
+      </div>
 
       {isGranting && (
         <GrantForm
@@ -215,42 +210,43 @@ export function CreditPanel({ customer }: { customer: Customer }) {
       )}
 
       {entries.length > 0 && (
-        <Card data-testid="customer-credit-ledger">
-          <div className="flex flex-col gap-4">
-            {entries.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex items-start justify-between gap-4"
-              >
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <span className="font-medium text-ink-strong text-sm">
-                    {entry.reason ?? t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Tag size="sm" variant="neutral">
-                      {t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
-                    </Tag>
-                    <span className="text-ink-muted text-sm">
-                      {when(entry.createdAt)}
-                    </span>
-                  </div>
-                </div>
-
-                <span
-                  className={
-                    entry.amount.startsWith("-")
-                      ? "shrink-0 font-medium text-danger text-sm"
-                      : "shrink-0 font-medium text-sm text-success"
-                  }
-                >
-                  {entry.amount.startsWith("-") ? "" : "+"}
-                  {trimAmount(entry.amount)}
+        <div
+          className="flex flex-col gap-4 border-overlay/10 border-t pt-5"
+          data-testid="customer-credit-ledger"
+        >
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-start justify-between gap-4"
+            >
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="font-medium text-ink-strong text-sm">
+                  {entry.reason ?? t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
                 </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Tag size="sm" variant="neutral">
+                    {t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
+                  </Tag>
+                  <span className="text-ink-muted text-sm">
+                    {when(entry.createdAt)}
+                  </span>
+                </div>
               </div>
-            ))}
-          </div>
-        </Card>
+
+              <span
+                className={
+                  entry.amount.startsWith("-")
+                    ? "shrink-0 font-medium text-danger text-sm"
+                    : "shrink-0 font-medium text-sm text-success"
+                }
+              >
+                {entry.amount.startsWith("-") ? "" : "+"}
+                {trimAmount(entry.amount)}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
-    </SettingsSection>
+    </SectionCard>
   );
 }

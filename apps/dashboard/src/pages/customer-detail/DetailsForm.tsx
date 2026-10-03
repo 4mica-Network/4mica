@@ -1,3 +1,4 @@
+import { Button, Spinner } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { updateCustomer } from "@stores/customer/actions";
 import {
@@ -10,7 +11,6 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { z } from "zod";
-import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { TYPE_OPTIONS } from "../customers/constants";
 import {
@@ -20,6 +20,7 @@ import {
   NAME_MAX_LENGTH,
   NOTES_MAX_LENGTH,
 } from "../customers/validation";
+import { SectionCard, SectionFooter } from "./SectionCard";
 
 type DetailsValues = z.infer<typeof customerDetailsSchema>;
 
@@ -91,11 +92,10 @@ export function DetailsForm({ customer }: { customer: Customer }) {
   };
 
   return (
-    <EditableCard
-      isDirty={isDirty}
-      isSaving={isSaving}
-      onSave={handleSubmit(onValid)}
-      onReset={() => reset(defaults)}
+    <SectionCard
+      title={t("customer.detail.detailsTitle")}
+      description={t("customer.detail.detailsLead")}
+      data-testid="customer-details"
     >
       <div className="flex flex-col gap-4">
         <FieldRow title={t("customer.fields.name.label")} htmlFor="detail-name">
@@ -160,6 +160,31 @@ export function DetailsForm({ customer }: { customer: Customer }) {
           />
         </FieldRow>
       </div>
-    </EditableCard>
+
+      <SectionFooter>
+        <Button
+          type="button"
+          intent="ghost"
+          size="sm"
+          disabled={!isDirty || isSaving}
+          onClick={() => reset(defaults)}
+        >
+          {t("settings.discard")}
+        </Button>
+        <Button
+          type="button"
+          intent="invert"
+          size="sm"
+          className="btn-no-lift w-20"
+          disabled={!isDirty || isSaving}
+          onClick={handleSubmit(onValid)}
+          data-testid="customer-details-save"
+        >
+          <span className="flex w-full items-center justify-center text-sm">
+            {isSaving ? <Spinner size="sm" /> : t("settings.update")}
+          </span>
+        </Button>
+      </SectionFooter>
+    </SectionCard>
   );
 }

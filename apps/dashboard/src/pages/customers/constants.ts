@@ -74,6 +74,12 @@ export const CREDIT_KIND_OPTIONS = (
   ["PROMOTIONAL", "PREPAID", "ADJUSTMENT"] as const
 ).map((value) => ({ value, titleKey: CREDIT_KIND_LABEL_KEYS[value] }));
 
+export const SUSPEND_DURATION_OPTIONS = [
+  { value: "7", titleKey: "customer.access.days" },
+  { value: "30", titleKey: "customer.access.days" },
+  { value: "90", titleKey: "customer.access.days" },
+] as const;
+
 export const COUPON_KIND_OPTIONS = [
   { value: "PERCENT", titleKey: "customer.coupon.kindPercent" },
   { value: "FIXED", titleKey: "customer.coupon.kindFixed" },
