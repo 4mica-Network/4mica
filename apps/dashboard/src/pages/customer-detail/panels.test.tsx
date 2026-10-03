@@ -27,12 +27,20 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router-dom")>()),
+  useNavigate: () => navigate,
+}));
+
 const { AccessPanel } = await import("./AccessPanel");
 const { IdentitiesPanel } = await import("./IdentitiesPanel");
 const { LimitsPanel } = await import("./LimitsPanel");
 const { PolicyPanel } = await import("./PolicyPanel");
 const { CreditPanel } = await import("./CreditPanel");
 const { CouponsPanel } = await import("./CouponsPanel");
+const { RemovePanel } = await import("./RemovePanel");
 
 const CARD = /rounded-lg border border-overlay\/10/;
 
@@ -956,5 +964,75 @@ describe("AccessPanel", () => {
     expect(
       (document.getElementById("access-reason") as HTMLInputElement).value,
     ).toBe("late payment");
+  });
+});
+
+describe("RemovePanel", () => {
+  beforeEach(() => {
+    dispatch.mockClear();
+    navigate.mockClear();
+    storeState.customer.pending = {};
+  });
+
+  const renderPanel = () =>
+    render(
+      <MemoryRouter>
+        <RemovePanel customer={customer()} />
+      </MemoryRouter>,
+    );
+
+  it("asks before removing rather than removing on the first click", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-remove-button"));
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId(
+        "customer-remove-popup-confirm-confirm-popup-dropdown",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("removes once the question is answered", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-remove-button"));
+    fireEvent.click(
+      screen.getByTestId("customer-remove-popup-confirm-confirm-popup-confirm"),
+    );
+
+    expect(dispatch.mock.calls.at(-1)?.[0]?.payload).toEqual({
+      id: "customer_1",
+    });
+  });
+
+  it("removes nothing when the question is dismissed", () => {
+    renderPanel();
+    fireEvent.click(screen.getByTestId("customer-remove-button"));
+    fireEvent.click(
+      screen.getByTestId("customer-remove-popup-confirm-confirm-popup-cancel"),
+    );
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId(
+        "customer-remove-popup-confirm-confirm-popup-dropdown",
+      ),
+    ).toBeNull();
+  });
+
+  it("leaves for the list once the delete lands", () => {
+    storeState.customer.pending = { "customer:customer_1": true };
+    const view = renderPanel();
+
+    expect(navigate).not.toHaveBeenCalled();
+
+    storeState.customer.pending = {};
+    view.rerender(
+      <MemoryRouter>
+        <RemovePanel customer={customer()} />
+      </MemoryRouter>,
+    );
+
+    expect(navigate).toHaveBeenCalledWith("/customers");
   });
 });

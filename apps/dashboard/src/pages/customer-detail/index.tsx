@@ -23,6 +23,7 @@ import { IdentitiesPanel } from "./IdentitiesPanel";
 import { LimitsPanel } from "./LimitsPanel";
 import { OverviewTiles } from "./OverviewTiles";
 import { PolicyPanel } from "./PolicyPanel";
+import { RemovePanel } from "./RemovePanel";
 
 export function CustomerDetail() {
   const { t } = useTranslation();
@@ -107,6 +108,8 @@ export function CustomerDetail() {
         <CouponsPanel customer={customer} />
 
         <ActivityPanel customerId={customer.id} />
+
+        <RemovePanel customer={customer} />
       </div>
     </div>
   );

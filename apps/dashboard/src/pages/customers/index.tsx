@@ -1,7 +1,6 @@
 import { Button, EmptyState, Pagination, Spinner } from "@4mica/ui";
 import {
   batchDeleteCustomers,
-  deleteCustomer,
   fetchCustomers,
   setCustomerPage,
 } from "@stores/customer/actions";
@@ -16,7 +15,6 @@ import {
   selectIsCustomersLoading,
   selectSelectedCustomerIds,
 } from "@stores/customer/selector";
-import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTitle } from "ahooks";
 import { Plus, TriangleAlert, Users } from "lucide-react";
@@ -44,7 +42,6 @@ export function Customers() {
   useTitle(`${t("page.customers.title")} - ${t("org")}`);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [deleting, setDeleting] = useState<Customer | null>(null);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -56,13 +53,6 @@ export function Customers() {
   );
   const showSpinner = isLoading && !hasLoaded;
   const showError = Boolean(error) && !hasLoaded && !isLoading;
-
-  const confirmDelete = () => {
-    if (deleting) {
-      dispatch(deleteCustomer({ id: deleting.id }));
-      setDeleting(null);
-    }
-  };
 
   const confirmBatchDelete = () => {
     dispatch(batchDeleteCustomers({ ids: selectedIds }));
@@ -153,11 +143,7 @@ export function Customers() {
         ) : (
           <div className="divide-y divide-overlay/10 overflow-hidden rounded-lg border border-overlay/10">
             {customers.map((customer) => (
-              <CustomerRow
-                key={customer.id}
-                customer={customer}
-                onDelete={setDeleting}
-              />
+              <CustomerRow key={customer.id} customer={customer} />
             ))}
           </div>
         )}
@@ -186,14 +172,11 @@ export function Customers() {
       />
 
       <DeleteCustomerDialog
-        customer={deleting}
+        customer={null}
         count={selectedIds.length}
-        isOpen={Boolean(deleting) || isBatchDeleteOpen}
-        onConfirm={deleting ? confirmDelete : confirmBatchDelete}
-        onClose={() => {
-          setDeleting(null);
-          setIsBatchDeleteOpen(false);
-        }}
+        isOpen={isBatchDeleteOpen}
+        onConfirm={confirmBatchDelete}
+        onClose={() => setIsBatchDeleteOpen(false)}
       />
     </div>
   );

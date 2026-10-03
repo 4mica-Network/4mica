@@ -1019,5 +1019,13 @@
   "customer.coupon.emptyTitle": "No coupons yet",
   "customer.coupon.emptyDescription": "Give this customer a code and it applies to what they owe.",
   "customer.limits.emptyTitle": "No limits set",
-  "customer.limits.emptyDescription": "Add one to track this customer against an expected spend."
+  "customer.limits.emptyDescription": "Add one to track this customer against an expected spend.",
+  "customer.detail.removeTitle": "Remove customer",
+  "customer.detail.removeLead": "Take this customer off your list.",
+  "customer.remove.cta": "Remove customer",
+  "customer.remove.hint": "Their payments stay on your ledger, and the wallets they claimed become free to map to someone else.",
+  "customer.remove.confirmTitle": "Remove this customer?",
+  "customer.remove.confirmDescription": "You will be taken back to the customer list.",
+  "customer.remove.confirm": "Remove",
+  "customer.remove.cancel": "Cancel"
 }

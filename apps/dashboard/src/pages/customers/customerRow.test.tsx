@@ -72,7 +72,7 @@ const customer = (over: Partial<Customer> = {}): Customer => ({
 const renderRow = (over: Partial<Customer> = {}) =>
   render(
     <MemoryRouter>
-      <CustomerRow customer={customer(over)} onDelete={() => {}} />
+      <CustomerRow customer={customer(over)} />
     </MemoryRouter>,
   );
 
@@ -85,34 +85,25 @@ describe("CustomerRow", () => {
     ).toBe("/customers/customer_1");
   });
 
-  it("trims the trailing zeros off a spend amount", () => {
-    renderRow();
-
-    expect(screen.getByText("0.34")).toBeInTheDocument();
-  });
-
-  it("shows a dash-free placeholder when there is no spend", () => {
-    renderRow({ totalSpend: [] });
-
-    expect(screen.getByText("customer.row.noSpend")).toBeInTheDocument();
-  });
-
   it("shortens the wallet address rather than overflowing the row", () => {
     renderRow();
 
     expect(screen.getByText("0x8a1c…7e90")).toBeInTheDocument();
   });
 
-  it("says when the customer was last active", () => {
+  it("leaves the spend figures to the customer's own page", () => {
     renderRow();
 
-    expect(screen.getByText("12m ago")).toBeInTheDocument();
+    expect(screen.queryByText("0.34")).toBeNull();
+    expect(screen.queryByText("customer.row.noSpend")).toBeNull();
+    expect(screen.queryByText("customer.row.neverActive")).toBeNull();
   });
 
-  it("says so when the customer has never paid", () => {
-    renderRow({ lastActiveAt: null });
+  it("carries no row menu, so removal happens on the detail page", () => {
+    renderRow();
 
-    expect(screen.getByText("customer.row.neverActive")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-more-customer_1")).toBeNull();
+    expect(screen.queryByTestId("customer-delete-customer_1")).toBeNull();
   });
 
   it("marks a blocked customer with the danger variant", () => {

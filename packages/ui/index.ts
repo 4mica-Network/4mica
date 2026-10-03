@@ -34,6 +34,12 @@ export {
   Pagination,
   type PaginationProps,
 } from "./components/pagination";
+export {
+  ConfirmPopup,
+  type ConfirmPopupProps,
+  PopupConfirm,
+  type PopupConfirmProps,
+} from "./components/popup-confirm";
 export { type Option, Select, type SelectProps } from "./components/select";
 export {
   Spinner,
