@@ -50,6 +50,52 @@ export function SectionFooter({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * A list inside a section. `-mx-6` lets the rows meet the card edge, so a list
+ * reads as a list rather than a floating block inside the padding.
+ */
+export function SectionRows({
+  children,
+  "data-testid": testId,
+}: {
+  children: ReactNode;
+  "data-testid"?: string;
+}) {
+  return (
+    <div
+      className="-mx-6 divide-y divide-overlay/10 border-overlay/10 border-y"
+      data-testid={testId}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** One row in a SectionRows list, with its actions revealed on hover. */
+export function SectionRow({
+  children,
+  actions,
+  "data-testid": testId,
+}: {
+  children: ReactNode;
+  actions?: ReactNode;
+  "data-testid"?: string;
+}) {
+  return (
+    <div
+      className="group flex items-start justify-between gap-4 px-6 py-4 transition-colors hover:bg-overlay/5"
+      data-testid={testId}
+    >
+      {children}
+      {actions && (
+        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+          {actions}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A nested editor inside a section, set apart without a second card. */
 export function SectionInset({
   children,

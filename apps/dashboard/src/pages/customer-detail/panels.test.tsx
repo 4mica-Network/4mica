@@ -141,14 +141,25 @@ describe("IdentitiesPanel", () => {
     );
   });
 
-  it("keeps no rule between the identity rows", () => {
+  it("rules the identity rows apart", () => {
     renderPanel();
 
-    const card = screen
-      .getByTestId("customer-identity-identity_1")
-      .closest(`[class*="rounded-lg"]`);
+    const list = screen.getByTestId(
+      "customer-identity-identity_1",
+    ).parentElement;
 
-    expect(card?.innerHTML).not.toContain("divide-y");
+    expect(list?.className).toContain("divide-y");
+  });
+
+  it("keeps the row actions hidden until the row is hovered", () => {
+    renderPanel();
+
+    const actions = screen
+      .getByTestId("customer-identity-remove-identity_1")
+      .closest("div");
+
+    expect(actions?.className).toContain("lg:opacity-0");
+    expect(actions?.className).toContain("lg:group-hover:opacity-100");
   });
 
   it("leads a wallet identity with its address and an explorer link", () => {
@@ -224,12 +235,15 @@ describe("IdentitiesPanel", () => {
     expect(screen.getByTestId("customer-identity-add")).toBeInTheDocument();
   });
 
-  it("explains itself in a card when there are no identities", () => {
+  it("shows an empty state rather than a bare line when there are none", () => {
     renderPanel({ identities: [] });
 
-    const empty = screen.getByText("customer.identity.empty");
-
-    expect(empty.closest("div")?.className).toMatch(CARD);
+    expect(
+      screen.getByTestId("customer-identity-empty-empty-state"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("customer.identity.emptyTitle"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -288,12 +302,12 @@ describe("LimitsPanel", () => {
     expect(card.textContent).not.toContain("customer.limits.spent");
   });
 
-  it("explains itself in a card when no limits are set", () => {
+  it("shows an empty state when no limits are set", () => {
     renderPanel({ dailyLimit: null, monthlyLimit: null });
 
-    const empty = screen.getByText("customer.limits.none");
-
-    expect(empty.closest("div")?.className).toMatch(CARD);
+    expect(
+      screen.getByTestId("customer-limits-empty-empty-state"),
+    ).toBeInTheDocument();
   });
 
   it("omits a limit card the customer does not have", () => {
@@ -359,12 +373,12 @@ describe("LimitsPanel", () => {
     expect(card.textContent).not.toContain("customer.limits.spent");
   });
 
-  it("explains itself in a card when no limits are set", () => {
+  it("shows an empty state when no limits are set", () => {
     renderPanel({ dailyLimit: null, monthlyLimit: null });
 
-    const empty = screen.getByText("customer.limits.none");
-
-    expect(empty.closest("div")?.className).toMatch(CARD);
+    expect(
+      screen.getByTestId("customer-limits-empty-empty-state"),
+    ).toBeInTheDocument();
   });
 
   it("omits a limit card the customer does not have", () => {
@@ -678,10 +692,33 @@ describe("CouponsPanel", () => {
   const renderPanel = () => render(<CouponsPanel customer={customer()} />);
   const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
 
-  it("says so when there are no coupons", () => {
+  it("shows an empty state rather than a bare line when there are none", () => {
     renderPanel();
 
-    expect(screen.getByText("customer.coupon.empty")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("customer-coupon-empty-empty-state"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("customer.coupon.emptyTitle")).toBeInTheDocument();
+  });
+
+  it("rules the coupon rows apart", () => {
+    storeState.customer.detail.coupons = [coupon()];
+    renderPanel();
+
+    const list = screen.getByTestId("customer-coupon-coupon_1").parentElement;
+
+    expect(list?.className).toContain("divide-y");
+  });
+
+  it("keeps the coupon actions hidden until the row is hovered", () => {
+    storeState.customer.detail.coupons = [coupon()];
+    renderPanel();
+
+    const actions = screen
+      .getByTestId("customer-coupon-remove-coupon_1")
+      .closest("div");
+
+    expect(actions?.className).toContain("lg:opacity-0");
   });
 
   it("lists a coupon with its code and worth", () => {

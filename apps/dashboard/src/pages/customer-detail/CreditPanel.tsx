@@ -19,7 +19,12 @@ import {
   CREDIT_KIND_OPTIONS,
 } from "../customers/constants";
 import { trimAmount } from "../payments/constants";
-import { SectionCard, SectionInset } from "./SectionCard";
+import {
+  SectionCard,
+  SectionInset,
+  SectionRow,
+  SectionRows,
+} from "./SectionCard";
 
 const when = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, {
@@ -210,15 +215,9 @@ export function CreditPanel({ customer }: { customer: Customer }) {
       )}
 
       {entries.length > 0 && (
-        <div
-          className="flex flex-col gap-4 border-overlay/10 border-t pt-5"
-          data-testid="customer-credit-ledger"
-        >
+        <SectionRows data-testid="customer-credit-ledger">
           {entries.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-start justify-between gap-4"
-            >
+            <SectionRow key={entry.id}>
               <div className="flex min-w-0 flex-col gap-1.5">
                 <span className="font-medium text-ink-strong text-sm">
                   {entry.reason ?? t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
@@ -243,9 +242,9 @@ export function CreditPanel({ customer }: { customer: Customer }) {
                 {entry.amount.startsWith("-") ? "" : "+"}
                 {trimAmount(entry.amount)}
               </span>
-            </div>
+            </SectionRow>
           ))}
-        </div>
+        </SectionRows>
       )}
     </SectionCard>
   );

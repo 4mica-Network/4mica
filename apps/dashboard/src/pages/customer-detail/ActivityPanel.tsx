@@ -10,7 +10,7 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { ArrowRightLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PaymentRow } from "../payments/PaymentRow";
-import { SectionCard } from "./SectionCard";
+import { SectionCard, SectionRows } from "./SectionCard";
 
 export function ActivityPanel({ customerId }: { customerId: string }) {
   const { t } = useTranslation();
@@ -36,12 +36,11 @@ export function ActivityPanel({ customerId }: { customerId: string }) {
         />
       ) : (
         <>
-          {/* -mx-6 lets the rows meet the card edge, as a list should. */}
-          <div className="-mx-6 divide-y divide-overlay/10 border-overlay/10 border-y">
+          <SectionRows>
             {items.map((payment) => (
               <PaymentRow key={payment.id} payment={payment} />
             ))}
-          </div>
+          </SectionRows>
 
           <div className="flex justify-end">
             <Pagination

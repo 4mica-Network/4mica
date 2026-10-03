@@ -1,5 +1,6 @@
-import { cn } from "@4mica/ui";
+import { cn, EmptyState } from "@4mica/ui";
 import type { Customer, CustomerOverview } from "@stores/customer/type";
+import { Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { trimAmount } from "../payments/constants";
 import { SectionCard } from "./SectionCard";
@@ -86,7 +87,12 @@ export function LimitsPanel({
       data-testid="customer-limits"
     >
       {!customer.dailyLimit && !customer.monthlyLimit ? (
-        <p className="text-ink-muted text-sm">{t("customer.limits.none")}</p>
+        <EmptyState
+          icon={<Gauge className="h-5 w-5" />}
+          title={t("customer.limits.emptyTitle")}
+          description={t("customer.limits.emptyDescription")}
+          data-testid="customer-limits-empty"
+        />
       ) : (
         <div className="flex flex-col gap-5">
           {customer.monthlyLimit && (

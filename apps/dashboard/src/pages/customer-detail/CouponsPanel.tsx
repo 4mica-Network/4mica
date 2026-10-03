@@ -1,4 +1,4 @@
-import { Button, Spinner, Tag } from "@4mica/ui";
+import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
 import {
   createCustomerCoupon,
   deleteCustomerCoupon,
@@ -14,7 +14,7 @@ import type {
   CustomerCouponKind,
 } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Ban, Plus, ShieldCheck, TicketPercent, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
@@ -23,7 +23,12 @@ import {
   COUPON_UNUSABLE_LABEL_KEYS,
 } from "../customers/constants";
 import { trimAmount } from "../payments/constants";
-import { SectionCard, SectionInset } from "./SectionCard";
+import {
+  SectionCard,
+  SectionInset,
+  SectionRow,
+  SectionRows,
+} from "./SectionCard";
 
 const asDate = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
@@ -47,9 +52,59 @@ function CouponRow({
   );
 
   return (
-    <div
-      className="flex items-start justify-between gap-4"
+    <SectionRow
       data-testid={`customer-coupon-${coupon.id}`}
+      actions={
+        <>
+          {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
+
+          <Button
+            type="button"
+            intent="ghost"
+            size="sm"
+            className="btn-no-lift"
+            disabled={isPending}
+            aria-label={
+              coupon.revokedAt
+                ? t("customer.coupon.restore")
+                : t("customer.coupon.revoke")
+            }
+            onClick={() =>
+              dispatch(
+                updateCustomerCoupon({
+                  id: customerId,
+                  couponId: coupon.id,
+                  data: { revoked: !coupon.revokedAt },
+                }),
+              )
+            }
+            data-testid={`customer-coupon-revoke-${coupon.id}`}
+          >
+            {coupon.revokedAt ? (
+              <ShieldCheck className="h-4 w-4" />
+            ) : (
+              <Ban className="h-4 w-4" />
+            )}
+          </Button>
+
+          <Button
+            type="button"
+            intent="ghost"
+            size="sm"
+            className="btn-no-lift text-danger"
+            disabled={isPending}
+            aria-label={t("customer.coupon.remove")}
+            onClick={() =>
+              dispatch(
+                deleteCustomerCoupon({ id: customerId, couponId: coupon.id }),
+              )
+            }
+            data-testid={`customer-coupon-remove-${coupon.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      }
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
@@ -87,57 +142,7 @@ function CouponRow({
             : ` · ${t("customer.coupon.noExpiry")}`}
         </span>
       </div>
-
-      <div className="flex shrink-0 items-center gap-0.5">
-        {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
-
-        <Button
-          type="button"
-          intent="ghost"
-          size="sm"
-          className="btn-no-lift"
-          disabled={isPending}
-          aria-label={
-            coupon.revokedAt
-              ? t("customer.coupon.restore")
-              : t("customer.coupon.revoke")
-          }
-          onClick={() =>
-            dispatch(
-              updateCustomerCoupon({
-                id: customerId,
-                couponId: coupon.id,
-                data: { revoked: !coupon.revokedAt },
-              }),
-            )
-          }
-          data-testid={`customer-coupon-revoke-${coupon.id}`}
-        >
-          {coupon.revokedAt ? (
-            <ShieldCheck className="h-4 w-4" />
-          ) : (
-            <Ban className="h-4 w-4" />
-          )}
-        </Button>
-
-        <Button
-          type="button"
-          intent="ghost"
-          size="sm"
-          className="btn-no-lift text-danger"
-          disabled={isPending}
-          aria-label={t("customer.coupon.remove")}
-          onClick={() =>
-            dispatch(
-              deleteCustomerCoupon({ id: customerId, couponId: coupon.id }),
-            )
-          }
-          data-testid={`customer-coupon-remove-${coupon.id}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+    </SectionRow>
   );
 }
 
@@ -295,9 +300,14 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
       }
     >
       {coupons.length === 0 ? (
-        <p className="text-ink-muted text-sm">{t("customer.coupon.empty")}</p>
+        <EmptyState
+          icon={<TicketPercent className="h-5 w-5" />}
+          title={t("customer.coupon.emptyTitle")}
+          description={t("customer.coupon.emptyDescription")}
+          data-testid="customer-coupon-empty"
+        />
       ) : (
-        <div className="flex flex-col gap-5">
+        <SectionRows>
           {coupons.map((coupon) => (
             <CouponRow
               key={coupon.id}
@@ -305,7 +315,7 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
               coupon={coupon}
             />
           ))}
-        </div>
+        </SectionRows>
       )}
 
       {isAdding && (

@@ -1,4 +1,4 @@
-import { Button, Spinner, Tag } from "@4mica/ui";
+import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   addCustomerIdentity,
@@ -11,7 +11,14 @@ import {
 } from "@stores/customer/selector";
 import type { Customer, CustomerIdentity } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { ArrowUpRight, Ban, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  ArrowUpRight,
+  Ban,
+  Fingerprint,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -28,7 +35,12 @@ import {
   IDENTITY_TYPE_OPTIONS,
 } from "../customers/constants";
 import { type IdentityValues, identitySchema } from "../customers/validation";
-import { SectionCard, SectionInset } from "./SectionCard";
+import {
+  SectionCard,
+  SectionInset,
+  SectionRow,
+  SectionRows,
+} from "./SectionCard";
 
 const PENDING_KEY = "customerIdentity";
 
@@ -47,9 +59,62 @@ function IdentityRow({
   );
 
   return (
-    <div
-      className="flex items-start justify-between gap-4"
+    <SectionRow
       data-testid={`customer-identity-${identity.id}`}
+      actions={
+        <>
+          {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
+
+          <Button
+            type="button"
+            intent="ghost"
+            size="sm"
+            className="btn-no-lift"
+            disabled={isPending}
+            aria-label={
+              identity.blockedAt
+                ? t("customer.identity.unblock")
+                : t("customer.identity.block")
+            }
+            onClick={() =>
+              dispatch(
+                updateCustomerIdentity({
+                  id: customerId,
+                  identityId: identity.id,
+                  data: { blocked: !identity.blockedAt },
+                }),
+              )
+            }
+            data-testid={`customer-identity-block-${identity.id}`}
+          >
+            {identity.blockedAt ? (
+              <ShieldCheck className="h-4 w-4" />
+            ) : (
+              <Ban className="h-4 w-4" />
+            )}
+          </Button>
+
+          <Button
+            type="button"
+            intent="ghost"
+            size="sm"
+            className="btn-no-lift text-danger"
+            disabled={isPending}
+            aria-label={t("customer.identity.remove")}
+            onClick={() =>
+              dispatch(
+                removeCustomerIdentity({
+                  id: customerId,
+                  identityId: identity.id,
+                }),
+              )
+            }
+            data-testid={`customer-identity-remove-${identity.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      }
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         {identity.address && identity.network ? (
@@ -103,60 +168,7 @@ function IdentityRow({
           </span>
         )}
       </div>
-
-      <div className="flex shrink-0 items-center gap-0.5">
-        {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
-
-        <Button
-          type="button"
-          intent="ghost"
-          size="sm"
-          className="btn-no-lift"
-          disabled={isPending}
-          aria-label={
-            identity.blockedAt
-              ? t("customer.identity.unblock")
-              : t("customer.identity.block")
-          }
-          onClick={() =>
-            dispatch(
-              updateCustomerIdentity({
-                id: customerId,
-                identityId: identity.id,
-                data: { blocked: !identity.blockedAt },
-              }),
-            )
-          }
-          data-testid={`customer-identity-block-${identity.id}`}
-        >
-          {identity.blockedAt ? (
-            <ShieldCheck className="h-4 w-4" />
-          ) : (
-            <Ban className="h-4 w-4" />
-          )}
-        </Button>
-
-        <Button
-          type="button"
-          intent="ghost"
-          size="sm"
-          className="btn-no-lift text-danger"
-          disabled={isPending}
-          aria-label={t("customer.identity.remove")}
-          onClick={() =>
-            dispatch(
-              removeCustomerIdentity({
-                id: customerId,
-                identityId: identity.id,
-              }),
-            )
-          }
-          data-testid={`customer-identity-remove-${identity.id}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+    </SectionRow>
   );
 }
 
@@ -363,9 +375,14 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
       }
     >
       {customer.identities.length === 0 ? (
-        <p className="text-ink-muted text-sm">{t("customer.identity.empty")}</p>
+        <EmptyState
+          icon={<Fingerprint className="h-5 w-5" />}
+          title={t("customer.identity.emptyTitle")}
+          description={t("customer.identity.emptyDescription")}
+          data-testid="customer-identity-empty"
+        />
       ) : (
-        <div className="flex flex-col gap-5">
+        <SectionRows>
           {customer.identities.map((identity) => (
             <IdentityRow
               key={identity.id}
@@ -373,7 +390,7 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
               identity={identity}
             />
           ))}
-        </div>
+        </SectionRows>
       )}
 
       {isAdding && (

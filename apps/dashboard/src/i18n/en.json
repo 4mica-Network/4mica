@@ -884,7 +884,6 @@
   "customer.identity.sourceApi": "Added by API",
   "customer.identity.sourceVerified": "Ownership proved",
   "customer.identity.sourceDiscovered": "Discovered",
-  "customer.identity.empty": "No payment identities yet.",
   "customer.identity.add": "Add identity",
   "customer.identity.save": "Attach",
   "customer.identity.cancel": "Cancel",
@@ -899,7 +898,6 @@
   "customer.identity.ongoing": "now",
   "customer.limits.monthly": "Monthly limit",
   "customer.limits.daily": "Daily limit",
-  "customer.limits.none": "No limits set.",
   "customer.limits.within": "{{percent}}% of the limit used",
   "customer.limits.over": "Over the limit, at {{percent}}%",
   "customer.activity.emptyTitle": "No payments yet",
@@ -984,7 +982,6 @@
   "customer.detail.couponsTitle": "Coupons",
   "customer.detail.couponsLead": "Discount codes only this customer can use.",
   "customer.coupon.add": "Add coupon",
-  "customer.coupon.empty": "No coupons yet.",
   "customer.coupon.code": "Code",
   "customer.coupon.kind": "Discount",
   "customer.coupon.kindPercent": "Percentage off",
@@ -1016,5 +1013,11 @@
   "customer.access.status": "Status",
   "customer.access.suspendFor": "Suspend for",
   "customer.access.days_one": "{{count}} day",
-  "customer.access.days_other": "{{count}} days"
+  "customer.access.days_other": "{{count}} days",
+  "customer.identity.emptyTitle": "No payment identities yet",
+  "customer.identity.emptyDescription": "Attach a wallet to start matching payments to this customer.",
+  "customer.coupon.emptyTitle": "No coupons yet",
+  "customer.coupon.emptyDescription": "Give this customer a code and it applies to what they owe.",
+  "customer.limits.emptyTitle": "No limits set",
+  "customer.limits.emptyDescription": "Add one to track this customer against an expected spend."
 }
