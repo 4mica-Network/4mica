@@ -642,6 +642,38 @@ export const customerCouponListResponseSchema = {
   },
 } as const;
 
+export const customerResolveResponseSchema = {
+  type: "object",
+  required: ["allowed", "gross", "payable", "needsApproval"],
+  properties: {
+    customerId: nullStr,
+    allowed: bool,
+    deniedReason: {
+      type: "string",
+      nullable: true,
+      enum: [
+        "customer_blocked",
+        "customer_suspended",
+        "identity_blocked",
+        "below_minimum",
+        null,
+      ],
+    },
+    needsApproval: bool,
+    gross: str,
+    quotaApplied: str,
+    couponApplied: str,
+    discountApplied: str,
+    creditApplied: str,
+    payable: str,
+    couponSkippedReason: {
+      type: "string",
+      nullable: true,
+      enum: ["unknown", "revoked", "expired", "exhausted", null],
+    },
+  },
+} as const;
+
 export const customerListResponseSchema = {
   type: "object",
   required: ["items", "total", "page", "limit"],

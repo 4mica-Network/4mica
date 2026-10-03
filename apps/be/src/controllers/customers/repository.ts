@@ -985,6 +985,75 @@ export const deleteCoupon = async (
   return count > 0;
 };
 
+export interface ResolvedPayer {
+  customer: RawCustomer & { id: string };
+  identityBlocked: boolean;
+}
+
+/**
+ * Finds the customer that claims this payer, matching on network and address
+ * together and honouring the identity's validity window at `at`. A blocked
+ * identity still resolves, because the caller has to be told it is refused
+ * rather than that the payer is unknown.
+ */
+export const resolveCustomerForPayer = async (
+  ownerId: string,
+  network: string,
+  address: string,
+  at = new Date(),
+): Promise<ResolvedPayer | null> => {
+  const identity = await prisma.customerPaymentIdentity.findFirst({
+    where: {
+      ownerId,
+      type: "WALLET",
+      address,
+      network: network as never,
+      customer: { deletedAt: null },
+      AND: [
+        { OR: [{ validFrom: null }, { validFrom: { lte: at } }] },
+        { OR: [{ validUntil: null }, { validUntil: { gt: at } }] },
+      ],
+    },
+    select: {
+      blockedAt: true,
+      customer: { select: CUSTOMER_SELECT },
+    },
+  });
+
+  if (!identity?.customer) {
+    return null;
+  }
+
+  return {
+    customer: identity.customer,
+    identityBlocked: identity.blockedAt !== null,
+  };
+};
+
+export const findCouponByCode = async (
+  ownerId: string,
+  customerId: string,
+  code: string,
+): Promise<CustomerCouponRow | null> => {
+  const row = await prisma.customerCoupon.findFirst({
+    where: { ownerId, customerId, code },
+    select: CUSTOMER_COUPON_SELECT,
+  });
+
+  return row ? toCouponRow(row) : null;
+};
+
+/** The allowance left for a customer already loaded, without re-reading it. */
+export const quotaRemainingFor = async (
+  ownerId: string,
+  customer: RawCustomer & { id: string },
+): Promise<string | null> => {
+  const addresses = await walletAddressesFor(ownerId);
+  const usage = await quotaUsageFor(ownerId, customer.id, customer, addresses);
+
+  return usage.remaining;
+};
+
 export const updateIdentity = async (
   ownerId: string,
   customerId: string,

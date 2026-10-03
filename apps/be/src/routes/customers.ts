@@ -1,3 +1,4 @@
+import { authenticateApiKey } from "@auth/api-key";
 import {
   addCustomerIdentityHandler,
   batchDeleteCustomersHandler,
@@ -15,6 +16,7 @@ import {
   listCustomersHandler,
   removeCustomerIdentityHandler,
   resetCustomerUsageHandler,
+  resolveCustomerHandler,
   setCustomerPolicyHandler,
   setCustomerStatusHandler,
   updateCustomerCouponHandler,
@@ -34,6 +36,7 @@ import {
   customerCreditResponseSchema,
   customerListResponseSchema,
   customerOverviewResponseSchema,
+  customerResolveResponseSchema,
   customerResponseSchema,
   errorResponseSchema,
   limitedResponses,
@@ -593,6 +596,27 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     customerBreakdownHandler,
+  );
+
+  app.post(
+    "/v1/customers/resolve",
+    {
+      onRequest: [authenticateApiKey],
+      schema: {
+        tags: ["customers"],
+        summary: "What this payer owes, and whether they may pay at all",
+        description:
+          "Applies the customer's access rules and pricing to a gross amount: allowance first, then the coupon, then the standing discounts, then credit. Read only — it spends no allowance, redeems no coupon and draws down no credit, so it is safe to call before every paid request. An unrecognised payer is allowed at full price rather than refused.",
+        security: [{ apiKeyAuth: [] }],
+        response: {
+          ...limitedResponses,
+          200: customerResolveResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+    },
+    resolveCustomerHandler,
   );
 
   done();

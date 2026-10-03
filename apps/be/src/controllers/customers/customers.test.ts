@@ -8,6 +8,7 @@ const {
   getUser,
   findUnique,
   upsert,
+  apiKey,
   customer,
   customerCoupon,
   customerCreditEntry,
@@ -42,11 +43,13 @@ const {
   },
   customerPaymentIdentity: {
     create: vi.fn(),
+    findFirst: vi.fn(),
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
     count: vi.fn(),
   },
   wallet: { findMany: vi.fn() },
+  apiKey: { findUnique: vi.fn(), update: vi.fn() },
   queryRaw: vi.fn(),
   // Enough of Prisma.Decimal for the quota arithmetic the repository does.
   // The raw text is kept so a scale like "10.50" survives, as it does in the
@@ -96,6 +99,7 @@ vi.mock("@4mica/db", () => ({
     Decimal: FakeDecimal,
   },
   prisma: {
+    apiKey,
     customer,
     customerCoupon,
     customerCreditEntry,
@@ -155,6 +159,17 @@ const signedOut = () => ({
 });
 
 const AUTH = { authorization: "Bearer good" };
+const API_KEY = "4mica_sk_abcdefghijklmnop";
+const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
+
+const storedKey = (over: Record<string, unknown> = {}) => ({
+  id: "key_1",
+  ownerId: USER_ID,
+  revokedAt: null,
+  expiresAt: null,
+  owner: { banned: false, deletedAt: null },
+  ...over,
+});
 
 const decimal = (value: string) => new FakeDecimal(value);
 
@@ -291,6 +306,7 @@ describe("customer routes", () => {
       mock.mockReset();
     }
     for (const group of [
+      apiKey,
       customer,
       customerCoupon,
       customerCreditEntry,
@@ -317,6 +333,9 @@ describe("customer routes", () => {
     customerPaymentIdentity.create.mockResolvedValue(storedIdentity());
     customerPaymentIdentity.updateMany.mockResolvedValue({ count: 1 });
     customerPaymentIdentity.deleteMany.mockResolvedValue({ count: 1 });
+    apiKey.findUnique.mockResolvedValue(storedKey());
+    apiKey.update.mockResolvedValue({});
+    customerPaymentIdentity.findFirst.mockResolvedValue(null);
     customerCoupon.findMany.mockResolvedValue([]);
     customerCoupon.updateMany.mockResolvedValue({ count: 1 });
     customerCoupon.deleteMany.mockResolvedValue({ count: 1 });
@@ -1749,6 +1768,243 @@ describe("customer routes", () => {
       });
 
       expect(response.json().items[0].value).toBe("12.50");
+
+      await instance.close();
+    });
+  });
+
+  describe("resolving a price", () => {
+    const resolve = (payload: Record<string, unknown>) => ({
+      method: "POST" as const,
+      url: "/v1/customers/resolve",
+      headers: KEY_AUTH,
+      payload: {
+        payerAddress: PAYER,
+        network: "BASE_SEPOLIA",
+        amount: "1.00",
+        ...payload,
+      },
+    });
+
+    const claims = (over: Record<string, unknown> = {}) => ({
+      blockedAt: null,
+      customer: storedCustomer(over),
+    });
+
+    it("requires an API key, not a session", async () => {
+      const instance = await app();
+
+      const noKey = await instance.inject({
+        method: "POST",
+        url: "/v1/customers/resolve",
+        payload: {},
+      });
+      expect(noKey.statusCode).toBe(401);
+
+      apiKey.findUnique.mockResolvedValue(null);
+      const badKey = await instance.inject(resolve({}));
+      expect(badKey.statusCode).toBe(401);
+
+      await instance.close();
+    });
+
+    it("charges an unrecognised payer the full price", async () => {
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        customerId: null,
+        allowed: true,
+        gross: "1.00",
+        payable: "1.00",
+      });
+
+      await instance.close();
+    });
+
+    it("matches a payer on network and address together", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(claims());
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where,
+      ).toMatchObject({
+        ownerId: USER_ID,
+        type: "WALLET",
+        address: PAYER,
+        network: "BASE_SEPOLIA",
+      });
+
+      await instance.close();
+    });
+
+    it("refuses a blocked customer", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ status: "BLOCKED" }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "customer_blocked",
+      });
+
+      await instance.close();
+    });
+
+    it("refuses a blocked wallet while the customer stays active", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue({
+        blockedAt: new Date(),
+        customer: storedCustomer(),
+      });
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "identity_blocked",
+      });
+
+      await instance.close();
+    });
+
+    it("applies a percentage discount", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ discountPercent: decimal("10") }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "10" }));
+
+      expect(response.json()).toMatchObject({
+        discountApplied: "1",
+        payable: "9",
+      });
+
+      await instance.close();
+    });
+
+    it("draws down the credit balance", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(claims());
+      customerCreditEntry.groupBy.mockResolvedValue([
+        { kind: "PREPAID", _sum: { amount: decimal("4") } },
+      ]);
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "10" }));
+
+      expect(response.json()).toMatchObject({
+        creditApplied: "4",
+        payable: "6",
+      });
+
+      await instance.close();
+    });
+
+    it("applies a coupon the caller named", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(claims());
+      customerCoupon.findFirst.mockResolvedValue(
+        storedCoupon({ kind: "FIXED", value: decimal("2") }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "10", couponCode: "welcome10" }),
+      );
+
+      expect(response.json()).toMatchObject({
+        couponApplied: "2",
+        payable: "8",
+      });
+
+      await instance.close();
+    });
+
+    it("says when a named coupon does not exist", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(claims());
+      customerCoupon.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "10", couponCode: "NOPE" }),
+      );
+
+      expect(response.json()).toMatchObject({
+        couponApplied: "0",
+        couponSkippedReason: "unknown",
+        payable: "10",
+      });
+
+      await instance.close();
+    });
+
+    it("flags a call above the approval threshold but allows it", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "150" }));
+
+      expect(response.json()).toMatchObject({
+        allowed: true,
+        needsApproval: true,
+      });
+
+      await instance.close();
+    });
+
+    it("spends nothing: no write touches the ledger or the quota", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(claims());
+      customerCoupon.findFirst.mockResolvedValue(storedCoupon());
+
+      const instance = await app();
+      await instance.inject(resolve({ amount: "10", couponCode: "WELCOME10" }));
+
+      expect(customer.updateMany).not.toHaveBeenCalled();
+      expect(customer.update).not.toHaveBeenCalled();
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+      expect(customerCoupon.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses an amount that is not positive", async () => {
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "0" }));
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses an address that is not checksummed", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ payerAddress: "0xnope" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("scopes the payer lookup to the key's owner", async () => {
+      apiKey.findUnique.mockResolvedValue(storedKey({ ownerId: "other" }));
+      customerPaymentIdentity.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(
+        customerPaymentIdentity.findFirst.mock.calls[0][0].where.ownerId,
+      ).toBe("other");
 
       await instance.close();
     });

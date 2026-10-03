@@ -1,3 +1,4 @@
+import { requireApiKeyOwner } from "@auth/api-key";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
@@ -6,6 +7,7 @@ import {
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
+import { priceFor } from "@services/customer-pricing";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
@@ -21,14 +23,17 @@ import {
   customerBreakdown,
   customerOverview,
   deleteCoupon,
+  findCouponByCode,
   getCustomer,
   grantCredit,
   listCoupons,
   listCreditEntries,
   listCustomers,
   ownsCustomer,
+  quotaRemainingFor,
   removeIdentity,
   resetCustomerUsage,
+  resolveCustomerForPayer,
   setCustomerPolicy,
   setCustomerStatus,
   softDeleteCustomer,
@@ -45,6 +50,7 @@ import {
   CustomerIdentitySchema,
   GrantCustomerCreditSchema,
   ListCustomersQuerySchema,
+  ResolveCustomerSchema,
   SetCustomerPolicySchema,
   SetCustomerStatusSchema,
   UpdateCustomerCouponSchema,
@@ -537,6 +543,82 @@ export const deleteCustomerCouponHandler: RouteHandler = async (
   }
 
   return notFound(reply, "coupon");
+};
+
+/**
+ * What a payer owes for a call, and whether they may make it at all. Read
+ * only: nothing here spends the allowance, redeems the coupon or draws down
+ * credit — the caller reports the payment afterwards as it always did.
+ */
+export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
+  const ownerId = requireApiKeyOwner(request, reply);
+  if (!ownerId) {
+    return reply;
+  }
+
+  const parsed = parseBody(ResolveCustomerSchema, request.body);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { payerAddress, network, amount, couponCode } = parsed.data;
+  const resolved = await resolveCustomerForPayer(
+    ownerId,
+    network,
+    payerAddress,
+  );
+
+  // An unrecognised payer is not an error: they simply pay the full price.
+  if (!resolved) {
+    return reply.send({
+      customerId: null,
+      allowed: true,
+      deniedReason: null,
+      needsApproval: false,
+      gross: amount,
+      quotaApplied: "0",
+      couponApplied: "0",
+      discountApplied: "0",
+      creditApplied: "0",
+      payable: amount,
+      couponSkippedReason: couponCode ? "unknown" : null,
+    });
+  }
+
+  const { customer, identityBlocked } = resolved;
+
+  const [quotaRemaining, credit, coupon] = await Promise.all([
+    quotaRemainingFor(ownerId, customer),
+    creditBalance(ownerId, customer.id),
+    couponCode
+      ? findCouponByCode(ownerId, customer.id, couponCode)
+      : Promise.resolve(null),
+  ]);
+
+  const result = priceFor({
+    amount,
+    status: customer.status,
+    suspendedUntil: customer.suspendedUntil,
+    identityBlocked,
+    minPaymentAmount: customer.minPaymentAmount?.toString() ?? null,
+    freeQuotaUnit: customer.freeQuotaUnit,
+    quotaRemaining,
+    coupon: coupon
+      ? {
+          code: coupon.code,
+          kind: coupon.kind,
+          value: coupon.value,
+          unusableReason: coupon.unusableReason,
+        }
+      : null,
+    couponRequested: couponCode ?? null,
+    discountPercent: customer.discountPercent?.toString() ?? null,
+    discountFixed: customer.discountFixed?.toString() ?? null,
+    creditBalance: credit.total,
+    approvalThreshold: customer.approvalThreshold?.toString() ?? null,
+  });
+
+  return reply.send({ customerId: customer.id, ...result });
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {

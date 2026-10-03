@@ -275,6 +275,13 @@ export const UpdateCustomerCouponSchema = v.partial(
   }),
 );
 
+export const ResolveCustomerSchema = v.object({
+  payerAddress: address,
+  network: PaymentNetworkSchema,
+  amount: positiveDecimalAmount,
+  couponCode: v.optional(v.nullable(couponCode)),
+});
+
 export const BatchDeleteCustomersSchema = batchDeleteSchema("a customer id");
 
 export const ListCustomersQuerySchema = v.object({
@@ -338,6 +345,7 @@ export type CreateCustomerCouponInput = v.InferOutput<
 export type UpdateCustomerCouponInput = v.InferOutput<
   typeof UpdateCustomerCouponSchema
 >;
+export type ResolveCustomerInput = v.InferOutput<typeof ResolveCustomerSchema>;
 export type ListCustomersQuery = v.InferOutput<typeof ListCustomersQuerySchema>;
 export type CustomerActivityQuery = v.InferOutput<
   typeof CustomerActivityQuerySchema
