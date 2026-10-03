@@ -259,11 +259,6 @@ const filterFor = (
   return Prisma.join(clauses, " AND ");
 };
 
-/**
- * `rank_total` and `rank_recent` sum across assets, which no reported figure
- * ever does — they exist only to order the page. Every amount this module
- * returns stays grouped by (network, assetAddress).
- */
 const orderFor = (sort: ListCustomersQuery["sort"]): Prisma.Sql => {
   switch (sort) {
     case "totalSpend":
@@ -377,12 +372,6 @@ export interface QuotaUsage {
   remaining: string | null;
 }
 
-/**
- * Where the current allowance window starts. A TOTAL quota has no window, so
- * it runs from the last reset (or from the beginning if never reset); the
- * others start at the current day, week or month, unless a later reset moved
- * the line forward.
- */
 export const quotaWindowStart = (
   period: CustomerQuotaPeriod,
   resetAt: Date | null,
@@ -405,10 +394,6 @@ export const quotaWindowStart = (
   return resetAt && resetAt > start ? resetAt : start;
 };
 
-/**
- * Usage is read off the payments the customer has already made, so it cannot
- * drift from them. REQUESTS counts rows, AMOUNT sums what was settled.
- */
 const quotaUsageFor = async (
   ownerId: string,
   customerId: string,
@@ -649,11 +634,6 @@ export const addIdentity = async (
   return getCustomer(ownerId, customerId);
 };
 
-/**
- * Moving to ACTIVE clears the suspension window and the reason together: the
- * database refuses a `suspendedUntil` that outlives a SUSPENDED status, so
- * leaving it behind would make the row unwritable.
- */
 export const setCustomerStatus = async (
   ownerId: string,
   id: string,
@@ -682,10 +662,6 @@ export const setCustomerStatus = async (
   return count > 0 ? getCustomer(ownerId, id) : null;
 };
 
-/**
- * Writing a quota starts its window now, so an allowance never arrives already
- * spent by payments that predate it. Clearing the quota clears that line too.
- */
 export const setCustomerPolicy = async (
   ownerId: string,
   id: string,
@@ -733,11 +709,6 @@ export interface CustomerCreditRow {
 
 const ZERO = "0";
 
-/**
- * The balance is the sum of the ledger, so a grant is never overwritten. The
- * per-kind figures let the dashboard say what came from a promotion and what
- * the customer actually paid in; ADJUSTMENT rows move the total only.
- */
 export const creditBalance = async (
   ownerId: string,
   customerId: string,
@@ -822,10 +793,6 @@ export const grantCredit = async (
   };
 };
 
-/**
- * Zeroing writes the offsetting movement rather than deleting rows, so the
- * history of what was granted survives the reset.
- */
 export const zeroCredit = async (
   ownerId: string,
   customerId: string,
@@ -874,7 +841,6 @@ export type CustomerCouponRow = Omit<
   revokedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Why it cannot be used, or null while it still can be. */
   unusableReason: "revoked" | "expired" | "exhausted" | null;
 };
 
@@ -990,12 +956,6 @@ export interface ResolvedPayer {
   identityBlocked: boolean;
 }
 
-/**
- * Finds the customer that claims this payer, matching on network and address
- * together and honouring the identity's validity window at `at`. A blocked
- * identity still resolves, because the caller has to be told it is refused
- * rather than that the payer is unknown.
- */
 export const resolveCustomerForPayer = async (
   ownerId: string,
   network: string,
@@ -1043,7 +1003,6 @@ export const findCouponByCode = async (
   return row ? toCouponRow(row) : null;
 };
 
-/** The allowance left for a customer already loaded, without re-reading it. */
 export const quotaRemainingFor = async (
   ownerId: string,
   customer: RawCustomer & { id: string },

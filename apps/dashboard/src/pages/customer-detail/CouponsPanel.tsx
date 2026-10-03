@@ -33,7 +33,6 @@ import {
 const asDate = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 
-/** A date input gives `YYYY-MM-DD`; the API wants an instant. */
 const endOfDay = (day: string): string =>
   new Date(`${day}T23:59:59.000Z`).toISOString();
 

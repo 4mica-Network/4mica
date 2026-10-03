@@ -219,15 +219,6 @@ const PAYMENTS = [
 
 const CUSTOMER_ADDRESS = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 
-/**
- * The counterparties that pay into the seeded treasury. The first one claims
- * `CUSTOMER_ADDRESS`, which every incoming payment above was sent from, so its
- * spend, transaction count and activity are populated without inventing any
- * new payment rows. Its monthly limit sits above that spend on purpose — the
- * limits panel should render the within-limit state, not a breach.
- *
- * The second has no wallet at all, which is the zero-activity rendering path.
- */
 const CUSTOMERS = [
   {
     name: "Acme Procurement",
@@ -837,8 +828,6 @@ const seed = async (): Promise<void> => {
     }
   }
 
-  // Keyed on name, so renaming a fixture leaves a stale row holding the
-  // addresses the new one wants to claim. Clearing first frees them.
   await prisma.customer.deleteMany({
     where: { ownerId: owner.id, name: { notIn: CUSTOMERS.map((c) => c.name) } },
   });

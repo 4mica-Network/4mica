@@ -51,9 +51,6 @@ const {
   wallet: { findMany: vi.fn() },
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
   queryRaw: vi.fn(),
-  // Enough of Prisma.Decimal for the quota arithmetic the repository does.
-  // The raw text is kept so a scale like "10.50" survives, as it does in the
-  // real column.
   FakeDecimal: class {
     private readonly raw: string;
     constructor(value: unknown) {
@@ -240,7 +237,6 @@ const uniqueViolation = (fields: string[]) =>
     },
   });
 
-/** The text of a `$queryRaw` tagged template, so a test can tell them apart. */
 const sqlText = (call: unknown[]): string =>
   (call[0] as TemplateStringsArray | string[]).join(" ");
 
@@ -255,7 +251,6 @@ const flatten = (node: unknown, into: unknown[] = []): unknown[] => {
   return into;
 };
 
-/** Every interpolated leaf value a `$queryRaw` call was given. */
 const sqlValues = (call: unknown[]): unknown[] =>
   call.slice(1).flatMap((value) => flatten(value));
 
@@ -977,8 +972,6 @@ describe("customer routes", () => {
         payload: { status: "BLOCKED", name: "Renamed" },
       });
 
-      // ajv strips the unknown key and valibot never sees it, so the status
-      // can only move through the route that enforces its shape.
       expect(customer.updateMany.mock.calls[0][0].data).toEqual({
         name: "Renamed",
       });

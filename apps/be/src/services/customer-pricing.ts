@@ -23,7 +23,6 @@ export interface PricingInput {
   suspendedUntil: Date | null;
   identityBlocked: boolean;
   minPaymentAmount: string | null;
-  /** How much allowance is left, in whichever unit the quota is set in. */
   freeQuotaUnit: "REQUESTS" | "AMOUNT" | null;
   quotaRemaining: string | null;
   coupon: PricingCoupon | null;
@@ -48,12 +47,6 @@ export interface PricingResult {
   couponSkippedReason: CouponSkippedReason | null;
 }
 
-/**
- * Money is handled as an integer scaled by 10^18 — the same scale the columns
- * use — so every step here is exact. Deliberately no Decimal import: this file
- * is reached from the route tree, and depending on the database client would
- * drag it into every test that only wanted to register a route.
- */
 const PLACES = 18;
 const SCALE = 10n ** BigInt(PLACES);
 
@@ -104,18 +97,6 @@ const denied = (reason: DeniedReason, gross: bigint): PricingResult => ({
   couponSkippedReason: null,
 });
 
-/**
- * Turns a gross price into what this customer actually owes.
- *
- * The order is deliberate and is the contract: refusals first, then the free
- * allowance, then the coupon, then the customer's standing discounts, then
- * credit. Discounts apply to what is left after the allowance rather than to
- * the gross, so an allowance that already covers the call cannot also earn a
- * discount on money that was never owed.
- *
- * A lapsed suspension is treated as active without a write, so a customer
- * comes back on their own once the date passes.
- */
 export const priceFor = (input: PricingInput): PricingResult => {
   const now = input.now ?? new Date();
   const gross = parseAmount(input.amount);
@@ -150,7 +131,6 @@ export const priceFor = (input: PricingInput): PricingResult => {
     const left = parseAmount(input.quotaRemaining);
 
     if (input.freeQuotaUnit === "REQUESTS") {
-      // One call consumes one request, so the whole call is free or none of it.
       quotaApplied = left >= SCALE ? remaining : 0n;
     } else {
       quotaApplied = min(left, remaining);

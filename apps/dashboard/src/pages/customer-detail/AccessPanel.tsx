@@ -32,8 +32,6 @@ export function AccessPanel({ customer }: { customer: Customer }) {
 
   const isPending = useAppSelector(selectIsCustomerStatusPending(customer.id));
 
-  // The dropdown opens on whatever the customer is now, so Active is the
-  // default for everyone who has not been stopped.
   const initial = useMemo(
     () => ({
       status: customer.status as string,

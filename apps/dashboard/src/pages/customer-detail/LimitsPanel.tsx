@@ -5,10 +5,6 @@ import { useTranslation } from "react-i18next";
 import { trimAmount } from "../payments/constants";
 import { SectionCard } from "./SectionCard";
 
-/**
- * Spend against a limit is an indication, not an accounting figure: this sum
- * crosses assets, and nothing in the payment path enforces the limit.
- */
 const rankingTotal = (overview: CustomerOverview): number =>
   overview.recentSpend.reduce((sum, bucket) => sum + Number(bucket.amount), 0);
 

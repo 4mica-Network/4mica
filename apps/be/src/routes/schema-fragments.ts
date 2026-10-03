@@ -519,11 +519,6 @@ export const customerIdentityResponseSchema = {
   },
 } as const;
 
-/**
- * `totalSpend` and `recentSpend` are arrays, not scalars, because volume is
- * grouped by (network, assetAddress) — two different tokens are never summed
- * into one figure.
- */
 export const customerResponseSchema = {
   type: "object",
   required: ["id", "name", "type", "status"],

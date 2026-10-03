@@ -65,7 +65,6 @@ export function SettingsSection({
 }: {
   title: string;
   description?: string;
-  /** Sits opposite the heading, for a section-level control like "Add". */
   action?: ReactNode;
   children: ReactNode;
 }) {

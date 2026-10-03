@@ -62,7 +62,6 @@ const render = (args: PopupConfirmProps) => (
 
 export const Default: Story = { render };
 
-/** The destructive case: the confirm button carries the danger colour. */
 export const Destructive: Story = {
   args: {
     confirmButtonProps: {
@@ -72,13 +71,11 @@ export const Destructive: Story = {
   render,
 };
 
-/** With no description, the bubble is just a question and two answers. */
 export const TitleOnly: Story = {
   args: { description: undefined, title: "Remove this customer?" },
   render,
 };
 
-/** Clicking away leaves it open, so the choice has to be made deliberately. */
 export const StaysOpenOnOutsideClick: Story = {
   args: { closeOnOutsideClick: false },
   render,
@@ -101,14 +98,8 @@ export const Placements: Story = {
   ),
 };
 
-/**
- * The controlled half, for a caller that already owns the open state and the
- * thing being anchored to.
- */
 export const Controlled: Story = {
   render: (args) => {
-    // Button does not forward a ref, so the anchor is a wrapping span —
-    // the same way the dashboard anchors its row menus.
     const anchorRef = useRef<HTMLSpanElement>(null);
     const [isOpen, setIsOpen] = useState(false);
 

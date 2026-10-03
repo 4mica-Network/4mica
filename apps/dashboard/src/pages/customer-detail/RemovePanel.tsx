@@ -18,8 +18,6 @@ export function RemovePanel({ customer }: { customer: Customer }) {
     selectIsCustomerPending(`customer:${customer.id}`),
   );
 
-  // The record this page is built on is gone once the delete lands, so leave
-  // rather than sit on a page whose subject no longer exists.
   const sawDeleting = useRef(false);
   useEffect(() => {
     if (isDeleting) {

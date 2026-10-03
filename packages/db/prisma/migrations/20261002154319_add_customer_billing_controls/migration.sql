@@ -81,15 +81,12 @@ ALTER TABLE "customer_credit_entries" ADD CONSTRAINT "customer_credit_entries_ow
 ALTER TABLE "customer_credit_entries" ADD CONSTRAINT "customer_credit_entries_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
--- A quota only means something as a (unit, value, period) triple, so either
--- all three are set or none are.
 ALTER TABLE "customers" ADD CONSTRAINT "customers_free_quota_shape"
     CHECK (
       ("free_quota_unit" IS NULL AND "free_quota" IS NULL AND "free_quota_period" IS NULL)
       OR ("free_quota_unit" IS NOT NULL AND "free_quota" IS NOT NULL AND "free_quota_period" IS NOT NULL)
     );
 
--- A request allowance is a count, so it cannot be fractional.
 ALTER TABLE "customers" ADD CONSTRAINT "customers_free_quota_requests_whole"
     CHECK ("free_quota_unit" <> 'REQUESTS' OR "free_quota" = trunc("free_quota"));
 
@@ -108,7 +105,6 @@ ALTER TABLE "customers" ADD CONSTRAINT "customers_min_payment_non_negative"
 ALTER TABLE "customers" ADD CONSTRAINT "customers_approval_threshold_non_negative"
     CHECK ("approval_threshold" IS NULL OR "approval_threshold" >= 0);
 
--- `suspended_until` is only meaningful while suspended.
 ALTER TABLE "customers" ADD CONSTRAINT "customers_suspended_until_requires_status"
     CHECK ("suspended_until" IS NULL OR "status" = 'SUSPENDED');
 
@@ -124,6 +120,5 @@ ALTER TABLE "customer_coupons" ADD CONSTRAINT "customer_coupons_usage_limit_posi
 ALTER TABLE "customer_coupons" ADD CONSTRAINT "customer_coupons_times_redeemed_non_negative"
     CHECK ("times_redeemed" >= 0);
 
--- A zero movement would be a row that changes nothing.
 ALTER TABLE "customer_credit_entries" ADD CONSTRAINT "customer_credit_entries_amount_non_zero"
     CHECK ("amount" <> 0);

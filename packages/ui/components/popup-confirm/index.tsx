@@ -23,12 +23,6 @@ export interface ConfirmPopupProps {
   "data-testid"?: string;
 }
 
-/**
- * The controlled half: a confirmation bubble anchored to something the caller
- * owns. Positioning, the portal and the outside click all come from Dropdown,
- * so this behaves like every other floating surface in the app — including
- * flipping when it would run off the viewport.
- */
 export const ConfirmPopup = ({
   isOpen,
   anchorRef,
@@ -121,12 +115,6 @@ export interface PopupConfirmProps {
   "data-testid"?: string;
 }
 
-/**
- * The uncontrolled half: wrap whatever should ask before it acts, and the
- * bubble opens against it. The trigger is a plain span so the child keeps
- * being the button — nesting one button inside another is invalid markup and
- * breaks keyboard activation.
- */
 export const PopupConfirm = ({
   title = "Are you sure?",
   description,
@@ -160,8 +148,6 @@ export const PopupConfirm = ({
         ref={anchorRef}
         className="inline-flex"
         onClickCapture={(event) => {
-          // Capture, so the wrapped control's own click never fires: asking
-          // first is the whole point.
           event.preventDefault();
           event.stopPropagation();
           setIsOpen((open) => !open);

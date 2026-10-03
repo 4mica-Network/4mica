@@ -81,10 +81,6 @@ ALTER TABLE "customer_payment_identities"
     ADD CONSTRAINT "customer_payment_identities_address_lowercase"
     CHECK ("address" IS NULL OR "address" ~ '^0x[0-9a-f]{40}$');
 
--- The `type` discriminator decides which columns may be set, so a WALLET
--- always carries the (network, address) pair payment matching keys on and the
--- other kinds always carry `value`. Without this a WALLET with a null network
--- would sit in the table matching nothing.
 ALTER TABLE "customer_payment_identities"
     ADD CONSTRAINT "customer_payment_identities_shape"
     CHECK (

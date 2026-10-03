@@ -211,7 +211,6 @@ describe("coupons", () => {
       coupon: coupon({ kind: "PERCENT", value: "50" }),
     });
 
-    // 50% of the remaining 5, not of the gross 10.
     expect(result).toMatchObject({
       quotaApplied: "5",
       couponApplied: "2.5",
@@ -242,7 +241,6 @@ describe("discounts and credit", () => {
       discountFixed: "1",
     });
 
-    // 50% off 10 leaves 5, then 1 off leaves 4.
     expect(result).toMatchObject({ discountApplied: "6", payable: "4" });
   });
 
@@ -342,7 +340,6 @@ describe("the whole chain", () => {
       approvalThreshold: "50",
     });
 
-    // 100 − 20 allowance = 80; −10% = 72; −50% = 36; −6 = 30; −10 credit = 20.
     expect(result).toEqual({
       allowed: true,
       deniedReason: null,

@@ -166,11 +166,6 @@ export const UpdateCustomerSchema = v.partial(
   }),
 );
 
-/**
- * A quota is the (unit, value, period) triple or nothing at all, and the unit
- * decides whether the value may be fractional — the same rule the database
- * CHECK enforces, stated once here so a caller gets a 400 rather than a 500.
- */
 export const SetCustomerPolicySchema = v.pipe(
   v.partial(
     v.object({
@@ -217,10 +212,6 @@ export const CustomerCreditKindSchema = v.picklist([
   "ADJUSTMENT",
 ]);
 
-/**
- * A movement, not a balance: the amount is signed so a correction is the same
- * shape as a grant, and zero is refused because it would change nothing.
- */
 export const GrantCustomerCreditSchema = v.object({
   kind: CustomerCreditKindSchema,
   amount: v.pipe(
@@ -246,10 +237,6 @@ const couponCode = v.pipe(
   v.regex(/^[A-Z0-9][A-Z0-9_-]*$/, "may use letters, numbers, - and _"),
 );
 
-/**
- * A variant on `kind`, so a percentage is held to 0-100 while a fixed amount
- * off is not — one schema cannot say both at once.
- */
 export const CreateCustomerCouponSchema = v.variant("kind", [
   v.object({
     kind: v.literal("PERCENT"),

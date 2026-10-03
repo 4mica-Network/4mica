@@ -74,10 +74,6 @@ export interface CustomerIdentity {
   updatedAt: string;
 }
 
-/**
- * Volume is grouped by network and asset, never summed into one number, so a
- * customer paying in two tokens has two entries rather than a nonsense total.
- */
 export interface SpendBucket {
   network: string;
   assetAddress: string | null;

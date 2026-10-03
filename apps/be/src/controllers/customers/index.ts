@@ -545,11 +545,6 @@ export const deleteCustomerCouponHandler: RouteHandler = async (
   return notFound(reply, "coupon");
 };
 
-/**
- * What a payer owes for a call, and whether they may make it at all. Read
- * only: nothing here spends the allowance, redeems the coupon or draws down
- * credit — the caller reports the payment afterwards as it always did.
- */
 export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
   const ownerId = requireApiKeyOwner(request, reply);
   if (!ownerId) {
@@ -568,7 +563,6 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     payerAddress,
   );
 
-  // An unrecognised payer is not an error: they simply pay the full price.
   if (!resolved) {
     return reply.send({
       customerId: null,

@@ -2,11 +2,6 @@ import { cn } from "@4mica/ui";
 import type { ReactNode } from "react";
 import { Card } from "@/components/form";
 
-/**
- * A whole section in one card: heading, blurb, its control and its content.
- * Unlike SettingsSection, which leaves the heading outside the border, so the
- * customer page reads as a stack of self-contained panels.
- */
 export function SectionCard({
   title,
   description,
@@ -37,11 +32,6 @@ export function SectionCard({
   );
 }
 
-/**
- * The save row at the foot of a section. `-mx-6` cancels the card padding so
- * the rule spans the full width, the way EditableCard does on the settings
- * pages.
- */
 export function SectionFooter({ children }: { children: ReactNode }) {
   return (
     <div className="-mx-6 -mb-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4 pb-5">
@@ -50,10 +40,6 @@ export function SectionFooter({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * A list inside a section. `-mx-6` lets the rows meet the card edge, so a list
- * reads as a list rather than a floating block inside the padding.
- */
 export function SectionRows({
   children,
   "data-testid": testId,
@@ -71,7 +57,6 @@ export function SectionRows({
   );
 }
 
-/** One row in a SectionRows list, with its actions revealed on hover. */
 export function SectionRow({
   children,
   actions,
@@ -96,7 +81,6 @@ export function SectionRow({
   );
 }
 
-/** A nested editor inside a section, set apart without a second card. */
 export function SectionInset({
   children,
   className,

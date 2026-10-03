@@ -143,7 +143,6 @@ describe("IdentitiesPanel", () => {
       expect(row.closest(`[class*="rounded-lg"]`)?.className).toMatch(CARD);
     }
 
-    // Both rows share the one card rather than getting a border each.
     expect(rows[0].closest(`[class*="rounded-lg"]`)).toBe(
       rows[1].closest(`[class*="rounded-lg"]`),
     );
@@ -415,8 +414,6 @@ describe("PolicyPanel", () => {
   it("hides the allowance amount until a unit is picked", () => {
     renderPanel();
 
-    // The library Select renders its test id with a -select suffix;
-    // TextInput keeps a real DOM id.
     expect(screen.getByTestId("policy-quota-unit-select")).toBeInTheDocument();
     expect(document.getElementById("policy-quota")).toBeNull();
     expect(screen.queryByTestId("policy-quota-period-select")).toBeNull();
@@ -846,7 +843,6 @@ describe("AccessPanel", () => {
 
   const lastAction = () => dispatch.mock.calls.at(-1)?.[0];
 
-  /** The library Select is a listbox: open the trigger, then pick by index. */
   const pickStatus = (index: number) => {
     fireEvent.click(screen.getByTestId("access-status-select-trigger"));
     fireEvent.click(screen.getByTestId(`access-status-select-option-${index}`));
