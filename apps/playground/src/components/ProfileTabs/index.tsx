@@ -7,7 +7,6 @@ import { messages } from "@/i18n";
 export interface ProfileTabsProps {
   agentCount: number;
   apiCount: number;
-  /** Server-rendered panels, passed as slots so the lists stay on the server. */
   agents: ReactNode;
   apis: ReactNode;
 }

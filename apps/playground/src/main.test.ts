@@ -353,6 +353,33 @@ describe("reserved segments vs nginx", () => {
     expect(unreserved).toEqual([]);
   });
 
+  it("routes a profile's llms.txt to the playground, ahead of the .txt catch-all", () => {
+    const profileRule = nginxConf.indexOf("^/[^/]+/llms\\.txt$");
+    const catchAll = nginxConf.indexOf("location ~ \\.txt$");
+
+    expect(profileRule).toBeGreaterThan(-1);
+    expect(catchAll).toBeGreaterThan(-1);
+    expect(profileRule).toBeLessThan(catchAll);
+    expect(nginxConf).toMatch(
+      /location ~ \^\/\[\^\/\]\+\/llms\\\.txt\$\s+{[^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
+  it("routes the profiles sitemap to the playground", () => {
+    expect(nginxConf).toMatch(
+      /location = \/sitemap-profiles\.xml\s+{[^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
+  it("leaves the apex robots.txt and sitemap.xml with apps/web", () => {
+    expect(nginxConf).toMatch(
+      /location = \/robots\.txt\s+{[^}]*proxy_pass [^;]*mica_web;/,
+    );
+    expect(nginxConf).toMatch(
+      /location = \/sitemap\.xml\s+{[^}]*proxy_pass [^;]*mica_web;/,
+    );
+  });
+
   it.each([
     "sign-in",
     "sign-up",

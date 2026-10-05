@@ -50,7 +50,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/customers", labelKey: "nav.customers", icon: Users },
       { to: "/agents", labelKey: "nav.agents", icon: Bot },
-      { to: "/apps", labelKey: "nav.apps", icon: Blocks },
+      { to: "/apis", labelKey: "nav.apis", icon: Blocks },
     ],
   },
 ];

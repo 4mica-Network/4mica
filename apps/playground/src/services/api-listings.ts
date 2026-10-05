@@ -5,20 +5,14 @@ import type { PublicApiListing } from "@/schema/api-listing";
 import type { HttpMethod, PaymentNetwork } from "@/schema/params";
 import { type Prisma, prisma } from "./db";
 
-/**
- * `ownerId` is omitted so a listing can never correlate two profiles.
- *
- * The payment columns ARE selected: x402 advertises `payTo`, `asset`, `network`
- * and the price to any anonymous caller in the 402 response, so they are public
- * facts by protocol design.
- */
-const API_LISTING_PUBLIC_SELECT = {
+export const API_LISTING_PUBLIC_SELECT = {
   id: true,
   slug: true,
   name: true,
   summary: true,
   description: true,
-  baseUrl: true,
+  url: true,
+  method: true,
   docsUrl: true,
   category: true,
   tags: true,
@@ -31,32 +25,9 @@ const API_LISTING_PUBLIC_SELECT = {
   priceAmount: true,
   priceCurrency: true,
   x402Endpoint: true,
-  endpoints: {
-    select: {
-      id: true,
-      method: true,
-      path: true,
-      summary: true,
-      priceAmount: true,
-    },
-    // Deterministic: the snippet builder demonstrates endpoints[0], so a tie
-    // here would make the generated code unstable between renders.
-    orderBy: [{ sortOrder: "asc" }, { path: "asc" }],
-  },
-  // `satisfies` rather than `as const`, which would make the nested `orderBy`
-  // array readonly and so unassignable to Prisma's input type.
 } satisfies Prisma.ApiListingSelect;
 
-/** Prisma Decimal is not serialisable across the RSC boundary. */
 type Decimalish = { toString(): string } | null;
-
-type ApiEndpointRow = {
-  id: string;
-  method: HttpMethod;
-  path: string;
-  summary: string | null;
-  priceAmount: Decimalish;
-};
 
 type ApiListingRow = {
   id: string;
@@ -64,7 +35,8 @@ type ApiListingRow = {
   name: string;
   summary: string | null;
   description: string | null;
-  baseUrl: string | null;
+  url: string | null;
+  method: HttpMethod;
   docsUrl: string | null;
   category: string | null;
   tags: string[];
@@ -77,19 +49,19 @@ type ApiListingRow = {
   priceAmount: Decimalish;
   priceCurrency: string | null;
   x402Endpoint: string | null;
-  endpoints: ApiEndpointRow[];
 };
 
 const toAmount = (value: Decimalish): string | null =>
   value === null ? null : value.toString();
 
-const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
+export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   id: row.id,
   ref: row.slug,
   name: row.name,
   summary: row.summary,
   description: row.description,
-  baseUrl: row.baseUrl,
+  url: row.url,
+  method: row.method,
   docsUrl: row.docsUrl,
   category: row.category,
   tags: row.tags,
@@ -102,13 +74,6 @@ const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   priceAmount: toAmount(row.priceAmount),
   priceCurrency: row.priceCurrency,
   x402Endpoint: row.x402Endpoint,
-  endpoints: row.endpoints.map((endpoint) => ({
-    id: endpoint.id,
-    method: endpoint.method,
-    path: endpoint.path,
-    summary: endpoint.summary,
-    priceAmount: toAmount(endpoint.priceAmount),
-  })),
 });
 
 export const listPublicApiListings = cache(

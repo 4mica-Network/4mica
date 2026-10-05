@@ -5,7 +5,6 @@ const WEBHOOK_SECRET_PREFIX = "whsec";
 const EMAIL_VERIFICATION_PREFIX = "4mica_ev";
 
 export interface GeneratedSecret {
-  /** Returned to the caller once and never stored. */
   plaintext: string;
   hash: string;
   prefix: string;
@@ -15,7 +14,6 @@ export interface GeneratedSecret {
 export const hashSecret = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
 
-/** Constant-time comparison so a hash never leaks via response timing. */
 export const secretMatches = (value: string, hash: string): boolean => {
   const candidate = Buffer.from(hashSecret(value), "hex");
   const expected = Buffer.from(hash, "hex");
@@ -46,3 +44,6 @@ export const generateWebhookSecret = (): GeneratedSecret =>
 
 export const generateEmailVerificationToken = (): GeneratedSecret =>
   generate(EMAIL_VERIFICATION_PREFIX);
+
+export const generateWalletNonce = (): string =>
+  randomBytes(32).toString("base64url");

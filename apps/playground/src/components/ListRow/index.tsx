@@ -5,20 +5,10 @@ export interface ListRowProps {
   href: string;
   title: string;
   description: string | null;
-  /** Tag elements rendered under the description. */
   tags?: ReactNode;
-  /** Owner-only control. Sits above the row link so it stays clickable. */
   action?: ReactNode;
 }
 
-/**
- * One line item in a ListSection.
- *
- * The whole row is clickable via `after:absolute after:inset-0` on the title
- * link rather than by wrapping everything in an anchor — nesting the owner's
- * visibility toggle inside a link would be invalid HTML, and the pseudo-element
- * lets that control sit above the hit area with a z-index instead.
- */
 export function ListRow({
   href,
   title,

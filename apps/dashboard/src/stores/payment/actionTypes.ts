@@ -1,0 +1,19 @@
+import { mirrorKeys } from "@stores/utils";
+
+const paymentActions = mirrorKeys([
+  "FETCH_PAYMENTS_REQUESTED",
+  "FETCH_PAYMENTS_PENDING",
+  "FETCH_PAYMENTS_SUCCEEDED",
+  "FETCH_PAYMENTS_FAILED",
+
+  "FETCH_PAYMENT_SUMMARY_REQUESTED",
+  "FETCH_PAYMENT_SUMMARY_SUCCEEDED",
+
+  "FETCH_PAYMENT_STATS_REQUESTED",
+  "FETCH_PAYMENT_STATS_SUCCEEDED",
+
+  "SET_PAYMENT_FILTERS",
+  "SET_PAYMENT_PAGE",
+] as const);
+
+export default paymentActions;

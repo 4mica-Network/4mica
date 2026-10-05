@@ -10,7 +10,8 @@ const listing = (
   name: "Credit Limits API",
   summary: null,
   description: null,
-  baseUrl: "https://api.4mica.io/v1/credit",
+  url: "https://api.4mica.io/v1/credit/limits",
+  method: "GET",
   docsUrl: null,
   category: "Credit",
   tags: [],
@@ -23,15 +24,6 @@ const listing = (
   priceAmount: "0.010000000000000000",
   priceCurrency: "USD",
   x402Endpoint: "https://api.4mica.io/v1/credit/x402",
-  endpoints: [
-    {
-      id: "endpoint-1",
-      method: "GET",
-      path: "/limits",
-      summary: "Available credit for an agent.",
-      priceAmount: null,
-    },
-  ],
   ...overrides,
 });
 
@@ -75,57 +67,30 @@ describe("buildApiListingSnippets", () => {
   it("names the endpoint's own method and path", () => {
     const snippets = buildApiListingSnippets(listing());
 
-    expect(snippets?.typescript).toContain("GET /limits");
-    expect(snippets?.curl).toContain('curl -i -X GET "');
-  });
-
-  it("prefers a per-endpoint price over the listing price", () => {
-    const snippets = buildApiListingSnippets(
-      listing({
-        endpoints: [
-          {
-            id: "endpoint-2",
-            method: "POST",
-            path: "/holds",
-            summary: null,
-            priceAmount: "0.050000000000000000",
-          },
-        ],
-      }),
+    expect(snippets?.typescript).toContain(
+      "GET https://api.4mica.io/v1/credit/limits",
     );
-
-    expect(snippets?.typescript).toContain("$0.05 per call");
-    expect(snippets?.typescript).not.toContain("$0.01");
+    expect(snippets?.curl).toContain('curl -i -X GET "');
   });
 
   it("adds request options for a non-GET route", () => {
     const snippets = buildApiListingSnippets(
-      listing({
-        endpoints: [
-          {
-            id: "endpoint-2",
-            method: "POST",
-            path: "/holds",
-            summary: null,
-            priceAmount: null,
-          },
-        ],
-      }),
+      listing({ method: "POST", url: "https://api.4mica.io/v1/credit/holds" }),
     );
 
     expect(snippets?.typescript).toContain('method: "POST"');
     expect(snippets?.python).toContain("session.post(");
   });
 
-  it("falls back to a marked placeholder when the base URL is unset", () => {
-    const snippets = buildApiListingSnippets(listing({ baseUrl: null }));
+  it("falls back to a marked placeholder when the URL is unset", () => {
+    const snippets = buildApiListingSnippets(listing({ url: null }));
 
-    expect(snippets?.typescript).toContain("https://api.example.com/limits");
+    expect(snippets?.typescript).toContain("https://api.example.com");
     expect(snippets?.typescript).not.toContain("undefined");
   });
 
-  it("never leaks a nullish interpolation for a listing with no endpoints", () => {
-    const snippets = buildApiListingSnippets(listing({ endpoints: [] }));
+  it("never leaks a nullish interpolation", () => {
+    const snippets = buildApiListingSnippets(listing());
 
     for (const source of Object.values(snippets ?? {})) {
       expect(source).not.toContain("undefined");
@@ -168,7 +133,6 @@ describe("buildApiListingSnippets", () => {
         priceAmount: null,
         priceCurrency: null,
         priceLabel: "Usage-based",
-        endpoints: [],
       }),
     );
 
