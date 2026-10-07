@@ -79,6 +79,51 @@ describe("loadUser", () => {
     expect(upsert.mock.calls[0][0].update).not.toHaveProperty("username");
   });
 
+  it("never overwrites a returning user's own name, email or avatar", async () => {
+    findUnique.mockResolvedValue({
+      ...ROW,
+      name: "Ada (edited)",
+      email: "ada@edited.example",
+      avatarUrl: "https://cdn.example/edited.png",
+    });
+
+    await loadUser({ ...IDENTITY, avatarUrl: "https://clerk.example/a.png" });
+
+    const update = upsert.mock.calls[0][0].update;
+    expect(update).not.toHaveProperty("name");
+    expect(update).not.toHaveProperty("email");
+    expect(update).not.toHaveProperty("avatarUrl");
+    expect(update).toHaveProperty("lastSeenAt");
+  });
+
+  it("fills only the gaps on a returning account", async () => {
+    findUnique.mockResolvedValue({
+      ...ROW,
+      name: "",
+      email: null,
+      avatarUrl: null,
+    });
+
+    await loadUser({ ...IDENTITY, avatarUrl: "https://clerk.example/a.png" });
+
+    expect(upsert.mock.calls[0][0].update).toMatchObject({
+      name: IDENTITY.name,
+      email: IDENTITY.email,
+      avatarUrl: "https://clerk.example/a.png",
+    });
+  });
+
+  it("copies the profile in full when the account is created", async () => {
+    await loadUser(IDENTITY);
+
+    expect(createArg(0)).toMatchObject({
+      name: IDENTITY.name,
+      email: IDENTITY.email,
+    });
+    // Nothing to fill if a concurrent request created the row first.
+    expect(upsert.mock.calls[0][0].update).not.toHaveProperty("name");
+  });
+
   it("draws a new handle when the generated one is taken", async () => {
     upsert
       .mockRejectedValueOnce(uniqueViolation(["username"]))

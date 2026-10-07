@@ -112,8 +112,30 @@ interface UpsertOptions {
   username: string;
 }
 
+/**
+ * Clerk seeds the profile; after that the user owns it. On a returning account
+ * only the gaps are filled, so a sign-in never overwrites an edited name,
+ * avatar or (verified) email with whatever the session token carries.
+ */
+const profileGaps = (
+  identity: AuthIdentity,
+  existing: UserRow | null,
+  withEmail: boolean,
+) => ({
+  ...(withEmail && identity.email !== null && existing?.email === null
+    ? { email: identity.email }
+    : {}),
+  ...(identity.name !== null && existing !== null && !existing.name
+    ? { name: identity.name }
+    : {}),
+  ...(identity.avatarUrl !== null && existing?.avatarUrl === null
+    ? { avatarUrl: identity.avatarUrl }
+    : {}),
+});
+
 const runUpsert = async (
   identity: AuthIdentity,
+  existing: UserRow | null,
   { withEmail, username }: UpsertOptions,
 ): Promise<AuthUser> =>
   toAuthUser(
@@ -131,13 +153,7 @@ const runUpsert = async (
           : {}),
       },
       update: {
-        ...(withEmail && identity.email !== null
-          ? { email: identity.email }
-          : {}),
-        ...(identity.name !== null ? { name: identity.name } : {}),
-        ...(identity.avatarUrl !== null
-          ? { avatarUrl: identity.avatarUrl }
-          : {}),
+        ...profileGaps(identity, existing, withEmail),
         lastSeenAt: new Date(),
         lastLogin: new Date(),
       },
@@ -145,7 +161,10 @@ const runUpsert = async (
     }),
   );
 
-const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
+const upsert = async (
+  identity: AuthIdentity,
+  existing: UserRow | null,
+): Promise<AuthUser> => {
   let options: UpsertOptions = {
     withEmail: true,
     username: generateUsername(),
@@ -153,7 +172,7 @@ const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
 
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await runUpsert(identity, options);
+      return await runUpsert(identity, existing, options);
     } catch (error) {
       if (!isUniqueViolation(error) || attempt === CREATE_ATTEMPTS) {
         throw error;
@@ -197,7 +216,7 @@ export const loadUser = async (identity: AuthIdentity): Promise<AuthUser> => {
       ? await fetchProfile(identity)
       : identity;
 
-  const user = await upsert(resolved);
+  const user = await upsert(resolved, existing);
 
   writeCache(identity.clerkUserId, user);
 
