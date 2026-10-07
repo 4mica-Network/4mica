@@ -1,4 +1,4 @@
-import { generateUsername } from "@services/username";
+import { generateUsername } from "@utils/username";
 import { describe, expect, it } from "vitest";
 
 // Mirrors apps/be/src/controllers/me/schema.ts, which the playground's

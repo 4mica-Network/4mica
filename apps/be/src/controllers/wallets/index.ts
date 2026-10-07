@@ -5,11 +5,8 @@ import {
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { isUniqueViolation } from "@services/prisma-errors";
-import {
-  buildWalletLinkMessage,
-  WALLET_NONCE_MAX_ATTEMPTS,
-} from "@services/siwe";
+import { isUniqueViolation } from "@utils/prisma-errors";
+import { buildWalletLinkMessage, WALLET_NONCE_MAX_ATTEMPTS } from "@utils/siwe";
 import type { FastifyReply, RouteHandler } from "fastify";
 import { verifyMessage } from "viem";
 import { config } from "@/config/index";

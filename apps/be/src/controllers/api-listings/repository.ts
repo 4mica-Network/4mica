@@ -1,5 +1,5 @@
 import { type Prisma, prisma } from "@4mica/db";
-import { SLUG_MAX_LENGTH } from "@services/slug";
+import { SLUG_MAX_LENGTH } from "@utils/slug";
 import type { ListApiListingsQuery } from "./schema";
 
 export const API_LISTING_SELECT = {

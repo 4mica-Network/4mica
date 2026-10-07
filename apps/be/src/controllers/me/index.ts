@@ -3,10 +3,7 @@ import { invalidateUser } from "@auth/user-store";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
 import { deliverVerification } from "@controllers/verification/index";
 import { appLogger } from "@logger/index";
-import {
-  isUniqueViolation,
-  uniqueViolationTarget,
-} from "@services/prisma-errors";
+import { isUniqueViolation, uniqueViolationTarget } from "@utils/prisma-errors";
 import type { RouteHandler } from "fastify";
 import type { GenericSchema } from "valibot";
 import {
@@ -51,9 +48,6 @@ const patchUserHandler =
         invalidateUser(request.user.clerkUserId);
       }
 
-      // A new address only takes effect once confirmed, so send the link now
-      // rather than leave the user to find the resend button. A failed send
-      // does not fail the save — the dashboard can resend.
       const requested = (parsed.data as { email?: unknown }).email;
       if (
         request.server.email &&

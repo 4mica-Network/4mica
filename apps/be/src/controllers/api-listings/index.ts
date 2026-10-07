@@ -4,14 +4,12 @@ import {
   notFound,
   parseBody,
   requireUserId,
-} from "@controllers/shared";
-import { appLogger } from "@logger/index";
-import { isUniqueViolation } from "@services/prisma-errors";
-import {
-  resolveSellerWallet,
   sellerWalletError,
-} from "@services/seller-wallet";
-import { nextFreeSlug, slugify } from "@services/slug";
+} from "@controllers/shared";
+import { resolveSellerWallet } from "@controllers/wallets/repository";
+import { appLogger } from "@logger/index";
+import { isUniqueViolation } from "@utils/prisma-errors";
+import { nextFreeSlug, slugify } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteApiListings,

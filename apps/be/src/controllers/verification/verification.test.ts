@@ -1,6 +1,6 @@
 import { clearUserCache } from "@auth/user-store";
 import { verificationRoutes } from "@routes/verification";
-import { hashSecret } from "@services/secrets";
+import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 

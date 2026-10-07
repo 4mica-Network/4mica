@@ -1,7 +1,7 @@
-import { prisma } from "@4mica/db";
 import { appLogger } from "@logger/index";
-import { hashSecret } from "@services/secrets";
+import { hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { findApiKeyByHash, touchApiKey } from "./repository";
 
 export interface ApiKeyContext {
   id: string;
@@ -69,16 +69,7 @@ export const authenticateApiKey = async (
     return;
   }
 
-  const record = await prisma.apiKey.findUnique({
-    where: { hashedKey: hashSecret(token) },
-    select: {
-      id: true,
-      ownerId: true,
-      revokedAt: true,
-      expiresAt: true,
-      owner: { select: { banned: true, locked: true, deletedAt: true } },
-    },
-  });
+  const record = await findApiKeyByHash(hashSecret(token));
 
   const reason = !record
     ? "unknown"
@@ -99,9 +90,7 @@ export const authenticateApiKey = async (
 
   request.apiKey = { id: record.id, ownerId: record.ownerId };
 
-  void prisma.apiKey
-    .update({ where: { id: record.id }, data: { lastUsedAt: new Date() } })
-    .catch(() => {});
+  void touchApiKey(record.id).catch(() => {});
 };
 
 export const requireApiKeyOwner = (

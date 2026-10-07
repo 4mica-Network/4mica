@@ -243,8 +243,6 @@ describe("account routes", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    // `email` is unique: writing an unproven address there would let anyone
-    // squat or probe for it. It only moves once the link is confirmed.
     expect(update.mock.calls[0][0].data).toEqual({
       pendingEmail: "ada@newdomain.com",
     });
@@ -405,11 +403,6 @@ describe("account routes", () => {
   });
 
   describe("GET /me/username-available", () => {
-    /**
-     * One `findUnique` mock serves three callers — loadUser (by clerkUserId),
-     * getProfile (by id) and findUsernameOwner (by username) — so the
-     * availability tests have to answer per `where` clause.
-     */
     const withUsernameOwner = (owner: { id: string } | null) => {
       findUnique.mockImplementation(
         async ({ where }: { where: Record<string, unknown> }) =>
@@ -472,11 +465,6 @@ describe("account routes", () => {
       ).toBe(false);
     });
 
-    /**
-     * Distinct from "reserved": `google` is not a route and has no page, so the
-     * blacklist is the only thing stopping it being claimed. It must answer 200
-     * with its own reason, not fall through to the database as available.
-     */
     it("rejects a blacklisted handle without touching the database", async () => {
       withUsernameOwner(null);
 

@@ -1,5 +1,5 @@
 import { prisma } from "@4mica/db";
-import { generateApiKey, generateWebhookSecret } from "@services/secrets";
+import { generateApiKey, generateWebhookSecret } from "@utils/secrets";
 import type {
   CreateApiKeyInput,
   CreateWebhookInput,

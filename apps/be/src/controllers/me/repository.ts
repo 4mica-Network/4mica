@@ -85,10 +85,6 @@ export const BUSINESS_SELECT = {
 export const getProfile = async (userId: string) =>
   prisma.user.findUnique({ where: { id: userId }, select: USER_SELECT });
 
-/**
- * Who holds `username`, if anyone. Selects the id and nothing else — the
- * availability response must never leak whose handle it is.
- */
 export const findUsernameOwner = async (username: string) =>
   prisma.user.findUnique({ where: { username }, select: { id: true } });
 
@@ -103,13 +99,6 @@ type UpdatableUser =
   | UpdateAccountInput
   | UpdateNotificationsInput;
 
-/**
- * A new address is parked in `pendingEmail` and only becomes `email` once its
- * owner follows the link sent to it (see controllers/verification). Writing it
- * straight to the unique `email` column would let anyone claim, or probe for,
- * an address they cannot read. Re-entering the current address cancels a
- * pending change.
- */
 const routeEmailChange = async (
   userId: string,
   data: UpdatableUser,
@@ -142,8 +131,6 @@ export const upsertBusiness = async (
 ) =>
   prisma.business.upsert({
     where: { ownerId: userId },
-    // ownerId is written after the spread so a payload can never reassign the
-    // row to someone else, independently of what the schema happens to strip.
     create: { legalName: "", ...data, ownerId: userId },
     update: data,
     select: BUSINESS_SELECT,

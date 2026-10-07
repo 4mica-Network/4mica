@@ -1,13 +1,18 @@
 import type { AuthIdentity, AuthUser } from "@4mica/auth";
-import { prisma } from "@4mica/db";
 import { createClerkClient } from "@clerk/backend";
 import { config } from "@config/index";
 import { appLogger } from "@logger/index";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
-import { generateUsername } from "@services/username";
+} from "@utils/prisma-errors";
+import { generateUsername } from "@utils/username";
+import {
+  findUserByClerkId,
+  type UpsertOptions,
+  type UserRow,
+  upsertUser,
+} from "./repository";
 
 const CACHE_TTL_MS = 60_000;
 export const CACHE_MAX_ENTRIES = 10_000;
@@ -53,28 +58,6 @@ const clerk = createClerkClient({
   publishableKey: config.env.CLERK_PUBLISHABLE_KEY,
 });
 
-const USER_FIELDS = {
-  id: true,
-  clerkUserId: true,
-  email: true,
-  name: true,
-  avatarUrl: true,
-  banned: true,
-  locked: true,
-  deletedAt: true,
-} as const;
-
-type UserRow = {
-  id: string;
-  clerkUserId: string;
-  email: string | null;
-  name: string | null;
-  avatarUrl: string | null;
-  banned: boolean;
-  locked: boolean;
-  deletedAt: Date | null;
-};
-
 const toAuthUser = (row: UserRow): AuthUser => ({
   id: row.id,
   clerkUserId: row.clerkUserId,
@@ -107,60 +90,6 @@ const fetchProfile = async (identity: AuthIdentity): Promise<AuthIdentity> => {
   }
 };
 
-interface UpsertOptions {
-  withEmail: boolean;
-  username: string;
-}
-
-/**
- * Clerk seeds the profile; after that the user owns it. On a returning account
- * only the gaps are filled, so a sign-in never overwrites an edited name,
- * avatar or (verified) email with whatever the session token carries.
- */
-const profileGaps = (
-  identity: AuthIdentity,
-  existing: UserRow | null,
-  withEmail: boolean,
-) => ({
-  ...(withEmail && identity.email !== null && existing?.email === null
-    ? { email: identity.email }
-    : {}),
-  ...(identity.name !== null && existing !== null && !existing.name
-    ? { name: identity.name }
-    : {}),
-  ...(identity.avatarUrl !== null && existing?.avatarUrl === null
-    ? { avatarUrl: identity.avatarUrl }
-    : {}),
-});
-
-const runUpsert = async (
-  identity: AuthIdentity,
-  existing: UserRow | null,
-  { withEmail, username }: UpsertOptions,
-): Promise<AuthUser> =>
-  toAuthUser(
-    await prisma.user.upsert({
-      where: { clerkUserId: identity.clerkUserId },
-      create: {
-        clerkUserId: identity.clerkUserId,
-        username,
-        ...(withEmail && identity.email !== null
-          ? { email: identity.email }
-          : {}),
-        ...(identity.name !== null ? { name: identity.name } : {}),
-        ...(identity.avatarUrl !== null
-          ? { avatarUrl: identity.avatarUrl }
-          : {}),
-      },
-      update: {
-        ...profileGaps(identity, existing, withEmail),
-        lastSeenAt: new Date(),
-        lastLogin: new Date(),
-      },
-      select: USER_FIELDS,
-    }),
-  );
-
 const upsert = async (
   identity: AuthIdentity,
   existing: UserRow | null,
@@ -172,7 +101,7 @@ const upsert = async (
 
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await runUpsert(identity, existing, options);
+      return toAuthUser(await upsertUser(identity, existing, options));
     } catch (error) {
       if (!isUniqueViolation(error) || attempt === CREATE_ATTEMPTS) {
         throw error;
@@ -206,10 +135,7 @@ export const loadUser = async (identity: AuthIdentity): Promise<AuthUser> => {
     return cached;
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { clerkUserId: identity.clerkUserId },
-    select: USER_FIELDS,
-  });
+  const existing = await findUserByClerkId(identity.clerkUserId);
 
   const resolved =
     existing === null && identity.email === null

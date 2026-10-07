@@ -10,7 +10,7 @@ import {
   positiveDecimalAmount,
   positiveInt,
 } from "@controllers/schema-primitives";
-import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@services/slug";
+import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@utils/slug";
 import * as v from "valibot";
 
 const slug = v.pipe(

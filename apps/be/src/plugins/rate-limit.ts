@@ -22,11 +22,9 @@ const userKey = (request: FastifyRequest): string =>
 
 const ipKey = (request: FastifyRequest): string => request.ip;
 
-/** Logged instead of `request.url`: some query strings carry tokens. */
 const pathOf = (request: FastifyRequest): string =>
   request.url.split("?", 1)[0] ?? request.url;
 
-/** The counted (non-allowlisted) branch of a limiter check. */
 type CountedResult = Extract<
   Awaited<ReturnType<ReturnType<FastifyInstance["createRateLimit"]>>>,
   { isExceeded: boolean }
@@ -124,11 +122,6 @@ export const registerRateLimit = async (
   app.addHook("preHandler", userLimit(app, config.rateLimit.userMax, "User"));
 };
 
-/**
- * Budget per API key on the server-to-server `/v1` routes. The IP shield alone
- * would let one leaked key spread across many hosts; this caps the key itself.
- * Must run after `authenticateApiKey`, which is what sets `request.apiKey`.
- */
 export const apiKeyRateLimit = (
   app: FastifyInstance,
 ): preHandlerAsyncHookHandler => {

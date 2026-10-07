@@ -7,11 +7,11 @@ import {
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { priceFor } from "@services/customer-pricing";
+import { priceFor } from "@utils/customer-pricing";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
+} from "@utils/prisma-errors";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   addIdentity,

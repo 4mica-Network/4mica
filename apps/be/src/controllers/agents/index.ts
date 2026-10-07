@@ -5,18 +5,18 @@ import {
   notFound,
   parseBody,
   requireUserId,
+  sellerWalletError,
 } from "@controllers/shared";
+import {
+  resolvePayerWallet,
+  resolveSellerWallet,
+} from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
-import {
-  resolvePayerWallet,
-  resolveSellerWallet,
-  sellerWalletError,
-} from "@services/seller-wallet";
-import { nextFreeSlug, slugify } from "@services/slug";
+} from "@utils/prisma-errors";
+import { nextFreeSlug, slugify } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteAgents,

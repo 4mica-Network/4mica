@@ -1,6 +1,6 @@
 import { clearUserCache } from "@auth/user-store";
 import { walletRoutes } from "@routes/wallets";
-import { buildWalletLinkMessage } from "@services/siwe";
+import { buildWalletLinkMessage } from "@utils/siwe";
 import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";

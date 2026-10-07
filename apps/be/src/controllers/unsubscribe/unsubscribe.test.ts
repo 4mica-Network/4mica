@@ -29,7 +29,7 @@ vi.mock("@4mica/db", () => ({
 const build = () => initApp([{ plugin: unsubscribeRoutes }]);
 
 const tokenFor = async (userId: string): Promise<string> => {
-  const { signUnsubscribeToken } = await import("@services/unsubscribe-token");
+  const { signUnsubscribeToken } = await import("@utils/unsubscribe-token");
 
   return signUnsubscribeToken(userId) as string;
 };

@@ -1,6 +1,6 @@
 import { prisma } from "@4mica/db";
-import { isUniqueViolation } from "@services/prisma-errors";
-import { generateEmailVerificationToken, hashSecret } from "@services/secrets";
+import { isUniqueViolation } from "@utils/prisma-errors";
+import { generateEmailVerificationToken, hashSecret } from "@utils/secrets";
 
 export const EMAIL_VERIFICATION_TTL_HOURS = 24;
 
@@ -31,14 +31,6 @@ export const createEmailVerification = async (
   return secret.plaintext;
 };
 
-/**
- * Spends a link on behalf of the signed-in `userId`. A token minted for anyone
- * else reads as invalid, so a link that reaches the wrong inbox — or a scanner
- * that prefetches it — can never verify an address for another account.
- *
- * A token for the pending address promotes it to `email`; a token for the
- * current, unverified address just marks it verified. Anything else is stale.
- */
 export const consumeEmailVerification = async (
   token: string,
   userId: string,
@@ -81,8 +73,6 @@ export const consumeEmailVerification = async (
       }),
     ]);
   } catch (error) {
-    // Another account already holds the address. Proving you can read an
-    // inbox does not evict a verified owner, so the change is refused.
     if (isUniqueViolation(error)) {
       return "taken";
     }

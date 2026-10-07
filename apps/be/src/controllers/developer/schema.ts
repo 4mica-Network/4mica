@@ -1,4 +1,4 @@
-import { isKnownEvent } from "@services/webhook-events";
+import { isKnownEvent } from "@utils/webhook-events";
 import * as v from "valibot";
 
 const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));

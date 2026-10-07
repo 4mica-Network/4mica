@@ -323,11 +323,6 @@ export const apiListingListResponseSchema = {
   },
 } as const;
 
-/**
- * Both wallet addresses are present here because this is the OWNER's view of
- * their own agent. The public projection lives in apps/playground and omits
- * `walletAddress` and `creditLimit` on purpose.
- */
 export const agentResponseSchema = {
   type: "object",
   required: ["id", "name", "status", "visibility", "network"],

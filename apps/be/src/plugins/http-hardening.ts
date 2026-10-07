@@ -38,7 +38,6 @@ const prismaCode = (error: unknown): string | undefined => {
   return typeof code === "string" && /^P\d{4}$/.test(code) ? code : undefined;
 };
 
-/** The path without its query string — tokens travel in some query strings. */
 const pathOf = (request: FastifyRequest): string =>
   request.url.split("?", 1)[0] ?? request.url;
 

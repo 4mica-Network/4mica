@@ -18,13 +18,11 @@ const verifyUrlFor = (token: string): string =>
 const outcomeUrl = (result: VerificationResult): string =>
   `${config.appUrl}/settings/profile?verify=${result}`;
 
-/** The dashboard page that asks the signed-in user to confirm the link. */
 const confirmUrl = (token: string): string =>
   `${config.appUrl}/settings/profile?verifyToken=${encodeURIComponent(token)}`;
 
 type EmailClient = NonNullable<FastifyInstance["email"]>;
 
-/** Mints a fresh link for `target` and mails it there. */
 export const deliverVerification = async (
   email: EmailClient,
   userId: string,
@@ -66,8 +64,6 @@ export const sendVerificationEmailHandler: RouteHandler = async (
     });
   }
 
-  // A pending change is what needs proving; failing that, an address that was
-  // never verified.
   const target = user.pendingEmail ?? (user.emailVerified ? null : user.email);
 
   if (!target) {
@@ -103,11 +99,6 @@ export const sendVerificationEmailHandler: RouteHandler = async (
   return reply.code(202).send({ sent: true });
 };
 
-/**
- * The link in the email. It only forwards the browser to the dashboard, which
- * asks the signed-in user to confirm — a GET must never spend the token, or a
- * mail scanner prefetching the link would verify the address on its own.
- */
 export const verifyEmailHandler: RouteHandler = async (request, reply) => {
   const parsed = parseBody(VerifyEmailQuerySchema, request.query);
   if (!parsed.success) {

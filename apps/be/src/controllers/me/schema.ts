@@ -10,18 +10,6 @@ import * as v from "valibot";
 
 const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
 
-/**
- * The one handle rule, shared with the availability check and with the
- * playground's route params via @4mica/url.
- *
- * `toLowerCase` runs before the pattern so "Ada" normalises to "ada" instead of
- * 400ing — the playground lowercases when it resolves a profile, so a
- * mixed-case handle stored here would be unreachable at its own public URL.
- * The availability check keeps handles out of the marketing site's namespace —
- * public profiles are served bare off the same apex domain, so without it a
- * user could claim `pricing` and shadow that page — and out of the blacklist,
- * which bars role and brand names like `admin` or `stripe`.
- */
 const usernameFormatPipe = v.pipe(
   v.string(),
   v.trim(),
@@ -39,13 +27,6 @@ const usernamePipe = v.pipe(
   ),
 );
 
-/**
- * GET /me/username-available — the candidate handle, not an identity.
- *
- * Format only: a reserved or blacklisted handle is well-formed, so the handler
- * answers it as a 200 `{ available: false, reason }` rather than a 400. The
- * client is asking a question, and "no, and here's why" is a valid answer.
- */
 export const CheckUsernameSchema = v.object({ username: usernameFormatPipe });
 
 export type CheckUsernameInput = v.InferOutput<typeof CheckUsernameSchema>;
@@ -70,7 +51,6 @@ export const BUSINESS_TYPES = [
   "NON_PROFIT",
 ] as const;
 
-/** PATCH /me/profile — public-facing identity. */
 export const UpdateProfileSchema = v.partial(
   v.object({
     name: trimmed(120),
@@ -96,7 +76,6 @@ export const UpdateProfileSchema = v.partial(
   }),
 );
 
-/** PATCH /me/account — credentials, locale and app preferences. */
 export const UpdateAccountSchema = v.partial(
   v.object({
     email: v.pipe(v.string(), v.trim(), v.email(), v.maxLength(255)),
@@ -119,7 +98,6 @@ export const UpdateAccountSchema = v.partial(
   }),
 );
 
-/** PATCH /me/notifications — every opt-in toggle. */
 export const UpdateNotificationsSchema = v.partial(
   v.object({
     allowNotification: v.boolean(),
@@ -134,7 +112,6 @@ export const UpdateNotificationsSchema = v.partial(
   }),
 );
 
-/** PUT /me/business — the legal entity behind the account. */
 export const UpsertBusinessSchema = v.partial(
   v.object({
     legalName: trimmed(255),
