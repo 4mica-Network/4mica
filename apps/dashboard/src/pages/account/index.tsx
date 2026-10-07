@@ -1,5 +1,5 @@
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { updateAccount } from "@stores/user/actions";
+import { sendEmailVerification, updateAccount } from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
@@ -61,6 +61,9 @@ export function AccountSettings() {
   const savingGeneral = useAppSelector(selectIsSectionSaving("general"));
   const savingHome = useAppSelector(selectIsSectionSaving("defaultHome"));
   const savingPrivacy = useAppSelector(selectIsSectionSaving("privacyMode"));
+  const sendingVerification = useAppSelector(
+    selectIsSectionSaving("emailVerification"),
+  );
   const savingTwoFactor = useAppSelector(
     selectIsSectionSaving("twoFactorEnabled"),
   );
@@ -136,6 +139,21 @@ export function AccountSettings() {
               error={issues.email}
               onChange={(v) => contact.set("email", v)}
             />
+            {user.pendingEmail ? (
+              <p className="mt-2 text-ink-muted text-xs">
+                {t("settings.account.emailPending", {
+                  email: user.pendingEmail,
+                })}{" "}
+                <button
+                  type="button"
+                  className="font-medium text-ink-strong underline disabled:opacity-50"
+                  disabled={sendingVerification}
+                  onClick={() => dispatch(sendEmailVerification())}
+                >
+                  {t("settings.account.emailPendingResend")}
+                </button>
+              </p>
+            ) : null}
           </FieldRow>
 
           <FieldRow

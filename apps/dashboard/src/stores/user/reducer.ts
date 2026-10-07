@@ -194,6 +194,7 @@ export default function userReducer(
     }
 
     case actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED:
+    case actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED:
       return {
         ...state,
         savingSections: setSaving(

@@ -34,6 +34,8 @@ export interface User {
   name: string;
   email: string | null;
   emailVerified: boolean;
+  /** A requested address change, waiting for its link to be confirmed. */
+  pendingEmail: string | null;
   phoneNumber: string | null;
   phoneNumberVerified: boolean;
   avatarUrl: string | null;

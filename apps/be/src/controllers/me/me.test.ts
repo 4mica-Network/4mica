@@ -11,6 +11,8 @@ const {
   update,
   businessFindUnique,
   businessUpsert,
+  tokenCreate,
+  sendAccountVerification,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -19,6 +21,8 @@ const {
   update: vi.fn(),
   businessFindUnique: vi.fn(),
   businessUpsert: vi.fn(),
+  tokenCreate: vi.fn(),
+  sendAccountVerification: vi.fn(),
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -33,8 +37,15 @@ vi.mock("@4mica/db", () => ({
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update },
     business: { findUnique: businessFindUnique, upsert: businessUpsert },
+    emailVerificationToken: { create: tokenCreate, deleteMany: vi.fn() },
+    $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
   },
   disconnect: vi.fn(async () => {}),
+}));
+
+vi.mock("@services/email", () => ({
+  getEmailClient: () => ({ sendAccountVerification }),
+  resetEmailClient: vi.fn(),
 }));
 
 const AUTH_USER = {
@@ -134,6 +145,8 @@ describe("account routes", () => {
       update,
       businessFindUnique,
       businessUpsert,
+      tokenCreate,
+      sendAccountVerification,
     ]) {
       m.mockReset();
     }
@@ -144,6 +157,7 @@ describe("account routes", () => {
     upsert.mockResolvedValue(AUTH_USER);
     update.mockResolvedValue(FULL_USER);
     businessFindUnique.mockResolvedValue(null);
+    sendAccountVerification.mockResolvedValue({ id: "msg_1" });
   });
 
   it("GET /me returns the user and business envelope", async () => {
@@ -220,7 +234,7 @@ describe("account routes", () => {
     await app.close();
   });
 
-  it("PATCH /me/account un-verifies a changed email address", async () => {
+  it("PATCH /me/account parks a new email as pending instead of claiming it", async () => {
     const app = await initApp([{ plugin: meRoutes }]);
     const res = await app.inject({
       method: "PATCH",
@@ -230,15 +244,75 @@ describe("account routes", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    // `email` is unique: writing an unproven address there would let anyone
+    // squat or probe for it. It only moves once the link is confirmed.
     expect(update.mock.calls[0][0].data).toEqual({
-      email: "ada@newdomain.com",
-      emailVerified: false,
+      pendingEmail: "ada@newdomain.com",
     });
 
     await app.close();
   });
 
-  it("PATCH /me/account leaves the flag alone when the email is unchanged", async () => {
+  it("PATCH /me/account mails the confirmation link to the new address", async () => {
+    update.mockResolvedValue({
+      ...FULL_USER,
+      pendingEmail: "ada@newdomain.com",
+    });
+
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { email: "ada@newdomain.com" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().pendingEmail).toBe("ada@newdomain.com");
+    expect(res.json().email).toBe(FULL_USER.email);
+    expect(sendAccountVerification.mock.calls[0][0].to).toBe(
+      "ada@newdomain.com",
+    );
+    expect(tokenCreate.mock.calls[0][0].data.email).toBe("ada@newdomain.com");
+
+    await app.close();
+  });
+
+  it("PATCH /me/account still saves when the link cannot be sent", async () => {
+    update.mockResolvedValue({
+      ...FULL_USER,
+      pendingEmail: "ada@newdomain.com",
+    });
+    sendAccountVerification.mockRejectedValue(new Error("down"));
+
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { email: "ada@newdomain.com" },
+    });
+
+    expect(res.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("PATCH /me/account sends nothing when the email is not being changed", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { timeZone: "Europe/London" },
+    });
+
+    expect(sendAccountVerification).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("PATCH /me/account cancels a pending change when the current email is re-entered", async () => {
     const app = await initApp([{ plugin: meRoutes }]);
     const res = await app.inject({
       method: "PATCH",
@@ -248,7 +322,10 @@ describe("account routes", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(update.mock.calls[0][0].data).not.toHaveProperty("emailVerified");
+    expect(update.mock.calls[0][0].data).toEqual({
+      timeZone: "Europe/London",
+      pendingEmail: null,
+    });
 
     await app.close();
   });
@@ -475,8 +552,8 @@ describe("account routes", () => {
     });
     expect(good.statusCode).toBe(200);
     expect(update.mock.calls[0][0].data).toEqual({
-      email: "ada@example.com",
       theme: "light",
+      pendingEmail: null,
     });
 
     await app.close();

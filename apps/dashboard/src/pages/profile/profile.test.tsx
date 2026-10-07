@@ -139,4 +139,34 @@ describe("profile account status", () => {
     expect(notifySuccess).not.toHaveBeenCalled();
     expect(notifyError).not.toHaveBeenCalled();
   });
+
+  it("asks before spending a link, so a page load alone verifies nothing", async () => {
+    const dispatched = renderPage(
+      { emailVerified: false },
+      { path: "/settings/profile?verifyToken=4mica_ev_good" },
+    );
+
+    expect(dispatched.map((a) => a.type)).not.toContain(
+      actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm email" }),
+    );
+
+    expect(dispatched).toContainEqual(
+      expect.objectContaining({
+        type: actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
+        payload: "4mica_ev_good",
+      }),
+    );
+  });
+
+  it("shows no confirmation prompt without a link token", () => {
+    renderPage({ emailVerified: false });
+
+    expect(
+      screen.queryByRole("button", { name: "Confirm email" }),
+    ).not.toBeInTheDocument();
+  });
 });

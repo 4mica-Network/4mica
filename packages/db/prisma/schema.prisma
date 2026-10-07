@@ -141,6 +141,8 @@ model User {
   name                           String                    @default("")
   email                          String?                   @unique @db.VarChar(255)
   emailVerified                  Boolean                   @default(false) @map("email_verified")
+  /// An address the user asked to switch to; promoted to `email` only once verified.
+  pendingEmail                   String?                   @map("pending_email") @db.VarChar(255)
   phoneNumber                    String?                   @unique @map("phone_number") @db.VarChar(20)
   phoneNumberVerified            Boolean                   @default(false) @map("phone_number_verified")
   avatarUrl                      String?                   @map("avatar_url")

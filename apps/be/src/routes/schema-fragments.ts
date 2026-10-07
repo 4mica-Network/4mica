@@ -19,6 +19,7 @@ export const userResponseSchema = {
     name: str,
     email: nullStr,
     emailVerified: bool,
+    pendingEmail: nullStr,
     phoneNumber: nullStr,
     phoneNumberVerified: bool,
     avatarUrl: nullStr,

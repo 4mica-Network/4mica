@@ -1,6 +1,7 @@
 import { HttpError } from "@4mica/http";
 import {
   checkUsernameAvailability,
+  confirmEmailVerification as confirmEmailVerificationRequest,
   getMe,
   sendEmailVerification as sendEmailVerificationRequest,
   type UsernameAvailability,
@@ -159,7 +160,7 @@ export function* sendEmailVerification(action: {
       }),
       content: i18n.t("store.user.verificationSentBody", {
         defaultValue:
-          "We sent you a link. Open it and your account is verified.",
+          "We sent you a link. Open it while signed in and press confirm.",
       }),
       placement: (yield* placement()) as NotificationPlacement,
     });
@@ -177,6 +178,47 @@ export function* sendEmailVerification(action: {
       title: i18n.t("store.user.verificationFailedTitle", {
         defaultValue: "Couldn't send the email",
       }),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
+/** The API's error codes for a link that could not be spent. */
+const CONFIRM_OUTCOMES: Record<string, string> = {
+  invalid_token: "invalid",
+  token_expired: "expired",
+  email_taken: "taken",
+};
+
+export function* confirmEmailVerification(action: {
+  type: string;
+  payload: string;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    const user = yield call(() =>
+      confirmEmailVerificationRequest(action.payload),
+    );
+    yield put(updateUserSucceeded(user as User, action.meta));
+
+    notifySuccess({
+      title: i18n.t("page.settings.profile.verify.success.title"),
+      content: i18n.t("page.settings.profile.verify.success.body"),
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  } catch (error) {
+    const code =
+      error instanceof HttpError
+        ? (error.body as { error?: string } | null)?.error
+        : undefined;
+    const outcome = (code && CONFIRM_OUTCOMES[code]) ?? "invalid";
+    const message = i18n.t(`page.settings.profile.verify.${outcome}.body`);
+
+    yield put(sendEmailVerificationFailed(message, action.meta));
+
+    notifyError({
+      title: i18n.t(`page.settings.profile.verify.${outcome}.title`),
       content: message,
       placement: (yield* placement()) as NotificationPlacement,
     });
@@ -262,6 +304,10 @@ export default [
   takeLatest(
     actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED,
     sendEmailVerification,
+  ),
+  takeLatest(
+    actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
+    confirmEmailVerification,
   ),
   takeEvery(actionTypes.UPDATE_PROFILE_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_ACCOUNT_REQUESTED, updateUser),

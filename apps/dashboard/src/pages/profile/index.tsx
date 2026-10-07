@@ -1,13 +1,17 @@
 import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { sendEmailVerification, updateProfile } from "@stores/user/actions";
+import {
+  confirmEmailVerification,
+  sendEmailVerification,
+  updateProfile,
+} from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
 import { notifyError, notifySuccess } from "@utils/notification";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { EditableCard } from "@/components/EditableCard";
@@ -48,6 +52,31 @@ function useVerificationOutcome() {
   }, [outcome, setParams, t]);
 }
 
+/**
+ * The emailed link lands here with `?verifyToken=`. Nothing is spent until the
+ * user presses Confirm: mail scanners open links on their own, and a page load
+ * must not be enough to verify an address.
+ */
+function useVerificationToken() {
+  const [params, setParams] = useSearchParams();
+  const token = params.get("verifyToken");
+
+  const clear = useCallback(
+    () =>
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("verifyToken");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+
+  return { token, clear };
+}
+
 export function ProfileSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -55,6 +84,7 @@ export function ProfileSettings() {
   const issues = useAppSelector(selectValidationIssues);
 
   useVerificationOutcome();
+  const pendingVerification = useVerificationToken();
 
   const savingIdentity = useAppSelector(selectIsSectionSaving("identity"));
   const savingColors = useAppSelector(selectIsSectionSaving("colors"));
@@ -127,6 +157,53 @@ export function ProfileSettings() {
         title={t("settings.profile.identity")}
         description={t("settings.profile.identityHint")}
       >
+        {pendingVerification.token ? (
+          <Card className="flex items-center justify-between gap-4">
+            <div>
+              <span className="font-medium text-ink-strong text-sm">
+                {t("page.settings.profile.verify.confirm.title")}
+              </span>
+              <p className="mt-0.5 text-ink-muted text-xs">
+                {t("page.settings.profile.verify.confirm.body")}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                intent="ghost"
+                size="sm"
+                className="btn-no-lift"
+                onClick={pendingVerification.clear}
+              >
+                {t("page.settings.profile.verify.confirm.dismiss")}
+              </Button>
+              <Button
+                type="button"
+                intent="invert"
+                size="sm"
+                className="btn-no-lift w-32"
+                disabled={sendingVerification}
+                onClick={() => {
+                  dispatch(
+                    confirmEmailVerification(
+                      pendingVerification.token as string,
+                    ),
+                  );
+                  pendingVerification.clear();
+                }}
+              >
+                <span className="flex w-full items-center justify-center text-sm">
+                  {sendingVerification ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    t("page.settings.profile.verify.confirm.action")
+                  )}
+                </span>
+              </Button>
+            </div>
+          </Card>
+        ) : null}
+
         <Card className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">

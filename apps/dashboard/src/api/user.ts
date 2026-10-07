@@ -38,6 +38,13 @@ export const sendEmailVerification = () =>
     method: HttpMethod.POST,
   });
 
+export const confirmEmailVerification = (token: string) =>
+  httpClient.request<User, { token: string }>({
+    url: "/me/email/verification/confirm",
+    method: HttpMethod.POST,
+    data: { token },
+  });
+
 export type UsernameUnavailability = UsernameUnavailableReason | "taken";
 export interface UsernameAvailability {
   username: string;

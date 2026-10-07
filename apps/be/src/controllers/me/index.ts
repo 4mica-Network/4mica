@@ -1,6 +1,7 @@
 import { usernameUnavailableReason } from "@4mica/url";
 import { invalidateUser } from "@auth/user-store";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
+import { deliverVerification } from "@controllers/verification/index";
 import { appLogger } from "@logger/index";
 import {
   isUniqueViolation,
@@ -49,6 +50,29 @@ const patchUserHandler =
       if (request.user) {
         invalidateUser(request.user.clerkUserId);
       }
+
+      // A new address only takes effect once confirmed, so send the link now
+      // rather than leave the user to find the resend button. A failed send
+      // does not fail the save — the dashboard can resend.
+      const requested = (parsed.data as { email?: unknown }).email;
+      if (
+        request.server.email &&
+        typeof requested === "string" &&
+        updated.pendingEmail === requested
+      ) {
+        await deliverVerification(
+          request.server.email,
+          userId,
+          updated.pendingEmail,
+          updated.name,
+        ).catch((error) => {
+          appLogger.warn("Could not send the email-change link", {
+            error,
+            userId,
+          });
+        });
+      }
+
       return reply.send(updated);
     } catch (error) {
       if (isUniqueViolation(error)) {

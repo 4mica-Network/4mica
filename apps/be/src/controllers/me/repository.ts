@@ -13,6 +13,7 @@ export const USER_SELECT = {
   name: true,
   email: true,
   emailVerified: true,
+  pendingEmail: true,
   phoneNumber: true,
   phoneNumberVerified: true,
   avatarUrl: true,
@@ -98,31 +99,41 @@ export const getBusiness = async (userId: string) =>
     select: BUSINESS_SELECT,
   });
 
-const clearsEmailVerification = async (
+type UpdatableUser =
+  | UpdateProfileInput
+  | UpdateAccountInput
+  | UpdateNotificationsInput;
+
+/**
+ * A new address is parked in `pendingEmail` and only becomes `email` once its
+ * owner follows the link sent to it (see controllers/verification). Writing it
+ * straight to the unique `email` column would let anyone claim, or probe for,
+ * an address they cannot read. Re-entering the current address cancels a
+ * pending change.
+ */
+const routeEmailChange = async (
   userId: string,
-  data: UpdateProfileInput | UpdateAccountInput | UpdateNotificationsInput,
-): Promise<boolean> => {
+  data: UpdatableUser,
+): Promise<Record<string, unknown>> => {
   if (!("email" in data) || typeof data.email !== "string") {
-    return false;
+    return data;
   }
 
+  const { email, ...rest } = data;
   const current = await prisma.user.findUnique({
     where: { id: userId },
     select: { email: true },
   });
 
-  return current?.email !== data.email;
+  return current?.email === email
+    ? { ...rest, pendingEmail: null }
+    : { ...rest, pendingEmail: email };
 };
 
-export const updateUser = async (
-  userId: string,
-  data: UpdateProfileInput | UpdateAccountInput | UpdateNotificationsInput,
-) =>
+export const updateUser = async (userId: string, data: UpdatableUser) =>
   prisma.user.update({
     where: { id: userId },
-    data: (await clearsEmailVerification(userId, data))
-      ? { ...data, emailVerified: false }
-      : data,
+    data: await routeEmailChange(userId, data),
     select: USER_SELECT,
   });
 
