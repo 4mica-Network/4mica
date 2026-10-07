@@ -1,7 +1,7 @@
 import { getServiceState, type ServiceState } from "@lifecycle/index";
 import { appLogger } from "@logger/index";
 import type { RouteHandler } from "fastify";
-import { countAgents } from "./repository";
+import { pingDatabase } from "./repository";
 
 export interface HealthResponse {
   status: "ok" | "degraded" | "draining";
@@ -9,7 +9,6 @@ export interface HealthResponse {
   uptime: number;
   timestamp: string;
   db: "ok" | "down" | "unknown";
-  agents?: number;
 }
 
 export const getHealthHandler: RouteHandler = async (_request, reply) => {
@@ -30,7 +29,7 @@ export const getHealthHandler: RouteHandler = async (_request, reply) => {
   }
 
   try {
-    body.agents = await countAgents();
+    await pingDatabase();
     body.db = "ok";
     body.status = "ok";
   } catch (error) {

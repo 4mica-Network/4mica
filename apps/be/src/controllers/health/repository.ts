@@ -1,3 +1,5 @@
 import { prisma } from "@4mica/db";
 
-export const countAgents = () => prisma.agent.count();
+export const pingDatabase = async (): Promise<void> => {
+  await prisma.$queryRaw`SELECT 1`;
+};

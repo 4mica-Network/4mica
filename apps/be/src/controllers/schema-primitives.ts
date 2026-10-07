@@ -31,6 +31,28 @@ export const address = v.pipe(
   v.transform((value) => value.toLowerCase()),
 );
 
+const isWebUrl = (value: string): boolean => {
+  try {
+    const { protocol, hostname } = new URL(value);
+    return (protocol === "https:" || protocol === "http:") && hostname !== "";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * An http(s) URL and nothing else. `v.url()` alone is only `new URL()`, which
+ * happily accepts `javascript:` and `data:` — and these values end up in
+ * `href`/`src` attributes, sometimes on another account's screen.
+ */
+export const webUrl = (max: number) =>
+  v.pipe(
+    v.string(),
+    v.trim(),
+    v.maxLength(max),
+    v.check(isWebUrl, "must be an http:// or https:// URL"),
+  );
+
 export const decimalAmount = v.pipe(
   v.string(),
   v.trim(),

@@ -49,6 +49,22 @@ const payerAddressTaken = (reply: FastifyReply) =>
     issues: [{ path: "payerWalletId", message: "is already used by an agent" }],
   });
 
+const notPayable = (reply: FastifyReply) =>
+  reply.code(409).send({
+    error: "agent_not_payable",
+    message:
+      "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
+    issues: [{ path: "walletId", message: "is required before publishing" }],
+  });
+
+const suspended = (reply: FastifyReply, path: "status" | "visibility") =>
+  reply.code(409).send({
+    error: "agent_suspended",
+    message:
+      "This agent was suspended by moderation and cannot be reactivated or published from here.",
+    issues: [{ path, message: "cannot change while suspended" }],
+  });
+
 const uniqueConflict = (reply: FastifyReply, error: unknown) => {
   const targets = uniqueViolationTargets(error);
   return targets.some((target) => target.includes("wallet_address"))
@@ -128,6 +144,11 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     payToAddress = resolved.wallet.address;
   }
 
+  // Same bar as POST /publish: a public agent must be payable.
+  if (data.visibility === "PUBLIC" && !payToAddress) {
+    return notPayable(reply);
+  }
+
   const taken = await takenSlugs(userId);
   if (data.slug && taken.has(data.slug)) {
     return slugTaken(reply);
@@ -197,12 +218,10 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   const next = parsed.data;
 
   if (current.status === "SUSPENDED" && next.status !== undefined) {
-    return reply.code(409).send({
-      error: "agent_suspended",
-      message:
-        "This agent was suspended by moderation and cannot be reactivated from here.",
-      issues: [{ path: "status", message: "cannot change while suspended" }],
-    });
+    return suspended(reply, "status");
+  }
+  if (current.status === "SUSPENDED" && next.visibility === "PUBLIC") {
+    return suspended(reply, "visibility");
   }
 
   const { walletId, payerWalletId, network, ...rest } = next;
@@ -269,6 +288,24 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
     }
   }
 
+  const payToAfter =
+    "payToAddress" in data
+      ? (data.payToAddress as string | null)
+      : current.payToAddress;
+
+  if (next.visibility === "PUBLIC") {
+    if (!payToAfter) {
+      return notPayable(reply);
+    }
+    data.publishedAt = current.publishedAt ?? new Date();
+  } else if (
+    next.visibility === undefined &&
+    current.visibility === "PUBLIC" &&
+    !payToAfter
+  ) {
+    data.visibility = "PRIVATE";
+  }
+
   if (next.slug && next.slug !== current.slug) {
     const taken = await takenSlugs(userId);
     if (taken.has(next.slug)) {
@@ -299,13 +336,12 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
     return notFound(reply, "agent");
   }
 
+  if (current.status === "SUSPENDED") {
+    return suspended(reply, "visibility");
+  }
+
   if (!current.payToAddress) {
-    return reply.code(409).send({
-      error: "agent_not_payable",
-      message:
-        "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
-      issues: [{ path: "walletId", message: "is required before publishing" }],
-    });
+    return notPayable(reply);
   }
 
   const updated = await updateAgent(userId, id, {

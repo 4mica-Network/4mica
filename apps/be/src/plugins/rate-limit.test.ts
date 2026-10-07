@@ -1,12 +1,14 @@
 import type { FastifyPluginCallback } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authenticateRequest, getUser, findUnique, upsert } = vi.hoisted(() => ({
-  authenticateRequest: vi.fn(),
-  getUser: vi.fn(),
-  findUnique: vi.fn(),
-  upsert: vi.fn(),
-}));
+const { authenticateRequest, getUser, findUnique, upsert, apiKeyFind } =
+  vi.hoisted(() => ({
+    authenticateRequest: vi.fn(),
+    getUser: vi.fn(),
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+    apiKeyFind: vi.fn(),
+  }));
 
 vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({
@@ -17,8 +19,12 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
-    agent: { count: vi.fn(async () => 0) },
+    $queryRaw: vi.fn(async () => [{ "?column?": 1 }]),
     user: { findUnique, upsert },
+    apiKey: {
+      findUnique: apiKeyFind,
+      update: vi.fn(async () => ({})),
+    },
   },
   disconnect: vi.fn(async () => {}),
 }));
@@ -58,14 +64,21 @@ const loadApp = async (limits: Record<string, string>) => {
   vi.stubEnv("RATE_LIMIT_IP_MAX", limits.ip ?? "1000");
   vi.stubEnv("RATE_LIMIT_USER_MAX", limits.user ?? "1000");
   vi.stubEnv("RATE_LIMIT_SENSITIVE_MAX", limits.sensitive ?? "1000");
+  vi.stubEnv("RATE_LIMIT_API_KEY_MAX", limits.apiKey ?? "1000");
 
-  const [{ initApp }, { healthRoutes }, { guards }, { sensitiveRateLimit }] =
-    await Promise.all([
-      import("@/server"),
-      import("@routes/health"),
-      import("@routes/guards"),
-      import("./rate-limit"),
-    ]);
+  const [
+    { initApp },
+    { healthRoutes },
+    { guards },
+    { apiKeyRateLimit, sensitiveRateLimit },
+    { authenticateApiKey },
+  ] = await Promise.all([
+    import("@/server"),
+    import("@routes/health"),
+    import("@routes/guards"),
+    import("./rate-limit"),
+    import("@auth/api-key"),
+  ]);
 
   const testRoutes: FastifyPluginCallback = (app, _opts, done) => {
     const base = guards(app);
@@ -77,6 +90,14 @@ const loadApp = async (limits: Record<string, string>) => {
       {
         onRequest: base.onRequest,
         preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      },
+      async () => ({ ok: true }),
+    );
+    app.post(
+      "/v1/thing",
+      {
+        onRequest: [authenticateApiKey],
+        preHandler: [apiKeyRateLimit(app)],
       },
       async () => ({ ok: true }),
     );
@@ -208,6 +229,75 @@ describe("rate limiting", () => {
       headers: AUTH,
     });
     expect(ordinary.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("keys the IP limit on the address nginx saw, not a forged X-Forwarded-For", async () => {
+    const app = await loadApp({ ip: "3" });
+
+    // nginx appends $remote_addr, so only the last entry is trustworthy; the
+    // client controls everything before it.
+    const codes: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const response = await app.inject({
+        method: "GET",
+        url: "/open",
+        headers: { "x-forwarded-for": `10.0.0.${i}, 203.0.113.7` },
+      });
+      codes.push(response.statusCode);
+    }
+
+    expect(codes).toEqual([200, 200, 200, 429]);
+
+    await app.close();
+  });
+
+  it("still budgets distinct real clients separately behind the proxy", async () => {
+    const app = await loadApp({ ip: "1" });
+
+    const first = await app.inject({
+      method: "GET",
+      url: "/open",
+      headers: { "x-forwarded-for": "203.0.113.7" },
+    });
+    const second = await app.inject({
+      method: "GET",
+      url: "/open",
+      headers: { "x-forwarded-for": "203.0.113.8" },
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("caps each API key on its own, whichever IP it arrives from", async () => {
+    apiKeyFind.mockImplementation(async () => ({
+      id: "key_1",
+      ownerId: "owner_1",
+      revokedAt: null,
+      expiresAt: null,
+      owner: { banned: false, locked: false, deletedAt: null },
+    }));
+
+    const app = await loadApp({ apiKey: "2" });
+
+    const codes: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/thing",
+        headers: {
+          authorization: "Bearer 4mica_sk_abc",
+          "x-forwarded-for": `203.0.113.${i}`,
+        },
+      });
+      codes.push(response.statusCode);
+    }
+
+    expect(codes).toEqual([200, 200, 429]);
 
     await app.close();
   });

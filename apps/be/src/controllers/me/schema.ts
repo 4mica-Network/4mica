@@ -5,6 +5,7 @@ import {
   USERNAME_PATTERN,
   usernameUnavailableReason,
 } from "@4mica/url";
+import { webUrl } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
 const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
@@ -76,7 +77,7 @@ export const UpdateProfileSchema = v.partial(
     username: v.nullable(usernamePipe),
     bio: nullableText(2000),
     description: nullableText(2000),
-    avatarUrl: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2048))),
+    avatarUrl: v.nullable(webUrl(2048)),
     private: v.boolean(),
     hidden: v.boolean(),
     allowSEOIndexing: v.boolean(),
@@ -143,12 +144,7 @@ export const UpsertBusinessSchema = v.partial(
     taxId: nullableText(64),
     vatNumber: nullableText(64),
     industry: nullableText(128),
-    website: v.nullable(
-      v.union([
-        v.literal(""),
-        v.pipe(v.string(), v.trim(), v.url(), v.maxLength(255)),
-      ]),
-    ),
+    website: v.nullable(v.union([v.literal(""), webUrl(255)])),
     description: nullableText(2000),
     supportEmail: v.nullable(
       v.union([

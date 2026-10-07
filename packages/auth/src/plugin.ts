@@ -5,6 +5,14 @@ import { extractProfile } from "./claims";
 import { toWebRequest } from "./request";
 import type { AuthContext, ClerkAuthOptions } from "./types";
 
+/**
+ * Session tokens are accepted from the Authorization header only. Forwarding
+ * the Cookie header would let Clerk fall back to a `__session` cookie, and a
+ * cookie is sent by the browser on requests the user never meant to make —
+ * which is the whole of CSRF. A bearer token has to be attached on purpose.
+ */
+const BEARER_ONLY = { omitHeaders: ["cookie"] } as const;
+
 const UNAUTHORIZED = {
   error: "unauthorized",
   message: "A valid Clerk session token is required.",
@@ -32,7 +40,7 @@ const clerkAuthPlugin = async (
   ): Promise<AuthContext | null> => {
     let webRequest: Request;
     try {
-      webRequest = toWebRequest(request);
+      webRequest = toWebRequest(request, BEARER_ONLY);
     } catch (error) {
       log?.warn("Could not convert request for Clerk", { err: error });
       return null;

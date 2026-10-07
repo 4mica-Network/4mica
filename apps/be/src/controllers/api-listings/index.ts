@@ -36,6 +36,14 @@ const slugTaken = (reply: FastifyReply) =>
     issues: [{ path: "slug", message: "is already in use on your profile" }],
   });
 
+const notPayable = (reply: FastifyReply) =>
+  reply.code(409).send({
+    error: "listing_not_payable",
+    message:
+      "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
+    issues: [{ path: "walletId", message: "is required before publishing" }],
+  });
+
 export const listApiListingsHandler: RouteHandler = async (request, reply) => {
   const userId = requireUserId(request, reply);
   if (!userId) {
@@ -93,6 +101,10 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     walletId = resolved.wallet.id;
     network = resolved.wallet.network;
     payToAddress = resolved.wallet.address;
+  }
+
+  if (data.visibility === "PUBLIC" && !payToAddress) {
+    return notPayable(reply);
   }
 
   const taken = await takenSlugs(userId);
@@ -180,6 +192,24 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
     }
   }
 
+  const payToAfter =
+    "payToAddress" in data
+      ? (data.payToAddress as string | null)
+      : current.payToAddress;
+
+  if (next.visibility === "PUBLIC") {
+    if (!payToAfter) {
+      return notPayable(reply);
+    }
+    data.publishedAt = current.publishedAt ?? new Date();
+  } else if (
+    next.visibility === undefined &&
+    current.visibility === "PUBLIC" &&
+    !payToAfter
+  ) {
+    data.visibility = "PRIVATE";
+  }
+
   if (next.slug && next.slug !== current.slug) {
     const taken = await takenSlugs(userId);
     if (taken.has(next.slug)) {
@@ -214,12 +244,7 @@ export const publishApiListingHandler: RouteHandler = async (
   }
 
   if (!current.payToAddress || !current.network) {
-    return reply.code(409).send({
-      error: "listing_not_payable",
-      message:
-        "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
-      issues: [{ path: "walletId", message: "is required before publishing" }],
-    });
+    return notPayable(reply);
   }
 
   const updated = await updateApiListing(userId, id, {

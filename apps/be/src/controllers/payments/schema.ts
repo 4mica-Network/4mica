@@ -5,6 +5,7 @@ import {
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
   positiveInt,
+  webUrl,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
@@ -26,8 +27,6 @@ const hexBlob = v.pipe(
   v.maxLength(20_000),
 );
 
-const httpsUrl = v.pipe(v.string(), v.trim(), v.url(), v.maxLength(2048));
-
 export const ReportPaymentSchema = v.object({
   reqId: hex32,
   payerAddress: address,
@@ -48,7 +47,7 @@ export const ReportPaymentSchema = v.object({
     v.nullable(v.pipe(v.string(), v.trim(), v.toLowerCase(), v.maxLength(64))),
   ),
 
-  resource: v.optional(v.nullable(httpsUrl)),
+  resource: v.optional(v.nullable(webUrl(2048))),
   description: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(280))),
   ),

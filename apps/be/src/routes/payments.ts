@@ -6,6 +6,7 @@ import {
   paymentSummaryHandler,
   reportPaymentHandler,
 } from "@controllers/payments/index";
+import { apiKeyRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
@@ -136,11 +137,12 @@ export const paymentRoutes: FastifyPluginCallback = (app, _opts, done) => {
     "/v1/payments",
     {
       onRequest: [authenticateApiKey],
+      preHandler: [apiKeyRateLimit(app)],
       schema: {
         tags: ["payments"],
         summary: "Report a payment your service took",
         description:
-          "Idempotent on `reqId`, which the payer mints once per payment — a retry after a timeout updates the existing row rather than creating a second one. Returns 201 the first time and 200 thereafter.",
+          "Idempotent on `reqId`, which the payer mints once per payment — a retry after a timeout updates the existing row rather than creating a second one. Returns 201 the first time and 200 thereafter. The first report fixes the payer, recipient, network, asset and amount; a PENDING payment may later settle or fail, but SETTLED and FAILED are final. A report that contradicts any of that is a 409.",
         security: [{ apiKeyAuth: [] }],
         response: {
           ...limitedResponses,
@@ -148,6 +150,7 @@ export const paymentRoutes: FastifyPluginCallback = (app, _opts, done) => {
           201: paymentResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
+          409: errorResponseSchema,
         },
       },
     },

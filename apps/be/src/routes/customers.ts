@@ -24,7 +24,7 @@ import {
   updateCustomerIdentityHandler,
   zeroCustomerCreditHandler,
 } from "@controllers/customers/index";
-import { sensitiveRateLimit } from "@plugins/rate-limit";
+import { apiKeyRateLimit, sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
@@ -602,6 +602,7 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
     "/v1/customers/resolve",
     {
       onRequest: [authenticateApiKey],
+      preHandler: [apiKeyRateLimit(app)],
       schema: {
         tags: ["customers"],
         summary: "What this payer owes, and whether they may pay at all",

@@ -272,7 +272,7 @@ const visibilityEnum = {
   enum: ["PRIVATE", "UNLISTED", "PUBLIC"],
 } as const;
 
-const httpMethodEnum = {
+const _httpMethodEnum = {
   type: "string",
   enum: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 } as const;
@@ -731,6 +731,7 @@ export const errorResponseSchema = {
   properties: {
     error: str,
     message: str,
+    requestId: str,
     issues: {
       type: "array",
       items: {
@@ -741,10 +742,6 @@ export const errorResponseSchema = {
   },
 } as const;
 
-/**
- * Responses every rate-limited route can produce regardless of its handler:
- * 429 from the limiter, 503 while the instance is draining.
- */
 export const limitedResponses = {
   429: errorResponseSchema,
   503: errorResponseSchema,

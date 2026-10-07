@@ -81,3 +81,5 @@ jobs:
             RATE_LIMIT_IP_MAX=${{ vars.RATE_LIMIT_IP_MAX || '300' }}
             RATE_LIMIT_USER_MAX=${{ vars.RATE_LIMIT_USER_MAX || '120' }}
             RATE_LIMIT_SENSITIVE_MAX=${{ vars.RATE_LIMIT_SENSITIVE_MAX || '10' }}
+            RATE_LIMIT_API_KEY_MAX=${{ vars.RATE_LIMIT_API_KEY_MAX || '600' }}
+            TRUST_PROXY_HOPS=${{ vars.TRUST_PROXY_HOPS || '1' }}

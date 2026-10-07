@@ -22,6 +22,10 @@ const userKey = (request: FastifyRequest): string =>
 
 const ipKey = (request: FastifyRequest): string => request.ip;
 
+/** Logged instead of `request.url`: some query strings carry tokens. */
+const pathOf = (request: FastifyRequest): string =>
+  request.url.split("?", 1)[0] ?? request.url;
+
 /** The counted (non-allowlisted) branch of a limiter check. */
 type CountedResult = Extract<
   Awaited<ReturnType<ReturnType<FastifyInstance["createRateLimit"]>>>,
@@ -72,7 +76,7 @@ const ipShield = (app: FastifyInstance): onRequestAsyncHookHandler => {
     appLogger.warn("IP rate limit exceeded", {
       key: result.key,
       method: request.method,
-      url: request.url,
+      path: pathOf(request),
     });
 
     return reject(reply, result);
@@ -100,7 +104,7 @@ const userLimit = (
     appLogger.warn(`${scope} rate limit exceeded`, {
       key: result.key,
       method: request.method,
-      url: request.url,
+      path: pathOf(request),
     });
 
     return reject(reply, result);
@@ -118,6 +122,45 @@ export const registerRateLimit = async (
 
   app.addHook("onRequest", ipShield(app));
   app.addHook("preHandler", userLimit(app, config.rateLimit.userMax, "User"));
+};
+
+/**
+ * Budget per API key on the server-to-server `/v1` routes. The IP shield alone
+ * would let one leaked key spread across many hosts; this caps the key itself.
+ * Must run after `authenticateApiKey`, which is what sets `request.apiKey`.
+ */
+export const apiKeyRateLimit = (
+  app: FastifyInstance,
+): preHandlerAsyncHookHandler => {
+  if (!config.rateLimit.enabled) {
+    return async () => {};
+  }
+
+  const check = limiter(
+    app,
+    config.rateLimit.apiKeyMax,
+    (request) => `key:${request.apiKey?.id ?? request.ip}`,
+  );
+
+  return async (request, reply) => {
+    if (!request.apiKey) {
+      return;
+    }
+
+    const result = await check(request);
+
+    if (result.isAllowed || !result.isExceeded) {
+      return;
+    }
+
+    appLogger.warn("API key rate limit exceeded", {
+      apiKeyId: request.apiKey.id,
+      method: request.method,
+      path: pathOf(request),
+    });
+
+    return reject(reply, result);
+  };
 };
 
 export const sensitiveRateLimit = (

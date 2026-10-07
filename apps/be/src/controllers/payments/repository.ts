@@ -294,51 +294,205 @@ export const resolveReportTargets = async (
   return { listingId: listing?.id ?? null, agentId: agent?.id ?? null };
 };
 
+const canonicalAmount = (value: string): string =>
+  value.includes(".") ? value.replace(/\.?0+$/, "") : value;
+
+const IDENTITY_FIELDS = [
+  "payerAddress",
+  "recipientAddress",
+  "network",
+  "assetAddress",
+  "amount",
+] as const;
+
+const DETAIL_FIELDS = [
+  "listingId",
+  "agentId",
+  "failureReason",
+  "guaranteeClaims",
+  "guaranteeSignature",
+  "txHash",
+  "resource",
+  "description",
+] as const;
+
+type PaymentStatus = ReportPaymentInput["status"];
+
+const canMove = (from: PaymentStatus, to: PaymentStatus): boolean =>
+  from === "PENDING" || from === to;
+
+const EXISTING_SELECT = {
+  id: true,
+  status: true,
+  settledAt: true,
+  payerAddress: true,
+  recipientAddress: true,
+  network: true,
+  assetAddress: true,
+  amount: true,
+  listingId: true,
+  agentId: true,
+  failureReason: true,
+  guaranteeClaims: true,
+  guaranteeSignature: true,
+  txHash: true,
+  resource: true,
+  description: true,
+} satisfies Prisma.PaymentSelect;
+
+type ExistingPayment = Prisma.PaymentGetPayload<{
+  select: typeof EXISTING_SELECT;
+}>;
+
+export type ReportOutcome =
+  | { kind: "created" | "updated"; row: PaymentRow }
+  | { kind: "conflict"; field: string; message: string };
+
+const isUniqueViolation = (error: unknown): boolean =>
+  (error as { code?: unknown })?.code === "P2002";
+
+const identityConflict = (
+  existing: ExistingPayment,
+  incoming: Record<(typeof IDENTITY_FIELDS)[number], string | null>,
+): string | null => {
+  for (const field of IDENTITY_FIELDS) {
+    const before =
+      field === "amount"
+        ? canonicalAmount(existing.amount.toString())
+        : (existing[field] as string | null);
+    const after =
+      field === "amount"
+        ? canonicalAmount(incoming.amount ?? "")
+        : incoming[field];
+
+    if (before !== after) {
+      return field;
+    }
+  }
+  return null;
+};
+
 export const reportPayment = async (
   ownerId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
-): Promise<{ row: PaymentRow; created: boolean }> => {
-  const settledAt =
-    data.status === "SETTLED"
-      ? data.settledAt
-        ? new Date(data.settledAt)
-        : new Date()
-      : null;
-
-  const fields = {
-    listingId: targets.listingId,
-    agentId: targets.agentId,
+): Promise<ReportOutcome> => {
+  const identity = {
     payerAddress: data.payerAddress,
     recipientAddress: data.recipientAddress,
     network: data.network,
     assetAddress: data.assetAddress ?? null,
     amount: data.amount,
-    status: data.status,
+  };
+
+  const detail: Record<(typeof DETAIL_FIELDS)[number], string | null> = {
+    listingId: targets.listingId,
+    agentId: targets.agentId,
     failureReason: data.failureReason ?? null,
     guaranteeClaims: data.guaranteeClaims ?? null,
     guaranteeSignature: data.guaranteeSignature ?? null,
     txHash: data.txHash ?? null,
     resource: data.resource ?? null,
     description: data.description ?? null,
-    settledAt,
   };
 
-  const existing = await prisma.payment.findUnique({
-    where: { ownerId_reqId: { ownerId, reqId: data.reqId } },
-    select: { id: true },
-  });
+  const reportedSettledAt = data.settledAt ? new Date(data.settledAt) : null;
+  const where = { ownerId_reqId: { ownerId, reqId: data.reqId } };
 
-  const row = await prisma.payment.upsert({
-    where: { ownerId_reqId: { ownerId, reqId: data.reqId } },
-    update: fields,
-    create: { ownerId, reqId: data.reqId, ...fields },
-    select: PAYMENT_SELECT,
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await prisma.payment.findUnique({
+      where,
+      select: EXISTING_SELECT,
+    });
+
+    if (!existing) {
+      try {
+        const row = await prisma.payment.create({
+          data: {
+            ownerId,
+            reqId: data.reqId,
+            ...identity,
+            ...detail,
+            status: data.status,
+            settledAt:
+              data.status === "SETTLED"
+                ? (reportedSettledAt ?? new Date())
+                : null,
+          },
+          select: PAYMENT_SELECT,
+        });
+        return {
+          kind: "created",
+          row: toRow(row, new Set([data.recipientAddress])),
+        };
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    const field = identityConflict(existing, identity);
+    if (field) {
+      return {
+        kind: "conflict",
+        field,
+        message: `A payment with this reqId was already reported with a different ${field}.`,
+      };
+    }
+
+    if (!canMove(existing.status, data.status)) {
+      return {
+        kind: "conflict",
+        field: "status",
+        message: `This payment is already ${existing.status} and cannot become ${data.status}.`,
+      };
+    }
+
+    const final = existing.status !== "PENDING";
+    const update: Record<string, unknown> = {};
+    for (const key of DETAIL_FIELDS) {
+      const value = detail[key];
+      if (value !== null && (!final || existing[key] === null)) {
+        update[key] = value;
+      }
+    }
+
+    if (!final && data.status !== existing.status) {
+      update.status = data.status;
+      if (data.status === "SETTLED") {
+        update.settledAt = reportedSettledAt ?? new Date();
+      }
+    }
+
+    if (Object.keys(update).length > 0) {
+      const { count } = await prisma.payment.updateMany({
+        where: { id: existing.id, status: existing.status },
+        data: update,
+      });
+      if (count === 0) {
+        continue;
+      }
+    }
+
+    const row = await prisma.payment.findUnique({
+      where: { id: existing.id },
+      select: PAYMENT_SELECT,
+    });
+
+    if (row) {
+      return {
+        kind: "updated",
+        row: toRow(row, new Set([data.recipientAddress])),
+      };
+    }
+  }
 
   return {
-    row: toRow(row, new Set([data.recipientAddress])),
-    created: existing === null,
+    kind: "conflict",
+    field: "reqId",
+    message: "This payment changed while it was being reported. Retry.",
   };
 };
 

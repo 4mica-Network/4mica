@@ -131,14 +131,29 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  const { row, created } = await reportPayment(ownerId, data, targets);
+  const outcome = await reportPayment(ownerId, data, targets);
 
-  appLogger.info(created ? "Payment reported" : "Payment updated", {
+  if (outcome.kind === "conflict") {
+    appLogger.warn("Payment report conflicts with an earlier one", {
+      ownerId,
+      reqId: data.reqId,
+      field: outcome.field,
+    });
+    return reply.code(409).send({
+      error: "payment_conflict",
+      message: outcome.message,
+      issues: [{ path: outcome.field, message: "cannot change once reported" }],
+    });
+  }
+
+  const { row, kind } = outcome;
+
+  appLogger.info(kind === "created" ? "Payment reported" : "Payment updated", {
     ownerId,
     paymentId: row.id,
     reqId: row.reqId,
     status: row.status,
   });
 
-  return reply.code(created ? 201 : 200).send(row);
+  return reply.code(kind === "created" ? 201 : 200).send(row);
 };
