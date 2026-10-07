@@ -19,7 +19,6 @@ export function UsernameStep({
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** The handle currently on the server, generated or chosen. */
   savedUsername: string;
   error?: string;
 }) {

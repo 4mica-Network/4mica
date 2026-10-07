@@ -29,7 +29,6 @@ describe("onboarding username shape", () => {
   });
 
   it("normalises case before judging", () => {
-    // The server lowercases on write, so "AdaLovelace" is a valid submission.
     expect(isUsernameShapeValid("AdaLovelace")).toBe(true);
   });
 
@@ -44,8 +43,6 @@ describe("onboarding username shape", () => {
   });
 
   it("rejects segments the marketing site owns", () => {
-    // Public profiles are served bare off the same apex domain, so these would
-    // shadow real pages.
     expect(isUsernameShapeValid("pricing")).toBe(false);
     expect(isUsernameShapeValid("docs")).toBe(false);
     expect(isUsernameShapeValid("Blog")).toBe(false);

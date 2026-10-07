@@ -367,8 +367,6 @@ export function CreateApiListingModal({
                 />
               )}
 
-              {/* Show what choosing this wallet actually commits to. The two
-                  values are derived server-side, so they are not editable. */}
               {chosenWallet && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <Tag size="sm" variant="neutral">

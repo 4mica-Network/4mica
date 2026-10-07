@@ -7,7 +7,6 @@ import { useTranslation } from "react-i18next";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { links } from "@/lib/links";
 
-/** Google's brand mark. Inlined because lucide ships no brand icons. */
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className="h-4.5 w-4.5">

@@ -3,7 +3,6 @@ import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardHeader } from "@/components/form";
 
-/** A card whose fields are typed, so changes are committed with a button. */
 export function EditableCard({
   title,
   description,
@@ -39,7 +38,6 @@ export function EditableCard({
 
         {children}
 
-        {/* -mx-6 cancels the card padding so the rule spans the full width. */}
         <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
           <Button
             type="button"
@@ -67,7 +65,6 @@ export function EditableCard({
   );
 }
 
-/** A card of controls that each save the moment they change. */
 export function InstantCard({
   title,
   description,

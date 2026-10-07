@@ -94,8 +94,6 @@ export function AgentRow({
             </Tag>
           )}
 
-          {/* The RECEIVING address. The payer address is never shown in a
-              list — it is the agent's spending identity. */}
           {agent.payToAddress && (
             <Tag size="sm" variant="neutral" className="font-mono">
               {shortenAddress(agent.payToAddress)}

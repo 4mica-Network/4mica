@@ -14,19 +14,9 @@ export interface ChecklistItem {
   hint: string;
   to: string;
   done: boolean;
-  /** KYB is reviewed out of band, so it has a third state the others lack. */
   pending?: boolean;
 }
 
-/**
- * Everything here is derived from slices the app already holds — no bespoke
- * "progress" endpoint, so the items tick the moment the underlying mutation
- * lands rather than on the next page load.
- *
- * Ordered as the journey actually runs: prove an address, put something behind
- * a paywall, make it reachable, then get paid. The developer items come after,
- * because an API key is only useful once there is a payment to report.
- */
 export function useChecklist(): {
   items: ChecklistItem[];
   done: number;
@@ -105,9 +95,6 @@ export function useChecklist(): {
       title: t("checklist.kyb"),
       hint: t("checklist.kybHint"),
       to: "/settings/business",
-      // Onboarding already collected the legal name, so presence of a business
-      // row would tick this for everyone on day one. Verification is the thing
-      // that actually gates payouts, so that is what it tracks.
       done: business?.kybStatus === "VERIFIED",
       pending: business?.kybStatus === "PENDING",
     },

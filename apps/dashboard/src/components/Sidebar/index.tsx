@@ -62,16 +62,10 @@ function Label({
   );
 }
 
-/**
- * `User.name` is `@default("")`, not nullable, so an unset name arrives as a
- * blank string — `??` would happily return it. Everything here is trimmed and
- * blank-checked rather than null-checked.
- */
 const firstNonBlank = (
   ...values: (string | null | undefined)[]
 ): string | undefined => values.find((value) => value?.trim())?.trim();
 
-/** Who the sidebar says you are: a real name if we have one, else an email. */
 function useDisplayName(): string {
   const { t } = useTranslation();
   const { user } = useUser();
@@ -243,8 +237,6 @@ function StaticBrand({ collapsed }: { collapsed: boolean }) {
   const displayName = useDisplayName();
   return (
     <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
-      {/* mr-1 matches AvatarMenu. The avatar is 32px inside a 36px box, so
-          without it the label sits 2px off the circle. */}
       <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
         <AvatarCircle />
       </span>
@@ -264,10 +256,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const currentUser = useAppSelector(selectUser);
-
-  // Null until the user loads and picks a handle in Settings → Profile. Both
-  // actions fall back to that page rather than linking to a profile that
-  // cannot exist.
   const profileUrl = currentUser?.username
     ? links.profile(currentUser.username)
     : null;

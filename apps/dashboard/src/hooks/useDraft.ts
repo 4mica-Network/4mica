@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-/**
- * Local draft for cards that hold free text. Toggles and selects bypass this
- * and dispatch straight away, so only typed input needs a Save button.
- */
 export function useDraft<T extends Record<string, unknown>>(initial: T) {
   const [draft, setDraft] = useState<T>(initial);
 

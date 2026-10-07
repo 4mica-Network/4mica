@@ -119,9 +119,6 @@ export function ApiKeysCard() {
             type="submit"
             size="sm"
             intent="invert"
-            // py/text/border mirror InputField's own box so the button lines up
-            // with the input beside it. min-w keeps the width stable while the
-            // spinner replaces the label.
             className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
             disabled={!name.trim() || isCreating}
           >

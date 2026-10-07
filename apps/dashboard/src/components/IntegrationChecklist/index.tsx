@@ -19,18 +19,9 @@ import { useChecklist } from "./useChecklist";
 interface ChecklistPrefs {
   collapsed: boolean;
   dismissed: boolean;
-  /** Which set of steps the dismissal was for. */
   version?: number;
 }
 
-/**
- * Bump whenever the steps change.
- *
- * A dismissal means "I have read these", not "never show me anything again".
- * Without a version, someone who dismissed an earlier, shorter checklist would
- * never see the steps added later — the guidance would be there and silently
- * unreachable, which is worse than not having written it.
- */
 export const CHECKLIST_VERSION = 2;
 
 const DEFAULT_PREFS: ChecklistPrefs = {
@@ -39,11 +30,6 @@ const DEFAULT_PREFS: ChecklistPrefs = {
   version: CHECKLIST_VERSION,
 };
 
-/**
- * A dismissal only silences the steps it was made against, so adding a step
- * brings the widget back once. Completing everything hides it for good, which
- * needs no version.
- */
 export const shouldShowChecklist = (
   prefs: ChecklistPrefs,
   done: number,
@@ -56,20 +42,12 @@ export const shouldShowChecklist = (
   return !(prefs.dismissed && prefs.version === CHECKLIST_VERSION);
 };
 
-/**
- * Sits at z-40, below react-toastify's 9999 — a transient alert should be able
- * to appear over the widget, not behind it. Empty toast containers set
- * `pointerEvents: none` themselves, so the bottom-right stack does not swallow
- * clicks meant for this.
- */
 export function IntegrationChecklist() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
   const { items, done, total } = useChecklist();
 
-  // Namespaced by user id: on a shared browser, one account's dismissal must
-  // not hide the widget for the next person to sign in.
   const [prefs, setPrefs] = useLocalStorageState<ChecklistPrefs>(
     `4mica:checklist:${user?.id ?? "anon"}`,
     { defaultValue: DEFAULT_PREFS },
@@ -77,8 +55,6 @@ export function IntegrationChecklist() {
 
   const { collapsed, dismissed } = prefs ?? DEFAULT_PREFS;
 
-  // The widget is mounted app-wide, so this is the one place that guarantees
-  // the checklist reflects reality no matter which page the user landed on.
   useEffect(() => {
     dispatch(fetchDeveloper());
     dispatch(fetchWallets());
@@ -151,8 +127,6 @@ export function IntegrationChecklist() {
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              {/* Capped so eight items cannot run off a short viewport; the
-                  header and footer stay put while the list scrolls. */}
               <ul className="flex max-h-[45vh] flex-col overflow-y-auto border-overlay/10 border-t px-4 py-2">
                 {items.map((item) => (
                   <ChecklistItem key={item.id} item={item} />

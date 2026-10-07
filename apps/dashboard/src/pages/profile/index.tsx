@@ -52,11 +52,6 @@ function useVerificationOutcome() {
   }, [outcome, setParams, t]);
 }
 
-/**
- * The emailed link lands here with `?verifyToken=`. Nothing is spent until the
- * user presses Confirm: mail scanners open links on their own, and a page load
- * must not be enough to verify an address.
- */
 function useVerificationToken() {
   const [params, setParams] = useSearchParams();
   const token = params.get("verifyToken");

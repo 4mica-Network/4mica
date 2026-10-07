@@ -12,7 +12,6 @@ import type { ReactNode } from "react";
 export type { Option };
 export { Switch };
 
-/** Mirrors the `BusinessType` enum; the blank entry clears the field. */
 export const BUSINESS_TYPES: Option[] = [
   { title: "—", value: "" },
   { title: "Sole trader", value: "SOLE_TRADER" },
@@ -22,7 +21,6 @@ export const BUSINESS_TYPES: Option[] = [
   { title: "Non-profit", value: "NON_PROFIT" },
 ];
 
-/** Empty strings mean "clear this optional field"; the API expects null. */
 export const blankToNull = (
   changes: Record<string, unknown>,
   keep: string[] = [],
@@ -56,7 +54,6 @@ export function Card({
   );
 }
 
-/** Heading and blurb that sit above a group of cards, outside their borders. */
 export function SettingsSection({
   title,
   description,
@@ -117,10 +114,6 @@ export function CardHeader({
   );
 }
 
-/**
- * Label and description stacked above a full-width control. `action` sits
- * opposite the label so badges do not eat into the control's width.
- */
 export function FieldRow({
   title,
   description,
@@ -136,8 +129,6 @@ export function FieldRow({
 }) {
   return (
     <div className="flex flex-col py-3 first:pt-0 last:pb-0">
-      {/* items-end keeps the action level with the bottom of the label block,
-          so it sits just above the control rather than up beside the title. */}
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <label
@@ -157,7 +148,6 @@ export function FieldRow({
   );
 }
 
-/** Label and description on the left, compact control on the right. */
 export function SettingRow({
   title,
   description,
@@ -194,7 +184,6 @@ export function SettingRow({
   );
 }
 
-/** A single toggle in its own card. */
 export function SwitchCard({
   id,
   title,
@@ -264,7 +253,6 @@ export function TextInput({
   prefix?: string;
   format?: "lowercase" | "uppercase";
   maxLength?: number;
-  /** Status affordance inside the field — a spinner, tick or cross. */
   trailingIcon?: ReactNode;
   autoFocus?: boolean;
 }) {
@@ -321,10 +309,6 @@ export function TextArea({
   );
 }
 
-/**
- * Thin wrapper over the library Select so pages keep working with plain
- * string values instead of Option objects.
- */
 export function Select({
   id,
   value,
@@ -365,7 +349,6 @@ const KYB_VARIANT = {
   UNVERIFIED: "neutral",
 } as const;
 
-/** KYB has four states, so it gets its own tag rather than a yes/no badge. */
 export function KybTag({ status, label }: { status: string; label: string }) {
   const variant = KYB_VARIANT[status as keyof typeof KYB_VARIANT] ?? "neutral";
 

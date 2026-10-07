@@ -236,16 +236,10 @@ export function* checkUsername(action: {
     const { username, available, reason } = response as UsernameAvailability;
     yield put(checkUsernameSucceeded(username, available, reason));
   } catch {
-    // Deliberately quiet: this probe is advisory, the write is the authority,
-    // and a toast on every failed keystroke check would be noise.
     yield put(checkUsernameFailed(action.payload));
   }
 }
 
-/**
- * Write the business, then flip the flag — and only in that order, so a failed
- * business write can never leave an account marked onboarded with no entity.
- */
 export function* completeOnboarding(action: {
   type: string;
   payload: Partial<Business>;

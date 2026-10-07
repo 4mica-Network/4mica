@@ -53,7 +53,6 @@ const makeStore = (banners: Banner[], user: unknown = { id: "usr_1" }) => {
 const renderDeck = (banners: Banner[], user: unknown = { id: "usr_1" }) => {
   const { store, dispatched } = makeStore(banners, user);
   const view = render(
-    // biome-ignore lint/suspicious/noExplicitAny: a minimal store stub, deliberately not a full redux Store.
     <Provider store={store as any}>
       <MemoryRouter>
         <SidebarBanners />

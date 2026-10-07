@@ -21,7 +21,6 @@ import {
 } from "@stores/developer/selector";
 import type { Webhook } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-// `Webhook` is already the store's entity type in this file.
 import { Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -254,9 +253,6 @@ export function WebhooksCard() {
               type="submit"
               size="sm"
               intent="invert"
-              // Same box as the API-key submit button so both primary actions
-              // on this page match. min-w rather than w so a longer label grows
-              // the button instead of wrapping onto a second line.
               className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
               disabled={!canSubmit || isCreating}
             >

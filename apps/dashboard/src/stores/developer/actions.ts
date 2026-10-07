@@ -7,7 +7,6 @@ import type {
   WebhookStatus,
 } from "./type";
 
-/** Identifies which row is busy, so only that row shows a spinner. */
 export interface PendingMeta {
   pendingKey: string;
 }

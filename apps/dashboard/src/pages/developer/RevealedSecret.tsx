@@ -7,10 +7,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/form";
 
-/**
- * The plaintext exists only in this response, so the banner stays until the
- * user dismisses it rather than disappearing on the next render.
- */
 export function RevealedSecretBanner() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();

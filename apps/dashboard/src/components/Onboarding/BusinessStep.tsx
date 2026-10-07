@@ -10,11 +10,6 @@ export interface BusinessDraft {
 
 export type { BusinessType };
 
-/**
- * Three controls, not the twenty on the Business settings page. This is a
- * blocking modal for a first-time user — the rest is collected later, and the
- * integration checklist's KYB item is what drives them back to finish it.
- */
 export function BusinessStep({
   draft,
   onChange,

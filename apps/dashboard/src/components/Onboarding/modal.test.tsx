@@ -10,13 +10,6 @@ const Fixture = (props: Partial<Parameters<typeof Modal>[0]>) => (
   </Modal>
 );
 
-/**
- * packages/ui is otherwise covered by stories + Chromatic, which cannot assert
- * behaviour. The Modal hand-rolls focus trapping, Escape, scroll lock and focus
- * restore — none of which have a precedent in this package — so it carries the
- * package's first render tests. A layout-based visibility filter in the trap
- * silently disabled Tab inside every dialog, and only these caught it.
- */
 describe("Modal a11y", () => {
   it("exposes dialog semantics wired to the title", () => {
     render(<Fixture />);

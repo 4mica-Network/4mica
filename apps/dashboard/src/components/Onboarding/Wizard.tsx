@@ -50,21 +50,11 @@ export function Wizard() {
     country: business?.country ?? "",
   });
 
-  /** The section whose write we are waiting on, or null when idle. */
   const [pending, setPending] = useState<string | null>(null);
   const isSaving = useAppSelector(selectIsSectionSaving(pending ?? ""));
 
-  // "not saving" only means "finished" once we have actually seen it saving.
-  // Without this, a render where `pending` is set but the dispatch has not yet
-  // been reflected in `savingSections` reads as a completed write and skips the
-  // step forward before anything was sent.
   const sawSaving = useRef(false);
 
-  // Advance only once the write has landed cleanly.
-  //
-  // Relies on exactly one write being in flight at a time, which a blocking
-  // modal with a single Continue button guarantees. If a "save and skip"
-  // affordance is ever added, this needs a request id in `meta` instead.
   useEffect(() => {
     if (!pending) {
       return;
@@ -115,7 +105,6 @@ export function Wizard() {
         break;
 
       case "username":
-        // Unchanged handle: nothing to write, just move on.
         if (username.trim().toLowerCase() === savedUsername) {
           setStep((current) => current + 1);
           return;
@@ -163,11 +152,6 @@ export function Wizard() {
       data-testid="onboarding"
       footer={
         <div className="flex w-full items-center justify-between gap-2">
-          {/*
-            Not an escape from onboarding — an escape from a broken one. Without
-            it a failing API strands the user in a modal with no way to even
-            sign out.
-          */}
           <button
             type="button"
             onClick={() => signOut()}

@@ -37,7 +37,6 @@ const setSaving = (
   return next;
 };
 
-/** Snapshot of the keys about to change, so a failed write can be undone. */
 const snapshot = <T extends object>(
   source: T | null,
   patch: Partial<T>,
@@ -82,7 +81,6 @@ export default function userReducer(
           "Failed to load your account.",
       };
 
-    // Applied optimistically so toggles move the instant they are clicked.
     case actionTypes.UPDATE_PROFILE_REQUESTED:
     case actionTypes.UPDATE_ACCOUNT_REQUESTED:
     case actionTypes.UPDATE_NOTIFICATIONS_REQUESTED: {
@@ -122,7 +120,6 @@ export default function userReducer(
       };
       return {
         ...state,
-        // Undo the optimistic patch so the UI matches the server again.
         user:
           state.user && state.rollback
             ? { ...state.user, ...state.rollback }

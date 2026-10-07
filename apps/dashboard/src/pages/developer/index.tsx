@@ -26,8 +26,6 @@ export function DeveloperSettings() {
       titleKey="page.settings.developer.title"
       descriptionKey="page.settings.developer.description"
     >
-      {/* Only blank the page on the very first load. Later re-fetches redraw
-          the same content, so showing a spinner over it is just a flicker. */}
       {isLoading && !hasLoaded ? (
         <p className="text-ink-muted text-sm">{t("settings.loading")}</p>
       ) : (
