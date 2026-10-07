@@ -1,4 +1,5 @@
 import { usernameUnavailableReason } from "@4mica/url";
+import { invalidateUser } from "@auth/user-store";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import {
@@ -44,7 +45,11 @@ const patchUserHandler =
     }
 
     try {
-      return reply.send(await updateUser(userId, parsed.data));
+      const updated = await updateUser(userId, parsed.data);
+      if (request.user) {
+        invalidateUser(request.user.clerkUserId);
+      }
+      return reply.send(updated);
     } catch (error) {
       if (isUniqueViolation(error)) {
         const target = uniqueViolationTarget(error);
@@ -52,10 +57,6 @@ const patchUserHandler =
         return reply.code(409).send({
           error: "conflict",
           message,
-          // Carry the same `issues[]` envelope a 400 uses, so a client can
-          // render "already taken" under the offending field instead of as a
-          // page-level banner. `target` is a column name, which is what the
-          // client keys its issue map by.
           issues: target ? [{ path: target, message }] : [],
         });
       }
@@ -64,10 +65,6 @@ const patchUserHandler =
     }
   };
 
-/**
- * Advisory only — the unique index is what actually enforces this, and the 409
- * above is the backstop for the race between checking and writing.
- */
 export const checkUsernameHandler: RouteHandler = async (request, reply) => {
   const userId = requireUserId(request, reply);
   if (!userId) {
@@ -81,18 +78,12 @@ export const checkUsernameHandler: RouteHandler = async (request, reply) => {
 
   const { username } = parsed.data;
 
-  // Short-circuit before Prisma: policy alone settles these, and no row will
-  // ever hold one. "reserved" means the marketing site owns the path;
-  // "blacklisted" means the name is barred outright (roles, brands).
   const blocked = usernameUnavailableReason(username);
   if (blocked) {
     return reply.send({ username, available: false, reason: blocked });
   }
 
   const owner = await findUsernameOwner(username);
-
-  // Your own current handle reads as available, so re-submitting an unchanged
-  // username in the wizard or in Settings does not self-conflict.
   const available = owner === null || owner.id === userId;
 
   return reply.send({

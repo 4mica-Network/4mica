@@ -1,6 +1,11 @@
 import type { AuthIdentity } from "@4mica/auth";
-import { clearUserCache, loadUser } from "@auth/user-store";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  CACHE_MAX_ENTRIES,
+  clearUserCache,
+  invalidateUser,
+  loadUser,
+} from "@auth/user-store";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { authenticateRequest, getUser, findUnique, upsert } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
@@ -45,7 +50,6 @@ const ROW = {
 const uniqueViolation = (target: string[]) =>
   Object.assign(new Error("unique"), { code: "P2002", meta: { target } });
 
-/** The `create` payload of the nth prisma.user.upsert call. */
 const createArg = (call: number) => upsert.mock.calls[call][0].create;
 
 describe("loadUser", () => {
@@ -114,6 +118,66 @@ describe("loadUser", () => {
     upsert.mockRejectedValue(new Error("connection refused"));
 
     await expect(loadUser(IDENTITY)).rejects.toThrow("connection refused");
+    expect(upsert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("loadUser cache", () => {
+  const withId = (clerkUserId: string): AuthIdentity => ({
+    ...IDENTITY,
+    clerkUserId,
+  });
+
+  beforeEach(() => {
+    findUnique.mockReset();
+    upsert.mockReset();
+    clearUserCache();
+
+    findUnique.mockResolvedValue(ROW);
+    upsert.mockResolvedValue(ROW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("serves a repeat request from the cache", async () => {
+    await loadUser(IDENTITY);
+    await loadUser(IDENTITY);
+
+    expect(upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads once the entry has expired", async () => {
+    vi.useFakeTimers();
+
+    await loadUser(IDENTITY);
+    vi.advanceTimersByTime(60_001);
+    await loadUser(IDENTITY);
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("reloads after the user is invalidated", async () => {
+    await loadUser(IDENTITY);
+    invalidateUser(IDENTITY.clerkUserId);
+    await loadUser(IDENTITY);
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("evicts the least recently used entry at capacity", async () => {
+    for (let i = 0; i < CACHE_MAX_ENTRIES; i += 1) {
+      await loadUser(withId(`user_${i}`));
+    }
+    await loadUser(withId("user_0"));
+    await loadUser(withId("user_overflow"));
+    upsert.mockClear();
+
+    await loadUser(withId("user_0"));
+    expect(upsert).not.toHaveBeenCalled();
+
+    await loadUser(withId("user_1"));
     expect(upsert).toHaveBeenCalledTimes(1);
   });
 });
