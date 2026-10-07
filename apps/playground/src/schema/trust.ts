@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdOrSlugParamSchema, UsernameParamSchema } from "./params";
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
@@ -65,3 +66,10 @@ export interface TrustSummary {
   verifiedCount: number;
   distribution: Record<"1" | "2" | "3" | "4" | "5", number>;
 }
+
+export const ResourceRefSchema = v.object({
+  kind: v.picklist(["listing", "agent"]),
+  id: v.pipe(v.string(), v.uuid()),
+  username: UsernameParamSchema,
+  ref: IdOrSlugParamSchema,
+});

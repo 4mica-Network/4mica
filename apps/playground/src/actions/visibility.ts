@@ -48,10 +48,10 @@ export const setAgentVisibility = async (
 
   const agent = await prisma.agent.findUnique({
     where: { id: agentId },
-    select: { id: true, ownerId: true },
+    select: { id: true, ownerId: true, deletedAt: true },
   });
 
-  if (!agent || agent.ownerId !== viewer.id) {
+  if (!agent || agent.ownerId !== viewer.id || agent.deletedAt) {
     // Same response for "missing" and "not yours" — a distinct 404 would let a
     // caller enumerate valid agent ids.
     return { ok: false, error: "not_found" };

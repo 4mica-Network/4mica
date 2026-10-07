@@ -6,7 +6,7 @@ import {
 } from "@4mica/url";
 import * as v from "valibot";
 
-const UsernameParamSchema = v.pipe(
+export const UsernameParamSchema = v.pipe(
   v.string(),
   v.trim(),
   v.transform((value) => value.replace(/^@/, "").toLowerCase()),
@@ -15,7 +15,7 @@ const UsernameParamSchema = v.pipe(
   v.regex(USERNAME_PATTERN, USERNAME_MESSAGE),
 );
 
-const IdOrSlugParamSchema = v.pipe(
+export const IdOrSlugParamSchema = v.pipe(
   v.string(),
   v.trim(),
   v.transform((value) => value.toLowerCase()),

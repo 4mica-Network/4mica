@@ -5,6 +5,7 @@ import * as v from "valibot";
 import {
   FileReportSchema,
   type ReportReason,
+  ResourceRefSchema,
   SubmitReviewSchema,
 } from "@/schema/trust";
 import { prisma } from "@/services/db";
@@ -22,6 +23,11 @@ interface ResourceRef {
   username: string;
   ref: string;
 }
+
+const parseResource = (resource: unknown): ResourceRef | null => {
+  const parsed = v.safeParse(ResourceRefSchema, resource);
+  return parsed.success ? parsed.output : null;
+};
 
 const pathOf = ({ kind, username, ref }: ResourceRef): string =>
   kind === "listing" ? `/${username}/api/${ref}` : `/${username}/agents/${ref}`;
@@ -53,13 +59,19 @@ const resolveTarget = async (
 };
 
 export const submitReview = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
   if (!viewer) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
   }
 
   const parsed = v.safeParse(SubmitReviewSchema, input);
@@ -115,12 +127,18 @@ export const submitReview = async (
 };
 
 export const deleteOwnReview = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
   if (!viewer) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
   }
 
   await prisma.review.deleteMany({
@@ -136,13 +154,19 @@ export const deleteOwnReview = async (
 };
 
 export const fileReport = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
   if (!viewer) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
   }
 
   const parsed = v.safeParse(FileReportSchema, input);
