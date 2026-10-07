@@ -349,7 +349,7 @@
   "wallet.delete.body": "{{label}} ({{address}}) will no longer be available for payments.",
   "wallet.delete.batchTitle": "Remove {{count}} wallets?",
   "wallet.delete.batchBody": "{{count}} wallets will no longer be available for payments.",
-  "wallet.delete.hint": "This removes the wallet from 4Mica only. Your funds and the address itself are untouched.",
+  "wallet.delete.hint": "This removes the wallet from 4Mica only. Your funds and the address itself are untouched. Any API or agent that receives payments here is unpublished until you choose another wallet.",
   "wallet.delete.cancel": "Cancel",
   "wallet.delete.confirm": "Remove",
   "wallet.toolbar.searchPlaceholder": "Search by name, description or address",

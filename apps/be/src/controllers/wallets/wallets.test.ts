@@ -12,6 +12,8 @@ const {
   upsert,
   wallet,
   walletNonce,
+  apiListing,
+  agent,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
@@ -34,6 +36,8 @@ const {
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
   },
+  apiListing: { updateMany: vi.fn() },
+  agent: { count: vi.fn(), updateMany: vi.fn() },
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -42,14 +46,20 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("@4mica/db", () => ({
   prisma: {
-    agent: { count: vi.fn() },
+    agent,
+    apiListing,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     wallet,
     walletNonce,
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === "function"
-        ? (arg as (tx: unknown) => unknown)({ wallet, walletNonce })
+        ? (arg as (tx: unknown) => unknown)({
+            wallet,
+            walletNonce,
+            apiListing,
+            agent,
+          })
         : Promise.all(arg as Promise<unknown>[]),
     ),
   },
@@ -148,7 +158,7 @@ describe("wallet routes", () => {
     for (const m of [authenticateRequest, getUser, findUnique, upsert]) {
       m.mockReset();
     }
-    for (const group of [wallet, walletNonce]) {
+    for (const group of [wallet, walletNonce, apiListing, agent]) {
       for (const fn of Object.values(group)) {
         fn.mockReset();
       }
@@ -170,6 +180,9 @@ describe("wallet routes", () => {
     walletNonce.updateMany.mockResolvedValue({ count: 1 });
     walletNonce.deleteMany.mockResolvedValue({ count: 0 });
     walletNonce.create.mockResolvedValue(challenge());
+
+    apiListing.updateMany.mockResolvedValue({ count: 0 });
+    agent.updateMany.mockResolvedValue({ count: 0 });
   });
 
   it("requires authentication on every wallet route", async () => {
@@ -232,8 +245,12 @@ describe("wallet routes", () => {
       url: `/me/wallets/${WALLET_ID}`,
       headers: AUTH,
     });
-    expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
+    expect(wallet.findFirst.mock.calls[1][0].where).toEqual({
       id: WALLET_ID,
+      ownerId: USER_ID,
+    });
+    expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
+      id: { in: [WALLET_ID] },
       ownerId: USER_ID,
     });
 
@@ -644,6 +661,43 @@ describe("wallet routes", () => {
     });
   });
 
+  describe("delete", () => {
+    it("detaches the wallet's address before deleting it", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(apiListing.updateMany.mock.calls[0][0].where).toEqual({
+        ownerId: USER_ID,
+        walletId: { in: [WALLET_ID] },
+      });
+      expect(agent.updateMany).toHaveBeenCalledTimes(2);
+      await app.close();
+    });
+
+    it("touches nothing for a wallet the caller does not own", async () => {
+      wallet.findFirst.mockResolvedValue(null);
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/me/wallets/${OTHER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(apiListing.updateMany).not.toHaveBeenCalled();
+      expect(agent.updateMany).not.toHaveBeenCalled();
+      expect(wallet.deleteMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+  });
+
   describe("batch delete", () => {
     it("deletes only the caller's wallets and reports the rest as notFound", async () => {
       wallet.findMany.mockResolvedValue([{ id: WALLET_ID }]);
@@ -664,6 +718,33 @@ describe("wallet routes", () => {
       expect(wallet.deleteMany.mock.calls[0][0].where).toEqual({
         id: { in: [WALLET_ID] },
         ownerId: USER_ID,
+      });
+      await app.close();
+    });
+
+    it("strips the deleted wallets' addresses from agents and listings", async () => {
+      wallet.findMany.mockResolvedValue([{ id: WALLET_ID }]);
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      await app.inject({
+        method: "POST",
+        url: "/me/wallets/batch-delete",
+        headers: AUTH,
+        payload: { ids: [WALLET_ID, OTHER_ID] },
+      });
+
+      const receiving = { ownerId: USER_ID, walletId: { in: [WALLET_ID] } };
+      expect(apiListing.updateMany).toHaveBeenCalledWith({
+        where: receiving,
+        data: { payToAddress: null, visibility: "PRIVATE" },
+      });
+      expect(agent.updateMany).toHaveBeenCalledWith({
+        where: receiving,
+        data: { payToAddress: null, visibility: "PRIVATE" },
+      });
+      expect(agent.updateMany).toHaveBeenCalledWith({
+        where: { ownerId: USER_ID, payerWalletId: { in: [WALLET_ID] } },
+        data: { walletAddress: null },
       });
       await app.close();
     });

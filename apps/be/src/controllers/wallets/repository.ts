@@ -237,8 +237,53 @@ export const updateWallet = async (
   });
 };
 
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Deletes wallets together with every address copied off them. The relation
+ * only nulls `walletId`/`payerWalletId`, but agents and listings also carry the
+ * address itself — left behind, a published page would keep advertising an
+ * address this account no longer proves it controls. Anything that loses its
+ * receiving address goes back to PRIVATE, since it can no longer be paid.
+ */
+const removeWallets = async (
+  tx: Tx,
+  ownerId: string,
+  ids: string[],
+): Promise<number> => {
+  const receiving = { ownerId, walletId: { in: ids } };
+
+  await tx.apiListing.updateMany({
+    where: receiving,
+    data: { payToAddress: null, visibility: "PRIVATE" },
+  });
+  await tx.agent.updateMany({
+    where: receiving,
+    data: { payToAddress: null, visibility: "PRIVATE" },
+  });
+  await tx.agent.updateMany({
+    where: { ownerId, payerWalletId: { in: ids } },
+    data: { walletAddress: null },
+  });
+
+  const { count } = await tx.wallet.deleteMany({
+    where: { id: { in: ids }, ownerId },
+  });
+  return count;
+};
+
 export const deleteWallet = async (ownerId: string, id: string) => {
-  const { count } = await prisma.wallet.deleteMany({ where: { id, ownerId } });
+  const owned = await prisma.wallet.findFirst({
+    where: { id, ownerId },
+    select: { id: true },
+  });
+  if (!owned) {
+    return false;
+  }
+
+  const count = await prisma.$transaction((tx) =>
+    removeWallets(tx, ownerId, [owned.id]),
+  );
   return count > 0;
 };
 
@@ -254,7 +299,7 @@ export const batchDeleteWallets = async (
   const deleted = owned.map((wallet) => wallet.id);
 
   if (deleted.length > 0) {
-    await prisma.wallet.deleteMany({ where: { id: { in: deleted }, ownerId } });
+    await prisma.$transaction((tx) => removeWallets(tx, ownerId, deleted));
   }
 
   const deletedSet = new Set(deleted);
