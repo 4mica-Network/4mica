@@ -51,7 +51,6 @@ export interface User {
   language: string;
   timeZone: string;
   privacyMode: boolean;
-  twoFactorEnabled: boolean;
   defaultHome: string;
   disableBranding: boolean;
   allowCustomBrandColor: boolean;

@@ -29,7 +29,6 @@ export const USER_SELECT = {
   language: true,
   timeZone: true,
   privacyMode: true,
-  twoFactorEnabled: true,
   defaultHome: true,
   disableBranding: true,
   allowCustomBrandColor: true,

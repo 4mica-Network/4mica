@@ -35,7 +35,6 @@ export const userResponseSchema = {
     language: str,
     timeZone: str,
     privacyMode: bool,
-    twoFactorEnabled: bool,
     defaultHome: str,
     disableBranding: bool,
     allowCustomBrandColor: bool,

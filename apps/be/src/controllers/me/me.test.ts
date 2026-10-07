@@ -83,7 +83,6 @@ const FULL_USER = {
   language: "en",
   timeZone: "UTC",
   privacyMode: false,
-  twoFactorEnabled: false,
   defaultHome: "overview",
   disableBranding: false,
   allowCustomBrandColor: false,
@@ -532,6 +531,21 @@ describe("account routes", () => {
 
       expect(res.statusCode).toBe(401);
     });
+  });
+
+  it("PATCH /me/account ignores twoFactorEnabled — Clerk owns MFA", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { twoFactorEnabled: true, theme: "light" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data).toEqual({ theme: "light" });
+
+    await app.close();
   });
 
   it("PATCH /me/account validates the email", async () => {

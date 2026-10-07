@@ -1,3 +1,5 @@
+import { Button } from "@4mica/ui";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { sendEmailVerification, updateAccount } from "@stores/user/actions";
 import {
@@ -9,6 +11,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
+  Card,
   FieldRow,
   Select,
   SettingRow,
@@ -64,9 +67,10 @@ export function AccountSettings() {
   const sendingVerification = useAppSelector(
     selectIsSectionSaving("emailVerification"),
   );
-  const savingTwoFactor = useAppSelector(
-    selectIsSectionSaving("twoFactorEnabled"),
-  );
+  // Clerk enforces the second factor, so it is the only honest source for
+  // whether one is set up. The dashboard reads it and hands off to Clerk.
+  const { user: clerkUser } = useUser();
+  const { openUserProfile } = useClerk();
 
   const contactInitial = useMemo(
     () => ({
@@ -268,14 +272,34 @@ export function AccountSettings() {
           isSaving={savingPrivacy}
           onToggle={(v) => set("privacyMode", v)}
         />
-        <SwitchCard
-          id="account-2fa"
-          title={t("settings.account.twoFactor")}
-          description={t("settings.account.twoFactorHint")}
-          checked={user.twoFactorEnabled}
-          isSaving={savingTwoFactor}
-          onToggle={(v) => set("twoFactorEnabled", v)}
-        />
+        <Card className="flex items-center justify-between gap-4">
+          <div>
+            <span className="font-medium text-ink-strong text-sm">
+              {t("settings.account.twoFactor")}
+            </span>
+            <p className="mt-0.5 text-ink-muted text-xs">
+              {t("settings.account.twoFactorHint")}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <VerifiedBadge
+              verified={Boolean(clerkUser?.twoFactorEnabled)}
+              labels={{
+                yes: t("settings.account.twoFactorOn"),
+                no: t("settings.account.twoFactorOff"),
+              }}
+            />
+            <Button
+              type="button"
+              intent="ghost"
+              size="sm"
+              className="btn-no-lift"
+              onClick={() => openUserProfile()}
+            >
+              {t("settings.account.twoFactorManage")}
+            </Button>
+          </div>
+        </Card>
       </SettingsSection>
     </SettingsPage>
   );

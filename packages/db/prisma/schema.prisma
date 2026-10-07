@@ -158,7 +158,6 @@ model User {
   language                       String                    @default("en")
   timeZone                       String                    @default("UTC") @map("time_zone")
   privacyMode                    Boolean                   @default(false) @map("privacy_mode")
-  twoFactorEnabled               Boolean                   @default(false) @map("two_factor_enabled")
   defaultHome                    String                    @default("overview") @map("default_home")
   disableBranding                Boolean                   @default(false) @map("disable_branding")
   allowCustomBrandColor          Boolean                   @default(false) @map("allow_custom_brand_color")

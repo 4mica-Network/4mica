@@ -113,7 +113,6 @@ export const UpdateAccountSchema = v.partial(
     timeZone: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
     defaultHome: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
     privacyMode: v.boolean(),
-    twoFactorEnabled: v.boolean(),
     completeOnboarding: v.boolean(),
     lastViewed: nullableText(255),
   }),
