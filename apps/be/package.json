@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "payments:purge-spoofed": "tsx scripts/purge-spoofed-payments.ts",
     "clean": "rm -rf dist logs .turbo",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
