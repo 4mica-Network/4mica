@@ -64,6 +64,17 @@ export const walletAddressesFor = async (
   return [...new Set(rows.map((row) => row.address))];
 };
 
+/** A seller may only report payments into a wallet it has proved it controls. */
+export const ownsRecipientWallet = async (
+  ownerId: string,
+  address: string,
+  network: ReportPaymentInput["network"],
+): Promise<boolean> =>
+  (await prisma.wallet.findFirst({
+    where: { ownerId, address, network },
+    select: { id: true },
+  })) !== null;
+
 const escapeLike = (value: string): string =>
   value.replace(/[\\%_]/g, (match) => `\\${match}`);
 

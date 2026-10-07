@@ -589,6 +589,24 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("counts only payments this account reported, not ones aimed at it", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+
+      for (const marker of ["rank_total", "WITH matched"]) {
+        expect(sqlText(rawCall(marker) as unknown[])).toContain("p.owner_id =");
+      }
+      expect(customer.findMany.mock.calls[0][0].where).toMatchObject({
+        ownerId: USER_ID,
+      });
+
+      await instance.close();
+    });
+
     it("matches a wallet identity on network and address together", async () => {
       const instance = await app();
       await instance.inject({

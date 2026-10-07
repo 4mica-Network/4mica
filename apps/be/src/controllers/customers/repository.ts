@@ -192,6 +192,7 @@ const matchedPayments = (
      AND i.type = 'WALLET'
      AND i.customer_id IN (${customerIds})
      AND p.recipient_address IN (${owned})
+     AND p.owner_id = ${ownerId}
 `;
 
 interface ScalarRow {
@@ -478,6 +479,7 @@ export const listCustomers = async (
          WHERE i.owner_id = ${ownerId}
            AND i.type = 'WALLET'
            AND p.recipient_address IN (${owned})
+           AND p.owner_id = ${ownerId}
       )
       SELECT c.id,
              COUNT(m.customer_id) AS txn_count,
@@ -508,7 +510,7 @@ export const listCustomers = async (
 
   const [rows, spend] = await Promise.all([
     prisma.customer.findMany({
-      where: { id: { in: pageIds } },
+      where: { id: { in: pageIds }, ownerId },
       select: CUSTOMER_SELECT,
     }),
     spendFor(ownerId, pageIds, addresses),
@@ -1192,6 +1194,7 @@ export const customerBreakdown = async (
        AND i.type = 'WALLET'
        AND i.customer_id = ${customerId}
        AND p.recipient_address IN (${owned})
+       AND p.owner_id = ${ownerId}
      GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
      ORDER BY 7 ASC, 8 ASC
   `;
@@ -1320,6 +1323,7 @@ export const customerActivity = async (
     Prisma.sql`i.type = 'WALLET'`,
     Prisma.sql`i.customer_id = ${customerId}`,
     Prisma.sql`p.recipient_address IN (${owned})`,
+    Prisma.sql`p.owner_id = ${ownerId}`,
   ];
 
   if (query.status) {

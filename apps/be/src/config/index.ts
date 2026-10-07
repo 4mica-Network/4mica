@@ -35,8 +35,6 @@ const EnvSchema = v.object({
   ),
   CLERK_JWT_KEY: v.string(),
   CLERK_AUTHORIZED_PARTIES: v.string(),
-  // Optional on purpose. Empty disables sending rather than failing boot, so
-  // local dev and tests need no email service running.
   EMAIL_SERVICE_URL: v.union([
     v.literal(""),
     v.pipe(
@@ -165,7 +163,6 @@ export const config = {
   clerkAuthorizedParties: env.CLERK_AUTHORIZED_PARTIES.split(",")
     .map((party) => party.trim())
     .filter(Boolean),
-  /** `undefined` when unset — see src/services/email.ts. */
   emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
   publicApiUrl: env.PUBLIC_API_URL || `http://localhost:${env.PORT}`,
   appUrl: new LinkConfig(process.env).appBase,

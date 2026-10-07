@@ -195,6 +195,16 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   const next = parsed.data;
+
+  if (current.status === "SUSPENDED" && next.status !== undefined) {
+    return reply.code(409).send({
+      error: "agent_suspended",
+      message:
+        "This agent was suspended by moderation and cannot be reactivated from here.",
+      issues: [{ path: "status", message: "cannot change while suspended" }],
+    });
+  }
+
   const { walletId, payerWalletId, network, ...rest } = next;
   const data: Record<string, unknown> = { ...rest };
 

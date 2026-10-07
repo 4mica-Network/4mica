@@ -396,6 +396,25 @@ describe("agent routes", () => {
       await instance.close();
     });
 
+    it("will not let an owner lift a moderation suspension", async () => {
+      agent.findFirst.mockResolvedValue(storedAgent({ status: "SUSPENDED" }));
+      const instance = await app();
+
+      for (const status of ["PENDING", "ACTIVE"]) {
+        const res = await instance.inject({
+          method: "PATCH",
+          url: `/me/agents/${AGENT_ID}`,
+          headers: AUTH,
+          payload: { status },
+        });
+        expect(res.statusCode, status).toBe(409);
+        expect(res.json().error).toBe("agent_suspended");
+      }
+      expect(agent.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("accepts PENDING and ACTIVE", async () => {
       agent.findMany.mockResolvedValue([]);
       const instance = await app();

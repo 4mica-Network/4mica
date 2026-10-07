@@ -53,7 +53,7 @@ export const authenticateApiKey = async (
       ownerId: true,
       revokedAt: true,
       expiresAt: true,
-      owner: { select: { banned: true, deletedAt: true } },
+      owner: { select: { banned: true, locked: true, deletedAt: true } },
     },
   });
 
@@ -62,6 +62,7 @@ export const authenticateApiKey = async (
     record.revokedAt !== null ||
     (record.expiresAt !== null && record.expiresAt.getTime() <= Date.now()) ||
     record.owner.banned ||
+    record.owner.locked ||
     record.owner.deletedAt !== null
   ) {
     unauthorized(reply);

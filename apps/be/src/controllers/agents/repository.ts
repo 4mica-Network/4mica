@@ -13,11 +13,9 @@ export const AGENT_SELECT = {
   status: true,
   visibility: true,
   network: true,
-
   walletAddress: true,
   payerWalletId: true,
   creditLimit: true,
-
   walletId: true,
   payToAddress: true,
   assetAddress: true,
@@ -26,7 +24,6 @@ export const AGENT_SELECT = {
   priceLabel: true,
   endpointUrl: true,
   x402Endpoint: true,
-
   publishedAt: true,
   createdAt: true,
   updatedAt: true,

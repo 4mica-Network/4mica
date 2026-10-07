@@ -11,6 +11,7 @@ import type { RouteHandler } from "fastify";
 import {
   getPayment,
   listPayments,
+  ownsRecipientWallet,
   paymentStats,
   paymentSummary,
   reportPayment,
@@ -103,6 +104,17 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
   if (data.status === "FAILED" && !data.failureReason) {
     return invalidBody(reply, [
       { path: "failureReason", message: "is required when status is FAILED" },
+    ]);
+  }
+
+  if (
+    !(await ownsRecipientWallet(ownerId, data.recipientAddress, data.network))
+  ) {
+    return invalidBody(reply, [
+      {
+        path: "recipientAddress",
+        message: "is not one of your wallets on this network",
+      },
     ]);
   }
 

@@ -458,17 +458,17 @@ enum CustomerIdentitySource {
 }
 
 model Customer {
-  id            String                    @id @default(uuid(7))
-  ownerId       String                    @map("owner_id")
-  name          String                    @db.VarChar(120)
-  email         String?                   @db.VarChar(320)
-  type          CustomerType              @default(ORGANIZATION)
-  status        CustomerStatus            @default(ACTIVE)
-  description   String?                   @db.VarChar(280)
-  notes         String?                   @db.VarChar(2000)
-  dailyLimit    Decimal?                  @map("daily_limit") @db.Decimal(38, 18)
-  monthlyLimit  Decimal?                  @map("monthly_limit") @db.Decimal(38, 18)
-  limitCurrency String                    @default("USD") @map("limit_currency") @db.VarChar(16)
+  id            String         @id @default(uuid(7))
+  ownerId       String         @map("owner_id")
+  name          String         @db.VarChar(120)
+  email         String?        @db.VarChar(320)
+  type          CustomerType   @default(ORGANIZATION)
+  status        CustomerStatus @default(ACTIVE)
+  description   String?        @db.VarChar(280)
+  notes         String?        @db.VarChar(2000)
+  dailyLimit    Decimal?       @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit  Decimal?       @map("monthly_limit") @db.Decimal(38, 18)
+  limitCurrency String         @default("USD") @map("limit_currency") @db.VarChar(16)
 
   statusReason   String?   @map("status_reason") @db.VarChar(280)
   suspendedUntil DateTime? @map("suspended_until")
@@ -483,12 +483,12 @@ model Customer {
   minPaymentAmount  Decimal? @map("min_payment_amount") @db.Decimal(38, 18)
   approvalThreshold Decimal? @map("approval_threshold") @db.Decimal(38, 18)
 
-  createdAt    DateTime                  @default(now()) @map("created_at")
-  updatedAt    DateTime                  @updatedAt @map("updated_at")
-  deletedAt    DateTime?                 @map("deleted_at")
-  owner        User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  identities   CustomerPaymentIdentity[]
-  coupons      CustomerCoupon[]
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+  deletedAt     DateTime?                 @map("deleted_at")
+  owner         User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  identities    CustomerPaymentIdentity[]
+  coupons       CustomerCoupon[]
   creditEntries CustomerCreditEntry[]
 
   @@index([ownerId, createdAt(sort: Desc)])
@@ -526,9 +526,9 @@ model CustomerCreditEntry {
   ownerId    String @map("owner_id")
   customerId String @map("customer_id")
 
-  kind CustomerCreditKind
-  amount Decimal @db.Decimal(38, 18)
-  reason String? @db.VarChar(280)
+  kind   CustomerCreditKind
+  amount Decimal            @db.Decimal(38, 18)
+  reason String?            @db.VarChar(280)
 
   createdAt DateTime @default(now()) @map("created_at")
 

@@ -27,7 +27,7 @@ const {
     groupBy: vi.fn(),
     upsert: vi.fn(),
   },
-  wallet: { findMany: vi.fn() },
+  wallet: { findMany: vi.fn(), findFirst: vi.fn() },
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
   apiListing: { findFirst: vi.fn() },
   agent: { findFirst: vi.fn() },
@@ -108,7 +108,7 @@ const storedKey = (over: Record<string, unknown> = {}) => ({
   ownerId: OWNER_ID,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, deletedAt: null },
+  owner: { banned: false, locked: false, deletedAt: null },
   ...over,
 });
 
@@ -162,6 +162,7 @@ describe("payment routes", () => {
     upsert.mockResolvedValue(AUTH_USER);
 
     wallet.findMany.mockResolvedValue([{ address: MY_ADDRESS }]);
+    wallet.findFirst.mockResolvedValue({ id: "wallet_1" });
     payment.findMany.mockResolvedValue([storedPayment()]);
     payment.findFirst.mockResolvedValue(storedPayment());
     payment.count.mockResolvedValue(1);
@@ -445,14 +446,17 @@ describe("payment routes", () => {
       await instance.close();
     });
 
-    it("rejects a revoked, expired or banned key", async () => {
+    it("rejects a revoked, expired, banned or locked key", async () => {
       const instance = await app();
 
       for (const key of [
         storedKey({ revokedAt: new Date() }),
         storedKey({ expiresAt: new Date(Date.now() - 1000) }),
-        storedKey({ owner: { banned: true, deletedAt: null } }),
-        storedKey({ owner: { banned: false, deletedAt: new Date() } }),
+        storedKey({ owner: { banned: true, locked: false, deletedAt: null } }),
+        storedKey({ owner: { banned: false, locked: true, deletedAt: null } }),
+        storedKey({
+          owner: { banned: false, locked: false, deletedAt: new Date() },
+        }),
         null,
       ]) {
         apiKey.findUnique.mockResolvedValue(key);
@@ -617,6 +621,29 @@ describe("payment routes", () => {
       expect(payment.upsert.mock.calls[0][0].create.settledAt).toBeInstanceOf(
         Date,
       );
+
+      await instance.close();
+    });
+
+    it("refuses a recipient that is not one of the key owner's wallets", async () => {
+      wallet.findFirst.mockResolvedValue(null);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("recipientAddress");
+      expect(wallet.findFirst.mock.calls[0][0].where).toEqual({
+        ownerId: OWNER_ID,
+        address: MY_ADDRESS,
+        network: "BASE_SEPOLIA",
+      });
+      expect(payment.upsert).not.toHaveBeenCalled();
 
       await instance.close();
     });
