@@ -21,6 +21,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
 import {
   connectWallet,
@@ -50,6 +51,7 @@ import {
 
 const PENDING_KEY = "createWallet";
 const TOTAL_STEPS = CREATE_STEP_FIELDS.length;
+const ISSUE_STEPS: Record<string, number> = { signature: 0, nonce: 0 };
 
 const suggestedLabel = (address: string) => `Wallet ${shortenAddress(address)}`;
 
@@ -69,6 +71,7 @@ export function CreateWalletModal({
   const existing = useAppSelector(selectWallets);
 
   const [step, setStep] = useState(0);
+  useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep, ISSUE_STEPS);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -225,6 +228,9 @@ export function CreateWalletModal({
   };
 
   const onValid = (data: CreateWalletValues) => {
+    if (isSaving) {
+      return;
+    }
     dispatch(
       createWallet({
         label: data.label.trim(),
@@ -345,7 +351,13 @@ export function CreateWalletModal({
     >
       <form
         className="flex flex-col gap-5"
-        onSubmit={handleSubmit(onValid, onInvalid)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!isLastStep || !canSubmit) {
+            return;
+          }
+          void handleSubmit(onValid, onInvalid)(event);
+        }}
         noValidate
       >
         <StepIndicator current={step} total={TOTAL_STEPS} />
@@ -497,6 +509,12 @@ export function CreateWalletModal({
             {connectError && (
               <p className="text-danger text-xs" role="alert">
                 {connectError}
+              </p>
+            )}
+
+            {(issues.address || issues.network || issues.signature) && (
+              <p className="text-danger text-xs" role="alert">
+                {issues.address ?? issues.network ?? issues.signature}
               </p>
             )}
 

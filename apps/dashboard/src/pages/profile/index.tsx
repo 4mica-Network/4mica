@@ -11,6 +11,7 @@ import {
   selectValidationIssues,
 } from "@stores/user/selector";
 import { notifyError, notifySuccess } from "@utils/notification";
+import { HEX_COLOR_PATTERN, hasErrors, isSingleLine } from "@utils/validation";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -24,8 +25,16 @@ import {
   TextInput,
   VerifiedBadge,
 } from "@/components/form";
+import {
+  isUsernameShapeValid,
+  NAME_MAX_LENGTH,
+  NAME_MIN_LENGTH,
+} from "@/components/Onboarding/validation";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
+
+const TEXT_MAX_LENGTH = 2000;
 
 function useVerificationOutcome() {
   const { t } = useTranslation();
@@ -123,6 +132,64 @@ export function ProfileSettings() {
   const identity = useDraft(identityInitial);
   const colors = useDraft(colorsInitial);
 
+  const savedUsername = user?.username ?? "";
+  const candidate = identity.draft.username.trim().toLowerCase();
+  const usernameStatus = useUsernameAvailability(candidate, savedUsername);
+
+  const usernameError = (): string | undefined => {
+    if (candidate === savedUsername) {
+      return undefined;
+    }
+    if (candidate === "") {
+      return t("validation.required");
+    }
+    if (!isUsernameShapeValid(candidate)) {
+      return t("onboarding.username.invalid");
+    }
+    if (usernameStatus === "taken") {
+      return t("onboarding.username.taken", { username: candidate });
+    }
+    if (usernameStatus === "reserved") {
+      return t("onboarding.username.reserved");
+    }
+    if (usernameStatus === "blacklisted") {
+      return t("onboarding.username.blacklisted");
+    }
+    return undefined;
+  };
+
+  const nameValue = identity.draft.name.trim();
+  const identityErrors = {
+    name:
+      nameValue.length < NAME_MIN_LENGTH
+        ? t("validation.minLength", { min: NAME_MIN_LENGTH })
+        : nameValue.length > NAME_MAX_LENGTH
+          ? t("validation.tooLong", { max: NAME_MAX_LENGTH })
+          : !isSingleLine(nameValue)
+            ? t("validation.singleLine")
+            : undefined,
+    username: usernameError(),
+    bio:
+      identity.draft.bio.trim().length > TEXT_MAX_LENGTH
+        ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
+        : undefined,
+    description:
+      identity.draft.description.trim().length > TEXT_MAX_LENGTH
+        ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
+        : undefined,
+  };
+  const isUsernamePending =
+    candidate !== savedUsername && usernameStatus === "checking";
+
+  const colorError = (value: string) =>
+    value === "" || HEX_COLOR_PATTERN.test(value)
+      ? undefined
+      : t("validation.hexColor");
+  const colorErrors = {
+    primaryBrandColor: colorError(colors.draft.primaryBrandColor),
+    secondaryBrandColor: colorError(colors.draft.secondaryBrandColor),
+  };
+
   const toggle = (key: string, value: boolean) =>
     dispatch(updateProfile({ [key]: value }, key));
 
@@ -130,10 +197,13 @@ export function ProfileSettings() {
     dispatch(
       updateProfile(
         Object.fromEntries(
-          Object.entries(identity.changes).map(([k, v]) => [
-            k,
-            v === "" && k !== "name" ? null : v,
-          ]),
+          Object.entries(identity.changes).map(([k, v]) => {
+            const value = typeof v === "string" ? v.trim() : v;
+            if (k === "username" && typeof value === "string") {
+              return [k, value.toLowerCase()];
+            }
+            return [k, value === "" && k !== "name" ? null : value];
+          }),
         ),
         "identity",
       ),
@@ -239,6 +309,7 @@ export function ProfileSettings() {
 
         <EditableCard
           isDirty={identity.isDirty}
+          isInvalid={hasErrors(identityErrors) || isUsernamePending}
           isSaving={savingIdentity}
           onSave={saveIdentity}
           onReset={identity.reset}
@@ -251,7 +322,8 @@ export function ProfileSettings() {
             <TextInput
               id="profile-name"
               value={identity.draft.name}
-              error={issues.name}
+              error={identityErrors.name ?? issues.name}
+              maxLength={NAME_MAX_LENGTH}
               onChange={(v) => identity.set("name", v)}
             />
           </FieldRow>
@@ -264,8 +336,9 @@ export function ProfileSettings() {
             <TextInput
               id="profile-username"
               value={identity.draft.username}
-              error={issues.username}
+              error={identityErrors.username ?? issues.username}
               format="lowercase"
+              maxLength={64}
               onChange={(v) => identity.set("username", v)}
             />
           </FieldRow>
@@ -278,7 +351,8 @@ export function ProfileSettings() {
             <TextArea
               id="profile-bio"
               value={identity.draft.bio}
-              error={issues.bio}
+              error={identityErrors.bio ?? issues.bio}
+              maxLength={TEXT_MAX_LENGTH}
               onChange={(v) => identity.set("bio", v)}
             />
           </FieldRow>
@@ -291,7 +365,8 @@ export function ProfileSettings() {
             <TextArea
               id="profile-description"
               value={identity.draft.description}
-              error={issues.description}
+              error={identityErrors.description ?? issues.description}
+              maxLength={TEXT_MAX_LENGTH}
               onChange={(v) => identity.set("description", v)}
             />
           </FieldRow>
@@ -368,6 +443,7 @@ export function ProfileSettings() {
         {user.allowCustomBrandColor && (
           <EditableCard
             isDirty={colors.isDirty}
+            isInvalid={hasErrors(colorErrors)}
             isSaving={savingColors}
             onSave={() => dispatch(updateProfile(colors.changes, "colors"))}
             onReset={colors.reset}
@@ -381,7 +457,10 @@ export function ProfileSettings() {
                 id="profile-primary-color"
                 value={colors.draft.primaryBrandColor}
                 placeholder="#4f46e5"
-                error={issues.primaryBrandColor}
+                error={
+                  colorErrors.primaryBrandColor ?? issues.primaryBrandColor
+                }
+                maxLength={7}
                 onChange={(v) => colors.set("primaryBrandColor", v)}
               />
             </FieldRow>
@@ -394,7 +473,10 @@ export function ProfileSettings() {
                 id="profile-secondary-color"
                 value={colors.draft.secondaryBrandColor}
                 placeholder="#0ea5e9"
-                error={issues.secondaryBrandColor}
+                error={
+                  colorErrors.secondaryBrandColor ?? issues.secondaryBrandColor
+                }
+                maxLength={7}
                 onChange={(v) => colors.set("secondaryBrandColor", v)}
               />
             </FieldRow>

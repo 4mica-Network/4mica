@@ -3,10 +3,14 @@ import {
   batchDeleteSchema,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
+  email as emailAddress,
+  futureTimestamp,
+  MAX_INT32,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
   positiveDecimalAmount,
   positiveInt,
+  singleLine,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
@@ -30,8 +34,14 @@ export const CustomerIdentitySourceSchema = v.picklist([
   "DISCOVERED",
 ]);
 
-const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
-const email = v.pipe(v.string(), v.trim(), v.email(), v.maxLength(320));
+const name = v.pipe(
+  v.string(),
+  v.trim(),
+  v.minLength(1),
+  v.maxLength(120),
+  singleLine,
+);
+const email = emailAddress(320);
 const description = v.pipe(v.string(), v.trim(), v.maxLength(280));
 const notes = v.pipe(v.string(), v.trim(), v.maxLength(2000));
 
@@ -51,15 +61,6 @@ const identityValue = v.pipe(
 
 const timestamp = v.pipe(v.string(), v.isoTimestamp());
 
-const futureTimestamp = v.pipe(
-  v.string(),
-  v.isoTimestamp(),
-  v.check(
-    (value) => new Date(value).getTime() > Date.now(),
-    "must be in the future",
-  ),
-);
-
 const statusReason = v.pipe(v.string(), v.trim(), v.maxLength(280));
 
 const positiveCount = v.pipe(
@@ -68,6 +69,7 @@ const positiveCount = v.pipe(
   v.number(),
   v.integer(),
   v.minValue(1),
+  v.maxValue(MAX_INT32),
 );
 
 export const CustomerQuotaUnitSchema = v.picklist(["REQUESTS", "AMOUNT"]);
@@ -86,7 +88,17 @@ const percent = v.pipe(
   v.check((value) => Number(value) <= 100, "must not be above 100"),
 );
 
-export const CustomerIdentitySchema = v.variant("type", [
+const WINDOW_MESSAGE = "must be after the start date";
+
+const isOrderedWindow = (input: {
+  validFrom?: string | null;
+  validUntil?: string | null;
+}): boolean =>
+  !input.validFrom ||
+  !input.validUntil ||
+  new Date(input.validFrom).getTime() < new Date(input.validUntil).getTime();
+
+const IdentityVariantsSchema = v.variant("type", [
   v.object({
     type: v.literal("WALLET"),
     network: PaymentNetworkSchema,
@@ -111,13 +123,27 @@ export const CustomerIdentitySchema = v.variant("type", [
   }),
 ]);
 
-export const UpdateCustomerIdentitySchema = v.partial(
-  v.object({
-    source: CustomerIdentitySourceSchema,
-    validFrom: v.nullable(timestamp),
-    validUntil: v.nullable(timestamp),
-    blocked: v.boolean(),
-  }),
+export const CustomerIdentitySchema = v.pipe(
+  IdentityVariantsSchema,
+  v.forward(
+    v.check((input) => isOrderedWindow(input), WINDOW_MESSAGE),
+    ["validUntil"],
+  ),
+);
+
+export const UpdateCustomerIdentitySchema = v.pipe(
+  v.partial(
+    v.object({
+      source: CustomerIdentitySourceSchema,
+      validFrom: v.nullable(timestamp),
+      validUntil: v.nullable(timestamp),
+      blocked: v.boolean(),
+    }),
+  ),
+  v.forward(
+    v.check((input) => isOrderedWindow(input), WINDOW_MESSAGE),
+    ["validUntil"],
+  ),
 );
 
 export const SetCustomerStatusSchema = v.variant("status", [
@@ -212,19 +238,28 @@ export const CustomerCreditKindSchema = v.picklist([
   "ADJUSTMENT",
 ]);
 
-export const GrantCustomerCreditSchema = v.object({
-  kind: CustomerCreditKindSchema,
-  amount: v.pipe(
-    v.string(),
-    v.trim(),
-    v.regex(
-      /^-?(?!0\d)\d{1,20}(\.\d{1,18})?$/,
-      "must be a decimal amount, as a string",
+export const GrantCustomerCreditSchema = v.pipe(
+  v.object({
+    kind: CustomerCreditKindSchema,
+    amount: v.pipe(
+      v.string(),
+      v.trim(),
+      v.regex(
+        /^-?(?!0\d)\d{1,20}(\.\d{1,18})?$/,
+        "must be a decimal amount, as a string",
+      ),
+      v.check((value) => Number(value) !== 0, "must not be zero"),
     ),
-    v.check((value) => Number(value) !== 0, "must not be zero"),
+    reason: v.optional(v.nullable(statusReason)),
+  }),
+  v.forward(
+    v.check(
+      (input) => input.kind !== "PROMOTIONAL" || !input.amount.startsWith("-"),
+      "promotional credit cannot be negative",
+    ),
+    ["amount"],
   ),
-  reason: v.optional(v.nullable(statusReason)),
-});
+);
 
 export const CustomerCouponKindSchema = v.picklist(["PERCENT", "FIXED"]);
 

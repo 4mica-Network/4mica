@@ -401,6 +401,15 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   }
 
   const entry = await grantCredit(userId, id, parsed.data);
+  if (!entry) {
+    const message = "would take the credit balance below zero";
+    return reply.code(409).send({
+      error: "insufficient_credit",
+      message: `This adjustment ${message}.`,
+      issues: [{ path: "amount", message }],
+    });
+  }
+
   const balance = await creditBalance(userId, id);
 
   appLogger.info("Customer credit granted", {

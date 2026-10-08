@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
 import { AgentFormFields } from "./AgentFormFields";
 import {
@@ -46,6 +47,7 @@ export function CreateAgentModal({
   const payerWallets = useAppSelector(selectPayerWallets);
 
   const [step, setStep] = useState(0);
+  useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
 
   const {
     handleSubmit,

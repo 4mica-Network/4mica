@@ -1,6 +1,6 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/trust";
 import i18n from "@i18n";
+import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { notifyError, notifySuccess } from "@utils/notification";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
 import {
@@ -18,35 +18,15 @@ import {
 import actionTypes from "./actionTypes";
 import type { PolicyInput, ReportStatus } from "./type";
 
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  return Array.isArray(issues)
-    ? Object.fromEntries(issues.map((i) => [i.path, i.message]))
-    : {};
-};
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return t(
-        "store.trust.sessionExpired",
-        "Your session has expired. Refresh the page and sign in again.",
-      );
-    }
-    return (error.body as { message?: string } | null)?.message ?? fallback;
-  }
-  return fallback;
-};
+const toMessage = (error: unknown, fallback: string): string =>
+  messageOf(error, fallback, {
+    sessionExpired: t(
+      "store.trust.sessionExpired",
+      "Your session has expired. Refresh the page and sign in again.",
+    ),
+  });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);

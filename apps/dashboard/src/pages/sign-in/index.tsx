@@ -1,4 +1,5 @@
 import { Button } from "@4mica/ui";
+import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
 import { motion } from "framer-motion";
@@ -37,7 +38,7 @@ export function SignInPage() {
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
-  const redirectUrlComplete = params.get("redirect_url") ?? "/";
+  const redirectUrlComplete = safeRedirectPath(params.get("redirect_url"));
 
   const signInWithGoogle = async () => {
     if (!isLoaded) {

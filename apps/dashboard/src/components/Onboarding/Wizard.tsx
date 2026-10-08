@@ -87,7 +87,7 @@ export function Wizard() {
       case "username":
         return isUsernameValid(username, usernameCheck.status);
       case "business":
-        return isBusinessValid(businessDraft.legalName);
+        return isBusinessValid(businessDraft.legalName, businessDraft.country);
       default:
         return false;
     }

@@ -10,6 +10,7 @@ import {
 } from "@stores/customer/selector";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { hasErrors } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
@@ -23,6 +24,9 @@ import { SectionCard, SectionFooter, SectionInset } from "./SectionCard";
 
 const blankToNull = (value: string): string | null =>
   value.trim() === "" ? null : value.trim();
+
+const DECIMAL_PATTERN = /^(?!0\d)\d{1,20}(\.\d{1,18})?$/;
+const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
 
 function QuotaUsage({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
@@ -119,6 +123,9 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
   const draft = useDraft(initial);
 
   const save = () => {
+    if (isInvalid || isSaving) {
+      return;
+    }
     const unit = blankToNull(draft.draft.freeQuotaUnit);
 
     dispatch(
@@ -140,6 +147,39 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
   };
 
   const hasQuota = draft.draft.freeQuotaUnit !== "";
+
+  const decimalError = (raw: string) => {
+    const value = raw.trim();
+    return value === "" || DECIMAL_PATTERN.test(value)
+      ? undefined
+      : t("validation.decimal");
+  };
+  const quota = draft.draft.freeQuota.trim();
+  const percent = draft.draft.discountPercent.trim();
+  const errors = {
+    freeQuota: !hasQuota
+      ? undefined
+      : quota === ""
+        ? t("validation.quotaTogether")
+        : (decimalError(quota) ??
+          (draft.draft.freeQuotaUnit === "REQUESTS" &&
+          !Number.isInteger(Number(quota))
+            ? t("validation.wholeNumber")
+            : undefined)),
+    freeQuotaPeriod:
+      hasQuota && draft.draft.freeQuotaPeriod === ""
+        ? t("validation.quotaTogether")
+        : undefined,
+    discountPercent:
+      percent === "" ||
+      (PERCENT_PATTERN.test(percent) && Number(percent) <= 100)
+        ? undefined
+        : t("validation.percent"),
+    discountFixed: decimalError(draft.draft.discountFixed),
+    minPaymentAmount: decimalError(draft.draft.minPaymentAmount),
+    approvalThreshold: decimalError(draft.draft.approvalThreshold),
+  };
+  const isInvalid = hasErrors(errors);
 
   return (
     <SectionCard
@@ -181,7 +221,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
                 placeholder={
                   draft.draft.freeQuotaUnit === "REQUESTS" ? "500" : "10.00"
                 }
-                error={issues.freeQuota}
+                error={errors.freeQuota ?? issues.freeQuota}
               />
             </FieldRow>
 
@@ -197,7 +237,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
                   value: option.value,
                   title: t(option.titleKey),
                 }))}
-                error={issues.freeQuotaPeriod}
+                error={errors.freeQuotaPeriod ?? issues.freeQuotaPeriod}
               />
             </FieldRow>
           </>
@@ -212,7 +252,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
             value={draft.draft.discountPercent}
             onChange={(value) => draft.set("discountPercent", value)}
             placeholder="10"
-            error={issues.discountPercent}
+            error={errors.discountPercent ?? issues.discountPercent}
           />
         </FieldRow>
 
@@ -225,7 +265,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
             value={draft.draft.discountFixed}
             onChange={(value) => draft.set("discountFixed", value)}
             placeholder="0.50"
-            error={issues.discountFixed}
+            error={errors.discountFixed ?? issues.discountFixed}
           />
         </FieldRow>
 
@@ -238,7 +278,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
             value={draft.draft.minPaymentAmount}
             onChange={(value) => draft.set("minPaymentAmount", value)}
             placeholder="0.01"
-            error={issues.minPaymentAmount}
+            error={errors.minPaymentAmount ?? issues.minPaymentAmount}
           />
         </FieldRow>
 
@@ -251,7 +291,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
             value={draft.draft.approvalThreshold}
             onChange={(value) => draft.set("approvalThreshold", value)}
             placeholder="100"
-            error={issues.approvalThreshold}
+            error={errors.approvalThreshold ?? issues.approvalThreshold}
           />
         </FieldRow>
       </div>
@@ -271,7 +311,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
           intent="invert"
           size="sm"
           className="btn-no-lift w-20"
-          disabled={!draft.isDirty || isSaving}
+          disabled={!draft.isDirty || isSaving || isInvalid}
           onClick={save}
           data-testid="customer-policy-save"
         >

@@ -6,6 +6,7 @@ import {
 } from "@stores/developer/actions";
 import {
   selectApiKeys,
+  selectDeveloperError,
   selectDeveloperIssues,
   selectIsPending,
 } from "@stores/developer/selector";
@@ -15,6 +16,7 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, SettingsSection } from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleDateString() : "—";
@@ -80,16 +82,18 @@ export function ApiKeysCard() {
   const dispatch = useAppDispatch();
   const apiKeys = useAppSelector(selectApiKeys);
   const issues = useAppSelector(selectDeveloperIssues);
+  const error = useAppSelector(selectDeveloperError);
   const isCreating = useAppSelector(selectIsPending("createApiKey"));
   const [name, setName] = useState("");
 
+  useOnSuccess(isCreating, error !== null, () => setName(""));
+
   const create = () => {
     const trimmed = name.trim();
-    if (!trimmed) {
+    if (!trimmed || isCreating) {
       return;
     }
     dispatch(createApiKey({ name: trimmed }));
-    setName("");
   };
 
   return (

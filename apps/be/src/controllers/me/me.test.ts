@@ -220,6 +220,48 @@ describe("account routes", () => {
     await app.close();
   });
 
+  it("PATCH /me/profile refuses to clear the username", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+
+    for (const username of [null, "", "   "]) {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/me/profile",
+        headers: AUTH,
+        payload: { username },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("username");
+    }
+    expect(update).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("PATCH /me/account refuses values outside the dashboard's options", async () => {
+    const app = await initApp([{ plugin: meRoutes }]);
+
+    for (const payload of [
+      { language: "xx" },
+      { timeZone: "Mars/Olympus" },
+      { defaultHome: "../admin" },
+    ]) {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/me/account",
+        headers: AUTH,
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe(Object.keys(payload)[0]);
+    }
+    expect(update).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it("PATCH /me/profile rejects a non-hex brand colour", async () => {
     const app = await initApp([{ plugin: meRoutes }]);
     const res = await app.inject({

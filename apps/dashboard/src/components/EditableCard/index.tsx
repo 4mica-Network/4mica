@@ -8,6 +8,7 @@ export function EditableCard({
   description,
   isDirty,
   isSaving,
+  isInvalid = false,
   onSave,
   onReset,
   children,
@@ -16,6 +17,7 @@ export function EditableCard({
   description?: string;
   isDirty: boolean;
   isSaving: boolean;
+  isInvalid?: boolean;
   onSave: () => void;
   onReset: () => void;
   children: ReactNode;
@@ -24,6 +26,9 @@ export function EditableCard({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (!isDirty || isSaving || isInvalid) {
+      return;
+    }
     onSave();
   };
 
@@ -53,7 +58,7 @@ export function EditableCard({
             size="sm"
             intent="invert"
             className="btn-no-lift w-20"
-            disabled={!isDirty || isSaving}
+            disabled={!isDirty || isSaving || isInvalid}
           >
             <span className="flex w-full items-center justify-center text-sm">
               {isSaving ? <Spinner size="sm" /> : t("settings.update")}

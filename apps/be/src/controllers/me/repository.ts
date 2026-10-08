@@ -113,7 +113,7 @@ const routeEmailChange = async (
     select: { email: true },
   });
 
-  return current?.email === email
+  return current?.email?.toLowerCase() === email
     ? { ...rest, pendingEmail: null }
     : { ...rest, pendingEmail: email };
 };

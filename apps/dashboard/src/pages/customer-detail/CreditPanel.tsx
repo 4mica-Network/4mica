@@ -6,6 +6,8 @@ import {
 import {
   selectCustomerCredit,
   selectCustomerCreditEntries,
+  selectCustomerError,
+  selectCustomerIssues,
   selectIsCustomerPending,
 } from "@stores/customer/selector";
 import type { Customer, CustomerCreditKind } from "@stores/customer/type";
@@ -14,6 +16,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 import {
   CREDIT_KIND_LABEL_KEYS,
   CREDIT_KIND_OPTIONS,
@@ -42,12 +45,35 @@ function GrantForm({
   const dispatch = useAppDispatch();
 
   const isSaving = useAppSelector(selectIsCustomerPending("customerCredit"));
+  const error = useAppSelector(selectCustomerError);
+  const issues = useAppSelector(selectCustomerIssues);
 
   const [kind, setKind] = useState<CustomerCreditKind>("PROMOTIONAL");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
+
+  useOnSuccess(isSaving, error !== null, onDone);
+
+  const trimmedAmount = amount.trim();
+  const amountError =
+    trimmedAmount === ""
+      ? undefined
+      : !/^-?(?!0\d)\d{1,20}(\.\d{1,18})?$/.test(trimmedAmount)
+        ? t("validation.decimal")
+        : Number(trimmedAmount) === 0
+          ? t("validation.positiveNumber")
+          : kind === "PROMOTIONAL" && trimmedAmount.startsWith("-")
+            ? t("customer.credit.promotionalNegative")
+            : undefined;
+  const serverIssue = (key: string) =>
+    attempted && !isSaving ? issues[key] : undefined;
 
   const submit = () => {
+    if (isSaving || trimmedAmount === "" || amountError) {
+      return;
+    }
+    setAttempted(true);
     dispatch(
       grantCustomerCredit({
         id: customerId,
@@ -58,7 +84,6 @@ function GrantForm({
         },
       }),
     );
-    onDone();
   };
 
   return (
@@ -86,6 +111,7 @@ function GrantForm({
             value={amount}
             onChange={setAmount}
             placeholder="5.00"
+            error={amountError ?? serverIssue("amount")}
           />
         </FieldRow>
 
@@ -96,6 +122,7 @@ function GrantForm({
             onChange={setReason}
             placeholder={t("customer.credit.reasonPlaceholder")}
             maxLength={280}
+            error={serverIssue("reason")}
           />
         </FieldRow>
       </div>
@@ -115,7 +142,7 @@ function GrantForm({
           intent="invert"
           size="sm"
           className="btn-no-lift w-24"
-          disabled={isSaving || amount.trim() === ""}
+          disabled={isSaving || trimmedAmount === "" || Boolean(amountError)}
           onClick={submit}
           data-testid="customer-credit-save"
         >

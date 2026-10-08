@@ -768,23 +768,44 @@ export const grantCredit = async (
   ownerId: string,
   customerId: string,
   input: GrantCustomerCreditInput,
-): Promise<CustomerCreditRow> => {
-  const row = await prisma.customerCreditEntry.create({
-    data: {
-      ownerId,
-      customerId,
-      kind: input.kind,
-      amount: input.amount,
-      reason: input.reason ?? null,
+): Promise<CustomerCreditRow | null> => {
+  const row = await prisma.$transaction(
+    async (tx) => {
+      if (input.amount.startsWith("-")) {
+        const { _sum } = await tx.customerCreditEntry.aggregate({
+          where: { ownerId, customerId },
+          _sum: { amount: true },
+        });
+        const after = (_sum.amount ?? new Prisma.Decimal(0)).plus(input.amount);
+
+        if (after.isNegative()) {
+          return null;
+        }
+      }
+
+      return tx.customerCreditEntry.create({
+        data: {
+          ownerId,
+          customerId,
+          kind: input.kind,
+          amount: input.amount,
+          reason: input.reason ?? null,
+        },
+        select: {
+          id: true,
+          kind: true,
+          amount: true,
+          reason: true,
+          createdAt: true,
+        },
+      });
     },
-    select: {
-      id: true,
-      kind: true,
-      amount: true,
-      reason: true,
-      createdAt: true,
-    },
-  });
+    { isolationLevel: "Serializable" },
+  );
+
+  if (!row) {
+    return null;
+  }
 
   return {
     id: row.id,

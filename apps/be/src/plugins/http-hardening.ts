@@ -5,6 +5,7 @@ import type {
   FastifyInstance,
   FastifyReply,
   FastifyRequest,
+  FastifySchemaValidationError,
 } from "fastify";
 
 export const REQUEST_ID_HEADER = "x-request-id";
@@ -40,6 +41,16 @@ const prismaCode = (error: unknown): string | undefined => {
 
 const pathOf = (request: FastifyRequest): string =>
   request.url.split("?", 1)[0] ?? request.url;
+
+const issuePath = (issue: FastifySchemaValidationError): string => {
+  const base = issue.instancePath.replace(/^\//, "").replaceAll("/", ".");
+  const missing = (issue.params as { missingProperty?: unknown })
+    ?.missingProperty;
+  const leaf = typeof missing === "string" ? missing : "";
+  const path = [base, leaf].filter((part) => part !== "").join(".");
+
+  return path === "" ? "(root)" : path;
+};
 
 const sendError = (
   reply: FastifyReply,
@@ -87,6 +98,18 @@ export const installHttpHardening = (app: FastifyInstance): void => {
   );
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error.validation) {
+      return reply.code(400).send({
+        error: "invalid_request",
+        message: "The request failed validation.",
+        issues: error.validation.map((issue) => ({
+          path: issuePath(issue),
+          message: issue.message ?? "is invalid",
+        })),
+        requestId: request.id,
+      });
+    }
+
     const prisma = prismaCode(error);
 
     if (prisma === "P2002") {
@@ -95,6 +118,14 @@ export const installHttpHardening = (app: FastifyInstance): void => {
         409,
         "conflict",
         "That conflicts with an existing record.",
+      );
+    }
+    if (prisma === "P2034") {
+      return sendError(
+        reply,
+        409,
+        "conflict",
+        "Another change landed at the same time. Try again.",
       );
     }
     if (prisma === "P2025") {

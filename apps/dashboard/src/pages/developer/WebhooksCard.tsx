@@ -14,6 +14,7 @@ import {
   updateWebhook,
 } from "@stores/developer/actions";
 import {
+  selectDeveloperError,
   selectDeveloperIssues,
   selectIsPending,
   selectWebhookEvents,
@@ -25,6 +26,7 @@ import { Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, FieldRow, SettingsSection } from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function WebhookRow({ webhook }: { webhook: Webhook }) {
   const { t } = useTranslation();
@@ -161,6 +163,7 @@ export function WebhooksCard() {
   const webhooks = useAppSelector(selectWebhooks);
   const events = useAppSelector(selectWebhookEvents);
   const issues = useAppSelector(selectDeveloperIssues);
+  const error = useAppSelector(selectDeveloperError);
   const isCreating = useAppSelector(selectIsPending("createWebhook"));
 
   const [url, setUrl] = useState("");
@@ -172,22 +175,35 @@ export function WebhooksCard() {
     [events],
   );
 
-  const canSubmit = url.trim().length > 0 && selected.length > 0;
+  const trimmedUrl = url.trim();
+  const urlError =
+    trimmedUrl === ""
+      ? undefined
+      : !trimmedUrl.startsWith("https://")
+        ? t("validation.httpsUrl")
+        : trimmedUrl.length > 2048
+          ? t("validation.tooLong", { max: 2048 })
+          : undefined;
+  const canSubmit =
+    trimmedUrl.length > 0 && urlError === undefined && selected.length > 0;
+
+  useOnSuccess(isCreating, error !== null, () => {
+    setUrl("");
+    setDescription("");
+    setSelected([]);
+  });
 
   const create = () => {
-    if (!canSubmit) {
+    if (!canSubmit || isCreating) {
       return;
     }
     dispatch(
       createWebhook({
-        url: url.trim(),
+        url: trimmedUrl,
         description: description.trim() || null,
         events: selected.map(String),
       }),
     );
-    setUrl("");
-    setDescription("");
-    setSelected([]);
   };
 
   return (
@@ -211,7 +227,8 @@ export function WebhooksCard() {
               id="webhook-url"
               value={url}
               placeholder="https://api.example.com/4mica/webhooks"
-              error={issues.url}
+              error={urlError ?? issues.url}
+              maxLength={2048}
               onChange={(e) => setUrl(e.target.value)}
             />
           </FieldRow>

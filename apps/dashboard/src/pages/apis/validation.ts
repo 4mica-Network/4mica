@@ -1,4 +1,5 @@
 import { USERNAME_PATTERN } from "@4mica/url";
+import { isSingleLine, isUuidShaped, isWebUrl } from "@utils/validation";
 import { isAddress } from "viem";
 import { z } from "zod";
 
@@ -20,7 +21,7 @@ const optionalDecimal = decimalAmount.optional().or(z.literal(""));
 const httpsUrl = z
   .string()
   .trim()
-  .url("apiListing.errors.urlInvalid")
+  .refine(isWebUrl, "apiListing.errors.urlInvalid")
   .max(2048, "apiListing.errors.urlTooLong")
   .refine(
     (value) => value.startsWith("https://"),
@@ -48,6 +49,7 @@ const slugField = z
     (value) => value === "" || USERNAME_PATTERN.test(value),
     "apiListing.errors.slugInvalid",
   )
+  .refine((value) => !isUuidShaped(value), "apiListing.errors.slugIdShaped")
   .optional()
   .or(z.literal(""));
 
@@ -56,12 +58,14 @@ export const apiListingDetailsSchema = z.object({
     .string()
     .trim()
     .min(1, "apiListing.errors.nameRequired")
-    .max(NAME_MAX_LENGTH, "apiListing.errors.nameTooLong"),
+    .max(NAME_MAX_LENGTH, "apiListing.errors.nameTooLong")
+    .refine(isSingleLine, "validation.singleLine"),
   slug: slugField,
   summary: z
     .string()
     .trim()
     .max(SUMMARY_MAX_LENGTH, "apiListing.errors.summaryTooLong")
+    .refine(isSingleLine, "validation.singleLine")
     .optional()
     .or(z.literal("")),
   description: z
@@ -87,6 +91,7 @@ export const apiListingPaymentSchema = z.object({
     .string()
     .trim()
     .max(64, "apiListing.errors.priceLabelTooLong")
+    .refine(isSingleLine, "validation.singleLine")
     .optional()
     .or(z.literal("")),
 });
@@ -100,6 +105,7 @@ export const apiListingPublishingSchema = z.object({
     .string()
     .trim()
     .max(64, "apiListing.errors.categoryTooLong")
+    .refine(isSingleLine, "validation.singleLine")
     .optional()
     .or(z.literal("")),
   tags: z

@@ -767,3 +767,5 @@ export type Routes = typeof routes;
 export type RouteKey = keyof Routes;
 export type Links = typeof links;
 export type LinkKey = keyof Links;
+
+export { DEFAULT_REDIRECT, safeRedirectPath } from "./redirect";

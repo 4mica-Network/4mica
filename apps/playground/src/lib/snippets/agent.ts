@@ -2,9 +2,11 @@ import type { PublicAgent } from "@/schema/agent";
 import { networkInfo } from "./networks";
 import {
   buildCurlHandshake,
+  codeString,
   commentLine,
   formatPrice,
   PLACEHOLDER,
+  singleLine,
 } from "./shared";
 
 export interface AgentSnippets {
@@ -43,7 +45,7 @@ export const buildAgentSnippets = (agent: PublicAgent): AgentSnippets => {
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
 
-// ${agent.name} signs from ${wallet}.
+// ${singleLine(agent.name)} signs from ${wallet}.
 // Keep its key in a secret manager — never in source control.
 const account = privateKeyToAccount(
   process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`,
@@ -148,7 +150,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ${descriptor}
 ${paidTo}
-const response = await fetchWithPayment("${url}", {
+const response = await fetchWithPayment(${codeString(url)}, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ prompt: "..." }),
@@ -168,7 +170,7 @@ session = x402_requests(client)
 
 ${commentLine(descriptorParts, "#")}
 ${commentLine(paidToParts, "#")}
-response = session.post("${url}", json={"prompt": "..."})
+response = session.post(${codeString(url)}, json={"prompt": "..."})
 data = response.json()`;
 
   const curl = buildCurlHandshake({

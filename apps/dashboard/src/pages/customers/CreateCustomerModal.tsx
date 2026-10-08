@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { CustomerFormFields } from "./CustomerFormFields";
 import {
   blankToNull,
@@ -21,6 +22,7 @@ import {
 
 const PENDING_KEY = "createCustomer";
 const TOTAL_STEPS = CREATE_STEP_FIELDS.length;
+const ISSUE_STEPS: Record<string, number> = { identities: 1 };
 
 export function CreateCustomerModal({
   isOpen,
@@ -37,6 +39,7 @@ export function CreateCustomerModal({
   const issues = useAppSelector(selectCustomerIssues);
 
   const [step, setStep] = useState(0);
+  useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep, ISSUE_STEPS);
 
   const {
     handleSubmit,

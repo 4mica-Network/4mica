@@ -1,6 +1,7 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/wallet";
 import i18n from "@i18n";
+import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import {
@@ -25,32 +26,16 @@ import actionTypes from "./actionTypes";
 import { selectWalletState } from "./selector";
 import type { PaymentNetwork, WalletRole, WalletState } from "./type";
 
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
-
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  return Array.isArray(issues)
-    ? Object.fromEntries(issues.map((i) => [i.path, i.message]))
-    : {};
-};
 
 const toMessage = (error: unknown, fallback: string): string => {
   if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return t(
+    return messageOf(error, fallback, {
+      sessionExpired: t(
         "store.wallet.sessionExpired",
         "Your session has expired. Refresh the page and sign in again.",
-      );
-    }
-    return (error.body as { message?: string } | null)?.message ?? fallback;
+      ),
+    });
   }
   if (error instanceof NoWalletError) {
     return t(

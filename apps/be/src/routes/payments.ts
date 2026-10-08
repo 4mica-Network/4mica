@@ -11,6 +11,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   errorResponseSchema,
+  idParam,
   limitedResponses,
   paymentListResponseSchema,
   paymentResponseSchema,
@@ -21,7 +22,7 @@ import {
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 const listQuerySchema = {

@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { fileReport } from "@/actions/trust";
 import { messages } from "@/i18n";
 import { REPORT_REASONS, type ReportReason } from "@/schema/trust";
+import { runAction } from "@/utils/runAction";
 
 export interface ReportDialogProps {
   resource: {
@@ -32,6 +33,7 @@ const ERRORS: Record<string, string> = {
   already_reported: messages.trust.errorAlreadyReported,
   invalid_report: messages.trust.errorInvalidReport,
   not_found: messages.trust.errorNotFound,
+  own_resource: messages.trust.errorReportOwn,
 };
 
 export function ReportDialog({
@@ -50,8 +52,15 @@ export function ReportDialog({
   const send = () => {
     setError(null);
 
+    if (reason === "OTHER" && detail.trim() === "") {
+      setError(messages.trust.errorDescribeOther);
+      return;
+    }
+
     startTransition(async () => {
-      const result = await fileReport(resource, { reason, detail });
+      const result = await runAction(() =>
+        fileReport(resource, { reason, detail }),
+      );
 
       if (result.ok) {
         setDone(true);

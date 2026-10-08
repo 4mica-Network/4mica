@@ -57,7 +57,18 @@ export const formatPrice = (
  * carries the host language's comment marker.
  */
 export const commentLine = (parts: (string | null)[], prefix = "//"): string =>
-  `${prefix} ${parts.filter((part): part is string => part !== null).join(" · ")}`;
+  `${prefix} ${parts
+    .filter((part): part is string => part !== null)
+    .map(singleLine)
+    .join(" · ")}`;
+
+export const singleLine = (value: string): string =>
+  value.replace(/[\p{Cc}\u2028\u2029]+/gu, " ");
+
+export const codeString = (value: string): string => JSON.stringify(value);
+
+export const shellQuote = (value: string): string =>
+  `'${value.replaceAll("'", `'\\''`)}'`;
 
 export interface CurlHandshakeInput {
   method: string;
@@ -76,7 +87,7 @@ export const buildCurlHandshake = ({
   assetAddress,
   wireAmount,
 }: CurlHandshakeInput): string => `# 1. An unpaid request answers 402 with the payment requirements.
-curl -i -X ${method} "${url}"
+curl -i -X ${method} ${shellQuote(url)}
 
 # {
 #   "x402Version": 1,
@@ -98,5 +109,5 @@ curl -i -X ${method} "${url}"
 
 # 2. Sign a guarantee for those requirements, then retry with the header.
 #    The SDK does steps 1 and 2 for you — this is the wire format.
-curl -X ${method} "${url}" \\
+curl -X ${method} ${shellQuote(url)} \\
   -H "X-PAYMENT: $PAYMENT_HEADER"`;

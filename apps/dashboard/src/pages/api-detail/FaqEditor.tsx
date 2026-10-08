@@ -7,12 +7,18 @@ import {
   reorderFaqs,
   updateFaq,
 } from "@stores/trust/actions";
-import { selectFaqs, selectIsTrustPending } from "@stores/trust/selector";
+import {
+  selectFaqs,
+  selectIsTrustPending,
+  selectTrustError,
+  selectTrustIssues,
+} from "@stores/trust/selector";
 import type { Faq } from "@stores/trust/type";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import type { DragEvent } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function FaqRow({
   faq,
@@ -34,9 +40,16 @@ function FaqRow({
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isPending = useAppSelector(selectIsTrustPending(`faq:${faq.id}`));
+  const error = useAppSelector(selectTrustError);
+  const issues = useAppSelector(selectTrustIssues);
 
   const [question, setQuestion] = useState(faq.question);
   const [answer, setAnswer] = useState(faq.answer);
+  const [attempted, setAttempted] = useState(false);
+
+  useOnSuccess(isPending, error !== null, () => setAttempted(false));
+
+  const showIssues = attempted && !isPending;
 
   const isDirty = question !== faq.question || answer !== faq.answer;
 
@@ -63,12 +76,14 @@ function FaqRow({
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <InputField
+          error={showIssues ? issues.question : undefined}
           maxLength={280}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={t("appDetail.faq.questionPlaceholder")}
           value={question}
         />
         <InputField
+          error={showIssues ? issues.answer : undefined}
           maxLength={2000}
           onChange={(event) => setAnswer(event.target.value)}
           placeholder={t("appDetail.faq.answerPlaceholder")}
@@ -94,14 +109,15 @@ function FaqRow({
               className="btn-no-lift"
               disabled={isPending || !question.trim() || !answer.trim()}
               intent="invert"
-              onClick={() =>
+              onClick={() => {
+                setAttempted(true);
                 dispatch(
                   updateFaq(resource, faq.id, {
                     question: question.trim(),
                     answer: answer.trim(),
                   }),
-                )
-              }
+                );
+              }}
               size="sm"
               type="button"
             >
@@ -132,25 +148,35 @@ export function FaqEditor({ resource }: { resource: ResourceRef }) {
 
   const faqs = useAppSelector(selectFaqs);
   const isAdding = useAppSelector(selectIsTrustPending("faq:new"));
+  const error = useAppSelector(selectTrustError);
+  const issues = useAppSelector(selectTrustIssues);
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
+  useOnSuccess(isAdding, error !== null, () => {
+    setQuestion("");
+    setAnswer("");
+    setAttempted(false);
+  });
+
+  const showIssues = attempted && !isAdding;
+
   const add = () => {
-    if (!question.trim() || !answer.trim()) {
+    if (!question.trim() || !answer.trim() || isAdding) {
       return;
     }
 
+    setAttempted(true);
     dispatch(
       createFaq(resource, {
         question: question.trim(),
         answer: answer.trim(),
       }),
     );
-    setQuestion("");
-    setAnswer("");
   };
 
   const commitOrder = () => {
@@ -195,12 +221,14 @@ export function FaqEditor({ resource }: { resource: ResourceRef }) {
 
       <div className="flex flex-col gap-2 rounded-lg border border-overlay/10 border-dashed px-3 py-3">
         <InputField
+          error={showIssues ? issues.question : undefined}
           maxLength={280}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={t("appDetail.faq.questionPlaceholder")}
           value={question}
         />
         <InputField
+          error={showIssues ? issues.answer : undefined}
           maxLength={2000}
           onChange={(event) => setAnswer(event.target.value)}
           placeholder={t("appDetail.faq.answerPlaceholder")}

@@ -7,6 +7,7 @@ import { NETWORK_OPTIONS, NETWORKS, shortenAddress } from "@/lib/networks";
 import { STATUS_OPTIONS, VISIBILITY_OPTIONS } from "./constants";
 import {
   type AgentValues,
+  DESCRIPTION_MAX_LENGTH,
   HEADLINE_MAX_LENGTH,
   NAME_MAX_LENGTH,
 } from "./validation";
@@ -102,6 +103,7 @@ export function AgentFormFields({
               id={`${idPrefix}-description`}
               rows={4}
               value={values.description ?? ""}
+              maxLength={DESCRIPTION_MAX_LENGTH}
               error={fieldError("description")}
               onChange={(value) =>
                 setValue("description", value, { shouldValidate: true })

@@ -39,6 +39,7 @@ import {
   customerResolveResponseSchema,
   customerResponseSchema,
   errorResponseSchema,
+  idParam,
   limitedResponses,
   paymentListResponseSchema,
 } from "./schema-fragments";
@@ -46,19 +47,19 @@ import {
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 const couponParamSchema = {
   type: "object",
   required: ["id", "couponId"],
-  properties: { id: { type: "string" }, couponId: { type: "string" } },
+  properties: { id: idParam, couponId: idParam },
 } as const;
 
 const identityParamSchema = {
   type: "object",
   required: ["id", "identityId"],
-  properties: { id: { type: "string" }, identityId: { type: "string" } },
+  properties: { id: idParam, identityId: idParam },
 } as const;
 
 const networkEnum = {

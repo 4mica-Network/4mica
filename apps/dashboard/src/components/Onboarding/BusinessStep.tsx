@@ -1,6 +1,7 @@
 import type { BusinessType } from "@stores/user/type";
 import { useTranslation } from "react-i18next";
 import { BUSINESS_TYPES, FieldRow, Select, TextInput } from "@/components/form";
+import { isCountryValid } from "./validation";
 
 export interface BusinessDraft {
   legalName: string;
@@ -66,7 +67,11 @@ export function BusinessStep({
           value={draft.country}
           onChange={(value) => onChange("country", value.slice(0, 2))}
           placeholder="GB"
-          error={issues.country}
+          error={
+            isCountryValid(draft.country)
+              ? issues.country
+              : t("validation.countryCode")
+          }
           format="uppercase"
           maxLength={2}
         />

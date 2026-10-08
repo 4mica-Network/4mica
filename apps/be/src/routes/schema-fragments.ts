@@ -1,3 +1,10 @@
+export const idParam = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[A-Za-z0-9_-]+$",
+} as const;
+
 const bool = { type: "boolean" } as const;
 const str = { type: "string" } as const;
 const nullStr = { type: "string", nullable: true } as const;

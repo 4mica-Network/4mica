@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
 import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
@@ -61,6 +62,7 @@ export function CreateApiListingModal({
   const wallets = useAppSelector(selectSellerWallets);
 
   const [step, setStep] = useState(0);
+  useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
   const [slugTouched, setSlugTouched] = useState(false);
   const [tagText, setTagText] = useState("");
 

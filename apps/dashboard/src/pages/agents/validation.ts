@@ -1,4 +1,5 @@
 import { USERNAME_PATTERN } from "@4mica/url";
+import { isSingleLine, isUuidShaped, isWebUrl } from "@utils/validation";
 import { isAddress } from "viem";
 import { z } from "zod";
 
@@ -21,7 +22,7 @@ const creditLimitField = decimalAmount.optional().or(z.literal(""));
 const httpsUrl = z
   .string()
   .trim()
-  .url("agent.errors.urlInvalid")
+  .refine(isWebUrl, "agent.errors.urlInvalid")
   .max(2048, "agent.errors.urlTooLong")
   .refine((value) => value.startsWith("https://"), "agent.errors.urlHttps");
 
@@ -46,6 +47,7 @@ const slugField = z
     (value) => value === "" || USERNAME_PATTERN.test(value),
     "agent.errors.slugInvalid",
   )
+  .refine((value) => !isUuidShaped(value), "agent.errors.slugIdShaped")
   .optional()
   .or(z.literal(""));
 
@@ -54,12 +56,14 @@ export const agentSchema = z.object({
     .string()
     .trim()
     .min(1, "agent.errors.nameRequired")
-    .max(NAME_MAX_LENGTH, "agent.errors.nameTooLong"),
+    .max(NAME_MAX_LENGTH, "agent.errors.nameTooLong")
+    .refine(isSingleLine, "validation.singleLine"),
   slug: slugField,
   headline: z
     .string()
     .trim()
     .max(HEADLINE_MAX_LENGTH, "agent.errors.headlineTooLong")
+    .refine(isSingleLine, "validation.singleLine")
     .optional()
     .or(z.literal("")),
   description: z
@@ -90,6 +94,7 @@ export const agentSchema = z.object({
     .string()
     .trim()
     .max(64, "agent.errors.priceLabelTooLong")
+    .refine(isSingleLine, "validation.singleLine")
     .optional()
     .or(z.literal("")),
   endpointUrl: optionalHttpsUrl,

@@ -33,6 +33,9 @@ export const selectIsPending =
   (state: RootState): boolean =>
     Boolean(state.developer.pending[key]);
 
+export const selectDeveloperError = (state: RootState): string | null =>
+  state.developer.error;
+
 export const selectDeveloperIssues = (
   state: RootState,
 ): Record<string, string> => state.developer.validationIssues;

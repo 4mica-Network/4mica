@@ -37,10 +37,19 @@ export const SubmitReviewSchema = v.object({
   body: optionalText(2000),
 });
 
-export const FileReportSchema = v.object({
-  reason: v.picklist(REPORT_REASONS, "choose a reason"),
-  detail: optionalText(2000),
-});
+export const FileReportSchema = v.pipe(
+  v.object({
+    reason: v.picklist(REPORT_REASONS, "choose a reason"),
+    detail: optionalText(2000),
+  }),
+  v.forward(
+    v.check(
+      (input) => input.reason !== "OTHER" || input.detail !== null,
+      "describe the problem",
+    ),
+    ["detail"],
+  ),
+);
 
 export type SubmitReviewInput = v.InferOutput<typeof SubmitReviewSchema>;
 export type FileReportInput = v.InferOutput<typeof FileReportSchema>;

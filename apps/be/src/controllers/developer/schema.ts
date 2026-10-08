@@ -1,7 +1,18 @@
+import {
+  futureTimestamp,
+  publicHttpsUrl,
+  singleLine,
+} from "@controllers/schema-primitives";
 import { isKnownEvent } from "@utils/webhook-events";
 import * as v from "valibot";
 
-const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
+const name = v.pipe(
+  v.string(),
+  v.trim(),
+  v.minLength(1),
+  v.maxLength(120),
+  singleLine,
+);
 
 const eventList = v.pipe(
   v.array(
@@ -14,19 +25,11 @@ const eventList = v.pipe(
   v.transform((events) => [...new Set(events)]),
 );
 
-const webhookUrl = v.pipe(
-  v.string(),
-  v.trim(),
-  v.url("must be a valid URL"),
-  v.startsWith("https://", "must be an https URL"),
-  v.maxLength(2048),
-);
+const webhookUrl = publicHttpsUrl(2048);
 
 export const CreateApiKeySchema = v.object({
   name,
-  expiresAt: v.optional(
-    v.nullable(v.pipe(v.string(), v.isoTimestamp("must be an ISO timestamp"))),
-  ),
+  expiresAt: v.optional(v.nullable(futureTimestamp)),
 });
 
 export const UpdateApiKeySchema = v.object({

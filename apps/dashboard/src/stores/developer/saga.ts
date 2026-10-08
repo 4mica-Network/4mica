@@ -1,6 +1,6 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import { toIssueMap, toMessage } from "@utils/http-errors";
 import { notifyError, notifySuccess } from "@utils/notification";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
 import {
@@ -20,28 +20,6 @@ import {
 } from "./actions";
 import actionTypes from "./actionTypes";
 import type { WebhookStatus } from "./type";
-
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  return Array.isArray(issues)
-    ? Object.fromEntries(issues.map((i) => [i.path, i.message]))
-    : {};
-};
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    return (error.body as { message?: string } | null)?.message ?? fallback;
-  }
-  return fallback;
-};
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 

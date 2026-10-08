@@ -6,6 +6,8 @@ import {
 } from "@stores/customer/actions";
 import {
   selectCustomerCoupons,
+  selectCustomerError,
+  selectCustomerIssues,
   selectIsCustomerPending,
 } from "@stores/customer/selector";
 import type {
@@ -18,6 +20,7 @@ import { Ban, Plus, ShieldCheck, TicketPercent, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 import {
   COUPON_KIND_OPTIONS,
   COUPON_UNUSABLE_LABEL_KEYS,
@@ -35,6 +38,11 @@ const asDate = (iso: string): string =>
 
 const endOfDay = (day: string): string =>
   new Date(`${day}T23:59:59.000Z`).toISOString();
+
+const MAX_USAGE_LIMIT = 2_147_483_647;
+const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]*$/;
+const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
+const DECIMAL_PATTERN = /^(?!0\d)\d{1,20}(\.\d{1,18})?$/;
 
 function CouponRow({
   customerId,
@@ -156,27 +164,78 @@ function AddCouponCard({
   const dispatch = useAppDispatch();
 
   const isSaving = useAppSelector(selectIsCustomerPending("customerCoupon"));
+  const error = useAppSelector(selectCustomerError);
+  const issues = useAppSelector(selectCustomerIssues);
 
   const [kind, setKind] = useState<CustomerCouponKind>("PERCENT");
   const [code, setCode] = useState("");
   const [value, setValue] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
   const [usageLimit, setUsageLimit] = useState("");
+  const [attempted, setAttempted] = useState(false);
+
+  useOnSuccess(isSaving, error !== null, onDone);
+
+  const trimmedCode = code.trim().toUpperCase();
+  const trimmedValue = value.trim();
+  const trimmedLimit = usageLimit.trim();
+
+  const errors = {
+    code:
+      trimmedCode === "" || COUPON_CODE_PATTERN.test(trimmedCode)
+        ? undefined
+        : t("validation.couponCode"),
+    value:
+      trimmedValue === ""
+        ? undefined
+        : kind === "PERCENT"
+          ? PERCENT_PATTERN.test(trimmedValue) && Number(trimmedValue) <= 100
+            ? undefined
+            : t("validation.percent")
+          : !DECIMAL_PATTERN.test(trimmedValue)
+            ? t("validation.decimal")
+            : Number(trimmedValue) > 0
+              ? undefined
+              : t("validation.positiveNumber"),
+    expiresAt:
+      expiresOn === "" || new Date(endOfDay(expiresOn)).getTime() > Date.now()
+        ? undefined
+        : t("validation.futureDate"),
+    usageLimit:
+      trimmedLimit === ""
+        ? undefined
+        : !/^\d+$/.test(trimmedLimit)
+          ? t("validation.wholeNumber")
+          : Number(trimmedLimit) < 1
+            ? t("validation.positiveNumber")
+            : Number(trimmedLimit) > MAX_USAGE_LIMIT
+              ? t("validation.maxValue", { max: MAX_USAGE_LIMIT })
+              : undefined,
+  };
+  const isInvalid =
+    trimmedCode === "" ||
+    trimmedValue === "" ||
+    Object.values(errors).some((message) => message !== undefined);
+  const serverIssue = (key: string) =>
+    attempted && !isSaving ? issues[key] : undefined;
 
   const submit = () => {
+    if (isSaving || isInvalid) {
+      return;
+    }
+    setAttempted(true);
     dispatch(
       createCustomerCoupon({
         id: customerId,
         data: {
           kind,
-          code: code.trim().toUpperCase(),
-          value: value.trim(),
+          code: trimmedCode,
+          value: trimmedValue,
           expiresAt: expiresOn === "" ? null : endOfDay(expiresOn),
-          usageLimit: usageLimit.trim() === "" ? null : Number(usageLimit),
+          usageLimit: trimmedLimit === "" ? null : Number(trimmedLimit),
         },
       }),
     );
-    onDone();
   };
 
   return (
@@ -190,6 +249,7 @@ function AddCouponCard({
             format="uppercase"
             placeholder="WELCOME10"
             maxLength={64}
+            error={errors.code ?? serverIssue("code")}
           />
         </FieldRow>
 
@@ -211,6 +271,7 @@ function AddCouponCard({
             value={value}
             onChange={setValue}
             placeholder={kind === "PERCENT" ? "10" : "5.00"}
+            error={errors.value ?? serverIssue("value")}
           />
         </FieldRow>
 
@@ -224,6 +285,7 @@ function AddCouponCard({
             type="date"
             value={expiresOn}
             onChange={setExpiresOn}
+            error={errors.expiresAt ?? serverIssue("expiresAt")}
           />
         </FieldRow>
 
@@ -237,6 +299,7 @@ function AddCouponCard({
             value={usageLimit}
             onChange={setUsageLimit}
             placeholder="1"
+            error={errors.usageLimit ?? serverIssue("usageLimit")}
           />
         </FieldRow>
       </div>
@@ -256,7 +319,7 @@ function AddCouponCard({
           intent="invert"
           size="sm"
           className="btn-no-lift w-24"
-          disabled={isSaving || code.trim() === "" || value.trim() === ""}
+          disabled={isSaving || isInvalid}
           onClick={submit}
           data-testid="customer-coupon-save"
         >

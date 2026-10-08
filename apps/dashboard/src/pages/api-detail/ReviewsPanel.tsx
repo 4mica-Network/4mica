@@ -4,12 +4,15 @@ import { replyToReview } from "@stores/trust/actions";
 import {
   selectIsTrustPending,
   selectReviews,
+  selectTrustError,
+  selectTrustIssues,
   selectTrustSummary,
 } from "@stores/trust/selector";
 import type { Review } from "@stores/trust/type";
 import { MessageSquare, Star } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 const Stars = ({ value }: { value: number }) => (
   <span className="inline-flex items-center gap-0.5">
@@ -39,12 +42,24 @@ function ReviewRow({
   const dispatch = useAppDispatch();
   const isPending = useAppSelector(selectIsTrustPending(`review:${review.id}`));
 
+  const error = useAppSelector(selectTrustError);
+  const issues = useAppSelector(selectTrustIssues);
+
   const [open, setOpen] = useState(false);
   const [reply, setReply] = useState(review.ownerReply ?? "");
+  const [attempted, setAttempted] = useState(false);
+
+  useOnSuccess(isPending, error !== null, () => {
+    setAttempted(false);
+    setOpen(false);
+  });
 
   const send = () => {
+    if (isPending) {
+      return;
+    }
+    setAttempted(true);
     dispatch(replyToReview({ kind, id }, review.id, reply.trim() || null));
-    setOpen(false);
   };
 
   return (
@@ -87,6 +102,7 @@ function ReviewRow({
       {open ? (
         <div className="flex flex-col gap-2">
           <InputField
+            error={attempted && !isPending ? issues.reply : undefined}
             maxLength={2000}
             onChange={(event) => setReply(event.target.value)}
             placeholder={t("appDetail.replyPlaceholder")}

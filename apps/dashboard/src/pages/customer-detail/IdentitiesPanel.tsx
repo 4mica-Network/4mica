@@ -6,6 +6,7 @@ import {
   updateCustomerIdentity,
 } from "@stores/customer/actions";
 import {
+  selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
 } from "@stores/customer/selector";
@@ -19,10 +20,11 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 import {
   explorerAddressUrl,
   NETWORK_OPTIONS,
@@ -184,6 +186,7 @@ function AddIdentityCard({
 
   const isSaving = useAppSelector(selectIsCustomerPending(PENDING_KEY));
   const issues = useAppSelector(selectCustomerIssues);
+  const error = useAppSelector(selectCustomerError);
 
   const {
     handleSubmit,
@@ -198,20 +201,11 @@ function AddIdentityCard({
 
   const values = watch();
 
-  const sawSaving = useRef(false);
-  useEffect(() => {
-    if (isSaving) {
-      sawSaving.current = true;
-      return;
-    }
-    if (!sawSaving.current) {
-      return;
-    }
-    sawSaving.current = false;
-    if (Object.keys(issues).length === 0) {
-      onDone();
-    }
-  }, [isSaving, issues, onDone]);
+  useOnSuccess(
+    isSaving,
+    error !== null || Object.keys(issues).length > 0,
+    onDone,
+  );
 
   const fieldError = (field: keyof IdentityValues) => {
     if (issues[field]) {
@@ -235,7 +229,10 @@ function AddIdentityCard({
               }
             : {
                 type: data.type,
-                value: data.value as string,
+                value:
+                  data.type === "EMAIL"
+                    ? (data.value as string).trim().toLowerCase()
+                    : (data.value as string).trim(),
                 source: "MANUAL",
               },
       }),

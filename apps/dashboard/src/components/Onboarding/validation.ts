@@ -26,5 +26,10 @@ export const isUsernameValid = (
   status !== "reserved" &&
   status !== "blacklisted";
 
-export const isBusinessValid = (legalName: string): boolean =>
-  legalName.trim().length > 0;
+export const isCountryValid = (country: string): boolean => {
+  const trimmed = country.trim();
+  return trimmed === "" || /^[A-Za-z]{2}$/.test(trimmed);
+};
+
+export const isBusinessValid = (legalName: string, country = ""): boolean =>
+  legalName.trim().length > 0 && isCountryValid(country);

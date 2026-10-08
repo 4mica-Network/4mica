@@ -4,11 +4,13 @@ import {
   batchDeleteSchema,
   DEFAULT_PAGE_SIZE,
   HttpMethodSchema,
+  httpsUrl,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
   PublicVisibilitySchema,
   positiveDecimalAmount,
   positiveInt,
+  singleLine,
 } from "@controllers/schema-primitives";
 import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@utils/slug";
 import * as v from "valibot";
@@ -23,19 +25,19 @@ const slug = v.pipe(
   v.check((value) => !isUuidShaped(value), "must not look like an id"),
 );
 
-const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
-const summary = v.pipe(v.string(), v.trim(), v.maxLength(280));
-const description = v.pipe(v.string(), v.trim(), v.maxLength(10_000));
-const category = v.pipe(v.string(), v.trim(), v.maxLength(64));
-const priceLabel = v.pipe(v.string(), v.trim(), v.maxLength(64));
-
-const httpsUrl = v.pipe(
+const name = v.pipe(
   v.string(),
   v.trim(),
-  v.url(),
-  v.maxLength(2048),
-  v.check((value) => value.startsWith("https://"), "must be an https URL"),
+  v.minLength(1),
+  v.maxLength(120),
+  singleLine,
 );
+const summary = v.pipe(v.string(), v.trim(), v.maxLength(280), singleLine);
+const description = v.pipe(v.string(), v.trim(), v.maxLength(10_000));
+const category = v.pipe(v.string(), v.trim(), v.maxLength(64), singleLine);
+const priceLabel = v.pipe(v.string(), v.trim(), v.maxLength(64), singleLine);
+
+const url = httpsUrl(2048);
 
 const priceCurrency = v.pipe(
   v.string(),
@@ -52,6 +54,7 @@ const tags = v.pipe(
       v.toLowerCase(),
       v.minLength(1),
       v.maxLength(32),
+      singleLine,
     ),
   ),
   v.maxLength(10),
@@ -65,9 +68,9 @@ export const CreateApiListingSchema = v.object({
   slug: v.optional(slug),
   summary: v.optional(v.nullable(summary)),
   description: v.optional(v.nullable(description)),
-  url: v.optional(v.nullable(httpsUrl)),
+  url: v.optional(v.nullable(url)),
   method: v.optional(HttpMethodSchema, "GET"),
-  docsUrl: v.optional(v.nullable(httpsUrl)),
+  docsUrl: v.optional(v.nullable(url)),
   category: v.optional(v.nullable(category)),
   tags: v.optional(tags, []),
   priceLabel: v.optional(v.nullable(priceLabel)),
@@ -77,7 +80,7 @@ export const CreateApiListingSchema = v.object({
   assetAddress: v.optional(v.nullable(address)),
   priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
   priceCurrency: v.optional(v.nullable(priceCurrency)),
-  x402Endpoint: v.optional(v.nullable(httpsUrl)),
+  x402Endpoint: v.optional(v.nullable(url)),
 });
 
 export const UpdateApiListingSchema = v.partial(
@@ -86,9 +89,9 @@ export const UpdateApiListingSchema = v.partial(
     slug,
     summary: v.nullable(summary),
     description: v.nullable(description),
-    url: v.nullable(httpsUrl),
+    url: v.nullable(url),
     method: HttpMethodSchema,
-    docsUrl: v.nullable(httpsUrl),
+    docsUrl: v.nullable(url),
     category: v.nullable(category),
     tags,
     priceLabel: v.nullable(priceLabel),
@@ -98,7 +101,7 @@ export const UpdateApiListingSchema = v.partial(
     assetAddress: v.nullable(address),
     priceAmount: v.nullable(positiveDecimalAmount),
     priceCurrency: v.nullable(priceCurrency),
-    x402Endpoint: v.nullable(httpsUrl),
+    x402Endpoint: v.nullable(url),
   }),
 );
 

@@ -37,6 +37,7 @@ const {
     deleteMany: vi.fn(),
   },
   customerCreditEntry: {
+    aggregate: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
     groupBy: vi.fn(),
@@ -110,6 +111,7 @@ vi.mock("@4mica/db", () => ({
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
             customer,
+            customerCreditEntry,
             customerPaymentIdentity,
           })
         : Promise.all(arg as Promise<unknown>[]),
@@ -337,6 +339,9 @@ describe("customer routes", () => {
     customerCoupon.create.mockResolvedValue(storedCoupon());
     customerCoupon.findFirst.mockResolvedValue(storedCoupon());
     customerCreditEntry.groupBy.mockResolvedValue([]);
+    customerCreditEntry.aggregate.mockResolvedValue({
+      _sum: { amount: decimal("10") },
+    });
     customerCreditEntry.findMany.mockResolvedValue([]);
     customerCreditEntry.create.mockResolvedValue({
       id: CREDIT_ID,
@@ -1385,6 +1390,34 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("refuses a movement that would take the balance below zero", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "ADJUSTMENT", amount: "-12" }),
+      );
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().issues).toEqual([
+        { path: "amount", message: expect.any(String) },
+      ]);
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses negative promotional credit", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PROMOTIONAL", amount: "-1" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("amount");
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("refuses a movement of zero", async () => {
       const instance = await app();
       const response = await instance.inject(
@@ -1584,6 +1617,23 @@ describe("customer routes", () => {
       );
 
       expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses a usage limit the database column cannot hold", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({
+          kind: "PERCENT",
+          code: "HUGE",
+          value: "10",
+          usageLimit: 2_147_483_648,
+        }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("usageLimit");
 
       await instance.close();
     });

@@ -11,6 +11,7 @@ import {
   upsertBusiness as upsertBusinessRequest,
 } from "@api/user";
 import i18n from "@i18n";
+import { toIssueMap, toMessage } from "@utils/http-errors";
 import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import {
@@ -30,32 +31,6 @@ import {
 import actionTypes from "./actionTypes";
 import { selectUser } from "./selector";
 import type { Business, NotificationPlacement, User } from "./type";
-
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  if (!Array.isArray(issues)) {
-    return {};
-  }
-
-  return Object.fromEntries(issues.map((i) => [i.path, i.message]));
-};
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    const body = error.body as { message?: string } | null;
-    return body?.message ?? fallback;
-  }
-  return fallback;
-};
 
 function* placement(): Generator<unknown, NotificationPlacement> {
   const user = (yield select(selectUser)) as User | null;

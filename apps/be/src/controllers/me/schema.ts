@@ -5,10 +5,14 @@ import {
   USERNAME_PATTERN,
   usernameUnavailableReason,
 } from "@4mica/url";
-import { webUrl } from "@controllers/schema-primitives";
+import {
+  email,
+  httpsUrl,
+  phoneNumber,
+  singleLine,
+  webUrl,
+} from "@controllers/schema-primitives";
 import * as v from "valibot";
-
-const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
 
 const usernameFormatPipe = v.pipe(
   v.string(),
@@ -25,6 +29,32 @@ const usernamePipe = v.pipe(
     (value) => usernameUnavailableReason(value) === null,
     "that username is not available",
   ),
+);
+
+const isTimeZone = (value: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const LANGUAGES = ["en", "de", "fr", "es"] as const;
+
+export const DEFAULT_HOMES = [
+  "overview",
+  "balances",
+  "transactions",
+  "payments",
+  "agents",
+] as const;
+
+const requiredUsername = v.pipe(
+  v.nullable(v.string()),
+  v.transform((value) => (value ?? "").trim()),
+  v.minLength(1, "a username is required"),
+  usernamePipe,
 );
 
 export const CheckUsernameSchema = v.object({ username: usernameFormatPipe });
@@ -53,11 +83,17 @@ export const BUSINESS_TYPES = [
 
 export const UpdateProfileSchema = v.partial(
   v.object({
-    name: trimmed(120),
-    username: v.nullable(usernamePipe),
+    name: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(2, "must be at least 2 characters"),
+      v.maxLength(120),
+      singleLine,
+    ),
+    username: requiredUsername,
     bio: nullableText(2000),
     description: nullableText(2000),
-    avatarUrl: v.nullable(webUrl(2048)),
+    avatarUrl: v.nullable(httpsUrl(2048)),
     private: v.boolean(),
     hidden: v.boolean(),
     allowSEOIndexing: v.boolean(),
@@ -78,20 +114,19 @@ export const UpdateProfileSchema = v.partial(
 
 export const UpdateAccountSchema = v.partial(
   v.object({
-    email: v.pipe(v.string(), v.trim(), v.email(), v.maxLength(255)),
-    phoneNumber: v.nullable(
-      v.pipe(
-        v.string(),
-        v.trim(),
-        v.maxLength(20),
-        v.regex(/^\+?[0-9 ()-]{6,20}$/, "must be a valid phone number"),
-      ),
-    ),
+    email: email(255),
+    phoneNumber: v.nullable(phoneNumber),
     theme: v.picklist(["dark", "light", "system"]),
     appTheme: v.picklist(["dark", "light", "system"]),
-    language: v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(10)),
-    timeZone: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
-    defaultHome: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
+    language: v.picklist(LANGUAGES, "is not a supported language"),
+    timeZone: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1),
+      v.maxLength(64),
+      v.check(isTimeZone, "must be an IANA time zone"),
+    ),
+    defaultHome: v.picklist(DEFAULT_HOMES, "is not a page you can land on"),
     privacyMode: v.boolean(),
     completeOnboarding: v.boolean(),
     lastViewed: nullableText(255),
@@ -114,7 +149,12 @@ export const UpdateNotificationsSchema = v.partial(
 
 export const UpsertBusinessSchema = v.partial(
   v.object({
-    legalName: trimmed(255),
+    legalName: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1, "cannot be empty"),
+      v.maxLength(255),
+    ),
     tradingName: nullableText(255),
     businessType: v.nullable(v.picklist(BUSINESS_TYPES)),
     registrationNumber: nullableText(64),
@@ -123,13 +163,8 @@ export const UpsertBusinessSchema = v.partial(
     industry: nullableText(128),
     website: v.nullable(v.union([v.literal(""), webUrl(255)])),
     description: nullableText(2000),
-    supportEmail: v.nullable(
-      v.union([
-        v.literal(""),
-        v.pipe(v.string(), v.trim(), v.email(), v.maxLength(255)),
-      ]),
-    ),
-    supportPhone: nullableText(20),
+    supportEmail: v.nullable(v.union([v.literal(""), email(255)])),
+    supportPhone: v.nullable(v.union([v.literal(""), phoneNumber])),
     addressLine1: nullableText(255),
     addressLine2: nullableText(255),
     city: nullableText(128),

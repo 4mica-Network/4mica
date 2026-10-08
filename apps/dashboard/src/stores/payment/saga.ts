@@ -1,6 +1,6 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/payment";
 import i18n from "@i18n";
+import { toMessage as messageOf } from "@utils/http-errors";
 import { call, put, select, takeLatest } from "redux-saga/effects";
 import {
   fetchPaymentStatsSucceeded,
@@ -15,18 +15,13 @@ import type { PaymentState } from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return t(
-        "store.payment.sessionExpired",
-        "Your session has expired. Refresh the page and sign in again.",
-      );
-    }
-    return (error.body as { message?: string } | null)?.message ?? fallback;
-  }
-  return fallback;
-};
+const toMessage = (error: unknown, fallback: string): string =>
+  messageOf(error, fallback, {
+    sessionExpired: t(
+      "store.payment.sessionExpired",
+      "Your session has expired. Refresh the page and sign in again.",
+    ),
+  });
 
 export function* fetchPayments(): Generator {
   try {

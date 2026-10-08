@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_REDIRECT, safeRedirectPath } from "@/utils/redirect";
+import { DEFAULT_REDIRECT, safeRedirectPath } from "./redirect";
 
 describe("safeRedirectPath", () => {
   it("keeps a same-origin path, including query and hash", () => {

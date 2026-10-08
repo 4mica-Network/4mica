@@ -38,6 +38,8 @@ export const parseUsername = (value: unknown): string | null =>
 export const parseIdOrSlug = (value: unknown): string | null =>
   safeParam(IdOrSlugParamSchema, value);
 
+export const ResourceIdSchema = v.pipe(v.string(), v.uuid());
+
 export const VisibilitySchema = v.picklist([
   "PRIVATE",
   "UNLISTED",

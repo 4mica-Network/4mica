@@ -227,6 +227,24 @@ describe("policy", () => {
     await instance.close();
   });
 
+  it("returns route-schema failures in the same issues envelope", async () => {
+    const instance = await app();
+
+    const response = await instance.inject({
+      method: "PUT",
+      url: `/me/api-listings/${LISTING_ID}/policy`,
+      headers: AUTH,
+      payload: { uptimeTarget: "x".repeat(121) },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "invalid_request",
+      issues: [{ path: "uptimeTarget", message: expect.any(String) }],
+    });
+    await instance.close();
+  });
+
   it("rejects a support email that is not an address", async () => {
     const instance = await app();
 

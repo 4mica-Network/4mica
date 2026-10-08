@@ -29,12 +29,34 @@ import { HTTP_METHODS, VISIBILITY_OPTIONS } from "../apis/constants";
 import {
   type ApiListingValues,
   blankToNull,
+  DESCRIPTION_MAX_LENGTH,
   editApiListingSchema,
   NAME_MAX_LENGTH,
   SUMMARY_MAX_LENGTH,
 } from "../apis/validation";
 
 const NO_WALLET = "__none__";
+
+const DETAILS_FIELDS = [
+  "name",
+  "summary",
+  "description",
+  "category",
+] as const satisfies readonly (keyof ApiListingValues)[];
+
+const PAYMENT_FIELDS = [
+  "walletId",
+  "priceAmount",
+  "priceCurrency",
+  "assetAddress",
+  "method",
+  "url",
+  "docsUrl",
+] as const satisfies readonly (keyof ApiListingValues)[];
+
+const VISIBILITY_FIELDS = [
+  "visibility",
+] as const satisfies readonly (keyof ApiListingValues)[];
 
 export function DetailsForm({ listing }: { listing: ApiListing }) {
   const { t } = useTranslation();
@@ -51,7 +73,8 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
     setValue,
     watch,
     reset,
-    formState: { errors, isDirty },
+    handleSubmit,
+    formState: { errors, dirtyFields },
   } = useForm<ApiListingValues>({
     resolver: zodResolver(editApiListingSchema),
     mode: "onBlur",
@@ -118,32 +141,36 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
 
   const chosenWallet = wallets.find((wallet) => wallet.id === values.walletId);
 
-  const onValid = (data: ApiListingValues) => {
-    dispatch(
-      updateApiListing({
-        id: listing.id,
-        data: {
-          name: data.name.trim(),
-          slug: data.slug || undefined,
-          summary: blankToNull(data.summary),
-          description: blankToNull(data.description),
-          url: blankToNull(data.url),
-          method: data.method,
-          docsUrl: blankToNull(data.docsUrl),
-          x402Endpoint: blankToNull(data.x402Endpoint),
-          category: blankToNull(data.category),
-          tags: data.tags,
-          visibility: data.visibility,
-          walletId:
-            data.walletId === NO_WALLET ? null : blankToNull(data.walletId),
-          assetAddress: blankToNull(data.assetAddress),
-          priceAmount: blankToNull(data.priceAmount),
-          priceCurrency: blankToNull(data.priceCurrency),
-          priceLabel: blankToNull(data.priceLabel),
-        },
-      }),
-    );
-  };
+  const toPayload = (data: ApiListingValues) => ({
+    name: data.name.trim(),
+    summary: blankToNull(data.summary),
+    description: blankToNull(data.description),
+    url: blankToNull(data.url),
+    method: data.method,
+    docsUrl: blankToNull(data.docsUrl),
+    category: blankToNull(data.category),
+    visibility: data.visibility,
+    walletId: data.walletId === NO_WALLET ? null : blankToNull(data.walletId),
+    assetAddress: blankToNull(data.assetAddress),
+    priceAmount: blankToNull(data.priceAmount),
+    priceCurrency: blankToNull(data.priceCurrency),
+  });
+
+  const isCardDirty = (fields: readonly (keyof ApiListingValues)[]) =>
+    fields.some((field) => Boolean(dirtyFields[field]));
+
+  const saveCard =
+    (fields: readonly (keyof ReturnType<typeof toPayload>)[]) =>
+    (data: ApiListingValues) => {
+      const payload = toPayload(data);
+      const changed = Object.fromEntries(
+        fields
+          .filter((field) => dirtyFields[field])
+          .map((field) => [field, payload[field]]),
+      );
+
+      dispatch(updateApiListing({ id: listing.id, data: changed }));
+    };
 
   return (
     <div className="flex flex-col gap-10">
@@ -152,10 +179,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
         title={t("appDetail.details.title")}
       >
         <EditableCard
-          isDirty={isDirty}
+          isDirty={isCardDirty(DETAILS_FIELDS)}
           isSaving={isSaving}
           onReset={() => reset()}
-          onSave={() => onValid(values)}
+          onSave={handleSubmit(saveCard(DETAILS_FIELDS))}
         >
           <div className="flex flex-col divide-y divide-overlay/10">
             <FieldRow
@@ -167,7 +194,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 id="app-name"
                 maxLength={NAME_MAX_LENGTH}
                 onChange={(value) =>
-                  setValue("name", value, { shouldValidate: true })
+                  setValue("name", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 value={values.name}
               />
@@ -182,7 +212,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 id="app-summary"
                 maxLength={SUMMARY_MAX_LENGTH}
                 onChange={(value) =>
-                  setValue("summary", value, { shouldValidate: true })
+                  setValue("summary", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 value={values.summary ?? ""}
               />
@@ -196,8 +229,12 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 error={fieldError("description")}
                 id="app-description"
                 onChange={(value) =>
-                  setValue("description", value, { shouldValidate: true })
+                  setValue("description", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
+                maxLength={DESCRIPTION_MAX_LENGTH}
                 rows={4}
                 value={values.description ?? ""}
               />
@@ -211,7 +248,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 error={fieldError("category")}
                 id="app-category"
                 onChange={(value) =>
-                  setValue("category", value, { shouldValidate: true })
+                  setValue("category", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 value={values.category ?? ""}
               />
@@ -225,10 +265,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
         title={t("appDetail.payment.title")}
       >
         <EditableCard
-          isDirty={isDirty}
+          isDirty={isCardDirty(PAYMENT_FIELDS)}
           isSaving={isSaving}
           onReset={() => reset()}
-          onSave={() => onValid(values)}
+          onSave={handleSubmit(saveCard(PAYMENT_FIELDS))}
         >
           <div className="flex flex-col divide-y divide-overlay/10">
             <FieldRow
@@ -241,6 +281,7 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 id="app-wallet"
                 onChange={(value) =>
                   setValue("walletId", value === NO_WALLET ? "" : value, {
+                    shouldDirty: true,
                     shouldValidate: true,
                   })
                 }
@@ -269,7 +310,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                     error={fieldError("priceAmount")}
                     id="app-price"
                     onChange={(value) =>
-                      setValue("priceAmount", value, { shouldValidate: true })
+                      setValue("priceAmount", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
                     }
                     placeholder="0.01"
                     value={values.priceAmount ?? ""}
@@ -282,7 +326,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                     id="app-currency"
                     maxLength={16}
                     onChange={(value) =>
-                      setValue("priceCurrency", value, { shouldValidate: true })
+                      setValue("priceCurrency", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
                     }
                     placeholder="USD"
                     value={values.priceCurrency ?? ""}
@@ -299,7 +346,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 error={fieldError("assetAddress")}
                 id="app-asset"
                 onChange={(value) =>
-                  setValue("assetAddress", value, { shouldValidate: true })
+                  setValue("assetAddress", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 value={values.assetAddress ?? ""}
               />
@@ -314,6 +364,7 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 id="app-method"
                 onChange={(value) =>
                   setValue("method", value as ApiListingValues["method"], {
+                    shouldDirty: true,
                     shouldValidate: true,
                   })
                 }
@@ -330,7 +381,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 error={fieldError("url")}
                 id="app-url"
                 onChange={(value) =>
-                  setValue("url", value, { shouldValidate: true })
+                  setValue("url", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 placeholder="https://api.example.com/v1/limits"
                 value={values.url ?? ""}
@@ -345,7 +399,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 error={fieldError("docsUrl")}
                 id="app-docs-url"
                 onChange={(value) =>
-                  setValue("docsUrl", value, { shouldValidate: true })
+                  setValue("docsUrl", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
                 }
                 value={values.docsUrl ?? ""}
               />
@@ -359,10 +416,10 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
         title={t("appDetail.visibility.title")}
       >
         <EditableCard
-          isDirty={isDirty}
+          isDirty={isCardDirty(VISIBILITY_FIELDS)}
           isSaving={isSaving}
           onReset={() => reset()}
-          onSave={() => onValid(values)}
+          onSave={handleSubmit(saveCard(VISIBILITY_FIELDS))}
         >
           <FieldRow
             htmlFor="app-visibility"
@@ -375,7 +432,7 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
                 setValue(
                   "visibility",
                   value as ApiListingValues["visibility"],
-                  { shouldValidate: true },
+                  { shouldDirty: true, shouldValidate: true },
                 )
               }
               options={VISIBILITY_OPTIONS.map((option) => ({

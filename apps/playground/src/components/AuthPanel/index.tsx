@@ -1,13 +1,13 @@
 "use client";
 
 import { Button, Spinner } from "@4mica/ui";
+import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { messages } from "@/i18n";
-import { safeRedirectPath } from "@/utils/redirect";
 
 export type AuthMode = "signIn" | "signUp";
 

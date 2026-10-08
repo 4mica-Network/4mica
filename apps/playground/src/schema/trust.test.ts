@@ -74,6 +74,17 @@ describe("FileReportSchema", () => {
 
     expect(result.success && result.output.detail).toBeNull();
   });
+
+  it("requires a detail when the reason is OTHER", () => {
+    const missing = parse(FileReportSchema, { reason: "OTHER", detail: "  " });
+
+    expect(missing.success).toBe(false);
+    expect(!missing.success && v.getDotPath(missing.issues[0])).toBe("detail");
+    expect(
+      parse(FileReportSchema, { reason: "OTHER", detail: "Charges twice" })
+        .success,
+    ).toBe(true);
+  });
 });
 
 describe("ResourceRefSchema", () => {

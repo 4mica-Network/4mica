@@ -7,6 +7,7 @@ import {
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
+import { hasErrors, isEmail, isPhoneNumber } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
@@ -82,6 +83,23 @@ export function AccountSettings() {
 
   const contact = useDraft(contactInitial);
 
+  const emailValue = contact.draft.email.trim();
+  const phoneValue = contact.draft.phoneNumber.trim();
+  const contactErrors = {
+    email:
+      emailValue === ""
+        ? t("validation.required")
+        : emailValue.length > 255
+          ? t("validation.tooLong", { max: 255 })
+          : !isEmail(emailValue)
+            ? t("validation.email")
+            : undefined,
+    phoneNumber:
+      phoneValue === "" || isPhoneNumber(phoneValue)
+        ? undefined
+        : t("validation.phone"),
+  };
+
   const set = (key: string, value: string | boolean, section = key) =>
     dispatch(updateAccount({ [key]: value }, section));
 
@@ -89,13 +107,15 @@ export function AccountSettings() {
     dispatch(
       updateAccount(
         {
-          ...contact.changes,
+          ...(contact.changes.email !== undefined
+            ? { email: contact.changes.email.trim().toLowerCase() }
+            : {}),
           ...(contact.changes.phoneNumber !== undefined
             ? {
                 phoneNumber:
-                  contact.changes.phoneNumber === ""
+                  contact.changes.phoneNumber.trim() === ""
                     ? null
-                    : contact.changes.phoneNumber,
+                    : contact.changes.phoneNumber.trim(),
               }
             : {}),
         },
@@ -118,6 +138,7 @@ export function AccountSettings() {
       >
         <EditableCard
           isDirty={contact.isDirty}
+          isInvalid={hasErrors(contactErrors)}
           isSaving={savingContact}
           onSave={saveContact}
           onReset={contact.reset}
@@ -140,7 +161,8 @@ export function AccountSettings() {
               id="account-email"
               type="email"
               value={contact.draft.email}
-              error={issues.email}
+              error={contactErrors.email ?? issues.email}
+              maxLength={255}
               onChange={(v) => contact.set("email", v)}
             />
             {user.pendingEmail ? (
@@ -178,7 +200,8 @@ export function AccountSettings() {
               id="account-phone"
               value={contact.draft.phoneNumber}
               placeholder="+1 555 000 1234"
-              error={issues.phoneNumber}
+              error={contactErrors.phoneNumber ?? issues.phoneNumber}
+              maxLength={20}
               onChange={(v) => contact.set("phoneNumber", v)}
             />
           </FieldRow>
