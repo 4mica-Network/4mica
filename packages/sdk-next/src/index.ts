@@ -5,6 +5,7 @@ import type {
 } from "@4mica/sdk/server";
 import { createPaywall } from "@4mica/sdk/server";
 
+export * from "@4mica/sdk/app";
 export type { PaywallConfig, PaywallGuarantee, PaywallVerifier };
 
 export type RouteHandler = (

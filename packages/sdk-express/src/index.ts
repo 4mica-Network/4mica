@@ -6,6 +6,7 @@ import type {
 import { createPaywall } from "@4mica/sdk/server";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
+export * from "@4mica/sdk/app";
 export type { PaywallConfig, PaywallGuarantee, PaywallVerifier };
 
 export function paywall(

@@ -6,6 +6,7 @@ import type {
 import { createPaywall } from "@4mica/sdk/server";
 import type { MiddlewareHandler } from "hono";
 
+export * from "@4mica/sdk/app";
 export type { PaywallConfig, PaywallGuarantee, PaywallVerifier };
 
 declare module "hono" {

@@ -1009,107 +1009,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.8(@types/node@25.9.1)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  examples/example-agent-comedian:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      '@anthropic-ai/sdk':
-        specifier: ^0.110.0
-        version: 0.110.0(zod@4.4.3)
-      express:
-        specifier: 'catalog:'
-        version: 5.2.1
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/express':
-        specifier: 'catalog:'
-        version: 5.0.6
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-agent-critic:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      '@anthropic-ai/sdk':
-        specifier: ^0.110.0
-        version: 0.110.0(zod@4.4.3)
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-buyer-express:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-buyer-hono:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-buyer-live:
+  examples/example-buyer:
     dependencies:
       '@4mica/sdk':
         specifier: workspace:*
@@ -1120,28 +1020,6 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-buyer-next:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
     devDependencies:
       '@4mica/tsconfig':
         specifier: workspace:*
@@ -1167,6 +1045,9 @@ importers:
       '@4mica/sdk-node':
         specifier: workspace:*
         version: link:../../packages/sdk-node
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
       express:
         specifier: 'catalog:'
         version: 5.2.1
@@ -1201,6 +1082,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.14(hono@4.12.27)
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
       hono:
         specifier: 'catalog:'
         version: 4.12.27
@@ -1208,40 +1092,6 @@ importers:
       '@4mica/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-seller-live:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-express':
-        specifier: workspace:*
-        version: link:../../packages/sdk-express
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      dotenv:
-        specifier: 'catalog:'
-        version: 17.4.2
-      express:
-        specifier: 'catalog:'
-        version: 5.2.1
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/express':
-        specifier: 'catalog:'
-        version: 5.0.6
       '@types/node':
         specifier: catalog:node24
         version: 24.12.4
@@ -1814,15 +1664,6 @@ packages:
     resolution: {integrity: sha512-3VuAbPjgY52rQNn4wABaXMhBU2Oq91uy6L8nX49eJ35OLI68CyckGU+HZxcaHix4ymuGM2nFL1D6sLpgODK5xw==}
     engines: {node: '>=20.19.0'}
     hasBin: true
-
-  '@anthropic-ai/sdk@0.110.0':
-    resolution: {integrity: sha512-hOP4bNYXDFHDxxiEgzlILXrxZIYCDnhe8sry0RDRKD/QnsEpvZcQpablCdm9X/WuD/YgOiSIkkqsL1mLLlTqJw==}
-    hasBin: true
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
-    peerDependenciesMeta:
-      zod:
-        optional: true
 
   '@arethetypeswrong/cli@0.18.4':
     resolution: {integrity: sha512-kNWo6LTzGAuLYPpJ7Sgo63whSUeeSuKMlYx6IBgzs4ONEG807gW4hSSENvpeCHzO2H2wIzG5EFl0OKBbqGBAyA==}
@@ -8556,10 +8397,6 @@ packages:
     resolution: {integrity: sha512-HqMnbz0tz2DaEJ3ntsqtx3ezzZyDE7G56A/pPY/NGmrPu76UzsWquOpHFRAf5beTNXoH2LU5cQePVvRli1nchA==}
     engines: {node: '>=20'}
 
-  json-schema-to-ts@3.1.1:
-    resolution: {integrity: sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==}
-    engines: {node: '>=16'}
-
   json-schema-traverse@1.0.0:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
@@ -10748,9 +10585,6 @@ packages:
   trough@2.2.0:
     resolution: {integrity: sha512-tmMpK00BjZiUyVyvrBK7knerNgmgvcV/KLVyuma/SC+TQN167GrMRciANTz09+k3zW8L8t60jWO1GpfkZdjTaw==}
 
-  ts-algebra@2.0.0:
-    resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
-
   ts-dedent@2.3.0:
     resolution: {integrity: sha512-JfJeIHke7y2egdGGgRAvpCwYFUsHlM2gPcrVOxFkznt/4uzQ7HFmvE63iFHVLBJNDuyDOQgijDK/tXH/f6Msjg==}
     engines: {node: '>=6.10'}
@@ -11572,13 +11406,6 @@ snapshots:
       package-manager-detector: 1.6.0
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
-
-  '@anthropic-ai/sdk@0.110.0(zod@4.4.3)':
-    dependencies:
-      json-schema-to-ts: 3.1.1
-      standardwebhooks: 1.0.0
-    optionalDependencies:
-      zod: 4.4.3
 
   '@arethetypeswrong/cli@0.18.4':
     dependencies:
@@ -19491,11 +19318,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  json-schema-to-ts@3.1.1:
-    dependencies:
-      '@babel/runtime': 7.29.7
-      ts-algebra: 2.0.0
-
   json-schema-traverse@1.0.0: {}
 
   json-schema-typed@8.0.2: {}
@@ -22209,8 +22031,6 @@ snapshots:
   triple-beam@1.4.1: {}
 
   trough@2.2.0: {}
-
-  ts-algebra@2.0.0: {}
 
   ts-dedent@2.3.0: {}
 

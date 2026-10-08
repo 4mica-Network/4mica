@@ -9,6 +9,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     server: "src/server/index.ts",
+    app: "src/app/index.ts",
   },
   outDir: "dist",
   format: ["esm", "cjs"],

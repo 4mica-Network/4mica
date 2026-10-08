@@ -1,20 +1,16 @@
 {
-  "name": "@4mica/example-seller-hono",
+  "name": "@4mica/example-buyer",
   "version": "0.0.1-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Seller: a Hono route priced from your 4Mica listing and paid over x402",
+  "description": "Buyer (payer): pay for a seller's paywalled route over x402",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts"
+    "start": "tsx src/buyer.ts"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",
-    "@4mica/sdk-hono": "workspace:*",
     "@4mica/sdk-node": "workspace:*",
-    "@hono/node-server": "^1.13.0",
-    "dotenv": "catalog:",
-    "hono": "catalog:"
+    "dotenv": "catalog:"
   },
   "devDependencies": {
     "@4mica/tsconfig": "workspace:*",
