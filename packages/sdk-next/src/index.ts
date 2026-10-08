@@ -7,28 +7,11 @@ import { createPaywall } from "@4mica/sdk/server";
 
 export type { PaywallConfig, PaywallGuarantee, PaywallVerifier };
 
-/**
- * A Next.js App Router route handler. `NextRequest` extends the Web `Request`
- * and `NextResponse` extends `Response`, so these helpers are Web-standard and
- * edge-safe — no `next` import required.
- */
 export type RouteHandler = (
   request: Request,
   context?: unknown,
 ) => Response | Promise<Response>;
 
-/**
- * Wrap an App Router route handler so it is gated behind a 4Mica x402 payment.
- *
- * When no valid `X-PAYMENT` header is present, returns a `402` with the x402
- * payment requirements. Otherwise verifies the payment, runs `handler`, and
- * merges the `X-PAYMENT-RESPONSE` header onto its response.
- *
- * @example
- * ```ts
- * export const GET = withPaywall(async () => Response.json({ ok: true }), client.rpc, config);
- * ```
- */
 export function withPaywall(
   handler: RouteHandler,
   verifier: PaywallVerifier,
@@ -48,20 +31,6 @@ export function withPaywall(
   };
 }
 
-/**
- * Build a `middleware.ts` handler that gates matched routes behind a payment.
- *
- * Returns a `402` `Response` when payment is required/invalid, or `undefined`
- * to let the request continue. Edge-safe — usable without `export const runtime
- * = "nodejs"` (Node runtime remains a supported fallback).
- *
- * @example
- * ```ts
- * // middleware.ts
- * const gate = paywallMiddleware(client.rpc, config);
- * export async function middleware(req: Request) { return (await gate(req)) ?? NextResponse.next(); }
- * ```
- */
 export function paywallMiddleware(
   verifier: PaywallVerifier,
   config: PaywallConfig,
