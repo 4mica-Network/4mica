@@ -360,3 +360,38 @@ describe("the whole chain", () => {
     expect(result.payable).toBe("0.046669");
   });
 });
+
+describe("spend limits", () => {
+  it("refuses a payment that would pass the daily limit", () => {
+    expect(
+      price({ amount: "3", dailyLimit: "10", dailySpent: "8" }),
+    ).toMatchObject({ allowed: false, deniedReason: "daily_limit_exceeded" });
+  });
+
+  it("allows a payment that lands exactly on the daily limit", () => {
+    expect(
+      price({ amount: "2", dailyLimit: "10", dailySpent: "8" }).allowed,
+    ).toBe(true);
+  });
+
+  it("refuses a payment that would pass the monthly limit", () => {
+    expect(
+      price({ amount: "1", monthlyLimit: "100", monthlySpent: "100" }),
+    ).toMatchObject({ allowed: false, deniedReason: "monthly_limit_exceeded" });
+  });
+
+  it("measures the limit against what is payable after credit", () => {
+    expect(
+      price({
+        amount: "5",
+        creditBalance: "4",
+        dailyLimit: "10",
+        dailySpent: "9",
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it("ignores limits that are not set", () => {
+    expect(price({ amount: "1000", dailySpent: "1000000" }).allowed).toBe(true);
+  });
+});

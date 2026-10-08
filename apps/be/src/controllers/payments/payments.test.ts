@@ -14,7 +14,9 @@ const {
   apiKey,
   apiListing,
   agent,
+  redeemPaymentBenefits,
 } = vi.hoisted(() => ({
+  redeemPaymentBenefits: vi.fn(),
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -32,6 +34,11 @@ const {
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
   apiListing: { findFirst: vi.fn() },
   agent: { findFirst: vi.fn() },
+}));
+
+vi.mock("@controllers/customers/repository", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  redeemPaymentBenefits,
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -125,13 +132,16 @@ const storedPayment = (over: Record<string, unknown> = {}) => ({
   recipientAddress: MY_ADDRESS,
   network: "BASE_SEPOLIA",
   assetAddress: null,
-  amount: { toString: () => "0.010000000000000000" },
+  amount: { toFixed: () => "0.010000000000000000" },
   status: "SETTLED",
   failureReason: null,
   reqId: "0xabc",
   txHash: null,
   resource: null,
   description: null,
+  couponCode: null,
+  creditApplied: null,
+  redeemedAt: null,
   settledAt: new Date("2026-09-21T00:00:00.000Z"),
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -148,7 +158,7 @@ const existingPayment = (over: Record<string, unknown> = {}) => ({
   recipientAddress: MY_ADDRESS,
   network: "BASE_SEPOLIA",
   assetAddress: null,
-  amount: { toString: () => "0.010000000000000000" },
+  amount: { toFixed: () => "0.010000000000000000" },
   listingId: null,
   agentId: null,
   failureReason: null,
@@ -198,6 +208,9 @@ describe("payment routes", () => {
 
     apiKey.findUnique.mockResolvedValue(storedKey());
     apiKey.update.mockResolvedValue({});
+
+    redeemPaymentBenefits.mockReset();
+    redeemPaymentBenefits.mockResolvedValue(null);
   });
 
   describe("session-authenticated reads", () => {
@@ -600,6 +613,125 @@ describe("payment routes", () => {
       });
 
       expect(res.statusCode).toBe(200);
+
+      await instance.close();
+    });
+
+    it("records the coupon and credit the paywall applied", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ couponCode: "welcome10", creditApplied: "4" }),
+      });
+
+      expect(payment.create.mock.calls[0][0].data).toMatchObject({
+        couponCode: "WELCOME10",
+        creditApplied: "4",
+      });
+
+      await instance.close();
+    });
+
+    it("rejects a malformed coupon code or credit amount", async () => {
+      const instance = await app();
+
+      for (const over of [
+        { couponCode: "no spaces" },
+        { creditApplied: "0" },
+      ]) {
+        const res = await instance.inject({
+          method: "POST",
+          url: "/v1/payments",
+          headers: KEY_AUTH,
+          payload: validReport(over),
+        });
+        expect(res.statusCode, JSON.stringify(over)).toBe(400);
+      }
+
+      await instance.close();
+    });
+
+    it("redeems once the settled payment carries a coupon or credit", async () => {
+      payment.create.mockResolvedValue(
+        storedPayment({ couponCode: "WELCOME10" }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ couponCode: "WELCOME10" }),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(redeemPaymentBenefits).toHaveBeenCalledWith(OWNER_ID, PAYMENT_ID);
+      expect(res.json()).not.toHaveProperty("couponCode");
+
+      await instance.close();
+    });
+
+    it("skips redemption while the payment is pending or already redeemed", async () => {
+      const instance = await app();
+
+      for (const over of [
+        { status: "PENDING", couponCode: "WELCOME10" },
+        { couponCode: "WELCOME10", redeemedAt: new Date() },
+        {},
+      ]) {
+        payment.create.mockResolvedValueOnce(storedPayment(over));
+        await instance.inject({
+          method: "POST",
+          url: "/v1/payments",
+          headers: KEY_AUTH,
+          payload: validReport({ reqId: "0xabc124" }),
+        });
+      }
+
+      expect(redeemPaymentBenefits).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("still records the payment when redemption fails", async () => {
+      payment.create.mockResolvedValue(
+        storedPayment({ creditApplied: { toFixed: () => "4" } }),
+      );
+      redeemPaymentBenefits.mockRejectedValue(new Error("serialization"));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ creditApplied: "4" }),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(redeemPaymentBenefits).toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("matches a tiny stored amount that Decimal would print as 1e-8", async () => {
+      const tiny = { toFixed: () => "0.00000001", toString: () => "1e-8" };
+      payment.findUnique
+        .mockResolvedValueOnce(existingPayment({ amount: tiny }))
+        .mockResolvedValueOnce(storedPayment({ amount: tiny }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ amount: "0.00000001" }),
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().amount).toBe("0.00000001");
 
       await instance.close();
     });

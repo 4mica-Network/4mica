@@ -606,6 +606,47 @@ describe("wallet routes", () => {
       await app.close();
     });
 
+    it("takes public listings and agents private when a wallet stops receiving", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+
+      for (const payload of [{ status: "PAUSED" }, { role: "PAYER" }]) {
+        apiListing.updateMany.mockClear();
+        agent.updateMany.mockClear();
+
+        await app.inject({
+          method: "PATCH",
+          url: `/me/wallets/${WALLET_ID}`,
+          headers: AUTH,
+          payload,
+        });
+
+        const hidden = {
+          where: {
+            ownerId: USER_ID,
+            walletId: WALLET_ID,
+            visibility: "PUBLIC",
+          },
+          data: { visibility: "PRIVATE" },
+        };
+        expect(apiListing.updateMany).toHaveBeenCalledWith(hidden);
+        expect(agent.updateMany).toHaveBeenCalledWith(hidden);
+      }
+      await app.close();
+    });
+
+    it("leaves listings alone when a wallet can still receive", async () => {
+      const app = await initApp([{ plugin: walletRoutes }]);
+      await app.inject({
+        method: "PATCH",
+        url: `/me/wallets/${WALLET_ID}`,
+        headers: AUTH,
+        payload: { label: "Renamed" },
+      });
+
+      expect(apiListing.updateMany).not.toHaveBeenCalled();
+      await app.close();
+    });
+
     it("clears the old default before setting the new one", async () => {
       const app = await initApp([{ plugin: walletRoutes }]);
       await app.inject({

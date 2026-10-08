@@ -1,6 +1,7 @@
 import {
   address,
   batchDeleteSchema,
+  couponCode,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
   email as emailAddress,
@@ -262,15 +263,6 @@ export const GrantCustomerCreditSchema = v.pipe(
 );
 
 export const CustomerCouponKindSchema = v.picklist(["PERCENT", "FIXED"]);
-
-const couponCode = v.pipe(
-  v.string(),
-  v.trim(),
-  v.toUpperCase(),
-  v.minLength(1),
-  v.maxLength(64),
-  v.regex(/^[A-Z0-9][A-Z0-9_-]*$/, "may use letters, numbers, - and _"),
-);
 
 export const CreateCustomerCouponSchema = v.variant("kind", [
   v.object({

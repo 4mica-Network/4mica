@@ -5,7 +5,10 @@ import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyInstance } from "fastify";
 import { loadUser } from "./auth/user-store";
 import { config, productionWarnings } from "./config/index";
-import { startOnboardingDrip } from "./jobs/onboarding/index";
+import {
+  startOnboardingDrip,
+  stopOnboardingDrip,
+} from "./jobs/onboarding/index";
 import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { genReqId, installHttpHardening } from "./plugins/http-hardening";
@@ -74,6 +77,8 @@ export const initApp = async (
   });
 
   app.decorate("email", getEmailClient());
+
+  app.addHook("onClose", stopOnboardingDrip);
 
   app.addHook("onClose", async () => {
     const { disconnect } = await import("@4mica/db");

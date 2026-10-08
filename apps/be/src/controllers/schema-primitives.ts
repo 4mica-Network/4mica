@@ -106,6 +106,15 @@ export const decimalAmount = v.pipe(
   ),
 );
 
+export const couponCode = v.pipe(
+  v.string(),
+  v.trim(),
+  v.toUpperCase(),
+  v.minLength(1),
+  v.maxLength(64),
+  v.regex(/^[A-Z0-9][A-Z0-9_-]*$/, "may use letters, numbers, - and _"),
+);
+
 export const positiveDecimalAmount = v.pipe(
   decimalAmount,
   v.check((value) => Number(value) > 0, "must be greater than zero"),

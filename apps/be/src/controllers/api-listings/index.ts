@@ -199,6 +199,12 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
     if (!payToAfter) {
       return notPayable(reply);
     }
+    if (walletId === undefined && current.walletId) {
+      const resolved = await resolveSellerWallet(userId, current.walletId);
+      if (!resolved.ok) {
+        return sellerWalletError(reply, resolved);
+      }
+    }
     data.publishedAt = current.publishedAt ?? new Date();
   } else if (
     next.visibility === undefined &&
@@ -243,6 +249,13 @@ export const publishApiListingHandler: RouteHandler = async (
 
   if (!current.payToAddress || !current.network) {
     return notPayable(reply);
+  }
+
+  if (current.walletId) {
+    const resolved = await resolveSellerWallet(userId, current.walletId);
+    if (!resolved.ok) {
+      return sellerWalletError(reply, resolved);
+    }
   }
 
   const updated = await updateApiListing(userId, id, {

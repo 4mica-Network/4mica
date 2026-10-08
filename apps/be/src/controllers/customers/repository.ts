@@ -1,5 +1,6 @@
 import { type CustomerQuotaPeriod, Prisma, prisma } from "@4mica/db";
 import { walletAddressesFor } from "@controllers/payments/repository";
+import { amountText, optionalAmountText } from "@utils/amount";
 import type {
   CreateCustomerCouponInput,
   CreateCustomerInput,
@@ -147,13 +148,13 @@ const toRow = (
 
   return {
     ...rest,
-    dailyLimit: dailyLimit?.toString() ?? null,
-    monthlyLimit: monthlyLimit?.toString() ?? null,
-    freeQuota: freeQuota?.toString() ?? null,
-    discountPercent: discountPercent?.toString() ?? null,
-    discountFixed: discountFixed?.toString() ?? null,
-    minPaymentAmount: minPaymentAmount?.toString() ?? null,
-    approvalThreshold: approvalThreshold?.toString() ?? null,
+    dailyLimit: optionalAmountText(dailyLimit),
+    monthlyLimit: optionalAmountText(monthlyLimit),
+    freeQuota: optionalAmountText(freeQuota),
+    discountPercent: optionalAmountText(discountPercent),
+    discountFixed: optionalAmountText(discountFixed),
+    minPaymentAmount: optionalAmountText(minPaymentAmount),
+    approvalThreshold: optionalAmountText(approvalThreshold),
     suspendedUntil: suspendedUntil?.toISOString() ?? null,
     quotaResetAt: quotaResetAt?.toISOString() ?? null,
     identities: identities.map(toIdentityRow),
@@ -353,14 +354,14 @@ const spendFor = async (
       entry.totalSpend.push({
         network: row.network,
         assetAddress: row.asset_address,
-        amount: row.total_amount.toString(),
+        amount: amountText(row.total_amount),
       });
     }
     if (row.recent_amount !== null) {
       entry.recentSpend.push({
         network: row.network,
         assetAddress: row.asset_address,
-        amount: row.recent_amount.toString(),
+        amount: amountText(row.recent_amount),
       });
     }
   }
@@ -438,11 +439,8 @@ const quotaUsageFor = async (
   const remaining = customer.freeQuota.minus(used);
 
   return {
-    used: used.toString(),
-    remaining: (remaining.isNegative()
-      ? new Prisma.Decimal(0)
-      : remaining
-    ).toString(),
+    used: amountText(used),
+    remaining: amountText(remaining.isNegative() ? 0 : remaining),
   };
 };
 
@@ -714,8 +712,9 @@ const ZERO = "0";
 export const creditBalance = async (
   ownerId: string,
   customerId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<CreditBalance> => {
-  const rows = await prisma.customerCreditEntry.groupBy({
+  const rows = await db.customerCreditEntry.groupBy({
     by: ["kind"],
     where: { ownerId, customerId },
     _sum: { amount: true },
@@ -731,9 +730,9 @@ export const creditBalance = async (
   );
 
   return {
-    total: total.toString(),
-    promotional: (byKind.get("PROMOTIONAL") ?? ZERO).toString(),
-    prepaid: (byKind.get("PREPAID") ?? ZERO).toString(),
+    total: amountText(total),
+    promotional: amountText(byKind.get("PROMOTIONAL") ?? ZERO),
+    prepaid: amountText(byKind.get("PREPAID") ?? ZERO),
   };
 };
 
@@ -758,7 +757,7 @@ export const listCreditEntries = async (
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
-    amount: row.amount.toString(),
+    amount: amountText(row.amount),
     reason: row.reason,
     createdAt: row.createdAt.toISOString(),
   }));
@@ -810,7 +809,7 @@ export const grantCredit = async (
   return {
     id: row.id,
     kind: row.kind,
-    amount: row.amount.toString(),
+    amount: amountText(row.amount),
     reason: row.reason,
     createdAt: row.createdAt.toISOString(),
   };
@@ -821,19 +820,24 @@ export const zeroCredit = async (
   customerId: string,
   reason: string | null,
 ): Promise<CreditBalance> => {
-  const balance = await creditBalance(ownerId, customerId);
+  await prisma.$transaction(
+    async (tx) => {
+      const balance = await creditBalance(ownerId, customerId, tx);
 
-  if (Number(balance.total) !== 0) {
-    await prisma.customerCreditEntry.create({
-      data: {
-        ownerId,
-        customerId,
-        kind: "ADJUSTMENT",
-        amount: new Prisma.Decimal(balance.total).negated(),
-        reason,
-      },
-    });
-  }
+      if (Number(balance.total) !== 0) {
+        await tx.customerCreditEntry.create({
+          data: {
+            ownerId,
+            customerId,
+            kind: "ADJUSTMENT",
+            amount: new Prisma.Decimal(balance.total).negated(),
+            reason,
+          },
+        });
+      }
+    },
+    { isolationLevel: "Serializable" },
+  );
 
   return creditBalance(ownerId, customerId);
 };
@@ -885,7 +889,7 @@ const couponUnusableReason = (
 
 const toCouponRow = (row: RawCoupon): CustomerCouponRow => ({
   ...row,
-  value: row.value.toString(),
+  value: amountText(row.value),
   expiresAt: row.expiresAt?.toISOString() ?? null,
   revokedAt: row.revokedAt?.toISOString() ?? null,
   createdAt: row.createdAt.toISOString(),
@@ -984,8 +988,9 @@ export const resolveCustomerForPayer = async (
   network: string,
   address: string,
   at = new Date(),
+  db: Prisma.TransactionClient = prisma,
 ): Promise<ResolvedPayer | null> => {
-  const identity = await prisma.customerPaymentIdentity.findFirst({
+  const identity = await db.customerPaymentIdentity.findFirst({
     where: {
       ownerId,
       type: "WALLET",
@@ -1013,6 +1018,126 @@ export const resolveCustomerForPayer = async (
   };
 };
 
+export interface Redemption {
+  paymentId: string;
+  customerId: string | null;
+  couponCode: string | null;
+  couponRedeemed: boolean;
+  creditRequested: string | null;
+  creditDrawn: string;
+}
+
+export const redeemPaymentBenefits = async (
+  ownerId: string,
+  paymentId: string,
+  now = new Date(),
+): Promise<Redemption | null> =>
+  prisma.$transaction(
+    async (tx) => {
+      const { count } = await tx.payment.updateMany({
+        where: {
+          id: paymentId,
+          ownerId,
+          status: "SETTLED",
+          redeemedAt: null,
+          OR: [{ couponCode: { not: null } }, { creditApplied: { not: null } }],
+        },
+        data: { redeemedAt: now },
+      });
+
+      if (count === 0) {
+        return null;
+      }
+
+      const payment = await tx.payment.findUniqueOrThrow({
+        where: { id: paymentId },
+        select: {
+          reqId: true,
+          payerAddress: true,
+          network: true,
+          couponCode: true,
+          creditApplied: true,
+          createdAt: true,
+        },
+      });
+
+      const redemption: Redemption = {
+        paymentId,
+        customerId: null,
+        couponCode: payment.couponCode,
+        couponRedeemed: false,
+        creditRequested: optionalAmountText(payment.creditApplied),
+        creditDrawn: "0",
+      };
+
+      const resolved = await resolveCustomerForPayer(
+        ownerId,
+        payment.network,
+        payment.payerAddress,
+        payment.createdAt,
+        tx,
+      );
+
+      if (!resolved) {
+        return redemption;
+      }
+
+      const customerId = resolved.customer.id;
+      redemption.customerId = customerId;
+
+      if (payment.couponCode) {
+        const redeemed = await tx.customerCoupon.updateMany({
+          where: {
+            ownerId,
+            customerId,
+            code: payment.couponCode,
+            revokedAt: null,
+            AND: [
+              { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+              {
+                OR: [
+                  { usageLimit: null },
+                  {
+                    timesRedeemed: {
+                      lt: prisma.customerCoupon.fields.usageLimit,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          data: { timesRedeemed: { increment: 1 } },
+        });
+        redemption.couponRedeemed = redeemed.count > 0;
+      }
+
+      if (payment.creditApplied?.greaterThan(0)) {
+        const { _sum } = await tx.customerCreditEntry.aggregate({
+          where: { ownerId, customerId },
+          _sum: { amount: true },
+        });
+        const balance = _sum.amount ?? new Prisma.Decimal(0);
+        const drawn = Prisma.Decimal.min(payment.creditApplied, balance);
+
+        if (drawn.greaterThan(0)) {
+          await tx.customerCreditEntry.create({
+            data: {
+              ownerId,
+              customerId,
+              kind: "ADJUSTMENT",
+              amount: drawn.negated(),
+              reason: `payment ${payment.reqId}`,
+            },
+          });
+          redemption.creditDrawn = amountText(drawn);
+        }
+      }
+
+      return redemption;
+    },
+    { isolationLevel: "Serializable" },
+  );
+
 export const findCouponByCode = async (
   ownerId: string,
   customerId: string,
@@ -1024,6 +1149,53 @@ export const findCouponByCode = async (
   });
 
   return row ? toCouponRow(row) : null;
+};
+
+export interface SpendLimitUsage {
+  dailySpent: string | null;
+  monthlySpent: string | null;
+}
+
+export const spendLimitUsageFor = async (
+  ownerId: string,
+  customer: Pick<RawCustomer, "dailyLimit" | "monthlyLimit"> & { id: string },
+  now = new Date(),
+): Promise<SpendLimitUsage> => {
+  if (!customer.dailyLimit && !customer.monthlyLimit) {
+    return { dailySpent: null, monthlySpent: null };
+  }
+
+  const addresses = await walletAddressesFor(ownerId);
+
+  if (addresses.length === 0) {
+    return { dailySpent: "0", monthlySpent: "0" };
+  }
+
+  const dayStart = quotaWindowStart("DAY", null, now) as Date;
+  const monthStart = quotaWindowStart("MONTH", null, now) as Date;
+  const matched = matchedPayments(
+    ownerId,
+    Prisma.join(addresses),
+    Prisma.join([customer.id]),
+  );
+
+  const rows = await prisma.$queryRaw<
+    {
+      daily_spent: Prisma.Decimal | null;
+      monthly_spent: Prisma.Decimal | null;
+    }[]
+  >`
+    WITH matched AS (${matched})
+    SELECT COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${dayStart}), 0) AS daily_spent,
+           COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${monthStart}), 0) AS monthly_spent
+      FROM matched m
+     WHERE m.status <> 'FAILED'
+  `;
+
+  return {
+    dailySpent: amountText(rows[0]?.daily_spent ?? 0),
+    monthlySpent: amountText(rows[0]?.monthly_spent ?? 0),
+  };
 };
 
 export const quotaRemainingFor = async (
@@ -1248,7 +1420,7 @@ export const customerBreakdown = async (
       entry.volume.push({
         network: row.network,
         assetAddress: row.asset_address,
-        amount: row.amount.toString(),
+        amount: amountText(row.amount),
       });
     }
 
@@ -1409,7 +1581,7 @@ export const customerActivity = async (
       recipientAddress: row.recipient_address,
       network: row.network,
       assetAddress: row.asset_address,
-      amount: row.amount.toString(),
+      amount: amountText(row.amount),
       status: row.status,
       failureReason: row.failure_reason,
       reqId: row.req_id,

@@ -2,7 +2,9 @@ export type DeniedReason =
   | "customer_blocked"
   | "customer_suspended"
   | "identity_blocked"
-  | "below_minimum";
+  | "below_minimum"
+  | "daily_limit_exceeded"
+  | "monthly_limit_exceeded";
 
 export type CouponSkippedReason =
   | "unknown"
@@ -31,6 +33,10 @@ export interface PricingInput {
   discountFixed: string | null;
   creditBalance: string;
   approvalThreshold: string | null;
+  dailyLimit?: string | null;
+  dailySpent?: string | null;
+  monthlyLimit?: string | null;
+  monthlySpent?: string | null;
   now?: Date;
 }
 
@@ -83,6 +89,13 @@ const percentOf = (value: bigint, percent: string): bigint =>
 
 const min = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 const atLeastZero = (value: bigint): bigint => (value < 0n ? 0n : value);
+
+const overLimit = (
+  limit: string | null | undefined,
+  spent: string | null | undefined,
+  payable: bigint,
+): boolean =>
+  limit != null && parseAmount(spent ?? "0") + payable > parseAmount(limit);
 
 const denied = (reason: DeniedReason, gross: bigint): PricingResult => ({
   allowed: false,
@@ -176,6 +189,14 @@ export const priceFor = (input: PricingInput): PricingResult => {
   const creditApplied = credit > 0n ? min(credit, remaining) : 0n;
 
   remaining = atLeastZero(remaining - creditApplied);
+
+  if (overLimit(input.dailyLimit, input.dailySpent, remaining)) {
+    return denied("daily_limit_exceeded", gross);
+  }
+
+  if (overLimit(input.monthlyLimit, input.monthlySpent, remaining)) {
+    return denied("monthly_limit_exceeded", gross);
+  }
 
   const needsApproval =
     input.approvalThreshold !== null &&

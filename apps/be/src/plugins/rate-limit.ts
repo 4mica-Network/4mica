@@ -9,6 +9,15 @@ import type {
   preHandlerAsyncHookHandler,
 } from "fastify";
 
+declare module "fastify" {
+  interface FastifyInstance {
+    sharedRateLimits?: {
+      sensitive: preHandlerAsyncHookHandler;
+      apiKey: preHandlerAsyncHookHandler;
+    };
+  }
+}
+
 const TOO_MANY_REQUESTS = {
   error: "rate_limit_exceeded",
   message: "Too many requests. Retry later.",
@@ -109,26 +118,7 @@ const userLimit = (
   };
 };
 
-export const registerRateLimit = async (
-  app: FastifyInstance,
-): Promise<void> => {
-  await app.register(fastifyRateLimit, {
-    global: false,
-    cache: 10_000,
-    timeWindow: config.rateLimit.windowMs,
-  });
-
-  app.addHook("onRequest", ipShield(app));
-  app.addHook("preHandler", userLimit(app, config.rateLimit.userMax, "User"));
-};
-
-export const apiKeyRateLimit = (
-  app: FastifyInstance,
-): preHandlerAsyncHookHandler => {
-  if (!config.rateLimit.enabled) {
-    return async () => {};
-  }
-
+const apiKeyLimit = (app: FastifyInstance): preHandlerAsyncHookHandler => {
   const check = limiter(
     app,
     config.rateLimit.apiKeyMax,
@@ -156,12 +146,34 @@ export const apiKeyRateLimit = (
   };
 };
 
+export const registerRateLimit = async (
+  app: FastifyInstance,
+): Promise<void> => {
+  await app.register(fastifyRateLimit, {
+    global: false,
+    cache: 10_000,
+    timeWindow: config.rateLimit.windowMs,
+  });
+
+  app.addHook("onRequest", ipShield(app));
+  app.addHook("preHandler", userLimit(app, config.rateLimit.userMax, "User"));
+
+  app.decorate("sharedRateLimits", {
+    sensitive: userLimit(
+      app,
+      config.rateLimit.sensitiveMax,
+      "Sensitive endpoint",
+    ),
+    apiKey: apiKeyLimit(app),
+  });
+};
+
+const noLimit: preHandlerAsyncHookHandler = async () => {};
+
+export const apiKeyRateLimit = (
+  app: FastifyInstance,
+): preHandlerAsyncHookHandler => app.sharedRateLimits?.apiKey ?? noLimit;
+
 export const sensitiveRateLimit = (
   app: FastifyInstance,
-): preHandlerAsyncHookHandler => {
-  if (!config.rateLimit.enabled) {
-    return async () => {};
-  }
-
-  return userLimit(app, config.rateLimit.sensitiveMax, "Sensitive endpoint");
-};
+): preHandlerAsyncHookHandler => app.sharedRateLimits?.sensitive ?? noLimit;

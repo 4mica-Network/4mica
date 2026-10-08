@@ -603,6 +603,40 @@ describe("api listing routes", () => {
       await instance.close();
     });
 
+    it("refuses to publish while the receiving wallet is retired", async () => {
+      wallet.findFirst.mockResolvedValue(storedWallet({ status: "RETIRED" }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/publish`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("wallet_not_active");
+      expect(apiListing.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses to make a listing public through PATCH while its wallet is paused", async () => {
+      wallet.findFirst.mockResolvedValue(storedWallet({ status: "PAUSED" }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/api-listings/${LISTING_ID}`,
+        headers: AUTH,
+        payload: { visibility: "PUBLIC" },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("wallet_not_active");
+
+      await instance.close();
+    });
+
     it("stamps publishedAt on the first publish", async () => {
       const instance = await app();
 
@@ -789,7 +823,7 @@ describe("api listing routes", () => {
     it("serialises the price as a string, not a mangled Decimal", async () => {
       apiListing.findMany.mockResolvedValue([
         storedListing({
-          priceAmount: { toString: () => "0.010000000000000000" },
+          priceAmount: { toFixed: () => "0.010000000000000000" },
         }),
       ]);
       const instance = await app();

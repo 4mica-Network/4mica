@@ -118,7 +118,7 @@ const storedAgent = (over: Record<string, unknown> = {}) => ({
   network: "BASE_SEPOLIA",
   walletAddress: PAYER_ADDRESS,
   payerWalletId: PAYER_WALLET_ID,
-  creditLimit: { toString: () => "0" },
+  creditLimit: { toFixed: () => "0" },
   walletId: SELLER_WALLET_ID,
   payToAddress: SELLER_ADDRESS,
   assetAddress: null,
@@ -448,6 +448,25 @@ describe("agent routes", () => {
 
       expect(res.statusCode).toBe(409);
       expect(res.json().error).toBe("agent_not_payable");
+
+      await instance.close();
+    });
+
+    it("refuses to publish while the receiving wallet is retired", async () => {
+      walletsById({
+        [SELLER_WALLET_ID]: sellerWallet({ status: "RETIRED" }),
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/agents/${AGENT_ID}/publish`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("wallet_not_active");
+      expect(agent.updateMany).not.toHaveBeenCalled();
 
       await instance.close();
     });

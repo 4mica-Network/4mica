@@ -65,8 +65,9 @@ on the dashboard.
 ### Check a payer before serving: `app.resolveCustomer()`
 
 Applies the customer rules you set in the dashboard (block or suspend, free allowance, coupons,
-discounts, credit, minimum amount, approval threshold) to one payer and one gross amount. It is
-read-only, so it is safe to call on every request.
+discounts, credit, minimum amount, daily and monthly limits, approval threshold) to one payer and
+one gross amount. It is read-only, so it is safe to call on every request: a coupon use and the
+credit it draws are only consumed when you report the payment as settled (see below).
 
 ```ts
 const decision = await app.resolveCustomer({
@@ -77,7 +78,8 @@ const decision = await app.resolveCustomer({
 });
 
 if (!decision.allowed) {
-  // decision.deniedReason: "customer_blocked" | "customer_suspended" | "identity_blocked" | "below_minimum"
+  // decision.deniedReason: "customer_blocked" | "customer_suspended" | "identity_blocked"
+  //   | "below_minimum" | "daily_limit_exceeded" | "monthly_limit_exceeded"
 }
 if (decision.needsApproval) {
   // hold the request for manual approval
@@ -106,6 +108,12 @@ const { payment, created } = await app.reportPayment({
   description: "One quote",
 });
 ```
+
+If `resolveCustomer()` applied a coupon or credit, pass `couponCode` and `creditApplied` (the
+decision's `creditApplied`, when it is above zero) with the report. The first time the payment is
+`SETTLED`, 4Mica counts the coupon use against its usage limit and draws the credit down, once per
+`reqId`, however many times you retry. A coupon that ran out in the meantime is not counted, and
+credit is never drawn below zero.
 
 With a listing or agent key the payment is attributed automatically. You can still pass
 `listingSlug` or `agentSlug`, but it must match the key or the API answers 400.
@@ -143,10 +151,12 @@ export async function handle(request: Request): Promise<Response> {
 
   const paid = paymentFromHeader(request.headers.get("x-payment")!, 6);
 
+  const couponCode = new URL(request.url).searchParams.get("coupon");
   const decision = await app.resolveCustomer({
     payerAddress: paid.payerAddress,
     network: "base-sepolia",
     amount: paid.amount,
+    couponCode,
   });
   if (!decision.allowed) {
     return Response.json({ error: decision.deniedReason }, { status: 403 });
@@ -163,6 +173,8 @@ export async function handle(request: Request): Promise<Response> {
     assetAddress: listing!.assetAddress,
     amount: paid.amount,
     resource: request.url,
+    couponCode: decision.couponApplied !== "0" ? couponCode : null,
+    creditApplied: decision.creditApplied !== "0" ? decision.creditApplied : null,
   });
 
   return response;

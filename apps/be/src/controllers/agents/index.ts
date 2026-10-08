@@ -297,6 +297,12 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
     if (!payToAfter) {
       return notPayable(reply);
     }
+    if (walletId === undefined && current.walletId) {
+      const resolved = await resolveSellerWallet(userId, current.walletId);
+      if (!resolved.ok) {
+        return sellerWalletError(reply, resolved);
+      }
+    }
     data.publishedAt = current.publishedAt ?? new Date();
   } else if (
     next.visibility === undefined &&
@@ -342,6 +348,13 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
 
   if (!current.payToAddress) {
     return notPayable(reply);
+  }
+
+  if (current.walletId) {
+    const resolved = await resolveSellerWallet(userId, current.walletId);
+    if (!resolved.ok) {
+      return sellerWalletError(reply, resolved);
+    }
   }
 
   const updated = await updateAgent(userId, id, {

@@ -106,7 +106,9 @@ export type CustomerDeniedReason =
   | "customer_blocked"
   | "customer_suspended"
   | "identity_blocked"
-  | "below_minimum";
+  | "below_minimum"
+  | "daily_limit_exceeded"
+  | "monthly_limit_exceeded";
 
 export type CouponSkippedReason =
   | "unknown"
@@ -145,6 +147,8 @@ export interface ReportPaymentInput {
   guaranteeSignature?: string | null;
   txHash?: string | null;
   settledAt?: string | null;
+  couponCode?: string | null;
+  creditApplied?: string | null;
 }
 
 export interface AppPayment {

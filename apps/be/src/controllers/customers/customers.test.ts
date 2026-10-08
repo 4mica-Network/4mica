@@ -1,3 +1,4 @@
+import { prisma as prismaMock } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { customerRoutes } from "@routes/customers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +74,9 @@ const {
       return Number(this.raw) < 0;
     }
     toString() {
+      return this.raw;
+    }
+    toFixed() {
       return this.raw;
     }
   },
@@ -1483,6 +1487,10 @@ describe("customer routes", () => {
       expect(
         customerCreditEntry.create.mock.calls[0][0].data.amount.toString(),
       ).toBe("-23.5");
+      expect(prismaMock.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: "Serializable" },
+      );
 
       await instance.close();
     });
@@ -1983,6 +1991,43 @@ describe("customer routes", () => {
         couponApplied: "2",
         payable: "8",
       });
+
+      await instance.close();
+    });
+
+    it("refuses a payer who has reached their monthly limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ monthlyLimit: decimal("100") }),
+      );
+      queryRaw.mockImplementation((...call: unknown[]) =>
+        Promise.resolve(
+          sqlText(call).includes("monthly_spent")
+            ? [{ daily_spent: decimal("5"), monthly_spent: decimal("95") }]
+            : [],
+        ),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "10" }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      expect(rawCall("monthly_spent")).toBeDefined();
+
+      await instance.close();
+    });
+
+    it("skips the spend query when the customer has no limits", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ dailyLimit: null, monthlyLimit: null }),
+      );
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(rawCall("monthly_spent")).toBeUndefined();
 
       await instance.close();
     });

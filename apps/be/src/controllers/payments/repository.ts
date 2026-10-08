@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@4mica/db";
+import { amountText } from "@utils/amount";
 import type { ListPaymentsQuery, ReportPaymentInput } from "./schema";
 
 export const PAYMENT_SELECT = {
@@ -19,6 +20,9 @@ export const PAYMENT_SELECT = {
   settledAt: true,
   createdAt: true,
   updatedAt: true,
+  couponCode: true,
+  creditApplied: true,
+  redeemedAt: true,
   listing: { select: { slug: true, name: true } },
   agent: { select: { slug: true, name: true } },
 } satisfies Prisma.PaymentSelect;
@@ -27,7 +31,13 @@ type RawPayment = Prisma.PaymentGetPayload<{ select: typeof PAYMENT_SELECT }>;
 
 export type PaymentRow = Omit<
   RawPayment,
-  "amount" | "listing" | "agent" | "settledAt"
+  | "amount"
+  | "listing"
+  | "agent"
+  | "settledAt"
+  | "couponCode"
+  | "creditApplied"
+  | "redeemedAt"
 > & {
   amount: string;
   settledAt: string | null;
@@ -39,11 +49,20 @@ export type PaymentRow = Omit<
 };
 
 const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
-  const { listing, agent, amount, settledAt, ...rest } = row;
+  const {
+    listing,
+    agent,
+    amount,
+    settledAt,
+    couponCode: _couponCode,
+    creditApplied: _creditApplied,
+    redeemedAt: _redeemedAt,
+    ...rest
+  } = row;
 
   return {
     ...rest,
-    amount: amount.toString(),
+    amount: amountText(amount),
     settledAt: settledAt?.toISOString() ?? null,
     listingSlug: listing?.slug ?? null,
     listingName: listing?.name ?? null,
@@ -221,7 +240,7 @@ const totalsFor = async (
     volume: byAsset.map((row) => ({
       assetAddress: row.assetAddress,
       network: row.network,
-      amount: (row._sum?.amount ?? 0).toString(),
+      amount: amountText(row._sum?.amount ?? 0),
     })),
   };
 };
@@ -314,6 +333,8 @@ const DETAIL_FIELDS = [
   "txHash",
   "resource",
   "description",
+  "couponCode",
+  "creditApplied",
 ] as const;
 
 type PaymentStatus = ReportPaymentInput["status"];
@@ -338,6 +359,8 @@ const EXISTING_SELECT = {
   txHash: true,
   resource: true,
   description: true,
+  couponCode: true,
+  creditApplied: true,
 } satisfies Prisma.PaymentSelect;
 
 type ExistingPayment = Prisma.PaymentGetPayload<{
@@ -345,7 +368,7 @@ type ExistingPayment = Prisma.PaymentGetPayload<{
 }>;
 
 export type ReportOutcome =
-  | { kind: "created" | "updated"; row: PaymentRow }
+  | { kind: "created" | "updated"; row: PaymentRow; redeemable: boolean }
   | { kind: "conflict"; field: string; message: string };
 
 const isUniqueViolation = (error: unknown): boolean =>
@@ -358,7 +381,7 @@ const identityConflict = (
   for (const field of IDENTITY_FIELDS) {
     const before =
       field === "amount"
-        ? canonicalAmount(existing.amount.toString())
+        ? canonicalAmount(amountText(existing.amount))
         : (existing[field] as string | null);
     const after =
       field === "amount"
@@ -371,6 +394,11 @@ const identityConflict = (
   }
   return null;
 };
+
+const isRedeemable = (row: RawPayment): boolean =>
+  row.status === "SETTLED" &&
+  row.redeemedAt === null &&
+  (row.couponCode !== null || row.creditApplied !== null);
 
 export const reportPayment = async (
   ownerId: string,
@@ -394,6 +422,8 @@ export const reportPayment = async (
     txHash: data.txHash ?? null,
     resource: data.resource ?? null,
     description: data.description ?? null,
+    couponCode: data.couponCode ?? null,
+    creditApplied: data.creditApplied ?? null,
   };
 
   const reportedSettledAt = data.settledAt ? new Date(data.settledAt) : null;
@@ -424,6 +454,7 @@ export const reportPayment = async (
         return {
           kind: "created",
           row: toRow(row, new Set([data.recipientAddress])),
+          redeemable: isRedeemable(row),
         };
       } catch (error) {
         if (isUniqueViolation(error)) {
@@ -485,6 +516,7 @@ export const reportPayment = async (
       return {
         kind: "updated",
         row: toRow(row, new Set([data.recipientAddress])),
+        redeemable: isRedeemable(row),
       };
     }
   }
@@ -521,7 +553,7 @@ interface VolumeRow {
   direction: string;
   network: string;
   asset_address: string | null;
-  amount: { toString(): string } | null;
+  amount: Prisma.Decimal | null;
 }
 
 const monthKeys = (months: number): string[] => {
@@ -616,7 +648,7 @@ export const paymentStats = async (
       byMonth.get(row.month)?.volume.push({
         assetAddress: row.asset_address,
         network: row.network,
-        amount: (row.amount ?? 0).toString(),
+        amount: amountText(row.amount ?? 0),
       });
     }
 

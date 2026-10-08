@@ -1,4 +1,5 @@
 import { type Prisma, prisma } from "@4mica/db";
+import { optionalAmountText } from "@utils/amount";
 import { SLUG_MAX_LENGTH } from "@utils/slug";
 import type { ListApiListingsQuery } from "./schema";
 
@@ -37,7 +38,7 @@ export type ApiListingRow = Omit<RawApiListing, "priceAmount"> & {
 
 const toRow = (row: RawApiListing): ApiListingRow => ({
   ...row,
-  priceAmount: row.priceAmount?.toString() ?? null,
+  priceAmount: optionalAmountText(row.priceAmount),
 });
 
 const escapeLike = (value: string): string =>

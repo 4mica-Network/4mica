@@ -107,6 +107,10 @@ describe("unsubscribe", () => {
       where: { id: "user-1" },
       data: { allowMarketingOnboardingEmails: false },
     });
+    expect(queueUpdateMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", status: "SENDING" },
+      data: { status: "PENDING", lockId: null, lockedUntil: null },
+    });
 
     await app.close();
   });

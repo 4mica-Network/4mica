@@ -94,6 +94,14 @@ const loadApp = async (limits: Record<string, string>) => {
       async () => ({ ok: true }),
     );
     app.post(
+      "/sensitive-too",
+      {
+        onRequest: base.onRequest,
+        preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      },
+      async () => ({ ok: true }),
+    );
+    app.post(
       "/v1/thing",
       {
         onRequest: [authenticateApiKey],
@@ -229,6 +237,26 @@ describe("rate limiting", () => {
       headers: AUTH,
     });
     expect(ordinary.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it("shares one sensitive budget across every sensitive route", async () => {
+    const app = await loadApp({ user: "50", sensitive: "1" });
+
+    const first = await app.inject({
+      method: "POST",
+      url: "/sensitive",
+      headers: AUTH,
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/sensitive-too",
+      headers: AUTH,
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(429);
 
     await app.close();
   });

@@ -1,4 +1,5 @@
 import { requireApiKeyOwner } from "@auth/api-key";
+import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
@@ -164,7 +165,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     });
   }
 
-  const { row, kind } = outcome;
+  const { row, kind, redeemable } = outcome;
 
   appLogger.info(kind === "created" ? "Payment reported" : "Payment updated", {
     ownerId,
@@ -172,6 +173,21 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     reqId: row.reqId,
     status: row.status,
   });
+
+  if (redeemable) {
+    try {
+      const redemption = await redeemPaymentBenefits(ownerId, row.id);
+      if (redemption) {
+        appLogger.info("Payment benefits redeemed", { ownerId, ...redemption });
+      }
+    } catch (error) {
+      appLogger.error("Payment benefits could not be redeemed", {
+        ownerId,
+        paymentId: row.id,
+        error,
+      });
+    }
+  }
 
   return reply.code(kind === "created" ? 201 : 200).send(row);
 };

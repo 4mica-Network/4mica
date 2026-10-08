@@ -1,9 +1,11 @@
 import {
   address,
+  couponCode,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
+  positiveDecimalAmount,
   positiveInt,
   webUrl,
 } from "@controllers/schema-primitives";
@@ -56,6 +58,9 @@ export const ReportPaymentSchema = v.object({
   guaranteeSignature: v.optional(v.nullable(hexBlob)),
   txHash: v.optional(v.nullable(hex32)),
   settledAt: v.optional(v.nullable(v.pipe(v.string(), v.isoTimestamp()))),
+
+  couponCode: v.optional(v.nullable(couponCode)),
+  creditApplied: v.optional(v.nullable(positiveDecimalAmount)),
 });
 
 export const ListPaymentsQuerySchema = v.object({

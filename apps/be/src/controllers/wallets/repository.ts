@@ -212,7 +212,7 @@ export const updateWallet = async (
   return prisma.$transaction(async (tx) => {
     const current = await tx.wallet.findFirst({
       where: { id, ownerId },
-      select: { id: true, network: true },
+      select: { id: true, network: true, role: true, status: true },
     });
 
     if (!current) {
@@ -230,6 +230,26 @@ export const updateWallet = async (
       where: { id: current.id },
       data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
     });
+
+    const canReceive =
+      (rest.status ?? current.status) === "ACTIVE" &&
+      (rest.role ?? current.role) !== "PAYER";
+
+    if (!canReceive) {
+      const receiving = {
+        ownerId,
+        walletId: current.id,
+        visibility: "PUBLIC" as const,
+      };
+      await tx.apiListing.updateMany({
+        where: receiving,
+        data: { visibility: "PRIVATE" },
+      });
+      await tx.agent.updateMany({
+        where: receiving,
+        data: { visibility: "PRIVATE" },
+      });
+    }
 
     return tx.wallet.findUnique({
       where: { id: current.id },

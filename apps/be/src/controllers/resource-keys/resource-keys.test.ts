@@ -153,7 +153,7 @@ const storedAgent = () => ({
   network: "BASE_SEPOLIA",
   walletAddress: null,
   payerWalletId: null,
-  creditLimit: { toString: () => "0" },
+  creditLimit: { toFixed: () => "0" },
   walletId: null,
   payToAddress: null,
   assetAddress: null,

@@ -1,4 +1,5 @@
 import { type Prisma, prisma } from "@4mica/db";
+import { amountText, optionalAmountText } from "@utils/amount";
 import { SLUG_MAX_LENGTH } from "@utils/slug";
 import type { ListAgentsQuery } from "./schema";
 
@@ -38,8 +39,8 @@ export type AgentRow = Omit<RawAgent, "creditLimit" | "priceAmount"> & {
 
 const toRow = (row: RawAgent): AgentRow => ({
   ...row,
-  creditLimit: row.creditLimit.toString(),
-  priceAmount: row.priceAmount?.toString() ?? null,
+  creditLimit: amountText(row.creditLimit),
+  priceAmount: optionalAmountText(row.priceAmount),
 });
 
 const escapeLike = (value: string): string =>

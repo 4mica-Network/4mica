@@ -661,6 +661,8 @@ export const customerResolveResponseSchema = {
         "customer_suspended",
         "identity_blocked",
         "below_minimum",
+        "daily_limit_exceeded",
+        "monthly_limit_exceeded",
         null,
       ],
     },
