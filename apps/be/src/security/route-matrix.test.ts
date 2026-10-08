@@ -78,6 +78,7 @@ const PUBLIC = new Set([
 const API_KEY_ROUTES = new Set([
   "POST /v1/payments",
   "POST /v1/customers/resolve",
+  "GET /v1/resource",
 ]);
 
 const ID = "019fce62-0000-7000-8000-00000000beef";

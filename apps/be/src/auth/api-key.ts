@@ -6,6 +6,14 @@ import { findApiKeyByHash, touchApiKey } from "./repository";
 export interface ApiKeyContext {
   id: string;
   ownerId: string;
+  listingId: string | null;
+  agentId: string | null;
+}
+
+export interface ResourceKeyContext {
+  ownerId: string;
+  kind: "listing" | "agent";
+  id: string;
 }
 
 declare module "fastify" {
@@ -81,14 +89,21 @@ export const authenticateApiKey = async (
             record.owner.locked ||
             record.owner.deletedAt !== null
           ? "owner_disabled"
-          : null;
+          : record.listing?.deletedAt || record.agent?.deletedAt
+            ? "resource_deleted"
+            : null;
 
   if (!record || reason) {
     rejected(request, reply, reason ?? "unknown", token);
     return;
   }
 
-  request.apiKey = { id: record.id, ownerId: record.ownerId };
+  request.apiKey = {
+    id: record.id,
+    ownerId: record.ownerId,
+    listingId: record.listingId,
+    agentId: record.agentId,
+  };
 
   void touchApiKey(record.id).catch(() => {});
 };
@@ -103,4 +118,29 @@ export const requireApiKeyOwner = (
   }
 
   return request.apiKey.ownerId;
+};
+
+export const requireResourceKey = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+): ResourceKeyContext | null => {
+  if (!request.apiKey) {
+    unauthorized(reply);
+    return null;
+  }
+
+  const { ownerId, listingId, agentId } = request.apiKey;
+
+  if (listingId) {
+    return { ownerId, kind: "listing", id: listingId };
+  }
+  if (agentId) {
+    return { ownerId, kind: "agent", id: agentId };
+  }
+
+  reply.code(403).send({
+    error: "key_not_scoped",
+    message: "This key is not tied to an API or agent.",
+  });
+  return null;
 };

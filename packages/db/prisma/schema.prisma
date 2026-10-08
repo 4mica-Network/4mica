@@ -82,6 +82,7 @@ model Agent {
   reports     Report[]
   policy      ResourcePolicy?
   faqs        FaqItem[]
+  apiKeys     ApiKey[]
 
   @@unique([walletAddress, network])
   @@unique([ownerId, slug])
@@ -277,6 +278,8 @@ model OnboardingEmailSend {
 model ApiKey {
   id         String    @id @default(uuid(7))
   ownerId    String    @map("owner_id")
+  listingId  String?   @map("listing_id")
+  agentId    String?   @map("agent_id")
   name       String    @db.VarChar(120)
   prefix     String    @db.VarChar(32)
   last4      String    @db.VarChar(4)
@@ -287,9 +290,13 @@ model ApiKey {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
+  @@index([listingId])
+  @@index([agentId])
   @@map("api_keys")
 }
 
@@ -337,6 +344,7 @@ model ApiListing {
   reports  Report[]
   policy   ResourcePolicy?
   faqs     FaqItem[]
+  apiKeys  ApiKey[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])

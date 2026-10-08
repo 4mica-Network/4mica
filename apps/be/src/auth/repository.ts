@@ -28,11 +28,6 @@ export interface UpsertOptions {
   username: string;
 }
 
-/**
- * Clerk seeds the profile; after that the user owns it. On a returning account
- * only the gaps are filled, so a sign-in never overwrites an edited name,
- * avatar or (verified) email with whatever the session token carries.
- */
 const profileGaps = (
   identity: AuthIdentity,
   existing: UserRow | null,
@@ -85,9 +80,13 @@ export const findApiKeyByHash = (hashedKey: string) =>
     select: {
       id: true,
       ownerId: true,
+      listingId: true,
+      agentId: true,
       revokedAt: true,
       expiresAt: true,
       owner: { select: { banned: true, locked: true, deletedAt: true } },
+      listing: { select: { deletedAt: true } },
+      agent: { select: { deletedAt: true } },
     },
   });
 

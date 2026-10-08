@@ -153,6 +153,14 @@ export const createdApiKeyResponseSchema = {
   },
 } as const;
 
+export const resourceKeyListResponseSchema = {
+  type: "object",
+  required: ["items"],
+  properties: {
+    items: { type: "array", items: apiKeyResponseSchema },
+  },
+} as const;
+
 export const webhookResponseSchema = {
   type: "object",
   required: ["id", "url", "events", "status"],
@@ -870,7 +878,7 @@ export const trustSummaryResponseSchema = {
   },
 } as const;
 
-const faqSchema = {
+export const faqSchema = {
   type: "object",
   required: ["id", "question", "answer"],
   properties: {
@@ -893,4 +901,16 @@ export const faqResponseSchema = {
   type: "object",
   required: ["faq"],
   properties: { faq: faqSchema },
+} as const;
+
+export const resourceContextResponseSchema = {
+  type: "object",
+  required: ["kind", "listing", "agent", "policy", "faqs"],
+  properties: {
+    kind: { type: "string", enum: ["listing", "agent"] },
+    listing: { ...apiListingResponseSchema, nullable: true },
+    agent: { ...agentResponseSchema, nullable: true },
+    policy: policyResponseSchema.properties.policy,
+    faqs: { type: "array", items: faqSchema },
+  },
 } as const;

@@ -6,6 +6,7 @@ import bannerReducer from "./banner/reducer";
 import customerReducer from "./customer/reducer";
 import developerReducer from "./developer/reducer";
 import paymentReducer from "./payment/reducer";
+import resourceKeyReducer from "./resourceKey/reducer";
 import rootSaga from "./rootSaga";
 import trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
   agent: agentReducer,
   payment: paymentReducer,
   customer: customerReducer,
+  resourceKey: resourceKeyReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

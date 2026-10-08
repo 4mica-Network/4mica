@@ -18,6 +18,7 @@ import { FaqEditor } from "./FaqEditor";
 import { PolicyForm } from "./PolicyForm";
 import { ReportsPanel } from "./ReportsPanel";
 import { ReviewsPanel } from "./ReviewsPanel";
+import { SecretKeysSection } from "./SecretKeysSection";
 import { ToggleSection } from "./ToggleSection";
 
 export function ApiDetail() {
@@ -111,6 +112,8 @@ export function ApiDetail() {
         >
           <FaqEditor resource={resource} />
         </ToggleSection>
+
+        <SecretKeysSection resource={resource} />
 
         <SettingsSection
           description={t("appDetail.reviewsLead")}

@@ -107,9 +107,13 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
   ownerId: OWNER_ID,
+  listingId: null,
+  agentId: null,
   revokedAt: null,
   expiresAt: null,
   owner: { banned: false, locked: false, deletedAt: null },
+  listing: null,
+  agent: null,
   ...over,
 });
 
@@ -859,6 +863,66 @@ describe("payment routes", () => {
         deletedAt: null,
       });
       expect(payment.create.mock.calls[0][0].data.listingId).toBe("listing_1");
+
+      await instance.close();
+    });
+
+    it("pins a listing key's payment to that listing", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ listingId: "listing_1" }),
+      );
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      expect(payment.create.mock.calls[0][0].data.listingId).toBe("listing_1");
+
+      await instance.close();
+    });
+
+    it("refuses a listing key reporting against another listing", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ listingId: "listing_1" }),
+      );
+      apiListing.findFirst.mockResolvedValue({ id: "listing_2" });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ listingSlug: "other-listing" }),
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0]).toEqual({
+        path: "listingSlug",
+        message: "does not match this key",
+      });
+      expect(payment.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("pins an agent key's payment to that agent", async () => {
+      apiKey.findUnique.mockResolvedValue(storedKey({ agentId: "agent_1" }));
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(agent.findFirst).not.toHaveBeenCalled();
+      expect(payment.create.mock.calls[0][0].data.agentId).toBe("agent_1");
 
       await instance.close();
     });

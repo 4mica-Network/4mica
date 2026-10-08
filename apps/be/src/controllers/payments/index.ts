@@ -131,6 +131,24 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
+  const key = request.apiKey;
+  if (key?.listingId) {
+    if (targets.listingId && targets.listingId !== key.listingId) {
+      return invalidBody(reply, [
+        { path: "listingSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.listingId = key.listingId;
+  }
+  if (key?.agentId) {
+    if (targets.agentId && targets.agentId !== key.agentId) {
+      return invalidBody(reply, [
+        { path: "agentSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.agentId = key.agentId;
+  }
+
   const outcome = await reportPayment(ownerId, data, targets);
 
   if (outcome.kind === "conflict") {

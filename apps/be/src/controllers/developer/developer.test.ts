@@ -133,6 +133,8 @@ describe("developer routes", () => {
     expect(res.statusCode).toBe(200);
     expect(apiKey.findMany.mock.calls[0][0].where).toEqual({
       ownerId: USER_ID,
+      listingId: null,
+      agentId: null,
     });
     await app.close();
   });
@@ -183,6 +185,8 @@ describe("developer routes", () => {
     expect(apiKey.updateMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
       ownerId: USER_ID,
+      listingId: null,
+      agentId: null,
     });
 
     await app.inject({
@@ -193,6 +197,8 @@ describe("developer routes", () => {
     expect(apiKey.deleteMany.mock.calls[0][0].where).toEqual({
       id: "key_1",
       ownerId: USER_ID,
+      listingId: null,
+      agentId: null,
     });
 
     await app.close();

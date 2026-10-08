@@ -14,6 +14,7 @@ import { FaqEditor } from "../api-detail/FaqEditor";
 import { PolicyForm } from "../api-detail/PolicyForm";
 import { ReportsPanel } from "../api-detail/ReportsPanel";
 import { ReviewsPanel } from "../api-detail/ReviewsPanel";
+import { SecretKeysSection } from "../api-detail/SecretKeysSection";
 import { ToggleSection } from "../api-detail/ToggleSection";
 
 export function AgentDetail() {
@@ -105,6 +106,8 @@ export function AgentDetail() {
         >
           <FaqEditor resource={resource} />
         </ToggleSection>
+
+        <SecretKeysSection resource={resource} />
 
         <SettingsSection
           description={t("appDetail.reviewsLead")}
