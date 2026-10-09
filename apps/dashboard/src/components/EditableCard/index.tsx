@@ -1,14 +1,14 @@
 import { Button, Spinner } from "@4mica/ui";
 import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, CardHeader } from "@/components/form";
+import { CardHeader, SurfaceCard } from "@/components/layout";
 
-/** A card whose fields are typed, so changes are committed with a button. */
 export function EditableCard({
   title,
   description,
   isDirty,
   isSaving,
+  isInvalid = false,
   onSave,
   onReset,
   children,
@@ -17,6 +17,7 @@ export function EditableCard({
   description?: string;
   isDirty: boolean;
   isSaving: boolean;
+  isInvalid?: boolean;
   onSave: () => void;
   onReset: () => void;
   children: ReactNode;
@@ -25,11 +26,14 @@ export function EditableCard({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (!isDirty || isSaving || isInvalid) {
+      return;
+    }
     onSave();
   };
 
   return (
-    <Card>
+    <SurfaceCard>
       <form onSubmit={handleSubmit}>
         {title && (
           <div className="mb-4">
@@ -39,7 +43,6 @@ export function EditableCard({
 
         {children}
 
-        {/* -mx-6 cancels the card padding so the rule spans the full width. */}
         <div className="-mx-6 mt-5 flex items-center justify-end gap-2 border-overlay/10 border-t px-6 pt-4">
           <Button
             type="button"
@@ -55,7 +58,7 @@ export function EditableCard({
             size="sm"
             intent="invert"
             className="btn-no-lift w-20"
-            disabled={!isDirty || isSaving}
+            disabled={!isDirty || isSaving || isInvalid}
           >
             <span className="flex w-full items-center justify-center text-sm">
               {isSaving ? <Spinner size="sm" /> : t("settings.update")}
@@ -63,11 +66,10 @@ export function EditableCard({
           </Button>
         </div>
       </form>
-    </Card>
+    </SurfaceCard>
   );
 }
 
-/** A card of controls that each save the moment they change. */
 export function InstantCard({
   title,
   description,
@@ -80,7 +82,7 @@ export function InstantCard({
   children: ReactNode;
 }) {
   return (
-    <Card>
+    <SurfaceCard>
       {title && (
         <div className="mb-4">
           <CardHeader
@@ -91,6 +93,6 @@ export function InstantCard({
         </div>
       )}
       {children}
-    </Card>
+    </SurfaceCard>
   );
 }

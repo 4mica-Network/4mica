@@ -1,7 +1,7 @@
 import { config } from "@config/index";
 import { parseBody } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { verifyUnsubscribeToken } from "@services/unsubscribe-token";
+import { verifyUnsubscribeToken } from "@utils/unsubscribe-token";
 import type { RouteHandler } from "fastify";
 import { unsubscribeFromOnboarding } from "./repository";
 import { UnsubscribeBodySchema, UnsubscribeQuerySchema } from "./schema";

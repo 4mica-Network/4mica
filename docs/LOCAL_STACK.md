@@ -28,7 +28,7 @@ system has the shape it does.
 └────────────────────────────────────────────────────────────────────────┘
         ▲ POST /verify, POST /settle
         │
-┌─ a seller's own API (examples/example-seller-live, :3010) ──────────────┐
+┌─ a seller's own API (examples/example-seller-express, :3000) ───────────┐
 │  Ordinary Express. One middleware turns a route into a paid route.      │
 └────────────────────────────────────────────────────────────────────────┘
 
@@ -212,23 +212,23 @@ address in it is yours.
 ## 5. Take a real payment
 
 ```bash
-cp examples/example-seller-live/.env.example examples/example-seller-live/.env
-cp examples/example-buyer-live/.env.example  examples/example-buyer-live/.env
+cp examples/example-seller-express/.env.example examples/example-seller-express/.env
+cp examples/example-buyer/.env.example          examples/example-buyer/.env
 ```
 
 Fill in:
 
 - **seller** — `4MICA_WALLET_PRIVATE_KEY` (any anvil key; it needs no balance),
-  `PAY_TO` (the wallet address from §4a), `NETWORK=eip155:31337`.
-- **buyer** — `4MICA_WALLET_PRIVATE_KEY` for a *different* anvil account, and
-  `RESOURCE_URL=http://localhost:3010/quote`.
+  `4MICA_RPC_URL=http://127.0.0.1:3000`, and `FOURMICA_API_KEY` from the
+  listing's **Secret keys** section in the dashboard (§4). The seller reads its
+  price, wallet and network from that listing, so there is nothing else to set.
+- **buyer** — `4MICA_WALLET_PRIVATE_KEY` for a *different* anvil account,
+  `4MICA_RPC_URL=http://127.0.0.1:3000`, and
+  `RESOURCE_URL=http://localhost:3000/quote`.
 
 ```bash
-pnpm --filter @4mica/example-seller-live dev
+pnpm --filter @4mica/example-seller-express dev
 ```
-
-On boot it prints the exact values to paste into the dashboard form, which is
-the loop back to §4.
 
 The buyer needs collateral — that is what its guarantees are backed by:
 
@@ -239,13 +239,11 @@ await client.deposit.of(null, 1_000_000_000_000_000n).send();
 or use the facilitator's gasless route, `POST /deposit`. Then:
 
 ```bash
-pnpm --filter @4mica/example-buyer-live start
+pnpm --filter @4mica/example-buyer start
 ```
 
 You should see `402` → `200`, a body, and an `X-PAYMENT-RESPONSE` carrying real
-claims and a BLS signature. Compare that with `example-buyer-express`, where
-the same field is the literal string `0xdemoSignature` — that is the whole
-difference between demo mode and live mode.
+claims and a BLS signature.
 
 The facilitator log shows `/verify` then `/settle`, in that order. Always that
 order: verify gates the work, settle takes the credit.
@@ -254,28 +252,23 @@ order: verify gates the work, settle takes the credit.
 
 4Mica is **not in the payment path** — your service calls the facilitator
 directly — so nothing appears in anyone's history until your service says so.
-That is one extra call, and the example already makes it:
+That is one extra call, and the example already makes it through
+`@4mica/sdk/app` with the same secret key it used to read the listing:
 
-```bash
-# Dashboard → Settings → Developer → new key
-FOURMICA_API_KEY=4mica_sk_…
-FOURMICA_API_URL=http://localhost:4000
-LISTING_SLUG=live-quotes        # attributes the payment to that listing
-ASSET_DECIMALS=18               # 6 for USDC
+```ts
+api.reportPayment({ reqId, payerAddress, recipientAddress, network, amount });
 ```
 
-Restart the seller, pay again, and the payment appears under **Payments** for
-*both* sides. It is reported once, by the seller, and the buyer sees the same
-row because their wallet is the payer on it — visibility is by proved wallet
-address, not by who filed it.
+Pay again and the payment appears under **Payments** for *both* sides. It is
+reported once, by the seller, and the buyer sees the same row because their
+wallet is the payer on it — visibility is by proved wallet address, not by who
+filed it. Because the key belongs to the listing, the payment is attributed to
+that listing without naming it.
 
 The report is idempotent on `reqId`, which the payer mints once per payment, so
 a retry after a timeout updates the row rather than double-counting. It is also
 fire-and-forget: the buyer has already been served, and a reporting failure
 must never turn a successful payment into an error.
-
-Without a key the paywall still works. The payments are simply invisible, and
-the seller boots with a warning saying so.
 
 ---
 

@@ -1,3 +1,4 @@
+import { isPhoneNumber, isWebUrl } from "@4mica/rules";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateBusiness } from "@stores/user/actions";
 import {
@@ -6,23 +7,45 @@ import {
   selectValidationIssues,
 } from "@stores/user/selector";
 import type { BusinessType } from "@stores/user/type";
+import { blankFieldsToNull } from "@utils/format";
+import { hasErrors, isEmail } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { KybTag } from "@/components/badges";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
-  BUSINESS_TYPES,
-  blankToNull,
-  Card,
   FieldRow,
-  KybTag,
   Select,
   SettingRow,
-  SettingsSection,
   TextArea,
   TextInput,
 } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
+import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
 import { useDraft } from "@/hooks/useDraft";
+
+type FieldKind = "required" | "url" | "email" | "phone" | "country";
+
+const FIELD_RULES: Record<string, { max: number; kind?: FieldKind }> = {
+  legalName: { max: 255, kind: "required" },
+  tradingName: { max: 255 },
+  industry: { max: 128 },
+  description: { max: 2000 },
+  registrationNumber: { max: 64 },
+  taxId: { max: 64 },
+  vatNumber: { max: 64 },
+  website: { max: 255, kind: "url" },
+  supportEmail: { max: 255, kind: "email" },
+  supportPhone: { max: 20, kind: "phone" },
+  addressLine1: { max: 255 },
+  addressLine2: { max: 255 },
+  city: { max: 128 },
+  region: { max: 128 },
+  postalCode: { max: 32 },
+  country: { max: 2, kind: "country" },
+  statementDescriptor: { max: 22 },
+};
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
   (code) => ({ title: code, value: code }),
@@ -30,6 +53,7 @@ const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
 
 export function BusinessSettings() {
   const { t } = useTranslation();
+  const businessTypes = useBusinessTypeOptions();
   const dispatch = useAppDispatch();
   const business = useAppSelector(selectBusiness);
   const issues = useAppSelector(selectValidationIssues);
@@ -96,11 +120,57 @@ export function BusinessSettings() {
   const address = useDraft(addressInitial);
   const descriptor = useDraft(descriptorInitial);
 
+  const validate = (key: string, raw: string): string | undefined => {
+    const rule = FIELD_RULES[key];
+    const value = raw.trim();
+    if (!rule) {
+      return undefined;
+    }
+    if (value === "") {
+      return rule.kind === "required" ? t("validation.required") : undefined;
+    }
+    if (value.length > rule.max) {
+      return t("validation.tooLong", { max: rule.max });
+    }
+    switch (rule.kind) {
+      case "url":
+        return isWebUrl(value) ? undefined : t("validation.webUrl");
+      case "email":
+        return isEmail(value) ? undefined : t("validation.email");
+      case "phone":
+        return isPhoneNumber(value) ? undefined : t("validation.phone");
+      case "country":
+        return /^[A-Za-z]{2}$/.test(value)
+          ? undefined
+          : t("validation.countryCode");
+      default:
+        return undefined;
+    }
+  };
+
+  const errorsOf = (draft: Record<string, string>) =>
+    Object.fromEntries(
+      Object.entries(draft).map(([key, value]) => [key, validate(key, value)]),
+    ) as Record<string, string | undefined>;
+
+  const entityErrors = errorsOf(entity.draft);
+  const registrationErrors = errorsOf(registration.draft);
+  const contactErrors = errorsOf(contact.draft);
+  const addressErrors = errorsOf(address.draft);
+  const descriptorErrors = errorsOf(descriptor.draft);
+  const fieldErrors: Record<string, string | undefined> = {
+    ...entityErrors,
+    ...registrationErrors,
+    ...contactErrors,
+    ...addressErrors,
+    ...descriptorErrors,
+  };
+
   const save = (
     changes: Record<string, unknown>,
     section: string,
     keep: string[] = [],
-  ) => dispatch(updateBusiness(blankToNull(changes, keep), section));
+  ) => dispatch(updateBusiness(blankFieldsToNull(changes, keep), section));
 
   return (
     <SettingsPage
@@ -111,7 +181,7 @@ export function BusinessSettings() {
         title={t("settings.business.entity")}
         description={t("settings.business.entityHint")}
       >
-        <Card className="flex items-center justify-between gap-4">
+        <SurfaceCard className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.business.kyb")}
@@ -124,10 +194,11 @@ export function BusinessSettings() {
             status={business?.kybStatus ?? "UNVERIFIED"}
             label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
           />
-        </Card>
+        </SurfaceCard>
 
         <EditableCard
           isDirty={entity.isDirty}
+          isInvalid={hasErrors(entityErrors)}
           isSaving={savingEntity}
           onSave={() => save(entity.changes, "entity", ["legalName"])}
           onReset={entity.reset}
@@ -139,8 +210,11 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-legal-name"
+              autoComplete="organization"
+              required
               value={entity.draft.legalName}
-              error={issues.legalName}
+              error={fieldErrors.legalName ?? issues.legalName}
+              maxLength={255}
               onChange={(v) => entity.set("legalName", v)}
             />
           </FieldRow>
@@ -151,8 +225,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-trading-name"
+              autoComplete="organization"
               value={entity.draft.tradingName}
-              error={issues.tradingName}
+              error={fieldErrors.tradingName ?? issues.tradingName}
+              maxLength={255}
               onChange={(v) => entity.set("tradingName", v)}
             />
           </FieldRow>
@@ -164,6 +240,8 @@ export function BusinessSettings() {
             <TextInput
               id="business-industry"
               value={entity.draft.industry}
+              error={fieldErrors.industry ?? issues.industry}
+              maxLength={128}
               onChange={(v) => entity.set("industry", v)}
             />
           </FieldRow>
@@ -175,6 +253,8 @@ export function BusinessSettings() {
             <TextArea
               id="business-description"
               value={entity.draft.description}
+              error={fieldErrors.description ?? issues.description}
+              maxLength={2000}
               onChange={(v) => entity.set("description", v)}
             />
           </FieldRow>
@@ -190,7 +270,7 @@ export function BusinessSettings() {
             <Select
               id="business-type"
               value={business?.businessType ?? ""}
-              options={BUSINESS_TYPES}
+              options={businessTypes}
               onChange={(v) =>
                 dispatch(
                   updateBusiness(
@@ -210,6 +290,7 @@ export function BusinessSettings() {
       >
         <EditableCard
           isDirty={registration.isDirty}
+          isInvalid={hasErrors(registrationErrors)}
           isSaving={savingRegistration}
           onSave={() => save(registration.changes, "registration")}
           onReset={registration.reset}
@@ -222,7 +303,10 @@ export function BusinessSettings() {
             <TextInput
               id="business-reg-no"
               value={registration.draft.registrationNumber}
-              error={issues.registrationNumber}
+              error={
+                fieldErrors.registrationNumber ?? issues.registrationNumber
+              }
+              maxLength={64}
               onChange={(v) => registration.set("registrationNumber", v)}
             />
           </FieldRow>
@@ -234,7 +318,8 @@ export function BusinessSettings() {
             <TextInput
               id="business-tax-id"
               value={registration.draft.taxId}
-              error={issues.taxId}
+              error={fieldErrors.taxId ?? issues.taxId}
+              maxLength={64}
               onChange={(v) => registration.set("taxId", v)}
             />
           </FieldRow>
@@ -246,7 +331,8 @@ export function BusinessSettings() {
             <TextInput
               id="business-vat"
               value={registration.draft.vatNumber}
-              error={issues.vatNumber}
+              error={fieldErrors.vatNumber ?? issues.vatNumber}
+              maxLength={64}
               onChange={(v) => registration.set("vatNumber", v)}
             />
           </FieldRow>
@@ -259,6 +345,7 @@ export function BusinessSettings() {
       >
         <EditableCard
           isDirty={contact.isDirty}
+          isInvalid={hasErrors(contactErrors)}
           isSaving={savingContact}
           onSave={() => save(contact.changes, "contact")}
           onReset={contact.reset}
@@ -270,9 +357,13 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-website"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               value={contact.draft.website}
+              error={fieldErrors.website ?? issues.website}
+              maxLength={255}
               placeholder="https://example.com"
-              error={issues.website}
               onChange={(v) => contact.set("website", v)}
             />
           </FieldRow>
@@ -283,9 +374,12 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-support-email"
+              inputMode="email"
+              autoComplete="email"
               type="email"
               value={contact.draft.supportEmail}
-              error={issues.supportEmail}
+              error={fieldErrors.supportEmail ?? issues.supportEmail}
+              maxLength={255}
               onChange={(v) => contact.set("supportEmail", v)}
             />
           </FieldRow>
@@ -296,8 +390,12 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-support-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={contact.draft.supportPhone}
-              error={issues.supportPhone}
+              error={fieldErrors.supportPhone ?? issues.supportPhone}
+              maxLength={20}
               onChange={(v) => contact.set("supportPhone", v)}
             />
           </FieldRow>
@@ -310,6 +408,7 @@ export function BusinessSettings() {
       >
         <EditableCard
           isDirty={address.isDirty}
+          isInvalid={hasErrors(addressErrors)}
           isSaving={savingAddress}
           onSave={() => save(address.changes, "address")}
           onReset={address.reset}
@@ -321,7 +420,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-address1"
+              autoComplete="address-line1"
               value={address.draft.addressLine1}
+              error={fieldErrors.addressLine1 ?? issues.addressLine1}
+              maxLength={255}
               onChange={(v) => address.set("addressLine1", v)}
             />
           </FieldRow>
@@ -332,7 +434,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-address2"
+              autoComplete="address-line2"
               value={address.draft.addressLine2}
+              error={fieldErrors.addressLine2 ?? issues.addressLine2}
+              maxLength={255}
               onChange={(v) => address.set("addressLine2", v)}
             />
           </FieldRow>
@@ -343,7 +448,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-city"
+              autoComplete="address-level2"
               value={address.draft.city}
+              error={fieldErrors.city ?? issues.city}
+              maxLength={128}
               onChange={(v) => address.set("city", v)}
             />
           </FieldRow>
@@ -354,7 +462,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-region"
+              autoComplete="address-level1"
               value={address.draft.region}
+              error={fieldErrors.region ?? issues.region}
+              maxLength={128}
               onChange={(v) => address.set("region", v)}
             />
           </FieldRow>
@@ -365,7 +476,10 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-postal"
+              autoComplete="postal-code"
               value={address.draft.postalCode}
+              error={fieldErrors.postalCode ?? issues.postalCode}
+              maxLength={32}
               onChange={(v) => address.set("postalCode", v)}
             />
           </FieldRow>
@@ -376,11 +490,12 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-country"
+              autoComplete="country"
               value={address.draft.country}
+              error={fieldErrors.country ?? issues.country}
+              maxLength={2}
               placeholder="US"
               format="uppercase"
-              maxLength={2}
-              error={issues.country}
               onChange={(v) => address.set("country", v.slice(0, 2))}
             />
           </FieldRow>
@@ -414,6 +529,7 @@ export function BusinessSettings() {
 
         <EditableCard
           isDirty={descriptor.isDirty}
+          isInvalid={hasErrors(descriptorErrors)}
           isSaving={savingDescriptor}
           onSave={() => save(descriptor.changes, "descriptor")}
           onReset={descriptor.reset}
@@ -426,8 +542,10 @@ export function BusinessSettings() {
             <TextInput
               id="business-descriptor"
               value={descriptor.draft.statementDescriptor}
+              error={
+                fieldErrors.statementDescriptor ?? issues.statementDescriptor
+              }
               maxLength={22}
-              error={issues.statementDescriptor}
               onChange={(v) =>
                 descriptor.set("statementDescriptor", v.slice(0, 22))
               }

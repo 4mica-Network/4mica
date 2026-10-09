@@ -38,7 +38,6 @@ export interface WebhookEvent {
   description: string;
 }
 
-/** Shown once after create or rotate, then discarded from the store. */
 export interface RevealedSecret {
   kind: "apiKey" | "webhookSecret";
   id: string;
@@ -51,12 +50,6 @@ export type DeveloperState = {
   events: WebhookEvent[];
   revealed: RevealedSecret | null;
   isLoading: boolean;
-  /**
-   * Sticky once the first fetch lands. The integration checklist mounts in the
-   * AppShell and fetches too, so by the time the developer page re-fetches on
-   * mount the data is already on screen — this lets it skip the loading state
-   * rather than blanking content it is about to redraw identically.
-   */
   hasLoaded: boolean;
   pending: Record<string, boolean>;
   error: string | null;

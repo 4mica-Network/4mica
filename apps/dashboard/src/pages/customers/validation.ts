@@ -1,4 +1,11 @@
-import { isAddress } from "viem";
+import { isEmail } from "@utils/validation";
+import {
+  addressOrBlank,
+  currencyOrBlank,
+  decimalAmount,
+  orBlank,
+  paymentNetwork,
+} from "@utils/zod";
 import { z } from "zod";
 
 export const NAME_MAX_LENGTH = 120;
@@ -6,12 +13,7 @@ export const EMAIL_MAX_LENGTH = 320;
 export const DESCRIPTION_MAX_LENGTH = 280;
 export const NOTES_MAX_LENGTH = 2000;
 
-const optionalDecimal = z
-  .string()
-  .trim()
-  .regex(/^(?!0\d)\d{1,20}(\.\d{1,18})?$/, "customer.errors.limitInvalid")
-  .optional()
-  .or(z.literal(""));
+const optionalDecimal = orBlank(decimalAmount("customer.errors.limitInvalid"));
 
 export const customerDetailsSchema = z.object({
   name: z
@@ -19,52 +21,35 @@ export const customerDetailsSchema = z.object({
     .trim()
     .min(1, "customer.errors.nameRequired")
     .max(NAME_MAX_LENGTH, "customer.errors.nameTooLong"),
-  email: z
-    .string()
-    .trim()
-    .email("customer.errors.emailInvalid")
-    .max(EMAIL_MAX_LENGTH, "customer.errors.emailTooLong")
-    .optional()
-    .or(z.literal("")),
+  email: orBlank(
+    z
+      .string()
+      .trim()
+      .pipe(
+        z
+          .email("customer.errors.emailInvalid")
+          .max(EMAIL_MAX_LENGTH, "customer.errors.emailTooLong"),
+      ),
+  ),
   type: z.enum(["HUMAN", "ORGANIZATION", "AGENT", "WALLET"]),
-  description: z
-    .string()
-    .trim()
-    .max(DESCRIPTION_MAX_LENGTH, "customer.errors.descriptionTooLong")
-    .optional()
-    .or(z.literal("")),
-  notes: z
-    .string()
-    .trim()
-    .max(NOTES_MAX_LENGTH, "customer.errors.notesTooLong")
-    .optional()
-    .or(z.literal("")),
+  description: orBlank(
+    z
+      .string()
+      .trim()
+      .max(DESCRIPTION_MAX_LENGTH, "customer.errors.descriptionTooLong"),
+  ),
+  notes: orBlank(
+    z.string().trim().max(NOTES_MAX_LENGTH, "customer.errors.notesTooLong"),
+  ),
 });
 
 export const customerPaymentSchema = z
   .object({
-    network: z
-      .enum(["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"])
-      .optional()
-      .or(z.literal("")),
-    address: z
-      .string()
-      .trim()
-      .refine(
-        (value): boolean => value === "" || isAddress(value, { strict: true }),
-        "customer.errors.addressInvalid",
-      )
-      .optional()
-      .or(z.literal("")),
+    network: orBlank(paymentNetwork),
+    address: addressOrBlank("customer.errors.addressInvalid"),
     dailyLimit: optionalDecimal,
     monthlyLimit: optionalDecimal,
-    limitCurrency: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[A-Z0-9]{2,16}$/, "customer.errors.currencyInvalid")
-      .optional()
-      .or(z.literal("")),
+    limitCurrency: currencyOrBlank("customer.errors.currencyInvalid"),
   })
   .refine((data) => !(data.address && !data.network), {
     message: "customer.errors.networkRequired",
@@ -89,20 +74,9 @@ export const CREATE_STEP_FIELDS = [
 export const identitySchema = z
   .object({
     type: z.enum(["WALLET", "EMAIL", "EXTERNAL"]),
-    network: z
-      .enum(["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"])
-      .optional()
-      .or(z.literal("")),
-    address: z
-      .string()
-      .trim()
-      .refine(
-        (value): boolean => value === "" || isAddress(value, { strict: true }),
-        "customer.errors.addressInvalid",
-      )
-      .optional()
-      .or(z.literal("")),
-    value: z.string().trim().optional().or(z.literal("")),
+    network: orBlank(paymentNetwork),
+    address: addressOrBlank("customer.errors.addressInvalid"),
+    value: orBlank(z.string().trim()),
   })
   .refine((data) => data.type !== "WALLET" || Boolean(data.network), {
     message: "customer.errors.networkRequired",
@@ -117,14 +91,8 @@ export const identitySchema = z
     path: ["value"],
   })
   .refine(
-    (data) =>
-      data.type !== "EMAIL" ||
-      !data.value ||
-      /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.value),
+    (data) => data.type !== "EMAIL" || !data.value || isEmail(data.value),
     { message: "customer.errors.emailInvalid", path: ["value"] },
   );
 
 export type IdentityValues = z.infer<typeof identitySchema>;
-
-export const blankToNull = (value: string | undefined | null): string | null =>
-  value == null || value.trim() === "" ? null : value.trim();

@@ -18,10 +18,10 @@ import {
 } from "@stores/agent/selector";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { useTitle } from "ahooks";
 import { ArrowUpRight, Bot, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { AgentRow } from "./AgentRow";
 import { AgentToolbar } from "./AgentToolbar";
@@ -42,7 +42,7 @@ export function Agents() {
   const hasLoaded = useAppSelector(selectHasLoadedAgents);
   const error = useAppSelector(selectAgentError);
 
-  useTitle(`${t("page.agents.title")} - ${t("org")}`);
+  usePageTitle(t("page.agents.title"));
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<Agent | null>(null);

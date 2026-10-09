@@ -1,8 +1,8 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/banner";
 import i18n from "@i18n";
-import { notifyError } from "@utils/notification";
+import { toMessage } from "@utils/http-errors";
 import { call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError } from "@/lib/notify";
 import {
   dismissBannerFailed,
   fetchBannersFailed,
@@ -11,13 +11,6 @@ import {
 } from "./actions";
 import actionTypes from "./actionTypes";
 import type { Banner, BannerInteractionType } from "./type";
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    return (error.body as { message?: string } | null)?.message ?? fallback;
-  }
-  return fallback;
-};
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 

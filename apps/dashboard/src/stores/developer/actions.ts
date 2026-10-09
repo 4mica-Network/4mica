@@ -1,3 +1,4 @@
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   ApiKey,
@@ -7,10 +8,10 @@ import type {
   WebhookStatus,
 } from "./type";
 
-/** Identifies which row is busy, so only that row shows a spinner. */
-export interface PendingMeta {
-  pendingKey: string;
-}
+export const developerPendingKeys = {
+  apiKey: (id: string) => `apiKey:${id}`,
+  webhook: (id: string) => `webhook:${id}`,
+} as const;
 
 export const fetchDeveloper = () => ({
   type: actionTypes.FETCH_DEVELOPER_REQUESTED,
@@ -53,7 +54,7 @@ export const createApiKeySucceeded = (
 export const renameApiKey = (payload: { id: string; name: string }) => ({
   type: actionTypes.RENAME_API_KEY_REQUESTED,
   payload,
-  meta: { pendingKey: `apiKey:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.apiKey(payload.id) },
 });
 
 export const renameApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
@@ -65,7 +66,7 @@ export const renameApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
 export const revokeApiKey = (payload: { id: string }) => ({
   type: actionTypes.REVOKE_API_KEY_REQUESTED,
   payload,
-  meta: { pendingKey: `apiKey:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.apiKey(payload.id) },
 });
 
 export const revokeApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
@@ -77,7 +78,7 @@ export const revokeApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
 export const deleteApiKey = (payload: { id: string }) => ({
   type: actionTypes.DELETE_API_KEY_REQUESTED,
   payload,
-  meta: { pendingKey: `apiKey:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.apiKey(payload.id) },
 });
 
 export const deleteApiKeySucceeded = (id: string, meta: PendingMeta) => ({
@@ -117,7 +118,7 @@ export const updateWebhook = (payload: {
 }) => ({
   type: actionTypes.UPDATE_WEBHOOK_REQUESTED,
   payload,
-  meta: { pendingKey: `webhook:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.webhook(payload.id) },
 });
 
 export const updateWebhookSucceeded = (
@@ -132,7 +133,7 @@ export const updateWebhookSucceeded = (
 export const rotateWebhookSecret = (payload: { id: string }) => ({
   type: actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED,
   payload,
-  meta: { pendingKey: `webhook:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.webhook(payload.id) },
 });
 
 export const rotateWebhookSecretSucceeded = (
@@ -148,7 +149,7 @@ export const rotateWebhookSecretSucceeded = (
 export const deleteWebhook = (payload: { id: string }) => ({
   type: actionTypes.DELETE_WEBHOOK_REQUESTED,
   payload,
-  meta: { pendingKey: `webhook:${payload.id}` },
+  meta: { pendingKey: developerPendingKeys.webhook(payload.id) },
 });
 
 export const deleteWebhookSucceeded = (id: string, meta: PendingMeta) => ({

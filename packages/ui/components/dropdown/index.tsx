@@ -10,6 +10,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/cn";
+import {
+  firstFocusable,
+  focusableWithin,
+  LAYER_ATTRIBUTE,
+} from "../../lib/focusable";
 
 export type Placement =
   | "top"
@@ -32,8 +37,17 @@ export interface DropdownProps {
   flipOnOverflow?: boolean;
   className?: string;
   onClickOutside?: () => void;
+  onDismiss?: () => void;
+  autoFocus?: boolean;
+  id?: string;
   "data-testid"?: string;
 }
+
+const ITEM_SELECTOR = [
+  '[role="option"]:not([disabled]):not([aria-disabled="true"])',
+  '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])',
+  '[role="checkbox"]:not([disabled])',
+].join(",");
 
 const DEFAULT_FLIP_EDGE_PADDING = 40;
 
@@ -61,6 +75,9 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       flipOnOverflow = true,
       className,
       onClickOutside,
+      onDismiss,
+      autoFocus = false,
+      id,
       ...props
     },
     forwardedRef,
@@ -85,10 +102,10 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
 
     useEffect(() => {
       const anchor = anchorRef.current;
-      if (!anchor) return;
+      if (!isOpen || !anchor) return;
       const rect = anchor.getBoundingClientRect();
       setWidth(matchAnchorWidth ? rect.width : undefined);
-    }, [anchorRef, matchAnchorWidth]);
+    }, [isOpen, anchorRef, matchAnchorWidth]);
 
     useLayoutEffect(() => {
       function updatePosition() {
@@ -223,7 +240,11 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
       anchorRef,
     ]);
 
+    const clickOutsideRef = useRef(onClickOutside);
+    clickOutsideRef.current = onClickOutside;
+
     useEffect(() => {
+      if (!isOpen) return;
       function handleClickOutside(event: MouseEvent) {
         if (
           internalRef.current &&
@@ -231,22 +252,92 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
           anchorRef.current &&
           !anchorRef.current.contains(event.target as Node)
         ) {
-          onClickOutside?.();
+          clickOutsideRef.current?.();
         }
       }
-      if (isOpen) {
-        document.addEventListener("mousedown", handleClickOutside);
-      }
+      document.addEventListener("mousedown", handleClickOutside);
       return () => {
         document.removeEventListener("mousedown", handleClickOutside);
       };
-    }, [isOpen, onClickOutside, anchorRef]);
+    }, [isOpen, anchorRef]);
+
+    useEffect(() => {
+      if (!isOpen || !ready || !autoFocus) return;
+      const root = internalRef.current;
+      if (!root) return;
+      const target =
+        root.querySelector<HTMLElement>("input, textarea") ??
+        root.querySelector<HTMLElement>('[aria-selected="true"]') ??
+        root.querySelector<HTMLElement>(ITEM_SELECTOR) ??
+        firstFocusable(root);
+      target?.focus();
+    }, [isOpen, ready, autoFocus]);
+
+    const dismissRef = useRef<() => void>(() => {});
+    dismissRef.current = () => {
+      (onDismiss ?? onClickOutside)?.();
+      firstFocusable(anchorRef.current)?.focus();
+    };
+
+    useEffect(() => {
+      const root = internalRef.current;
+      if (!isOpen || !root) return;
+
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          dismissRef.current();
+          return;
+        }
+
+        if (event.key === "Tab") {
+          const focusable = focusableWithin(root);
+          const edge = event.shiftKey ? focusable[0] : focusable.at(-1);
+          if (focusable.length === 0 || document.activeElement === edge) {
+            event.preventDefault();
+            dismissRef.current();
+          }
+          return;
+        }
+
+        const typing =
+          event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement;
+        if (typing && event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+          return;
+        }
+
+        const items = Array.from(
+          root.querySelectorAll<HTMLElement>(ITEM_SELECTOR),
+        );
+        if (items.length === 0) return;
+
+        const count = items.length;
+        const current = items.indexOf(document.activeElement as HTMLElement);
+        const next = {
+          ArrowDown: (current + 1) % count,
+          ArrowUp: current <= 0 ? count - 1 : current - 1,
+          Home: 0,
+          End: count - 1,
+        }[event.key];
+
+        if (next === undefined) return;
+        event.preventDefault();
+        items[next]?.focus();
+      };
+
+      root.addEventListener("keydown", handleKeyDown);
+      return () => root.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     return createPortal(
       <div
         ref={internalRef}
+        id={id}
+        {...{ [LAYER_ATTRIBUTE]: "" }}
         className={cn(
           "fixed z-9999 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg transition-opacity",
           ready ? "opacity-100" : "pointer-events-none opacity-0",

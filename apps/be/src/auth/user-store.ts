@@ -1,17 +1,21 @@
 import type { AuthIdentity, AuthUser } from "@4mica/auth";
-import { prisma } from "@4mica/db";
 import { createClerkClient } from "@clerk/backend";
 import { config } from "@config/index";
 import { appLogger } from "@logger/index";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
-import { generateUsername } from "@services/username";
+} from "@utils/prisma-errors";
+import { generateUsername } from "@utils/username";
+import {
+  findUserByClerkId,
+  type UpsertOptions,
+  type UserRow,
+  upsertUser,
+} from "./repository";
 
 const CACHE_TTL_MS = 60_000;
-
-/** Handle collisions are a 40-bit coincidence; two retries is already generous. */
+export const CACHE_MAX_ENTRIES = 10_000;
 const CREATE_ATTEMPTS = 3;
 
 interface CacheEntry {
@@ -21,32 +25,38 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
+const readCache = (clerkUserId: string): AuthUser | undefined => {
+  const entry = cache.get(clerkUserId);
+  if (!entry) {
+    return undefined;
+  }
+
+  cache.delete(clerkUserId);
+  if (entry.expiresAt <= Date.now()) {
+    return undefined;
+  }
+
+  cache.set(clerkUserId, entry);
+  return entry.user;
+};
+
+const writeCache = (clerkUserId: string, user: AuthUser): void => {
+  cache.delete(clerkUserId);
+  cache.set(clerkUserId, { user, expiresAt: Date.now() + CACHE_TTL_MS });
+
+  while (cache.size > CACHE_MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    cache.delete(oldest);
+  }
+};
+
 const clerk = createClerkClient({
   secretKey: config.env.CLERK_SECRET_KEY,
   publishableKey: config.env.CLERK_PUBLISHABLE_KEY,
 });
-
-const USER_FIELDS = {
-  id: true,
-  clerkUserId: true,
-  email: true,
-  name: true,
-  avatarUrl: true,
-  banned: true,
-  locked: true,
-  deletedAt: true,
-} as const;
-
-type UserRow = {
-  id: string;
-  clerkUserId: string;
-  email: string | null;
-  name: string | null;
-  avatarUrl: string | null;
-  banned: boolean;
-  locked: boolean;
-  deletedAt: Date | null;
-};
 
 const toAuthUser = (row: UserRow): AuthUser => ({
   id: row.id,
@@ -80,50 +90,10 @@ const fetchProfile = async (identity: AuthIdentity): Promise<AuthIdentity> => {
   }
 };
 
-interface UpsertOptions {
-  withEmail: boolean;
-  /**
-   * Written on create only. A returning user keeps whatever handle they have,
-   * including one they picked themselves and including null on rows that
-   * predate generated handles.
-   */
-  username: string;
-}
-
-const runUpsert = async (
+const upsert = async (
   identity: AuthIdentity,
-  { withEmail, username }: UpsertOptions,
-): Promise<AuthUser> =>
-  toAuthUser(
-    await prisma.user.upsert({
-      where: { clerkUserId: identity.clerkUserId },
-      create: {
-        clerkUserId: identity.clerkUserId,
-        username,
-        ...(withEmail && identity.email !== null
-          ? { email: identity.email }
-          : {}),
-        ...(identity.name !== null ? { name: identity.name } : {}),
-        ...(identity.avatarUrl !== null
-          ? { avatarUrl: identity.avatarUrl }
-          : {}),
-      },
-      update: {
-        ...(withEmail && identity.email !== null
-          ? { email: identity.email }
-          : {}),
-        ...(identity.name !== null ? { name: identity.name } : {}),
-        ...(identity.avatarUrl !== null
-          ? { avatarUrl: identity.avatarUrl }
-          : {}),
-        lastSeenAt: new Date(),
-        lastLogin: new Date(),
-      },
-      select: USER_FIELDS,
-    }),
-  );
-
-const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
+  existing: UserRow | null,
+): Promise<AuthUser> => {
   let options: UpsertOptions = {
     withEmail: true,
     username: generateUsername(),
@@ -131,7 +101,7 @@ const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
 
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await runUpsert(identity, options);
+      return toAuthUser(await upsertUser(identity, existing, options));
     } catch (error) {
       if (!isUniqueViolation(error) || attempt === CREATE_ATTEMPTS) {
         throw error;
@@ -139,7 +109,6 @@ const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
 
       const targets = uniqueViolationTargets(error);
 
-      // A generated handle lost a race with another insert. Draw a new one.
       if (targets.includes("username")) {
         appLogger.warn("Generated username was already taken, retrying", {
           clerkUserId: identity.clerkUserId,
@@ -161,29 +130,27 @@ const upsert = async (identity: AuthIdentity): Promise<AuthUser> => {
 };
 
 export const loadUser = async (identity: AuthIdentity): Promise<AuthUser> => {
-  const cached = cache.get(identity.clerkUserId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.user;
+  const cached = readCache(identity.clerkUserId);
+  if (cached) {
+    return cached;
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { clerkUserId: identity.clerkUserId },
-    select: USER_FIELDS,
-  });
+  const existing = await findUserByClerkId(identity.clerkUserId);
 
   const resolved =
     existing === null && identity.email === null
       ? await fetchProfile(identity)
       : identity;
 
-  const user = await upsert(resolved);
+  const user = await upsert(resolved, existing);
 
-  cache.set(identity.clerkUserId, {
-    user,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  writeCache(identity.clerkUserId, user);
 
   return user;
+};
+
+export const invalidateUser = (clerkUserId: string): void => {
+  cache.delete(clerkUserId);
 };
 
 export const clearUserCache = (): void => cache.clear();

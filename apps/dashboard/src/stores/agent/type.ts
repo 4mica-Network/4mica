@@ -1,9 +1,11 @@
-import type { PublicVisibility } from "@stores/apiListing/type";
-import type { PaymentNetwork } from "@stores/wallet/type";
+import type { PaymentNetwork, PublicVisibility } from "@stores/shared/type";
 
-export type { PublicVisibility } from "@stores/apiListing/type";
-export { PUBLIC_VISIBILITY } from "@stores/apiListing/type";
-export type { BatchDeleteResult, PaymentNetwork } from "@stores/wallet/type";
+export {
+  type BatchDeleteResult,
+  type PaymentNetwork,
+  PUBLIC_VISIBILITY,
+  type PublicVisibility,
+} from "@stores/shared/type";
 
 export const AGENT_STATUS = {
   PENDING: "PENDING",

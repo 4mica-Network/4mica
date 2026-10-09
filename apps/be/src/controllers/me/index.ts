@@ -1,10 +1,9 @@
 import { usernameUnavailableReason } from "@4mica/url";
+import { invalidateUser } from "@auth/user-store";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
+import { deliverVerification } from "@controllers/verification/index";
 import { appLogger } from "@logger/index";
-import {
-  isUniqueViolation,
-  uniqueViolationTarget,
-} from "@services/prisma-errors";
+import { isUniqueViolation, uniqueViolationTarget } from "@utils/prisma-errors";
 import type { RouteHandler } from "fastify";
 import type { GenericSchema } from "valibot";
 import {
@@ -44,7 +43,31 @@ const patchUserHandler =
     }
 
     try {
-      return reply.send(await updateUser(userId, parsed.data));
+      const updated = await updateUser(userId, parsed.data);
+      if (request.user) {
+        invalidateUser(request.user.clerkUserId);
+      }
+
+      const requested = (parsed.data as { email?: unknown }).email;
+      if (
+        request.server.email &&
+        typeof requested === "string" &&
+        updated.pendingEmail === requested
+      ) {
+        await deliverVerification(
+          request.server.email,
+          userId,
+          updated.pendingEmail,
+          updated.name,
+        ).catch((error) => {
+          appLogger.warn("Could not send the email-change link", {
+            error,
+            userId,
+          });
+        });
+      }
+
+      return reply.send(updated);
     } catch (error) {
       if (isUniqueViolation(error)) {
         const target = uniqueViolationTarget(error);
@@ -52,10 +75,6 @@ const patchUserHandler =
         return reply.code(409).send({
           error: "conflict",
           message,
-          // Carry the same `issues[]` envelope a 400 uses, so a client can
-          // render "already taken" under the offending field instead of as a
-          // page-level banner. `target` is a column name, which is what the
-          // client keys its issue map by.
           issues: target ? [{ path: target, message }] : [],
         });
       }
@@ -64,10 +83,6 @@ const patchUserHandler =
     }
   };
 
-/**
- * Advisory only — the unique index is what actually enforces this, and the 409
- * above is the backstop for the race between checking and writing.
- */
 export const checkUsernameHandler: RouteHandler = async (request, reply) => {
   const userId = requireUserId(request, reply);
   if (!userId) {
@@ -81,18 +96,12 @@ export const checkUsernameHandler: RouteHandler = async (request, reply) => {
 
   const { username } = parsed.data;
 
-  // Short-circuit before Prisma: policy alone settles these, and no row will
-  // ever hold one. "reserved" means the marketing site owns the path;
-  // "blacklisted" means the name is barred outright (roles, brands).
   const blocked = usernameUnavailableReason(username);
   if (blocked) {
     return reply.send({ username, available: false, reason: blocked });
   }
 
   const owner = await findUsernameOwner(username);
-
-  // Your own current handle reads as available, so re-submitting an unchanged
-  // username in the wizard or in Settings does not self-conflict.
   const available = owner === null || owner.id === userId;
 
   return reply.send({

@@ -1,10 +1,13 @@
 import {
   address,
+  couponCode,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
+  positiveDecimalAmount,
   positiveInt,
+  webUrl,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
@@ -26,8 +29,6 @@ const hexBlob = v.pipe(
   v.maxLength(20_000),
 );
 
-const httpsUrl = v.pipe(v.string(), v.trim(), v.url(), v.maxLength(2048));
-
 export const ReportPaymentSchema = v.object({
   reqId: hex32,
   payerAddress: address,
@@ -48,7 +49,7 @@ export const ReportPaymentSchema = v.object({
     v.nullable(v.pipe(v.string(), v.trim(), v.toLowerCase(), v.maxLength(64))),
   ),
 
-  resource: v.optional(v.nullable(httpsUrl)),
+  resource: v.optional(v.nullable(webUrl(2048))),
   description: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(280))),
   ),
@@ -57,6 +58,9 @@ export const ReportPaymentSchema = v.object({
   guaranteeSignature: v.optional(v.nullable(hexBlob)),
   txHash: v.optional(v.nullable(hex32)),
   settledAt: v.optional(v.nullable(v.pipe(v.string(), v.isoTimestamp()))),
+
+  couponCode: v.optional(v.nullable(couponCode)),
+  creditApplied: v.optional(v.nullable(positiveDecimalAmount)),
 });
 
 export const ListPaymentsQuerySchema = v.object({

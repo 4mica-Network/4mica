@@ -3,11 +3,11 @@
   "version": "0.0.1-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Seller (recipient): gate a Next.js App Router route behind a 4Mica x402 paywall",
+  "description": "Seller: a Next.js route priced from your 4Mica listing and paid over x402",
   "scripts": {
-    "dev": "node scripts/serve.mjs dev",
+    "dev": "next dev -p 3002",
     "build": "next build",
-    "start": "node scripts/serve.mjs start"
+    "start": "next start -p 3002"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",

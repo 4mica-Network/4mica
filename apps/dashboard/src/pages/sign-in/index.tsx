@@ -1,4 +1,5 @@
 import { Button } from "@4mica/ui";
+import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
 import { motion } from "framer-motion";
@@ -7,7 +8,6 @@ import { useTranslation } from "react-i18next";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { links } from "@/lib/links";
 
-/** Google's brand mark. Inlined because lucide ships no brand icons. */
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className="h-4.5 w-4.5">
@@ -38,7 +38,7 @@ export function SignInPage() {
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
-  const redirectUrlComplete = params.get("redirect_url") ?? "/";
+  const redirectUrlComplete = safeRedirectPath(params.get("redirect_url"));
 
   const signInWithGoogle = async () => {
     if (!isLoaded) {

@@ -1,9 +1,6 @@
+import { blankToNull } from "@utils/format";
 import { describe, expect, it } from "vitest";
-import {
-  blankToNull,
-  createCustomerSchema,
-  identitySchema,
-} from "./validation";
+import { createCustomerSchema, identitySchema } from "./validation";
 
 const PAYER = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
 

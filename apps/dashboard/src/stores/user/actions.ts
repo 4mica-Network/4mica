@@ -105,6 +105,15 @@ export const sendEmailVerificationFailed = (
   meta,
 });
 
+export const confirmEmailVerification = (
+  token: string,
+  section = "emailVerification",
+) => ({
+  type: actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
+  payload: token,
+  meta: { section },
+});
+
 export const checkUsername = (username: string) => ({
   type: actionTypes.CHECK_USERNAME_REQUESTED,
   payload: username,

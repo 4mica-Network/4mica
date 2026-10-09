@@ -1,12 +1,6 @@
 import type { MonthlyBucket } from "@stores/payment/type";
 import { describe, expect, it } from "vitest";
-import {
-  formatPercent,
-  growthOf,
-  successRate,
-  sumVolume,
-  trimAmount,
-} from "./metrics";
+import { formatPercent, growthOf, successRate, sumVolume } from "./metrics";
 
 const bucket = (amount: string | null): MonthlyBucket => ({
   month: "2026-09",
@@ -16,21 +10,6 @@ const bucket = (amount: string | null): MonthlyBucket => ({
     amount === null
       ? []
       : [{ assetAddress: null, network: "BASE_SEPOLIA", amount }],
-});
-
-describe("trimAmount", () => {
-  it("drops the trailing zeros a Decimal(38,18) carries", () => {
-    expect(trimAmount("0.010000000000000000")).toBe("0.01");
-    expect(trimAmount("1.000000000000000000")).toBe("1");
-  });
-
-  it("leaves an integer alone", () => {
-    expect(trimAmount("42")).toBe("42");
-  });
-
-  it("never returns an empty string", () => {
-    expect(trimAmount("0.000000000000000000")).toBe("0");
-  });
 });
 
 describe("sumVolume", () => {

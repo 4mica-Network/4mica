@@ -1,8 +1,6 @@
 import type { AgentStatus } from "@stores/agent/type";
 
 export {
-  formatPrice,
-  trimAmount,
   VISIBILITY_LABEL_KEYS,
   VISIBILITY_OPTIONS,
   VISIBILITY_TAG_VARIANT,

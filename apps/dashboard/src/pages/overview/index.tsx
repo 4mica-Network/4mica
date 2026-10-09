@@ -1,3 +1,4 @@
+import { trimAmount } from "@4mica/rules";
 import { cn, EmptyState, Spinner, Tag } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -9,13 +10,13 @@ import {
   selectPaymentSummary,
 } from "@stores/payment/selector";
 import type { PaymentTotals, PaymentVolume } from "@stores/payment/type";
-import { useTitle } from "ahooks";
 import { ArrowRightLeft, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { MonthlyChart } from "./MonthlyChart";
-import { formatPercent, growthOf, successRate, trimAmount } from "./metrics";
+import { formatPercent, growthOf, successRate } from "./metrics";
 
 function AssetAmounts({ volume }: { volume: PaymentVolume[] }) {
   const { t } = useTranslation();
@@ -79,7 +80,7 @@ export function Overview() {
   const summary = useAppSelector(selectPaymentSummary);
   const stats = useAppSelector(selectPaymentStats);
 
-  useTitle(`${t("page.overview.title")} - ${t("org")}`);
+  usePageTitle(t("page.overview.title"));
 
   useEffect(() => {
     dispatch(fetchPaymentSummary());

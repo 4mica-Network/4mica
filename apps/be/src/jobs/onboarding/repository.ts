@@ -3,7 +3,6 @@ import { config } from "@config/index";
 import { ONBOARDING_STEPS } from "./steps";
 
 export const LOCK_MS = 120_000;
-
 const ENROL_LIMIT = 200;
 
 export interface ClaimedRow {

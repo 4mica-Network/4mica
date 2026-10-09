@@ -1,6 +1,6 @@
 import { clearUserCache } from "@auth/user-store";
 import { paymentRoutes } from "@routes/payments";
-import { hashSecret } from "@services/secrets";
+import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 
@@ -14,7 +14,9 @@ const {
   apiKey,
   apiListing,
   agent,
+  redeemPaymentBenefits,
 } = vi.hoisted(() => ({
+  redeemPaymentBenefits: vi.fn(),
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -25,12 +27,18 @@ const {
     findUnique: vi.fn(),
     count: vi.fn(),
     groupBy: vi.fn(),
-    upsert: vi.fn(),
+    create: vi.fn(),
+    updateMany: vi.fn(),
   },
-  wallet: { findMany: vi.fn() },
+  wallet: { findMany: vi.fn(), findFirst: vi.fn() },
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
   apiListing: { findFirst: vi.fn() },
   agent: { findFirst: vi.fn() },
+}));
+
+vi.mock("@controllers/customers/repository", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  redeemPaymentBenefits,
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -106,9 +114,13 @@ const KEY_AUTH = { authorization: `Bearer ${API_KEY}` };
 const storedKey = (over: Record<string, unknown> = {}) => ({
   id: "key_1",
   ownerId: OWNER_ID,
+  listingId: null,
+  agentId: null,
   revokedAt: null,
   expiresAt: null,
-  owner: { banned: false, deletedAt: null },
+  owner: { banned: false, locked: false, deletedAt: null },
+  listing: null,
+  agent: null,
   ...over,
 });
 
@@ -120,18 +132,41 @@ const storedPayment = (over: Record<string, unknown> = {}) => ({
   recipientAddress: MY_ADDRESS,
   network: "BASE_SEPOLIA",
   assetAddress: null,
-  amount: { toString: () => "0.010000000000000000" },
+  amount: { toFixed: () => "0.010000000000000000" },
   status: "SETTLED",
   failureReason: null,
   reqId: "0xabc",
   txHash: null,
   resource: null,
   description: null,
+  couponCode: null,
+  creditApplied: null,
+  redeemedAt: null,
   settledAt: new Date("2026-09-21T00:00:00.000Z"),
   createdAt: new Date(),
   updatedAt: new Date(),
   listing: null,
   agent: null,
+  ...over,
+});
+
+const existingPayment = (over: Record<string, unknown> = {}) => ({
+  id: PAYMENT_ID,
+  status: "SETTLED",
+  settledAt: new Date("2026-09-21T00:00:00.000Z"),
+  payerAddress: OTHER_ADDRESS,
+  recipientAddress: MY_ADDRESS,
+  network: "BASE_SEPOLIA",
+  assetAddress: null,
+  amount: { toFixed: () => "0.010000000000000000" },
+  listingId: null,
+  agentId: null,
+  failureReason: null,
+  guaranteeClaims: null,
+  guaranteeSignature: null,
+  txHash: null,
+  resource: null,
+  description: null,
   ...over,
 });
 
@@ -162,15 +197,20 @@ describe("payment routes", () => {
     upsert.mockResolvedValue(AUTH_USER);
 
     wallet.findMany.mockResolvedValue([{ address: MY_ADDRESS }]);
+    wallet.findFirst.mockResolvedValue({ id: "wallet_1" });
     payment.findMany.mockResolvedValue([storedPayment()]);
     payment.findFirst.mockResolvedValue(storedPayment());
     payment.count.mockResolvedValue(1);
     payment.groupBy.mockResolvedValue([]);
-    payment.upsert.mockResolvedValue(storedPayment());
+    payment.create.mockResolvedValue(storedPayment());
+    payment.updateMany.mockResolvedValue({ count: 1 });
     payment.findUnique.mockResolvedValue(null);
 
     apiKey.findUnique.mockResolvedValue(storedKey());
     apiKey.update.mockResolvedValue({});
+
+    redeemPaymentBenefits.mockReset();
+    redeemPaymentBenefits.mockResolvedValue(null);
   });
 
   describe("session-authenticated reads", () => {
@@ -445,14 +485,17 @@ describe("payment routes", () => {
       await instance.close();
     });
 
-    it("rejects a revoked, expired or banned key", async () => {
+    it("rejects a revoked, expired, banned or locked key", async () => {
       const instance = await app();
 
       for (const key of [
         storedKey({ revokedAt: new Date() }),
         storedKey({ expiresAt: new Date(Date.now() - 1000) }),
-        storedKey({ owner: { banned: true, deletedAt: null } }),
-        storedKey({ owner: { banned: false, deletedAt: new Date() } }),
+        storedKey({ owner: { banned: true, locked: false, deletedAt: null } }),
+        storedKey({ owner: { banned: false, locked: true, deletedAt: null } }),
+        storedKey({
+          owner: { banned: false, locked: false, deletedAt: new Date() },
+        }),
         null,
       ]) {
         apiKey.findUnique.mockResolvedValue(key);
@@ -480,9 +523,10 @@ describe("payment routes", () => {
         }),
       });
 
-      expect(payment.upsert.mock.calls[0][0].where.ownerId_reqId.ownerId).toBe(
-        OWNER_ID,
-      );
+      expect(
+        payment.findUnique.mock.calls[0][0].where.ownerId_reqId.ownerId,
+      ).toBe(OWNER_ID);
+      expect(payment.create.mock.calls[0][0].data.ownerId).toBe(OWNER_ID);
 
       await instance.close();
     });
@@ -497,7 +541,7 @@ describe("payment routes", () => {
         payload: validReport({ assetAddress: CHECKSUMMED }),
       });
 
-      const written = payment.upsert.mock.calls[0][0].create;
+      const written = payment.create.mock.calls[0][0].data;
       expect(written.payerAddress).toBe(OTHER_ADDRESS);
       expect(written.recipientAddress).toBe(MY_ADDRESS);
       expect(written.assetAddress).toBe(CHECKSUMMED.toLowerCase());
@@ -516,7 +560,9 @@ describe("payment routes", () => {
       });
       expect(first.statusCode).toBe(201);
 
-      payment.findUnique.mockResolvedValue({ id: PAYMENT_ID });
+      payment.findUnique
+        .mockResolvedValueOnce(existingPayment())
+        .mockResolvedValueOnce(storedPayment());
       const second = await instance.inject({
         method: "POST",
         url: "/v1/payments",
@@ -525,7 +571,278 @@ describe("payment routes", () => {
       });
       expect(second.statusCode).toBe(200);
 
-      expect(payment.upsert).toHaveBeenCalledTimes(2);
+      expect(payment.create).toHaveBeenCalledTimes(1);
+      expect(payment.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses a replay that changes the amount of a reported payment", async () => {
+      payment.findUnique.mockResolvedValueOnce(existingPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ amount: "1000" }),
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        error: "payment_conflict",
+        issues: [{ path: "amount" }],
+      });
+      expect(payment.updateMany).not.toHaveBeenCalled();
+      expect(payment.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("treats 0.01 and 0.010000 as the same amount", async () => {
+      payment.findUnique
+        .mockResolvedValueOnce(existingPayment())
+        .mockResolvedValueOnce(storedPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ amount: "0.010000" }),
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      await instance.close();
+    });
+
+    it("records the coupon and credit the paywall applied", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ couponCode: "welcome10", creditApplied: "4" }),
+      });
+
+      expect(payment.create.mock.calls[0][0].data).toMatchObject({
+        couponCode: "WELCOME10",
+        creditApplied: "4",
+      });
+
+      await instance.close();
+    });
+
+    it("rejects a malformed coupon code or credit amount", async () => {
+      const instance = await app();
+
+      for (const over of [
+        { couponCode: "no spaces" },
+        { creditApplied: "0" },
+      ]) {
+        const res = await instance.inject({
+          method: "POST",
+          url: "/v1/payments",
+          headers: KEY_AUTH,
+          payload: validReport(over),
+        });
+        expect(res.statusCode, JSON.stringify(over)).toBe(400);
+      }
+
+      await instance.close();
+    });
+
+    it("redeems once the settled payment carries a coupon or credit", async () => {
+      payment.create.mockResolvedValue(
+        storedPayment({ couponCode: "WELCOME10" }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ couponCode: "WELCOME10" }),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(redeemPaymentBenefits).toHaveBeenCalledWith(OWNER_ID, PAYMENT_ID);
+      expect(res.json()).not.toHaveProperty("couponCode");
+
+      await instance.close();
+    });
+
+    it("skips redemption while the payment is pending or already redeemed", async () => {
+      const instance = await app();
+
+      for (const over of [
+        { status: "PENDING", couponCode: "WELCOME10" },
+        { couponCode: "WELCOME10", redeemedAt: new Date() },
+        {},
+      ]) {
+        payment.create.mockResolvedValueOnce(storedPayment(over));
+        await instance.inject({
+          method: "POST",
+          url: "/v1/payments",
+          headers: KEY_AUTH,
+          payload: validReport({ reqId: "0xabc124" }),
+        });
+      }
+
+      expect(redeemPaymentBenefits).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("still records the payment when redemption fails", async () => {
+      payment.create.mockResolvedValue(
+        storedPayment({ creditApplied: { toFixed: () => "4" } }),
+      );
+      redeemPaymentBenefits.mockRejectedValue(new Error("serialization"));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ creditApplied: "4" }),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(redeemPaymentBenefits).toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("matches a tiny stored amount that Decimal would print as 1e-8", async () => {
+      const tiny = { toFixed: () => "0.00000001", toString: () => "1e-8" };
+      payment.findUnique
+        .mockResolvedValueOnce(existingPayment({ amount: tiny }))
+        .mockResolvedValueOnce(storedPayment({ amount: tiny }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ amount: "0.00000001" }),
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().amount).toBe("0.00000001");
+
+      await instance.close();
+    });
+
+    it("refuses to move a final payment back to pending", async () => {
+      payment.findUnique.mockResolvedValueOnce(existingPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ status: "PENDING" }),
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().issues).toEqual([
+        expect.objectContaining({ path: "status" }),
+      ]);
+      expect(payment.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("settles a pending payment, guarded on the status it read", async () => {
+      payment.findUnique
+        .mockResolvedValueOnce(
+          existingPayment({ status: "PENDING", settledAt: null }),
+        )
+        .mockResolvedValueOnce(storedPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ status: "SETTLED", txHash: "0xfeed" }),
+      });
+
+      expect(res.statusCode).toBe(200);
+      const [call] = payment.updateMany.mock.calls;
+      expect(call[0].where).toEqual({ id: PAYMENT_ID, status: "PENDING" });
+      expect(call[0].data).toMatchObject({
+        status: "SETTLED",
+        txHash: "0xfeed",
+      });
+      expect(call[0].data.settledAt).toBeInstanceOf(Date);
+
+      await instance.close();
+    });
+
+    it("only fills gaps on a final payment, never overwrites", async () => {
+      payment.findUnique
+        .mockResolvedValueOnce(existingPayment({ description: "original" }))
+        .mockResolvedValueOnce(storedPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ txHash: "0xfeed", description: "rewritten" }),
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(payment.updateMany.mock.calls[0][0].data).toEqual({
+        txHash: "0xfeed",
+      });
+
+      await instance.close();
+    });
+
+    it("re-reads instead of failing when a concurrent first report wins", async () => {
+      payment.create.mockRejectedValueOnce(
+        Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+      );
+      payment.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingPayment())
+        .mockResolvedValueOnce(storedPayment());
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(payment.create).toHaveBeenCalledTimes(1);
+
+      await instance.close();
+    });
+
+    it("rejects a resource that is not an http(s) URL", async () => {
+      const instance = await app();
+
+      for (const resource of [
+        "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+      ]) {
+        const res = await instance.inject({
+          method: "POST",
+          url: "/v1/payments",
+          headers: KEY_AUTH,
+          payload: validReport({ resource }),
+        });
+        expect(res.statusCode).toBe(400);
+      }
+      expect(payment.create).not.toHaveBeenCalled();
 
       await instance.close();
     });
@@ -540,7 +857,7 @@ describe("payment routes", () => {
         payload: validReport({ amount: "0.000000000000000001" }),
       });
 
-      expect(payment.upsert.mock.calls[0][0].create.amount).toBe(
+      expect(payment.create.mock.calls[0][0].data.amount).toBe(
         "0.000000000000000001",
       );
 
@@ -605,18 +922,41 @@ describe("payment routes", () => {
         headers: KEY_AUTH,
         payload: validReport({ status: "PENDING" }),
       });
-      expect(payment.upsert.mock.calls[0][0].create.settledAt).toBeNull();
+      expect(payment.create.mock.calls[0][0].data.settledAt).toBeNull();
 
-      payment.upsert.mockClear();
+      payment.create.mockClear();
       await instance.inject({
         method: "POST",
         url: "/v1/payments",
         headers: KEY_AUTH,
         payload: validReport({ status: "SETTLED" }),
       });
-      expect(payment.upsert.mock.calls[0][0].create.settledAt).toBeInstanceOf(
+      expect(payment.create.mock.calls[0][0].data.settledAt).toBeInstanceOf(
         Date,
       );
+
+      await instance.close();
+    });
+
+    it("refuses a recipient that is not one of the key owner's wallets", async () => {
+      wallet.findFirst.mockResolvedValue(null);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("recipientAddress");
+      expect(wallet.findFirst.mock.calls[0][0].where).toEqual({
+        ownerId: OWNER_ID,
+        address: MY_ADDRESS,
+        network: "BASE_SEPOLIA",
+      });
+      expect(payment.create).not.toHaveBeenCalled();
 
       await instance.close();
     });
@@ -654,9 +994,67 @@ describe("payment routes", () => {
         slug: "credit-limits",
         deletedAt: null,
       });
-      expect(payment.upsert.mock.calls[0][0].create.listingId).toBe(
-        "listing_1",
+      expect(payment.create.mock.calls[0][0].data.listingId).toBe("listing_1");
+
+      await instance.close();
+    });
+
+    it("pins a listing key's payment to that listing", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ listingId: "listing_1" }),
       );
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(apiListing.findFirst).not.toHaveBeenCalled();
+      expect(payment.create.mock.calls[0][0].data.listingId).toBe("listing_1");
+
+      await instance.close();
+    });
+
+    it("refuses a listing key reporting against another listing", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ listingId: "listing_1" }),
+      );
+      apiListing.findFirst.mockResolvedValue({ id: "listing_2" });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ listingSlug: "other-listing" }),
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0]).toEqual({
+        path: "listingSlug",
+        message: "does not match this key",
+      });
+      expect(payment.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("pins an agent key's payment to that agent", async () => {
+      apiKey.findUnique.mockResolvedValue(storedKey({ agentId: "agent_1" }));
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(agent.findFirst).not.toHaveBeenCalled();
+      expect(payment.create.mock.calls[0][0].data.agentId).toBe("agent_1");
 
       await instance.close();
     });

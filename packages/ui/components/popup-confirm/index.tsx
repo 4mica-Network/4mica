@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type RefObject, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
 import { Button, type ButtonProps } from "../button";
 import { Dropdown, type Placement } from "../dropdown";
@@ -43,6 +43,8 @@ export const ConfirmPopup = ({
   const prefix = props["data-testid"]
     ? `${props["data-testid"]}-confirm-popup`
     : "confirm-popup";
+  const titleId = useId();
+  const descriptionId = useId();
 
   return (
     <Dropdown
@@ -51,11 +53,20 @@ export const ConfirmPopup = ({
       placement={placement}
       className={cn("w-72 p-4", className)}
       onClickOutside={closeOnOutsideClick ? onRequestClose : undefined}
+      onDismiss={onRequestClose}
+      autoFocus
       data-testid={prefix}
     >
-      <div className="flex flex-col gap-3">
+      <div
+        role="alertdialog"
+        aria-modal="false"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        className="flex flex-col gap-3"
+      >
         <div className="flex flex-col gap-1">
           <span
+            id={titleId}
             className="font-semibold text-ink-strong text-sm"
             data-testid={`${prefix}-title`}
           >
@@ -63,6 +74,7 @@ export const ConfirmPopup = ({
           </span>
           {description && (
             <p
+              id={descriptionId}
               className="text-ink-muted text-sm"
               data-testid={`${prefix}-description`}
             >

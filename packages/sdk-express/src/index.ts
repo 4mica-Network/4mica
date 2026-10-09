@@ -6,18 +6,9 @@ import type {
 import { createPaywall } from "@4mica/sdk/server";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
+export * from "@4mica/sdk/app";
 export type { PaywallConfig, PaywallGuarantee, PaywallVerifier };
 
-/**
- * Express middleware that gates a route behind a 4Mica x402 payment.
- *
- * Responds `402` with the x402 payment requirements when no valid `X-PAYMENT`
- * header is present; otherwise verifies the payment, sets `X-PAYMENT-RESPONSE`,
- * exposes the guarantee at `res.locals.paymentGuarantee`, and calls `next()`.
- *
- * @param verifier - `client`, `client.rpc`, or any guarantee verifier.
- * @param config - Advertised payment requirements for the protected resource.
- */
 export function paywall(
   verifier: PaywallVerifier,
   config: PaywallConfig,

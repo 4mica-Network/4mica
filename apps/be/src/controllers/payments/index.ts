@@ -1,4 +1,5 @@
 import { requireApiKeyOwner } from "@auth/api-key";
+import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
@@ -11,6 +12,7 @@ import type { RouteHandler } from "fastify";
 import {
   getPayment,
   listPayments,
+  ownsRecipientWallet,
   paymentStats,
   paymentSummary,
   reportPayment,
@@ -106,6 +108,17 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
+  if (
+    !(await ownsRecipientWallet(ownerId, data.recipientAddress, data.network))
+  ) {
+    return invalidBody(reply, [
+      {
+        path: "recipientAddress",
+        message: "is not one of your wallets on this network",
+      },
+    ]);
+  }
+
   const targets = await resolveReportTargets(ownerId, data);
 
   if (data.listingSlug && !targets.listingId) {
@@ -119,14 +132,62 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  const { row, created } = await reportPayment(ownerId, data, targets);
+  const key = request.apiKey;
+  if (key?.listingId) {
+    if (targets.listingId && targets.listingId !== key.listingId) {
+      return invalidBody(reply, [
+        { path: "listingSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.listingId = key.listingId;
+  }
+  if (key?.agentId) {
+    if (targets.agentId && targets.agentId !== key.agentId) {
+      return invalidBody(reply, [
+        { path: "agentSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.agentId = key.agentId;
+  }
 
-  appLogger.info(created ? "Payment reported" : "Payment updated", {
+  const outcome = await reportPayment(ownerId, data, targets);
+
+  if (outcome.kind === "conflict") {
+    appLogger.warn("Payment report conflicts with an earlier one", {
+      ownerId,
+      reqId: data.reqId,
+      field: outcome.field,
+    });
+    return reply.code(409).send({
+      error: "payment_conflict",
+      message: outcome.message,
+      issues: [{ path: outcome.field, message: "cannot change once reported" }],
+    });
+  }
+
+  const { row, kind, redeemable } = outcome;
+
+  appLogger.info(kind === "created" ? "Payment reported" : "Payment updated", {
     ownerId,
     paymentId: row.id,
     reqId: row.reqId,
     status: row.status,
   });
 
-  return reply.code(created ? 201 : 200).send(row);
+  if (redeemable) {
+    try {
+      const redemption = await redeemPaymentBenefits(ownerId, row.id);
+      if (redemption) {
+        appLogger.info("Payment benefits redeemed", { ownerId, ...redemption });
+      }
+    } catch (error) {
+      appLogger.error("Payment benefits could not be redeemed", {
+        ownerId,
+        paymentId: row.id,
+        error,
+      });
+    }
+  }
+
+  return reply.code(kind === "created" ? 201 : 200).send(row);
 };

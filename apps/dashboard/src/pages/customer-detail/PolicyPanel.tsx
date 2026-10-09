@@ -1,3 +1,4 @@
+import { isDecimalAmount, trimAmount } from "@4mica/rules";
 import { Button, cn, Spinner } from "@4mica/ui";
 import {
   resetCustomerUsage,
@@ -10,19 +11,20 @@ import {
 } from "@stores/customer/selector";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { blankToNull } from "@utils/format";
+import { hasErrors } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { SectionCard, SectionFooter, SectionInset } from "@/components/layout";
 import { useDraft } from "@/hooks/useDraft";
 import {
   QUOTA_PERIOD_OPTIONS,
   QUOTA_UNIT_OPTIONS,
 } from "../customers/constants";
-import { trimAmount } from "../payments/constants";
-import { SectionCard, SectionFooter, SectionInset } from "./SectionCard";
 
-const blankToNull = (value: string): string | null =>
-  value.trim() === "" ? null : value.trim();
+const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
 
 function QuotaUsage({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
@@ -57,20 +59,26 @@ function QuotaUsage({ customer }: { customer: Customer }) {
           </p>
         </div>
 
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift shrink-0"
-          disabled={isResetting}
-          onClick={() => dispatch(resetCustomerUsage({ id: customer.id }))}
+        <ConfirmAction
+          title={t("customer.policy.resetConfirm")}
+          confirmLabel={t("confirm.reset")}
+          onConfirm={() => dispatch(resetCustomerUsage({ id: customer.id }))}
           data-testid="customer-reset-usage"
         >
-          <span className="flex items-center gap-1.5 text-sm">
-            {isResetting && <Spinner size="sm" />}
-            {t("customer.policy.reset")}
-          </span>
-        </Button>
+          <Button
+            type="button"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift shrink-0"
+            disabled={isResetting}
+            data-testid="customer-reset-usage"
+          >
+            <span className="flex items-center gap-1.5 text-sm">
+              {isResetting && <Spinner size="sm" />}
+              {t("customer.policy.reset")}
+            </span>
+          </Button>
+        </ConfirmAction>
       </div>
 
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-overlay/10">
@@ -119,6 +127,9 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
   const draft = useDraft(initial);
 
   const save = () => {
+    if (isInvalid || isSaving) {
+      return;
+    }
     const unit = blankToNull(draft.draft.freeQuotaUnit);
 
     dispatch(
@@ -140,6 +151,39 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
   };
 
   const hasQuota = draft.draft.freeQuotaUnit !== "";
+
+  const decimalError = (raw: string) => {
+    const value = raw.trim();
+    return value === "" || isDecimalAmount(value)
+      ? undefined
+      : t("validation.decimal");
+  };
+  const quota = draft.draft.freeQuota.trim();
+  const percent = draft.draft.discountPercent.trim();
+  const errors = {
+    freeQuota: !hasQuota
+      ? undefined
+      : quota === ""
+        ? t("validation.quotaTogether")
+        : (decimalError(quota) ??
+          (draft.draft.freeQuotaUnit === "REQUESTS" &&
+          !Number.isInteger(Number(quota))
+            ? t("validation.wholeNumber")
+            : undefined)),
+    freeQuotaPeriod:
+      hasQuota && draft.draft.freeQuotaPeriod === ""
+        ? t("validation.quotaTogether")
+        : undefined,
+    discountPercent:
+      percent === "" ||
+      (PERCENT_PATTERN.test(percent) && Number(percent) <= 100)
+        ? undefined
+        : t("validation.percent"),
+    discountFixed: decimalError(draft.draft.discountFixed),
+    minPaymentAmount: decimalError(draft.draft.minPaymentAmount),
+    approvalThreshold: decimalError(draft.draft.approvalThreshold),
+  };
+  const isInvalid = hasErrors(errors);
 
   return (
     <SectionCard
@@ -176,12 +220,13 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
             >
               <TextInput
                 id="policy-quota"
+                inputMode="decimal"
                 value={draft.draft.freeQuota}
                 onChange={(value) => draft.set("freeQuota", value)}
                 placeholder={
                   draft.draft.freeQuotaUnit === "REQUESTS" ? "500" : "10.00"
                 }
-                error={issues.freeQuota}
+                error={errors.freeQuota ?? issues.freeQuota}
               />
             </FieldRow>
 
@@ -197,7 +242,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
                   value: option.value,
                   title: t(option.titleKey),
                 }))}
-                error={issues.freeQuotaPeriod}
+                error={errors.freeQuotaPeriod ?? issues.freeQuotaPeriod}
               />
             </FieldRow>
           </>
@@ -209,10 +254,11 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
         >
           <TextInput
             id="policy-discount-percent"
+            inputMode="decimal"
             value={draft.draft.discountPercent}
             onChange={(value) => draft.set("discountPercent", value)}
             placeholder="10"
-            error={issues.discountPercent}
+            error={errors.discountPercent ?? issues.discountPercent}
           />
         </FieldRow>
 
@@ -222,10 +268,11 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
         >
           <TextInput
             id="policy-discount-fixed"
+            inputMode="decimal"
             value={draft.draft.discountFixed}
             onChange={(value) => draft.set("discountFixed", value)}
             placeholder="0.50"
-            error={issues.discountFixed}
+            error={errors.discountFixed ?? issues.discountFixed}
           />
         </FieldRow>
 
@@ -235,10 +282,11 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
         >
           <TextInput
             id="policy-min-payment"
+            inputMode="decimal"
             value={draft.draft.minPaymentAmount}
             onChange={(value) => draft.set("minPaymentAmount", value)}
             placeholder="0.01"
-            error={issues.minPaymentAmount}
+            error={errors.minPaymentAmount ?? issues.minPaymentAmount}
           />
         </FieldRow>
 
@@ -248,10 +296,11 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
         >
           <TextInput
             id="policy-approval"
+            inputMode="decimal"
             value={draft.draft.approvalThreshold}
             onChange={(value) => draft.set("approvalThreshold", value)}
             placeholder="100"
-            error={issues.approvalThreshold}
+            error={errors.approvalThreshold ?? issues.approvalThreshold}
           />
         </FieldRow>
       </div>
@@ -271,7 +320,7 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
           intent="invert"
           size="sm"
           className="btn-no-lift w-20"
-          disabled={!draft.isDirty || isSaving}
+          disabled={!draft.isDirty || isSaving || isInvalid}
           onClick={save}
           data-testid="customer-policy-save"
         >

@@ -1,13 +1,5 @@
 import type { MonthlyBucket, PaymentVolume } from "@stores/payment/type";
 
-export const trimAmount = (amount: string): string => {
-  if (!amount.includes(".")) {
-    return amount;
-  }
-  const trimmed = amount.replace(/0+$/, "").replace(/\.$/, "");
-  return trimmed === "" || trimmed === "-" ? "0" : trimmed;
-};
-
 export const sumVolume = (volume: PaymentVolume[]): string =>
   volume.reduce((total, entry) => total + Number(entry.amount), 0).toString();
 

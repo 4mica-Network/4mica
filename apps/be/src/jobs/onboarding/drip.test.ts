@@ -1,3 +1,4 @@
+import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -84,13 +85,24 @@ describe("startOnboardingDrip", () => {
     expect(WorkerMock).not.toHaveBeenCalled();
   });
 
-  it("registers the repeatable tick and a shutdown hook when configured", async () => {
+  it("registers the repeatable tick when configured", async () => {
     const { startOnboardingDrip } = await importSubject();
     const app = fakeApp();
 
     expect(await startOnboardingDrip(app as never)).toBe(true);
     expect(upsertJobScheduler).toHaveBeenCalledTimes(1);
-    expect(app.addHook).toHaveBeenCalledWith("onClose", expect.any(Function));
+    expect(app.addHook).not.toHaveBeenCalled();
+  });
+
+  it("starts on an app that is already listening", async () => {
+    const { startOnboardingDrip } = await importSubject();
+    const app = Fastify();
+    app.decorate("email", { sendOnboardingStep: vi.fn() } as never);
+    await app.listen({ host: "127.0.0.1", port: 0 });
+
+    await expect(startOnboardingDrip(app)).resolves.toBe(true);
+
+    await app.close();
   });
 
   it("handles worker connection errors", async () => {

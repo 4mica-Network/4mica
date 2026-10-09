@@ -35,8 +35,6 @@ const EnvSchema = v.object({
   ),
   CLERK_JWT_KEY: v.string(),
   CLERK_AUTHORIZED_PARTIES: v.string(),
-  // Optional on purpose. Empty disables sending rather than failing boot, so
-  // local dev and tests need no email service running.
   EMAIL_SERVICE_URL: v.union([
     v.literal(""),
     v.pipe(
@@ -83,6 +81,8 @@ const EnvSchema = v.object({
   RATE_LIMIT_IP_MAX: numeric("RATE_LIMIT_IP_MAX", 1, 1_000_000),
   RATE_LIMIT_USER_MAX: numeric("RATE_LIMIT_USER_MAX", 1, 1_000_000),
   RATE_LIMIT_SENSITIVE_MAX: numeric("RATE_LIMIT_SENSITIVE_MAX", 1, 10_000),
+  RATE_LIMIT_API_KEY_MAX: numeric("RATE_LIMIT_API_KEY_MAX", 1, 1_000_000),
+  TRUST_PROXY_HOPS: numeric("TRUST_PROXY_HOPS", 0, 5),
 });
 
 export type Env = v.InferOutput<typeof EnvSchema>;
@@ -118,6 +118,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     RATE_LIMIT_IP_MAX: source.RATE_LIMIT_IP_MAX ?? "300",
     RATE_LIMIT_USER_MAX: source.RATE_LIMIT_USER_MAX ?? "120",
     RATE_LIMIT_SENSITIVE_MAX: source.RATE_LIMIT_SENSITIVE_MAX ?? "10",
+    RATE_LIMIT_API_KEY_MAX: source.RATE_LIMIT_API_KEY_MAX ?? "600",
+    TRUST_PROXY_HOPS: source.TRUST_PROXY_HOPS ?? "1",
   });
 
   if (!result.success) {
@@ -146,7 +148,43 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     );
   }
 
+  if (
+    result.output.NODE_ENV === "production" &&
+    result.output.CLERK_AUTHORIZED_PARTIES.trim() === ""
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - CLERK_AUTHORIZED_PARTIES: must list the dashboard origin(s) in production",
+    );
+  }
+
   return result.output;
+};
+
+export const productionWarnings = (env: Env): string[] => {
+  if (env.NODE_ENV !== "production") {
+    return [];
+  }
+
+  const warnings: string[] = [];
+
+  if (!env.CLERK_SECRET_KEY.startsWith("sk_live_")) {
+    warnings.push("CLERK_SECRET_KEY is not a live key");
+  }
+  if (env.RATE_LIMIT_ENABLED !== "true") {
+    warnings.push("RATE_LIMIT_ENABLED is off");
+  }
+  if (env.PUBLIC_API_URL === "") {
+    warnings.push(
+      "PUBLIC_API_URL is unset; emailed links will point at localhost",
+    );
+  }
+  if (env.TRUST_PROXY_HOPS === 0) {
+    warnings.push(
+      "TRUST_PROXY_HOPS is 0; behind nginx every client shares one IP",
+    );
+  }
+
+  return warnings;
 };
 
 const env = parseEnv(process.env);
@@ -165,7 +203,6 @@ export const config = {
   clerkAuthorizedParties: env.CLERK_AUTHORIZED_PARTIES.split(",")
     .map((party) => party.trim())
     .filter(Boolean),
-  /** `undefined` when unset — see src/services/email.ts. */
   emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
   publicApiUrl: env.PUBLIC_API_URL || `http://localhost:${env.PORT}`,
   appUrl: new LinkConfig(process.env).appBase,
@@ -179,7 +216,9 @@ export const config = {
     ipMax: env.RATE_LIMIT_IP_MAX,
     userMax: env.RATE_LIMIT_USER_MAX,
     sensitiveMax: env.RATE_LIMIT_SENSITIVE_MAX,
+    apiKeyMax: env.RATE_LIMIT_API_KEY_MAX,
   },
+  trustProxyHops: env.TRUST_PROXY_HOPS,
   onboarding: {
     valkeyUrl: env.VALKEY_URL || undefined,
     unsubscribeSecret: env.UNSUBSCRIBE_SECRET || undefined,

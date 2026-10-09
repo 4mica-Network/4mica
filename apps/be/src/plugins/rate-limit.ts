@@ -9,6 +9,15 @@ import type {
   preHandlerAsyncHookHandler,
 } from "fastify";
 
+declare module "fastify" {
+  interface FastifyInstance {
+    sharedRateLimits?: {
+      sensitive: preHandlerAsyncHookHandler;
+      apiKey: preHandlerAsyncHookHandler;
+    };
+  }
+}
+
 const TOO_MANY_REQUESTS = {
   error: "rate_limit_exceeded",
   message: "Too many requests. Retry later.",
@@ -22,7 +31,9 @@ const userKey = (request: FastifyRequest): string =>
 
 const ipKey = (request: FastifyRequest): string => request.ip;
 
-/** The counted (non-allowlisted) branch of a limiter check. */
+const pathOf = (request: FastifyRequest): string =>
+  request.url.split("?", 1)[0] ?? request.url;
+
 type CountedResult = Extract<
   Awaited<ReturnType<ReturnType<FastifyInstance["createRateLimit"]>>>,
   { isExceeded: boolean }
@@ -72,7 +83,7 @@ const ipShield = (app: FastifyInstance): onRequestAsyncHookHandler => {
     appLogger.warn("IP rate limit exceeded", {
       key: result.key,
       method: request.method,
-      url: request.url,
+      path: pathOf(request),
     });
 
     return reject(reply, result);
@@ -100,7 +111,35 @@ const userLimit = (
     appLogger.warn(`${scope} rate limit exceeded`, {
       key: result.key,
       method: request.method,
-      url: request.url,
+      path: pathOf(request),
+    });
+
+    return reject(reply, result);
+  };
+};
+
+const apiKeyLimit = (app: FastifyInstance): preHandlerAsyncHookHandler => {
+  const check = limiter(
+    app,
+    config.rateLimit.apiKeyMax,
+    (request) => `key:${request.apiKey?.id ?? request.ip}`,
+  );
+
+  return async (request, reply) => {
+    if (!request.apiKey) {
+      return;
+    }
+
+    const result = await check(request);
+
+    if (result.isAllowed || !result.isExceeded) {
+      return;
+    }
+
+    appLogger.warn("API key rate limit exceeded", {
+      apiKeyId: request.apiKey.id,
+      method: request.method,
+      path: pathOf(request),
     });
 
     return reject(reply, result);
@@ -118,14 +157,23 @@ export const registerRateLimit = async (
 
   app.addHook("onRequest", ipShield(app));
   app.addHook("preHandler", userLimit(app, config.rateLimit.userMax, "User"));
+
+  app.decorate("sharedRateLimits", {
+    sensitive: userLimit(
+      app,
+      config.rateLimit.sensitiveMax,
+      "Sensitive endpoint",
+    ),
+    apiKey: apiKeyLimit(app),
+  });
 };
+
+const noLimit: preHandlerAsyncHookHandler = async () => {};
+
+export const apiKeyRateLimit = (
+  app: FastifyInstance,
+): preHandlerAsyncHookHandler => app.sharedRateLimits?.apiKey ?? noLimit;
 
 export const sensitiveRateLimit = (
   app: FastifyInstance,
-): preHandlerAsyncHookHandler => {
-  if (!config.rateLimit.enabled) {
-    return async () => {};
-  }
-
-  return userLimit(app, config.rateLimit.sensitiveMax, "Sensitive endpoint");
-};
+): preHandlerAsyncHookHandler => app.sharedRateLimits?.sensitive ?? noLimit;

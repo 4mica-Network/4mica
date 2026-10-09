@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseEnv } from "./index";
+import { parseEnv, productionWarnings } from "./index";
 
 const VALID: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/test",
   CLERK_PUBLISHABLE_KEY: "pk_test_abc",
   CLERK_SECRET_KEY: "sk_test_abc",
+};
+
+const PRODUCTION: NodeJS.ProcessEnv = {
+  ...VALID,
+  NODE_ENV: "production",
+  CLERK_AUTHORIZED_PARTIES: "https://app.4mica.io",
 };
 
 describe("parseEnv", () => {
@@ -53,9 +59,7 @@ describe("parseEnv", () => {
 
   it("turns rate limiting off under NODE_ENV=test but on elsewhere", () => {
     expect(parseEnv(VALID).RATE_LIMIT_ENABLED).toBe("false");
-    expect(
-      parseEnv({ ...VALID, NODE_ENV: "production" }).RATE_LIMIT_ENABLED,
-    ).toBe("true");
+    expect(parseEnv(PRODUCTION).RATE_LIMIT_ENABLED).toBe("true");
     expect(
       parseEnv({ ...VALID, RATE_LIMIT_ENABLED: "true" }).RATE_LIMIT_ENABLED,
     ).toBe("true");
@@ -117,6 +121,48 @@ describe("parseEnv", () => {
     expect(() =>
       parseEnv({ ...VALID, UNSUBSCRIBE_SECRET: "too-short" }),
     ).not.toThrow();
+  });
+
+  it("trusts exactly one proxy hop by default", () => {
+    expect(parseEnv(VALID).TRUST_PROXY_HOPS).toBe(1);
+    expect(parseEnv({ ...VALID, TRUST_PROXY_HOPS: "2" }).TRUST_PROXY_HOPS).toBe(
+      2,
+    );
+    expect(() => parseEnv({ ...VALID, TRUST_PROXY_HOPS: "9" })).toThrow(
+      /TRUST_PROXY_HOPS must be at most 5/,
+    );
+  });
+
+  it("requires authorized parties in production, where azp is the only origin check", () => {
+    expect(() =>
+      parseEnv({ ...PRODUCTION, CLERK_AUTHORIZED_PARTIES: "" }),
+    ).toThrow(/CLERK_AUTHORIZED_PARTIES/);
+    expect(() => parseEnv({ ...VALID, NODE_ENV: "development" })).not.toThrow();
+  });
+
+  it("warns about risky but legal production settings", () => {
+    expect(productionWarnings(parseEnv(VALID))).toEqual([]);
+
+    const warnings = productionWarnings(
+      parseEnv({ ...PRODUCTION, RATE_LIMIT_ENABLED: "false" }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("not a live key"),
+        expect.stringContaining("RATE_LIMIT_ENABLED"),
+        expect.stringContaining("PUBLIC_API_URL"),
+      ]),
+    );
+    expect(
+      productionWarnings(
+        parseEnv({
+          ...PRODUCTION,
+          CLERK_SECRET_KEY: "sk_live_abc",
+          PUBLIC_API_URL: "https://api.app.4mica.io",
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it("rejects a non-ISO drip epoch", () => {

@@ -13,6 +13,7 @@ import { guards } from "./guards";
 import {
   batchDeleteResponseSchema,
   errorResponseSchema,
+  idParam,
   limitedResponses,
   walletListResponseSchema,
   walletNonceResponseSchema,
@@ -22,7 +23,7 @@ import {
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 const listQuerySchema = {

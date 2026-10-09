@@ -9,14 +9,18 @@ import {
   selectUsernameCheck,
   selectValidationIssues,
 } from "@stores/user/selector";
+import { blankFieldsToNull } from "@utils/format";
+import {
+  isBusinessValid,
+  isNameValid,
+  isUsernameValid,
+} from "@utils/user-rules";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { blankToNull } from "@/components/form";
 import { type BusinessDraft, BusinessStep } from "./BusinessStep";
 import { NameStep } from "./NameStep";
 import { StepIndicator } from "./StepIndicator";
 import { UsernameStep } from "./UsernameStep";
-import { isBusinessValid, isNameValid, isUsernameValid } from "./validation";
 
 const STEPS = ["name", "username", "business"] as const;
 
@@ -39,9 +43,6 @@ export function Wizard() {
 
   const [step, setStep] = useState(0);
 
-  // Plain useState, NOT useDraft: the user slice applies writes optimistically,
-  // so useDraft's resync-on-`initial`-change would wipe what is being typed the
-  // moment a step's PATCH lands.
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft>({
@@ -50,21 +51,11 @@ export function Wizard() {
     country: business?.country ?? "",
   });
 
-  /** The section whose write we are waiting on, or null when idle. */
   const [pending, setPending] = useState<string | null>(null);
   const isSaving = useAppSelector(selectIsSectionSaving(pending ?? ""));
 
-  // "not saving" only means "finished" once we have actually seen it saving.
-  // Without this, a render where `pending` is set but the dispatch has not yet
-  // been reflected in `savingSections` reads as a completed write and skips the
-  // step forward before anything was sent.
   const sawSaving = useRef(false);
 
-  // Advance only once the write has landed cleanly.
-  //
-  // Relies on exactly one write being in flight at a time, which a blocking
-  // modal with a single Continue button guarantees. If a "save and skip"
-  // affordance is ever added, this needs a request id in `meta` instead.
   useEffect(() => {
     if (!pending) {
       return;
@@ -97,7 +88,7 @@ export function Wizard() {
       case "username":
         return isUsernameValid(username, usernameCheck.status);
       case "business":
-        return isBusinessValid(businessDraft.legalName);
+        return isBusinessValid(businessDraft.legalName, businessDraft.country);
       default:
         return false;
     }
@@ -115,7 +106,6 @@ export function Wizard() {
         break;
 
       case "username":
-        // Unchanged handle: nothing to write, just move on.
         if (username.trim().toLowerCase() === savedUsername) {
           setStep((current) => current + 1);
           return;
@@ -133,7 +123,7 @@ export function Wizard() {
         setPending(SECTIONS.business);
         dispatch(
           completeOnboarding(
-            blankToNull(
+            blankFieldsToNull(
               {
                 legalName: businessDraft.legalName.trim(),
                 businessType: businessDraft.businessType,
@@ -163,11 +153,6 @@ export function Wizard() {
       data-testid="onboarding"
       footer={
         <div className="flex w-full items-center justify-between gap-2">
-          {/*
-            Not an escape from onboarding — an escape from a broken one. Without
-            it a failing API strands the user in a modal with no way to even
-            sign out.
-          */}
           <button
             type="button"
             onClick={() => signOut()}

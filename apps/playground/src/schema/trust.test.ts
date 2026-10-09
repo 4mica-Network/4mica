@@ -1,6 +1,10 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { FileReportSchema, SubmitReviewSchema } from "./trust";
+import {
+  FileReportSchema,
+  ResourceRefSchema,
+  SubmitReviewSchema,
+} from "./trust";
 
 const parse = <T extends v.GenericSchema>(schema: T, input: unknown) =>
   v.safeParse(schema, input);
@@ -69,5 +73,43 @@ describe("FileReportSchema", () => {
     const result = parse(FileReportSchema, { reason: "NOT_WORKING" });
 
     expect(result.success && result.output.detail).toBeNull();
+  });
+
+  it("requires a detail when the reason is OTHER", () => {
+    const missing = parse(FileReportSchema, { reason: "OTHER", detail: "  " });
+
+    expect(missing.success).toBe(false);
+    expect(!missing.success && v.getDotPath(missing.issues[0])).toBe("detail");
+    expect(
+      parse(FileReportSchema, { reason: "OTHER", detail: "Charges twice" })
+        .success,
+    ).toBe(true);
+  });
+});
+
+describe("ResourceRefSchema", () => {
+  const VALID = {
+    kind: "agent",
+    id: "019fce62-0000-7000-8000-000000000000",
+    username: "ada",
+    ref: "atlas",
+  };
+
+  it("accepts the shape the trust section sends", () => {
+    expect(parse(ResourceRefSchema, VALID).success).toBe(true);
+  });
+
+  it("rejects anything a crafted request could smuggle in", () => {
+    for (const bad of [
+      { ...VALID, kind: "user" },
+      { ...VALID, id: "not-a-uuid" },
+      { ...VALID, username: "../admin" },
+      { ...VALID, ref: "atlas/../../settings" },
+      null,
+    ]) {
+      expect(parse(ResourceRefSchema, bad).success, JSON.stringify(bad)).toBe(
+        false,
+      );
+    }
   });
 });

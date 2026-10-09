@@ -1,3 +1,4 @@
+import { DEFAULT_PAGE_SIZE } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   Payment,
@@ -6,8 +7,6 @@ import type {
   PaymentStats,
   PaymentSummary,
 } from "./type";
-
-export const DEFAULT_PAGE_SIZE = 20;
 
 export const INITIAL_STATE: PaymentState = {
   items: [],

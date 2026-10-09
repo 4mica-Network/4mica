@@ -1,6 +1,8 @@
+import { isWebUrl } from "@4mica/rules";
 import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
+  normalizeUrl,
   positiveInt,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
@@ -23,9 +25,10 @@ const nullableUrl = () =>
       v.maxLength(2048, "must be 2048 characters or shorter"),
       v.transform((value) => (value === "" ? null : value)),
       v.check(
-        (value) => value === null || /^https?:\/\/\S+$/.test(value),
+        (value) => value === null || isWebUrl(value),
         "must be an http:// or https:// URL",
       ),
+      v.transform((value) => (value === null ? null : normalizeUrl(value))),
     ),
   );
 
@@ -40,6 +43,7 @@ const nullableEmail = () =>
         (value) => value === null || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value),
         "must be an email address",
       ),
+      v.transform((value) => value?.toLowerCase() ?? null),
     ),
   );
 

@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/PageHeader";
 
 export function Balances() {
   return (

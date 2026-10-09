@@ -1,17 +1,16 @@
+import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
   notFound,
   parseBody,
   requireUserId,
-} from "@controllers/shared";
-import { appLogger } from "@logger/index";
-import { isUniqueViolation } from "@services/prisma-errors";
-import {
-  resolveSellerWallet,
   sellerWalletError,
-} from "@services/seller-wallet";
-import { nextFreeSlug, slugify } from "@services/slug";
+} from "@controllers/shared";
+import { resolveSellerWallet } from "@controllers/wallets/repository";
+import { appLogger } from "@logger/index";
+import { isUniqueViolation } from "@utils/prisma-errors";
+import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteApiListings,
@@ -34,6 +33,14 @@ const slugTaken = (reply: FastifyReply) =>
     error: "slug_taken",
     message: "You already have a listing at that address.",
     issues: [{ path: "slug", message: "is already in use on your profile" }],
+  });
+
+const notPayable = (reply: FastifyReply) =>
+  reply.code(409).send({
+    error: "listing_not_payable",
+    message:
+      "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
+    issues: [{ path: "walletId", message: "is required before publishing" }],
   });
 
 export const listApiListingsHandler: RouteHandler = async (request, reply) => {
@@ -93,6 +100,10 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     walletId = resolved.wallet.id;
     network = resolved.wallet.network;
     payToAddress = resolved.wallet.address;
+  }
+
+  if (data.visibility === "PUBLIC" && !payToAddress) {
+    return notPayable(reply);
   }
 
   const taken = await takenSlugs(userId);
@@ -180,6 +191,30 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
     }
   }
 
+  const payToAfter =
+    "payToAddress" in data
+      ? (data.payToAddress as string | null)
+      : current.payToAddress;
+
+  if (next.visibility === "PUBLIC") {
+    if (!payToAfter) {
+      return notPayable(reply);
+    }
+    if (walletId === undefined && current.walletId) {
+      const resolved = await resolveSellerWallet(userId, current.walletId);
+      if (!resolved.ok) {
+        return sellerWalletError(reply, resolved);
+      }
+    }
+    data.publishedAt = current.publishedAt ?? new Date();
+  } else if (
+    next.visibility === undefined &&
+    current.visibility === "PUBLIC" &&
+    !payToAfter
+  ) {
+    data.visibility = "PRIVATE";
+  }
+
   if (next.slug && next.slug !== current.slug) {
     const taken = await takenSlugs(userId);
     if (taken.has(next.slug)) {
@@ -214,12 +249,14 @@ export const publishApiListingHandler: RouteHandler = async (
   }
 
   if (!current.payToAddress || !current.network) {
-    return reply.code(409).send({
-      error: "listing_not_payable",
-      message:
-        "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
-      issues: [{ path: "walletId", message: "is required before publishing" }],
-    });
+    return notPayable(reply);
+  }
+
+  if (current.walletId) {
+    const resolved = await resolveSellerWallet(userId, current.walletId);
+    if (!resolved.ok) {
+      return sellerWalletError(reply, resolved);
+    }
   }
 
   const updated = await updateApiListing(userId, id, {

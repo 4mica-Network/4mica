@@ -5,6 +5,7 @@ import * as v from "valibot";
 import {
   FileReportSchema,
   type ReportReason,
+  ResourceRefSchema,
   SubmitReviewSchema,
 } from "@/schema/trust";
 import { prisma } from "@/services/db";
@@ -23,43 +24,85 @@ interface ResourceRef {
   ref: string;
 }
 
-const pathOf = ({ kind, username, ref }: ResourceRef): string =>
-  kind === "listing" ? `/${username}/api/${ref}` : `/${username}/agents/${ref}`;
+const parseResource = (resource: unknown): ResourceRef | null => {
+  const parsed = v.safeParse(ResourceRefSchema, resource);
+  return parsed.success ? parsed.output : null;
+};
+
+interface Target {
+  ownerId: string;
+  path: string | null;
+}
+
+const PUBLIC_VISIBILITY = { in: ["PUBLIC" as const, "UNLISTED" as const] };
 
 const resolveTarget = async (
   resource: ResourceRef,
-): Promise<{ ownerId: string } | null> => {
+  { publicOnly = true }: { publicOnly?: boolean } = {},
+): Promise<Target | null> => {
+  const where = {
+    id: resource.id,
+    deletedAt: null,
+    ...(publicOnly ? { visibility: PUBLIC_VISIBILITY } : {}),
+  };
+  const select = {
+    ownerId: true,
+    slug: true,
+    owner: { select: { username: true } },
+  } as const;
+
   if (resource.kind === "listing") {
-    return prisma.apiListing.findFirst({
-      where: {
-        id: resource.id,
-        deletedAt: null,
-        visibility: { in: ["PUBLIC", "UNLISTED"] },
-      },
-      select: { ownerId: true },
-    });
+    const listing = await prisma.apiListing.findFirst({ where, select });
+
+    return listing
+      ? {
+          ownerId: listing.ownerId,
+          path: listing.owner.username
+            ? `/${listing.owner.username}/api/${listing.slug}`
+            : null,
+        }
+      : null;
   }
 
-  const agent = await prisma.agent.findFirst({
-    where: {
-      id: resource.id,
-      deletedAt: null,
-      visibility: { in: ["PUBLIC", "UNLISTED"] },
-    },
-    select: { ownerId: true },
-  });
+  const agent = await prisma.agent.findFirst({ where, select });
 
-  return agent?.ownerId ? { ownerId: agent.ownerId } : null;
+  if (!agent?.ownerId) {
+    return null;
+  }
+
+  return {
+    ownerId: agent.ownerId,
+    path: agent.owner?.username
+      ? `/${agent.owner.username}/agents/${agent.slug ?? resource.id}`
+      : null,
+  };
 };
 
+const revalidateTarget = (target: Target): void => {
+  if (target.path) {
+    revalidatePath(target.path);
+  }
+};
+
+const errorCode = (error: unknown): string | undefined =>
+  typeof error === "object" && error !== null
+    ? (error as { code?: string }).code
+    : undefined;
+
 export const submitReview = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
   if (!viewer) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
   }
 
   const parsed = v.safeParse(SubmitReviewSchema, input);
@@ -84,38 +127,35 @@ export const submitReview = async (
     viewer.id,
   );
 
-  const where = {
-    ...targetOf(resource.kind, resource.id),
-    authorId: viewer.id,
-  };
-  const existing = await prisma.review.findFirst({
-    where,
-    select: { id: true },
+  const data = { ...parsed.output, verifiedPurchase };
+
+  await prisma.review.upsert({
+    where:
+      resource.kind === "listing"
+        ? {
+            listingId_authorId: {
+              listingId: resource.id,
+              authorId: viewer.id,
+            },
+          }
+        : {
+            agentId_authorId: { agentId: resource.id, authorId: viewer.id },
+          },
+    update: data,
+    create: {
+      ...targetOf(resource.kind, resource.id),
+      authorId: viewer.id,
+      ...data,
+    },
   });
 
-  if (existing) {
-    await prisma.review.update({
-      where: { id: existing.id },
-      data: { ...parsed.output, verifiedPurchase },
-    });
-  } else {
-    await prisma.review.create({
-      data: {
-        ...targetOf(resource.kind, resource.id),
-        authorId: viewer.id,
-        ...parsed.output,
-        verifiedPurchase,
-      },
-    });
-  }
-
-  revalidatePath(pathOf(resource));
+  revalidateTarget(target);
 
   return { ok: true };
 };
 
 export const deleteOwnReview = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
@@ -123,26 +163,46 @@ export const deleteOwnReview = async (
     return { ok: false, error: "unauthorized" };
   }
 
-  await prisma.review.deleteMany({
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
+  }
+
+  const { count } = await prisma.review.deleteMany({
     where: {
       ...targetOf(resource.kind, resource.id),
       authorId: viewer.id,
     },
   });
 
-  revalidatePath(pathOf(resource));
+  if (count === 0) {
+    return { ok: false, error: "not_found" };
+  }
+
+  const target = await resolveTarget(resource, { publicOnly: false });
+
+  if (target) {
+    revalidateTarget(target);
+  }
 
   return { ok: true };
 };
 
 export const fileReport = async (
-  resource: ResourceRef,
+  ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
   const viewer = await getViewer();
 
   if (!viewer) {
     return { ok: false, error: "unauthorized" };
+  }
+
+  const resource = parseResource(ref);
+
+  if (!resource) {
+    return { ok: false, error: "not_found" };
   }
 
   const parsed = v.safeParse(FileReportSchema, input);
@@ -157,27 +217,46 @@ export const fileReport = async (
     return { ok: false, error: "not_found" };
   }
 
-  const open = await prisma.report.findFirst({
-    where: {
-      ...targetOf(resource.kind, resource.id),
-      reporterId: viewer.id,
-      status: { in: ["OPEN", "ACKNOWLEDGED"] },
-    },
-    select: { id: true },
-  });
-
-  if (open) {
-    return { ok: false, error: "already_reported" };
+  if (target.ownerId === viewer.id) {
+    return { ok: false, error: "own_resource" };
   }
 
-  await prisma.report.create({
-    data: {
-      ...targetOf(resource.kind, resource.id),
-      reporterId: viewer.id,
-      reason: parsed.output.reason as ReportReason,
-      detail: parsed.output.detail,
-    },
-  });
+  try {
+    const created = await prisma.$transaction(
+      async (tx) => {
+        const open = await tx.report.findFirst({
+          where: {
+            ...targetOf(resource.kind, resource.id),
+            reporterId: viewer.id,
+            status: { in: ["OPEN", "ACKNOWLEDGED"] },
+          },
+          select: { id: true },
+        });
 
-  return { ok: true };
+        if (open) {
+          return false;
+        }
+
+        await tx.report.create({
+          data: {
+            ...targetOf(resource.kind, resource.id),
+            reporterId: viewer.id,
+            reason: parsed.output.reason as ReportReason,
+            detail: parsed.output.detail,
+          },
+        });
+
+        return true;
+      },
+      { isolationLevel: "Serializable" },
+    );
+
+    return created ? { ok: true } : { ok: false, error: "already_reported" };
+  } catch (error) {
+    if (errorCode(error) === "P2034") {
+      return { ok: false, error: "already_reported" };
+    }
+
+    throw error;
+  }
 };

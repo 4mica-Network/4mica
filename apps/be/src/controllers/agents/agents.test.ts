@@ -118,7 +118,7 @@ const storedAgent = (over: Record<string, unknown> = {}) => ({
   network: "BASE_SEPOLIA",
   walletAddress: PAYER_ADDRESS,
   payerWalletId: PAYER_WALLET_ID,
-  creditLimit: { toString: () => "0" },
+  creditLimit: { toFixed: () => "0" },
   walletId: SELLER_WALLET_ID,
   payToAddress: SELLER_ADDRESS,
   assetAddress: null,
@@ -396,6 +396,25 @@ describe("agent routes", () => {
       await instance.close();
     });
 
+    it("will not let an owner lift a moderation suspension", async () => {
+      agent.findFirst.mockResolvedValue(storedAgent({ status: "SUSPENDED" }));
+      const instance = await app();
+
+      for (const status of ["PENDING", "ACTIVE"]) {
+        const res = await instance.inject({
+          method: "PATCH",
+          url: `/me/agents/${AGENT_ID}`,
+          headers: AUTH,
+          payload: { status },
+        });
+        expect(res.statusCode, status).toBe(409);
+        expect(res.json().error).toBe("agent_suspended");
+      }
+      expect(agent.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("accepts PENDING and ACTIVE", async () => {
       agent.findMany.mockResolvedValue([]);
       const instance = await app();
@@ -433,6 +452,25 @@ describe("agent routes", () => {
       await instance.close();
     });
 
+    it("refuses to publish while the receiving wallet is retired", async () => {
+      walletsById({
+        [SELLER_WALLET_ID]: sellerWallet({ status: "RETIRED" }),
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/agents/${AGENT_ID}/publish`,
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("wallet_not_active");
+      expect(agent.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("keeps the original publishedAt when re-publishing", async () => {
       const first = new Date("2026-01-01T00:00:00.000Z");
       agent.findFirst.mockResolvedValue(storedAgent({ publishedAt: first }));
@@ -445,6 +483,128 @@ describe("agent routes", () => {
       });
 
       expect(agent.updateMany.mock.calls[0][0].data.publishedAt).toBe(first);
+
+      await instance.close();
+    });
+  });
+
+  describe("public visibility has one gate, whatever the route", () => {
+    it("will not publish a suspended agent", async () => {
+      agent.findFirst.mockResolvedValue(storedAgent({ status: "SUSPENDED" }));
+      const instance = await app();
+
+      const viaPublish = await instance.inject({
+        method: "POST",
+        url: `/me/agents/${AGENT_ID}/publish`,
+        headers: AUTH,
+      });
+      const viaPatch = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}`,
+        headers: AUTH,
+        payload: { visibility: "PUBLIC" },
+      });
+
+      for (const res of [viaPublish, viaPatch]) {
+        expect(res.statusCode).toBe(409);
+        expect(res.json().error).toBe("agent_suspended");
+      }
+      expect(agent.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("still lets a suspended agent be taken private", async () => {
+      agent.findFirst.mockResolvedValue(
+        storedAgent({ status: "SUSPENDED", visibility: "PUBLIC" }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}`,
+        headers: AUTH,
+        payload: { visibility: "PRIVATE" },
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      await instance.close();
+    });
+
+    it("refuses PUBLIC through PATCH without a receiving wallet", async () => {
+      agent.findFirst.mockResolvedValue(
+        storedAgent({ walletId: null, payToAddress: null }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}`,
+        headers: AUTH,
+        payload: { visibility: "PUBLIC" },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("agent_not_payable");
+      expect(agent.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses to create a public agent with no receiving wallet", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/agents",
+        headers: AUTH,
+        payload: { name: "Atlas", visibility: "PUBLIC" },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("agent_not_payable");
+      expect(agent.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("stamps publishedAt when PATCH makes an agent public", async () => {
+      agent.findMany.mockResolvedValue([]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}`,
+        headers: AUTH,
+        payload: { visibility: "PUBLIC" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(agent.updateMany.mock.calls[0][0].data.publishedAt).toBeInstanceOf(
+        Date,
+      );
+
+      await instance.close();
+    });
+
+    it("takes a public agent private when its receiving wallet is unlinked", async () => {
+      agent.findFirst.mockResolvedValue(storedAgent({ visibility: "PUBLIC" }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/agents/${AGENT_ID}`,
+        headers: AUTH,
+        payload: { walletId: null },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(agent.updateMany.mock.calls[0][0].data).toMatchObject({
+        walletId: null,
+        payToAddress: null,
+        visibility: "PRIVATE",
+      });
 
       await instance.close();
     });

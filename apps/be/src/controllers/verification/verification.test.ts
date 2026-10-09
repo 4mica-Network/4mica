@@ -1,6 +1,6 @@
 import { clearUserCache } from "@auth/user-store";
 import { verificationRoutes } from "@routes/verification";
-import { hashSecret } from "@services/secrets";
+import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 
@@ -72,6 +72,7 @@ const PROFILE = {
   ...AUTH_USER,
   username: "ada",
   emailVerified: false,
+  pendingEmail: null,
   phoneNumber: null,
   phoneNumberVerified: false,
   verified: false,
@@ -110,7 +111,7 @@ const tokenRow = (overrides: Record<string, unknown> = {}) => ({
   email: "ada@example.com",
   expiresAt: new Date(Date.now() + 60_000),
   consumedAt: null,
-  user: { id: AUTH_USER.id, email: "ada@example.com" },
+  user: { id: AUTH_USER.id, email: "ada@example.com", pendingEmail: null },
   ...overrides,
 });
 
@@ -220,6 +221,29 @@ describe("verification routes", () => {
       await instance.close();
     });
 
+    it("sends the link to a pending address, not the current one", async () => {
+      findUnique.mockResolvedValue({
+        ...PROFILE,
+        emailVerified: true,
+        pendingEmail: "ada@newdomain.com",
+      });
+
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/email/verification",
+        headers: AUTH,
+      });
+
+      expect(res.statusCode).toBe(202);
+      expect(sendAccountVerification.mock.calls[0][0].to).toBe(
+        "ada@newdomain.com",
+      );
+      expect(tokenCreate.mock.calls[0][0].data.email).toBe("ada@newdomain.com");
+
+      await instance.close();
+    });
+
     it("refuses when the account has no address", async () => {
       findUnique.mockResolvedValue({ ...PROFILE, email: null });
       upsert.mockResolvedValue({ ...AUTH_USER, email: null });
@@ -281,89 +305,19 @@ describe("verification routes", () => {
       return res;
     };
 
-    it("verifies the account and sends the browser back to the dashboard", async () => {
+    it("forwards to the dashboard to confirm, without spending the token", async () => {
       tokenFindUnique.mockResolvedValue(tokenRow());
 
       const res = await follow("?token=4mica_ev_good");
 
       expect(res.statusCode).toBe(303);
       expect(res.headers.location).toBe(
-        "http://app.test/settings/profile?verify=success",
+        "http://app.test/settings/profile?verifyToken=4mica_ev_good",
       );
-
-      expect(tokenFindUnique).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { tokenHash: hashSecret("4mica_ev_good") },
-        }),
-      );
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: AUTH_USER.id },
-          data: { emailVerified: true },
-        }),
-      );
-      expect(tokenUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "tok_1" } }),
-      );
-    });
-
-    it("needs no session — the token is the credential", async () => {
-      authenticateRequest.mockResolvedValue(signedOut());
-      tokenFindUnique.mockResolvedValue(tokenRow());
-
-      const res = await follow("?token=4mica_ev_good");
-
-      expect(res.statusCode).toBe(303);
-      expect(res.headers.location).toContain("verify=success");
-    });
-
-    it("reports an expired link without spending it", async () => {
-      tokenFindUnique.mockResolvedValue(
-        tokenRow({ expiresAt: new Date(Date.now() - 1_000) }),
-      );
-
-      const res = await follow("?token=4mica_ev_old");
-
-      expect(res.headers.location).toBe(
-        "http://app.test/settings/profile?verify=expired",
-      );
+      // A mail scanner prefetching the link must not be able to verify it.
+      expect(tokenFindUnique).not.toHaveBeenCalled();
       expect(update).not.toHaveBeenCalled();
-    });
-
-    it("rejects an unknown token", async () => {
-      tokenFindUnique.mockResolvedValue(null);
-
-      const res = await follow("?token=4mica_ev_nope");
-
-      expect(res.headers.location).toBe(
-        "http://app.test/settings/profile?verify=invalid",
-      );
-      expect(update).not.toHaveBeenCalled();
-    });
-
-    it("rejects a token that was already spent", async () => {
-      tokenFindUnique.mockResolvedValue(
-        tokenRow({ consumedAt: new Date("2026-09-01T00:00:00.000Z") }),
-      );
-
-      const res = await follow("?token=4mica_ev_used");
-
-      expect(res.headers.location).toContain("verify=invalid");
-      expect(update).not.toHaveBeenCalled();
-    });
-
-    it("rejects a token minted for an address the user has since changed", async () => {
-      tokenFindUnique.mockResolvedValue(
-        tokenRow({
-          email: "old@example.com",
-          user: { id: AUTH_USER.id, email: "new@example.com" },
-        }),
-      );
-
-      const res = await follow("?token=4mica_ev_stale");
-
-      expect(res.headers.location).toContain("verify=invalid");
-      expect(update).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
     });
 
     it("redirects rather than 400s when the token is missing", async () => {
@@ -371,7 +325,159 @@ describe("verification routes", () => {
 
       expect(res.statusCode).toBe(303);
       expect(res.headers.location).toContain("verify=invalid");
+    });
+  });
+
+  describe("POST /me/email/verification/confirm", () => {
+    const confirm = async (token = "4mica_ev_good") => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/email/verification/confirm",
+        headers: AUTH,
+        payload: { token },
+      });
+      await instance.close();
+      return res;
+    };
+
+    it("verifies the current address and returns the profile", async () => {
+      tokenFindUnique.mockResolvedValue(tokenRow());
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().id).toBe(AUTH_USER.id);
+      expect(tokenFindUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tokenHash: hashSecret("4mica_ev_good") },
+        }),
+      );
+      expect(update).toHaveBeenCalledWith({
+        where: { id: AUTH_USER.id },
+        data: { emailVerified: true },
+      });
+      expect(tokenUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "tok_1" } }),
+      );
+    });
+
+    it("promotes a pending address once its link is confirmed", async () => {
+      tokenFindUnique.mockResolvedValue(
+        tokenRow({
+          email: "ada@newdomain.com",
+          user: {
+            id: AUTH_USER.id,
+            email: "ada@example.com",
+            pendingEmail: "ada@newdomain.com",
+          },
+        }),
+      );
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(200);
+      expect(update).toHaveBeenCalledWith({
+        where: { id: AUTH_USER.id },
+        data: {
+          email: "ada@newdomain.com",
+          pendingEmail: null,
+          emailVerified: true,
+        },
+      });
+    });
+
+    it("refuses a token minted for another account", async () => {
+      tokenFindUnique.mockResolvedValue(
+        tokenRow({
+          user: {
+            id: "019fce62-9999-7000-8000-999999999999",
+            email: "ada@example.com",
+            pendingEmail: null,
+          },
+        }),
+      );
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("invalid_token");
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("requires a session — the token alone is not enough", async () => {
+      authenticateRequest.mockResolvedValue(signedOut());
+      tokenFindUnique.mockResolvedValue(tokenRow());
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(401);
       expect(tokenFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("reports an expired link without spending it", async () => {
+      tokenFindUnique.mockResolvedValue(
+        tokenRow({ expiresAt: new Date(Date.now() - 1_000) }),
+      );
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(410);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unknown or already spent token", async () => {
+      for (const row of [
+        null,
+        tokenRow({ consumedAt: new Date("2026-09-01T00:00:00.000Z") }),
+      ]) {
+        tokenFindUnique.mockResolvedValue(row);
+        const res = await confirm();
+        expect(res.statusCode).toBe(400);
+      }
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects a token for an address the user has since moved away from", async () => {
+      tokenFindUnique.mockResolvedValue(
+        tokenRow({
+          email: "old@example.com",
+          user: {
+            id: AUTH_USER.id,
+            email: "new@example.com",
+            pendingEmail: "newer@example.com",
+          },
+        }),
+      );
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(400);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses to take an address another account already holds", async () => {
+      tokenFindUnique.mockResolvedValue(
+        tokenRow({
+          email: "taken@example.com",
+          user: {
+            id: AUTH_USER.id,
+            email: "ada@example.com",
+            pendingEmail: "taken@example.com",
+          },
+        }),
+      );
+      transaction.mockRejectedValue(
+        Object.assign(new Error("unique"), {
+          code: "P2002",
+          meta: { target: ["email"] },
+        }),
+      );
+
+      const res = await confirm();
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("email_taken");
     });
   });
 });

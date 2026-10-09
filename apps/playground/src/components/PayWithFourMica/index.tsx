@@ -1,7 +1,7 @@
+import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Tag, Link as UiLink } from "@4mica/ui";
 import { ArrowUpRight, Check, Wallet } from "lucide-react";
 import { messages, t } from "@/i18n";
-import { networkInfo } from "@/lib/snippets/networks";
 import type { PaymentNetwork } from "@/schema/params";
 import { links } from "@/services/links";
 import type { PayerState } from "@/services/payer";
@@ -18,7 +18,7 @@ interface StepCopy {
 }
 
 export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
-  const chain = network ? networkInfo(network).label : null;
+  const chain = network ? PAYMENT_NETWORKS[network].label : null;
 
   if (state.step === "ready") {
     return (
@@ -31,7 +31,7 @@ export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
           {messages.payWith.readyTitle}
         </span>
         <Tag size="sm" variant="neutral" className="font-mono">
-          {`${state.address.slice(0, 6)}…${state.address.slice(-4)}`}
+          {shortenAddress(state.address)}
         </Tag>
         <UiLink className="text-sm" external href={`${links.app}/balances`}>
           {messages.payWith.readyAction}
@@ -84,7 +84,7 @@ export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
                 : messages.payWith.noWallet.walletTitle,
               body: t(messages.payWith.wrongNetwork.body, {
                 networks: state.networks
-                  .map((entry) => networkInfo(entry).label)
+                  .map((entry) => PAYMENT_NETWORKS[entry].label)
                   .join(", "),
               }),
             },

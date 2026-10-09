@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type {
   ApiKey,
   DeveloperState,
@@ -28,10 +28,13 @@ export const selectIsDeveloperLoading = (state: RootState): boolean =>
 export const selectHasLoadedDeveloper = (state: RootState): boolean =>
   state.developer.hasLoaded;
 
-export const selectIsPending =
+export const selectIsDeveloperPending =
   (key: string) =>
   (state: RootState): boolean =>
     Boolean(state.developer.pending[key]);
+
+export const selectDeveloperError = (state: RootState): string | null =>
+  state.developer.error;
 
 export const selectDeveloperIssues = (
   state: RootState,

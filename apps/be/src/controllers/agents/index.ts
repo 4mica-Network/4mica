@@ -1,22 +1,23 @@
 import type { PaymentNetwork } from "@4mica/db";
+import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
   notFound,
   parseBody,
   requireUserId,
+  sellerWalletError,
 } from "@controllers/shared";
+import {
+  resolvePayerWallet,
+  resolveSellerWallet,
+} from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
-import {
-  resolvePayerWallet,
-  resolveSellerWallet,
-  sellerWalletError,
-} from "@services/seller-wallet";
-import { nextFreeSlug, slugify } from "@services/slug";
+} from "@utils/prisma-errors";
+import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteAgents,
@@ -47,6 +48,22 @@ const payerAddressTaken = (reply: FastifyReply) =>
     message:
       "Another agent already signs with that wallet on this network. One payer address is one agent.",
     issues: [{ path: "payerWalletId", message: "is already used by an agent" }],
+  });
+
+const notPayable = (reply: FastifyReply) =>
+  reply.code(409).send({
+    error: "agent_not_payable",
+    message:
+      "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
+    issues: [{ path: "walletId", message: "is required before publishing" }],
+  });
+
+const suspended = (reply: FastifyReply, path: "status" | "visibility") =>
+  reply.code(409).send({
+    error: "agent_suspended",
+    message:
+      "This agent was suspended by moderation and cannot be reactivated or published from here.",
+    issues: [{ path, message: "cannot change while suspended" }],
   });
 
 const uniqueConflict = (reply: FastifyReply, error: unknown) => {
@@ -128,6 +145,11 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     payToAddress = resolved.wallet.address;
   }
 
+  // Same bar as POST /publish: a public agent must be payable.
+  if (data.visibility === "PUBLIC" && !payToAddress) {
+    return notPayable(reply);
+  }
+
   const taken = await takenSlugs(userId);
   if (data.slug && taken.has(data.slug)) {
     return slugTaken(reply);
@@ -195,6 +217,14 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
   }
 
   const next = parsed.data;
+
+  if (current.status === "SUSPENDED" && next.status !== undefined) {
+    return suspended(reply, "status");
+  }
+  if (current.status === "SUSPENDED" && next.visibility === "PUBLIC") {
+    return suspended(reply, "visibility");
+  }
+
   const { walletId, payerWalletId, network, ...rest } = next;
   const data: Record<string, unknown> = { ...rest };
 
@@ -259,6 +289,30 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
     }
   }
 
+  const payToAfter =
+    "payToAddress" in data
+      ? (data.payToAddress as string | null)
+      : current.payToAddress;
+
+  if (next.visibility === "PUBLIC") {
+    if (!payToAfter) {
+      return notPayable(reply);
+    }
+    if (walletId === undefined && current.walletId) {
+      const resolved = await resolveSellerWallet(userId, current.walletId);
+      if (!resolved.ok) {
+        return sellerWalletError(reply, resolved);
+      }
+    }
+    data.publishedAt = current.publishedAt ?? new Date();
+  } else if (
+    next.visibility === undefined &&
+    current.visibility === "PUBLIC" &&
+    !payToAfter
+  ) {
+    data.visibility = "PRIVATE";
+  }
+
   if (next.slug && next.slug !== current.slug) {
     const taken = await takenSlugs(userId);
     if (taken.has(next.slug)) {
@@ -289,13 +343,19 @@ export const publishAgentHandler: RouteHandler = async (request, reply) => {
     return notFound(reply, "agent");
   }
 
+  if (current.status === "SUSPENDED") {
+    return suspended(reply, "visibility");
+  }
+
   if (!current.payToAddress) {
-    return reply.code(409).send({
-      error: "agent_not_payable",
-      message:
-        "Choose a receiving wallet before publishing — without one the integration guide cannot generate code.",
-      issues: [{ path: "walletId", message: "is required before publishing" }],
-    });
+    return notPayable(reply);
+  }
+
+  if (current.walletId) {
+    const resolved = await resolveSellerWallet(userId, current.walletId);
+    if (!resolved.ok) {
+      return sellerWalletError(reply, resolved);
+    }
   }
 
   const updated = await updateAgent(userId, id, {

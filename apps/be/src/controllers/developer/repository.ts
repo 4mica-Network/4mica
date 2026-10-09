@@ -1,5 +1,5 @@
 import { prisma } from "@4mica/db";
-import { generateApiKey, generateWebhookSecret } from "@services/secrets";
+import { generateApiKey, generateWebhookSecret } from "@utils/secrets";
 import type {
   CreateApiKeyInput,
   CreateWebhookInput,
@@ -33,9 +33,11 @@ export const WEBHOOK_SELECT = {
   updatedAt: true,
 } as const;
 
+const ACCOUNT_KEY = { listingId: null, agentId: null } as const;
+
 export const listApiKeys = (ownerId: string) =>
   prisma.apiKey.findMany({
-    where: { ownerId },
+    where: { ownerId, ...ACCOUNT_KEY },
     orderBy: { createdAt: "desc" },
     select: API_KEY_SELECT,
   });
@@ -67,7 +69,7 @@ export const updateApiKey = async (
   data: UpdateApiKeyInput,
 ) => {
   const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId },
+    where: { id, ownerId, ...ACCOUNT_KEY },
     data,
   });
 
@@ -80,7 +82,7 @@ export const updateApiKey = async (
 
 export const revokeApiKey = async (ownerId: string, id: string) => {
   const { count } = await prisma.apiKey.updateMany({
-    where: { id, ownerId, revokedAt: null },
+    where: { id, ownerId, ...ACCOUNT_KEY, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 
@@ -92,7 +94,9 @@ export const revokeApiKey = async (ownerId: string, id: string) => {
 };
 
 export const deleteApiKey = async (ownerId: string, id: string) => {
-  const { count } = await prisma.apiKey.deleteMany({ where: { id, ownerId } });
+  const { count } = await prisma.apiKey.deleteMany({
+    where: { id, ownerId, ...ACCOUNT_KEY },
+  });
   return count > 0;
 };
 

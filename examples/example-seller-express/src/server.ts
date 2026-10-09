@@ -1,55 +1,74 @@
-import { rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { PaywallConfig, PaywallVerifier } from "@4mica/sdk-express";
-import { paywall } from "@4mica/sdk-express";
+import "dotenv/config";
+
+import { fromAppNetwork, paymentFromHeader, paywall } from "@4mica/sdk-express";
+import { createAppClient, createClient } from "@4mica/sdk-node";
 import express from "express";
 
-const PORT_FILE = join(tmpdir(), "4mica-example-express.url");
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-const verifier: PaywallVerifier = {
-  async issueGuarantee(payload) {
-    console.log("[seller] verifying payment payload:", payload);
-    return { claims: "0xdemoClaims", signature: "0xdemoSignature" };
-  },
-};
+const api = createAppClient();
+const { listing, policy } = await api.resource();
 
-export const PAYWALL_CONFIG: PaywallConfig = {
-  payTo: "0x1111111111111111111111111111111111111111",
-  asset: "0x0000000000000000000000000000000000000000",
-  network: "base-sepolia",
-  amount: "1000",
-  description: "Premium market data feed",
-};
-
-const app = express();
-app.use(express.json());
-
-app.get("/premium", paywall(verifier, PAYWALL_CONFIG), (_req, res) => {
-  res.json({ ok: true, data: "🔓 premium market data unlocked" });
-});
-
-function listen(port: number, attemptsLeft = 20) {
-  const server = app.listen(port);
-  server.once("listening", () => {
-    const url = `http://localhost:${port}`;
-    writeFileSync(PORT_FILE, url);
-    console.log(`[seller-express] listening on ${url}`);
-    console.log(`  GET /premium is paywalled — run the buyer to pay for it.`);
-  });
-  server.once("error", (err: NodeJS.ErrnoException) => {
-    if (err.code === "EADDRINUSE" && attemptsLeft > 0) {
-      console.log(`[seller-express] port ${port} in use, trying ${port + 1}…`);
-      listen(port + 1, attemptsLeft - 1);
-    } else {
-      throw err;
-    }
-  });
+if (!listing?.payToAddress || !listing.network || !listing.priceAmount) {
+  throw new Error(
+    "Give the listing a receiving wallet, a network and a price in the dashboard first.",
+  );
 }
 
-const cleanup = () => rmSync(PORT_FILE, { force: true });
-process.on("exit", cleanup);
-process.on("SIGINT", () => process.exit(0));
-process.on("SIGTERM", () => process.exit(0));
+const payTo = listing.payToAddress;
+const asset = listing.assetAddress;
+const network = fromAppNetwork(listing.network);
+const client = await createClient();
 
-listen(Number(process.env.PORT ?? 3000));
+const app = express();
+
+app.get(
+  "/quote",
+  paywall(client, {
+    payTo,
+    asset: asset ?? ZERO_ADDRESS,
+    network,
+    amount: listing.priceAmount,
+    x402Version: 2,
+    description: listing.summary ?? listing.name,
+  }),
+  async (req, res) => {
+    const paid = paymentFromHeader(req.get("x-payment") ?? "", 0);
+
+    const decision = await api.resolveCustomer({
+      payerAddress: paid.payerAddress,
+      network,
+      amount: paid.amount,
+    });
+    if (!decision.allowed) {
+      res.status(403).json({ error: decision.deniedReason });
+      return;
+    }
+
+    res.json({ symbol: "ETH", price: 3142.55, asOf: new Date().toISOString() });
+
+    api
+      .reportPayment({
+        reqId: paid.reqId,
+        payerAddress: paid.payerAddress,
+        recipientAddress: payTo,
+        network,
+        assetAddress: asset,
+        amount: paid.amount,
+        resource: `${req.protocol}://${req.get("host")}/quote`,
+      })
+      .catch((error) => console.error("[seller] report failed:", error));
+  },
+);
+
+const port = Number(process.env.PORT ?? 3000);
+
+app.listen(port, () => {
+  console.log(`[seller] ${listing.name} on http://localhost:${port}`);
+  console.log(
+    `  GET /quote costs ${listing.priceAmount} on ${network}, paid to ${payTo}`,
+  );
+  if (policy?.refundPolicy) {
+    console.log(`  refund policy: ${policy.refundPolicy}`);
+  }
+});

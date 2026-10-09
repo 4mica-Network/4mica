@@ -1,18 +1,30 @@
+import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Button, Modal, Spinner } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { clearWalletIssues, updateWallet } from "@stores/wallet/actions";
+import {
+  clearWalletIssues,
+  updateWallet,
+  walletPendingKeys,
+} from "@stores/wallet/actions";
 import {
   selectIsWalletPending,
   selectWalletError,
   selectWalletIssues,
 } from "@stores/wallet/selector";
 import type { Wallet } from "@stores/wallet/type";
-import { useEffect, useRef } from "react";
+import { useEffect, useId } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
-import { NETWORKS, shortenAddress } from "./constants";
+import {
+  FieldRow,
+  Form,
+  FormSelect,
+  FormTextArea,
+  FormTextInput,
+} from "@/components/form";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useServerIssues } from "@/hooks/useServerIssues";
 import {
   DESCRIPTION_MAX_LENGTH,
   type EditWalletValues,
@@ -31,20 +43,14 @@ export function EditWalletModal({
   const dispatch = useAppDispatch();
 
   const isSaving = useAppSelector(
-    selectIsWalletPending(`wallet:${wallet?.id ?? ""}`),
+    selectIsWalletPending(walletPendingKeys.row(wallet?.id ?? "")),
   );
   const error = useAppSelector(selectWalletError);
   const issues = useAppSelector(selectWalletIssues);
 
-  const {
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<EditWalletValues>({
+  const form = useForm<EditWalletValues>({
     resolver: zodResolver(editWalletSchema),
-    mode: "onBlur",
+    mode: "onTouched",
     defaultValues: {
       label: "",
       description: "",
@@ -53,7 +59,8 @@ export function EditWalletModal({
     },
   });
 
-  const values = watch();
+  const { handleSubmit, reset, setError } = form;
+  const formId = useId();
 
   useEffect(() => {
     if (wallet) {
@@ -67,28 +74,13 @@ export function EditWalletModal({
     }
   }, [wallet, reset, dispatch]);
 
-  const sawSaving = useRef(false);
-  useEffect(() => {
-    if (isSaving) {
-      sawSaving.current = true;
-      return;
-    }
-    if (!sawSaving.current) {
-      return;
-    }
-    sawSaving.current = false;
-    if (!error && Object.keys(issues).length === 0) {
-      onClose();
-    }
-  }, [isSaving, error, issues, onClose]);
+  useServerIssues(issues, setError);
 
-  const fieldError = (field: keyof EditWalletValues) => {
-    if (issues[field]) {
-      return issues[field];
-    }
-    const message = errors[field]?.message;
-    return message ? t(message) : undefined;
-  };
+  useOnSuccess(
+    isSaving,
+    Boolean(error) || Object.keys(issues).length > 0,
+    onClose,
+  );
 
   const onValid = (data: EditWalletValues) => {
     if (!wallet) {
@@ -133,8 +125,10 @@ export function EditWalletModal({
             intent="invert"
             size="sm"
             className="btn-no-lift min-w-24"
+            type="submit"
+            form={formId}
             disabled={isSaving}
-            onClick={handleSubmit(onValid)}
+            aria-busy={isSaving}
             data-testid="edit-wallet-submit"
           >
             <span className="flex w-full items-center justify-center text-sm">
@@ -144,10 +138,11 @@ export function EditWalletModal({
         </div>
       }
     >
-      <form
+      <Form
+        form={form}
+        id={formId}
         className="flex flex-col gap-1"
         onSubmit={handleSubmit(onValid)}
-        noValidate
       >
         {wallet && (
           <div className="mb-3 rounded-lg border border-overlay/10 bg-overlay/5 px-4 py-3">
@@ -156,7 +151,7 @@ export function EditWalletModal({
             </p>
             <p className="mt-0.5 text-ink-subtle text-xs">
               {t("wallet.edit.immutable", {
-                network: NETWORKS[wallet.network].label,
+                network: PAYMENT_NETWORKS[wallet.network].label,
               })}
             </p>
           </div>
@@ -165,51 +160,29 @@ export function EditWalletModal({
         <FieldRow
           title={t("wallet.create.fields.label.title")}
           htmlFor="edit-wallet-label"
+          required
         >
-          <TextInput
-            id="edit-wallet-label"
-            value={values.label}
-            onChange={(value) =>
-              setValue("label", value, { shouldValidate: true })
-            }
-            error={fieldError("label")}
-            maxLength={LABEL_MAX_LENGTH}
-          />
+          <FormTextInput name="label" maxLength={LABEL_MAX_LENGTH} />
         </FieldRow>
 
         <FieldRow
           title={t("wallet.create.fields.description.title")}
           htmlFor="edit-wallet-description"
         >
-          <TextArea
-            id="edit-wallet-description"
-            value={values.description ?? ""}
-            onChange={(value) =>
-              setValue("description", value, { shouldValidate: true })
-            }
-            error={fieldError("description")}
-            maxLength={DESCRIPTION_MAX_LENGTH}
-          />
+          <FormTextArea name="description" maxLength={DESCRIPTION_MAX_LENGTH} />
         </FieldRow>
 
         <FieldRow
           title={t("wallet.create.fields.role.title")}
           htmlFor="edit-wallet-role"
         >
-          <Select
-            id="edit-wallet-role"
-            value={values.role}
-            onChange={(value) =>
-              setValue("role", value as EditWalletValues["role"], {
-                shouldValidate: true,
-              })
-            }
+          <FormSelect
+            name="role"
             options={[
               { value: "BOTH", title: t("wallet.role.both") },
               { value: "PAYER", title: t("wallet.role.payer") },
               { value: "RECIPIENT", title: t("wallet.role.recipient") },
             ]}
-            error={fieldError("role")}
           />
         </FieldRow>
 
@@ -222,15 +195,9 @@ export function EditWalletModal({
               : t("wallet.edit.status.description")
           }
         >
-          <Select
-            id="edit-wallet-status"
-            value={values.status}
+          <FormSelect
+            name="status"
             disabled={isRetired}
-            onChange={(value) =>
-              setValue("status", value as EditWalletValues["status"], {
-                shouldValidate: true,
-              })
-            }
             options={
               isRetired
                 ? [{ value: "RETIRED", title: t("wallet.status.retired") }]
@@ -240,7 +207,6 @@ export function EditWalletModal({
                     { value: "RETIRED", title: t("wallet.status.retired") },
                   ]
             }
-            error={fieldError("status")}
           />
         </FieldRow>
 
@@ -249,7 +215,7 @@ export function EditWalletModal({
             {error}
           </p>
         )}
-      </form>
+      </Form>
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { HttpMethod } from "@4mica/http";
-import type { ResourceKind } from "@stores/trust/actions";
+import type { ResourceKind } from "@stores/shared/type";
 import type {
   Faq,
   PolicyInput,
@@ -10,9 +10,7 @@ import type {
   TrustSummary,
 } from "@stores/trust/type";
 import { httpClient } from "./client";
-
-const base = (kind: ResourceKind, id: string) =>
-  `${kind === "listing" ? "/me/api-listings" : "/me/agents"}/${encodeURIComponent(id)}`;
+import { resourcePath } from "./resource";
 
 export interface ListResponse<T> {
   data: T[];
@@ -23,26 +21,26 @@ export interface ListResponse<T> {
 
 export const getPolicy = (kind: ResourceKind, id: string) =>
   httpClient.request<{ policy: ResourcePolicy | null }>({
-    url: `${base(kind, id)}/policy`,
+    url: `${resourcePath(kind, id)}/policy`,
     method: HttpMethod.GET,
   });
 
 export const savePolicy = (kind: ResourceKind, id: string, data: PolicyInput) =>
   httpClient.request<{ policy: ResourcePolicy }, PolicyInput>({
-    url: `${base(kind, id)}/policy`,
+    url: `${resourcePath(kind, id)}/policy`,
     method: HttpMethod.PUT,
     data,
   });
 
 export const getTrustSummary = (kind: ResourceKind, id: string) =>
   httpClient.request<TrustSummary>({
-    url: `${base(kind, id)}/trust`,
+    url: `${resourcePath(kind, id)}/trust`,
     method: HttpMethod.GET,
   });
 
 export const getReviews = (kind: ResourceKind, id: string) =>
   httpClient.request<ListResponse<Review>>({
-    url: `${base(kind, id)}/reviews`,
+    url: `${resourcePath(kind, id)}/reviews`,
     method: HttpMethod.GET,
   });
 
@@ -53,14 +51,14 @@ export const replyToReview = (
   reply: string | null,
 ) =>
   httpClient.request<{ review: Review }, { reply: string | null }>({
-    url: `${base(kind, id)}/reviews/${encodeURIComponent(reviewId)}/reply`,
+    url: `${resourcePath(kind, id)}/reviews/${encodeURIComponent(reviewId)}/reply`,
     method: HttpMethod.POST,
     data: { reply },
   });
 
 export const getReports = (kind: ResourceKind, id: string) =>
   httpClient.request<ListResponse<Report>>({
-    url: `${base(kind, id)}/reports`,
+    url: `${resourcePath(kind, id)}/reports`,
     method: HttpMethod.GET,
   });
 
@@ -75,14 +73,14 @@ export const updateReport = (
     { report: Report },
     { status: string; resolutionNote?: string | null }
   >({
-    url: `${base(kind, id)}/reports/${encodeURIComponent(reportId)}`,
+    url: `${resourcePath(kind, id)}/reports/${encodeURIComponent(reportId)}`,
     method: HttpMethod.PATCH,
     data: { status, resolutionNote },
   });
 
 export const getFaqs = (kind: ResourceKind, id: string) =>
   httpClient.request<{ data: Faq[] }>({
-    url: `${base(kind, id)}/faqs`,
+    url: `${resourcePath(kind, id)}/faqs`,
     method: HttpMethod.GET,
   });
 
@@ -92,7 +90,7 @@ export const createFaq = (
   data: { question: string; answer: string },
 ) =>
   httpClient.request<{ faq: Faq }, typeof data>({
-    url: `${base(kind, id)}/faqs`,
+    url: `${resourcePath(kind, id)}/faqs`,
     method: HttpMethod.POST,
     data,
   });
@@ -104,20 +102,20 @@ export const updateFaq = (
   data: { question: string; answer: string },
 ) =>
   httpClient.request<{ faq: Faq }, typeof data>({
-    url: `${base(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
+    url: `${resourcePath(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
     method: HttpMethod.PATCH,
     data,
   });
 
 export const deleteFaq = (kind: ResourceKind, id: string, faqId: string) =>
   httpClient.request<null>({
-    url: `${base(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
+    url: `${resourcePath(kind, id)}/faqs/${encodeURIComponent(faqId)}`,
     method: HttpMethod.DELETE,
   });
 
 export const reorderFaqs = (kind: ResourceKind, id: string, ids: string[]) =>
   httpClient.request<{ data: Faq[] }, { ids: string[] }>({
-    url: `${base(kind, id)}/faqs/order`,
+    url: `${resourcePath(kind, id)}/faqs/order`,
     method: HttpMethod.PUT,
     data: { ids },
   });

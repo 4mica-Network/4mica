@@ -16,10 +16,10 @@ import {
   selectSelectedCustomerIds,
 } from "@stores/customer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { useTitle } from "ahooks";
 import { Plus, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { CreateCustomerModal } from "./CreateCustomerModal";
 import { CustomerRow } from "./CustomerRow";
 import { CustomerToolbar } from "./CustomerToolbar";
@@ -39,7 +39,7 @@ export function Customers() {
   const hasLoaded = useAppSelector(selectHasLoadedCustomers);
   const error = useAppSelector(selectCustomerError);
 
-  useTitle(`${t("page.customers.title")} - ${t("org")}`);
+  usePageTitle(t("page.customers.title"));
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);

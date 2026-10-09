@@ -7,6 +7,7 @@ import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { paymentRoutes } from "./payments";
+import { resourceKeyRoutes } from "./resource-keys";
 import { trustRoutes } from "./trust";
 import { unsubscribeRoutes } from "./unsubscribe";
 import { verificationRoutes } from "./verification";
@@ -30,6 +31,7 @@ export const routes: RouteRegistration[] = [
   { plugin: paymentRoutes },
   { plugin: customerRoutes },
   { plugin: trustRoutes },
+  { plugin: resourceKeyRoutes },
 ];
 
 export {
@@ -41,6 +43,7 @@ export {
   healthRoutes,
   meRoutes,
   paymentRoutes,
+  resourceKeyRoutes,
   trustRoutes,
   unsubscribeRoutes,
   verificationRoutes,

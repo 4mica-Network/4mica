@@ -5,7 +5,7 @@ import {
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { WEBHOOK_EVENTS } from "@services/webhook-events";
+import { WEBHOOK_EVENTS } from "@utils/webhook-events";
 import type { RouteHandler } from "fastify";
 import {
   createApiKey,

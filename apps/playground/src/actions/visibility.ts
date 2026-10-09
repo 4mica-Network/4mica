@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
-import { safeParam, VisibilitySchema } from "@/schema/params";
+import { ResourceIdSchema, safeParam, VisibilitySchema } from "@/schema/params";
 import { prisma } from "@/services/db";
 import { getViewer } from "@/services/viewer";
 import { type ActionResult, profileTag } from "./shared";
@@ -34,7 +34,12 @@ export const setAgentVisibility = async (
   agentId: string,
   visibility: string,
 ): Promise<ActionResult> => {
+  const id = safeParam(ResourceIdSchema, agentId);
   const parsed = safeParam(VisibilitySchema, visibility);
+
+  if (!id) {
+    return { ok: false, error: "not_found" };
+  }
 
   if (!parsed) {
     return { ok: false, error: "invalid_visibility" };
@@ -47,11 +52,11 @@ export const setAgentVisibility = async (
   }
 
   const agent = await prisma.agent.findUnique({
-    where: { id: agentId },
-    select: { id: true, ownerId: true },
+    where: { id },
+    select: { id: true, ownerId: true, deletedAt: true },
   });
 
-  if (!agent || agent.ownerId !== viewer.id) {
+  if (!agent || agent.ownerId !== viewer.id || agent.deletedAt) {
     // Same response for "missing" and "not yours" — a distinct 404 would let a
     // caller enumerate valid agent ids.
     return { ok: false, error: "not_found" };
@@ -71,7 +76,12 @@ export const setApiListingVisibility = async (
   listingId: string,
   visibility: string,
 ): Promise<ActionResult> => {
+  const id = safeParam(ResourceIdSchema, listingId);
   const parsed = safeParam(VisibilitySchema, visibility);
+
+  if (!id) {
+    return { ok: false, error: "not_found" };
+  }
 
   if (!parsed) {
     return { ok: false, error: "invalid_visibility" };
@@ -84,8 +94,8 @@ export const setApiListingVisibility = async (
   }
 
   const listing = await prisma.apiListing.findUnique({
-    where: { id: listingId },
-    select: { id: true, ownerId: true, deletedAt: true },
+    where: { id },
+    select: { id: true, ownerId: true, deletedAt: true, visibility: true },
   });
 
   if (!listing || listing.ownerId !== viewer.id || listing.deletedAt) {
@@ -96,7 +106,12 @@ export const setApiListingVisibility = async (
     where: { id: listing.id },
     data: {
       visibility: parsed,
-      publishedAt: parsed === "PUBLIC" ? new Date() : null,
+      publishedAt:
+        parsed !== "PUBLIC"
+          ? null
+          : listing.visibility === "PUBLIC"
+            ? undefined
+            : new Date(),
     },
   });
 

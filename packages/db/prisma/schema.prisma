@@ -82,6 +82,7 @@ model Agent {
   reports     Report[]
   policy      ResourcePolicy?
   faqs        FaqItem[]
+  apiKeys     ApiKey[]
 
   @@unique([walletAddress, network])
   @@unique([ownerId, slug])
@@ -141,6 +142,8 @@ model User {
   name                           String                    @default("")
   email                          String?                   @unique @db.VarChar(255)
   emailVerified                  Boolean                   @default(false) @map("email_verified")
+  /// An address the user asked to switch to; promoted to `email` only once verified.
+  pendingEmail                   String?                   @map("pending_email") @db.VarChar(255)
   phoneNumber                    String?                   @unique @map("phone_number") @db.VarChar(20)
   phoneNumberVerified            Boolean                   @default(false) @map("phone_number_verified")
   avatarUrl                      String?                   @map("avatar_url")
@@ -156,7 +159,6 @@ model User {
   language                       String                    @default("en")
   timeZone                       String                    @default("UTC") @map("time_zone")
   privacyMode                    Boolean                   @default(false) @map("privacy_mode")
-  twoFactorEnabled               Boolean                   @default(false) @map("two_factor_enabled")
   defaultHome                    String                    @default("overview") @map("default_home")
   disableBranding                Boolean                   @default(false) @map("disable_branding")
   allowCustomBrandColor          Boolean                   @default(false) @map("allow_custom_brand_color")
@@ -276,6 +278,8 @@ model OnboardingEmailSend {
 model ApiKey {
   id         String    @id @default(uuid(7))
   ownerId    String    @map("owner_id")
+  listingId  String?   @map("listing_id")
+  agentId    String?   @map("agent_id")
   name       String    @db.VarChar(120)
   prefix     String    @db.VarChar(32)
   last4      String    @db.VarChar(4)
@@ -286,9 +290,13 @@ model ApiKey {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  listing ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent   Agent?      @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
+  @@index([listingId])
+  @@index([agentId])
   @@map("api_keys")
 }
 
@@ -336,6 +344,7 @@ model ApiListing {
   reports  Report[]
   policy   ResourcePolicy?
   faqs     FaqItem[]
+  apiKeys  ApiKey[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, visibility])
@@ -391,6 +400,10 @@ model Payment {
   /// The URL that was paid for, and a human label for the line item.
   resource    String? @db.VarChar(2048)
   description String? @db.VarChar(280)
+
+  couponCode    String?   @map("coupon_code") @db.VarChar(64)
+  creditApplied Decimal?  @map("credit_applied") @db.Decimal(38, 18)
+  redeemedAt    DateTime? @map("redeemed_at")
 
   settledAt DateTime? @map("settled_at")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -457,17 +470,17 @@ enum CustomerIdentitySource {
 }
 
 model Customer {
-  id            String                    @id @default(uuid(7))
-  ownerId       String                    @map("owner_id")
-  name          String                    @db.VarChar(120)
-  email         String?                   @db.VarChar(320)
-  type          CustomerType              @default(ORGANIZATION)
-  status        CustomerStatus            @default(ACTIVE)
-  description   String?                   @db.VarChar(280)
-  notes         String?                   @db.VarChar(2000)
-  dailyLimit    Decimal?                  @map("daily_limit") @db.Decimal(38, 18)
-  monthlyLimit  Decimal?                  @map("monthly_limit") @db.Decimal(38, 18)
-  limitCurrency String                    @default("USD") @map("limit_currency") @db.VarChar(16)
+  id            String         @id @default(uuid(7))
+  ownerId       String         @map("owner_id")
+  name          String         @db.VarChar(120)
+  email         String?        @db.VarChar(320)
+  type          CustomerType   @default(ORGANIZATION)
+  status        CustomerStatus @default(ACTIVE)
+  description   String?        @db.VarChar(280)
+  notes         String?        @db.VarChar(2000)
+  dailyLimit    Decimal?       @map("daily_limit") @db.Decimal(38, 18)
+  monthlyLimit  Decimal?       @map("monthly_limit") @db.Decimal(38, 18)
+  limitCurrency String         @default("USD") @map("limit_currency") @db.VarChar(16)
 
   statusReason   String?   @map("status_reason") @db.VarChar(280)
   suspendedUntil DateTime? @map("suspended_until")
@@ -482,12 +495,12 @@ model Customer {
   minPaymentAmount  Decimal? @map("min_payment_amount") @db.Decimal(38, 18)
   approvalThreshold Decimal? @map("approval_threshold") @db.Decimal(38, 18)
 
-  createdAt    DateTime                  @default(now()) @map("created_at")
-  updatedAt    DateTime                  @updatedAt @map("updated_at")
-  deletedAt    DateTime?                 @map("deleted_at")
-  owner        User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  identities   CustomerPaymentIdentity[]
-  coupons      CustomerCoupon[]
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+  deletedAt     DateTime?                 @map("deleted_at")
+  owner         User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  identities    CustomerPaymentIdentity[]
+  coupons       CustomerCoupon[]
   creditEntries CustomerCreditEntry[]
 
   @@index([ownerId, createdAt(sort: Desc)])
@@ -525,9 +538,9 @@ model CustomerCreditEntry {
   ownerId    String @map("owner_id")
   customerId String @map("customer_id")
 
-  kind CustomerCreditKind
-  amount Decimal @db.Decimal(38, 18)
-  reason String? @db.VarChar(280)
+  kind   CustomerCreditKind
+  amount Decimal            @db.Decimal(38, 18)
+  reason String?            @db.VarChar(280)
 
   createdAt DateTime @default(now()) @map("created_at")
 

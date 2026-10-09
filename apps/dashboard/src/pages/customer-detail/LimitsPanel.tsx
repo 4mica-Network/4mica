@@ -1,9 +1,9 @@
+import { trimAmount } from "@4mica/rules";
 import { cn, EmptyState } from "@4mica/ui";
 import type { Customer, CustomerOverview } from "@stores/customer/type";
 import { Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { trimAmount } from "../payments/constants";
-import { SectionCard } from "./SectionCard";
+import { SectionCard } from "@/components/layout";
 
 const rankingTotal = (overview: CustomerOverview): number =>
   overview.recentSpend.reduce((sum, bucket) => sum + Number(bucket.amount), 0);

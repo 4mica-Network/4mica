@@ -1,11 +1,6 @@
-export const PAYMENT_NETWORK = {
-  BASE: "BASE",
-  BASE_SEPOLIA: "BASE_SEPOLIA",
-  ETHEREUM_SEPOLIA: "ETHEREUM_SEPOLIA",
-} as const;
+import type { PaymentNetwork } from "@stores/shared/type";
 
-export type PaymentNetwork =
-  (typeof PAYMENT_NETWORK)[keyof typeof PAYMENT_NETWORK];
+export type { BatchDeleteResult, PaymentNetwork } from "@stores/shared/type";
 
 export const WALLET_ROLE = {
   PAYER: "PAYER",
@@ -52,11 +47,6 @@ export interface WalletListResponse {
   total: number;
   page: number;
   limit: number;
-}
-
-export interface BatchDeleteResult {
-  deleted: string[];
-  notFound: string[];
 }
 
 export interface WalletFilters {

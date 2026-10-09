@@ -1,22 +1,26 @@
+import { isPhoneNumber } from "@4mica/rules";
+import { Button } from "@4mica/ui";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { updateAccount } from "@stores/user/actions";
+import { sendEmailVerification, updateAccount } from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
+import { hasErrors, isEmail } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { VerifiedBadge } from "@/components/badges";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
   FieldRow,
   Select,
   SettingRow,
-  SettingsSection,
   SwitchCard,
   TextInput,
-  VerifiedBadge,
 } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 
@@ -61,9 +65,13 @@ export function AccountSettings() {
   const savingGeneral = useAppSelector(selectIsSectionSaving("general"));
   const savingHome = useAppSelector(selectIsSectionSaving("defaultHome"));
   const savingPrivacy = useAppSelector(selectIsSectionSaving("privacyMode"));
-  const savingTwoFactor = useAppSelector(
-    selectIsSectionSaving("twoFactorEnabled"),
+  const sendingVerification = useAppSelector(
+    selectIsSectionSaving("emailVerification"),
   );
+  // Clerk enforces the second factor, so it is the only honest source for
+  // whether one is set up. The dashboard reads it and hands off to Clerk.
+  const { user: clerkUser } = useUser();
+  const { openUserProfile } = useClerk();
 
   const contactInitial = useMemo(
     () => ({
@@ -75,6 +83,23 @@ export function AccountSettings() {
 
   const contact = useDraft(contactInitial);
 
+  const emailValue = contact.draft.email.trim();
+  const phoneValue = contact.draft.phoneNumber.trim();
+  const contactErrors = {
+    email:
+      emailValue === ""
+        ? t("validation.required")
+        : emailValue.length > 255
+          ? t("validation.tooLong", { max: 255 })
+          : !isEmail(emailValue)
+            ? t("validation.email")
+            : undefined,
+    phoneNumber:
+      phoneValue === "" || isPhoneNumber(phoneValue)
+        ? undefined
+        : t("validation.phone"),
+  };
+
   const set = (key: string, value: string | boolean, section = key) =>
     dispatch(updateAccount({ [key]: value }, section));
 
@@ -82,13 +107,15 @@ export function AccountSettings() {
     dispatch(
       updateAccount(
         {
-          ...contact.changes,
+          ...(contact.changes.email !== undefined
+            ? { email: contact.changes.email.trim().toLowerCase() }
+            : {}),
           ...(contact.changes.phoneNumber !== undefined
             ? {
                 phoneNumber:
-                  contact.changes.phoneNumber === ""
+                  contact.changes.phoneNumber.trim() === ""
                     ? null
-                    : contact.changes.phoneNumber,
+                    : contact.changes.phoneNumber.trim(),
               }
             : {}),
         },
@@ -111,6 +138,7 @@ export function AccountSettings() {
       >
         <EditableCard
           isDirty={contact.isDirty}
+          isInvalid={hasErrors(contactErrors)}
           isSaving={savingContact}
           onSave={saveContact}
           onReset={contact.reset}
@@ -131,11 +159,29 @@ export function AccountSettings() {
           >
             <TextInput
               id="account-email"
+              inputMode="email"
+              autoComplete="email"
               type="email"
               value={contact.draft.email}
-              error={issues.email}
+              error={contactErrors.email ?? issues.email}
+              maxLength={255}
               onChange={(v) => contact.set("email", v)}
             />
+            {user.pendingEmail ? (
+              <p className="mt-2 text-ink-muted text-xs">
+                {t("settings.account.emailPending", {
+                  email: user.pendingEmail,
+                })}{" "}
+                <button
+                  type="button"
+                  className="font-medium text-ink-strong underline disabled:opacity-50"
+                  disabled={sendingVerification}
+                  onClick={() => dispatch(sendEmailVerification())}
+                >
+                  {t("settings.account.emailPendingResend")}
+                </button>
+              </p>
+            ) : null}
           </FieldRow>
 
           <FieldRow
@@ -154,9 +200,13 @@ export function AccountSettings() {
           >
             <TextInput
               id="account-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={contact.draft.phoneNumber}
               placeholder="+1 555 000 1234"
-              error={issues.phoneNumber}
+              error={contactErrors.phoneNumber ?? issues.phoneNumber}
+              maxLength={20}
               onChange={(v) => contact.set("phoneNumber", v)}
             />
           </FieldRow>
@@ -250,14 +300,34 @@ export function AccountSettings() {
           isSaving={savingPrivacy}
           onToggle={(v) => set("privacyMode", v)}
         />
-        <SwitchCard
-          id="account-2fa"
-          title={t("settings.account.twoFactor")}
-          description={t("settings.account.twoFactorHint")}
-          checked={user.twoFactorEnabled}
-          isSaving={savingTwoFactor}
-          onToggle={(v) => set("twoFactorEnabled", v)}
-        />
+        <SurfaceCard className="flex items-center justify-between gap-4">
+          <div>
+            <span className="font-medium text-ink-strong text-sm">
+              {t("settings.account.twoFactor")}
+            </span>
+            <p className="mt-0.5 text-ink-muted text-xs">
+              {t("settings.account.twoFactorHint")}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <VerifiedBadge
+              verified={Boolean(clerkUser?.twoFactorEnabled)}
+              labels={{
+                yes: t("settings.account.twoFactorOn"),
+                no: t("settings.account.twoFactorOff"),
+              }}
+            />
+            <Button
+              type="button"
+              intent="ghost"
+              size="sm"
+              className="btn-no-lift"
+              onClick={() => openUserProfile()}
+            >
+              {t("settings.account.twoFactorManage")}
+            </Button>
+          </div>
+        </SurfaceCard>
       </SettingsSection>
     </SettingsPage>
   );

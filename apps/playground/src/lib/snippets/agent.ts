@@ -1,10 +1,11 @@
+import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
 import type { PublicAgent } from "@/schema/agent";
-import { networkInfo } from "./networks";
 import {
   buildCurlHandshake,
+  codeString,
   commentLine,
-  formatPrice,
   PLACEHOLDER,
+  singleLine,
 } from "./shared";
 
 export interface AgentSnippets {
@@ -34,7 +35,7 @@ export interface AgentBuyerSnippets {
  * placeholder. Never source the address from anywhere else here.
  */
 export const buildAgentSnippets = (agent: PublicAgent): AgentSnippets => {
-  const { caip2, sdkName } = networkInfo(agent.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[agent.network];
   const wallet = agent.walletAddress ?? PLACEHOLDER.agentWallet;
 
   const install = "pnpm add @4mica/x402 @x402/fetch viem @4mica/sdk";
@@ -43,7 +44,7 @@ export const buildAgentSnippets = (agent: PublicAgent): AgentSnippets => {
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
 
-// ${agent.name} signs from ${wallet}.
+// ${singleLine(agent.name)} signs from ${wallet}.
 // Keep its key in a secret manager — never in source control.
 const account = privateKeyToAccount(
   process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`,
@@ -108,7 +109,7 @@ export const buildAgentBuyerSnippets = (
     return null;
   }
 
-  const { caip2, sdkName } = networkInfo(agent.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[agent.network];
   const url = agent.endpointUrl;
   const price = formatPrice(
     agent.priceAmount,
@@ -148,7 +149,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ${descriptor}
 ${paidTo}
-const response = await fetchWithPayment("${url}", {
+const response = await fetchWithPayment(${codeString(url)}, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ prompt: "..." }),
@@ -168,7 +169,7 @@ session = x402_requests(client)
 
 ${commentLine(descriptorParts, "#")}
 ${commentLine(paidToParts, "#")}
-response = session.post("${url}", json={"prompt": "..."})
+response = session.post(${codeString(url)}, json={"prompt": "..."})
 data = response.json()`;
 
   const curl = buildCurlHandshake({

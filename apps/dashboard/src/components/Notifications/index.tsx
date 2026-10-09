@@ -1,10 +1,6 @@
-import { NOTIFY_CONTAINER_IDS } from "@utils/notification";
 import { ToastContainer } from "react-toastify";
+import { NOTIFY_CONTAINER_IDS } from "@/lib/notify";
 
-/**
- * One container per placement. Toasts pick a container by id, so a user who
- * moves their notification position takes effect without a remount.
- */
 export function Notifications() {
   return (
     <>

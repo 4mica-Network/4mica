@@ -8,6 +8,7 @@ import type {
   CustomerPolicyInput,
   CustomerStatusInput,
 } from "@api/customer";
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   Customer,
@@ -19,14 +20,15 @@ import type {
   Payment,
 } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
-
-const rowKey = (id: string) => `customer:${id}`;
-const statusKey = (id: string) => `customerStatus:${id}`;
-const policyKey = (id: string) => `customerPolicy:${id}`;
-const resetKey = (id: string) => `customerUsageReset:${id}`;
+export const customerPendingKeys = {
+  row: (id: string) => `customer:${id}`,
+  status: (id: string) => `customerStatus:${id}`,
+  policy: (id: string) => `customerPolicy:${id}`,
+  usageReset: (id: string) => `customerUsageReset:${id}`,
+  coupon: (id: string) => `customerCoupon:${id}`,
+  identity: (id: string) => `customerIdentity:${id}`,
+  batchDelete: "batchDeleteCustomers",
+} as const;
 
 export const fetchCustomers = () => ({
   type: actionTypes.FETCH_CUSTOMERS_REQUESTED,
@@ -72,7 +74,7 @@ export const updateCustomer = (payload: {
 }) => ({
   type: actionTypes.UPDATE_CUSTOMER_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: customerPendingKeys.row(payload.id) },
 });
 
 export const updateCustomerSucceeded = (
@@ -110,7 +112,7 @@ export const updateCustomerCoupon = (payload: {
 }) => ({
   type: actionTypes.UPDATE_CUSTOMER_COUPON_REQUESTED,
   payload,
-  meta: { pendingKey: `customerCoupon:${payload.couponId}` },
+  meta: { pendingKey: customerPendingKeys.coupon(payload.couponId) },
 });
 
 export const deleteCustomerCoupon = (payload: {
@@ -119,7 +121,7 @@ export const deleteCustomerCoupon = (payload: {
 }) => ({
   type: actionTypes.DELETE_CUSTOMER_COUPON_REQUESTED,
   payload,
-  meta: { pendingKey: `customerCoupon:${payload.couponId}` },
+  meta: { pendingKey: customerPendingKeys.coupon(payload.couponId) },
 });
 
 export const fetchCustomerCredit = (id: string) => ({
@@ -156,7 +158,7 @@ export const setCustomerPolicy = (payload: {
 }) => ({
   type: actionTypes.SET_CUSTOMER_POLICY_REQUESTED,
   payload,
-  meta: { pendingKey: policyKey(payload.id) },
+  meta: { pendingKey: customerPendingKeys.policy(payload.id) },
 });
 
 export const setCustomerPolicySucceeded = (
@@ -171,7 +173,7 @@ export const setCustomerPolicySucceeded = (
 export const resetCustomerUsage = (payload: { id: string }) => ({
   type: actionTypes.RESET_CUSTOMER_USAGE_REQUESTED,
   payload,
-  meta: { pendingKey: resetKey(payload.id) },
+  meta: { pendingKey: customerPendingKeys.usageReset(payload.id) },
 });
 
 export const setCustomerStatus = (payload: {
@@ -180,7 +182,7 @@ export const setCustomerStatus = (payload: {
 }) => ({
   type: actionTypes.SET_CUSTOMER_STATUS_REQUESTED,
   payload,
-  meta: { pendingKey: statusKey(payload.id) },
+  meta: { pendingKey: customerPendingKeys.status(payload.id) },
 });
 
 export const setCustomerStatusSucceeded = (
@@ -195,7 +197,7 @@ export const setCustomerStatusSucceeded = (
 export const deleteCustomer = (payload: { id: string }) => ({
   type: actionTypes.DELETE_CUSTOMER_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: customerPendingKeys.row(payload.id) },
 });
 
 export const deleteCustomerSucceeded = (id: string, meta: PendingMeta) => ({
@@ -207,7 +209,7 @@ export const deleteCustomerSucceeded = (id: string, meta: PendingMeta) => ({
 export const batchDeleteCustomers = (payload: { ids: string[] }) => ({
   type: actionTypes.BATCH_DELETE_CUSTOMERS_REQUESTED,
   payload,
-  meta: { pendingKey: "batchDeleteCustomers" },
+  meta: { pendingKey: customerPendingKeys.batchDelete },
 });
 
 export const batchDeleteCustomersSucceeded = (
@@ -235,7 +237,7 @@ export const updateCustomerIdentity = (payload: {
 }) => ({
   type: actionTypes.UPDATE_CUSTOMER_IDENTITY_REQUESTED,
   payload,
-  meta: { pendingKey: `customerIdentity:${payload.identityId}` },
+  meta: { pendingKey: customerPendingKeys.identity(payload.identityId) },
 });
 
 export const removeCustomerIdentity = (payload: {
@@ -244,7 +246,7 @@ export const removeCustomerIdentity = (payload: {
 }) => ({
   type: actionTypes.REMOVE_CUSTOMER_IDENTITY_REQUESTED,
   payload,
-  meta: { pendingKey: `customerIdentity:${payload.identityId}` },
+  meta: { pendingKey: customerPendingKeys.identity(payload.identityId) },
 });
 
 export const customerIdentityChanged = (
