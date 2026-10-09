@@ -1,9 +1,10 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/wallet";
 import i18n from "@i18n";
+import { definedParams, type PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   NoWalletError,
   signMessage,
@@ -18,7 +19,6 @@ import {
   fetchWalletsFailed,
   fetchWalletsPending,
   fetchWalletsSucceeded,
-  type PendingMeta,
   updateWalletSucceeded,
   walletActionFailed,
 } from "./actions";
@@ -75,9 +75,11 @@ export function* fetchWallets(): Generator {
       api.getWallets({
         page,
         limit,
-        ...(filters.q ? { q: filters.q } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.network ? { network: filters.network } : {}),
+        ...definedParams({
+          q: filters.q,
+          status: filters.status,
+          network: filters.network,
+        }),
       }),
     )) as Awaited<ReturnType<typeof api.getWallets>>;
 

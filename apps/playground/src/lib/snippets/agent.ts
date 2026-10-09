@@ -1,10 +1,9 @@
+import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
 import type { PublicAgent } from "@/schema/agent";
-import { networkInfo } from "./networks";
 import {
   buildCurlHandshake,
   codeString,
   commentLine,
-  formatPrice,
   PLACEHOLDER,
   singleLine,
 } from "./shared";
@@ -36,7 +35,7 @@ export interface AgentBuyerSnippets {
  * placeholder. Never source the address from anywhere else here.
  */
 export const buildAgentSnippets = (agent: PublicAgent): AgentSnippets => {
-  const { caip2, sdkName } = networkInfo(agent.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[agent.network];
   const wallet = agent.walletAddress ?? PLACEHOLDER.agentWallet;
 
   const install = "pnpm add @4mica/x402 @x402/fetch viem @4mica/sdk";
@@ -110,7 +109,7 @@ export const buildAgentBuyerSnippets = (
     return null;
   }
 
-  const { caip2, sdkName } = networkInfo(agent.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[agent.network];
   const url = agent.endpointUrl;
   const price = formatPrice(
     agent.priceAmount,

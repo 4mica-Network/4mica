@@ -1,3 +1,4 @@
+import { isPhoneNumber, isWebUrl } from "@4mica/rules";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateBusiness } from "@stores/user/actions";
 import {
@@ -6,23 +7,22 @@ import {
   selectValidationIssues,
 } from "@stores/user/selector";
 import type { BusinessType } from "@stores/user/type";
-import { hasErrors, isEmail, isPhoneNumber, isWebUrl } from "@utils/validation";
+import { blankFieldsToNull } from "@utils/format";
+import { hasErrors, isEmail } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { KybTag } from "@/components/badges";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
-  BUSINESS_TYPES,
-  blankToNull,
-  Card,
   FieldRow,
-  KybTag,
   Select,
   SettingRow,
-  SettingsSection,
   TextArea,
   TextInput,
 } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
+import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
 import { useDraft } from "@/hooks/useDraft";
 
 type FieldKind = "required" | "url" | "email" | "phone" | "country";
@@ -53,6 +53,7 @@ const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
 
 export function BusinessSettings() {
   const { t } = useTranslation();
+  const businessTypes = useBusinessTypeOptions();
   const dispatch = useAppDispatch();
   const business = useAppSelector(selectBusiness);
   const issues = useAppSelector(selectValidationIssues);
@@ -169,7 +170,7 @@ export function BusinessSettings() {
     changes: Record<string, unknown>,
     section: string,
     keep: string[] = [],
-  ) => dispatch(updateBusiness(blankToNull(changes, keep), section));
+  ) => dispatch(updateBusiness(blankFieldsToNull(changes, keep), section));
 
   return (
     <SettingsPage
@@ -180,7 +181,7 @@ export function BusinessSettings() {
         title={t("settings.business.entity")}
         description={t("settings.business.entityHint")}
       >
-        <Card className="flex items-center justify-between gap-4">
+        <SurfaceCard className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.business.kyb")}
@@ -193,7 +194,7 @@ export function BusinessSettings() {
             status={business?.kybStatus ?? "UNVERIFIED"}
             label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
           />
-        </Card>
+        </SurfaceCard>
 
         <EditableCard
           isDirty={entity.isDirty}
@@ -209,6 +210,8 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-legal-name"
+              autoComplete="organization"
+              required
               value={entity.draft.legalName}
               error={fieldErrors.legalName ?? issues.legalName}
               maxLength={255}
@@ -222,6 +225,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-trading-name"
+              autoComplete="organization"
               value={entity.draft.tradingName}
               error={fieldErrors.tradingName ?? issues.tradingName}
               maxLength={255}
@@ -266,7 +270,7 @@ export function BusinessSettings() {
             <Select
               id="business-type"
               value={business?.businessType ?? ""}
-              options={BUSINESS_TYPES}
+              options={businessTypes}
               onChange={(v) =>
                 dispatch(
                   updateBusiness(
@@ -353,6 +357,9 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-website"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
               value={contact.draft.website}
               error={fieldErrors.website ?? issues.website}
               maxLength={255}
@@ -367,6 +374,8 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-support-email"
+              inputMode="email"
+              autoComplete="email"
               type="email"
               value={contact.draft.supportEmail}
               error={fieldErrors.supportEmail ?? issues.supportEmail}
@@ -381,6 +390,9 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-support-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={contact.draft.supportPhone}
               error={fieldErrors.supportPhone ?? issues.supportPhone}
               maxLength={20}
@@ -408,6 +420,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-address1"
+              autoComplete="address-line1"
               value={address.draft.addressLine1}
               error={fieldErrors.addressLine1 ?? issues.addressLine1}
               maxLength={255}
@@ -421,6 +434,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-address2"
+              autoComplete="address-line2"
               value={address.draft.addressLine2}
               error={fieldErrors.addressLine2 ?? issues.addressLine2}
               maxLength={255}
@@ -434,6 +448,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-city"
+              autoComplete="address-level2"
               value={address.draft.city}
               error={fieldErrors.city ?? issues.city}
               maxLength={128}
@@ -447,6 +462,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-region"
+              autoComplete="address-level1"
               value={address.draft.region}
               error={fieldErrors.region ?? issues.region}
               maxLength={128}
@@ -460,6 +476,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-postal"
+              autoComplete="postal-code"
               value={address.draft.postalCode}
               error={fieldErrors.postalCode ?? issues.postalCode}
               maxLength={32}
@@ -473,6 +490,7 @@ export function BusinessSettings() {
           >
             <TextInput
               id="business-country"
+              autoComplete="country"
               value={address.draft.country}
               error={fieldErrors.country ?? issues.country}
               maxLength={2}

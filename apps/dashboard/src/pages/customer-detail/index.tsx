@@ -9,11 +9,11 @@ import {
   selectHasLoadedCustomerDetail,
 } from "@stores/customer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { useTitle } from "ahooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { AccessPanel } from "./AccessPanel";
 import { ActivityPanel } from "./ActivityPanel";
 import { CouponsPanel } from "./CouponsPanel";
@@ -34,7 +34,7 @@ export function CustomerDetail() {
   const overview = useAppSelector(selectCustomerOverview);
   const hasLoaded = useAppSelector(selectHasLoadedCustomerDetail);
 
-  useTitle(
+  usePageTitle(
     customer
       ? `${customer.name} · ${t("customer.detail.title")}`
       : t("customer.detail.title"),

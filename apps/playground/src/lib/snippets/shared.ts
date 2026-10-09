@@ -1,3 +1,5 @@
+import { trimAmount } from "@4mica/rules";
+
 /**
  * Shared helpers for turning DB rows into snippet source text.
  *
@@ -12,45 +14,6 @@ export const PLACEHOLDER = {
   baseUrl: "https://api.example.com",
   agentWallet: "0xYourAgentWallet",
 } as const;
-
-/**
- * Decimal(38,18) round-trips through Prisma as a string that may carry trailing
- * zeros ("0.010000000000000000"). Show what a human would write.
- */
-export const trimAmount = (amount: string): string => {
-  if (!amount.includes(".")) {
-    return amount;
-  }
-
-  const trimmed = amount.replace(/0+$/, "").replace(/\.$/, "");
-
-  return trimmed === "" || trimmed === "-" ? "0" : trimmed;
-};
-
-/**
- * Prefer the machine price; fall back to the seller's display label. Returns
- * null when neither is set so callers can omit the clause entirely instead of
- * printing an empty one.
- */
-export const formatPrice = (
-  amount: string | null,
-  currency: string | null,
-  label: string | null,
-): string | null => {
-  if (amount !== null) {
-    const value = trimAmount(amount);
-
-    if (currency === null) {
-      return value;
-    }
-
-    return currency.toUpperCase() === "USD"
-      ? `$${value}`
-      : `${value} ${currency.toUpperCase()}`;
-  }
-
-  return label;
-};
 
 /**
  * Joins the non-null parts of a code comment with `·` separators. `prefix`

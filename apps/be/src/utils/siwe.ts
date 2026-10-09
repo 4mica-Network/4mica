@@ -1,14 +1,9 @@
 import type { PaymentNetwork } from "@4mica/db";
+import { PAYMENT_NETWORKS } from "@4mica/rules";
 import { getAddress } from "viem";
 
-export const NETWORK_CHAIN_IDS = {
-  BASE: 8453,
-  BASE_SEPOLIA: 84532,
-  ETHEREUM_SEPOLIA: 11155111,
-} as const satisfies Record<PaymentNetwork, number>;
-
 export const chainIdFor = (network: PaymentNetwork): number =>
-  NETWORK_CHAIN_IDS[network];
+  PAYMENT_NETWORKS[network].chainId;
 
 export const WALLET_LINK_STATEMENT =
   "Link this wallet to your 4Mica account. This does not authorize any transfer of funds.";

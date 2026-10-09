@@ -10,8 +10,8 @@ import type {
 } from "@api/customer";
 import * as api from "@api/customer";
 import i18n from "@i18n";
+import { definedParams, type PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import {
   all,
   call,
@@ -20,6 +20,7 @@ import {
   takeEvery,
   takeLatest,
 } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   batchDeleteCustomersSucceeded,
   createCustomerSucceeded,
@@ -39,7 +40,6 @@ import {
   fetchCustomersFailed,
   fetchCustomersPending,
   fetchCustomersSucceeded,
-  type PendingMeta,
   setCustomerPolicySucceeded,
   setCustomerStatusSucceeded,
   updateCustomerSucceeded,
@@ -80,10 +80,12 @@ export function* fetchCustomers(): Generator {
         page,
         limit,
         sort: filters.sort,
-        ...(filters.q ? { q: filters.q } : {}),
-        ...(filters.type ? { type: filters.type } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.network ? { network: filters.network } : {}),
+        ...definedParams({
+          q: filters.q,
+          type: filters.type,
+          status: filters.status,
+          network: filters.network,
+        }),
       }),
     )) as Awaited<ReturnType<typeof api.getCustomers>>;
 

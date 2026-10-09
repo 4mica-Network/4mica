@@ -1,4 +1,8 @@
 import {
+  CURRENCY_CODE_PATTERN,
+  SIGNED_DECIMAL_AMOUNT_PATTERN,
+} from "@4mica/rules";
+import {
   address,
   batchDeleteSchema,
   couponCode,
@@ -50,7 +54,7 @@ const limitCurrency = v.pipe(
   v.string(),
   v.trim(),
   v.toUpperCase(),
-  v.regex(/^[A-Z0-9]{2,16}$/, "must be a currency code"),
+  v.regex(CURRENCY_CODE_PATTERN, "must be a currency code"),
 );
 
 const identityValue = v.pipe(
@@ -246,7 +250,7 @@ export const GrantCustomerCreditSchema = v.pipe(
       v.string(),
       v.trim(),
       v.regex(
-        /^-?(?!0\d)\d{1,20}(\.\d{1,18})?$/,
+        SIGNED_DECIMAL_AMOUNT_PATTERN,
         "must be a decimal amount, as a string",
       ),
       v.check((value) => Number(value) !== 0, "must not be zero"),

@@ -35,7 +35,7 @@ const { notifyError, notifySuccess } = vi.hoisted(() => ({
   notifyError: vi.fn(),
   notifySuccess: vi.fn(),
 }));
-vi.mock("@utils/notification", () => ({ notifyError, notifySuccess }));
+vi.mock("@/lib/notify", () => ({ notifyError, notifySuccess }));
 
 const { createWallet, fetchWallets } = await import("./saga");
 const actionTypes = (await import("./actionTypes")).default;

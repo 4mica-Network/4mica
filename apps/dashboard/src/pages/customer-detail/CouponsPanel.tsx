@@ -1,6 +1,8 @@
+import { isDecimalAmount, trimAmount } from "@4mica/rules";
 import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
 import {
   createCustomerCoupon,
+  customerPendingKeys,
   deleteCustomerCoupon,
   updateCustomerCoupon,
 } from "@stores/customer/actions";
@@ -16,25 +18,24 @@ import type {
   CustomerCouponKind,
 } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { formatDate } from "@utils/format";
 import { Ban, Plus, ShieldCheck, TicketPercent, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
-import { useOnSuccess } from "@/hooks/useOnSuccess";
-import {
-  COUPON_KIND_OPTIONS,
-  COUPON_UNUSABLE_LABEL_KEYS,
-} from "../customers/constants";
-import { trimAmount } from "../payments/constants";
 import {
   SectionCard,
   SectionInset,
   SectionRow,
   SectionRows,
-} from "./SectionCard";
-
-const asDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+} from "@/components/layout";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import {
+  COUPON_KIND_OPTIONS,
+  COUPON_UNUSABLE_LABEL_KEYS,
+} from "../customers/constants";
 
 const endOfDay = (day: string): string =>
   new Date(`${day}T23:59:59.000Z`).toISOString();
@@ -42,7 +43,6 @@ const endOfDay = (day: string): string =>
 const MAX_USAGE_LIMIT = 2_147_483_647;
 const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]*$/;
 const PERCENT_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
-const DECIMAL_PATTERN = /^(?!0\d)\d{1,20}(\.\d{1,18})?$/;
 
 function CouponRow({
   customerId,
@@ -55,7 +55,7 @@ function CouponRow({
   const dispatch = useAppDispatch();
 
   const isPending = useAppSelector(
-    selectIsCustomerPending(`customerCoupon:${coupon.id}`),
+    selectIsCustomerPending(customerPendingKeys.coupon(coupon.id)),
   );
 
   return (
@@ -94,22 +94,28 @@ function CouponRow({
             )}
           </Button>
 
-          <Button
-            type="button"
-            intent="ghost"
-            size="sm"
-            className="btn-no-lift text-danger"
-            disabled={isPending}
-            aria-label={t("customer.coupon.remove")}
-            onClick={() =>
+          <ConfirmAction
+            title={t("customer.coupon.removeConfirm")}
+            confirmLabel={t("confirm.remove")}
+            onConfirm={() =>
               dispatch(
                 deleteCustomerCoupon({ id: customerId, couponId: coupon.id }),
               )
             }
             data-testid={`customer-coupon-remove-${coupon.id}`}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            <Button
+              type="button"
+              intent="ghost"
+              size="sm"
+              className="btn-no-lift text-danger"
+              disabled={isPending}
+              aria-label={t("customer.coupon.remove")}
+              data-testid={`customer-coupon-remove-${coupon.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </ConfirmAction>
         </>
       }
     >
@@ -145,7 +151,7 @@ function CouponRow({
                 : coupon.usageLimit,
           })}
           {coupon.expiresAt
-            ? ` · ${t("customer.coupon.expires", { when: asDate(coupon.expiresAt) })}`
+            ? ` · ${t("customer.coupon.expires", { when: formatDate(coupon.expiresAt) })}`
             : ` · ${t("customer.coupon.noExpiry")}`}
         </span>
       </div>
@@ -192,7 +198,7 @@ function AddCouponCard({
           ? PERCENT_PATTERN.test(trimmedValue) && Number(trimmedValue) <= 100
             ? undefined
             : t("validation.percent")
-          : !DECIMAL_PATTERN.test(trimmedValue)
+          : !isDecimalAmount(trimmedValue)
             ? t("validation.decimal")
             : Number(trimmedValue) > 0
               ? undefined
@@ -268,6 +274,7 @@ function AddCouponCard({
         <FieldRow title={t("customer.coupon.value")} htmlFor="coupon-value">
           <TextInput
             id="coupon-value"
+            inputMode="decimal"
             value={value}
             onChange={setValue}
             placeholder={kind === "PERCENT" ? "10" : "5.00"}
@@ -296,6 +303,7 @@ function AddCouponCard({
         >
           <TextInput
             id="coupon-limit"
+            inputMode="numeric"
             value={usageLimit}
             onChange={setUsageLimit}
             placeholder="1"
@@ -337,6 +345,7 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
 
   const coupons = useAppSelector(selectCustomerCoupons);
   const [isAdding, setIsAdding] = useState(false);
+  const addButton = useReturnFocus(isAdding);
 
   return (
     <SectionCard
@@ -346,6 +355,7 @@ export function CouponsPanel({ customer }: { customer: Customer }) {
       action={
         !isAdding && (
           <Button
+            ref={addButton}
             type="button"
             intent="invert"
             size="sm"

@@ -1,3 +1,4 @@
+import { isHexColor, isSingleLine } from "@4mica/rules";
 import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -10,29 +11,23 @@ import {
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
-import { notifyError, notifySuccess } from "@utils/notification";
-import { HEX_COLOR_PATTERN, hasErrors, isSingleLine } from "@utils/validation";
-import { useCallback, useEffect, useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
-import { EditableCard } from "@/components/EditableCard";
-import {
-  Card,
-  FieldRow,
-  SettingsSection,
-  SwitchCard,
-  TextArea,
-  TextInput,
-  VerifiedBadge,
-} from "@/components/form";
 import {
   isUsernameShapeValid,
   NAME_MAX_LENGTH,
   NAME_MIN_LENGTH,
-} from "@/components/Onboarding/validation";
+} from "@utils/user-rules";
+import { hasErrors } from "@utils/validation";
+import { useCallback, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
+import { VerifiedBadge } from "@/components/badges";
+import { EditableCard } from "@/components/EditableCard";
+import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 const TEXT_MAX_LENGTH = 2000;
 
@@ -182,9 +177,7 @@ export function ProfileSettings() {
     candidate !== savedUsername && usernameStatus === "checking";
 
   const colorError = (value: string) =>
-    value === "" || HEX_COLOR_PATTERN.test(value)
-      ? undefined
-      : t("validation.hexColor");
+    value === "" || isHexColor(value) ? undefined : t("validation.hexColor");
   const colorErrors = {
     primaryBrandColor: colorError(colors.draft.primaryBrandColor),
     secondaryBrandColor: colorError(colors.draft.secondaryBrandColor),
@@ -223,7 +216,7 @@ export function ProfileSettings() {
         description={t("settings.profile.identityHint")}
       >
         {pendingVerification.token ? (
-          <Card className="flex items-center justify-between gap-4">
+          <SurfaceCard className="flex items-center justify-between gap-4">
             <div>
               <span className="font-medium text-ink-strong text-sm">
                 {t("page.settings.profile.verify.confirm.title")}
@@ -266,10 +259,10 @@ export function ProfileSettings() {
                 </span>
               </Button>
             </div>
-          </Card>
+          </SurfaceCard>
         ) : null}
 
-        <Card className="flex items-center justify-between gap-4">
+        <SurfaceCard className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.profile.accountStatus")}
@@ -305,7 +298,7 @@ export function ProfileSettings() {
               </span>
             </Button>
           )}
-        </Card>
+        </SurfaceCard>
 
         <EditableCard
           isDirty={identity.isDirty}
@@ -321,6 +314,7 @@ export function ProfileSettings() {
           >
             <TextInput
               id="profile-name"
+              autoComplete="name"
               value={identity.draft.name}
               error={identityErrors.name ?? issues.name}
               maxLength={NAME_MAX_LENGTH}
@@ -335,6 +329,7 @@ export function ProfileSettings() {
           >
             <TextInput
               id="profile-username"
+              autoComplete="username"
               value={identity.draft.username}
               error={identityErrors.username ?? issues.username}
               format="lowercase"

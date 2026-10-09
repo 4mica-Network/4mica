@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type { Agent, AgentFilters, AgentState } from "./type";
 
 export const selectAgentState = (state: RootState): AgentState => state.agent;

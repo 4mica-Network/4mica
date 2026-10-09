@@ -1,3 +1,4 @@
+import { isProfileRenderable } from "@4mica/rules";
 import { selectAgents } from "@stores/agent/selector";
 import { selectApiListings } from "@stores/apiListing/selector";
 import { selectApiKeys, selectWebhooks } from "@stores/developer/selector";
@@ -6,7 +7,6 @@ import { selectPaymentSummary } from "@stores/payment/selector";
 import { selectBusiness, selectUser } from "@stores/user/selector";
 import { selectWallets } from "@stores/wallet/selector";
 import { useTranslation } from "react-i18next";
-import { isProfileRenderable } from "@/lib/profile-gate";
 
 export interface ChecklistItem {
   id: string;

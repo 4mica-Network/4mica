@@ -9,7 +9,6 @@ import type {
   MouseEvent,
   ReactNode,
   Ref,
-  RefCallback,
 } from "react";
 import {
   forwardRef,
@@ -20,12 +19,7 @@ import {
   useState,
 } from "react";
 import { cn } from "../../lib/cn";
-
-/**
- * Structurally identical to react-hook-form's UseFormRegisterReturn, so
- * `register={form.register("name")}` typechecks without this package taking a
- * dependency on react-hook-form or leaking the type into its declarations.
- */
+import { joinIds, mergeRefs } from "../../lib/focusable";
 export interface RegisterLike {
   name: string;
   onChange: (event: unknown) => unknown;
@@ -44,6 +38,11 @@ type Formatter = "lowercase" | "uppercase" | ((value: string) => string);
 
 type BaseProps = {
   id?: string;
+  name?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
+  "aria-controls"?: string;
   label?: string;
   placeholder?: string;
   className?: string;
@@ -95,18 +94,6 @@ type TextAreaVariant = BaseProps & { variant: "textarea" };
 
 export type InputFieldProps = InputVariant | TextAreaVariant;
 
-function mergeRefs<T>(...refs: (Ref<T> | undefined)[]): RefCallback<T> {
-  return (value) => {
-    for (const ref of refs) {
-      if (typeof ref === "function") {
-        ref(value);
-      } else if (ref && typeof ref === "object") {
-        (ref as { current: T | null }).current = value;
-      }
-    }
-  };
-}
-
 const applyFormat = (value: string, format?: Formatter): string => {
   if (!format) return value;
   if (typeof format === "function") return format(value);
@@ -149,12 +136,13 @@ export const InputField = forwardRef<
     format,
     onClick,
     onChange,
+    onBlur,
+    "aria-describedby": ariaDescribedBy,
     ...rest
   } = props;
 
   const type = "type" in props ? (props.type ?? "text") : "text";
 
-  // register.ref is pulled out so it can be merged rather than overwrite ours.
   const {
     ref: registerRef,
     onChange: registerOnChange,
@@ -191,8 +179,6 @@ export const InputField = forwardRef<
     } else if (value !== undefined) {
       setLocal(value);
     }
-    // format is intentionally excluded: an inline function would change
-    // identity every render and reset what the user is typing.
   }, [value]);
 
   useEffect(() => {
@@ -213,9 +199,16 @@ export const InputField = forwardRef<
 
   const generatedId = useId();
   const inputId =
-    id ??
-    (registerName ? `input-${registerName}` : label ? generatedId : undefined);
-  const errorId = error && inputId ? `${inputId}-error` : undefined;
+    id ?? (registerName ? `input-${registerName}` : `input-${generatedId}`);
+  const errorId = error ? `${inputId}-error` : undefined;
+  const describedBy = joinIds(ariaDescribedBy, errorId);
+
+  const handleBlur: FocusEventHandler<
+    HTMLInputElement | HTMLTextAreaElement
+  > = (event) => {
+    registerOnBlur?.(event);
+    onBlur?.(event);
+  };
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -243,12 +236,11 @@ export const InputField = forwardRef<
     maxLength: maxLength ?? registerRest.maxLength,
     name: registerName,
     "aria-invalid": error ? (true as const) : undefined,
-    "aria-describedby": errorId,
+    "aria-describedby": describedBy,
+    "aria-required": required || registerRest.required || undefined,
     onClick,
     onChange: handleChange,
-    onBlur: registerOnBlur as FocusEventHandler<
-      HTMLInputElement | HTMLTextAreaElement
-    >,
+    onBlur: handleBlur,
   };
 
   return (
@@ -332,7 +324,7 @@ export const InputField = forwardRef<
       {error && (
         <p
           id={errorId}
-          role="alert"
+          aria-live="polite"
           className="mt-2 select-none font-normal text-danger text-xs"
         >
           {error}

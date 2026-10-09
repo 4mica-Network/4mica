@@ -2,33 +2,35 @@ import { Button, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
 import {
   createApiKey,
   deleteApiKey,
+  developerPendingKeys,
   revokeApiKey,
 } from "@stores/developer/actions";
 import {
   selectApiKeys,
   selectDeveloperError,
   selectDeveloperIssues,
-  selectIsPending,
+  selectIsDeveloperPending,
 } from "@stores/developer/selector";
 import type { ApiKey } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { formatDate } from "@utils/format";
 import { KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, SettingsSection } from "@/components/form";
+import { ConfirmAction } from "@/components/ConfirmAction";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
-
-const formatDate = (value: string | null) =>
-  value ? new Date(value).toLocaleDateString() : "—";
 
 function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isPending = useAppSelector(selectIsPending(`apiKey:${apiKey.id}`));
+  const isPending = useAppSelector(
+    selectIsDeveloperPending(developerPendingKeys.apiKey(apiKey.id)),
+  );
   const isRevoked = Boolean(apiKey.revokedAt);
 
   return (
-    <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <SurfaceCard className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium text-ink-strong text-sm">
@@ -52,28 +54,33 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
       <div className="flex shrink-0 items-center gap-2">
         {isPending && <Spinner size="sm" className="text-ink-subtle" />}
         {!isRevoked && (
+          <ConfirmAction
+            title={t("developer.keys.revokeConfirm", { name: apiKey.name })}
+            description={t("developer.keys.revokeConsequence")}
+            confirmLabel={t("developer.keys.revoke")}
+            onConfirm={() => dispatch(revokeApiKey({ id: apiKey.id }))}
+          >
+            <Button type="button" size="sm" intent="soft" disabled={isPending}>
+              {t("developer.keys.revoke")}
+            </Button>
+          </ConfirmAction>
+        )}
+        <ConfirmAction
+          title={t("developer.keys.deleteConfirm", { name: apiKey.name })}
+          onConfirm={() => dispatch(deleteApiKey({ id: apiKey.id }))}
+        >
           <Button
             type="button"
             size="sm"
-            intent="soft"
+            intent="ghost"
+            aria-label={t("developer.keys.delete")}
             disabled={isPending}
-            onClick={() => dispatch(revokeApiKey({ id: apiKey.id }))}
           >
-            {t("developer.keys.revoke")}
+            <Trash2 className="h-4 w-4" />
           </Button>
-        )}
-        <Button
-          type="button"
-          size="sm"
-          intent="ghost"
-          aria-label={t("developer.keys.delete")}
-          disabled={isPending}
-          onClick={() => dispatch(deleteApiKey({ id: apiKey.id }))}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        </ConfirmAction>
       </div>
-    </Card>
+    </SurfaceCard>
   );
 }
 
@@ -83,7 +90,7 @@ export function ApiKeysCard() {
   const apiKeys = useAppSelector(selectApiKeys);
   const issues = useAppSelector(selectDeveloperIssues);
   const error = useAppSelector(selectDeveloperError);
-  const isCreating = useAppSelector(selectIsPending("createApiKey"));
+  const isCreating = useAppSelector(selectIsDeveloperPending("createApiKey"));
   const [name, setName] = useState("");
 
   useOnSuccess(isCreating, error !== null, () => setName(""));
@@ -101,7 +108,7 @@ export function ApiKeysCard() {
       title={t("developer.keys.title")}
       description={t("developer.keys.description")}
     >
-      <Card>
+      <SurfaceCard>
         <form
           className="flex flex-col gap-3 sm:flex-row sm:items-start"
           onSubmit={(e) => {
@@ -112,6 +119,7 @@ export function ApiKeysCard() {
           <div className="flex-1">
             <InputField
               id="api-key-name"
+              aria-label={t("developer.keys.nameLabel")}
               value={name}
               placeholder={t("developer.keys.namePlaceholder")}
               error={issues.name}
@@ -131,7 +139,7 @@ export function ApiKeysCard() {
             </span>
           </Button>
         </form>
-      </Card>
+      </SurfaceCard>
 
       {apiKeys.length === 0 ? (
         <EmptyState

@@ -1,13 +1,12 @@
 import type { ApiKey } from "@stores/developer/type";
-import type { ResourceRef } from "@stores/trust/actions";
+import type { ResourceRef } from "@stores/shared/type";
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { RevealedResourceKey } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
-
-const rowKey = (keyId: string) => `resourceKey:${keyId}`;
+export const resourceKeyPendingKeys = {
+  row: (keyId: string) => `resourceKey:${keyId}`,
+} as const;
 
 export const fetchResourceKeys = (resource: ResourceRef) => ({
   type: actionTypes.FETCH_RESOURCE_KEYS_REQUESTED,
@@ -47,7 +46,7 @@ export const createResourceKeySucceeded = (
 export const revokeResourceKey = (resource: ResourceRef, keyId: string) => ({
   type: actionTypes.REVOKE_RESOURCE_KEY_REQUESTED,
   payload: { resource, keyId },
-  meta: { pendingKey: rowKey(keyId) },
+  meta: { pendingKey: resourceKeyPendingKeys.row(keyId) },
 });
 
 export const revokeResourceKeySucceeded = (
@@ -62,7 +61,7 @@ export const revokeResourceKeySucceeded = (
 export const deleteResourceKey = (resource: ResourceRef, keyId: string) => ({
   type: actionTypes.DELETE_RESOURCE_KEY_REQUESTED,
   payload: { resource, keyId },
-  meta: { pendingKey: rowKey(keyId) },
+  meta: { pendingKey: resourceKeyPendingKeys.row(keyId) },
 });
 
 export const deleteResourceKeySucceeded = (

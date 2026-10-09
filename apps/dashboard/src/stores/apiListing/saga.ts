@@ -1,9 +1,10 @@
 import type { ApiListingInput } from "@api/apiListing";
 import * as api from "@api/apiListing";
 import i18n from "@i18n";
+import { definedParams, type PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   apiListingActionFailed,
   batchDeleteApiListingsSucceeded,
@@ -13,7 +14,6 @@ import {
   fetchApiListingsFailed,
   fetchApiListingsPending,
   fetchApiListingsSucceeded,
-  type PendingMeta,
   publishApiListingSucceeded,
   updateApiListingSucceeded,
 } from "./actions";
@@ -52,9 +52,11 @@ export function* fetchApiListings(): Generator {
       api.getApiListings({
         page,
         limit,
-        ...(filters.q ? { q: filters.q } : {}),
-        ...(filters.visibility ? { visibility: filters.visibility } : {}),
-        ...(filters.network ? { network: filters.network } : {}),
+        ...definedParams({
+          q: filters.q,
+          visibility: filters.visibility,
+          network: filters.network,
+        }),
       }),
     )) as Awaited<ReturnType<typeof api.getApiListings>>;
 

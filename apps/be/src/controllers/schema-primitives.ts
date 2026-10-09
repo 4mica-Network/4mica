@@ -1,3 +1,10 @@
+import {
+  DECIMAL_AMOUNT_PATTERN,
+  isHttpsUrl,
+  isSingleLine,
+  isWebUrl,
+  PHONE_PATTERN,
+} from "@4mica/rules";
 import { isPublicHostname } from "@utils/public-host";
 import * as v from "valibot";
 import { isAddress } from "viem";
@@ -32,26 +39,10 @@ export const address = v.pipe(
   v.transform((value) => value.toLowerCase()),
 );
 
-const CONTROL_CHARACTERS = /[\p{Cc}\u2028\u2029]/u;
-const SPACE_OR_CONTROL = /[\s\p{Cc}]/u;
-
 export const singleLine = v.check(
-  (value: string) => !CONTROL_CHARACTERS.test(value),
+  (value: string) => isSingleLine(value),
   "must be a single line of text",
 );
-
-export const isWebUrl = (value: string): boolean => {
-  if (SPACE_OR_CONTROL.test(value)) {
-    return false;
-  }
-
-  try {
-    const { protocol, hostname } = new URL(value);
-    return (protocol === "https:" || protocol === "http:") && hostname !== "";
-  } catch {
-    return false;
-  }
-};
 
 export const normalizeUrl = (value: string): string => new URL(value).href;
 
@@ -71,10 +62,7 @@ export const webUrl = (max: number) =>
   );
 
 export const httpsUrl = (max: number) =>
-  v.pipe(
-    webUrl(max),
-    v.check((value) => value.startsWith("https://"), "must be an https URL"),
-  );
+  v.pipe(webUrl(max), v.check(isHttpsUrl, "must be an https URL"));
 
 export const publicHttpsUrl = (max: number) =>
   v.pipe(
@@ -88,8 +76,6 @@ export const publicHttpsUrl = (max: number) =>
 export const email = (max: number) =>
   v.pipe(v.string(), v.trim(), v.toLowerCase(), v.email(), v.maxLength(max));
 
-export const PHONE_PATTERN = /^\+?[0-9 ()-]{6,20}$/;
-
 export const phoneNumber = v.pipe(
   v.string(),
   v.trim(),
@@ -100,10 +86,7 @@ export const phoneNumber = v.pipe(
 export const decimalAmount = v.pipe(
   v.string(),
   v.trim(),
-  v.regex(
-    /^(?!0\d)\d{1,20}(\.\d{1,18})?$/,
-    "must be a decimal amount, as a string",
-  ),
+  v.regex(DECIMAL_AMOUNT_PATTERN, "must be a decimal amount, as a string"),
 );
 
 export const couponCode = v.pipe(

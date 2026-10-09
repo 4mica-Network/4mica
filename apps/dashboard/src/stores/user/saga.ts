@@ -12,8 +12,8 @@ import {
 } from "@api/user";
 import i18n from "@i18n";
 import { toIssueMap, toMessage } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   checkUsernameFailed,
   checkUsernameSucceeded,

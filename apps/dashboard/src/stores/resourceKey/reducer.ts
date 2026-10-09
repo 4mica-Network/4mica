@@ -1,4 +1,5 @@
 import type { ApiKey } from "@stores/developer/type";
+import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { ResourceKeyState, RevealedResourceKey } from "./type";
 
@@ -17,23 +18,6 @@ interface ResourceKeyAction {
   payload?: unknown;
   meta?: { pendingKey: string };
 }
-
-const setPending = (
-  pending: Record<string, boolean>,
-  key: string | undefined,
-  value: boolean,
-): Record<string, boolean> => {
-  if (!key) {
-    return pending;
-  }
-  const next = { ...pending };
-  if (value) {
-    next[key] = true;
-  } else {
-    delete next[key];
-  }
-  return next;
-};
 
 const replaceById = <T extends { id: string }>(items: T[], next: T): T[] =>
   items.map((item) => (item.id === next.id ? next : item));

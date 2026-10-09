@@ -1,7 +1,13 @@
+import {
+  explorerAddressUrl,
+  PAYMENT_NETWORKS,
+  shortenAddress,
+} from "@4mica/rules";
 import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   addCustomerIdentity,
+  customerPendingKeys,
   removeCustomerIdentity,
   updateCustomerIdentity,
 } from "@stores/customer/actions";
@@ -12,6 +18,7 @@ import {
 } from "@stores/customer/selector";
 import type { Customer, CustomerIdentity } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { formatDate } from "@utils/format";
 import {
   ArrowUpRight,
   Ban,
@@ -21,28 +28,26 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { FieldRow, Select, TextInput } from "@/components/form";
-import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { ConfirmAction } from "@/components/ConfirmAction";
+import { FieldRow, Form, FormSelect, FormTextInput } from "@/components/form";
 import {
-  explorerAddressUrl,
-  NETWORK_OPTIONS,
-  NETWORKS,
-  shortenAddress,
-} from "@/lib/networks";
+  SectionCard,
+  SectionInset,
+  SectionRow,
+  SectionRows,
+} from "@/components/layout";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { useServerIssues } from "@/hooks/useServerIssues";
+import { NETWORK_OPTIONS } from "@/lib/networks";
 import {
   IDENTITY_SOURCE_LABEL_KEYS,
   IDENTITY_TYPE_LABEL_KEYS,
   IDENTITY_TYPE_OPTIONS,
 } from "../customers/constants";
 import { type IdentityValues, identitySchema } from "../customers/validation";
-import {
-  SectionCard,
-  SectionInset,
-  SectionRow,
-  SectionRows,
-} from "./SectionCard";
 
 const PENDING_KEY = "customerIdentity";
 
@@ -57,7 +62,7 @@ function IdentityRow({
   const dispatch = useAppDispatch();
 
   const isPending = useAppSelector(
-    selectIsCustomerPending(`customerIdentity:${identity.id}`),
+    selectIsCustomerPending(customerPendingKeys.identity(identity.id)),
   );
 
   return (
@@ -96,14 +101,10 @@ function IdentityRow({
             )}
           </Button>
 
-          <Button
-            type="button"
-            intent="ghost"
-            size="sm"
-            className="btn-no-lift text-danger"
-            disabled={isPending}
-            aria-label={t("customer.identity.remove")}
-            onClick={() =>
+          <ConfirmAction
+            title={t("customer.identity.removeConfirm")}
+            confirmLabel={t("confirm.remove")}
+            onConfirm={() =>
               dispatch(
                 removeCustomerIdentity({
                   id: customerId,
@@ -113,8 +114,18 @@ function IdentityRow({
             }
             data-testid={`customer-identity-remove-${identity.id}`}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            <Button
+              type="button"
+              intent="ghost"
+              size="sm"
+              className="btn-no-lift text-danger"
+              disabled={isPending}
+              aria-label={t("customer.identity.remove")}
+              data-testid={`customer-identity-remove-${identity.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </ConfirmAction>
         </>
       }
     >
@@ -142,7 +153,7 @@ function IdentityRow({
 
           {identity.network && (
             <Tag size="sm" variant="neutral">
-              {NETWORKS[identity.network].label}
+              {PAYMENT_NETWORKS[identity.network].label}
             </Tag>
           )}
 
@@ -161,10 +172,10 @@ function IdentityRow({
           <span className="text-ink-muted text-sm">
             {t("customer.identity.window", {
               from: identity.validFrom
-                ? new Date(identity.validFrom).toLocaleDateString()
+                ? formatDate(identity.validFrom)
                 : t("customer.identity.always"),
               until: identity.validUntil
-                ? new Date(identity.validUntil).toLocaleDateString()
+                ? formatDate(identity.validUntil)
                 : t("customer.identity.ongoing"),
             })}
           </span>
@@ -188,32 +199,20 @@ function AddIdentityCard({
   const issues = useAppSelector(selectCustomerIssues);
   const error = useAppSelector(selectCustomerError);
 
-  const {
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<IdentityValues>({
+  const form = useForm<IdentityValues>({
     resolver: zodResolver(identitySchema),
-    mode: "onBlur",
+    mode: "onTouched",
     defaultValues: { type: "WALLET", network: "", address: "", value: "" },
   });
-
-  const values = watch();
+  const { handleSubmit, setError, control } = form;
+  const type = useWatch({ control, name: "type" });
+  useServerIssues(issues, setError);
 
   useOnSuccess(
     isSaving,
     error !== null || Object.keys(issues).length > 0,
     onDone,
   );
-
-  const fieldError = (field: keyof IdentityValues) => {
-    if (issues[field]) {
-      return issues[field];
-    }
-    const message = errors[field]?.message;
-    return message ? t(message) : undefined;
-  };
 
   const onValid = (data: IdentityValues) => {
     dispatch(
@@ -241,104 +240,88 @@ function AddIdentityCard({
 
   return (
     <SectionInset data-testid="customer-identity-form">
-      <div className="flex flex-col gap-4">
-        <FieldRow
-          title={t("customer.identity.typeLabel")}
-          htmlFor="identity-type"
-        >
-          <Select
-            id="identity-type"
-            value={values.type}
-            onChange={(value) =>
-              setValue("type", value as never, { shouldValidate: true })
-            }
-            options={IDENTITY_TYPE_OPTIONS.map((option) => ({
-              value: option.value,
-              title: t(option.titleKey),
-            }))}
-          />
-        </FieldRow>
-
-        {values.type === "WALLET" ? (
-          <>
-            <FieldRow
-              title={t("customer.identity.networkLabel")}
-              htmlFor="identity-network"
-            >
-              <Select
-                id="identity-network"
-                value={values.network ?? ""}
-                onChange={(value) =>
-                  setValue("network", value as never, {
-                    shouldValidate: true,
-                  })
-                }
-                options={[
-                  { value: "", title: t("customer.identity.pickNetwork") },
-                  ...NETWORK_OPTIONS,
-                ]}
-                error={fieldError("network")}
-              />
-            </FieldRow>
-
-            <FieldRow
-              title={t("customer.identity.addressLabel")}
-              htmlFor="identity-address"
-            >
-              <TextInput
-                id="identity-address"
-                value={values.address ?? ""}
-                onChange={(value) =>
-                  setValue("address", value, { shouldValidate: true })
-                }
-                placeholder="0x…"
-                maxLength={42}
-                error={fieldError("address")}
-              />
-            </FieldRow>
-          </>
-        ) : (
+      <Form
+        form={form}
+        className="flex flex-col gap-4"
+        onSubmit={handleSubmit(onValid)}
+      >
+        <div className="flex flex-col gap-4">
           <FieldRow
-            title={t("customer.identity.valueLabel")}
-            htmlFor="identity-value"
+            title={t("customer.identity.typeLabel")}
+            htmlFor="identity-type"
           >
-            <TextInput
-              id="identity-value"
-              value={values.value ?? ""}
-              onChange={(value) =>
-                setValue("value", value, { shouldValidate: true })
-              }
-              maxLength={320}
-              error={fieldError("value")}
+            <FormSelect
+              name="type"
+              options={IDENTITY_TYPE_OPTIONS.map((option) => ({
+                value: option.value,
+                title: t(option.titleKey),
+              }))}
             />
           </FieldRow>
-        )}
-      </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          intent="ghost"
-          size="sm"
-          disabled={isSaving}
-          onClick={onDone}
-        >
-          {t("customer.identity.cancel")}
-        </Button>
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift w-24"
-          disabled={isSaving}
-          onClick={handleSubmit(onValid)}
-          data-testid="customer-identity-save"
-        >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
-          </span>
-        </Button>
-      </div>
+          {type === "WALLET" ? (
+            <>
+              <FieldRow
+                title={t("customer.identity.networkLabel")}
+                htmlFor="identity-network"
+                required
+              >
+                <FormSelect
+                  name="network"
+                  options={[
+                    { value: "", title: t("customer.identity.pickNetwork") },
+                    ...NETWORK_OPTIONS,
+                  ]}
+                />
+              </FieldRow>
+
+              <FieldRow
+                title={t("customer.identity.addressLabel")}
+                htmlFor="identity-address"
+                required
+              >
+                <FormTextInput
+                  name="address"
+                  placeholder="0x…"
+                  maxLength={42}
+                />
+              </FieldRow>
+            </>
+          ) : (
+            <FieldRow
+              title={t("customer.identity.valueLabel")}
+              htmlFor="identity-value"
+              required
+            >
+              <FormTextInput
+                name="value"
+                type={type === "EMAIL" ? "email" : "text"}
+                maxLength={320}
+                autoFocus
+              />
+            </FieldRow>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <Button intent="ghost" size="sm" disabled={isSaving} onClick={onDone}>
+            {t("customer.identity.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift w-24"
+            disabled={isSaving}
+            aria-busy={isSaving}
+            data-testid="customer-identity-save"
+          >
+            <span className="flex w-full items-center justify-center text-sm">
+              {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
+            </span>
+          </Button>
+        </div>
+      </Form>
     </SectionInset>
   );
 }
@@ -347,6 +330,7 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
 
   const [isAdding, setIsAdding] = useState(false);
+  const addButton = useReturnFocus(isAdding);
 
   return (
     <SectionCard
@@ -360,6 +344,7 @@ export function IdentitiesPanel({ customer }: { customer: Customer }) {
             intent="invert"
             size="sm"
             className="btn-no-lift"
+            ref={addButton}
             onClick={() => setIsAdding(true)}
             data-testid="customer-identity-add"
           >

@@ -1,6 +1,6 @@
+import { isWebUrl } from "@4mica/rules";
 import {
   DEFAULT_PAGE_SIZE,
-  isWebUrl,
   MAX_PAGE_SIZE,
   normalizeUrl,
   positiveInt,

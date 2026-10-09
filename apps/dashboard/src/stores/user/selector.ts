@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type { Business, User, UsernameCheck, UserState } from "./type";
 
 export const selectUserState = (state: RootState): UserState => state.user;

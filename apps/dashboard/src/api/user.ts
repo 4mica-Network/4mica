@@ -54,8 +54,9 @@ export interface UsernameAvailability {
 
 export const checkUsernameAvailability = (username: string) =>
   httpClient.request<UsernameAvailability>({
-    url: `/me/username-available?username=${encodeURIComponent(username)}`,
+    url: "/me/username-available",
     method: HttpMethod.GET,
+    params: { username },
   });
 
 export const getBusiness = () =>

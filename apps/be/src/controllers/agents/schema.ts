@@ -1,3 +1,9 @@
+import {
+  CURRENCY_CODE_PATTERN,
+  isUuidShaped,
+  SLUG_MAX_LENGTH,
+  SLUG_MESSAGE,
+} from "@4mica/rules";
 import { USERNAME_PATTERN } from "@4mica/url";
 import {
   address,
@@ -12,7 +18,6 @@ import {
   positiveInt,
   singleLine,
 } from "@controllers/schema-primitives";
-import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@utils/slug";
 import * as v from "valibot";
 
 const slug = v.pipe(
@@ -42,7 +47,7 @@ const priceCurrency = v.pipe(
   v.string(),
   v.trim(),
   v.toUpperCase(),
-  v.regex(/^[A-Z0-9]{2,16}$/, "must be a currency code"),
+  v.regex(CURRENCY_CODE_PATTERN, "must be a currency code"),
 );
 
 const walletId = v.pipe(v.string(), v.uuid("must be a wallet id"));

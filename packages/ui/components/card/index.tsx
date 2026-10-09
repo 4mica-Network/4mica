@@ -7,10 +7,6 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   onClick?: () => void;
 }
 
-/**
- * Stacked by default: bottom border only, square bottom corners, so a run of
- * cards reads as one surface. Pass `border rounded-lg` for a standalone card.
- */
 export const Card = ({ className, children, onClick, ...rest }: CardProps) => {
   if (onClick) {
     return (

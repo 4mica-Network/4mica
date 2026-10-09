@@ -1,4 +1,5 @@
 import type { PaymentNetwork } from "@4mica/db";
+import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
@@ -16,7 +17,7 @@ import {
   isUniqueViolation,
   uniqueViolationTargets,
 } from "@utils/prisma-errors";
-import { nextFreeSlug, slugify } from "@utils/slug";
+import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteAgents,

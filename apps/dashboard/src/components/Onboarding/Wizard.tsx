@@ -9,14 +9,18 @@ import {
   selectUsernameCheck,
   selectValidationIssues,
 } from "@stores/user/selector";
+import { blankFieldsToNull } from "@utils/format";
+import {
+  isBusinessValid,
+  isNameValid,
+  isUsernameValid,
+} from "@utils/user-rules";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { blankToNull } from "@/components/form";
 import { type BusinessDraft, BusinessStep } from "./BusinessStep";
 import { NameStep } from "./NameStep";
 import { StepIndicator } from "./StepIndicator";
 import { UsernameStep } from "./UsernameStep";
-import { isBusinessValid, isNameValid, isUsernameValid } from "./validation";
 
 const STEPS = ["name", "username", "business"] as const;
 
@@ -39,9 +43,6 @@ export function Wizard() {
 
   const [step, setStep] = useState(0);
 
-  // Plain useState, NOT useDraft: the user slice applies writes optimistically,
-  // so useDraft's resync-on-`initial`-change would wipe what is being typed the
-  // moment a step's PATCH lands.
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft>({
@@ -122,7 +123,7 @@ export function Wizard() {
         setPending(SECTIONS.business);
         dispatch(
           completeOnboarding(
-            blankToNull(
+            blankFieldsToNull(
               {
                 legalName: businessDraft.legalName.trim(),
                 businessType: businessDraft.businessType,

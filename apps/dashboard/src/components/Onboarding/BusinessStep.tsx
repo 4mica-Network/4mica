@@ -1,7 +1,8 @@
 import type { BusinessType } from "@stores/user/type";
+import { isCountryValid } from "@utils/user-rules";
 import { useTranslation } from "react-i18next";
-import { BUSINESS_TYPES, FieldRow, Select, TextInput } from "@/components/form";
-import { isCountryValid } from "./validation";
+import { FieldRow, Select, TextInput } from "@/components/form";
+import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
 
 export interface BusinessDraft {
   legalName: string;
@@ -24,6 +25,7 @@ export function BusinessStep({
   issues: Record<string, string>;
 }) {
   const { t } = useTranslation();
+  const businessTypes = useBusinessTypeOptions();
 
   return (
     <div className="flex flex-col gap-1">
@@ -36,6 +38,7 @@ export function BusinessStep({
       >
         <TextInput
           id="onboarding-legal-name"
+          autoComplete="organization"
           value={draft.legalName}
           onChange={(value) => onChange("legalName", value)}
           placeholder={t("onboarding.business.legalNamePlaceholder")}
@@ -51,7 +54,7 @@ export function BusinessStep({
         <Select
           id="onboarding-business-type"
           value={draft.businessType}
-          options={BUSINESS_TYPES}
+          options={businessTypes}
           error={issues.businessType}
           onChange={(value) => onChange("businessType", value)}
         />
@@ -64,6 +67,7 @@ export function BusinessStep({
       >
         <TextInput
           id="onboarding-country"
+          autoComplete="country"
           value={draft.country}
           onChange={(value) => onChange("country", value.slice(0, 2))}
           placeholder="GB"

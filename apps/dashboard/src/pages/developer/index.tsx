@@ -6,9 +6,9 @@ import {
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { RevealedSecretBanner } from "@/components/RevealedSecret";
 import { SettingsPage } from "@/components/SettingsPage";
 import { ApiKeysCard } from "./ApiKeysCard";
-import { RevealedSecretBanner } from "./RevealedSecret";
 import { WebhooksCard } from "./WebhooksCard";
 
 export function DeveloperSettings() {

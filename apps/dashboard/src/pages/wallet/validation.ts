@@ -1,3 +1,4 @@
+import { orBlank, paymentNetwork } from "@utils/zod";
 import { isAddress } from "viem";
 import { z } from "zod";
 
@@ -19,16 +20,16 @@ export const walletDetailsSchema = z.object({
     .trim()
     .min(1, "wallet.errors.labelRequired")
     .max(LABEL_MAX_LENGTH, "wallet.errors.labelTooLong"),
-  description: z
-    .string()
-    .trim()
-    .max(DESCRIPTION_MAX_LENGTH, "wallet.errors.descriptionTooLong")
-    .optional()
-    .or(z.literal("")),
+  description: orBlank(
+    z
+      .string()
+      .trim()
+      .max(DESCRIPTION_MAX_LENGTH, "wallet.errors.descriptionTooLong"),
+  ),
 });
 
 export const createWalletSchema = walletDetailsSchema.extend({
-  network: z.enum(["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"]),
+  network: paymentNetwork,
   role: z.enum(["PAYER", "RECIPIENT", "BOTH"]),
   address: addressField,
 });

@@ -1,7 +1,8 @@
+import { trimAmount } from "@4mica/rules";
 import { cn } from "@4mica/ui";
 import type { MonthlyBucket } from "@stores/payment/type";
 import { useTranslation } from "react-i18next";
-import { monthLabel, sumVolume, trimAmount } from "./metrics";
+import { monthLabel, sumVolume } from "./metrics";
 
 export function MonthlyChart({
   buckets,

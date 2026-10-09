@@ -1,3 +1,4 @@
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   PaymentNetwork,
@@ -7,9 +8,10 @@ import type {
   WalletStatus,
 } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
+export const walletPendingKeys = {
+  row: (id: string) => `wallet:${id}`,
+  batchDelete: "batchDeleteWallets",
+} as const;
 
 export const fetchWallets = () => ({
   type: actionTypes.FETCH_WALLETS_REQUESTED,
@@ -73,7 +75,7 @@ export const updateWallet = (payload: {
 }) => ({
   type: actionTypes.UPDATE_WALLET_REQUESTED,
   payload,
-  meta: { pendingKey: `wallet:${payload.id}` },
+  meta: { pendingKey: walletPendingKeys.row(payload.id) },
 });
 
 export const updateWalletSucceeded = (wallet: Wallet, meta: PendingMeta) => ({
@@ -85,7 +87,7 @@ export const updateWalletSucceeded = (wallet: Wallet, meta: PendingMeta) => ({
 export const deleteWallet = (payload: { id: string }) => ({
   type: actionTypes.DELETE_WALLET_REQUESTED,
   payload,
-  meta: { pendingKey: `wallet:${payload.id}` },
+  meta: { pendingKey: walletPendingKeys.row(payload.id) },
 });
 
 export const deleteWalletSucceeded = (id: string, meta: PendingMeta) => ({
@@ -97,7 +99,7 @@ export const deleteWalletSucceeded = (id: string, meta: PendingMeta) => ({
 export const batchDeleteWallets = (payload: { ids: string[] }) => ({
   type: actionTypes.BATCH_DELETE_WALLETS_REQUESTED,
   payload,
-  meta: { pendingKey: "batchDeleteWallets" },
+  meta: { pendingKey: walletPendingKeys.batchDelete },
 });
 
 export const batchDeleteWalletsSucceeded = (

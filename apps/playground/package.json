@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@4mica/db": "workspace:*",
+    "@4mica/rules": "workspace:*",
     "@4mica/tailwind-config": "workspace:*",
     "@4mica/ui": "workspace:*",
     "@4mica/url": "workspace:*",

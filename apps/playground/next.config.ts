@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
 
   // @4mica/db and @4mica/url export raw TS source; @4mica/ui follows the
   // precedent set by apps/web/next.config.ts.
-  transpilePackages: ["@4mica/db", "@4mica/ui", "@4mica/url"],
+  transpilePackages: ["@4mica/db", "@4mica/rules", "@4mica/ui", "@4mica/url"],
 
   // Engine-backed or fs-backed — never bundle these into a route chunk.
   serverExternalPackages: [

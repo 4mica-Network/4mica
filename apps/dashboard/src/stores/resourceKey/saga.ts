@@ -1,16 +1,16 @@
 import * as api from "@api/resourceKey";
 import i18n from "@i18n";
-import type { ResourceRef } from "@stores/trust/actions";
+import type { ResourceRef } from "@stores/shared/type";
+import type { PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   createResourceKeySucceeded,
   deleteResourceKeySucceeded,
   fetchResourceKeysFailed,
   fetchResourceKeysPending,
   fetchResourceKeysSucceeded,
-  type PendingMeta,
   resourceKeyActionFailed,
   revokeResourceKeySucceeded,
 } from "./actions";

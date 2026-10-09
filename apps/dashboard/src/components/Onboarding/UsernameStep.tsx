@@ -1,11 +1,11 @@
 import { Spinner } from "@4mica/ui";
 import { isGeneratedUsername } from "@4mica/url";
+import { isUsernameShapeValid } from "@utils/user-rules";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, TextInput } from "@/components/form";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { links } from "@/lib/links";
-import { isUsernameShapeValid } from "./validation";
 
 export function UsernameStep({
   value,
@@ -100,6 +100,7 @@ export function UsernameStep({
       >
         <TextInput
           id="onboarding-username"
+          autoComplete="username"
           value={value}
           onChange={onChange}
           placeholder={t("onboarding.username.placeholder")}
@@ -110,11 +111,9 @@ export function UsernameStep({
         />
       </FieldRow>
 
-      {message && (
-        <p className={`text-xs ${message.tone}`} aria-live="polite">
-          {message.text}
-        </p>
-      )}
+      <p className={`text-xs ${message?.tone ?? ""}`} aria-live="polite">
+        {message?.text}
+      </p>
     </div>
   );
 }

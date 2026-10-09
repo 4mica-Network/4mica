@@ -1,0 +1,31 @@
+{
+  "name": "@4mica/rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-light validation rules and payment-network facts shared by every 4Mica app.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rm -rf .turbo"
+  },
+  "dependencies": {
+    "@4mica/url": "workspace:*"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "@types/node": "catalog:node24",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}

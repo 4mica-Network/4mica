@@ -11,7 +11,7 @@ const { notifySuccess, notifyError } = vi.hoisted(() => ({
   notifySuccess: vi.fn(),
   notifyError: vi.fn(),
 }));
-vi.mock("@utils/notification", () => ({ notifySuccess, notifyError }));
+vi.mock("@/lib/notify", () => ({ notifySuccess, notifyError }));
 
 const { ProfileSettings } = await import("./index");
 const actionTypes = (await import("@stores/user/actionTypes")).default;

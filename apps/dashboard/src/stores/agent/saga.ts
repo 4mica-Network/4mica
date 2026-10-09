@@ -1,9 +1,10 @@
 import type { AgentInput } from "@api/agent";
 import * as api from "@api/agent";
 import i18n from "@i18n";
+import { definedParams, type PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   agentActionFailed,
   batchDeleteAgentsSucceeded,
@@ -13,7 +14,6 @@ import {
   fetchAgentsFailed,
   fetchAgentsPending,
   fetchAgentsSucceeded,
-  type PendingMeta,
   publishAgentSucceeded,
   updateAgentSucceeded,
 } from "./actions";
@@ -52,10 +52,12 @@ export function* fetchAgents(): Generator {
       api.getAgents({
         page,
         limit,
-        ...(filters.q ? { q: filters.q } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.visibility ? { visibility: filters.visibility } : {}),
-        ...(filters.network ? { network: filters.network } : {}),
+        ...definedParams({
+          q: filters.q,
+          status: filters.status,
+          visibility: filters.visibility,
+          network: filters.network,
+        }),
       }),
     )) as Awaited<ReturnType<typeof api.getAgents>>;
 

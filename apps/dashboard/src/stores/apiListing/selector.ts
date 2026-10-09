@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type { ApiListing, ApiListingFilters, ApiListingState } from "./type";
 
 export const selectApiListingState = (state: RootState): ApiListingState =>

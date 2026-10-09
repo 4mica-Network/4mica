@@ -1,8 +1,9 @@
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import type { PendingMeta } from "@stores/utils";
 import { toIssueMap, toMessage } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   createApiKeySucceeded,
   createWebhookSucceeded,
@@ -12,7 +13,6 @@ import {
   fetchDeveloperFailed,
   fetchDeveloperPending,
   fetchDeveloperSucceeded,
-  type PendingMeta,
   renameApiKeySucceeded,
   revokeApiKeySucceeded,
   rotateWebhookSecretSucceeded,

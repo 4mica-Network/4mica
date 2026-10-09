@@ -1,55 +1,23 @@
-import { USERNAME_PATTERN } from "@4mica/url";
-import { isSingleLine, isUuidShaped, isWebUrl } from "@utils/validation";
-import { isAddress } from "viem";
+import { isSingleLine } from "@4mica/rules";
+import { PUBLIC_VISIBILITY } from "@stores/shared/type";
+import {
+  addressOrBlank,
+  currencyOrBlank,
+  decimalAmount,
+  httpsUrl,
+  orBlank,
+  paymentNetwork,
+  positiveAmount,
+  slugOrBlank,
+} from "@utils/zod";
 import { z } from "zod";
 
 export const NAME_MAX_LENGTH = 120;
 export const HEADLINE_MAX_LENGTH = 160;
 export const DESCRIPTION_MAX_LENGTH = 10_000;
 
-const decimalAmount = z
-  .string()
-  .trim()
-  .regex(/^(?!0\d)\d{1,20}(\.\d{1,18})?$/, "agent.errors.priceInvalid");
-
-const positiveDecimal = decimalAmount
-  .refine((value) => Number(value) > 0, "agent.errors.pricePositive")
-  .optional()
-  .or(z.literal(""));
-
-const creditLimitField = decimalAmount.optional().or(z.literal(""));
-
-const httpsUrl = z
-  .string()
-  .trim()
-  .refine(isWebUrl, "agent.errors.urlInvalid")
-  .max(2048, "agent.errors.urlTooLong")
-  .refine((value) => value.startsWith("https://"), "agent.errors.urlHttps");
-
-const optionalHttpsUrl = httpsUrl.optional().or(z.literal(""));
-
-const optionalAddress = z
-  .string()
-  .trim()
-  .refine(
-    (value): boolean => value === "" || isAddress(value, { strict: true }),
-    "agent.errors.assetInvalid",
-  )
-  .optional()
-  .or(z.literal(""));
-
-const slugField = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .max(64, "agent.errors.slugTooLong")
-  .refine(
-    (value) => value === "" || USERNAME_PATTERN.test(value),
-    "agent.errors.slugInvalid",
-  )
-  .refine((value) => !isUuidShaped(value), "agent.errors.slugIdShaped")
-  .optional()
-  .or(z.literal(""));
+const NS = "agent.errors";
+const optionalHttpsUrl = orBlank(httpsUrl(NS));
 
 export const agentSchema = z.object({
   name: z
@@ -58,45 +26,39 @@ export const agentSchema = z.object({
     .min(1, "agent.errors.nameRequired")
     .max(NAME_MAX_LENGTH, "agent.errors.nameTooLong")
     .refine(isSingleLine, "validation.singleLine"),
-  slug: slugField,
-  headline: z
-    .string()
-    .trim()
-    .max(HEADLINE_MAX_LENGTH, "agent.errors.headlineTooLong")
-    .refine(isSingleLine, "validation.singleLine")
-    .optional()
-    .or(z.literal("")),
-  description: z
-    .string()
-    .trim()
-    .max(DESCRIPTION_MAX_LENGTH, "agent.errors.descriptionTooLong")
-    .optional()
-    .or(z.literal("")),
+  slug: slugOrBlank(NS),
+  headline: orBlank(
+    z
+      .string()
+      .trim()
+      .max(HEADLINE_MAX_LENGTH, "agent.errors.headlineTooLong")
+      .refine(isSingleLine, "validation.singleLine"),
+  ),
+  description: orBlank(
+    z
+      .string()
+      .trim()
+      .max(DESCRIPTION_MAX_LENGTH, "agent.errors.descriptionTooLong"),
+  ),
 
-  network: z.enum(["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"]),
+  network: paymentNetwork,
   status: z.enum(["PENDING", "ACTIVE"]),
-  visibility: z.enum(["PRIVATE", "UNLISTED", "PUBLIC"]),
+  visibility: z.enum(PUBLIC_VISIBILITY),
 
-  payerWalletId: z.string().optional().or(z.literal("")),
-  creditLimit: creditLimitField,
+  payerWalletId: orBlank(z.string()),
+  creditLimit: orBlank(decimalAmount(`${NS}.priceInvalid`)),
 
-  walletId: z.string().optional().or(z.literal("")),
-  assetAddress: optionalAddress,
-  priceAmount: positiveDecimal,
-  priceCurrency: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(/^[A-Z0-9]{2,16}$/, "agent.errors.currencyInvalid")
-    .optional()
-    .or(z.literal("")),
-  priceLabel: z
-    .string()
-    .trim()
-    .max(64, "agent.errors.priceLabelTooLong")
-    .refine(isSingleLine, "validation.singleLine")
-    .optional()
-    .or(z.literal("")),
+  walletId: orBlank(z.string()),
+  assetAddress: addressOrBlank(`${NS}.assetInvalid`),
+  priceAmount: orBlank(positiveAmount(NS)),
+  priceCurrency: currencyOrBlank("agent.errors.currencyInvalid"),
+  priceLabel: orBlank(
+    z
+      .string()
+      .trim()
+      .max(64, "agent.errors.priceLabelTooLong")
+      .refine(isSingleLine, "validation.singleLine"),
+  ),
   endpointUrl: optionalHttpsUrl,
   x402Endpoint: optionalHttpsUrl,
   docsUrl: optionalHttpsUrl,
@@ -118,6 +80,3 @@ export const CREATE_STEP_FIELDS = [
   ],
   ["docsUrl", "avatarUrl", "x402Endpoint", "status", "visibility"],
 ] as const satisfies readonly (readonly (keyof AgentValues)[])[];
-
-export const blankToNull = (value: string | undefined | null): string | null =>
-  value == null || value.trim() === "" ? null : value.trim();

@@ -1,3 +1,4 @@
+import { isPhoneNumber } from "@4mica/rules";
 import { Button } from "@4mica/ui";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -7,20 +8,19 @@ import {
   selectUser,
   selectValidationIssues,
 } from "@stores/user/selector";
-import { hasErrors, isEmail, isPhoneNumber } from "@utils/validation";
+import { hasErrors, isEmail } from "@utils/validation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { VerifiedBadge } from "@/components/badges";
 import { EditableCard, InstantCard } from "@/components/EditableCard";
 import {
-  Card,
   FieldRow,
   Select,
   SettingRow,
-  SettingsSection,
   SwitchCard,
   TextInput,
-  VerifiedBadge,
 } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 
@@ -159,6 +159,8 @@ export function AccountSettings() {
           >
             <TextInput
               id="account-email"
+              inputMode="email"
+              autoComplete="email"
               type="email"
               value={contact.draft.email}
               error={contactErrors.email ?? issues.email}
@@ -198,6 +200,9 @@ export function AccountSettings() {
           >
             <TextInput
               id="account-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={contact.draft.phoneNumber}
               placeholder="+1 555 000 1234"
               error={contactErrors.phoneNumber ?? issues.phoneNumber}
@@ -295,7 +300,7 @@ export function AccountSettings() {
           isSaving={savingPrivacy}
           onToggle={(v) => set("privacyMode", v)}
         />
-        <Card className="flex items-center justify-between gap-4">
+        <SurfaceCard className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.account.twoFactor")}
@@ -322,7 +327,7 @@ export function AccountSettings() {
               {t("settings.account.twoFactorManage")}
             </Button>
           </div>
-        </Card>
+        </SurfaceCard>
       </SettingsSection>
     </SettingsPage>
   );

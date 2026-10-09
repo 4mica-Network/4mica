@@ -1,15 +1,15 @@
 import * as api from "@api/trust";
 import i18n from "@i18n";
+import type { ResourceRef } from "@stores/shared/type";
+import type { PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
-import { notifyError, notifySuccess } from "@utils/notification";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   faqsChanged,
   fetchTrustFailed,
   fetchTrustPending,
   fetchTrustSucceeded,
-  type PendingMeta,
-  type ResourceRef,
   replyToReviewSucceeded,
   savePolicySucceeded,
   trustActionFailed,

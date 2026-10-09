@@ -1,10 +1,9 @@
+import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
 import type { PublicApiListing } from "@/schema/api-listing";
-import { networkInfo } from "./networks";
 import {
   buildCurlHandshake,
   codeString,
   commentLine,
-  formatPrice,
   PLACEHOLDER,
 } from "./shared";
 
@@ -42,7 +41,7 @@ export const buildApiListingSnippets = (
     return null;
   }
 
-  const { caip2, sdkName } = networkInfo(listing.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[listing.network];
   const url = listing.url ?? PLACEHOLDER.baseUrl;
   const price = formatPrice(
     listing.priceAmount,

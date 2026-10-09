@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type { Wallet, WalletFilters, WalletState } from "./type";
 
 export const selectWalletState = (state: RootState): WalletState =>

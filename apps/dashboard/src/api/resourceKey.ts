@@ -1,11 +1,12 @@
 import { HttpMethod } from "@4mica/http";
 import type { ApiKey } from "@stores/developer/type";
-import type { ResourceKind } from "@stores/trust/actions";
+import type { ResourceKind } from "@stores/shared/type";
 import { httpClient } from "./client";
 import type { CreatedApiKey } from "./developer";
+import { resourcePath } from "./resource";
 
 const base = (kind: ResourceKind, id: string) =>
-  `${kind === "listing" ? "/me/api-listings" : "/me/agents"}/${encodeURIComponent(id)}/keys`;
+  `${resourcePath(kind, id)}/keys`;
 
 export const getResourceKeys = (kind: ResourceKind, id: string) =>
   httpClient.request<{ items: ApiKey[] }>({

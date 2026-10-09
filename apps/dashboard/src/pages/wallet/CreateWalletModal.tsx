@@ -1,3 +1,8 @@
+import {
+  networkForChainId,
+  PAYMENT_NETWORKS,
+  shortenAddress,
+} from "@4mica/rules";
 import { Button, Modal, Spinner, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -9,6 +14,7 @@ import {
   selectWallets,
 } from "@stores/wallet/selector";
 import type { PaymentNetwork } from "@stores/wallet/type";
+import { blankToNull } from "@utils/format";
 import {
   ArrowUpRight,
   Check,
@@ -16,13 +22,22 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useCallback, useEffect, useId, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
+import {
+  FieldRow,
+  Form,
+  FormSelect,
+  FormTextArea,
+  FormTextInput,
+} from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
-import { useStepWithIssue } from "@/hooks/useStepWithIssue";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useServerIssues } from "@/hooks/useServerIssues";
+import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
+import { chainDefinition, NETWORK_OPTIONS } from "@/lib/networks";
 import {
   connectWallet,
   currentAccount,
@@ -34,13 +49,6 @@ import {
   WalletRejectedError,
   watchWallet,
 } from "@/lib/wallet-signer";
-import {
-  chainDefinition,
-  NETWORK_OPTIONS,
-  NETWORKS,
-  networkForChainId,
-  shortenAddress,
-} from "./constants";
 import {
   CREATE_STEP_FIELDS,
   type CreateWalletValues,
@@ -77,16 +85,9 @@ export function CreateWalletModal({
   const [isSwitching, setIsSwitching] = useState(false);
   const [walletChainId, setWalletChainId] = useState<number | null>(null);
 
-  const {
-    handleSubmit,
-    setValue,
-    watch,
-    trigger,
-    reset,
-    formState: { errors },
-  } = useForm<CreateWalletValues>({
+  const form = useForm<CreateWalletValues>({
     resolver: zodResolver(createWalletSchema),
-    mode: "onBlur",
+    mode: "onTouched",
     defaultValues: {
       label: "",
       description: "",
@@ -96,7 +97,12 @@ export function CreateWalletModal({
     },
   });
 
-  const values = watch();
+  const { handleSubmit, setValue, trigger, reset, setError, control } = form;
+  const [address, network, label] = useWatch({
+    control,
+    name: ["address", "network", "label"],
+  });
+  const formId = useId();
 
   const adopt = useCallback(
     (address: string, chainId: number | null) => {
@@ -133,6 +139,8 @@ export function CreateWalletModal({
       }
     })();
   }, [isOpen, reset, dispatch, adopt]);
+
+  useServerIssues(issues, setError);
 
   useEffect(() => {
     if (!isOpen) {
@@ -201,7 +209,7 @@ export function CreateWalletModal({
     setIsSwitching(true);
     try {
       await switchChain(chainDefinition(network));
-      setWalletChainId(NETWORKS[network].chainId);
+      setWalletChainId(PAYMENT_NETWORKS[network].chainId);
       setValue("network", network, { shouldValidate: true });
     } catch (cause) {
       setConnectError(
@@ -219,8 +227,8 @@ export function CreateWalletModal({
     if (!valid) {
       return;
     }
-    if (step === 0 && !values.label && values.address) {
-      setValue("label", suggestedLabel(values.address), {
+    if (step === 0 && !label && address) {
+      setValue("label", suggestedLabel(address), {
         shouldValidate: true,
       });
     }
@@ -228,13 +236,10 @@ export function CreateWalletModal({
   };
 
   const onValid = (data: CreateWalletValues) => {
-    if (isSaving) {
-      return;
-    }
     dispatch(
       createWallet({
         label: data.label.trim(),
-        description: data.description?.trim() ? data.description.trim() : null,
+        description: blankToNull(data.description),
         address: data.address,
         network: data.network,
         role: data.role,
@@ -243,49 +248,33 @@ export function CreateWalletModal({
   };
 
   const onInvalid = (invalid: Record<string, unknown>) => {
-    const firstBadStep = CREATE_STEP_FIELDS.findIndex((fields) =>
-      fields.some((field) => field in invalid),
+    const firstBadStep = firstStepWith(
+      CREATE_STEP_FIELDS,
+      Object.keys(invalid),
     );
     if (firstBadStep >= 0 && firstBadStep !== step) {
       setStep(firstBadStep);
     }
   };
 
-  const sawSaving = useRef(false);
-  useEffect(() => {
-    if (isSaving) {
-      sawSaving.current = true;
-      return;
-    }
-    if (!sawSaving.current) {
-      return;
-    }
-    sawSaving.current = false;
-    if (!error && Object.keys(issues).length === 0) {
-      onClose();
-    }
-  }, [isSaving, error, issues, onClose]);
-
-  const fieldError = (field: keyof CreateWalletValues) => {
-    if (issues[field]) {
-      return issues[field];
-    }
-    const message = errors[field]?.message;
-    return message ? t(message) : undefined;
-  };
+  useOnSuccess(
+    isSaving,
+    Boolean(error) || Object.keys(issues).length > 0,
+    onClose,
+  );
 
   const detectedNetwork = networkForChainId(walletChainId);
-  const isOnChosenChain = walletChainId === NETWORKS[values.network].chainId;
+  const isOnChosenChain = walletChainId === PAYMENT_NETWORKS[network].chainId;
 
   const alreadyLinked = existing.some(
     (item) =>
-      item.address.toLowerCase() === values.address.toLowerCase() &&
-      item.network === values.network,
+      item.address.toLowerCase() === address.toLowerCase() &&
+      item.network === network,
   );
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canContinue = Boolean(values.address) && !alreadyLinked;
-  const canSubmit = canContinue && Boolean(values.label?.trim()) && !isSaving;
+  const canContinue = Boolean(address) && !alreadyLinked;
+  const canSubmit = canContinue && Boolean(label?.trim()) && !isSaving;
 
   return (
     <Modal
@@ -325,8 +314,10 @@ export function CreateWalletModal({
                 intent="invert"
                 size="sm"
                 className="btn-no-lift min-w-32"
+                type="submit"
+                form={formId}
                 disabled={!canSubmit}
-                onClick={handleSubmit(onValid, onInvalid)}
+                aria-busy={isSaving}
                 data-testid="create-wallet-submit"
               >
                 <span className="flex w-full items-center justify-center text-sm">
@@ -338,8 +329,9 @@ export function CreateWalletModal({
                 intent="invert"
                 size="sm"
                 className="btn-no-lift min-w-24"
+                type="submit"
+                form={formId}
                 disabled={!canContinue}
-                onClick={continueToNext}
                 data-testid="create-wallet-continue"
               >
                 {t("wallet.create.continue")}
@@ -349,16 +341,22 @@ export function CreateWalletModal({
         </div>
       }
     >
-      <form
+      <Form
+        form={form}
+        id={formId}
         className="flex flex-col gap-5"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!isLastStep || !canSubmit) {
+          if (!isLastStep) {
+            if (canContinue) {
+              void continueToNext();
+            }
             return;
           }
-          void handleSubmit(onValid, onInvalid)(event);
+          if (canSubmit) {
+            void handleSubmit(onValid, onInvalid)(event);
+          }
         }}
-        noValidate
       >
         <StepIndicator current={step} total={TOTAL_STEPS} />
 
@@ -376,7 +374,7 @@ export function CreateWalletModal({
               </div>
             </div>
 
-            {values.address ? (
+            {address ? (
               <div className="flex flex-col gap-3 rounded-lg border border-overlay/10 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
@@ -385,7 +383,7 @@ export function CreateWalletModal({
                       className="truncate font-mono text-ink-body text-sm"
                       data-testid="create-wallet-address"
                     >
-                      {values.address}
+                      {address}
                     </span>
                   </div>
                   <button
@@ -407,12 +405,12 @@ export function CreateWalletModal({
                     <Tag
                       size="sm"
                       variant={
-                        NETWORKS[detectedNetwork].isTestnet
+                        PAYMENT_NETWORKS[detectedNetwork].isTestnet
                           ? "warning"
                           : "success"
                       }
                     >
-                      {NETWORKS[detectedNetwork].label}
+                      {PAYMENT_NETWORKS[detectedNetwork].label}
                     </Tag>
                   ) : (
                     <Tag size="sm" variant="error">
@@ -422,15 +420,21 @@ export function CreateWalletModal({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <p className="text-ink-muted text-xs">
+                  <p
+                    id={`${formId}-network-prompt`}
+                    className="text-ink-muted text-xs"
+                  >
                     {detectedNetwork
                       ? t("wallet.create.connect.networkPrompt")
                       : t("wallet.create.connect.switchPrompt")}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <fieldset
+                    aria-labelledby={`${formId}-network-prompt`}
+                    className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+                  >
                     {NETWORK_OPTIONS.map((option) => {
                       const value = option.value as PaymentNetwork;
-                      const isCurrent = values.network === value;
+                      const isCurrent = network === value;
 
                       return (
                         <Button
@@ -440,6 +444,7 @@ export function CreateWalletModal({
                           size="sm"
                           className="btn-no-lift"
                           disabled={isSwitching}
+                          aria-pressed={isCurrent}
                           onClick={() => handleSwitchChain(value)}
                           data-testid={`create-wallet-network-${value}`}
                         >
@@ -450,7 +455,7 @@ export function CreateWalletModal({
                         </Button>
                       );
                     })}
-                  </div>
+                  </fieldset>
                 </div>
 
                 {alreadyLinked && (
@@ -539,11 +544,11 @@ export function CreateWalletModal({
           <div className="flex flex-col gap-1">
             <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-overlay/10 bg-overlay/5 px-4 py-2.5">
               <span className="font-mono text-ink-body text-xs">
-                {shortenAddress(values.address)}
+                {shortenAddress(address)}
               </span>
               <span className="text-ink-subtle text-xs">·</span>
               <span className="text-ink-subtle text-xs">
-                {NETWORKS[values.network].label}
+                {PAYMENT_NETWORKS[network].label}
               </span>
             </div>
 
@@ -551,15 +556,11 @@ export function CreateWalletModal({
               title={t("wallet.create.fields.label.title")}
               htmlFor="wallet-label"
               description={t("wallet.create.fields.label.description")}
+              required
             >
-              <TextInput
-                id="wallet-label"
-                value={values.label}
-                onChange={(value) =>
-                  setValue("label", value, { shouldValidate: true })
-                }
+              <FormTextInput
+                name="label"
                 placeholder={t("wallet.create.fields.label.placeholder")}
-                error={fieldError("label")}
                 maxLength={LABEL_MAX_LENGTH}
                 autoFocus
               />
@@ -570,20 +571,13 @@ export function CreateWalletModal({
               htmlFor="wallet-role"
               description={t("wallet.create.fields.role.description")}
             >
-              <Select
-                id="wallet-role"
-                value={values.role}
-                onChange={(value) =>
-                  setValue("role", value as CreateWalletValues["role"], {
-                    shouldValidate: true,
-                  })
-                }
+              <FormSelect
+                name="role"
                 options={[
                   { value: "BOTH", title: t("wallet.role.both") },
                   { value: "PAYER", title: t("wallet.role.payer") },
                   { value: "RECIPIENT", title: t("wallet.role.recipient") },
                 ]}
-                error={fieldError("role")}
               />
             </FieldRow>
 
@@ -592,14 +586,9 @@ export function CreateWalletModal({
               htmlFor="wallet-description"
               description={t("wallet.create.fields.description.description")}
             >
-              <TextArea
-                id="wallet-description"
-                value={values.description ?? ""}
-                onChange={(value) =>
-                  setValue("description", value, { shouldValidate: true })
-                }
+              <FormTextArea
+                name="description"
                 placeholder={t("wallet.create.fields.description.placeholder")}
-                error={fieldError("description")}
                 maxLength={DESCRIPTION_MAX_LENGTH}
               />
             </FieldRow>
@@ -607,8 +596,8 @@ export function CreateWalletModal({
             {!isOnChosenChain && detectedNetwork && (
               <p className="mt-2 text-ink-subtle text-xs">
                 {t("wallet.create.fields.network.mismatch", {
-                  wallet: NETWORKS[detectedNetwork].label,
-                  chosen: NETWORKS[values.network].label,
+                  wallet: PAYMENT_NETWORKS[detectedNetwork].label,
+                  chosen: PAYMENT_NETWORKS[network].label,
                 })}
               </p>
             )}
@@ -624,7 +613,7 @@ export function CreateWalletModal({
             {error}
           </p>
         )}
-      </form>
+      </Form>
     </Modal>
   );
 }

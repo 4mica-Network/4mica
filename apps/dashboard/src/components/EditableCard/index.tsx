@@ -1,7 +1,7 @@
 import { Button, Spinner } from "@4mica/ui";
 import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, CardHeader } from "@/components/form";
+import { CardHeader, SurfaceCard } from "@/components/layout";
 
 export function EditableCard({
   title,
@@ -33,7 +33,7 @@ export function EditableCard({
   };
 
   return (
-    <Card>
+    <SurfaceCard>
       <form onSubmit={handleSubmit}>
         {title && (
           <div className="mb-4">
@@ -66,7 +66,7 @@ export function EditableCard({
           </Button>
         </div>
       </form>
-    </Card>
+    </SurfaceCard>
   );
 }
 
@@ -82,7 +82,7 @@ export function InstantCard({
   children: ReactNode;
 }) {
   return (
-    <Card>
+    <SurfaceCard>
       {title && (
         <div className="mb-4">
           <CardHeader
@@ -93,6 +93,6 @@ export function InstantCard({
         </div>
       )}
       {children}
-    </Card>
+    </SurfaceCard>
   );
 }

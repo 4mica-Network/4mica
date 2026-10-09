@@ -2,9 +2,9 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { checkUsername, resetUsernameCheck } from "@stores/user/actions";
 import { selectUsernameCheck } from "@stores/user/selector";
 import type { UsernameStatus } from "@stores/user/type";
+import { isUsernameShapeValid } from "@utils/user-rules";
 import { useDebounceEffect } from "ahooks";
 import { useEffect } from "react";
-import { isUsernameShapeValid } from "@/components/Onboarding/validation";
 
 export const useUsernameAvailability = (
   candidate: string,

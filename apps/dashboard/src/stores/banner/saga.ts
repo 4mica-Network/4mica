@@ -1,8 +1,8 @@
 import * as api from "@api/banner";
 import i18n from "@i18n";
 import { toMessage } from "@utils/http-errors";
-import { notifyError } from "@utils/notification";
 import { call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError } from "@/lib/notify";
 import {
   dismissBannerFailed,
   fetchBannersFailed,

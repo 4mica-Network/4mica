@@ -1,5 +1,5 @@
-import { NOTIFY_CONTAINER_IDS } from "@utils/notification";
 import { ToastContainer } from "react-toastify";
+import { NOTIFY_CONTAINER_IDS } from "@/lib/notify";
 
 export function Notifications() {
   return (

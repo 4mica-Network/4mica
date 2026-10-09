@@ -1,3 +1,4 @@
+import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   invalidBody,
@@ -9,7 +10,7 @@ import {
 import { resolveSellerWallet } from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
 import { isUniqueViolation } from "@utils/prisma-errors";
-import { nextFreeSlug, slugify } from "@utils/slug";
+import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   batchSoftDeleteApiListings,

@@ -24,6 +24,7 @@
     "@4mica/auth": "workspace:*",
     "@4mica/db": "workspace:*",
     "@4mica/email-client": "workspace:*",
+    "@4mica/rules": "workspace:*",
     "@4mica/url": "workspace:*",
     "@clerk/backend": "catalog:",
     "@fastify/cors": "catalog:",

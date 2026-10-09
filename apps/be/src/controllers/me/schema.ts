@@ -1,3 +1,4 @@
+import { HEX_COLOR_PATTERN } from "@4mica/rules";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MESSAGE,
@@ -64,8 +65,6 @@ export type CheckUsernameInput = v.InferOutput<typeof CheckUsernameSchema>;
 const nullableText = (max: number) =>
   v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(max)));
 
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-
 export const NOTIFICATION_PLACEMENTS = [
   "topLeft",
   "topRight",
@@ -101,11 +100,11 @@ export const UpdateProfileSchema = v.partial(
     allowPhoneNumberVisibility: v.boolean(),
     primaryBrandColor: v.union([
       v.literal(""),
-      v.pipe(v.string(), v.regex(HEX_COLOR, "must be a hex colour")),
+      v.pipe(v.string(), v.regex(HEX_COLOR_PATTERN, "must be a hex colour")),
     ]),
     secondaryBrandColor: v.union([
       v.literal(""),
-      v.pipe(v.string(), v.regex(HEX_COLOR, "must be a hex colour")),
+      v.pipe(v.string(), v.regex(HEX_COLOR_PATTERN, "must be a hex colour")),
     ]),
     allowCustomBrandColor: v.boolean(),
     disableBranding: v.boolean(),
