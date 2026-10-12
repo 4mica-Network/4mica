@@ -1,24 +1,10 @@
 import { trimAmount } from "@4mica/rules";
 
-/**
- * Shared helpers for turning DB rows into snippet source text.
- *
- * Everything here is pure so the builders can be asserted in unit tests — the
- * thing worth testing is that a listing's real values reach the code a customer
- * copies, and that a missing value degrades to a marked placeholder rather than
- * the string "undefined".
- */
-
-/** Stand-ins, all obviously not-real so nobody pastes one into production. */
 export const PLACEHOLDER = {
   baseUrl: "https://api.example.com",
   agentWallet: "0xYourAgentWallet",
 } as const;
 
-/**
- * Joins the non-null parts of a code comment with `·` separators. `prefix`
- * carries the host language's comment marker.
- */
 export const commentLine = (parts: (string | null)[], prefix = "//"): string =>
   `${prefix} ${parts
     .filter((part): part is string => part !== null)
