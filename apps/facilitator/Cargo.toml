@@ -28,7 +28,7 @@ reqwest = { version = "0.13.1", default-features = false, features = [
   "default-tls",
 ] }
 hex = "0.4"
-async-trait = "0.1.91"
+async-trait = "0.1.92"
 x402-rs = "0.12.5"
 alloy = "2.2.0"
 
