@@ -543,11 +543,39 @@ export interface MonthlyBucket {
   volume: { assetAddress: string | null; network: string; amount: string }[];
 }
 
+export interface RankedEntry {
+  id: string;
+  name: string;
+  slug: string;
+  settledCount: number;
+  amount: string;
+}
+
 export interface PaymentStats {
   months: string[];
   received: MonthlyBucket[];
   sent: MonthlyBucket[];
+  topListings: RankedEntry[];
+  topAgents: RankedEntry[];
 }
+
+const TOP_LIMIT = 8;
+
+interface RankedRow {
+  id: string;
+  name: string;
+  slug: string;
+  count: bigint | number;
+  amount: Prisma.Decimal | null;
+}
+
+const toRanked = (row: RankedRow): RankedEntry => ({
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  settledCount: Number(row.count),
+  amount: amountText(row.amount ?? 0),
+});
 
 interface CountRow {
   month: string;
@@ -594,13 +622,19 @@ export const paymentStats = async (
     }));
 
   if (addresses.length === 0) {
-    return { months: keys, received: empty(), sent: empty() };
+    return {
+      months: keys,
+      received: empty(),
+      sent: empty(),
+      topListings: [],
+      topAgents: [],
+    };
   }
 
   const since = new Date(`${keys[0]}-01T00:00:00.000Z`);
   const owned = Prisma.join(addresses);
 
-  const [counts, volumes] = await Promise.all([
+  const [counts, volumes, listings, agents] = await Promise.all([
     prisma.$queryRaw<CountRow[]>`
       SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
              CASE WHEN payer_address IN (${owned}) THEN 'sent' ELSE 'received' END AS direction,
@@ -622,6 +656,28 @@ export const paymentStats = async (
          AND status = 'SETTLED'
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3, 4
+    `,
+    prisma.$queryRaw<RankedRow[]>`
+      SELECT l.id, l.name, l.slug, COUNT(*) AS count, SUM(p.amount) AS amount
+        FROM payments p
+        JOIN api_listings l ON l.id = p.listing_id
+       WHERE p.created_at >= ${since}
+         AND p.status = 'SETTLED'
+         AND p.recipient_address IN (${owned})
+       GROUP BY 1, 2, 3
+       ORDER BY amount DESC
+       LIMIT ${TOP_LIMIT}
+    `,
+    prisma.$queryRaw<RankedRow[]>`
+      SELECT a.id, a.name, a.slug, COUNT(*) AS count, SUM(p.amount) AS amount
+        FROM payments p
+        JOIN agents a ON a.id = p.agent_id
+       WHERE p.created_at >= ${since}
+         AND p.status = 'SETTLED'
+         AND p.payer_address IN (${owned})
+       GROUP BY 1, 2, 3
+       ORDER BY amount DESC
+       LIMIT ${TOP_LIMIT}
     `,
   ]);
 
@@ -663,5 +719,11 @@ export const paymentStats = async (
     return keys.map((month) => byMonth.get(month) as MonthlyBucket);
   };
 
-  return { months: keys, received: build("received"), sent: build("sent") };
+  return {
+    months: keys,
+    received: build("received"),
+    sent: build("sent"),
+    topListings: listings.map(toRanked),
+    topAgents: agents.map(toRanked),
+  };
 };

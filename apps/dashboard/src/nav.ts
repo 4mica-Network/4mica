@@ -8,7 +8,6 @@ import {
   Code,
   CreditCard,
   House,
-  Landmark,
   type LucideIcon,
   Settings,
   ShieldCheck,
@@ -34,7 +33,6 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     titleKey: "nav.section.money",
     items: [
-      { to: "/balances", labelKey: "nav.balances", icon: Landmark },
       { to: "/payments", labelKey: "nav.payments", icon: CreditCard },
       { to: "/wallet", labelKey: "nav.wallet", icon: Wallet },
     ],

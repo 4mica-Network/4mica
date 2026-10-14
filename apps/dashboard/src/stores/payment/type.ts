@@ -80,10 +80,20 @@ export interface MonthlyBucket {
   volume: PaymentVolume[];
 }
 
+export interface RankedEntry {
+  id: string;
+  name: string;
+  slug: string;
+  settledCount: number;
+  amount: string;
+}
+
 export interface PaymentStats {
   months: string[];
   received: MonthlyBucket[];
   sent: MonthlyBucket[];
+  topListings: RankedEntry[];
+  topAgents: RankedEntry[];
 }
 
 export interface PaymentFilters {

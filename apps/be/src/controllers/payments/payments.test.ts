@@ -1,3 +1,4 @@
+import { prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { paymentRoutes } from "@routes/payments";
 import { hashSecret } from "@utils/secrets";
@@ -498,6 +499,52 @@ describe("payment routes", () => {
       expect(body.received).toHaveLength(3);
       expect(body.sent).toHaveLength(3);
       expect(body.months).toEqual([...body.months].sort());
+
+      await instance.close();
+    });
+
+    it("ranks the listings that earned and the agents that spent", async () => {
+      vi.mocked(prisma.$queryRaw)
+        .mockResolvedValueOnce([] as never)
+        .mockResolvedValueOnce([] as never)
+        .mockResolvedValueOnce([
+          {
+            id: "lst_1",
+            name: "Weather",
+            slug: "weather",
+            count: 4n,
+            amount: "0.4",
+          },
+        ] as never)
+        .mockResolvedValueOnce([
+          { id: "agt_1", name: "Scout", slug: "scout", count: 2, amount: "1" },
+        ] as never);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/payments/stats",
+        headers: AUTH,
+      });
+
+      expect(res.json().topListings).toEqual([
+        {
+          id: "lst_1",
+          name: "Weather",
+          slug: "weather",
+          settledCount: 4,
+          amount: "0.4",
+        },
+      ]);
+      expect(res.json().topAgents).toEqual([
+        {
+          id: "agt_1",
+          name: "Scout",
+          slug: "scout",
+          settledCount: 2,
+          amount: "1",
+        },
+      ]);
 
       await instance.close();
     });

@@ -33,7 +33,7 @@ export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
         <Tag size="sm" variant="neutral" className="font-mono">
           {shortenAddress(state.address)}
         </Tag>
-        <UiLink className="text-sm" external href={`${links.app}/balances`}>
+        <UiLink className="text-sm" external href={links.app}>
           {messages.payWith.readyAction}
         </UiLink>
       </div>

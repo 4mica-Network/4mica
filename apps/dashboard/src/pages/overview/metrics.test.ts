@@ -1,6 +1,16 @@
-import type { MonthlyBucket } from "@stores/payment/type";
+import type { WalletBalance } from "@stores/balance/type";
+import type { MonthlyBucket, RankedEntry } from "@stores/payment/type";
 import { describe, expect, it } from "vitest";
-import { formatPercent, growthOf, successRate, sumVolume } from "./metrics";
+import {
+  collateralRows,
+  formatPercent,
+  growthOf,
+  rankBy,
+  smoothPath,
+  successRate,
+  sumVolume,
+  totalsByAsset,
+} from "./metrics";
 
 const bucket = (amount: string | null): MonthlyBucket => ({
   month: "2026-09",
@@ -75,5 +85,115 @@ describe("successRate", () => {
 
   it("is 1 when nothing has failed", () => {
     expect(successRate(5, 0)).toBe(1);
+  });
+});
+
+describe("smoothPath", () => {
+  it("is empty without points", () => {
+    expect(smoothPath([])).toBe("");
+  });
+
+  it("passes through every point", () => {
+    const path = smoothPath([
+      { x: 0, y: 10 },
+      { x: 50, y: 0 },
+      { x: 100, y: 10 },
+    ]);
+
+    expect(path.startsWith("M0,10")).toBe(true);
+    expect(path).toContain(" 50,0");
+    expect(path.endsWith(" 100,10")).toBe(true);
+  });
+
+  it("stays flat at a peak instead of overshooting", () => {
+    const path = smoothPath([
+      { x: 0, y: 10 },
+      { x: 30, y: 0 },
+      { x: 60, y: 10 },
+    ]);
+
+    expect(path).toContain("C10,6.666666666666667 20,0 30,0");
+  });
+});
+
+const wallet = (
+  id: string,
+  total: string,
+  locked = "0",
+  assetAddress = "0xusdc",
+): WalletBalance => ({
+  id,
+  label: id,
+  address: `0x${id}`,
+  role: "PAYER",
+  assets: [
+    {
+      assetAddress,
+      symbol: "USDC",
+      decimals: 6,
+      total,
+      locked,
+      available: (BigInt(total) - BigInt(locked)).toString(),
+      updatedAt: null,
+    },
+  ],
+});
+
+describe("totalsByAsset", () => {
+  it("adds every wallet's holding of the same asset", () => {
+    const [usdc] = totalsByAsset([wallet("a", "100", "10"), wallet("b", "50")]);
+
+    expect(usdc.total).toBe(150n);
+    expect(usdc.locked).toBe(10n);
+  });
+});
+
+describe("collateralRows", () => {
+  it("orders wallets by holding and shares out the total", () => {
+    const rows = collateralRows(
+      [wallet("small", "250"), wallet("big", "750", "100")],
+      "0xusdc",
+    );
+
+    expect(rows.map((row) => row.wallet.id)).toEqual(["big", "small"]);
+    expect(rows[0].share).toBe(0.75);
+    expect(rows[0].available).toBe(650n);
+    expect(rows[1].share).toBe(0.25);
+  });
+
+  it("gives every wallet a zero share when nothing is deposited", () => {
+    const rows = collateralRows([wallet("a", "0")], "0xusdc");
+
+    expect(rows[0].share).toBe(0);
+  });
+
+  it("treats a wallet without the asset as empty", () => {
+    const rows = collateralRows(
+      [wallet("a", "10"), wallet("b", "10", "0", "0xother")],
+      "0xusdc",
+    );
+
+    expect(rows.find((row) => row.wallet.id === "b")?.total).toBe(0n);
+  });
+});
+
+describe("rankBy", () => {
+  const entries: RankedEntry[] = [
+    { id: "1", name: "Few big", slug: "a", settledCount: 2, amount: "9" },
+    { id: "2", name: "Many small", slug: "b", settledCount: 40, amount: "4" },
+  ];
+
+  it("ranks by volume", () => {
+    expect(rankBy(entries, "amount").map((entry) => entry.id)).toEqual([
+      "1",
+      "2",
+    ]);
+  });
+
+  it("ranks by payment count", () => {
+    const ranked = rankBy(entries, "settledCount");
+
+    expect(ranked.map((entry) => entry.id)).toEqual(["2", "1"]);
+    expect(ranked[0].value).toBe(40);
   });
 });

@@ -477,13 +477,27 @@ const monthlyBucketSchema = {
   },
 } as const;
 
+const rankedEntrySchema = {
+  type: "object",
+  required: ["id", "name", "slug", "settledCount", "amount"],
+  properties: {
+    id: str,
+    name: str,
+    slug: str,
+    settledCount: int,
+    amount: str,
+  },
+} as const;
+
 export const paymentStatsResponseSchema = {
   type: "object",
-  required: ["months", "received", "sent"],
+  required: ["months", "received", "sent", "topListings", "topAgents"],
   properties: {
     months: { type: "array", items: str },
     received: { type: "array", items: monthlyBucketSchema },
     sent: { type: "array", items: monthlyBucketSchema },
+    topListings: { type: "array", items: rankedEntrySchema },
+    topAgents: { type: "array", items: rankedEntrySchema },
   },
 } as const;
 

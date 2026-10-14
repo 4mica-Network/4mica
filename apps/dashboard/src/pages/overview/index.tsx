@@ -1,5 +1,7 @@
-import { trimAmount } from "@4mica/rules";
-import { cn, EmptyState, Spinner, Tag } from "@4mica/ui";
+import { PAYMENT_NETWORKS } from "@4mica/rules";
+import { EmptyState, Spinner, Tag } from "@4mica/ui";
+import { fetchBalances } from "@stores/balance/actions";
+import { selectBalanceState } from "@stores/balance/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchPaymentStats,
@@ -9,85 +11,45 @@ import {
   selectPaymentStats,
   selectPaymentSummary,
 } from "@stores/payment/selector";
-import type { PaymentTotals, PaymentVolume } from "@stores/payment/type";
-import { ArrowRightLeft, TrendingDown, TrendingUp } from "lucide-react";
-import { useEffect } from "react";
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  Landmark,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { MonthlyChart } from "./MonthlyChart";
-import { formatPercent, growthOf, successRate } from "./metrics";
-
-function AssetAmounts({ volume }: { volume: PaymentVolume[] }) {
-  const { t } = useTranslation();
-
-  if (volume.length === 0) {
-    return (
-      <span className="font-semibold text-2xl text-ink-strong tabular-nums">
-        0
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      {volume.map((entry) => (
-        <span
-          className="font-mono font-semibold text-2xl text-ink-strong tabular-nums"
-          key={`${entry.network}:${entry.assetAddress ?? "native"}`}
-        >
-          {trimAmount(entry.amount)}{" "}
-          <span className="font-normal text-ink-subtle text-xs">
-            {entry.assetAddress
-              ? t("overview.erc20")
-              : t("overview.nativeAsset")}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function Tile({
-  title,
-  children,
-  footer,
-  testId,
-}: {
-  title: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  testId: string;
-}) {
-  return (
-    <div
-      className="flex flex-col gap-2 rounded-lg border border-overlay/10 bg-surface px-4 py-3.5"
-      data-testid={testId}
-    >
-      <span className="text-ink-subtle text-xs uppercase tracking-wide">
-        {title}
-      </span>
-      {children}
-      {footer}
-    </div>
-  );
-}
+import { CashFlowChart, type Range } from "./CashFlowChart";
+import { CollateralTable } from "./CollateralTable";
+import { KpiStrip } from "./KpiStrip";
+import { Leaderboard } from "./Leaderboard";
+import { totalsByAsset } from "./metrics";
+import { Panel } from "./Panel";
 
 export function Overview() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const [range, setRange] = useState<Range>(6);
 
   const summary = useAppSelector(selectPaymentSummary);
   const stats = useAppSelector(selectPaymentStats);
+  const balances = useAppSelector(selectBalanceState);
 
   usePageTitle(t("page.overview.title"));
 
   useEffect(() => {
     dispatch(fetchPaymentSummary());
-    dispatch(fetchPaymentStats(6));
+    dispatch(fetchBalances());
   }, [dispatch]);
 
-  if (!summary || !stats) {
+  useEffect(() => {
+    dispatch(fetchPaymentStats(range));
+  }, [dispatch, range]);
+
+  if (!summary || !stats || (balances.isLoading && !balances.hasLoaded)) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <Spinner size="lg" className="text-ink-subtle" />
@@ -95,25 +57,42 @@ export function Overview() {
     );
   }
 
-  const earned: PaymentTotals = summary.received;
-  const spent: PaymentTotals = summary.sent;
-  const growth = growthOf(stats.received);
-  const rate = successRate(earned.settledCount, earned.failedCount);
-
-  const nothingYet = earned.count === 0 && spent.count === 0;
+  const assets = balances.hasLoaded ? totalsByAsset(balances.wallets) : null;
+  const noPayments = summary.received.count === 0 && summary.sent.count === 0;
+  const noWallets = balances.hasLoaded && balances.wallets.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-6">
-        <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
-          {t("page.overview.title")}
-        </h1>
-        <p className="mt-1 text-ink-muted text-sm">
-          {t("page.overview.description")}
-        </p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
+              {t("page.overview.title")}
+            </h1>
+            {balances.network && (
+              <Tag size="sm" variant="neutral" data-testid="balance-network">
+                {PAYMENT_NETWORKS[balances.network].label}
+              </Tag>
+            )}
+          </div>
+          <p className="mt-1 text-ink-muted text-sm">
+            {t("page.overview.description")}
+          </p>
+        </div>
+
+        {!noPayments && (
+          <Link
+            to="/payments"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-overlay/10 px-3 py-1.5 text-ink-body text-sm transition-colors hover:border-overlay/20 hover:text-ink-strong"
+            data-testid="overview-view-payments"
+          >
+            {t("overview.viewAll")}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
 
-      {nothingYet ? (
+      {noPayments && noWallets ? (
         <EmptyState
           className="flex-1"
           icon={<ArrowRightLeft className="h-5 w-5" />}
@@ -123,122 +102,69 @@ export function Overview() {
         />
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Tile
-              title={t("overview.totalEarned")}
-              testId="overview-total-earned"
-              footer={
-                <span className="text-ink-muted text-xs">
-                  {t("overview.acrossPayments", {
-                    count: earned.settledCount,
-                  })}
-                </span>
-              }
-            >
-              <AssetAmounts volume={earned.volume} />
-            </Tile>
+          <KpiStrip
+            summary={summary}
+            assets={assets}
+            walletCount={balances.wallets.length}
+          />
 
-            <Tile
-              title={t("overview.thisMonth")}
-              testId="overview-this-month"
-              footer={
-                growth.ratio === null ? (
-                  growth.current > 0 ? (
-                    <Tag size="sm" variant="success">
-                      {t("overview.growthNew")}
-                    </Tag>
-                  ) : (
-                    <span className="text-ink-subtle text-xs">
-                      {t("overview.growthNone")}
-                    </span>
-                  )
-                ) : (
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 text-xs",
-                      growth.ratio >= 0 ? "text-success" : "text-danger",
-                    )}
-                  >
-                    {growth.ratio >= 0 ? (
-                      <TrendingUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <TrendingDown className="h-3.5 w-3.5" />
-                    )}
-                    {t("overview.growthVsLast", {
-                      percent: formatPercent(growth.ratio),
-                    })}
-                  </span>
-                )
-              }
-            >
-              <span className="font-mono font-semibold text-2xl text-ink-strong tabular-nums">
-                {trimAmount(String(growth.current))}
-              </span>
-            </Tile>
+          <CashFlowChart stats={stats} range={range} onRangeChange={setRange} />
 
-            <Tile
-              title={t("overview.successRate")}
-              testId="overview-success-rate"
-              footer={
-                <span className="text-ink-muted text-xs">
-                  {earned.failedCount > 0
-                    ? t("overview.failedCount", { count: earned.failedCount })
-                    : t("overview.noFailures")}
-                </span>
-              }
-            >
-              <span className="font-semibold text-2xl text-ink-strong tabular-nums">
-                {rate === null ? "—" : `${Math.round(rate * 100)}%`}
-              </span>
-            </Tile>
-
-            <Tile
-              title={t("overview.totalSpent")}
-              testId="overview-total-spent"
-              footer={
-                <span className="text-ink-muted text-xs">
-                  {t("overview.acrossPayments", { count: spent.settledCount })}
-                </span>
-              }
-            >
-              <AssetAmounts volume={spent.volume} />
-            </Tile>
-          </div>
-
-          <section className="flex flex-col gap-4 rounded-lg border border-overlay/10 bg-surface p-4">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-semibold text-ink-strong text-sm">
-                {t("overview.chart.earnedTitle")}
-              </h2>
-              <span className="text-ink-subtle text-xs">
-                {t("overview.chart.lastMonths", {
-                  count: stats.months.length,
-                })}
-              </span>
+          <div className="grid gap-4 lg:grid-cols-5">
+            <div className="flex min-w-0 lg:col-span-3">
+              {balances.error && !balances.isLoading ? (
+                <Panel
+                  title={t("overview.collateral.title")}
+                  testId="overview-collateral"
+                  className="flex-1"
+                >
+                  <EmptyState
+                    className="flex-1"
+                    icon={<TriangleAlert className="h-5 w-5" />}
+                    title={t("balance.errorState.title")}
+                    description={balances.error}
+                    action={{
+                      label: t("balance.errorState.retry"),
+                      onClick: () => dispatch(fetchBalances()),
+                    }}
+                    data-testid="balance-error"
+                  />
+                </Panel>
+              ) : noWallets ? (
+                <Panel
+                  title={t("overview.collateral.title")}
+                  testId="overview-collateral"
+                  className="flex-1"
+                >
+                  <EmptyState
+                    className="flex-1"
+                    icon={<Landmark className="h-5 w-5" />}
+                    title={t("balance.empty.title")}
+                    description={t("balance.empty.description")}
+                    action={{
+                      label: t("balance.empty.action"),
+                      onClick: () => navigate("/wallet"),
+                    }}
+                    data-testid="balance-empty"
+                  />
+                </Panel>
+              ) : (
+                <div className="flex min-w-0 flex-1 [&>section]:flex-1">
+                  <CollateralTable
+                    wallets={balances.wallets}
+                    assets={assets ?? []}
+                  />
+                </div>
+              )}
             </div>
 
-            <MonthlyChart
-              buckets={stats.received}
-              testId="overview-chart-received"
-            />
-          </section>
-
-          {spent.count > 0 && (
-            <section className="flex flex-col gap-4 rounded-lg border border-overlay/10 bg-surface p-4">
-              <h2 className="font-semibold text-ink-strong text-sm">
-                {t("overview.chart.spentTitle")}
-              </h2>
-              <MonthlyChart buckets={stats.sent} testId="overview-chart-sent" />
-            </section>
-          )}
-
-          <Link
-            to="/payments"
-            className="text-accent text-sm underline-offset-2 hover:underline"
-            data-testid="overview-view-payments"
-          >
-            {t("overview.viewAll")}
-          </Link>
+            <div className="flex min-w-0 lg:col-span-2 [&>section]:flex-1">
+              <Leaderboard
+                listings={stats.topListings}
+                agents={stats.topAgents}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
