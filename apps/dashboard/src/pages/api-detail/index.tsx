@@ -7,18 +7,19 @@ import {
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
 import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
-import { useTitle } from "ahooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
-import { SettingsSection } from "@/components/form";
+import { SettingsSection } from "@/components/layout";
+import { FaqEditor } from "@/components/Resource/FaqEditor";
+import { PolicyForm } from "@/components/Resource/PolicyForm";
+import { ReportsPanel } from "@/components/Resource/ReportsPanel";
+import { ReviewsPanel } from "@/components/Resource/ReviewsPanel";
+import { SecretKeysSection } from "@/components/Resource/SecretKeysSection";
+import { ToggleSection } from "@/components/Resource/ToggleSection";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { DetailsForm } from "./DetailsForm";
-import { FaqEditor } from "./FaqEditor";
-import { PolicyForm } from "./PolicyForm";
-import { ReportsPanel } from "./ReportsPanel";
-import { ReviewsPanel } from "./ReviewsPanel";
-import { ToggleSection } from "./ToggleSection";
 
 export function ApiDetail() {
   const { t } = useTranslation();
@@ -33,7 +34,7 @@ export function ApiDetail() {
   const listing = listings.find((row) => row.id === id) ?? null;
   const resource = { kind: "listing" as const, id };
 
-  useTitle(
+  usePageTitle(
     listing
       ? `${listing.name} · ${t("appDetail.title")}`
       : t("appDetail.title"),
@@ -111,6 +112,8 @@ export function ApiDetail() {
         >
           <FaqEditor resource={resource} />
         </ToggleSection>
+
+        <SecretKeysSection resource={resource} />
 
         <SettingsSection
           description={t("appDetail.reviewsLead")}

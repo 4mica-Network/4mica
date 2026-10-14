@@ -1,3 +1,4 @@
+import { formatPrice, PAYMENT_NETWORKS, trimAmount } from "@4mica/rules";
 import type { PublicAgent } from "@/schema/agent";
 import type { PublicApiListing } from "@/schema/api-listing";
 import type { PaymentNetwork } from "@/schema/params";
@@ -5,8 +6,6 @@ import type { PublicProfile } from "@/schema/profile";
 import { links } from "@/services/links";
 import { isSellable } from "./snippets/agent";
 import { isPayable } from "./snippets/api-listing";
-import { networkInfo } from "./snippets/networks";
-import { formatPrice, trimAmount } from "./snippets/shared";
 
 export const DESCRIPTOR_SCHEMA =
   "https://4mica.io/schemas/resource-descriptor/v1";
@@ -113,7 +112,7 @@ const paymentOf = (
   assetAddress: string | null,
   price: DescriptorPrice,
 ): DescriptorPayment => {
-  const info = networkInfo(network);
+  const info = PAYMENT_NETWORKS[network];
 
   return {
     protocol: "x402",
@@ -135,9 +134,9 @@ const integrationOf = (
   page: string,
 ): DescriptorIntegration => ({
   install: "pnpm add @4mica/x402 @x402/fetch viem",
-  sdkNetwork: networkInfo(network).sdkName,
+  sdkNetwork: PAYMENT_NETWORKS[network].sdkName,
   steps: [
-    `Deposit collateral at 4Mica for the wallet that will pay, on ${networkInfo(network).label}.`,
+    `Deposit collateral at 4Mica for the wallet that will pay, on ${PAYMENT_NETWORKS[network].label}.`,
     "Create FourMicaEvmScheme with that signer, then wrap fetch with wrapFetchWithPaymentFromConfig.",
     "Call the resource url. The client answers the 402, signs a guarantee and retries automatically.",
     "Read the settled payment certificate from the X-PAYMENT-RESPONSE header.",

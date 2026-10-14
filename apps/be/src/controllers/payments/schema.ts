@@ -1,10 +1,13 @@
 import {
   address,
+  couponCode,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
+  positiveDecimalAmount,
   positiveInt,
+  webUrl,
 } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
@@ -22,11 +25,10 @@ const hex32 = v.pipe(
 const hexBlob = v.pipe(
   v.string(),
   v.trim(),
-  v.regex(/^0x[0-9a-fA-F]*$/, "must be a 0x-prefixed hex value"),
+  v.regex(/^(0x)?[0-9a-fA-F]*$/, "must be a hex value"),
   v.maxLength(20_000),
+  v.transform((value) => (value.startsWith("0x") ? value : `0x${value}`)),
 );
-
-const httpsUrl = v.pipe(v.string(), v.trim(), v.url(), v.maxLength(2048));
 
 export const ReportPaymentSchema = v.object({
   reqId: hex32,
@@ -48,7 +50,7 @@ export const ReportPaymentSchema = v.object({
     v.nullable(v.pipe(v.string(), v.trim(), v.toLowerCase(), v.maxLength(64))),
   ),
 
-  resource: v.optional(v.nullable(httpsUrl)),
+  resource: v.optional(v.nullable(webUrl(2048))),
   description: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(280))),
   ),
@@ -57,6 +59,9 @@ export const ReportPaymentSchema = v.object({
   guaranteeSignature: v.optional(v.nullable(hexBlob)),
   txHash: v.optional(v.nullable(hex32)),
   settledAt: v.optional(v.nullable(v.pipe(v.string(), v.isoTimestamp()))),
+
+  couponCode: v.optional(v.nullable(couponCode)),
+  creditApplied: v.optional(v.nullable(positiveDecimalAmount)),
 });
 
 export const ListPaymentsQuerySchema = v.object({
@@ -65,6 +70,7 @@ export const ListPaymentsQuerySchema = v.object({
   direction: v.optional(PaymentDirectionSchema, "all"),
   status: v.optional(PaymentStatusSchema),
   network: v.optional(PaymentNetworkSchema),
+  wallet: v.optional(address),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100))),
   sort: v.optional(
     v.picklist(["createdAt", "-createdAt", "amount", "-amount"]),

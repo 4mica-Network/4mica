@@ -1,14 +1,15 @@
 import {
-  Button,
-  Checkbox,
-  cn,
-  Dropdown,
-  Spinner,
-  Tag,
-  Tooltip,
-} from "@4mica/ui";
+  explorerAddressUrl,
+  PAYMENT_NETWORKS,
+  shortenAddress,
+} from "@4mica/rules";
+import { Button, Checkbox, cn, Spinner, Tag, Tooltip } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { toggleWalletSelected, updateWallet } from "@stores/wallet/actions";
+import {
+  toggleWalletSelected,
+  updateWallet,
+  walletPendingKeys,
+} from "@stores/wallet/actions";
 import {
   selectIsWalletPending,
   selectIsWalletSelected,
@@ -18,25 +19,19 @@ import {
   Check,
   Copy,
   ExternalLink,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
   Trash2,
 } from "lucide-react";
-import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import {
-  explorerAddressUrl,
-  NETWORKS,
   ROLE_LABEL_KEYS,
   STATUS_LABEL_KEYS,
   STATUS_TAG_VARIANT,
-  shortenAddress,
 } from "./constants";
-
-const menuItem =
-  "flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-overlay/5";
 
 export function WalletRow({
   wallet,
@@ -51,23 +46,15 @@ export function WalletRow({
   const dispatch = useAppDispatch();
 
   const isPending = useAppSelector(
-    selectIsWalletPending(`wallet:${wallet.id}`),
+    selectIsWalletPending(walletPendingKeys.row(wallet.id)),
   );
   const isSelected = useAppSelector(selectIsWalletSelected(wallet.id));
 
-  const [copied, setCopied] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuAnchor = useRef<HTMLSpanElement>(null);
+  const { copied, copy } = useCopyToClipboard();
 
-  const network = NETWORKS[wallet.network];
+  const network = PAYMENT_NETWORKS[wallet.network];
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(wallet.address);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  };
+  const handleCopy = () => copy(wallet.address);
 
   return (
     <div
@@ -78,6 +65,7 @@ export function WalletRow({
       data-testid={`wallet-row-${wallet.id}`}
     >
       <Checkbox
+        aria-label={t("wallet.row.select", { name: wallet.label })}
         variant="square"
         className="mt-0.5 w-auto shrink-0 sm:mt-0"
         checked={isSelected}
@@ -152,116 +140,71 @@ export function WalletRow({
           </Button>
         </Tooltip>
 
-        <span ref={menuAnchor} className="inline-flex">
-          <Button
-            type="button"
-            intent="ghost"
-            size="sm"
-            className="btn-no-lift px-2"
-            aria-label={t("wallet.row.more")}
-            aria-expanded={menuOpen}
-            disabled={isPending}
-            onClick={() => setMenuOpen((open) => !open)}
-            data-testid={`wallet-more-${wallet.id}`}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </span>
-
-        <Dropdown
-          isOpen={menuOpen}
-          anchorRef={menuAnchor}
-          placement="bottomRight"
-          onClickOutside={() => setMenuOpen(false)}
+        <RowActionsMenu
+          label={t("wallet.row.more", { name: wallet.label })}
+          disabled={isPending}
+          width="w-56"
+          data-testid={`wallet-more-${wallet.id}`}
         >
-          <div className="flex w-56 flex-col py-1">
-            <button
-              type="button"
-              className={cn(menuItem, "text-ink-body")}
-              onClick={() => {
-                onEdit(wallet);
-                setMenuOpen(false);
-              }}
-              data-testid={`wallet-edit-${wallet.id}`}
+          <RowActionsMenu.Item
+            icon={Pencil}
+            onSelect={() => onEdit(wallet)}
+            data-testid={`wallet-edit-${wallet.id}`}
+          >
+            {t("wallet.row.edit")}
+          </RowActionsMenu.Item>
+
+          <RowActionsMenu.ExternalItem
+            icon={ExternalLink}
+            href={explorerAddressUrl(wallet.network, wallet.address)}
+          >
+            {t("wallet.row.viewOnExplorer")}
+          </RowActionsMenu.ExternalItem>
+
+          {!wallet.isDefault && wallet.status === "ACTIVE" && (
+            <RowActionsMenu.Item
+              icon={Check}
+              onSelect={() =>
+                dispatch(
+                  updateWallet({ id: wallet.id, data: { isDefault: true } }),
+                )
+              }
+              data-testid={`wallet-make-default-${wallet.id}`}
             >
-              <Pencil className="h-4 w-4" />
-              {t("wallet.row.edit")}
-            </button>
+              {t("wallet.row.makeDefault")}
+            </RowActionsMenu.Item>
+          )}
 
-            <a
-              href={explorerAddressUrl(wallet.network, wallet.address)}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={cn(menuItem, "text-ink-body")}
-              onClick={() => setMenuOpen(false)}
+          {wallet.status !== "RETIRED" && (
+            <RowActionsMenu.Item
+              icon={wallet.status === "ACTIVE" ? Pause : Play}
+              onSelect={() =>
+                dispatch(
+                  updateWallet({
+                    id: wallet.id,
+                    data: {
+                      status: wallet.status === "ACTIVE" ? "PAUSED" : "ACTIVE",
+                    },
+                  }),
+                )
+              }
+              data-testid={`wallet-toggle-status-${wallet.id}`}
             >
-              <ExternalLink className="h-4 w-4" />
-              {t("wallet.row.viewOnExplorer")}
-            </a>
+              {wallet.status === "ACTIVE"
+                ? t("wallet.row.pause")
+                : t("wallet.row.resume")}
+            </RowActionsMenu.Item>
+          )}
 
-            {!wallet.isDefault && wallet.status === "ACTIVE" && (
-              <button
-                type="button"
-                className={cn(menuItem, "text-ink-body")}
-                onClick={() => {
-                  dispatch(
-                    updateWallet({
-                      id: wallet.id,
-                      data: { isDefault: true },
-                    }),
-                  );
-                  setMenuOpen(false);
-                }}
-                data-testid={`wallet-make-default-${wallet.id}`}
-              >
-                <Check className="h-4 w-4" />
-                {t("wallet.row.makeDefault")}
-              </button>
-            )}
-
-            {wallet.status !== "RETIRED" && (
-              <button
-                type="button"
-                className={cn(menuItem, "text-ink-body")}
-                onClick={() => {
-                  dispatch(
-                    updateWallet({
-                      id: wallet.id,
-                      data: {
-                        status:
-                          wallet.status === "ACTIVE" ? "PAUSED" : "ACTIVE",
-                      },
-                    }),
-                  );
-                  setMenuOpen(false);
-                }}
-                data-testid={`wallet-toggle-status-${wallet.id}`}
-              >
-                {wallet.status === "ACTIVE" ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                {wallet.status === "ACTIVE"
-                  ? t("wallet.row.pause")
-                  : t("wallet.row.resume")}
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={cn(menuItem, "text-danger")}
-              onClick={() => {
-                onDelete(wallet);
-                setMenuOpen(false);
-              }}
-              data-testid={`wallet-delete-${wallet.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              {t("wallet.row.delete")}
-            </button>
-          </div>
-        </Dropdown>
+          <RowActionsMenu.Item
+            icon={Trash2}
+            tone="danger"
+            onSelect={() => onDelete(wallet)}
+            data-testid={`wallet-delete-${wallet.id}`}
+          >
+            {t("wallet.row.delete")}
+          </RowActionsMenu.Item>
+        </RowActionsMenu>
       </div>
     </div>
   );

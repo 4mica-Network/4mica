@@ -1,4 +1,4 @@
-import type { RootState } from "..";
+import type { RootState } from "@stores/index";
 import type { Banner, BannerState } from "./type";
 
 export const selectBannerState = (state: RootState): BannerState =>

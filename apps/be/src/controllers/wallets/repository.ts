@@ -1,10 +1,11 @@
-import { type Prisma, prisma } from "@4mica/db";
-import { generateWalletNonce } from "@services/secrets";
+import { type PaymentNetwork, type Prisma, prisma } from "@4mica/db";
+import type { ValidationIssue } from "@controllers/shared";
+import { generateWalletNonce } from "@utils/secrets";
 import {
   buildWalletLinkMessage,
   chainIdFor,
   WALLET_NONCE_TTL_MS,
-} from "@services/siwe";
+} from "@utils/siwe";
 import type {
   CreateWalletInput,
   CreateWalletNonceInput,
@@ -211,7 +212,7 @@ export const updateWallet = async (
   return prisma.$transaction(async (tx) => {
     const current = await tx.wallet.findFirst({
       where: { id, ownerId },
-      select: { id: true, network: true },
+      select: { id: true, network: true, role: true, status: true },
     });
 
     if (!current) {
@@ -230,6 +231,26 @@ export const updateWallet = async (
       data: { ...rest, ...(isDefault === undefined ? {} : { isDefault }) },
     });
 
+    const canReceive =
+      (rest.status ?? current.status) === "ACTIVE" &&
+      (rest.role ?? current.role) !== "PAYER";
+
+    if (!canReceive) {
+      const receiving = {
+        ownerId,
+        walletId: current.id,
+        visibility: "PUBLIC" as const,
+      };
+      await tx.apiListing.updateMany({
+        where: receiving,
+        data: { visibility: "PRIVATE" },
+      });
+      await tx.agent.updateMany({
+        where: receiving,
+        data: { visibility: "PRIVATE" },
+      });
+    }
+
     return tx.wallet.findUnique({
       where: { id: current.id },
       select: WALLET_SELECT,
@@ -237,8 +258,46 @@ export const updateWallet = async (
   });
 };
 
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+const removeWallets = async (
+  tx: Tx,
+  ownerId: string,
+  ids: string[],
+): Promise<number> => {
+  const receiving = { ownerId, walletId: { in: ids } };
+
+  await tx.apiListing.updateMany({
+    where: receiving,
+    data: { payToAddress: null, visibility: "PRIVATE" },
+  });
+  await tx.agent.updateMany({
+    where: receiving,
+    data: { payToAddress: null, visibility: "PRIVATE" },
+  });
+  await tx.agent.updateMany({
+    where: { ownerId, payerWalletId: { in: ids } },
+    data: { walletAddress: null },
+  });
+
+  const { count } = await tx.wallet.deleteMany({
+    where: { id: { in: ids }, ownerId },
+  });
+  return count;
+};
+
 export const deleteWallet = async (ownerId: string, id: string) => {
-  const { count } = await prisma.wallet.deleteMany({ where: { id, ownerId } });
+  const owned = await prisma.wallet.findFirst({
+    where: { id, ownerId },
+    select: { id: true },
+  });
+  if (!owned) {
+    return false;
+  }
+
+  const count = await prisma.$transaction((tx) =>
+    removeWallets(tx, ownerId, [owned.id]),
+  );
   return count > 0;
 };
 
@@ -254,12 +313,163 @@ export const batchDeleteWallets = async (
   const deleted = owned.map((wallet) => wallet.id);
 
   if (deleted.length > 0) {
-    await prisma.wallet.deleteMany({ where: { id: { in: deleted }, ownerId } });
+    await prisma.$transaction((tx) => removeWallets(tx, ownerId, deleted));
   }
 
   const deletedSet = new Set(deleted);
   return {
     deleted,
     notFound: ids.filter((id) => !deletedSet.has(id)),
+  };
+};
+
+export type SellerWalletError =
+  | "wallet_not_found"
+  | "wallet_not_active"
+  | "wallet_not_recipient"
+  | "network_mismatch";
+
+export interface SellerWallet {
+  id: string;
+  address: string;
+  network: PaymentNetwork;
+}
+
+export type SellerWalletResult =
+  | { ok: true; wallet: SellerWallet }
+  | {
+      ok: false;
+      error: SellerWalletError;
+      message: string;
+      issues: ValidationIssue[];
+    };
+
+const fail = (
+  error: SellerWalletError,
+  message: string,
+  issue: string,
+  field = "walletId",
+): SellerWalletResult => ({
+  ok: false,
+  error,
+  message,
+  issues: [{ path: field, message: issue }],
+});
+
+export const resolveSellerWallet = async (
+  ownerId: string,
+  walletId: string,
+  requiredNetwork?: PaymentNetwork,
+  field = "walletId",
+): Promise<SellerWalletResult> => {
+  const wallet = await prisma.wallet.findFirst({
+    where: { id: walletId, ownerId },
+    select: {
+      id: true,
+      address: true,
+      network: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!wallet) {
+    return fail(
+      "wallet_not_found",
+      "That wallet is not one of yours.",
+      "is not one of your wallets",
+      field,
+    );
+  }
+
+  if (wallet.status !== "ACTIVE") {
+    return fail(
+      "wallet_not_active",
+      "A paused or retired wallet cannot receive payments. Reactivate it first.",
+      "must be an active wallet",
+      field,
+    );
+  }
+
+  if (wallet.role !== "RECIPIENT" && wallet.role !== "BOTH") {
+    return fail(
+      "wallet_not_recipient",
+      "That wallet is set up to pay, not to receive. Change its role to recipient or both.",
+      "must be able to receive payments",
+      field,
+    );
+  }
+
+  if (requiredNetwork && wallet.network !== requiredNetwork) {
+    return fail(
+      "network_mismatch",
+      `This agent signs on ${requiredNetwork}, but that wallet is on ${wallet.network}. Payments would be signed on a chain the wallet cannot receive on.`,
+      "is on a different network",
+      field,
+    );
+  }
+
+  return {
+    ok: true,
+    wallet: { id: wallet.id, address: wallet.address, network: wallet.network },
+  };
+};
+
+export const resolvePayerWallet = async (
+  ownerId: string,
+  walletId: string,
+  requiredNetwork?: PaymentNetwork,
+  field = "payerWalletId",
+): Promise<SellerWalletResult> => {
+  const wallet = await prisma.wallet.findFirst({
+    where: { id: walletId, ownerId },
+    select: {
+      id: true,
+      address: true,
+      network: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!wallet) {
+    return fail(
+      "wallet_not_found",
+      "That wallet is not one of yours.",
+      "is not one of your wallets",
+      field,
+    );
+  }
+
+  if (wallet.status !== "ACTIVE") {
+    return fail(
+      "wallet_not_active",
+      "A paused or retired wallet cannot sign payments. Reactivate it first.",
+      "must be an active wallet",
+      field,
+    );
+  }
+
+  if (wallet.role !== "PAYER" && wallet.role !== "BOTH") {
+    return fail(
+      "wallet_not_recipient",
+      "That wallet is set up to receive, not to pay. Change its role to payer or both.",
+      "must be able to send payments",
+      field,
+    );
+  }
+
+  if (requiredNetwork && wallet.network !== requiredNetwork) {
+    return fail(
+      "network_mismatch",
+      `This agent signs on ${requiredNetwork}, but that wallet is on ${wallet.network}.`,
+      "is on a different network",
+      field,
+    );
+  }
+
+  return {
+    ok: true,
+    wallet: { id: wallet.id, address: wallet.address, network: wallet.network },
   };
 };

@@ -1,6 +1,6 @@
 export { extractProfile, type ProfileClaims } from "./claims";
 export { clerkAuth } from "./plugin";
-export { toWebRequest } from "./request";
+export { type ToWebRequestOptions, toWebRequest } from "./request";
 export type {
   AuthContext,
   AuthIdentity,

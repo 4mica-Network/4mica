@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { deleteOwnReview, submitReview } from "@/actions/trust";
 import { messages, t } from "@/i18n";
 import { type PublicReview, RATING_MAX } from "@/schema/trust";
+import { runAction } from "@/utils/runAction";
 
 export interface ReviewComposerProps {
   resource: {
@@ -68,7 +69,9 @@ export function ReviewComposer({
     }
 
     startTransition(async () => {
-      const result = await submitReview(resource, { rating, title, body });
+      const result = await runAction(() =>
+        submitReview(resource, { rating, title, body }),
+      );
 
       if (result.ok) {
         setSaved(true);
@@ -80,8 +83,20 @@ export function ReviewComposer({
   };
 
   const remove = () => {
+    setError(null);
+
     startTransition(async () => {
-      await deleteOwnReview(resource);
+      const result = await runAction(() => deleteOwnReview(resource));
+
+      if (!result.ok) {
+        setError(
+          result.error === "not_found"
+            ? messages.trust.errorDeleteMissing
+            : (ERRORS[result.error ?? ""] ?? messages.trust.errorGeneric),
+        );
+        return;
+      }
+
       setRating(0);
       setTitle("");
       setBody("");

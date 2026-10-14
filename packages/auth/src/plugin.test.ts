@@ -221,6 +221,27 @@ describe("clerkAuth", () => {
     await app.close();
   });
 
+  it("never hands Clerk a cookie to fall back on", async () => {
+    authenticateRequest.mockResolvedValue(signedIn());
+
+    const { app } = await buildApp();
+    await app.inject({
+      method: "GET",
+      url: "/protected",
+      headers: {
+        authorization: "Bearer good",
+        cookie: "__session=from-a-cookie; __client_uat=1",
+      },
+    });
+
+    const [webRequest] = authenticateRequest.mock.calls[0];
+
+    expect(webRequest.headers.get("cookie")).toBeNull();
+    expect(webRequest.headers.get("authorization")).toBe("Bearer good");
+
+    await app.close();
+  });
+
   it("forwards the Authorization header and restricts the accepted token", async () => {
     authenticateRequest.mockResolvedValue(signedIn());
 

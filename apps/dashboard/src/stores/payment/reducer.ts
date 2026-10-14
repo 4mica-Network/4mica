@@ -1,3 +1,4 @@
+import { DEFAULT_PAGE_SIZE } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   Payment,
@@ -7,14 +8,19 @@ import type {
   PaymentSummary,
 } from "./type";
 
-export const DEFAULT_PAGE_SIZE = 20;
-
 export const INITIAL_STATE: PaymentState = {
   items: [],
   total: 0,
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
-  filters: { q: "", direction: "", status: "", network: "" },
+  filters: {
+    q: "",
+    direction: "",
+    status: "",
+    network: "",
+    wallet: "",
+    sort: "-createdAt",
+  },
   summary: null,
   stats: null,
   isLoading: false,

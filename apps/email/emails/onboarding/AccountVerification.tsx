@@ -11,8 +11,8 @@ export const AccountVerification = ({
     <Heading style={styles.heading}>Verify your email address</Heading>
 
     <Text style={styles.paragraph}>
-      Hi {userName}, welcome to {brand.name}. Confirm this is your address and
-      your account is verified.
+      Hi {userName}, confirm this is your address to verify it on your{" "}
+      {brand.name} account. You will be asked to sign in and press confirm.
     </Text>
 
     <CallToAction href={verifyUrl} label="Verify my email" />
@@ -24,8 +24,8 @@ export const AccountVerification = ({
     </Text>
 
     <Text style={styles.muted}>
-      If you did not create a {brand.name} account you can safely ignore this
-      email — nothing changes until the link above is opened.
+      If you did not ask for this you can safely ignore it — nothing changes
+      unless the account owner signs in and confirms.
     </Text>
   </Layout>
 );

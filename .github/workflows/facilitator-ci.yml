@@ -82,17 +82,12 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
 
       - name: Install
-        run: |
-          uv venv
-          uv pip install -e ../../../../../packages/sdk-python
-          uv pip install -e ".[dev,fastapi,flask,httpx]"
+        run: uv sync --python 3.12 --extra dev --extra fastapi --extra flask --extra httpx
 
       - name: Ruff lint
         run: uv run ruff check src tests demo
 
       - name: Pytest
-        run: uv run pytest
+        run: uv run python -X faulthandler -m pytest -v

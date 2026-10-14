@@ -1,3 +1,4 @@
+import { SIGNED_DECIMAL_AMOUNT_PATTERN, trimAmount } from "@4mica/rules";
 import { Button, Spinner, Tag } from "@4mica/ui";
 import {
   grantCustomerCredit,
@@ -6,30 +7,30 @@ import {
 import {
   selectCustomerCredit,
   selectCustomerCreditEntries,
+  selectCustomerError,
+  selectCustomerIssues,
   selectIsCustomerPending,
 } from "@stores/customer/selector";
 import type { Customer, CustomerCreditKind } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { formatDate } from "@utils/format";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
-import {
-  CREDIT_KIND_LABEL_KEYS,
-  CREDIT_KIND_OPTIONS,
-} from "../customers/constants";
-import { trimAmount } from "../payments/constants";
 import {
   SectionCard,
   SectionInset,
   SectionRow,
   SectionRows,
-} from "./SectionCard";
-
-const when = (iso: string): string =>
-  new Date(iso).toLocaleDateString(undefined, {
-    dateStyle: "medium",
-  });
+} from "@/components/layout";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useReturnFocus } from "@/hooks/useReturnFocus";
+import {
+  CREDIT_KIND_LABEL_KEYS,
+  CREDIT_KIND_OPTIONS,
+} from "../customers/constants";
 
 function GrantForm({
   customerId,
@@ -42,12 +43,35 @@ function GrantForm({
   const dispatch = useAppDispatch();
 
   const isSaving = useAppSelector(selectIsCustomerPending("customerCredit"));
+  const error = useAppSelector(selectCustomerError);
+  const issues = useAppSelector(selectCustomerIssues);
 
   const [kind, setKind] = useState<CustomerCreditKind>("PROMOTIONAL");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
+
+  useOnSuccess(isSaving, error !== null, onDone);
+
+  const trimmedAmount = amount.trim();
+  const amountError =
+    trimmedAmount === ""
+      ? undefined
+      : !SIGNED_DECIMAL_AMOUNT_PATTERN.test(trimmedAmount)
+        ? t("validation.decimal")
+        : Number(trimmedAmount) === 0
+          ? t("validation.positiveNumber")
+          : kind === "PROMOTIONAL" && trimmedAmount.startsWith("-")
+            ? t("customer.credit.promotionalNegative")
+            : undefined;
+  const serverIssue = (key: string) =>
+    attempted && !isSaving ? issues[key] : undefined;
 
   const submit = () => {
+    if (isSaving || trimmedAmount === "" || amountError) {
+      return;
+    }
+    setAttempted(true);
     dispatch(
       grantCustomerCredit({
         id: customerId,
@@ -58,7 +82,6 @@ function GrantForm({
         },
       }),
     );
-    onDone();
   };
 
   return (
@@ -83,9 +106,11 @@ function GrantForm({
         >
           <TextInput
             id="credit-amount"
+            inputMode="decimal"
             value={amount}
             onChange={setAmount}
             placeholder="5.00"
+            error={amountError ?? serverIssue("amount")}
           />
         </FieldRow>
 
@@ -96,6 +121,7 @@ function GrantForm({
             onChange={setReason}
             placeholder={t("customer.credit.reasonPlaceholder")}
             maxLength={280}
+            error={serverIssue("reason")}
           />
         </FieldRow>
       </div>
@@ -115,7 +141,7 @@ function GrantForm({
           intent="invert"
           size="sm"
           className="btn-no-lift w-24"
-          disabled={isSaving || amount.trim() === ""}
+          disabled={isSaving || trimmedAmount === "" || Boolean(amountError)}
           onClick={submit}
           data-testid="customer-credit-save"
         >
@@ -139,6 +165,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
   );
 
   const [isGranting, setIsGranting] = useState(false);
+  const addButton = useReturnFocus(isGranting);
 
   const hasBalance = balance !== null && Number(balance.total) !== 0;
 
@@ -150,6 +177,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
       action={
         !isGranting && (
           <Button
+            ref={addButton}
             type="button"
             intent="invert"
             size="sm"
@@ -189,20 +217,28 @@ export function CreditPanel({ customer }: { customer: Customer }) {
 
         {hasBalance && (
           <div className="flex justify-end">
-            <Button
-              type="button"
-              intent="ghost"
-              size="sm"
-              className="btn-no-lift text-danger"
-              disabled={isZeroing}
-              onClick={() => dispatch(zeroCustomerCredit({ id: customer.id }))}
+            <ConfirmAction
+              title={t("customer.credit.zeroConfirm")}
+              confirmLabel={t("confirm.reset")}
+              onConfirm={() =>
+                dispatch(zeroCustomerCredit({ id: customer.id }))
+              }
               data-testid="customer-credit-zero"
             >
-              <span className="flex items-center gap-1.5 text-sm">
-                {isZeroing && <Spinner size="sm" />}
-                {t("customer.credit.zero")}
-              </span>
-            </Button>
+              <Button
+                type="button"
+                intent="ghost"
+                size="sm"
+                className="btn-no-lift text-danger"
+                disabled={isZeroing}
+                data-testid="customer-credit-zero"
+              >
+                <span className="flex items-center gap-1.5 text-sm">
+                  {isZeroing && <Spinner size="sm" />}
+                  {t("customer.credit.zero")}
+                </span>
+              </Button>
+            </ConfirmAction>
           </div>
         )}
       </div>
@@ -227,7 +263,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
                     {t(CREDIT_KIND_LABEL_KEYS[entry.kind])}
                   </Tag>
                   <span className="text-ink-muted text-sm">
-                    {when(entry.createdAt)}
+                    {formatDate(entry.createdAt)}
                   </span>
                 </div>
               </div>

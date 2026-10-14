@@ -29,8 +29,6 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* Mounted here rather than in main.tsx so it lives inside the
-          authenticated subtree and survives route changes without remounting. */}
       <OnboardingGate />
     </div>
   );

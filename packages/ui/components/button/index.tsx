@@ -1,13 +1,8 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cn } from "../../lib/cn";
 
-/**
- * Button is a typed wrapper over the canonical `.btn-*` design-system classes
- * defined in `@4mica/tailwind-config` (styles.css). It adds zero new CSS while
- * guaranteeing visual parity with the rest of the app.
- */
 const button = cva("btn", {
   variants: {
     intent: {
@@ -35,15 +30,10 @@ const button = cva("btn", {
 export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {
-  /** Optional leading/trailing icon. Icon-agnostic — pass any ReactNode. */
   icon?: ReactNode;
   iconPosition?: "left" | "right";
-  /**
-   * Render the child element instead of a `<button>`, forwarding all classes
-   * (e.g. an `<a>` or a Next `<Link>`). Icon props are ignored in this mode —
-   * compose the child's content yourself.
-   */
   asChild?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({
@@ -54,6 +44,7 @@ export function Button({
   asChild = false,
   icon,
   iconPosition = "left",
+  type = "button",
   children,
   ...props
 }: ButtonProps) {
@@ -68,7 +59,7 @@ export function Button({
   }
 
   return (
-    <button className={classes} {...props}>
+    <button type={type} className={classes} {...props}>
       {icon && iconPosition === "left" && (
         <span className="inline-flex shrink-0">{icon}</span>
       )}

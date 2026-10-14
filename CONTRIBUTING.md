@@ -95,11 +95,10 @@ pnpm turbo build --filter=@4mica/example-seller-express...
 pnpm turbo dev   --filter=@4mica/example-seller-express...
 
 # In another terminal, fire the buyer to exercise your change
-pnpm --filter @4mica/example-buyer-express start
+pnpm --filter @4mica/example-buyer start
 ```
 
-See [examples/README.md](./examples/README.md) for the full harness guide and the
-"going live" recipe.
+See [examples/README.md](./examples/README.md) for the setup each example needs.
 
 ## Developing & testing the CLI (`@4mica/cli`)
 

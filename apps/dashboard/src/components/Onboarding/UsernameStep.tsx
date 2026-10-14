@@ -1,15 +1,11 @@
 import { Spinner } from "@4mica/ui";
 import { isGeneratedUsername } from "@4mica/url";
-import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { checkUsername, resetUsernameCheck } from "@stores/user/actions";
-import { selectUsernameCheck } from "@stores/user/selector";
-import { useDebounceEffect } from "ahooks";
+import { isUsernameShapeValid } from "@utils/user-rules";
 import { Check, X } from "lucide-react";
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, TextInput } from "@/components/form";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { links } from "@/lib/links";
-import { isUsernameShapeValid } from "./validation";
 
 export function UsernameStep({
   value,
@@ -19,36 +15,16 @@ export function UsernameStep({
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** The handle currently on the server, generated or chosen. */
   savedUsername: string;
   error?: string;
 }) {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const check = useAppSelector(selectUsernameCheck);
 
   const candidate = value.trim().toLowerCase();
   const isGenerated = isGeneratedUsername(savedUsername);
-
-  useEffect(() => {
-    return () => {
-      dispatch(resetUsernameCheck());
-    };
-  }, [dispatch]);
-
-  useDebounceEffect(
-    () => {
-      if (!isUsernameShapeValid(candidate) || candidate === savedUsername) {
-        return;
-      }
-      dispatch(checkUsername(candidate));
-    },
-    [candidate, savedUsername],
-    { wait: 450 },
-  );
+  const status = useUsernameAvailability(candidate, savedUsername);
 
   const isCurrent = candidate === savedUsername;
-  const status = check.value === candidate ? check.status : "idle";
 
   const statusMessage = (): { text: string; tone: string } | null => {
     if (error) {
@@ -124,6 +100,7 @@ export function UsernameStep({
       >
         <TextInput
           id="onboarding-username"
+          autoComplete="username"
           value={value}
           onChange={onChange}
           placeholder={t("onboarding.username.placeholder")}
@@ -134,11 +111,9 @@ export function UsernameStep({
         />
       </FieldRow>
 
-      {message && (
-        <p className={`text-xs ${message.tone}`} aria-live="polite">
-          {message.text}
-        </p>
-      )}
+      <p className={`text-xs ${message?.tone ?? ""}`} aria-live="polite">
+        {message?.text}
+      </p>
     </div>
   );
 }

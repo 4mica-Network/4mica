@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@4mica/http": "workspace:*",
+    "@4mica/rules": "workspace:*",
     "@4mica/ui": "workspace:*",
     "@4mica/url": "workspace:*",
     "@clerk/clerk-react": "catalog:",

@@ -1,4 +1,5 @@
 import {
+  confirmEmailHandler,
   sendVerificationEmailHandler,
   verifyEmailHandler,
 } from "@controllers/verification/index";
@@ -8,6 +9,7 @@ import { guards } from "./guards";
 import {
   errorResponseSchema,
   limitedResponses,
+  userResponseSchema,
   verificationSentResponseSchema,
 } from "./schema-fragments";
 
@@ -21,7 +23,8 @@ export const verificationRoutes: FastifyPluginCallback = (app, _opts, done) => {
       preHandler: [...base.preHandler, sensitiveRateLimit(app)],
       schema: {
         tags: ["verification"],
-        summary: "Send a verification link to the account's email address",
+        summary:
+          "Send a verification link to the pending email address, or to the current one if it was never verified",
         security: [{ bearerAuth: [] }],
         response: {
           ...limitedResponses,
@@ -35,12 +38,43 @@ export const verificationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     sendVerificationEmailHandler,
   );
 
+  app.post(
+    "/me/email/verification/confirm",
+    {
+      onRequest: base.onRequest,
+      preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      schema: {
+        tags: ["verification"],
+        summary: "Spend a verification link as the signed-in user",
+        description:
+          "The token must have been minted for the caller. A link for a pending address promotes it to the account email.",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          required: ["token"],
+          properties: { token: { type: "string" } },
+        },
+        response: {
+          ...limitedResponses,
+          200: userResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          409: errorResponseSchema,
+          410: errorResponseSchema,
+        },
+      },
+    },
+    confirmEmailHandler,
+  );
+
   app.get(
     "/verify-email",
     {
       schema: {
         tags: ["verification"],
-        summary: "Consume a verification link and return to the dashboard",
+        summary: "Forward a verification link to the dashboard to confirm",
+        description:
+          "Never spends the token: a GET can be prefetched by mail scanners. The dashboard confirms through POST /me/email/verification/confirm.",
         querystring: {
           type: "object",
           properties: { token: { type: "string" } },

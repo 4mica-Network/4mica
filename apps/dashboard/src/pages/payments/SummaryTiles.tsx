@@ -1,7 +1,7 @@
+import { trimAmount } from "@4mica/rules";
 import { Tooltip } from "@4mica/ui";
 import type { PaymentSummary, PaymentTotals } from "@stores/payment/type";
 import { useTranslation } from "react-i18next";
-import { trimAmount } from "./constants";
 
 function Volume({ totals }: { totals: PaymentTotals }) {
   const { t } = useTranslation();

@@ -1,9 +1,10 @@
-import { HttpError } from "@4mica/http";
 import type { AgentInput } from "@api/agent";
 import * as api from "@api/agent";
 import i18n from "@i18n";
-import { notifyError, notifySuccess } from "@utils/notification";
+import { definedParams, type PendingMeta } from "@stores/utils";
+import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   agentActionFailed,
   batchDeleteAgentsSucceeded,
@@ -13,7 +14,6 @@ import {
   fetchAgentsFailed,
   fetchAgentsPending,
   fetchAgentsSucceeded,
-  type PendingMeta,
   publishAgentSucceeded,
   updateAgentSucceeded,
 } from "./actions";
@@ -21,35 +21,15 @@ import actionTypes from "./actionTypes";
 import { selectAgentState } from "./selector";
 import type { AgentState } from "./type";
 
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  return Array.isArray(issues)
-    ? Object.fromEntries(issues.map((i) => [i.path, i.message]))
-    : {};
-};
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    if (error.status === 401 || error.status === 403) {
-      return t(
-        "store.agent.sessionExpired",
-        "Your session has expired. Refresh the page and sign in again.",
-      );
-    }
-    return (error.body as { message?: string } | null)?.message ?? fallback;
-  }
-  return fallback;
-};
+const toMessage = (error: unknown, fallback: string): string =>
+  messageOf(error, fallback, {
+    sessionExpired: t(
+      "store.agent.sessionExpired",
+      "Your session has expired. Refresh the page and sign in again.",
+    ),
+  });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
@@ -72,10 +52,12 @@ export function* fetchAgents(): Generator {
       api.getAgents({
         page,
         limit,
-        ...(filters.q ? { q: filters.q } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.visibility ? { visibility: filters.visibility } : {}),
-        ...(filters.network ? { network: filters.network } : {}),
+        ...definedParams({
+          q: filters.q,
+          status: filters.status,
+          visibility: filters.visibility,
+          network: filters.network,
+        }),
       }),
     )) as Awaited<ReturnType<typeof api.getAgents>>;
 

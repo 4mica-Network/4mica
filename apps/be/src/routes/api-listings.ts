@@ -16,13 +16,14 @@ import {
   apiListingResponseSchema,
   batchDeleteResponseSchema,
   errorResponseSchema,
+  idParam,
   limitedResponses,
 } from "./schema-fragments";
 
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 const listQuerySchema = {

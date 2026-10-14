@@ -13,10 +13,11 @@ import {
   type LucideIcon,
   UserCog,
 } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
@@ -62,16 +63,10 @@ function Label({
   );
 }
 
-/**
- * `User.name` is `@default("")`, not nullable, so an unset name arrives as a
- * blank string — `??` would happily return it. Everything here is trimmed and
- * blank-checked rather than null-checked.
- */
 const firstNonBlank = (
   ...values: (string | null | undefined)[]
 ): string | undefined => values.find((value) => value?.trim())?.trim();
 
-/** Who the sidebar says you are: a real name if we have one, else an email. */
 function useDisplayName(): string {
   const { t } = useTranslation();
   const { user } = useUser();
@@ -174,6 +169,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
 
   const displayName = useDisplayName();
 
@@ -182,6 +178,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
       <button
         ref={anchorRef}
         type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={collapsed ? displayName : undefined}
         onClick={() => setOpen((v) => !v)}
         className="flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-colors hover:bg-overlay/5"
       >
@@ -202,7 +202,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
             transition={{ duration: 0.18 }}
             className="shrink-0 text-ink-subtle"
           >
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown aria-hidden="true" className="h-4 w-4" />
           </motion.span>
         </span>
       </button>
@@ -213,27 +213,32 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         placement="bottom"
         matchAnchorWidth={!collapsed}
         onClickOutside={() => setOpen(false)}
+        autoFocus
         className="min-w-50 bg-surface-deep p-1"
       >
-        <NavLink
-          to="/settings/profile"
-          onClick={() => setOpen(false)}
-          className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
-        >
-          <UserCog className="h-4 w-4" />
-          {t("sidebar.preferences")}
-        </NavLink>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            void signOut({ redirectUrl: "/sign-in" });
-          }}
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm hover:bg-overlay/10"
-        >
-          <LogOut className="h-4 w-4" />
-          {t("sidebar.signOut")}
-        </button>
+        <div id={menuId} role="menu" aria-label={displayName}>
+          <NavLink
+            to="/settings/profile"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+          >
+            <UserCog aria-hidden="true" className="h-4 w-4" />
+            {t("sidebar.preferences")}
+          </NavLink>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              void signOut({ redirectUrl: "/sign-in" });
+            }}
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+          >
+            <LogOut aria-hidden="true" className="h-4 w-4" />
+            {t("sidebar.signOut")}
+          </button>
+        </div>
       </Dropdown>
     </>
   );
@@ -243,8 +248,6 @@ function StaticBrand({ collapsed }: { collapsed: boolean }) {
   const displayName = useDisplayName();
   return (
     <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
-      {/* mr-1 matches AvatarMenu. The avatar is 32px inside a 36px box, so
-          without it the label sits 2px off the circle. */}
       <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
         <AvatarCircle />
       </span>
@@ -262,12 +265,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   const inSettings = useLocation().pathname.startsWith("/settings");
   const navigate = useNavigate();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const currentUser = useAppSelector(selectUser);
-
-  // Null until the user loads and picks a handle in Settings → Profile. Both
-  // actions fall back to that page rather than linking to a profile that
-  // cannot exist.
   const profileUrl = currentUser?.username
     ? links.profile(currentUser.username)
     : null;
@@ -277,11 +276,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       navigate("/settings/profile");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(profileUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
+    await copy(profileUrl);
   };
 
   const viewProfile = () => {

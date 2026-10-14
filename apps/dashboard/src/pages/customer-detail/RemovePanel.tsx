@@ -1,5 +1,5 @@
-import { Button, PopupConfirm, Spinner } from "@4mica/ui";
-import { deleteCustomer } from "@stores/customer/actions";
+import { Button, Spinner } from "@4mica/ui";
+import { customerPendingKeys, deleteCustomer } from "@stores/customer/actions";
 import { selectIsCustomerPending } from "@stores/customer/selector";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -7,7 +7,8 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { SectionCard } from "./SectionCard";
+import { ConfirmAction } from "@/components/ConfirmAction";
+import { SectionCard } from "@/components/layout";
 
 export function RemovePanel({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export function RemovePanel({ customer }: { customer: Customer }) {
   const navigate = useNavigate();
 
   const isDeleting = useAppSelector(
-    selectIsCustomerPending(`customer:${customer.id}`),
+    selectIsCustomerPending(customerPendingKeys.row(customer.id)),
   );
 
   const sawDeleting = useRef(false);
@@ -36,15 +37,10 @@ export function RemovePanel({ customer }: { customer: Customer }) {
       description={t("customer.detail.removeLead")}
       data-testid="customer-remove"
       action={
-        <PopupConfirm
-          placement="bottomRight"
+        <ConfirmAction
           title={t("customer.remove.confirmTitle")}
           description={t("customer.remove.confirmDescription")}
           confirmLabel={t("customer.remove.confirm")}
-          cancelLabel={t("customer.remove.cancel")}
-          confirmButtonProps={{
-            className: "bg-danger text-surface-deep hover:bg-danger",
-          }}
           onConfirm={() => dispatch(deleteCustomer({ id: customer.id }))}
           data-testid="customer-remove"
         >
@@ -65,7 +61,7 @@ export function RemovePanel({ customer }: { customer: Customer }) {
               {t("customer.remove.cta")}
             </span>
           </Button>
-        </PopupConfirm>
+        </ConfirmAction>
       }
     >
       <p className="text-ink-muted text-sm">{t("customer.remove.hint")}</p>

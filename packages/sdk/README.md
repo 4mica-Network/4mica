@@ -19,6 +19,9 @@ Merkle root. This SDK provides:
   with a random per-payment `reqId` and no server round-trip before signing
 - **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a
   route behind an x402 payment
+- **App API** (`@4mica/sdk/app`): read the pricing, policy and FAQs you set in the dashboard for
+  one API listing or agent, check a payer's rules, and record payments, using a secret key from
+  that listing or agent. See [docs/app-api.md](docs/app-api.md)
 - **Golden-vector parity**: EIP-712/EIP-191 digests and the guarantee envelope are pinned by the
   same fixtures the Rust and Python SDKs test against
 

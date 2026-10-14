@@ -36,10 +36,29 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     return null;
   }
 
-  return prisma.user.findUnique({
+  const row = await prisma.user.findUnique({
     where: { clerkUserId },
-    select: { id: true, username: true, name: true, avatarUrl: true },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      avatarUrl: true,
+      banned: true,
+      locked: true,
+      deletedAt: true,
+    },
   });
+
+  if (!row || row.banned || row.locked || row.deletedAt !== null) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    avatarUrl: row.avatarUrl,
+  };
 });
 
 export const getSessionIdentity = cache(

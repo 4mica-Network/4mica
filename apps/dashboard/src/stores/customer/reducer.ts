@@ -1,3 +1,4 @@
+import { DEFAULT_PAGE_SIZE, setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   Customer,
@@ -11,7 +12,6 @@ import type {
   Payment,
 } from "./type";
 
-export const DEFAULT_PAGE_SIZE = 20;
 export const ACTIVITY_PAGE_SIZE = 10;
 
 const EMPTY_DETAIL: CustomerDetail = {
@@ -45,23 +45,6 @@ interface CustomerAction {
   payload?: unknown;
   meta?: { pendingKey: string };
 }
-
-const setPending = (
-  pending: Record<string, boolean>,
-  key: string | undefined,
-  value: boolean,
-): Record<string, boolean> => {
-  if (!key) {
-    return pending;
-  }
-  const next = { ...pending };
-  if (value) {
-    next[key] = true;
-  } else {
-    delete next[key];
-  }
-  return next;
-};
 
 export default function customerReducer(
   state: CustomerState = INITIAL_STATE,

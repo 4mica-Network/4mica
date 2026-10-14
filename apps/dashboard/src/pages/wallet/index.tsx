@@ -18,10 +18,10 @@ import {
   selectWalletTotal,
 } from "@stores/wallet/selector";
 import type { Wallet as WalletType } from "@stores/wallet/type";
-import { useTitle } from "ahooks";
 import { ArrowUpRight, Plus, TriangleAlert, WalletMinimal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { CreateWalletModal } from "./CreateWalletModal";
 import { DeleteWalletDialog } from "./DeleteWalletDialog";
@@ -43,7 +43,7 @@ export function Wallet() {
   const hasLoaded = useAppSelector(selectHasLoadedWallets);
   const error = useAppSelector(selectWalletError);
 
-  useTitle(`${t("page.wallet.title")} - ${t("org")}`);
+  usePageTitle(t("page.wallet.title"));
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WalletType | null>(null);

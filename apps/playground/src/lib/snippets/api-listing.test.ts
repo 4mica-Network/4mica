@@ -70,7 +70,7 @@ describe("buildApiListingSnippets", () => {
     expect(snippets?.typescript).toContain(
       "GET https://api.4mica.io/v1/credit/limits",
     );
-    expect(snippets?.curl).toContain('curl -i -X GET "');
+    expect(snippets?.curl).toContain("curl -i -X GET '");
   });
 
   it("adds request options for a non-GET route", () => {
@@ -146,5 +146,20 @@ describe("buildApiListingSnippets", () => {
 
     expect(snippets?.curl).toContain('"scheme": "4mica-credit"');
     expect(snippets?.curl).not.toContain("tabEndpoint");
+  });
+
+  it("cannot be broken out of by a hostile URL or name", () => {
+    const hostile = 'https://x.example/$(id)`id`"; touch pwn; echo "';
+    const snippets = buildApiListingSnippets(
+      listing({ name: "Evil\nprocess.exit(1)", url: hostile }),
+    );
+
+    expect(snippets?.curl).toContain(`curl -i -X GET '${hostile}'`);
+    expect(snippets?.typescript).toContain(JSON.stringify(hostile));
+    expect(snippets?.python).toContain(
+      `session.get(${JSON.stringify(hostile)})`,
+    );
+    expect(snippets?.typescript).not.toMatch(/^process\.exit/m);
+    expect(snippets?.python).not.toMatch(/^process\.exit/m);
   });
 });

@@ -48,6 +48,7 @@ const payment = (over: Partial<Payment> = {}): Payment => ({
   agentSlug: null,
   agentName: null,
   direction: "received",
+  onCore: false,
   ...over,
 });
 
@@ -85,6 +86,8 @@ describe("payment reducer", () => {
       direction: "sent",
       status: "",
       network: "",
+      wallet: "",
+      sort: "-createdAt",
     });
   });
 
@@ -165,7 +168,11 @@ describe("payment sagas", () => {
   it("omits blank filters rather than sending empty strings", async () => {
     await record(fetchPayments, paymentState());
 
-    expect(getPayments).toHaveBeenCalledWith({ page: 1, limit: 20 });
+    expect(getPayments).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+      sort: "-createdAt",
+    });
   });
 
   it("sends every set filter", async () => {
@@ -178,6 +185,8 @@ describe("payment sagas", () => {
           direction: "received",
           status: "SETTLED",
           network: "BASE",
+          wallet: "0x6c5cc69e4c4863dbc3439ab2673806ea7715ebd5",
+          sort: "-amount",
         },
       }),
     );
@@ -189,6 +198,8 @@ describe("payment sagas", () => {
       direction: "received",
       status: "SETTLED",
       network: "BASE",
+      wallet: "0x6c5cc69e4c4863dbc3439ab2673806ea7715ebd5",
+      sort: "-amount",
     });
   });
 

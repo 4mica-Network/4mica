@@ -1,3 +1,4 @@
+import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Checkbox, cn, Tag } from "@4mica/ui";
 import { toggleCustomerSelected } from "@stores/customer/actions";
 import { selectIsCustomerSelected } from "@stores/customer/selector";
@@ -5,7 +6,6 @@ import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { NETWORKS, shortenAddress } from "@/lib/networks";
 import {
   STATUS_LABEL_KEYS,
   STATUS_TAG_VARIANT,
@@ -31,6 +31,7 @@ export function CustomerRow({ customer }: { customer: Customer }) {
       data-testid={`customer-row-${customer.id}`}
     >
       <Checkbox
+        aria-label={t("customer.row.select", { name: customer.name })}
         variant="square"
         className="relative z-10 mt-0.5 w-auto shrink-0"
         checked={isSelected}
@@ -64,7 +65,7 @@ export function CustomerRow({ customer }: { customer: Customer }) {
 
           {wallet?.network && (
             <Tag size="sm" variant="neutral">
-              {NETWORKS[wallet.network].label}
+              {PAYMENT_NETWORKS[wallet.network].label}
             </Tag>
           )}
 

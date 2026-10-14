@@ -1,3 +1,10 @@
+export const idParam = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[A-Za-z0-9_-]+$",
+} as const;
+
 const bool = { type: "boolean" } as const;
 const str = { type: "string" } as const;
 const nullStr = { type: "string", nullable: true } as const;
@@ -19,6 +26,7 @@ export const userResponseSchema = {
     name: str,
     email: nullStr,
     emailVerified: bool,
+    pendingEmail: nullStr,
     phoneNumber: nullStr,
     phoneNumberVerified: bool,
     avatarUrl: nullStr,
@@ -34,7 +42,6 @@ export const userResponseSchema = {
     language: str,
     timeZone: str,
     privacyMode: bool,
-    twoFactorEnabled: bool,
     defaultHome: str,
     disableBranding: bool,
     allowCustomBrandColor: bool,
@@ -143,6 +150,14 @@ export const createdApiKeyResponseSchema = {
     apiKey: apiKeyResponseSchema,
     // Present in this one response and never retrievable again.
     plaintext: str,
+  },
+} as const;
+
+export const resourceKeyListResponseSchema = {
+  type: "object",
+  required: ["items"],
+  properties: {
+    items: { type: "array", items: apiKeyResponseSchema },
   },
 } as const;
 
@@ -272,7 +287,7 @@ const visibilityEnum = {
   enum: ["PRIVATE", "UNLISTED", "PUBLIC"],
 } as const;
 
-const httpMethodEnum = {
+const _httpMethodEnum = {
   type: "string",
   enum: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 } as const;
@@ -323,11 +338,6 @@ export const apiListingListResponseSchema = {
   },
 } as const;
 
-/**
- * Both wallet addresses are present here because this is the OWNER's view of
- * their own agent. The public projection lives in apps/playground and omits
- * `walletAddress` and `creditLimit` on purpose.
- */
 export const agentResponseSchema = {
   type: "object",
   required: ["id", "name", "status", "visibility", "network"],
@@ -404,6 +414,7 @@ export const paymentResponseSchema = {
     agentSlug: nullStr,
     agentName: nullStr,
     direction: { type: "string", enum: ["sent", "received"] },
+    onCore: { type: "boolean" },
   },
 } as const;
 
@@ -466,13 +477,27 @@ const monthlyBucketSchema = {
   },
 } as const;
 
+const rankedEntrySchema = {
+  type: "object",
+  required: ["id", "name", "slug", "settledCount", "amount"],
+  properties: {
+    id: str,
+    name: str,
+    slug: str,
+    settledCount: int,
+    amount: str,
+  },
+} as const;
+
 export const paymentStatsResponseSchema = {
   type: "object",
-  required: ["months", "received", "sent"],
+  required: ["months", "received", "sent", "topListings", "topAgents"],
   properties: {
     months: { type: "array", items: str },
     received: { type: "array", items: monthlyBucketSchema },
     sent: { type: "array", items: monthlyBucketSchema },
+    topListings: { type: "array", items: rankedEntrySchema },
+    topAgents: { type: "array", items: rankedEntrySchema },
   },
 } as const;
 
@@ -651,6 +676,8 @@ export const customerResolveResponseSchema = {
         "customer_suspended",
         "identity_blocked",
         "below_minimum",
+        "daily_limit_exceeded",
+        "monthly_limit_exceeded",
         null,
       ],
     },
@@ -725,12 +752,61 @@ export const verificationSentResponseSchema = {
   properties: { sent: bool },
 } as const;
 
+export const balancesResponseSchema = {
+  type: "object",
+  required: ["network", "wallets"],
+  properties: {
+    network: {
+      type: "string",
+      enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+      nullable: true,
+    },
+    wallets: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "label", "address", "role", "assets"],
+        properties: {
+          id: str,
+          label: str,
+          address: str,
+          role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
+          assets: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "assetAddress",
+                "symbol",
+                "decimals",
+                "total",
+                "locked",
+                "available",
+              ],
+              properties: {
+                assetAddress: str,
+                symbol: str,
+                decimals: int,
+                total: str,
+                locked: str,
+                available: str,
+                updatedAt: nullDate,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
 export const errorResponseSchema = {
   type: "object",
   required: ["error", "message"],
   properties: {
     error: str,
     message: str,
+    requestId: str,
     issues: {
       type: "array",
       items: {
@@ -741,10 +817,6 @@ export const errorResponseSchema = {
   },
 } as const;
 
-/**
- * Responses every rate-limited route can produce regardless of its handler:
- * 429 from the limiter, 503 while the instance is draining.
- */
 export const limitedResponses = {
   429: errorResponseSchema,
   503: errorResponseSchema,
@@ -871,7 +943,7 @@ export const trustSummaryResponseSchema = {
   },
 } as const;
 
-const faqSchema = {
+export const faqSchema = {
   type: "object",
   required: ["id", "question", "answer"],
   properties: {
@@ -894,4 +966,16 @@ export const faqResponseSchema = {
   type: "object",
   required: ["faq"],
   properties: { faq: faqSchema },
+} as const;
+
+export const resourceContextResponseSchema = {
+  type: "object",
+  required: ["kind", "listing", "agent", "policy", "faqs"],
+  properties: {
+    kind: { type: "string", enum: ["listing", "agent"] },
+    listing: { ...apiListingResponseSchema, nullable: true },
+    agent: { ...agentResponseSchema, nullable: true },
+    policy: policyResponseSchema.properties.policy,
+    faqs: { type: "array", items: faqSchema },
+  },
 } as const;

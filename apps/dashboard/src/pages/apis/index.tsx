@@ -18,10 +18,10 @@ import {
 } from "@stores/apiListing/selector";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { useTitle } from "ahooks";
 import { ArrowUpRight, Blocks, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { ApiListingRow } from "./ApiListingRow";
 import { ApiListingToolbar } from "./ApiListingToolbar";
@@ -42,7 +42,7 @@ export function Apis() {
   const hasLoaded = useAppSelector(selectHasLoadedApiListings);
   const error = useAppSelector(selectApiListingError);
 
-  useTitle(`${t("page.apps.title")} - ${t("org")}`);
+  usePageTitle(t("page.apps.title"));
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<ApiListing | null>(null);

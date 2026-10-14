@@ -1,3 +1,5 @@
+import type { ResourceRef } from "@stores/shared/type";
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   Faq,
@@ -9,16 +11,11 @@ import type {
   TrustSummary,
 } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
-
-export type ResourceKind = "listing" | "agent";
-
-export interface ResourceRef {
-  kind: ResourceKind;
-  id: string;
-}
+export const trustPendingKeys = {
+  review: (id: string) => `review:${id}`,
+  report: (id: string) => `report:${id}`,
+  faq: (id: string) => `faq:${id}`,
+} as const;
 
 export const fetchTrust = (resource: ResourceRef) => ({
   type: actionTypes.FETCH_TRUST_REQUESTED,
@@ -63,7 +60,7 @@ export const replyToReview = (
 ) => ({
   type: actionTypes.REPLY_TO_REVIEW_REQUESTED,
   payload: { resource, reviewId, reply },
-  meta: { pendingKey: `review:${reviewId}` },
+  meta: { pendingKey: trustPendingKeys.review(reviewId) },
 });
 
 export const replyToReviewSucceeded = (review: Review) => ({
@@ -79,7 +76,7 @@ export const updateReport = (
 ) => ({
   type: actionTypes.UPDATE_REPORT_REQUESTED,
   payload: { resource, reportId, status, resolutionNote },
-  meta: { pendingKey: `report:${reportId}` },
+  meta: { pendingKey: trustPendingKeys.report(reportId) },
 });
 
 export const updateReportSucceeded = (report: Report) => ({
@@ -119,13 +116,13 @@ export const updateFaq = (
 ) => ({
   type: actionTypes.UPDATE_FAQ_REQUESTED,
   payload: { resource, faqId, faq },
-  meta: { pendingKey: `faq:${faqId}` },
+  meta: { pendingKey: trustPendingKeys.faq(faqId) },
 });
 
 export const deleteFaq = (resource: ResourceRef, faqId: string) => ({
   type: actionTypes.DELETE_FAQ_REQUESTED,
   payload: { resource, faqId },
-  meta: { pendingKey: `faq:${faqId}` },
+  meta: { pendingKey: trustPendingKeys.faq(faqId) },
 });
 
 export const reorderFaqs = (resource: ResourceRef, ids: string[]) => ({

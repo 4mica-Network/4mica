@@ -12,17 +12,21 @@ import {
   selectPayerWallets,
   selectSellerWallets,
 } from "@stores/wallet/selector";
+import { blankToNull } from "@utils/format";
 import { ArrowUpRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FormEvent, useEffect, useId, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { useServerIssues } from "@/hooks/useServerIssues";
+import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
 import { AgentFormFields } from "./AgentFormFields";
 import {
   type AgentValues,
   agentSchema,
-  blankToNull,
   CREATE_STEP_FIELDS,
 } from "./validation";
 
@@ -46,17 +50,11 @@ export function CreateAgentModal({
   const payerWallets = useAppSelector(selectPayerWallets);
 
   const [step, setStep] = useState(0);
+  useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
 
-  const {
-    handleSubmit,
-    setValue,
-    watch,
-    trigger,
-    reset,
-    formState: { errors },
-  } = useForm<AgentValues>({
+  const form = useForm<AgentValues>({
     resolver: zodResolver(agentSchema),
-    mode: "onBlur",
+    mode: "onTouched",
     defaultValues: {
       name: "",
       slug: "",
@@ -79,7 +77,9 @@ export function CreateAgentModal({
     },
   });
 
-  const values = watch();
+  const { handleSubmit, trigger, reset, setError, control } = form;
+  const [name, network] = useWatch({ control, name: ["name", "network"] });
+  const formId = useId();
 
   useEffect(() => {
     if (!isOpen) {
@@ -90,11 +90,13 @@ export function CreateAgentModal({
     dispatch(fetchActiveWallets());
   }, [isOpen, reset, dispatch]);
 
+  useServerIssues(issues, setError);
+
   const eligibleSellers = sellerWallets.filter(
-    (wallet) => wallet.network === values.network,
+    (wallet) => wallet.network === network,
   );
   const eligiblePayers = payerWallets.filter(
-    (wallet) => wallet.network === values.network,
+    (wallet) => wallet.network === network,
   );
 
   const continueToNext = async () => {
@@ -133,39 +135,32 @@ export function CreateAgentModal({
   };
 
   const onInvalid = (invalid: Record<string, unknown>) => {
-    const firstBadStep = CREATE_STEP_FIELDS.findIndex((fields) =>
-      fields.some((field) => field in invalid),
+    const firstBadStep = firstStepWith(
+      CREATE_STEP_FIELDS,
+      Object.keys(invalid),
     );
     if (firstBadStep >= 0 && firstBadStep !== step) {
       setStep(firstBadStep);
     }
   };
 
-  const sawSaving = useRef(false);
-  useEffect(() => {
-    if (isSaving) {
-      sawSaving.current = true;
-      return;
-    }
-    if (!sawSaving.current) {
-      return;
-    }
-    sawSaving.current = false;
-    if (!error && Object.keys(issues).length === 0) {
-      onClose();
-    }
-  }, [isSaving, error, issues, onClose]);
-
-  const fieldError = (field: keyof AgentValues) => {
-    if (issues[field]) {
-      return issues[field];
-    }
-    const message = errors[field]?.message;
-    return message ? t(message) : undefined;
-  };
+  useOnSuccess(
+    isSaving,
+    Boolean(error) || Object.keys(issues).length > 0,
+    onClose,
+  );
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canSubmit = Boolean(values.name?.trim()) && !isSaving;
+  const canSubmit = Boolean(name?.trim()) && !isSaving;
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (isLastStep) {
+      handleSubmit(onValid, onInvalid)(event);
+      return;
+    }
+    event.preventDefault();
+    void continueToNext();
+  };
 
   return (
     <Modal
@@ -205,8 +200,10 @@ export function CreateAgentModal({
                 intent="invert"
                 size="sm"
                 className="btn-no-lift min-w-32"
+                type="submit"
+                form={formId}
                 disabled={!canSubmit}
-                onClick={handleSubmit(onValid, onInvalid)}
+                aria-busy={isSaving}
                 data-testid="create-agent-submit"
               >
                 <span className="flex w-full items-center justify-center text-sm">
@@ -218,7 +215,8 @@ export function CreateAgentModal({
                 intent="invert"
                 size="sm"
                 className="btn-no-lift min-w-32"
-                onClick={continueToNext}
+                type="submit"
+                form={formId}
                 data-testid="create-agent-continue"
               >
                 <span className="flex w-full items-center justify-center text-sm">
@@ -233,18 +231,20 @@ export function CreateAgentModal({
       <div className="flex flex-col gap-4">
         <StepIndicator current={step} total={TOTAL_STEPS} />
 
-        <AgentFormFields
-          t={t}
-          values={values}
-          setValue={setValue}
-          fieldError={fieldError}
-          wallets={eligibleSellers}
-          payerWallets={eligiblePayers}
-          idPrefix="create-agent"
-          step={step}
-        />
+        <Form form={form} id={formId} onSubmit={onSubmit}>
+          <AgentFormFields
+            wallets={eligibleSellers}
+            payerWallets={eligiblePayers}
+            idPrefix="create-agent"
+            step={step}
+          />
+        </Form>
 
-        {error && <p className="text-danger text-sm">{error}</p>}
+        {error && (
+          <p className="text-danger text-sm" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );

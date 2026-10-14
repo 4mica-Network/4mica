@@ -9,8 +9,8 @@ import {
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { ArrowRightLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { PaymentRow } from "../payments/PaymentRow";
-import { SectionCard, SectionRows } from "./SectionCard";
+import { SectionCard, SectionRows } from "@/components/layout";
+import { PaymentRow } from "@/components/PaymentRow";
 
 export function ActivityPanel({ customerId }: { customerId: string }) {
   const { t } = useTranslation();

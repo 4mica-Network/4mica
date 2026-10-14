@@ -1,3 +1,4 @@
+import { isProfileRenderable } from "@4mica/rules";
 import type { PublicProfile } from "@/schema/profile";
 import { safeBrandColor } from "@/utils/brandColor";
 
@@ -28,12 +29,7 @@ export interface ProfileRow extends ProfileGateRow {
   disableBranding: boolean;
 }
 
-export const isProfileRenderable = (row: ProfileGateRow): boolean =>
-  row.username !== null &&
-  row.deletedAt === null &&
-  row.banned === false &&
-  row.hidden === false &&
-  row.private === false;
+export { isProfileRenderable };
 
 export const toPublicProfile = (
   row: ProfileRow,

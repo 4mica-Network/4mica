@@ -7,11 +7,12 @@ import {
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
-import { priceFor } from "@services/customer-pricing";
+import { optionalAmountText } from "@utils/amount";
+import { priceFor } from "@utils/customer-pricing";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
-} from "@services/prisma-errors";
+} from "@utils/prisma-errors";
 import type { FastifyReply, RouteHandler } from "fastify";
 import {
   addIdentity,
@@ -37,6 +38,7 @@ import {
   setCustomerPolicy,
   setCustomerStatus,
   softDeleteCustomer,
+  spendLimitUsageFor,
   updateCoupon,
   updateCustomer,
   updateIdentity,
@@ -401,6 +403,15 @@ export const grantCustomerCreditHandler: RouteHandler = async (
   }
 
   const entry = await grantCredit(userId, id, parsed.data);
+  if (!entry) {
+    const message = "would take the credit balance below zero";
+    return reply.code(409).send({
+      error: "insufficient_credit",
+      message: `This adjustment ${message}.`,
+      issues: [{ path: "amount", message }],
+    });
+  }
+
   const balance = await creditBalance(userId, id);
 
   appLogger.info("Customer credit granted", {
@@ -581,12 +592,13 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
 
   const { customer, identityBlocked } = resolved;
 
-  const [quotaRemaining, credit, coupon] = await Promise.all([
+  const [quotaRemaining, credit, coupon, spent] = await Promise.all([
     quotaRemainingFor(ownerId, customer),
     creditBalance(ownerId, customer.id),
     couponCode
       ? findCouponByCode(ownerId, customer.id, couponCode)
       : Promise.resolve(null),
+    spendLimitUsageFor(ownerId, customer),
   ]);
 
   const result = priceFor({
@@ -594,7 +606,7 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     status: customer.status,
     suspendedUntil: customer.suspendedUntil,
     identityBlocked,
-    minPaymentAmount: customer.minPaymentAmount?.toString() ?? null,
+    minPaymentAmount: optionalAmountText(customer.minPaymentAmount),
     freeQuotaUnit: customer.freeQuotaUnit,
     quotaRemaining,
     coupon: coupon
@@ -606,10 +618,14 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
         }
       : null,
     couponRequested: couponCode ?? null,
-    discountPercent: customer.discountPercent?.toString() ?? null,
-    discountFixed: customer.discountFixed?.toString() ?? null,
+    discountPercent: optionalAmountText(customer.discountPercent),
+    discountFixed: optionalAmountText(customer.discountFixed),
     creditBalance: credit.total,
-    approvalThreshold: customer.approvalThreshold?.toString() ?? null,
+    approvalThreshold: optionalAmountText(customer.approvalThreshold),
+    dailyLimit: optionalAmountText(customer.dailyLimit),
+    dailySpent: spent.dailySpent,
+    monthlyLimit: optionalAmountText(customer.monthlyLimit),
+    monthlySpent: spent.monthlySpent,
   });
 
   return reply.send({ customerId: customer.id, ...result });

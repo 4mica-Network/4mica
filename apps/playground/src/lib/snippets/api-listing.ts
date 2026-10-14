@@ -1,9 +1,9 @@
+import { formatPrice, PAYMENT_NETWORKS } from "@4mica/rules";
 import type { PublicApiListing } from "@/schema/api-listing";
-import { networkInfo } from "./networks";
 import {
   buildCurlHandshake,
+  codeString,
   commentLine,
-  formatPrice,
   PLACEHOLDER,
 } from "./shared";
 
@@ -41,7 +41,7 @@ export const buildApiListingSnippets = (
     return null;
   }
 
-  const { caip2, sdkName } = networkInfo(listing.network);
+  const { caip2, sdkName } = PAYMENT_NETWORKS[listing.network];
   const url = listing.url ?? PLACEHOLDER.baseUrl;
   const price = formatPrice(
     listing.priceAmount,
@@ -70,8 +70,8 @@ export const buildApiListingSnippets = (
   // Anything other than GET needs a body, so the fetch call grows options.
   const requestArgs =
     listing.method === "GET"
-      ? `\n  "${url}",\n`
-      : `\n  "${url}",\n  {\n    method: "${listing.method}",\n    headers: { "content-type": "application/json" },\n    body: JSON.stringify({}),\n  },\n`;
+      ? `\n  ${codeString(url)},\n`
+      : `\n  ${codeString(url)},\n  {\n    method: "${listing.method}",\n    headers: { "content-type": "application/json" },\n    body: JSON.stringify({}),\n  },\n`;
 
   const install = "pnpm add @4mica/x402 @x402/fetch viem";
 
@@ -97,8 +97,8 @@ const data = await response.json();`;
 
   const pythonCall =
     listing.method === "GET"
-      ? `response = session.get("${url}")`
-      : `response = session.${listing.method.toLowerCase()}("${url}", json={})`;
+      ? `response = session.get(${codeString(url)})`
+      : `response = session.${listing.method.toLowerCase()}(${codeString(url)}, json={})`;
 
   const python = `import os
 

@@ -3,9 +3,11 @@ import { setCustomerStatus } from "@stores/customer/actions";
 import { selectIsCustomerStatusPending } from "@stores/customer/selector";
 import type { Customer, CustomerStatus } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { formatDateTime } from "@utils/format";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { SectionCard, SectionFooter } from "@/components/layout";
 import { useDraft } from "@/hooks/useDraft";
 import {
   STATUS_LABEL_KEYS,
@@ -13,18 +15,11 @@ import {
   STATUS_TAG_VARIANT,
   SUSPEND_DURATION_OPTIONS,
 } from "../customers/constants";
-import { SectionCard, SectionFooter } from "./SectionCard";
 
 const DEFAULT_SUSPEND_DAYS = "30";
 
 const inDays = (days: string): string =>
   new Date(Date.now() + Number(days) * 86_400_000).toISOString();
-
-const asDateTime = (iso: string): string =>
-  new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 
 export function AccessPanel({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
@@ -126,7 +121,7 @@ export function AccessPanel({ customer }: { customer: Customer }) {
               {t("customer.access.suspendedUntil")}
             </span>
             <span className="text-ink-muted text-sm">
-              {asDateTime(customer.suspendedUntil)}
+              {formatDateTime(customer.suspendedUntil)}
             </span>
           </div>
         )}

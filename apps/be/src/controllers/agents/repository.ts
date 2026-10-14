@@ -1,5 +1,6 @@
 import { type Prisma, prisma } from "@4mica/db";
-import { SLUG_MAX_LENGTH } from "@services/slug";
+import { SLUG_MAX_LENGTH } from "@4mica/rules";
+import { amountText, optionalAmountText } from "@utils/amount";
 import type { ListAgentsQuery } from "./schema";
 
 export const AGENT_SELECT = {
@@ -13,11 +14,9 @@ export const AGENT_SELECT = {
   status: true,
   visibility: true,
   network: true,
-
   walletAddress: true,
   payerWalletId: true,
   creditLimit: true,
-
   walletId: true,
   payToAddress: true,
   assetAddress: true,
@@ -26,7 +25,6 @@ export const AGENT_SELECT = {
   priceLabel: true,
   endpointUrl: true,
   x402Endpoint: true,
-
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -41,8 +39,8 @@ export type AgentRow = Omit<RawAgent, "creditLimit" | "priceAmount"> & {
 
 const toRow = (row: RawAgent): AgentRow => ({
   ...row,
-  creditLimit: row.creditLimit.toString(),
-  priceAmount: row.priceAmount?.toString() ?? null,
+  creditLimit: amountText(row.creditLimit),
+  priceAmount: optionalAmountText(row.priceAmount),
 });
 
 const escapeLike = (value: string): string =>

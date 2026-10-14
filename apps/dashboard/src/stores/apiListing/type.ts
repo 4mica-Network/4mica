@@ -1,15 +1,11 @@
-import type { PaymentNetwork } from "@stores/wallet/type";
+import type { PaymentNetwork, PublicVisibility } from "@stores/shared/type";
 
-export type { BatchDeleteResult, PaymentNetwork } from "@stores/wallet/type";
-
-export const PUBLIC_VISIBILITY = {
-  PRIVATE: "PRIVATE",
-  UNLISTED: "UNLISTED",
-  PUBLIC: "PUBLIC",
-} as const;
-
-export type PublicVisibility =
-  (typeof PUBLIC_VISIBILITY)[keyof typeof PUBLIC_VISIBILITY];
+export {
+  type BatchDeleteResult,
+  type PaymentNetwork,
+  PUBLIC_VISIBILITY,
+  type PublicVisibility,
+} from "@stores/shared/type";
 
 export const HTTP_METHOD = {
   GET: "GET",

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { EmailClient, OnboardingStepId } from "@4mica/email-client";
 import { config } from "@config/index";
-import { unsubscribeUrlFor } from "@services/unsubscribe-token";
+import { unsubscribeUrlFor } from "@utils/unsubscribe-token";
 import {
   type ClaimedRow,
   claimDueRows,

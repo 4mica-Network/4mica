@@ -69,8 +69,6 @@ export const startOnboardingDrip = async (
 
   await ensureScheduler(queue, config.onboarding.tickMs);
 
-  app.addHook("onClose", stopOnboardingDrip);
-
   logger.info("onboarding drip started", {
     steps: STEP_COUNT,
     tickMs: config.onboarding.tickMs,

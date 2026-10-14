@@ -133,6 +133,9 @@ export const en = {
     errorNotFound: "That listing is no longer available.",
     errorNoRating: "Pick a star rating first.",
     errorGeneric: "That did not go through. Try again.",
+    errorReportOwn: "You cannot report your own listing.",
+    errorDescribeOther: "Tell us what is wrong so we can look into it.",
+    errorDeleteMissing: "There is no review of yours to delete.",
   },
 
   support: {
@@ -237,6 +240,9 @@ export const en = {
     private: "Private",
     unlistedHint: "Reachable by direct link, hidden from your profile.",
     privateHint: "Only visible to you.",
+    errorUnauthorized: "Sign in again to change visibility.",
+    errorNotFound: "This item is no longer available.",
+    errorGeneric: "Could not change visibility. Try again.",
   },
 
   owner: {
@@ -246,6 +252,7 @@ export const en = {
     publishAction: "Profile settings",
     refreshAction: "Refresh",
     refreshed: "Refreshed",
+    refreshFailed: "Could not refresh",
   },
 
   errors: {

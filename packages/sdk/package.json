@@ -38,6 +38,16 @@
         "default": "./dist/server.cjs"
       }
     },
+    "./app": {
+      "import": {
+        "types": "./dist/app.d.ts",
+        "default": "./dist/app.js"
+      },
+      "require": {
+        "types": "./dist/app.d.cts",
+        "default": "./dist/app.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [

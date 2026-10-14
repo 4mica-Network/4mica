@@ -1,16 +1,23 @@
+import { PAYMENT_NETWORKS } from "@4mica/rules";
+import { BLSCert } from "@4mica/sdk";
 import { requireApiKeyOwner } from "@auth/api-key";
+import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
+  coreUnavailable,
   invalidBody,
   notFound,
   parseBody,
   requireUserId,
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
+import { getCoreClient } from "@services/core";
+import { guaranteeMismatch } from "@utils/guarantee";
 import type { RouteHandler } from "fastify";
 import {
   getPayment,
   listPayments,
+  ownsRecipientWallet,
   paymentStats,
   paymentSummary,
   reportPayment,
@@ -19,6 +26,7 @@ import {
 import {
   ListPaymentsQuerySchema,
   PaymentStatsQuerySchema,
+  type ReportPaymentInput,
   ReportPaymentSchema,
 } from "./schema";
 
@@ -77,6 +85,41 @@ export const getPaymentHandler: RouteHandler = async (request, reply) => {
   return payment ? reply.send(payment) : notFound(reply, "payment");
 };
 
+const checkGuarantee = async (
+  data: ReportPaymentInput,
+): Promise<
+  | { kind: "ok" }
+  | { kind: "missing" | "mismatch"; path: keyof ReportPaymentInput }
+> => {
+  const core = await getCoreClient();
+  if (!core) {
+    return { kind: "ok" };
+  }
+
+  if (!data.guaranteeClaims || !data.guaranteeSignature) {
+    return {
+      kind: "missing",
+      path: data.guaranteeClaims ? "guaranteeSignature" : "guaranteeClaims",
+    };
+  }
+
+  const claims = await core.payment
+    .verifyGuarantee(new BLSCert(data.guaranteeClaims, data.guaranteeSignature))
+    .catch(() => null);
+  if (!claims) {
+    return { kind: "mismatch", path: "guaranteeSignature" };
+  }
+
+  const decimals = data.assetAddress
+    ? ((await core.rpc.getSupportedTokens()).tokens.find(
+        (token) => token.address.toLowerCase() === data.assetAddress,
+      )?.decimals ?? 0)
+    : PAYMENT_NETWORKS[data.network].currency.decimals;
+
+  const mismatch = guaranteeMismatch(claims, data, decimals);
+  return mismatch ? { kind: "mismatch", path: mismatch } : { kind: "ok" };
+};
+
 export const reportPaymentHandler: RouteHandler = async (request, reply) => {
   const ownerId = requireApiKeyOwner(request, reply);
   if (!ownerId) {
@@ -106,6 +149,52 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
+  if (
+    !(await ownsRecipientWallet(ownerId, data.recipientAddress, data.network))
+  ) {
+    return invalidBody(reply, [
+      {
+        path: "recipientAddress",
+        message: "is not one of your wallets on this network",
+      },
+    ]);
+  }
+
+  if (data.status !== "FAILED") {
+    let check: Awaited<ReturnType<typeof checkGuarantee>>;
+    try {
+      check = await checkGuarantee(data);
+    } catch (error) {
+      appLogger.error("Could not reach 4mica core", { error });
+      return coreUnavailable(reply);
+    }
+
+    if (check.kind === "missing") {
+      return invalidBody(reply, [
+        {
+          path: check.path,
+          message: "is required: pass the certificate 4mica core issued",
+        },
+      ]);
+    }
+
+    if (check.kind === "mismatch") {
+      appLogger.warn("Payment report failed guarantee verification", {
+        ownerId,
+        reqId: data.reqId,
+        field: check.path,
+      });
+      return reply.code(422).send({
+        error: "invalid_guarantee",
+        message:
+          "The payment is not backed by a valid 4mica core guarantee for these details.",
+        issues: [
+          { path: check.path, message: "does not match the core guarantee" },
+        ],
+      });
+    }
+  }
+
   const targets = await resolveReportTargets(ownerId, data);
 
   if (data.listingSlug && !targets.listingId) {
@@ -119,14 +208,62 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     ]);
   }
 
-  const { row, created } = await reportPayment(ownerId, data, targets);
+  const key = request.apiKey;
+  if (key?.listingId) {
+    if (targets.listingId && targets.listingId !== key.listingId) {
+      return invalidBody(reply, [
+        { path: "listingSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.listingId = key.listingId;
+  }
+  if (key?.agentId) {
+    if (targets.agentId && targets.agentId !== key.agentId) {
+      return invalidBody(reply, [
+        { path: "agentSlug", message: "does not match this key" },
+      ]);
+    }
+    targets.agentId = key.agentId;
+  }
 
-  appLogger.info(created ? "Payment reported" : "Payment updated", {
+  const outcome = await reportPayment(ownerId, data, targets);
+
+  if (outcome.kind === "conflict") {
+    appLogger.warn("Payment report conflicts with an earlier one", {
+      ownerId,
+      reqId: data.reqId,
+      field: outcome.field,
+    });
+    return reply.code(409).send({
+      error: "payment_conflict",
+      message: outcome.message,
+      issues: [{ path: outcome.field, message: "cannot change once reported" }],
+    });
+  }
+
+  const { row, kind, redeemable } = outcome;
+
+  appLogger.info(kind === "created" ? "Payment reported" : "Payment updated", {
     ownerId,
     paymentId: row.id,
     reqId: row.reqId,
     status: row.status,
   });
 
-  return reply.code(created ? 201 : 200).send(row);
+  if (redeemable) {
+    try {
+      const redemption = await redeemPaymentBenefits(ownerId, row.id);
+      if (redemption) {
+        appLogger.info("Payment benefits redeemed", { ownerId, ...redemption });
+      }
+    } catch (error) {
+      appLogger.error("Payment benefits could not be redeemed", {
+        ownerId,
+        paymentId: row.id,
+        error,
+      });
+    }
+  }
+
+  return reply.code(kind === "created" ? 201 : 200).send(row);
 };

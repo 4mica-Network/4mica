@@ -22,6 +22,11 @@ export function App() {
             ),
           )}
 
+          <Route
+            path="transactions"
+            element={<Navigate to="/payments" replace />}
+          />
+
           <Route path="settings" element={<SettingsLayout />}>
             <Route
               index

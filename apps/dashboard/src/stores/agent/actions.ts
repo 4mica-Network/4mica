@@ -1,12 +1,12 @@
 import type { AgentInput } from "@api/agent";
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { Agent, AgentFilters } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
-
-const rowKey = (id: string) => `agent:${id}`;
+export const agentPendingKeys = {
+  row: (id: string) => `agent:${id}`,
+  batchDelete: "batchDeleteAgents",
+} as const;
 
 export const fetchAgents = () => ({
   type: actionTypes.FETCH_AGENTS_REQUESTED,
@@ -49,7 +49,7 @@ export const updateAgent = (payload: {
 }) => ({
   type: actionTypes.UPDATE_AGENT_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: agentPendingKeys.row(payload.id) },
 });
 
 export const updateAgentSucceeded = (agent: Agent, meta: PendingMeta) => ({
@@ -61,7 +61,7 @@ export const updateAgentSucceeded = (agent: Agent, meta: PendingMeta) => ({
 export const publishAgent = (payload: { id: string; publish: boolean }) => ({
   type: actionTypes.PUBLISH_AGENT_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: agentPendingKeys.row(payload.id) },
 });
 
 export const publishAgentSucceeded = (agent: Agent, meta: PendingMeta) => ({
@@ -73,7 +73,7 @@ export const publishAgentSucceeded = (agent: Agent, meta: PendingMeta) => ({
 export const deleteAgent = (payload: { id: string }) => ({
   type: actionTypes.DELETE_AGENT_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: agentPendingKeys.row(payload.id) },
 });
 
 export const deleteAgentSucceeded = (id: string, meta: PendingMeta) => ({
@@ -85,7 +85,7 @@ export const deleteAgentSucceeded = (id: string, meta: PendingMeta) => ({
 export const batchDeleteAgents = (payload: { ids: string[] }) => ({
   type: actionTypes.BATCH_DELETE_AGENTS_REQUESTED,
   payload,
-  meta: { pendingKey: "batchDeleteAgents" },
+  meta: { pendingKey: agentPendingKeys.batchDelete },
 });
 
 export const batchDeleteAgentsSucceeded = (

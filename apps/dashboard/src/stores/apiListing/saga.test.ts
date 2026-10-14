@@ -33,7 +33,7 @@ const { notifyError, notifySuccess } = vi.hoisted(() => ({
   notifyError: vi.fn(),
   notifySuccess: vi.fn(),
 }));
-vi.mock("@utils/notification", () => ({ notifyError, notifySuccess }));
+vi.mock("@/lib/notify", () => ({ notifyError, notifySuccess }));
 
 const { createApiListing, fetchApiListings, publishApiListing } = await import(
   "./saga"

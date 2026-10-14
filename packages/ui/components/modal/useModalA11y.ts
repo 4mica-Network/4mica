@@ -1,35 +1,5 @@
-import { type RefObject, useEffect } from "react";
-
-/**
- * Selector for the elements a focus trap has to cycle through. `[tabindex="-1"]`
- * is excluded because those are programmatically focusable but not tab stops.
- */
-const FOCUSABLE = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
-
-/**
- * Attribute-based, deliberately not layout-based.
- *
- * The obvious check here is `offsetParent !== null`, and it is wrong: per spec
- * `offsetParent` is null for an element inside a `position: fixed` ancestor,
- * which the modal panel always is. That filter would strip every candidate and
- * leave the trap with nothing to cycle, disabling Tab inside the dialog. This
- * also keeps the hook working under jsdom, which performs no layout at all.
- */
-const isHidden = (element: HTMLElement): boolean =>
-  element.closest("[hidden]") !== null ||
-  element.getAttribute("aria-hidden") === "true";
-
-const focusableWithin = (root: HTMLElement): HTMLElement[] =>
-  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (element) => !isHidden(element),
-  );
+import { type RefObject, useEffect, useLayoutEffect, useRef } from "react";
+import { focusableWithin, isInsideLayer } from "../../lib/focusable";
 
 export interface ModalA11yOptions {
   isOpen: boolean;
@@ -66,15 +36,22 @@ export const useModalA11y = ({
     };
   }, [isOpen]);
 
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (isOpen) {
+      opener.current = document.activeElement as HTMLElement | null;
+    }
+  }, [isOpen]);
+
   // Move focus in on open, put it back where it came from on close.
   useEffect(() => {
     if (!isOpen) {
       return;
     }
-    const returnTo = document.activeElement as HTMLElement | null;
+    const returnTo = opener.current;
     const panel = panelRef.current;
 
-    if (panel) {
+    if (panel && !panel.contains(document.activeElement)) {
       const [first] = focusableWithin(panel);
       (first ?? panel).focus();
     }
@@ -91,6 +68,10 @@ export const useModalA11y = ({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isInsideLayer(event.target)) {
+        return;
+      }
+
       if (event.key === "Escape" && !disableEscapeClose) {
         event.stopPropagation();
         onClose();

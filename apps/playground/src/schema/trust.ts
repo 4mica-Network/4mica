@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdOrSlugParamSchema, UsernameParamSchema } from "./params";
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
@@ -36,10 +37,19 @@ export const SubmitReviewSchema = v.object({
   body: optionalText(2000),
 });
 
-export const FileReportSchema = v.object({
-  reason: v.picklist(REPORT_REASONS, "choose a reason"),
-  detail: optionalText(2000),
-});
+export const FileReportSchema = v.pipe(
+  v.object({
+    reason: v.picklist(REPORT_REASONS, "choose a reason"),
+    detail: optionalText(2000),
+  }),
+  v.forward(
+    v.check(
+      (input) => input.reason !== "OTHER" || input.detail !== null,
+      "describe the problem",
+    ),
+    ["detail"],
+  ),
+);
 
 export type SubmitReviewInput = v.InferOutput<typeof SubmitReviewSchema>;
 export type FileReportInput = v.InferOutput<typeof FileReportSchema>;
@@ -65,3 +75,10 @@ export interface TrustSummary {
   verifiedCount: number;
   distribution: Record<"1" | "2" | "3" | "4" | "5", number>;
 }
+
+export const ResourceRefSchema = v.object({
+  kind: v.picklist(["listing", "agent"]),
+  id: v.pipe(v.string(), v.uuid()),
+  username: UsernameParamSchema,
+  ref: IdOrSlugParamSchema,
+});

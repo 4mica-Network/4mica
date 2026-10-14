@@ -1,8 +1,8 @@
 import type { Payment } from "@stores/payment/type";
-import type { PaymentNetwork } from "@stores/wallet/type";
+import type { PaymentNetwork } from "@stores/shared/type";
 
 export type { Payment, PaymentStatus } from "@stores/payment/type";
-export type { BatchDeleteResult, PaymentNetwork } from "@stores/wallet/type";
+export type { BatchDeleteResult, PaymentNetwork } from "@stores/shared/type";
 
 export const CUSTOMER_TYPE = {
   HUMAN: "HUMAN",

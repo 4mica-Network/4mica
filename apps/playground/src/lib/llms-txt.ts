@@ -7,14 +7,15 @@ import {
   buildApiListingDescriptor,
   type ResourceDescriptor,
 } from "./descriptor";
+import { singleLine } from "./snippets/shared";
 
 const line = (label: string, value: string | null): string | null =>
-  value === null ? null : `  - ${label}: ${value}`;
+  value === null ? null : `  - ${label}: ${singleLine(value)}`;
 
 const entrySection = (descriptor: ResourceDescriptor): string => {
   const price = descriptor.payment?.price.display ?? null;
   const rows = [
-    descriptor.summary ? `  ${descriptor.summary}` : null,
+    descriptor.summary ? `  ${singleLine(descriptor.summary)}` : null,
     line("Page", descriptor.page),
     line("Machine descriptor", descriptor.descriptor),
     line("Price", price === null ? null : `${price} per request`),
@@ -35,7 +36,7 @@ const entrySection = (descriptor: ResourceDescriptor): string => {
     ),
   ].filter((row): row is string => row !== null);
 
-  return [`### ${descriptor.name}`, ...rows, ""].join("\n");
+  return [`### ${singleLine(descriptor.name)}`, ...rows, ""].join("\n");
 };
 
 export const buildProfileLlmsTxt = (
@@ -43,7 +44,7 @@ export const buildProfileLlmsTxt = (
   listings: PublicApiListing[],
   agents: PublicAgent[],
 ): string => {
-  const title = profile.name || `@${profile.username}`;
+  const title = singleLine(profile.name || `@${profile.username}`);
   const apis = listings.map((listing) =>
     buildApiListingDescriptor(listing, profile),
   );
@@ -52,7 +53,7 @@ export const buildProfileLlmsTxt = (
   const sections: string[] = [
     `# ${title} on 4Mica`,
     "",
-    `> ${profile.bio || profile.description || `Paid APIs and agents published by @${profile.username}.`}`,
+    `> ${singleLine(profile.bio || profile.description || `Paid APIs and agents published by @${profile.username}.`)}`,
     "",
     "Every resource below is paid for with x402 using the 4mica-credit scheme:",
     "call it without a payment header, read the payment requirements from the",

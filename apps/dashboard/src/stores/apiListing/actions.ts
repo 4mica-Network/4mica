@@ -1,12 +1,12 @@
 import type { ApiListingInput } from "@api/apiListing";
+import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { ApiListing, ApiListingFilters } from "./type";
 
-export interface PendingMeta {
-  pendingKey: string;
-}
-
-const rowKey = (id: string) => `apiListing:${id}`;
+export const apiListingPendingKeys = {
+  row: (id: string) => `apiListing:${id}`,
+  batchDelete: "batchDeleteApiListings",
+} as const;
 
 export const fetchApiListings = () => ({
   type: actionTypes.FETCH_API_LISTINGS_REQUESTED,
@@ -52,7 +52,7 @@ export const updateApiListing = (payload: {
 }) => ({
   type: actionTypes.UPDATE_API_LISTING_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: apiListingPendingKeys.row(payload.id) },
 });
 
 export const updateApiListingSucceeded = (
@@ -70,7 +70,7 @@ export const publishApiListing = (payload: {
 }) => ({
   type: actionTypes.PUBLISH_API_LISTING_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: apiListingPendingKeys.row(payload.id) },
 });
 
 export const publishApiListingSucceeded = (
@@ -85,7 +85,7 @@ export const publishApiListingSucceeded = (
 export const deleteApiListing = (payload: { id: string }) => ({
   type: actionTypes.DELETE_API_LISTING_REQUESTED,
   payload,
-  meta: { pendingKey: rowKey(payload.id) },
+  meta: { pendingKey: apiListingPendingKeys.row(payload.id) },
 });
 
 export const deleteApiListingSucceeded = (id: string, meta: PendingMeta) => ({
@@ -97,7 +97,7 @@ export const deleteApiListingSucceeded = (id: string, meta: PendingMeta) => ({
 export const batchDeleteApiListings = (payload: { ids: string[] }) => ({
   type: actionTypes.BATCH_DELETE_API_LISTINGS_REQUESTED,
   payload,
-  meta: { pendingKey: "batchDeleteApiListings" },
+  meta: { pendingKey: apiListingPendingKeys.batchDelete },
 });
 
 export const batchDeleteApiListingsSucceeded = (

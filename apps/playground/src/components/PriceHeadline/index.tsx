@@ -1,10 +1,6 @@
+import { PAYMENT_NETWORKS, shortenAddress, trimAmount } from "@4mica/rules";
 import { messages, t } from "@/i18n";
-import { networkInfo } from "@/lib/snippets/networks";
-import { trimAmount } from "@/lib/snippets/shared";
 import type { PaymentNetwork } from "@/schema/params";
-
-const shortAddress = (address: string): string =>
-  `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 export interface PriceHeadlineProps {
   amount: string | null;
@@ -33,13 +29,13 @@ export function PriceHeadline({
   assetAddress,
   network,
 }: PriceHeadlineProps) {
-  const chain = network ? networkInfo(network).label : null;
+  const chain = network ? PAYMENT_NETWORKS[network].label : null;
   const price = amount ? formatAmount(amount, currency) : null;
 
   const facts = [
     chain,
     assetAddress
-      ? `${messages.integration.erc20} ${shortAddress(assetAddress)}`
+      ? `${messages.integration.erc20} ${shortenAddress(assetAddress)}`
       : messages.integration.nativeAsset,
     price && label?.includes(price) ? null : label,
   ].filter((fact): fact is string => Boolean(fact));

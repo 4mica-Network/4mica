@@ -1,16 +1,23 @@
+import {
+  CURRENCY_CODE_PATTERN,
+  isUuidShaped,
+  SLUG_MAX_LENGTH,
+  SLUG_MESSAGE,
+} from "@4mica/rules";
 import { USERNAME_PATTERN } from "@4mica/url";
 import {
   address,
   batchDeleteSchema,
   DEFAULT_PAGE_SIZE,
   decimalAmount,
+  httpsUrl,
   MAX_PAGE_SIZE,
   PaymentNetworkSchema,
   PublicVisibilitySchema,
   positiveDecimalAmount,
   positiveInt,
+  singleLine,
 } from "@controllers/schema-primitives";
-import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@services/slug";
 import * as v from "valibot";
 
 const slug = v.pipe(
@@ -23,24 +30,24 @@ const slug = v.pipe(
   v.check((value) => !isUuidShaped(value), "must not look like an id"),
 );
 
-const name = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120));
-const headline = v.pipe(v.string(), v.trim(), v.maxLength(160));
-const description = v.pipe(v.string(), v.trim(), v.maxLength(10_000));
-const priceLabel = v.pipe(v.string(), v.trim(), v.maxLength(64));
-
-const httpsUrl = v.pipe(
+const name = v.pipe(
   v.string(),
   v.trim(),
-  v.url(),
-  v.maxLength(2048),
-  v.check((value) => value.startsWith("https://"), "must be an https URL"),
+  v.minLength(1),
+  v.maxLength(120),
+  singleLine,
 );
+const headline = v.pipe(v.string(), v.trim(), v.maxLength(160), singleLine);
+const description = v.pipe(v.string(), v.trim(), v.maxLength(10_000));
+const priceLabel = v.pipe(v.string(), v.trim(), v.maxLength(64), singleLine);
+
+const url = httpsUrl(2048);
 
 const priceCurrency = v.pipe(
   v.string(),
   v.trim(),
   v.toUpperCase(),
-  v.regex(/^[A-Z0-9]{2,16}$/, "must be a currency code"),
+  v.regex(CURRENCY_CODE_PATTERN, "must be a currency code"),
 );
 
 const walletId = v.pipe(v.string(), v.uuid("must be a wallet id"));
@@ -52,8 +59,8 @@ export const CreateAgentSchema = v.object({
   slug: v.optional(slug),
   headline: v.optional(v.nullable(headline)),
   description: v.optional(v.nullable(description)),
-  avatarUrl: v.optional(v.nullable(httpsUrl)),
-  docsUrl: v.optional(v.nullable(httpsUrl)),
+  avatarUrl: v.optional(v.nullable(url)),
+  docsUrl: v.optional(v.nullable(url)),
   status: v.optional(AgentStatusInputSchema, "PENDING"),
   visibility: v.optional(PublicVisibilitySchema, "PRIVATE"),
   network: v.optional(PaymentNetworkSchema, "ETHEREUM_SEPOLIA"),
@@ -66,8 +73,8 @@ export const CreateAgentSchema = v.object({
   priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
   priceCurrency: v.optional(v.nullable(priceCurrency)),
   priceLabel: v.optional(v.nullable(priceLabel)),
-  endpointUrl: v.optional(v.nullable(httpsUrl)),
-  x402Endpoint: v.optional(v.nullable(httpsUrl)),
+  endpointUrl: v.optional(v.nullable(url)),
+  x402Endpoint: v.optional(v.nullable(url)),
 });
 
 export const UpdateAgentSchema = v.partial(
@@ -76,8 +83,8 @@ export const UpdateAgentSchema = v.partial(
     slug,
     headline: v.nullable(headline),
     description: v.nullable(description),
-    avatarUrl: v.nullable(httpsUrl),
-    docsUrl: v.nullable(httpsUrl),
+    avatarUrl: v.nullable(url),
+    docsUrl: v.nullable(url),
     status: AgentStatusInputSchema,
     visibility: PublicVisibilitySchema,
     network: PaymentNetworkSchema,
@@ -90,8 +97,8 @@ export const UpdateAgentSchema = v.partial(
     priceAmount: v.nullable(positiveDecimalAmount),
     priceCurrency: v.nullable(priceCurrency),
     priceLabel: v.nullable(priceLabel),
-    endpointUrl: v.nullable(httpsUrl),
-    x402Endpoint: v.nullable(httpsUrl),
+    endpointUrl: v.nullable(url),
+    x402Endpoint: v.nullable(url),
   }),
 );
 

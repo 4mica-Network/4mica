@@ -1,3 +1,4 @@
+import { prisma as prismaMock } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { customerRoutes } from "@routes/customers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,6 +38,7 @@ const {
     deleteMany: vi.fn(),
   },
   customerCreditEntry: {
+    aggregate: vi.fn(),
     create: vi.fn(),
     findMany: vi.fn(),
     groupBy: vi.fn(),
@@ -72,6 +74,9 @@ const {
       return Number(this.raw) < 0;
     }
     toString() {
+      return this.raw;
+    }
+    toFixed() {
       return this.raw;
     }
   },
@@ -110,6 +115,7 @@ vi.mock("@4mica/db", () => ({
       typeof arg === "function"
         ? (arg as (tx: unknown) => unknown)({
             customer,
+            customerCreditEntry,
             customerPaymentIdentity,
           })
         : Promise.all(arg as Promise<unknown>[]),
@@ -337,6 +343,9 @@ describe("customer routes", () => {
     customerCoupon.create.mockResolvedValue(storedCoupon());
     customerCoupon.findFirst.mockResolvedValue(storedCoupon());
     customerCreditEntry.groupBy.mockResolvedValue([]);
+    customerCreditEntry.aggregate.mockResolvedValue({
+      _sum: { amount: decimal("10") },
+    });
     customerCreditEntry.findMany.mockResolvedValue([]);
     customerCreditEntry.create.mockResolvedValue({
       id: CREDIT_ID,
@@ -585,6 +594,24 @@ describe("customer routes", () => {
       expect(sqlValues(rawCall("rank_total") as unknown[])).toContain(
         "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
       );
+
+      await instance.close();
+    });
+
+    it("counts only payments this account reported, not ones aimed at it", async () => {
+      const instance = await app();
+      await instance.inject({
+        method: "GET",
+        url: "/me/customers",
+        headers: AUTH,
+      });
+
+      for (const marker of ["rank_total", "WITH matched"]) {
+        expect(sqlText(rawCall(marker) as unknown[])).toContain("p.owner_id =");
+      }
+      expect(customer.findMany.mock.calls[0][0].where).toMatchObject({
+        ownerId: USER_ID,
+      });
 
       await instance.close();
     });
@@ -1367,6 +1394,34 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("refuses a movement that would take the balance below zero", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "ADJUSTMENT", amount: "-12" }),
+      );
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().issues).toEqual([
+        { path: "amount", message: expect.any(String) },
+      ]);
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses negative promotional credit", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        grant({ kind: "PROMOTIONAL", amount: "-1" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("amount");
+      expect(customerCreditEntry.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
     it("refuses a movement of zero", async () => {
       const instance = await app();
       const response = await instance.inject(
@@ -1432,6 +1487,10 @@ describe("customer routes", () => {
       expect(
         customerCreditEntry.create.mock.calls[0][0].data.amount.toString(),
       ).toBe("-23.5");
+      expect(prismaMock.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: "Serializable" },
+      );
 
       await instance.close();
     });
@@ -1566,6 +1625,23 @@ describe("customer routes", () => {
       );
 
       expect(response.statusCode).toBe(400);
+
+      await instance.close();
+    });
+
+    it("refuses a usage limit the database column cannot hold", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        create({
+          kind: "PERCENT",
+          code: "HUGE",
+          value: "10",
+          usageLimit: 2_147_483_648,
+        }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("usageLimit");
 
       await instance.close();
     });
@@ -1915,6 +1991,43 @@ describe("customer routes", () => {
         couponApplied: "2",
         payable: "8",
       });
+
+      await instance.close();
+    });
+
+    it("refuses a payer who has reached their monthly limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ monthlyLimit: decimal("100") }),
+      );
+      queryRaw.mockImplementation((...call: unknown[]) =>
+        Promise.resolve(
+          sqlText(call).includes("monthly_spent")
+            ? [{ daily_spent: decimal("5"), monthly_spent: decimal("95") }]
+            : [],
+        ),
+      );
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ amount: "10" }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      expect(rawCall("monthly_spent")).toBeDefined();
+
+      await instance.close();
+    });
+
+    it("skips the spend query when the customer has no limits", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ dailyLimit: null, monthlyLimit: null }),
+      );
+
+      const instance = await app();
+      await instance.inject(resolve({}));
+
+      expect(rawCall("monthly_spent")).toBeUndefined();
 
       await instance.close();
     });

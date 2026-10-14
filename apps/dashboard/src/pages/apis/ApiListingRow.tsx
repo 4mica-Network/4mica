@@ -1,5 +1,7 @@
-import { Button, Checkbox, cn, Dropdown, Spinner, Tag } from "@4mica/ui";
+import { formatPrice, PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
+import { Checkbox, cn, Spinner, Tag } from "@4mica/ui";
 import {
+  apiListingPendingKeys,
   publishApiListing,
   toggleApiListingSelected,
 } from "@stores/apiListing/actions";
@@ -9,19 +11,11 @@ import {
 } from "@stores/apiListing/selector";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { EyeOff, Globe, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { NETWORKS, shortenAddress } from "@/lib/networks";
-import {
-  formatPrice,
-  VISIBILITY_LABEL_KEYS,
-  VISIBILITY_TAG_VARIANT,
-} from "./constants";
-
-const menuItem =
-  "flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-overlay/5";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { VISIBILITY_LABEL_KEYS, VISIBILITY_TAG_VARIANT } from "./constants";
 
 export function ApiListingRow({
   listing,
@@ -34,12 +28,9 @@ export function ApiListingRow({
   const dispatch = useAppDispatch();
 
   const isPending = useAppSelector(
-    selectIsApiListingPending(`apiListing:${listing.id}`),
+    selectIsApiListingPending(apiListingPendingKeys.row(listing.id)),
   );
   const isSelected = useAppSelector(selectIsApiListingSelected(listing.id));
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuAnchor = useRef<HTMLSpanElement>(null);
 
   const isPayable = listing.network !== null && listing.payToAddress !== null;
   const price = formatPrice(
@@ -57,6 +48,7 @@ export function ApiListingRow({
       data-testid={`api-listing-row-${listing.id}`}
     >
       <Checkbox
+        aria-label={t("apiListing.row.select", { name: listing.name })}
         variant="square"
         className="relative z-10 mt-0.5 w-auto shrink-0"
         checked={isSelected}
@@ -92,7 +84,7 @@ export function ApiListingRow({
 
           {listing.network && (
             <Tag size="sm" variant="neutral">
-              {NETWORKS[listing.network].label}
+              {PAYMENT_NETWORKS[listing.network].label}
             </Tag>
           )}
 
@@ -111,91 +103,53 @@ export function ApiListingRow({
       <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
-        <span ref={menuAnchor} className="inline-flex">
-          <Button
-            type="button"
-            intent="ghost"
-            size="sm"
-            className="btn-no-lift px-2"
-            aria-label={t("apiListing.row.more")}
-            aria-expanded={menuOpen}
-            disabled={isPending}
-            onClick={() => setMenuOpen((open) => !open)}
-            data-testid={`api-listing-more-${listing.id}`}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </span>
-
-        <Dropdown
-          isOpen={menuOpen}
-          anchorRef={menuAnchor}
-          placement="bottomRight"
-          onClickOutside={() => setMenuOpen(false)}
+        <RowActionsMenu
+          label={t("apiListing.row.more", { name: listing.name })}
+          disabled={isPending}
+          data-testid={`api-listing-more-${listing.id}`}
         >
-          <div className="flex w-60 flex-col py-1">
-            <Link
-              className={cn(menuItem, "text-ink-body")}
-              data-testid={`api-listing-edit-${listing.id}`}
-              onClick={() => setMenuOpen(false)}
-              to={`/apis/${listing.id}`}
-            >
-              <Pencil className="h-4 w-4" />
-              {t("apiListing.row.edit")}
-            </Link>
+          <RowActionsMenu.RouteItem
+            icon={Pencil}
+            to={`/apis/${listing.id}`}
+            data-testid={`api-listing-edit-${listing.id}`}
+          >
+            {t("apiListing.row.edit")}
+          </RowActionsMenu.RouteItem>
 
-            {listing.visibility === "PUBLIC" ? (
-              <button
-                type="button"
-                className={cn(menuItem, "text-ink-body")}
-                onClick={() => {
-                  dispatch(
-                    publishApiListing({ id: listing.id, publish: false }),
-                  );
-                  setMenuOpen(false);
-                }}
-                data-testid={`api-listing-unpublish-${listing.id}`}
-              >
-                <EyeOff className="h-4 w-4" />
-                {t("apiListing.row.unpublish")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={cn(
-                  menuItem,
-                  isPayable ? "text-ink-body" : "cursor-not-allowed opacity-50",
-                )}
-                disabled={!isPayable}
-                onClick={() => {
-                  dispatch(
-                    publishApiListing({ id: listing.id, publish: true }),
-                  );
-                  setMenuOpen(false);
-                }}
-                data-testid={`api-listing-publish-${listing.id}`}
-              >
-                <Globe className="h-4 w-4" />
-                {isPayable
-                  ? t("apiListing.row.publish")
-                  : t("apiListing.row.publishBlocked")}
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={cn(menuItem, "text-danger")}
-              onClick={() => {
-                onDelete(listing);
-                setMenuOpen(false);
-              }}
-              data-testid={`api-listing-delete-${listing.id}`}
+          {listing.visibility === "PUBLIC" ? (
+            <RowActionsMenu.Item
+              icon={EyeOff}
+              onSelect={() =>
+                dispatch(publishApiListing({ id: listing.id, publish: false }))
+              }
+              data-testid={`api-listing-unpublish-${listing.id}`}
             >
-              <Trash2 className="h-4 w-4" />
-              {t("apiListing.row.delete")}
-            </button>
-          </div>
-        </Dropdown>
+              {t("apiListing.row.unpublish")}
+            </RowActionsMenu.Item>
+          ) : (
+            <RowActionsMenu.Item
+              icon={Globe}
+              disabled={!isPayable}
+              onSelect={() =>
+                dispatch(publishApiListing({ id: listing.id, publish: true }))
+              }
+              data-testid={`api-listing-publish-${listing.id}`}
+            >
+              {isPayable
+                ? t("apiListing.row.publish")
+                : t("apiListing.row.publishBlocked")}
+            </RowActionsMenu.Item>
+          )}
+
+          <RowActionsMenu.Item
+            icon={Trash2}
+            tone="danger"
+            onSelect={() => onDelete(listing)}
+            data-testid={`api-listing-delete-${listing.id}`}
+          >
+            {t("apiListing.row.delete")}
+          </RowActionsMenu.Item>
+        </RowActionsMenu>
       </div>
     </div>
   );

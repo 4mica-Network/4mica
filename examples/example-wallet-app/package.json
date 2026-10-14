@@ -1,0 +1,35 @@
+{
+  "name": "@4mica/example-wallet-app",
+  "version": "0.0.1-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "Buyer with a UI: a Next.js wallet that deposits collateral and pays for x402 routes with 4Mica credit",
+  "scripts": {
+    "dev": "next dev -p 3011",
+    "build": "next build",
+    "start": "next start -p 3011"
+  },
+  "dependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/sdk-node": "workspace:*",
+    "@4mica/ui": "workspace:*",
+    "framer-motion": "catalog:",
+    "lucide-react": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "viem": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tailwind-config": "workspace:*",
+    "@4mica/tsconfig": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "catalog:node24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "tailwindcss-animate": "catalog:",
+    "typescript": "catalog:typescript-latest"
+  }
+}

@@ -1,4 +1,5 @@
-import { EmptyState, InputField, Pagination, Select, Spinner } from "@4mica/ui";
+import { shortenAddress } from "@4mica/rules";
+import { EmptyState, Pagination, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchPaymentSummary,
@@ -20,14 +21,17 @@ import {
 import type {
   PaymentDirection,
   PaymentNetwork,
+  PaymentSort,
   PaymentStatus,
 } from "@stores/payment/type";
-import { useDebounceEffect } from "ahooks";
-import { ArrowRightLeft, Search, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { fetchActiveWallets } from "@stores/wallet/actions";
+import { selectActiveWallets } from "@stores/wallet/selector";
+import { ArrowRightLeft, TriangleAlert } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { ListToolbar } from "@/components/ListToolbar";
+import { PaymentRow } from "@/components/PaymentRow";
 import { NETWORK_OPTIONS } from "@/lib/networks";
-import { PaymentRow } from "./PaymentRow";
 import { SummaryTiles } from "./SummaryTiles";
 
 export function Payments() {
@@ -43,30 +47,20 @@ export function Payments() {
   const isLoading = useAppSelector(selectIsPaymentsLoading);
   const hasLoaded = useAppSelector(selectHasLoadedPayments);
   const error = useAppSelector(selectPaymentError);
-
-  const [search, setSearch] = useState(filters.q);
+  const wallets = useAppSelector(selectActiveWallets);
 
   useEffect(() => {
     dispatch(fetchPayments());
     dispatch(fetchPaymentSummary());
+    dispatch(fetchActiveWallets());
   }, [dispatch]);
 
-  useEffect(() => {
-    setSearch(filters.q);
-  }, [filters.q]);
-
-  useDebounceEffect(
-    () => {
-      if (search !== filters.q) {
-        dispatch(setPaymentFilters({ q: search }));
-      }
-    },
-    [search],
-    { wait: 450 },
-  );
-
   const hasFilters = Boolean(
-    filters.q || filters.direction || filters.status || filters.network,
+    filters.q ||
+      filters.direction ||
+      filters.status ||
+      filters.network ||
+      filters.wallet,
   );
   const showSpinner = isLoading && !hasLoaded;
   const showError = Boolean(error) && !hasLoaded && !isLoading;
@@ -85,78 +79,86 @@ export function Payments() {
       <SummaryTiles summary={summary} />
 
       <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-0 sm:w-72">
-            <InputField
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("payment.toolbar.searchPlaceholder")}
-              aria-label={t("payment.toolbar.searchPlaceholder")}
-              icon={<Search className="h-4 w-4 text-ink-subtle" />}
-              maxLength={100}
-              data-testid="payment-search"
+        <ListToolbar>
+          <ListToolbar.Search
+            value={filters.q}
+            placeholder={t("payment.toolbar.searchPlaceholder")}
+            onSearch={(q) => dispatch(setPaymentFilters({ q }))}
+            data-testid="payment-search"
+          />
+
+          <ListToolbar.Filters>
+            <ListToolbar.Filter<PaymentDirection | "">
+              label={t("list.filter.direction")}
+              className="sm:w-40"
+              value={filters.direction}
+              options={[
+                { value: "", title: t("payment.toolbar.allDirections") },
+                { value: "received", title: t("payment.direction.received") },
+                { value: "sent", title: t("payment.direction.sent") },
+              ]}
+              onChange={(direction) =>
+                dispatch(setPaymentFilters({ direction }))
+              }
+              data-testid="payment-direction-filter"
             />
-          </div>
 
-          <div className="flex flex-wrap gap-3">
-            <div className="w-full sm:w-40">
-              <Select
-                value={filters.direction}
-                options={[
-                  { value: "", title: t("payment.toolbar.allDirections") },
-                  { value: "received", title: t("payment.direction.received") },
-                  { value: "sent", title: t("payment.direction.sent") },
-                ]}
-                onChange={(option) =>
-                  dispatch(
-                    setPaymentFilters({
-                      direction: (option?.value ?? "") as PaymentDirection | "",
-                    }),
-                  )
-                }
-                data-testid="payment-direction-filter"
-              />
-            </div>
+            <ListToolbar.Filter<PaymentStatus | "">
+              label={t("list.filter.status")}
+              className="sm:w-40"
+              value={filters.status}
+              options={[
+                { value: "", title: t("payment.toolbar.allStatuses") },
+                { value: "SETTLED", title: t("payment.status.settled") },
+                { value: "PENDING", title: t("payment.status.pending") },
+                { value: "FAILED", title: t("payment.status.failed") },
+              ]}
+              onChange={(status) => dispatch(setPaymentFilters({ status }))}
+              data-testid="payment-status-filter"
+            />
 
-            <div className="w-full sm:w-40">
-              <Select
-                value={filters.status}
-                options={[
-                  { value: "", title: t("payment.toolbar.allStatuses") },
-                  { value: "SETTLED", title: t("payment.status.settled") },
-                  { value: "PENDING", title: t("payment.status.pending") },
-                  { value: "FAILED", title: t("payment.status.failed") },
-                ]}
-                onChange={(option) =>
-                  dispatch(
-                    setPaymentFilters({
-                      status: (option?.value ?? "") as PaymentStatus | "",
-                    }),
-                  )
-                }
-                data-testid="payment-status-filter"
-              />
-            </div>
+            <ListToolbar.Filter<PaymentNetwork | "">
+              label={t("list.filter.network")}
+              value={filters.network}
+              options={[
+                { value: "", title: t("payment.toolbar.allNetworks") },
+                ...NETWORK_OPTIONS,
+              ]}
+              onChange={(network) => dispatch(setPaymentFilters({ network }))}
+              data-testid="payment-network-filter"
+            />
 
-            <div className="w-full sm:w-44">
-              <Select
-                value={filters.network}
-                options={[
-                  { value: "", title: t("payment.toolbar.allNetworks") },
-                  ...NETWORK_OPTIONS,
-                ]}
-                onChange={(option) =>
-                  dispatch(
-                    setPaymentFilters({
-                      network: (option?.value ?? "") as PaymentNetwork | "",
-                    }),
-                  )
-                }
-                data-testid="payment-network-filter"
-              />
-            </div>
-          </div>
-        </div>
+            <ListToolbar.Filter<string>
+              label={t("payment.toolbar.wallet")}
+              className="sm:w-52"
+              value={filters.wallet}
+              options={[
+                { value: "", title: t("payment.toolbar.allWallets") },
+                ...wallets.map((wallet) => ({
+                  value: wallet.address,
+                  title: `${wallet.label} · ${shortenAddress(wallet.address)}`,
+                })),
+              ]}
+              onChange={(wallet) => dispatch(setPaymentFilters({ wallet }))}
+              data-testid="payment-wallet-filter"
+            />
+
+            <ListToolbar.Filter<PaymentSort>
+              label={t("list.sort")}
+              value={filters.sort}
+              options={[
+                { value: "-createdAt", title: t("payment.sort.newest") },
+                { value: "createdAt", title: t("payment.sort.oldest") },
+                { value: "-amount", title: t("payment.sort.amountHigh") },
+                { value: "amount", title: t("payment.sort.amountLow") },
+              ]}
+              onChange={(sort) =>
+                dispatch(setPaymentFilters({ sort: sort || "-createdAt" }))
+              }
+              data-testid="payment-sort"
+            />
+          </ListToolbar.Filters>
+        </ListToolbar>
 
         {showSpinner ? (
           <div className="flex flex-1 items-center justify-center">

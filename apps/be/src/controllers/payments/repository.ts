@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@4mica/db";
+import { amountText } from "@utils/amount";
 import type { ListPaymentsQuery, ReportPaymentInput } from "./schema";
 
 export const PAYMENT_SELECT = {
@@ -13,12 +14,16 @@ export const PAYMENT_SELECT = {
   status: true,
   failureReason: true,
   reqId: true,
+  guaranteeSignature: true,
   txHash: true,
   resource: true,
   description: true,
   settledAt: true,
   createdAt: true,
   updatedAt: true,
+  couponCode: true,
+  creditApplied: true,
+  redeemedAt: true,
   listing: { select: { slug: true, name: true } },
   agent: { select: { slug: true, name: true } },
 } satisfies Prisma.PaymentSelect;
@@ -27,7 +32,14 @@ type RawPayment = Prisma.PaymentGetPayload<{ select: typeof PAYMENT_SELECT }>;
 
 export type PaymentRow = Omit<
   RawPayment,
-  "amount" | "listing" | "agent" | "settledAt"
+  | "amount"
+  | "listing"
+  | "agent"
+  | "guaranteeSignature"
+  | "settledAt"
+  | "couponCode"
+  | "creditApplied"
+  | "redeemedAt"
 > & {
   amount: string;
   settledAt: string | null;
@@ -36,20 +48,32 @@ export type PaymentRow = Omit<
   agentSlug: string | null;
   agentName: string | null;
   direction: "sent" | "received";
+  onCore: boolean;
 };
 
 const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
-  const { listing, agent, amount, settledAt, ...rest } = row;
+  const {
+    listing,
+    agent,
+    amount,
+    guaranteeSignature,
+    settledAt,
+    couponCode: _couponCode,
+    creditApplied: _creditApplied,
+    redeemedAt: _redeemedAt,
+    ...rest
+  } = row;
 
   return {
     ...rest,
-    amount: amount.toString(),
+    amount: amountText(amount),
     settledAt: settledAt?.toISOString() ?? null,
     listingSlug: listing?.slug ?? null,
     listingName: listing?.name ?? null,
     agentSlug: agent?.slug ?? null,
     agentName: agent?.name ?? null,
     direction: myAddresses.has(row.payerAddress) ? "sent" : "received",
+    onCore: guaranteeSignature !== null,
   };
 };
 
@@ -63,6 +87,17 @@ export const walletAddressesFor = async (
 
   return [...new Set(rows.map((row) => row.address))];
 };
+
+/** A seller may only report payments into a wallet it has proved it controls. */
+export const ownsRecipientWallet = async (
+  ownerId: string,
+  address: string,
+  network: ReportPaymentInput["network"],
+): Promise<boolean> =>
+  (await prisma.wallet.findFirst({
+    where: { ownerId, address, network },
+    select: { id: true },
+  })) !== null;
 
 const escapeLike = (value: string): string =>
   value.replace(/[\\%_]/g, (match) => `\\${match}`);
@@ -136,12 +171,15 @@ export const listPayments = async (
   limit: number;
 }> => {
   const addresses = await walletAddressesFor(ownerId);
+  const scope = query.wallet
+    ? addresses.filter((address) => address === query.wallet)
+    : addresses;
 
-  if (addresses.length === 0) {
+  if (scope.length === 0) {
     return { items: [], total: 0, page: query.page, limit: query.limit };
   }
 
-  const where = whereFor(addresses, query);
+  const where = whereFor(scope, query);
   const skip = (query.page - 1) * query.limit;
   const mine = new Set(addresses);
 
@@ -210,7 +248,7 @@ const totalsFor = async (
     volume: byAsset.map((row) => ({
       assetAddress: row.assetAddress,
       network: row.network,
-      amount: (row._sum?.amount ?? 0).toString(),
+      amount: amountText(row._sum?.amount ?? 0),
     })),
   };
 };
@@ -283,51 +321,218 @@ export const resolveReportTargets = async (
   return { listingId: listing?.id ?? null, agentId: agent?.id ?? null };
 };
 
+const canonicalAmount = (value: string): string =>
+  value.includes(".") ? value.replace(/\.?0+$/, "") : value;
+
+const IDENTITY_FIELDS = [
+  "payerAddress",
+  "recipientAddress",
+  "network",
+  "assetAddress",
+  "amount",
+] as const;
+
+const DETAIL_FIELDS = [
+  "listingId",
+  "agentId",
+  "failureReason",
+  "guaranteeClaims",
+  "guaranteeSignature",
+  "txHash",
+  "resource",
+  "description",
+  "couponCode",
+  "creditApplied",
+] as const;
+
+type PaymentStatus = ReportPaymentInput["status"];
+
+const canMove = (from: PaymentStatus, to: PaymentStatus): boolean =>
+  from === "PENDING" || from === to;
+
+const EXISTING_SELECT = {
+  id: true,
+  status: true,
+  settledAt: true,
+  payerAddress: true,
+  recipientAddress: true,
+  network: true,
+  assetAddress: true,
+  amount: true,
+  listingId: true,
+  agentId: true,
+  failureReason: true,
+  guaranteeClaims: true,
+  guaranteeSignature: true,
+  txHash: true,
+  resource: true,
+  description: true,
+  couponCode: true,
+  creditApplied: true,
+} satisfies Prisma.PaymentSelect;
+
+type ExistingPayment = Prisma.PaymentGetPayload<{
+  select: typeof EXISTING_SELECT;
+}>;
+
+export type ReportOutcome =
+  | { kind: "created" | "updated"; row: PaymentRow; redeemable: boolean }
+  | { kind: "conflict"; field: string; message: string };
+
+const isUniqueViolation = (error: unknown): boolean =>
+  (error as { code?: unknown })?.code === "P2002";
+
+const identityConflict = (
+  existing: ExistingPayment,
+  incoming: Record<(typeof IDENTITY_FIELDS)[number], string | null>,
+): string | null => {
+  for (const field of IDENTITY_FIELDS) {
+    const before =
+      field === "amount"
+        ? canonicalAmount(amountText(existing.amount))
+        : (existing[field] as string | null);
+    const after =
+      field === "amount"
+        ? canonicalAmount(incoming.amount ?? "")
+        : incoming[field];
+
+    if (before !== after) {
+      return field;
+    }
+  }
+  return null;
+};
+
+const isRedeemable = (row: RawPayment): boolean =>
+  row.status === "SETTLED" &&
+  row.redeemedAt === null &&
+  (row.couponCode !== null || row.creditApplied !== null);
+
 export const reportPayment = async (
   ownerId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
-): Promise<{ row: PaymentRow; created: boolean }> => {
-  const settledAt =
-    data.status === "SETTLED"
-      ? data.settledAt
-        ? new Date(data.settledAt)
-        : new Date()
-      : null;
-
-  const fields = {
-    listingId: targets.listingId,
-    agentId: targets.agentId,
+): Promise<ReportOutcome> => {
+  const identity = {
     payerAddress: data.payerAddress,
     recipientAddress: data.recipientAddress,
     network: data.network,
     assetAddress: data.assetAddress ?? null,
     amount: data.amount,
-    status: data.status,
+  };
+
+  const detail: Record<(typeof DETAIL_FIELDS)[number], string | null> = {
+    listingId: targets.listingId,
+    agentId: targets.agentId,
     failureReason: data.failureReason ?? null,
     guaranteeClaims: data.guaranteeClaims ?? null,
     guaranteeSignature: data.guaranteeSignature ?? null,
     txHash: data.txHash ?? null,
     resource: data.resource ?? null,
     description: data.description ?? null,
-    settledAt,
+    couponCode: data.couponCode ?? null,
+    creditApplied: data.creditApplied ?? null,
   };
 
-  const existing = await prisma.payment.findUnique({
-    where: { ownerId_reqId: { ownerId, reqId: data.reqId } },
-    select: { id: true },
-  });
+  const reportedSettledAt = data.settledAt ? new Date(data.settledAt) : null;
+  const where = { ownerId_reqId: { ownerId, reqId: data.reqId } };
 
-  const row = await prisma.payment.upsert({
-    where: { ownerId_reqId: { ownerId, reqId: data.reqId } },
-    update: fields,
-    create: { ownerId, reqId: data.reqId, ...fields },
-    select: PAYMENT_SELECT,
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await prisma.payment.findUnique({
+      where,
+      select: EXISTING_SELECT,
+    });
+
+    if (!existing) {
+      try {
+        const row = await prisma.payment.create({
+          data: {
+            ownerId,
+            reqId: data.reqId,
+            ...identity,
+            ...detail,
+            status: data.status,
+            settledAt:
+              data.status === "SETTLED"
+                ? (reportedSettledAt ?? new Date())
+                : null,
+          },
+          select: PAYMENT_SELECT,
+        });
+        return {
+          kind: "created",
+          row: toRow(row, new Set([data.recipientAddress])),
+          redeemable: isRedeemable(row),
+        };
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    const field = identityConflict(existing, identity);
+    if (field) {
+      return {
+        kind: "conflict",
+        field,
+        message: `A payment with this reqId was already reported with a different ${field}.`,
+      };
+    }
+
+    if (!canMove(existing.status, data.status)) {
+      return {
+        kind: "conflict",
+        field: "status",
+        message: `This payment is already ${existing.status} and cannot become ${data.status}.`,
+      };
+    }
+
+    const final = existing.status !== "PENDING";
+    const update: Record<string, unknown> = {};
+    for (const key of DETAIL_FIELDS) {
+      const value = detail[key];
+      if (value !== null && (!final || existing[key] === null)) {
+        update[key] = value;
+      }
+    }
+
+    if (!final && data.status !== existing.status) {
+      update.status = data.status;
+      if (data.status === "SETTLED") {
+        update.settledAt = reportedSettledAt ?? new Date();
+      }
+    }
+
+    if (Object.keys(update).length > 0) {
+      const { count } = await prisma.payment.updateMany({
+        where: { id: existing.id, status: existing.status },
+        data: update,
+      });
+      if (count === 0) {
+        continue;
+      }
+    }
+
+    const row = await prisma.payment.findUnique({
+      where: { id: existing.id },
+      select: PAYMENT_SELECT,
+    });
+
+    if (row) {
+      return {
+        kind: "updated",
+        row: toRow(row, new Set([data.recipientAddress])),
+        redeemable: isRedeemable(row),
+      };
+    }
+  }
 
   return {
-    row: toRow(row, new Set([data.recipientAddress])),
-    created: existing === null,
+    kind: "conflict",
+    field: "reqId",
+    message: "This payment changed while it was being reported. Retry.",
   };
 };
 
@@ -338,11 +543,39 @@ export interface MonthlyBucket {
   volume: { assetAddress: string | null; network: string; amount: string }[];
 }
 
+export interface RankedEntry {
+  id: string;
+  name: string;
+  slug: string;
+  settledCount: number;
+  amount: string;
+}
+
 export interface PaymentStats {
   months: string[];
   received: MonthlyBucket[];
   sent: MonthlyBucket[];
+  topListings: RankedEntry[];
+  topAgents: RankedEntry[];
 }
+
+const TOP_LIMIT = 8;
+
+interface RankedRow {
+  id: string;
+  name: string;
+  slug: string;
+  count: bigint | number;
+  amount: Prisma.Decimal | null;
+}
+
+const toRanked = (row: RankedRow): RankedEntry => ({
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  settledCount: Number(row.count),
+  amount: amountText(row.amount ?? 0),
+});
 
 interface CountRow {
   month: string;
@@ -356,7 +589,7 @@ interface VolumeRow {
   direction: string;
   network: string;
   asset_address: string | null;
-  amount: { toString(): string } | null;
+  amount: Prisma.Decimal | null;
 }
 
 const monthKeys = (months: number): string[] => {
@@ -389,13 +622,19 @@ export const paymentStats = async (
     }));
 
   if (addresses.length === 0) {
-    return { months: keys, received: empty(), sent: empty() };
+    return {
+      months: keys,
+      received: empty(),
+      sent: empty(),
+      topListings: [],
+      topAgents: [],
+    };
   }
 
   const since = new Date(`${keys[0]}-01T00:00:00.000Z`);
   const owned = Prisma.join(addresses);
 
-  const [counts, volumes] = await Promise.all([
+  const [counts, volumes, listings, agents] = await Promise.all([
     prisma.$queryRaw<CountRow[]>`
       SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
              CASE WHEN payer_address IN (${owned}) THEN 'sent' ELSE 'received' END AS direction,
@@ -417,6 +656,28 @@ export const paymentStats = async (
          AND status = 'SETTLED'
          AND (payer_address IN (${owned}) OR recipient_address IN (${owned}))
        GROUP BY 1, 2, 3, 4
+    `,
+    prisma.$queryRaw<RankedRow[]>`
+      SELECT l.id, l.name, l.slug, COUNT(*) AS count, SUM(p.amount) AS amount
+        FROM payments p
+        JOIN api_listings l ON l.id = p.listing_id
+       WHERE p.created_at >= ${since}
+         AND p.status = 'SETTLED'
+         AND p.recipient_address IN (${owned})
+       GROUP BY 1, 2, 3
+       ORDER BY amount DESC
+       LIMIT ${TOP_LIMIT}
+    `,
+    prisma.$queryRaw<RankedRow[]>`
+      SELECT a.id, a.name, a.slug, COUNT(*) AS count, SUM(p.amount) AS amount
+        FROM payments p
+        JOIN agents a ON a.id = p.agent_id
+       WHERE p.created_at >= ${since}
+         AND p.status = 'SETTLED'
+         AND p.payer_address IN (${owned})
+       GROUP BY 1, 2, 3
+       ORDER BY amount DESC
+       LIMIT ${TOP_LIMIT}
     `,
   ]);
 
@@ -451,12 +712,18 @@ export const paymentStats = async (
       byMonth.get(row.month)?.volume.push({
         assetAddress: row.asset_address,
         network: row.network,
-        amount: (row.amount ?? 0).toString(),
+        amount: amountText(row.amount ?? 0),
       });
     }
 
     return keys.map((month) => byMonth.get(month) as MonthlyBucket);
   };
 
-  return { months: keys, received: build("received"), sent: build("sent") };
+  return {
+    months: keys,
+    received: build("received"),
+    sent: build("sent"),
+    topListings: listings.map(toRanked),
+    topAgents: agents.map(toRanked),
+  };
 };

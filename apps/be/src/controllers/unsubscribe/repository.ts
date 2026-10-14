@@ -18,8 +18,8 @@ export const unsubscribeFromOnboarding = async (
       data: { allowMarketingOnboardingEmails: false },
     }),
     prisma.onboardingEmailQueue.updateMany({
-      where: { userId },
-      data: { lockId: null, lockedUntil: null },
+      where: { userId, status: "SENDING" },
+      data: { status: "PENDING", lockId: null, lockedUntil: null },
     }),
   ]);
 

@@ -534,6 +534,11 @@ describe("PolicyPanel", () => {
     });
 
     fireEvent.click(screen.getByTestId("customer-reset-usage"));
+    fireEvent.click(
+      screen.getByTestId(
+        "customer-reset-usage-popup-confirm-confirm-popup-confirm",
+      ),
+    );
 
     expect(lastAction()?.payload).toEqual({ id: "customer_1" });
   });
@@ -825,6 +830,11 @@ describe("CouponsPanel", () => {
     renderPanel();
 
     fireEvent.click(screen.getByTestId("customer-coupon-remove-coupon_1"));
+    fireEvent.click(
+      screen.getByTestId(
+        "customer-coupon-remove-coupon_1-popup-confirm-confirm-popup-confirm",
+      ),
+    );
 
     expect(lastAction()?.payload).toEqual({
       id: "customer_1",

@@ -1,6 +1,15 @@
 import { Asterisk, ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type Ref,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "../../lib/cn";
+import { isOpenKey, joinIds, mergeRefs } from "../../lib/focusable";
 import { Dropdown } from "../dropdown";
 import { InputField } from "../input-field";
 import { Spinner } from "../spinner";
@@ -12,14 +21,21 @@ export type Option = {
 };
 
 export type SelectProps = {
+  id?: string;
+  ref?: Ref<HTMLButtonElement>;
   label?: string;
+  searchPlaceholder?: string;
+  noDataText?: string;
+  noResultsText?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
   options: Option[];
   value?: string | number;
   initialValue?: Option;
   className?: string;
   disabled?: boolean;
   loading?: boolean;
-  /** Omit to let the component own its open state. */
   visible?: boolean;
   isInputHidden?: boolean;
   placeholder?: string;
@@ -34,6 +50,8 @@ export type SelectProps = {
 };
 
 export const Select = ({
+  id,
+  ref,
   options = [],
   value,
   initialValue,
@@ -48,6 +66,12 @@ export const Select = ({
   required,
   error,
   placeholder = "Select an option",
+  searchPlaceholder = "Search...",
+  noDataText = "No Data",
+  noResultsText = "No matching results",
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
   onChange,
   onToggle,
   onSearch,
@@ -62,6 +86,12 @@ export const Select = ({
   const [internalVisible, setInternalVisible] = useState(false);
 
   const anchorRef = useRef<HTMLButtonElement | null>(null);
+
+  const generatedId = useId();
+  const triggerId = id ?? `select-${generatedId}`;
+  const listboxId = `${triggerId}-listbox`;
+  const errorId = error ? `${triggerId}-error` : undefined;
+  const describedBy = joinIds(ariaDescribedBy, errorId);
 
   const isOpen = visible ?? internalVisible;
 
@@ -109,10 +139,18 @@ export const Select = ({
 
   const displayLabel = selected?.title ?? placeholder;
 
+  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (isOpenKey(event.key)) {
+      event.preventDefault();
+      if (!disabled) setOpen(true);
+    }
+  };
+
   return (
     <div className="relative w-full" data-testid={prefix}>
       {label && (
-        <span
+        <label
+          htmlFor={triggerId}
           className="mb-2.5 flex select-none items-center gap-1 font-medium text-ink-muted text-sm"
           data-testid={`${prefix}-label`}
         >
@@ -120,17 +158,24 @@ export const Select = ({
           {required && (
             <Asterisk className="h-2 w-2 text-danger" aria-hidden="true" />
           )}
-        </span>
+        </label>
       )}
 
       {!isInputHidden && (
         <button
-          ref={anchorRef}
+          ref={mergeRefs(anchorRef, ref)}
+          id={triggerId}
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isOpen}
+          aria-controls={isOpen ? listboxId : undefined}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : undefined}
           disabled={disabled}
           onClick={() => !disabled && setOpen(!isOpen)}
+          onKeyDown={handleTriggerKeyDown}
           className={cn(
             "flex w-full items-center justify-between rounded-lg border border-overlay/15 px-3 py-2.5 text-left text-ink-body text-sm outline-none transition",
             disabled
@@ -169,6 +214,7 @@ export const Select = ({
           anchorRef={anchorRef}
           placement="bottom"
           onClickOutside={() => setOpen(false)}
+          autoFocus
           matchAnchorWidth
           className="p-0"
           data-testid={prefix}
@@ -183,16 +229,16 @@ export const Select = ({
           ) : (
             <div
               className="max-h-62.5 w-full overflow-y-auto p-2 text-sm"
-              role="listbox"
               data-testid={`${prefix}-list`}
             >
               {hasSearch && (
                 <div className="mb-2">
                   <InputField
-                    type="text"
-                    placeholder="Search..."
+                    type="search"
+                    aria-label={searchPlaceholder}
+                    aria-controls={listboxId}
+                    placeholder={searchPlaceholder}
                     value={searchTerm}
-                    autoFocus
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
                       onSearch?.(e.target.value);
@@ -202,50 +248,59 @@ export const Select = ({
                 </div>
               )}
 
-              {hasEmptyValue && selected && (
-                <button
-                  type="button"
-                  className="block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10"
-                  onClick={() => handleChange(null)}
-                  data-testid={`${prefix}-clear`}
-                >
-                  -
-                </button>
-              )}
-
-              {options.length === 0 ? (
-                <div
-                  className="py-2 text-center text-ink-muted italic"
-                  data-testid={`${prefix}-no-data`}
-                >
-                  No Data
-                </div>
-              ) : filteredOptions.length > 0 ? (
-                filteredOptions.map((opt, i) => (
+              <div
+                id={listboxId}
+                role="listbox"
+                aria-labelledby={label ? triggerId : undefined}
+                aria-label={label ? undefined : (ariaLabel ?? placeholder)}
+              >
+                {hasEmptyValue && selected && (
                   <button
-                    key={opt.value}
                     type="button"
                     role="option"
-                    aria-selected={opt.value === selected?.value}
-                    title={opt.title}
-                    className={cn(
-                      "block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10",
-                      opt.value === selected?.value && "bg-overlay/5",
-                    )}
-                    onClick={() => handleChange(opt)}
-                    data-testid={`${prefix}-option-${i}`}
+                    aria-selected={false}
+                    className="block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none"
+                    onClick={() => handleChange(null)}
+                    data-testid={`${prefix}-clear`}
                   >
-                    {opt.title}
+                    -
                   </button>
-                ))
-              ) : (
-                <div
-                  className="py-2 text-center text-ink-muted italic"
-                  data-testid={`${prefix}-no-results`}
-                >
-                  No matching results
-                </div>
-              )}
+                )}
+
+                {options.length === 0 ? (
+                  <div
+                    className="py-2 text-center text-ink-muted italic"
+                    data-testid={`${prefix}-no-data`}
+                  >
+                    {noDataText}
+                  </div>
+                ) : filteredOptions.length > 0 ? (
+                  filteredOptions.map((opt, i) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={opt.value === selected?.value}
+                      title={opt.title}
+                      className={cn(
+                        "block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none",
+                        opt.value === selected?.value && "bg-overlay/5",
+                      )}
+                      onClick={() => handleChange(opt)}
+                      data-testid={`${prefix}-option-${i}`}
+                    >
+                      {opt.title}
+                    </button>
+                  ))
+                ) : (
+                  <div
+                    className="py-2 text-center text-ink-muted italic"
+                    data-testid={`${prefix}-no-results`}
+                  >
+                    {noResultsText}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Dropdown>
@@ -253,7 +308,8 @@ export const Select = ({
 
       {error && (
         <p
-          role="alert"
+          id={errorId}
+          aria-live="polite"
           className="mt-2 select-none font-normal text-danger text-xs"
           data-testid={`${prefix}-error`}
         >

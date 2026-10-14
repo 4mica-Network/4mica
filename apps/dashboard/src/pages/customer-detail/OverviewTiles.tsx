@@ -1,9 +1,10 @@
+import { trimAmount } from "@4mica/rules";
 import { Tooltip } from "@4mica/ui";
 import type { CustomerOverview, SpendBucket } from "@stores/customer/type";
+import { formatDateTime } from "@utils/format";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Card } from "@/components/form";
-import { trimAmount } from "../payments/constants";
+import { SurfaceCard } from "@/components/layout";
 
 function Amount({ buckets }: { buckets: SpendBucket[] }) {
   const { t } = useTranslation();
@@ -43,7 +44,10 @@ function Tile({
   testId: string;
 }) {
   return (
-    <Card className="flex flex-col gap-2 px-4 py-3.5" data-testid={testId}>
+    <SurfaceCard
+      className="flex flex-col gap-2 px-4 py-3.5"
+      data-testid={testId}
+    >
       <span className="text-ink-muted text-sm">{title}</span>
       {children}
       {footer && (
@@ -51,17 +55,9 @@ function Tile({
           {footer}
         </div>
       )}
-    </Card>
+    </SurfaceCard>
   );
 }
-
-const absoluteWhen = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "—";
 
 export function OverviewTiles({
   overview,
@@ -122,7 +118,7 @@ export function OverviewTiles({
         testId="customer-tile-active"
       >
         <span className="font-semibold text-ink-strong text-sm">
-          {absoluteWhen(overview.lastActiveAt)}
+          {formatDateTime(overview.lastActiveAt)}
         </span>
       </Tile>
     </div>

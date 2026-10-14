@@ -4,12 +4,8 @@ import { selectIsSectionSaving, selectUser } from "@stores/user/selector";
 import type { NotificationPlacement } from "@stores/user/type";
 import { useTranslation } from "react-i18next";
 import { InstantCard } from "@/components/EditableCard";
-import {
-  Select,
-  SettingRow,
-  SettingsSection,
-  SwitchCard,
-} from "@/components/form";
+import { Select, SettingRow, SwitchCard } from "@/components/form";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 
 const PLACEMENTS = [

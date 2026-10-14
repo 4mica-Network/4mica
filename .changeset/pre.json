@@ -10,14 +10,6 @@
     "@4mica/x402-demo": "0.0.0",
     "@4mica/playground": "0.1.0",
     "@4mica/web": "0.1.0",
-    "@4mica/example-agent-comedian": "0.0.0",
-    "@4mica/example-agent-critic": "0.0.0",
-    "@4mica/example-buyer-express": "0.0.0",
-    "@4mica/example-buyer-hono": "0.0.0",
-    "@4mica/example-buyer-next": "0.0.0",
-    "@4mica/example-seller-express": "0.0.0",
-    "@4mica/example-seller-hono": "0.0.0",
-    "@4mica/example-seller-next": "0.0.0",
     "@4mica/auth": "0.0.0",
     "@4mica/cli": "0.2.0",
     "@4mica/db": "0.0.0",
@@ -37,7 +29,11 @@
     "@4mica/tailwind-config": "0.0.0",
     "@4mica/tsconfig": "0.0.0",
     "@4mica/ui": "0.0.0",
-    "@4mica/url": "0.0.0"
+    "@4mica/url": "0.0.0",
+    "@4mica/example-buyer": "0.0.0",
+    "@4mica/example-seller-express": "0.0.0",
+    "@4mica/example-seller-hono": "0.0.0",
+    "@4mica/example-seller-next": "0.0.0"
   },
   "changesets": [
     "quiet-pens-relax",

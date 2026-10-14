@@ -42,7 +42,10 @@ export interface Payment {
   agentSlug: string | null;
   agentName: string | null;
   direction: PaymentDirection;
+  onCore: boolean;
 }
+
+export type PaymentSort = "-createdAt" | "createdAt" | "-amount" | "amount";
 
 export interface PaymentListResponse {
   items: Payment[];
@@ -77,10 +80,20 @@ export interface MonthlyBucket {
   volume: PaymentVolume[];
 }
 
+export interface RankedEntry {
+  id: string;
+  name: string;
+  slug: string;
+  settledCount: number;
+  amount: string;
+}
+
 export interface PaymentStats {
   months: string[];
   received: MonthlyBucket[];
   sent: MonthlyBucket[];
+  topListings: RankedEntry[];
+  topAgents: RankedEntry[];
 }
 
 export interface PaymentFilters {
@@ -88,6 +101,8 @@ export interface PaymentFilters {
   direction: PaymentDirection | "";
   status: PaymentStatus | "";
   network: PaymentNetwork | "";
+  wallet: string;
+  sort: PaymentSort;
 }
 
 export type PaymentState = {

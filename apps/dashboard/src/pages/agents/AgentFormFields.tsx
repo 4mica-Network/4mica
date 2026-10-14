@@ -1,21 +1,24 @@
+import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Tag } from "@4mica/ui";
 import type { Wallet } from "@stores/wallet/type";
-import type { TFunction } from "i18next";
-import type { UseFormSetValue } from "react-hook-form";
-import { FieldRow, Select, TextArea, TextInput } from "@/components/form";
-import { NETWORK_OPTIONS, NETWORKS, shortenAddress } from "@/lib/networks";
+import { useWatch } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import {
+  FieldRow,
+  FormSelect,
+  FormTextArea,
+  FormTextInput,
+} from "@/components/form";
+import { NETWORK_OPTIONS } from "@/lib/networks";
 import { STATUS_OPTIONS, VISIBILITY_OPTIONS } from "./constants";
 import {
   type AgentValues,
+  DESCRIPTION_MAX_LENGTH,
   HEADLINE_MAX_LENGTH,
   NAME_MAX_LENGTH,
 } from "./validation";
 
 export interface AgentFormFieldsProps {
-  t: TFunction;
-  values: AgentValues;
-  setValue: UseFormSetValue<AgentValues>;
-  fieldError: (field: keyof AgentValues) => string | undefined;
   wallets: Wallet[];
   payerWallets: Wallet[];
   idPrefix: string;
@@ -23,39 +26,27 @@ export interface AgentFormFieldsProps {
   networkLocked?: boolean;
 }
 
-const NO_WALLET = "__none__";
+const walletOption = (wallet: Wallet) => ({
+  value: wallet.id,
+  title: `${wallet.label} · ${PAYMENT_NETWORKS[wallet.network].label}`,
+});
 
 export function AgentFormFields({
-  t,
-  values,
-  setValue,
-  fieldError,
   wallets,
   payerWallets,
   idPrefix,
   step,
   networkLocked = false,
 }: AgentFormFieldsProps) {
+  const { t } = useTranslation();
   const show = (index: number) => step === undefined || step === index;
+  const [walletId, payerWalletId] = useWatch<
+    AgentValues,
+    ["walletId", "payerWalletId"]
+  >({ name: ["walletId", "payerWalletId"] });
 
-  const sellerOptions = [
-    { value: NO_WALLET, title: t("agent.fields.wallet.none") },
-    ...wallets.map((wallet) => ({
-      value: wallet.id,
-      title: `${wallet.label} · ${NETWORKS[wallet.network].label}`,
-    })),
-  ];
-
-  const payerOptions = [
-    { value: NO_WALLET, title: t("agent.fields.payerWallet.none") },
-    ...payerWallets.map((wallet) => ({
-      value: wallet.id,
-      title: `${wallet.label} · ${NETWORKS[wallet.network].label}`,
-    })),
-  ];
-
-  const chosenSeller = wallets.find((w) => w.id === values.walletId);
-  const chosenPayer = payerWallets.find((w) => w.id === values.payerWalletId);
+  const chosenSeller = wallets.find((w) => w.id === walletId);
+  const chosenPayer = payerWallets.find((w) => w.id === payerWalletId);
 
   return (
     <div className="flex flex-col divide-y divide-overlay/10">
@@ -65,16 +56,13 @@ export function AgentFormFields({
             title={t("agent.fields.name.title")}
             description={t("agent.fields.name.description")}
             htmlFor={`${idPrefix}-name`}
+            required
           >
-            <TextInput
-              id={`${idPrefix}-name`}
-              value={values.name}
+            <FormTextInput
+              name="name"
               maxLength={NAME_MAX_LENGTH}
               placeholder={t("agent.fields.name.placeholder")}
-              error={fieldError("name")}
-              onChange={(value) =>
-                setValue("name", value, { shouldValidate: true })
-              }
+              autoFocus
             />
           </FieldRow>
 
@@ -83,14 +71,10 @@ export function AgentFormFields({
             description={t("agent.fields.headline.description")}
             htmlFor={`${idPrefix}-headline`}
           >
-            <TextInput
-              id={`${idPrefix}-headline`}
-              value={values.headline ?? ""}
+            <FormTextInput
+              name="headline"
               maxLength={HEADLINE_MAX_LENGTH}
-              error={fieldError("headline")}
-              onChange={(value) =>
-                setValue("headline", value, { shouldValidate: true })
-              }
+              spellCheck
             />
           </FieldRow>
 
@@ -98,14 +82,10 @@ export function AgentFormFields({
             title={t("agent.fields.description.title")}
             htmlFor={`${idPrefix}-description`}
           >
-            <TextArea
-              id={`${idPrefix}-description`}
+            <FormTextArea
+              name="description"
               rows={4}
-              value={values.description ?? ""}
-              error={fieldError("description")}
-              onChange={(value) =>
-                setValue("description", value, { shouldValidate: true })
-              }
+              maxLength={DESCRIPTION_MAX_LENGTH}
             />
           </FieldRow>
         </>
@@ -122,17 +102,10 @@ export function AgentFormFields({
             }
             htmlFor={`${idPrefix}-network`}
           >
-            <Select
-              id={`${idPrefix}-network`}
-              value={values.network}
+            <FormSelect
+              name="network"
               options={NETWORK_OPTIONS}
               disabled={networkLocked}
-              error={fieldError("network")}
-              onChange={(value) =>
-                setValue("network", value as AgentValues["network"], {
-                  shouldValidate: true,
-                })
-              }
             />
           </FieldRow>
 
@@ -141,16 +114,12 @@ export function AgentFormFields({
             description={t("agent.fields.payerWallet.description")}
             htmlFor={`${idPrefix}-payer-wallet`}
           >
-            <Select
-              id={`${idPrefix}-payer-wallet`}
-              value={values.payerWalletId || NO_WALLET}
-              options={payerOptions}
-              error={fieldError("payerWalletId")}
-              onChange={(value) =>
-                setValue("payerWalletId", value === NO_WALLET ? "" : value, {
-                  shouldValidate: true,
-                })
-              }
+            <FormSelect
+              name="payerWalletId"
+              options={[
+                { value: "", title: t("agent.fields.payerWallet.none") },
+                ...payerWallets.map(walletOption),
+              ]}
             />
             {chosenPayer && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -169,14 +138,10 @@ export function AgentFormFields({
             description={t("agent.fields.creditLimit.description")}
             htmlFor={`${idPrefix}-credit-limit`}
           >
-            <TextInput
-              id={`${idPrefix}-credit-limit`}
-              value={values.creditLimit ?? ""}
+            <FormTextInput
+              name="creditLimit"
+              inputMode="decimal"
               placeholder="0"
-              error={fieldError("creditLimit")}
-              onChange={(value) =>
-                setValue("creditLimit", value, { shouldValidate: true })
-              }
             />
           </FieldRow>
         </>
@@ -189,21 +154,17 @@ export function AgentFormFields({
             description={t("agent.fields.wallet.description")}
             htmlFor={`${idPrefix}-wallet`}
           >
-            <Select
-              id={`${idPrefix}-wallet`}
-              value={values.walletId || NO_WALLET}
-              options={sellerOptions}
-              error={fieldError("walletId")}
-              onChange={(value) =>
-                setValue("walletId", value === NO_WALLET ? "" : value, {
-                  shouldValidate: true,
-                })
-              }
+            <FormSelect
+              name="walletId"
+              options={[
+                { value: "", title: t("agent.fields.wallet.none") },
+                ...wallets.map(walletOption),
+              ]}
             />
             {chosenSeller && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Tag size="sm" variant="neutral">
-                  {NETWORKS[chosenSeller.network].label}
+                  {PAYMENT_NETWORKS[chosenSeller.network].label}
                 </Tag>
                 <Tag size="sm" variant="neutral" className="font-mono">
                   {shortenAddress(chosenSeller.address)}
@@ -220,14 +181,11 @@ export function AgentFormFields({
             description={t("agent.fields.endpointUrl.description")}
             htmlFor={`${idPrefix}-endpoint`}
           >
-            <TextInput
-              id={`${idPrefix}-endpoint`}
-              value={values.endpointUrl ?? ""}
+            <FormTextInput
+              name="endpointUrl"
+              type="url"
+              inputMode="url"
               placeholder="https://agents.example.com/atlas/brief"
-              error={fieldError("endpointUrl")}
-              onChange={(value) =>
-                setValue("endpointUrl", value, { shouldValidate: true })
-              }
             />
           </FieldRow>
 
@@ -238,27 +196,20 @@ export function AgentFormFields({
           >
             <div className="flex gap-2">
               <div className="flex-1">
-                <TextInput
-                  id={`${idPrefix}-price`}
-                  value={values.priceAmount ?? ""}
+                <FormTextInput
+                  name="priceAmount"
+                  inputMode="decimal"
                   placeholder="0.002"
-                  error={fieldError("priceAmount")}
-                  onChange={(value) =>
-                    setValue("priceAmount", value, { shouldValidate: true })
-                  }
                 />
               </div>
               <div className="w-28">
-                <TextInput
+                <FormTextInput
                   id={`${idPrefix}-currency`}
-                  value={values.priceCurrency ?? ""}
+                  name="priceCurrency"
+                  aria-label={t("form.currency")}
                   format="uppercase"
                   maxLength={16}
                   placeholder="USD"
-                  error={fieldError("priceCurrency")}
-                  onChange={(value) =>
-                    setValue("priceCurrency", value, { shouldValidate: true })
-                  }
                 />
               </div>
             </div>
@@ -269,14 +220,7 @@ export function AgentFormFields({
             description={t("agent.fields.asset.description")}
             htmlFor={`${idPrefix}-asset`}
           >
-            <TextInput
-              id={`${idPrefix}-asset`}
-              value={values.assetAddress ?? ""}
-              error={fieldError("assetAddress")}
-              onChange={(value) =>
-                setValue("assetAddress", value, { shouldValidate: true })
-              }
-            />
+            <FormTextInput name="assetAddress" placeholder="0x…" />
           </FieldRow>
         </>
       )}
@@ -287,28 +231,14 @@ export function AgentFormFields({
             title={t("agent.fields.docsUrl.title")}
             htmlFor={`${idPrefix}-docs`}
           >
-            <TextInput
-              id={`${idPrefix}-docs`}
-              value={values.docsUrl ?? ""}
-              error={fieldError("docsUrl")}
-              onChange={(value) =>
-                setValue("docsUrl", value, { shouldValidate: true })
-              }
-            />
+            <FormTextInput name="docsUrl" type="url" inputMode="url" />
           </FieldRow>
 
           <FieldRow
             title={t("agent.fields.avatarUrl.title")}
             htmlFor={`${idPrefix}-avatar`}
           >
-            <TextInput
-              id={`${idPrefix}-avatar`}
-              value={values.avatarUrl ?? ""}
-              error={fieldError("avatarUrl")}
-              onChange={(value) =>
-                setValue("avatarUrl", value, { shouldValidate: true })
-              }
-            />
+            <FormTextInput name="avatarUrl" type="url" inputMode="url" />
           </FieldRow>
 
           <FieldRow
@@ -316,19 +246,12 @@ export function AgentFormFields({
             description={t("agent.fields.status.description")}
             htmlFor={`${idPrefix}-status`}
           >
-            <Select
-              id={`${idPrefix}-status`}
-              value={values.status}
+            <FormSelect
+              name="status"
               options={STATUS_OPTIONS.map((option) => ({
                 value: option.value,
                 title: t(option.labelKey),
               }))}
-              error={fieldError("status")}
-              onChange={(value) =>
-                setValue("status", value as AgentValues["status"], {
-                  shouldValidate: true,
-                })
-              }
             />
           </FieldRow>
 
@@ -336,19 +259,12 @@ export function AgentFormFields({
             title={t("agent.fields.visibility.title")}
             htmlFor={`${idPrefix}-visibility`}
           >
-            <Select
-              id={`${idPrefix}-visibility`}
-              value={values.visibility}
+            <FormSelect
+              name="visibility"
               options={VISIBILITY_OPTIONS.map((option) => ({
                 value: option.value,
                 title: t(option.labelKey),
               }))}
-              error={fieldError("visibility")}
-              onChange={(value) =>
-                setValue("visibility", value as AgentValues["visibility"], {
-                  shouldValidate: true,
-                })
-              }
             />
           </FieldRow>
         </>

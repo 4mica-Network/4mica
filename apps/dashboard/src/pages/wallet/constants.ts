@@ -1,14 +1,5 @@
 import type { WalletRole, WalletStatus } from "@stores/wallet/type";
 
-export {
-  chainDefinition,
-  explorerAddressUrl,
-  NETWORK_OPTIONS,
-  NETWORKS,
-  networkForChainId,
-  shortenAddress,
-} from "@/lib/networks";
-
 export const ROLE_LABEL_KEYS = {
   PAYER: "wallet.role.payer",
   RECIPIENT: "wallet.role.recipient",

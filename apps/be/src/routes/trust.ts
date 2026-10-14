@@ -20,6 +20,7 @@ import {
   errorResponseSchema,
   faqListResponseSchema,
   faqResponseSchema,
+  idParam,
   limitedResponses,
   policyResponseSchema,
   reportListResponseSchema,
@@ -32,14 +33,14 @@ import {
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 const childParamSchema = (child: string) =>
   ({
     type: "object",
     required: ["id", child],
-    properties: { id: { type: "string" }, [child]: { type: "string" } },
+    properties: { id: idParam, [child]: idParam },
   }) as const;
 
 const pageQuerySchema = {

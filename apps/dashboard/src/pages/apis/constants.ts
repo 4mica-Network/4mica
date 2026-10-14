@@ -41,31 +41,3 @@ export const CATEGORY_SUGGESTIONS = [
   "Search",
   "Storage",
 ] as const;
-
-export const trimAmount = (amount: string | null): string => {
-  if (amount === null) {
-    return "";
-  }
-  if (!amount.includes(".")) {
-    return amount;
-  }
-  const trimmed = amount.replace(/0+$/, "").replace(/\.$/, "");
-  return trimmed === "" || trimmed === "-" ? "0" : trimmed;
-};
-
-export const formatPrice = (
-  amount: string | null,
-  currency: string | null,
-  label: string | null,
-): string | null => {
-  if (amount !== null) {
-    const value = trimAmount(amount);
-    if (currency === null) {
-      return value;
-    }
-    return currency.toUpperCase() === "USD"
-      ? `$${value}`
-      : `${value} ${currency.toUpperCase()}`;
-  }
-  return label;
-};
