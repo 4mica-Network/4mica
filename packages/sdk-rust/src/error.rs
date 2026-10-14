@@ -3,7 +3,10 @@ use alloy::contract as alloy_contract;
 use alloy::primitives::{Address, B256, Bytes, U256};
 use anyhow::Error as AnyError;
 use reqwest::StatusCode;
-use rpc::ApiClientError;
+use rpc::{
+    ApiClientError, CheckpointRequiredDetails, CycleMismatchDetails, GuaranteeDecodeError,
+    TimestampNotPastCutoffDetails,
+};
 use serde_json::Value;
 use thiserror::Error;
 use url::ParseError;
@@ -385,29 +388,48 @@ pub enum SettlementError {
 pub enum PaymentError {
     #[error("invalid params: {0}")]
     InvalidParams(String),
-    #[error("address mismatch: signer={signer:?} != claims.user_address={claims}")]
-    AddressMismatch { signer: Address, claims: String },
-    #[error("invalid user address in claims")]
-    InvalidUserAddress,
-    #[error("invalid recipient address in claims")]
-    InvalidRecipientAddress,
+
+    #[error("signer {signer} cannot sign for payer {payer}")]
+    AddressMismatch { signer: Address, payer: Address },
+    #[error("payer address is not a valid address")]
+    InvalidPayerAddress,
     #[error("failed to sign the payment: {0}")]
     SigningFailed(String),
 
-    #[error("invalid BLS certificate")]
-    InvalidCertificate(#[source] AnyError),
-    #[error("certificate signature mismatch")]
-    CertificateMismatch,
-    #[error("guarantee domain mismatch")]
-    GuaranteeDomainMismatch,
-    #[error("unsupported guarantee version: {0}")]
-    UnsupportedGuaranteeVersion(u64),
+    #[error("guarantee receipt does not decode: {0}")]
+    MalformedReceipt(#[from] GuaranteeDecodeError),
+    #[error("guarantee receipt carries an unreadable signature")]
+    UnreadableReceiptSignature,
+    #[error("guarantee receipt was signed by {recovered}, not by the operator {expected}")]
+    ReceiptSignerMismatch {
+        expected: Address,
+        recovered: Address,
+    },
+
+    #[error(
+        "payer {} has {} uncheckpointed guarantees (max {}); submit a checkpoint and retry",
+        .0.payer, .0.uncheckpointed, .0.max_uncheckpointed
+    )]
+    CheckpointRequired(Box<CheckpointRequiredDetails>),
+    #[error(
+        "payment was signed for cycle {} but the active cycle is {}",
+        .0.signed_cycle_id, .0.active_cycle_id
+    )]
+    CycleMismatch(Box<CycleMismatchDetails>),
+    #[error(
+        "payment timestamp {} is not past the payer's checkpoint cutoff {}",
+        .0.timestamp, .0.timestamp_cutoff
+    )]
+    TimestampNotPastCutoff(Box<TimestampNotPastCutoffDetails>),
 
     #[error("failed to decode API response: {0}")]
     Decode(String),
 
     #[error(transparent)]
     Rpc(#[from] ApiClientError),
+
+    #[error(transparent)]
+    Client(#[from] ClientError),
 
     #[error(transparent)]
     Auth(#[from] AuthError),

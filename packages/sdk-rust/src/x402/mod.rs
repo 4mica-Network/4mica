@@ -1,26 +1,32 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::{Client, PaymentSignature, SigningScheme, error::X402Error};
+use crate::{Asset, Client, error::X402Error};
 use alloy::{
-    primitives::{B256, Bytes, U256},
+    primitives::{Address, B256, Bytes, U256},
     signers::Signer,
 };
 use async_trait::async_trait;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use reqwest::{Client as HttpClient, Url};
-use rpc::{PaymentGuaranteeRequest, PaymentGuaranteeRequestClaims, ValidationRequirement};
+use rpc::{PaymentRequest, PaymentRequestPayload, ValidationRequirement};
 
 pub mod model;
 
 pub use model::*;
 
+/// What the flow needs of a payer: a payload scoped to the live settlement cycle, and a signature
+/// over it.
 #[async_trait]
 pub trait FlowSigner: Send + Sync {
+    async fn new_payment(
+        &self,
+        recipient: Address,
+        amount: U256,
+        asset: Asset,
+    ) -> Result<PaymentRequestPayload, X402Error>;
+
     async fn sign_payment(
         &self,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme,
-    ) -> Result<PaymentSignature, X402Error>;
+        payload: PaymentRequestPayload,
+    ) -> Result<PaymentRequest, X402Error>;
 }
 
 #[async_trait]
@@ -28,13 +34,24 @@ impl<S> FlowSigner for Client<S>
 where
     S: Signer + Send + Sync,
 {
+    async fn new_payment(
+        &self,
+        recipient: Address,
+        amount: U256,
+        asset: Asset,
+    ) -> Result<PaymentRequestPayload, X402Error> {
+        self.payment
+            .new_payment(recipient, amount, asset)
+            .await
+            .map_err(X402Error::Signing)
+    }
+
     async fn sign_payment(
         &self,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme,
-    ) -> Result<PaymentSignature, X402Error> {
+        payload: PaymentRequestPayload,
+    ) -> Result<PaymentRequest, X402Error> {
         self.payment
-            .sign_request(claims, scheme)
+            .sign_request(payload)
             .await
             .map_err(X402Error::Signing)
     }
@@ -65,32 +82,22 @@ where
     pub async fn sign_payment(
         &self,
         payment_requirements: PaymentRequirements,
-        user_address: String,
     ) -> Result<X402SignedPayment, X402Error> {
         if payment_requirements.scheme != SCHEME_4MICA_CREDIT {
             return Err(X402Error::InvalidScheme(payment_requirements.scheme));
         }
 
-        let claims = Self::build_claims_request(&payment_requirements, &user_address)?;
-        let signature = self
-            .signer
-            .sign_payment(claims.clone(), SigningScheme::Eip712)
-            .await?;
-
-        let payload = PaymentGuaranteeRequest::new(
-            claims,
-            signature.signature.clone(),
-            signature.scheme.clone(),
-        );
+        let payload = self.build_payment(&payment_requirements).await?;
+        let request = self.signer.sign_payment(payload).await?;
 
         let envelope = X402PaymentEnvelope {
             x402_version: 1,
             scheme: payment_requirements.scheme,
             network: payment_requirements.network,
-            payload: payload.clone(),
+            payload: request.clone(),
         };
 
-        Self::finish(1, &envelope, payload, signature)
+        Self::finish(1, &envelope, request)
     }
 
     /// Build a signed payment envelope for the given payment requirements, for x402 version 2.
@@ -98,7 +105,6 @@ where
         &self,
         payment_required: X402PaymentRequiredV2,
         accepted: PaymentRequirementsV2,
-        user_address: String,
     ) -> Result<X402SignedPayment, X402Error> {
         if accepted.scheme != SCHEME_4MICA_CREDIT {
             return Err(X402Error::InvalidScheme(accepted.scheme));
@@ -107,27 +113,18 @@ where
             return Err(X402Error::InvalidVersion("expected x402 version 2".into()));
         }
 
-        let claims = Self::build_claims_request(&accepted, &user_address)?;
-        let signature = self
-            .signer
-            .sign_payment(claims.clone(), SigningScheme::Eip712)
-            .await?;
-
-        let payload = PaymentGuaranteeRequest::new(
-            claims,
-            signature.signature.clone(),
-            signature.scheme.clone(),
-        );
+        let payload = self.build_payment(&accepted).await?;
+        let request = self.signer.sign_payment(payload).await?;
 
         let envelope = X402PaymentEnvelopeV2 {
             x402_version: 2,
             accepted: accepted.clone(),
-            payload: payload.clone(),
+            payload: request.clone(),
             resource: Some(payment_required.resource),
             extensions: payment_required.extensions,
         };
 
-        Self::finish(2, &envelope, payload, signature)
+        Self::finish(2, &envelope, request)
     }
 
     /// Encode a signed envelope once, keeping both the object form (for a facilitator's
@@ -135,8 +132,7 @@ where
     fn finish(
         x402_version: u8,
         envelope: &impl serde::Serialize,
-        payload: PaymentGuaranteeRequest,
-        signature: PaymentSignature,
+        payload: PaymentRequest,
     ) -> Result<X402SignedPayment, X402Error> {
         let envelope =
             serde_json::to_value(envelope).map_err(|e| X402Error::EncodeEnvelope(e.to_string()))?;
@@ -148,7 +144,6 @@ where
             envelope,
             x402_version,
             payload,
-            signature,
         })
     }
 
@@ -200,24 +195,27 @@ where
         })
     }
 
-    /// Build the signed claims for a payment.
-    fn build_claims_request(
+    /// The payment these requirements ask for, scoped to the live settlement cycle.
+    async fn build_payment(
+        &self,
         requirements: &impl X402PaymentRequirements,
-        user_address: &str,
-    ) -> Result<PaymentGuaranteeRequestClaims, X402Error> {
-        let payment_context = Self::build_payment_context(requirements)?;
+    ) -> Result<PaymentRequestPayload, X402Error> {
+        let recipient = parse_address_field("payTo", requirements.pay_to())?;
+        let amount = parse_u256_field("amount", requirements.amount())?;
+        let asset = match parse_address_field("asset", requirements.asset())? {
+            Address::ZERO => Asset::Native,
+            token => Asset::Erc20(token),
+        };
 
-        let claims = PaymentGuaranteeRequestClaims::new(
-            user_address.to_string(),
-            requirements.pay_to().to_string(),
-            payment_context.req_id,
-            payment_context.amount,
-            payment_context.timestamp,
-            Some(requirements.asset().to_string()),
-        );
+        let mut payload = self.signer.new_payment(recipient, amount, asset).await?;
+        // Echo the advertised spelling of the recipient rather than a re-encoded one, so a
+        // resource server that compares it as a string still matches. What the payer commits to
+        // is the parsed address either way.
+        let PaymentRequestPayload::V1(inner) = &mut payload;
+        inner.recipient_address = requirements.pay_to().trim().to_string();
 
         let Some(validation) = parse_validation_extra(requirements)? else {
-            return Ok(claims);
+            return Ok(payload);
         };
 
         let subject = parse_b256_field("subject", &validation.subject)?;
@@ -226,39 +224,13 @@ where
             None => Bytes::new(),
         };
 
-        Ok(claims.with_validation(ValidationRequirement {
+        Ok(payload.with_validation(ValidationRequirement {
             validator: validation.validator,
             subject,
             deadline: validation.deadline,
             params,
         }))
     }
-
-    fn build_payment_context(
-        requirements: &impl X402PaymentRequirements,
-    ) -> Result<PaymentContext, X402Error> {
-        let req_id_bytes: [u8; 32] = rand::random();
-        let req_id = U256::from_be_bytes(req_id_bytes);
-        let amount = parse_u256_field("amount", requirements.amount())?;
-
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or_default();
-
-        Ok(PaymentContext {
-            req_id,
-            amount,
-            timestamp,
-        })
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct PaymentContext {
-    req_id: U256,
-    amount: U256,
-    timestamp: u64,
 }
 
 fn parse_validation_extra(
@@ -270,6 +242,15 @@ fn parse_validation_extra(
     let parsed: PaymentRequirementsExtra = serde_json::from_value(extra.clone())
         .map_err(|e| X402Error::InvalidExtra(e.to_string()))?;
     Ok(parsed.validation)
+}
+
+fn parse_address_field(field: &str, raw: &str) -> Result<Address, X402Error> {
+    raw.trim()
+        .parse::<Address>()
+        .map_err(|e| X402Error::InvalidNumber {
+            field: field.to_string(),
+            source: e.into(),
+        })
 }
 
 fn parse_u256_field(field: &str, raw: &str) -> Result<U256, X402Error> {

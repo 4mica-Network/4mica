@@ -1,79 +1,84 @@
-use std::str::FromStr;
+use alloy::hex;
+use alloy::primitives::Address;
+use alloy::signers::Signer;
+use alloy::sol_types::Eip712Domain;
+use async_trait::async_trait;
+use rpc::{CheckpointPayload, PaymentRequest, PaymentRequestPayload, SignedCheckpoint};
 
 use crate::error::PaymentError;
-use alloy::primitives::{Address, B256};
-use alloy::signers::Signer;
-
-use async_trait::async_trait;
-use rpc::{CorePublicParameters, PaymentGuaranteeRequestClaims, SigningScheme};
-use serde::Deserialize;
 
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct PaymentSignature {
-    pub signature: String,
-    pub scheme: SigningScheme,
-}
-
-/// Signs a guarantee request with the chosen EIP scheme.
+/// Signs the payloads a payer authorizes, under the domain the ClearingHouse verifies them in.
 #[async_trait]
-pub trait PaymentSigner: Send + Sync {
-    /// Signs the claims and returns the resulting signature.
-    ///
-    /// Implementations MUST verify that the signer address equals `claims.user_address`.
-    async fn sign_claims(
+pub(crate) trait PayerSigner: Send + Sync {
+    async fn sign_payment_request(
         &self,
-        params: &CorePublicParameters,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme,
-    ) -> Result<PaymentSignature, PaymentError>;
+        domain: &Eip712Domain,
+        payload: PaymentRequestPayload,
+    ) -> Result<PaymentRequest, PaymentError>;
+
+    async fn sign_checkpoint(
+        &self,
+        domain: &Eip712Domain,
+        payload: CheckpointPayload,
+    ) -> Result<SignedCheckpoint, PaymentError>;
 }
 
 #[async_trait]
-impl<S> PaymentSigner for S
+impl<S> PayerSigner for S
 where
     S: Signer + Send + Sync,
 {
-    async fn sign_claims(
+    async fn sign_payment_request(
         &self,
-        params: &CorePublicParameters,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme,
-    ) -> Result<PaymentSignature, PaymentError> {
-        let signer_addr = self.address();
-        let expected = Address::from_str(claims.user_address())
-            .map_err(|_| PaymentError::InvalidUserAddress)?;
+        domain: &Eip712Domain,
+        payload: PaymentRequestPayload,
+    ) -> Result<PaymentRequest, PaymentError> {
+        require_signer_is(self.address(), payload.user_address())?;
 
-        if signer_addr != expected {
-            return Err(PaymentError::AddressMismatch {
-                signer: signer_addr,
-                claims: claims.user_address().to_string(),
-            });
-        }
+        let digest = payload
+            .signing_digest(domain)
+            .map_err(|err| PaymentError::SigningFailed(err.to_string()))?;
+        let signature = self.sign_hash(&digest).await.map_err(sign_failed)?;
 
-        let digest: B256 = match scheme {
-            SigningScheme::Eip712 => crate::digest::eip712_digest_for_claims(params, &claims)
-                .map_err(|e| PaymentError::SigningFailed(e.to_string()))?,
-            SigningScheme::Eip191 => {
-                let user = Address::from_str(claims.user_address())
-                    .map_err(|_| PaymentError::InvalidUserAddress)?;
-                let recipient = Address::from_str(claims.recipient_address())
-                    .map_err(|_| PaymentError::InvalidRecipientAddress)?;
-                crate::digest::eip191_digest_for_claims(&claims, user, recipient)
-                    .map_err(|e| PaymentError::SigningFailed(e.to_string()))?
-            }
-        };
+        Ok(PaymentRequest::new(
+            payload,
+            hex::encode_prefixed(signature.as_bytes()),
+        ))
+    }
 
-        let sig = self
-            .sign_hash(&digest)
-            .await
-            .map_err(|e| PaymentError::SigningFailed(e.to_string()))?;
+    async fn sign_checkpoint(
+        &self,
+        domain: &Eip712Domain,
+        payload: CheckpointPayload,
+    ) -> Result<SignedCheckpoint, PaymentError> {
+        require_signer_is(self.address(), &payload.payer)?;
 
-        Ok(PaymentSignature {
-            signature: sig.to_string(),
-            scheme,
+        let digest = payload
+            .signing_digest(domain)
+            .map_err(|err| PaymentError::SigningFailed(err.to_string()))?;
+        let signature = self.sign_hash(&digest).await.map_err(sign_failed)?;
+
+        Ok(SignedCheckpoint {
+            payload,
+            signature: hex::encode_prefixed(signature.as_bytes()),
         })
     }
+}
+
+fn require_signer_is(signer: Address, payer: &str) -> Result<(), PaymentError> {
+    let payer = payer
+        .parse::<Address>()
+        .map_err(|_| PaymentError::InvalidPayerAddress)?;
+
+    if signer != payer {
+        return Err(PaymentError::AddressMismatch { signer, payer });
+    }
+    Ok(())
+}
+
+fn sign_failed(err: alloy::signers::Error) -> PaymentError {
+    PaymentError::SigningFailed(err.to_string())
 }
