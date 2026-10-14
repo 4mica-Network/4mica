@@ -22,8 +22,10 @@ use alloy::primitives::{Address, B256, Signature, U256, address, keccak256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolCall;
 use axum::{Json, Router, extract::Path, routing::get, routing::post};
-use crypto::bls::KeyMaterial;
-use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION, GuaranteeVersionDomain};
+use rpc::{
+    CLEARING_HOUSE_EIP712_NAME, CLEARING_HOUSE_EIP712_VERSION, CorePublicParameters,
+    PAYMENT_PAYLOAD_VERSION,
+};
 use sdk_4mica::client::model::{Route, TokenRoute};
 use sdk_4mica::contract::ClearingHouse::{claimNetCreditForCall, payNetDebitCall};
 use sdk_4mica::error::{SettlementError, SponsorshipError};
@@ -36,15 +38,15 @@ use tokio::net::TcpListener;
 const CHAIN_ID: u64 = 1337;
 const CONTRACT: Address = address!("00000000000000000000000000000000c04e4a1c");
 const CLEARING_HOUSE: Address = address!("00000000000000000000000000000000c1ea4111");
+const GUARANTEE_REGISTRY: Address = address!("0000000000000000000000000000000000065e61");
 const CREDITOR: Address = address!("000000000000000000000000000000000000c0ed");
 const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
 const CYCLE_ID: B256 = B256::repeat_byte(0xaa);
 const AMOUNT: u64 = 1_000_000;
 
-const GUARANTEE_DOMAIN: B256 = B256::repeat_byte(0x33);
 const CORE_DOMAIN: B256 = B256::repeat_byte(0x44);
 const TOKEN_DOMAIN: B256 = B256::repeat_byte(0x55);
-const BLS_SECRET: &str = "0x4573DBD225C8E065FC30FF774C9EF81BD29D34E559D80E2276EE7824812399D3";
+const GUARANTEE_SIGNER: Address = address!("0000000000000000000000000000000000005164");
 
 /// What the SDK put on the wire, so a test can assert on the transaction rather than only on the
 /// call having been made at all.
@@ -166,20 +168,16 @@ fn rpc_result(id: &Value, result: Value) -> Json<Value> {
 }
 
 fn public_params(eth_rpc_url: &str) -> CorePublicParameters {
-    let operator_key = KeyMaterial::from_str(BLS_SECRET).expect("valid test BLS key");
     CorePublicParameters {
-        public_key: operator_key.public_key().to_vec(),
+        guarantee_signer: GUARANTEE_SIGNER.to_string(),
         contract_address: CONTRACT.to_string(),
+        guarantee_registry_address: GUARANTEE_REGISTRY.to_string(),
+        clearing_house_address: CLEARING_HOUSE.to_string(),
         ethereum_http_rpc_url: eth_rpc_url.to_string(),
-        eip712_name: "4mica".into(),
-        eip712_version: "1".into(),
+        eip712_name: CLEARING_HOUSE_EIP712_NAME.into(),
+        eip712_version: CLEARING_HOUSE_EIP712_VERSION.into(),
         chain_id: CHAIN_ID,
-        supported_guarantee_versions: vec![GUARANTEE_CLAIMS_VERSION],
-        guarantee_domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        guarantee_domains: vec![GuaranteeVersionDomain {
-            version: GUARANTEE_CLAIMS_VERSION,
-            domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        }],
+        supported_payment_payload_versions: vec![PAYMENT_PAYLOAD_VERSION],
         core_domain_separator: format!("0x{}", alloy::hex::encode(CORE_DOMAIN)),
         validators: vec![],
     }

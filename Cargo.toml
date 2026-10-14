@@ -1,0 +1,41 @@
+[workspace]
+resolver = "3"
+members = ["packages/sdk-rust"]
+
+# `apps/facilitator` still builds against the published SDK surface, so it cannot compile against
+# the unreleased core crates the patch below points at. Excluded rather than broken: it keeps
+# building on its own from `apps/facilitator`, and becomes a member once it is migrated.
+exclude = ["apps/facilitator"]
+
+[workspace.package]
+edition = "2024"
+authors = ["4Mica Network <engineering@4mica.io>"]
+license = "CC-BY-NC-4.0"
+repository = "https://github.com/4mica-Network/4mica"
+homepage = "https://4mica.io"
+
+[workspace.dependencies]
+rpc = { version = "2.0.0-alpha.3", package = "rpc-4mica" }
+crypto = { version = "2.0.0-alpha.3", package = "crypto-4mica" }
+alloy = "2.0.4"
+anyhow = "1.0.102"
+async-trait = "0.1.86"
+base64 = "0.22"
+log = "0.4.29"
+rand = "0.10.1"
+reqwest = { version = "0.13.2", default-features = false }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+thiserror = "2.0.18"
+tokio = "1.52.0"
+url = { version = "2.5.8", features = ["serde"] }
+zeroize = "1.8.2"
+axum = "0.8.8"
+chrono = "0.4.44"
+serial_test = { version = "3.2.0", features = ["file_locks"] }
+
+# Development against unreleased core crates, checked out alongside this repo. Drop both entries
+# once they are published.
+[patch.crates-io]
+rpc-4mica = { path = "../4mica-core/crates/rpc" }
+crypto-4mica = { path = "../4mica-core/crates/crypto" }

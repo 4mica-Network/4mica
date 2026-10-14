@@ -1,8 +1,6 @@
-use rpc::PaymentGuaranteeRequest;
+use rpc::PaymentRequest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use crate::PaymentSignature;
 
 pub trait X402PaymentRequirements {
     fn amount(&self) -> &str;
@@ -78,10 +76,10 @@ pub struct X402PaymentEnvelope {
     pub x402_version: u8,
     pub scheme: String,
     pub network: String,
-    pub payload: PaymentGuaranteeRequest,
+    pub payload: PaymentRequest,
 }
 
-/// Final signed payment envelope plus the resolved paymentRequirements and claims.
+/// A signed payment, in every form the x402 exchange needs it.
 #[derive(Debug, Clone, Deserialize)]
 pub struct X402SignedPayment {
     /// Base64 of `envelope`, for the `X-PAYMENT` (v1) / `PAYMENT-SIGNATURE` (v2) request header.
@@ -90,8 +88,7 @@ pub struct X402SignedPayment {
     /// form is only ever an HTTP header value.
     pub envelope: Value,
     pub x402_version: u8,
-    pub payload: PaymentGuaranteeRequest,
-    pub signature: PaymentSignature,
+    pub payload: PaymentRequest,
 }
 
 /// End-to-end payment that has been prepared and settled via the X402 endpoints.
@@ -197,7 +194,7 @@ pub struct X402PaymentRequiredV2 {
 pub struct X402PaymentEnvelopeV2 {
     pub x402_version: u8,
     pub accepted: PaymentRequirementsV2,
-    pub payload: PaymentGuaranteeRequest,
+    pub payload: PaymentRequest,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<X402ResourceInfo>,
     /// Echoed back from `PaymentRequired.extensions`. Spec v2 §5.1.2 requires the client to
