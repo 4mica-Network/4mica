@@ -13,8 +13,14 @@ export type RouteHandler = (
   context?: unknown,
 ) => Response | Promise<Response>;
 
+export type PaidRouteHandler = (
+  request: Request,
+  context: unknown,
+  guarantee: PaywallGuarantee,
+) => Response | Promise<Response>;
+
 export function withPaywall(
-  handler: RouteHandler,
+  handler: PaidRouteHandler,
   verifier: PaywallVerifier,
   config: PaywallConfig,
 ): RouteHandler {
@@ -24,7 +30,7 @@ export function withPaywall(
     if (result instanceof Response) {
       return result;
     }
-    const response = await handler(request, context);
+    const response = await handler(request, context, result.guarantee);
     result.headers.forEach((value, key) => {
       response.headers.set(key, value);
     });

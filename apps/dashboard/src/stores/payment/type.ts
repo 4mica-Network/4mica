@@ -42,7 +42,10 @@ export interface Payment {
   agentSlug: string | null;
   agentName: string | null;
   direction: PaymentDirection;
+  onCore: boolean;
 }
+
+export type PaymentSort = "-createdAt" | "createdAt" | "-amount" | "amount";
 
 export interface PaymentListResponse {
   items: Payment[];
@@ -88,6 +91,8 @@ export interface PaymentFilters {
   direction: PaymentDirection | "";
   status: PaymentStatus | "";
   network: PaymentNetwork | "";
+  wallet: string;
+  sort: PaymentSort;
 }
 
 export type PaymentState = {

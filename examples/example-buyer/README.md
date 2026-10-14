@@ -16,10 +16,10 @@ cp .env.example .env
 | `4MICA_NETWORK` or `4MICA_RPC_URL` | Same network as the seller. |
 | `RESOURCE_URL` | The paywalled route, default `http://localhost:3000/quote`. |
 
-To deposit collateral:
+To deposit native collateral (`DEPOSIT_AMOUNT` wei, default 1 ETH):
 
-```ts
-await client.deposit.of(null, 1_000_000_000_000_000n).send();
+```bash
+pnpm --filter @4mica/example-buyer deposit
 ```
 
 ## Run

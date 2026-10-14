@@ -14,6 +14,7 @@ export const PAYMENT_SELECT = {
   status: true,
   failureReason: true,
   reqId: true,
+  guaranteeSignature: true,
   txHash: true,
   resource: true,
   description: true,
@@ -34,6 +35,7 @@ export type PaymentRow = Omit<
   | "amount"
   | "listing"
   | "agent"
+  | "guaranteeSignature"
   | "settledAt"
   | "couponCode"
   | "creditApplied"
@@ -46,6 +48,7 @@ export type PaymentRow = Omit<
   agentSlug: string | null;
   agentName: string | null;
   direction: "sent" | "received";
+  onCore: boolean;
 };
 
 const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
@@ -53,6 +56,7 @@ const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
     listing,
     agent,
     amount,
+    guaranteeSignature,
     settledAt,
     couponCode: _couponCode,
     creditApplied: _creditApplied,
@@ -69,6 +73,7 @@ const toRow = (row: RawPayment, myAddresses: Set<string>): PaymentRow => {
     agentSlug: agent?.slug ?? null,
     agentName: agent?.name ?? null,
     direction: myAddresses.has(row.payerAddress) ? "sent" : "received",
+    onCore: guaranteeSignature !== null,
   };
 };
 
@@ -166,12 +171,15 @@ export const listPayments = async (
   limit: number;
 }> => {
   const addresses = await walletAddressesFor(ownerId);
+  const scope = query.wallet
+    ? addresses.filter((address) => address === query.wallet)
+    : addresses;
 
-  if (addresses.length === 0) {
+  if (scope.length === 0) {
     return { items: [], total: 0, page: query.page, limit: query.limit };
   }
 
-  const where = whereFor(addresses, query);
+  const where = whereFor(scope, query);
   const skip = (query.page - 1) * query.limit;
   const mine = new Set(addresses);
 

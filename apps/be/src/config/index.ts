@@ -60,6 +60,20 @@ const EnvSchema = v.object({
     ),
   ]),
   UNSUBSCRIBE_SECRET: v.string(),
+  CORE_URL: v.union([
+    v.literal(""),
+    v.pipe(v.string(), v.startsWith("http", "CORE_URL must be an http(s) URL")),
+  ]),
+  CORE_SIGNER_KEY: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.regex(
+        /^0x[0-9a-fA-F]{64}$/,
+        "CORE_SIGNER_KEY must be a 0x-prefixed 32-byte hex private key",
+      ),
+    ),
+  ]),
   ONBOARDING_TICK_MS: numeric("ONBOARDING_TICK_MS", 10_000, 3_600_000),
   ONBOARDING_BATCH_SIZE: numeric("ONBOARDING_BATCH_SIZE", 1, 500),
   ONBOARDING_STEP_GAP_MS: numeric(
@@ -104,6 +118,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     PUBLIC_API_URL: source.PUBLIC_API_URL ?? "",
     VALKEY_URL: source.VALKEY_URL ?? "",
     UNSUBSCRIBE_SECRET: source.UNSUBSCRIBE_SECRET ?? "",
+    CORE_URL: source.CORE_URL ?? "",
+    CORE_SIGNER_KEY: source.CORE_SIGNER_KEY ?? "",
     ONBOARDING_TICK_MS: source.ONBOARDING_TICK_MS ?? "300000",
     ONBOARDING_BATCH_SIZE: source.ONBOARDING_BATCH_SIZE ?? "25",
     ONBOARDING_STEP_GAP_MS: source.ONBOARDING_STEP_GAP_MS ?? "259200000",
@@ -178,6 +194,11 @@ export const productionWarnings = (env: Env): string[] => {
       "PUBLIC_API_URL is unset; emailed links will point at localhost",
     );
   }
+  if (env.CORE_URL === "" || env.CORE_SIGNER_KEY === "") {
+    warnings.push(
+      "CORE_URL or CORE_SIGNER_KEY is unset; reported payments are not verified against 4mica core",
+    );
+  }
   if (env.TRUST_PROXY_HOPS === 0) {
     warnings.push(
       "TRUST_PROXY_HOPS is 0; behind nginx every client shares one IP",
@@ -219,6 +240,10 @@ export const config = {
     apiKeyMax: env.RATE_LIMIT_API_KEY_MAX,
   },
   trustProxyHops: env.TRUST_PROXY_HOPS,
+  core: {
+    url: env.CORE_URL || undefined,
+    signerKey: (env.CORE_SIGNER_KEY || undefined) as `0x${string}` | undefined,
+  },
   onboarding: {
     valkeyUrl: env.VALKEY_URL || undefined,
     unsubscribeSecret: env.UNSUBSCRIBE_SECRET || undefined,

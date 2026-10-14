@@ -15,8 +15,14 @@ const {
   apiListing,
   agent,
   redeemPaymentBenefits,
+  getCoreClient,
+  verifyGuarantee,
+  getSupportedTokens,
 } = vi.hoisted(() => ({
+  getSupportedTokens: vi.fn(),
   redeemPaymentBenefits: vi.fn(),
+  getCoreClient: vi.fn(),
+  verifyGuarantee: vi.fn(),
   authenticateRequest: vi.fn(),
   getUser: vi.fn(),
   findUnique: vi.fn(),
@@ -39,6 +45,11 @@ const {
 vi.mock("@controllers/customers/repository", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   redeemPaymentBenefits,
+}));
+
+vi.mock("@services/core", () => ({
+  getCoreClient,
+  closeCoreClient: vi.fn(async () => {}),
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -136,6 +147,7 @@ const storedPayment = (over: Record<string, unknown> = {}) => ({
   status: "SETTLED",
   failureReason: null,
   reqId: "0xabc",
+  guaranteeSignature: null,
   txHash: null,
   resource: null,
   description: null,
@@ -211,6 +223,10 @@ describe("payment routes", () => {
 
     redeemPaymentBenefits.mockReset();
     redeemPaymentBenefits.mockResolvedValue(null);
+
+    getCoreClient.mockReset();
+    getCoreClient.mockResolvedValue(null);
+    verifyGuarantee.mockReset();
   });
 
   describe("session-authenticated reads", () => {
@@ -247,6 +263,62 @@ describe("payment routes", () => {
         { payerAddress: { in: [MY_ADDRESS] } },
         { recipientAddress: { in: [MY_ADDRESS] } },
       ]);
+
+      await instance.close();
+    });
+
+    it("narrows the list to one of the caller's wallets", async () => {
+      wallet.findMany.mockResolvedValue([
+        { address: MY_ADDRESS },
+        { address: OTHER_ADDRESS },
+      ]);
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: `/me/payments?wallet=${MY_ADDRESS}`,
+        headers: AUTH,
+      });
+
+      expect(payment.findMany.mock.calls[0][0].where.OR).toEqual([
+        { payerAddress: { in: [MY_ADDRESS] } },
+        { recipientAddress: { in: [MY_ADDRESS] } },
+      ]);
+
+      await instance.close();
+    });
+
+    it("returns nothing for a wallet the caller does not own", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/payments?wallet=${OTHER_ADDRESS}`,
+        headers: AUTH,
+      });
+
+      expect(res.json()).toMatchObject({ items: [], total: 0 });
+      expect(payment.findMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("flags rows that carry a core guarantee", async () => {
+      payment.findMany.mockResolvedValue([
+        storedPayment({ guaranteeSignature: "0xbeef" }),
+        storedPayment({ id: "019fce62-6666-7000-8000-000000000000" }),
+      ]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/payments",
+        headers: AUTH,
+      });
+
+      expect(
+        res.json().items.map((row: { onCore: boolean }) => row.onCore),
+      ).toEqual([true, false]);
 
       await instance.close();
     });
@@ -346,6 +418,7 @@ describe("payment routes", () => {
         "guaranteeClaims",
       );
       expect(res.body).not.toContain("guaranteeClaims");
+      expect(res.body).not.toContain("guaranteeSignature");
 
       await instance.close();
     });
@@ -1090,6 +1163,153 @@ describe("payment routes", () => {
       expect(res.statusCode).toBe(401);
 
       await instance.close();
+    });
+  });
+
+  describe("4mica core verification", () => {
+    const CERT = { guaranteeClaims: "0xc1a1", guaranteeSignature: "0x5157" };
+
+    const coreClaims = (over: Record<string, unknown> = {}) => ({
+      reqId: 0xabc123n,
+      userAddress: "0x3D8E1f5a7c9B2D4E6a8C0F2B4D6E8A1c3F5B7D09",
+      recipientAddress: "0x6c5CC69E4C4863DbC3439Ab2673806ea7715eBD5",
+      assetAddress: "0x0000000000000000000000000000000000000000",
+      amount: 10_000n,
+      ...over,
+    });
+
+    const report = async (payload: Record<string, unknown>) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport({ amount: "10000", ...payload }),
+      });
+      await instance.close();
+      return res;
+    };
+
+    beforeEach(() => {
+      getCoreClient.mockResolvedValue({
+        payment: { verifyGuarantee },
+        rpc: { getSupportedTokens },
+      });
+      verifyGuarantee.mockResolvedValue(coreClaims());
+      getSupportedTokens.mockResolvedValue({
+        chainId: 84532,
+        tokens: [{ symbol: "USDC", address: CHECKSUMMED, decimals: 6 }],
+      });
+    });
+
+    it("records a payment whose certificate verifies and matches", async () => {
+      const res = await report(CERT);
+
+      expect(res.statusCode).toBe(201);
+      expect(verifyGuarantee).toHaveBeenCalledWith(
+        expect.objectContaining({
+          claims: CERT.guaranteeClaims,
+          signature: CERT.guaranteeSignature,
+        }),
+      );
+      expect(payment.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("accepts the certificate in core's unprefixed hex and stores it prefixed", async () => {
+      const res = await report({
+        guaranteeClaims: "c1a1",
+        guaranteeSignature: "5157",
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(verifyGuarantee).toHaveBeenCalledWith(
+        expect.objectContaining({ claims: "0xc1a1", signature: "0x5157" }),
+      );
+      expect(payment.create.mock.calls[0][0].data).toMatchObject(CERT);
+    });
+
+    it("requires the certificate once core is configured", async () => {
+      const res = await report({});
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("guaranteeClaims");
+      expect(payment.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a certificate core did not sign", async () => {
+      verifyGuarantee.mockRejectedValue(new Error("signature mismatch"));
+
+      const res = await report(CERT);
+
+      expect(res.statusCode).toBe(422);
+      expect(res.json()).toMatchObject({
+        error: "invalid_guarantee",
+        issues: [{ path: "guaranteeSignature" }],
+      });
+      expect(payment.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["amount", { amount: 99n }],
+      ["payerAddress", { userAddress: MY_ADDRESS }],
+      ["recipientAddress", { recipientAddress: OTHER_ADDRESS }],
+      ["reqId", { reqId: 1n }],
+      ["assetAddress", { assetAddress: CHECKSUMMED }],
+    ])("rejects a report whose %s disagrees with the guarantee", async (field, over) => {
+      verifyGuarantee.mockResolvedValue(coreClaims(over));
+
+      const res = await report(CERT);
+
+      expect(res.statusCode).toBe(422);
+      expect(res.json().issues[0].path).toBe(field);
+      expect(payment.create).not.toHaveBeenCalled();
+    });
+
+    it("accepts a whole amount written with trailing zero decimals", async () => {
+      const res = await report({ ...CERT, amount: "10000.000" });
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it("accepts the amount in display units of the native asset", async () => {
+      verifyGuarantee.mockResolvedValue(
+        coreClaims({ amount: 10_000_000_000_000_000n }),
+      );
+
+      const res = await report({ ...CERT, amount: "0.01" });
+
+      expect(res.statusCode).toBe(201);
+    });
+
+    it("reads an ERC-20's decimals from core to check a display amount", async () => {
+      verifyGuarantee.mockResolvedValue(
+        coreClaims({ assetAddress: CHECKSUMMED, amount: 1_500_000n }),
+      );
+
+      const res = await report({
+        ...CERT,
+        assetAddress: CHECKSUMMED,
+        amount: "1.5",
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(getSupportedTokens).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers 503 when core cannot be reached", async () => {
+      getCoreClient.mockRejectedValue(new Error("ECONNREFUSED"));
+
+      const res = await report(CERT);
+
+      expect(res.statusCode).toBe(503);
+      expect(res.json().error).toBe("core_unavailable");
+    });
+
+    it("does not ask for a certificate on a failed payment", async () => {
+      const res = await report({ status: "FAILED", failureReason: "declined" });
+
+      expect(res.statusCode).toBe(201);
+      expect(verifyGuarantee).not.toHaveBeenCalled();
     });
   });
 });

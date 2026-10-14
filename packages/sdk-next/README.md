@@ -85,7 +85,7 @@ const api = createAppClientFromEnv(); // reads FOURMICA_API_KEY
 const { listing } = await api.resource();
 
 export const GET = withPaywall(
-  async (request) => {
+  async (request, _context, guarantee) => {
     const paid = paymentFromHeader(request.headers.get("x-payment")!, 6);
 
     const decision = await api.resolveCustomer({
@@ -104,6 +104,8 @@ export const GET = withPaywall(
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
+      guaranteeClaims: guarantee.claims,
+      guaranteeSignature: guarantee.signature,
       resource: request.url,
     });
 
@@ -118,6 +120,10 @@ export const GET = withPaywall(
   },
 );
 ```
+
+The third handler argument is the certificate 4mica core issued for the payment.
+Report it with the payment: the 4Mica API verifies it against core and refuses
+a report it cannot match to a real guarantee.
 
 On the Edge runtime there is no `process.env`; pass the key directly with
 `createAppClient({ apiKey })` from this package instead of the env-driven factory.

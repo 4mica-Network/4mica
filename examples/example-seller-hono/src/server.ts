@@ -37,6 +37,7 @@ app.use(
 
 app.get("/quote", async (c) => {
   const paid = paymentFromHeader(c.req.header("x-payment") ?? "", 0);
+  const guarantee = c.get("paymentGuarantee");
 
   const decision = await api.resolveCustomer({
     payerAddress: paid.payerAddress,
@@ -55,6 +56,8 @@ app.get("/quote", async (c) => {
       network,
       assetAddress: asset,
       amount: paid.amount,
+      guaranteeClaims: guarantee.claims,
+      guaranteeSignature: guarantee.signature,
       resource: c.req.url,
     })
     .catch((error) => console.error("[seller] report failed:", error));

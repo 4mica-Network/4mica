@@ -25,7 +25,7 @@ const init = async () => {
   const client = await createClient();
 
   return withPaywall(
-    async (request) => {
+    async (request, _context, guarantee) => {
       const paid = paymentFromHeader(request.headers.get("x-payment") ?? "", 0);
 
       const decision = await api.resolveCustomer({
@@ -45,6 +45,8 @@ const init = async () => {
           network,
           assetAddress: asset,
           amount: paid.amount,
+          guaranteeClaims: guarantee.claims,
+          guaranteeSignature: guarantee.signature,
           resource: request.url,
         })
         .catch((error) => console.error("[seller] report failed:", error));

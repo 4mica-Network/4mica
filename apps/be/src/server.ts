@@ -14,6 +14,7 @@ import { appLogger } from "./logger/index";
 import { genReqId, installHttpHardening } from "./plugins/http-hardening";
 import { registerRateLimit } from "./plugins/rate-limit";
 import { type RouteRegistration, routes } from "./routes/index";
+import { closeCoreClient } from "./services/core";
 import { getEmailClient } from "./services/email";
 
 /**
@@ -79,6 +80,8 @@ export const initApp = async (
   app.decorate("email", getEmailClient());
 
   app.addHook("onClose", stopOnboardingDrip);
+
+  app.addHook("onClose", closeCoreClient);
 
   app.addHook("onClose", async () => {
     const { disconnect } = await import("@4mica/db");

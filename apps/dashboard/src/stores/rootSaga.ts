@@ -1,6 +1,7 @@
 import { all } from "redux-saga/effects";
 import agentSaga from "./agent/saga";
 import apiListingSaga from "./apiListing/saga";
+import balanceSaga from "./balance/saga";
 import bannerSaga from "./banner/saga";
 import customerSaga from "./customer/saga";
 import developerSaga from "./developer/saga";
@@ -20,6 +21,7 @@ export default function* rootSaga() {
     ...trustSaga,
     ...agentSaga,
     ...paymentSaga,
+    ...balanceSaga,
     ...customerSaga,
     ...resourceKeySaga,
   ]);

@@ -85,6 +85,8 @@ app.get(
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
+      guaranteeClaims: res.locals.paymentGuarantee.claims,
+      guaranteeSignature: res.locals.paymentGuarantee.signature,
       resource: req.originalUrl,
     });
   },

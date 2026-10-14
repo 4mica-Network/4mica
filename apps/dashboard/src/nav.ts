@@ -1,5 +1,4 @@
 import {
-  ArrowRightLeft,
   BadgeCheck,
   Bell,
   Blocks,
@@ -36,11 +35,6 @@ export const NAV_SECTIONS: NavSection[] = [
     titleKey: "nav.section.money",
     items: [
       { to: "/balances", labelKey: "nav.balances", icon: Landmark },
-      {
-        to: "/transactions",
-        labelKey: "nav.transactions",
-        icon: ArrowRightLeft,
-      },
       { to: "/payments", labelKey: "nav.payments", icon: CreditCard },
       { to: "/wallet", labelKey: "nav.wallet", icon: Wallet },
     ],

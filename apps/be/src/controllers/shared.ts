@@ -36,6 +36,12 @@ export const notFound = (reply: FastifyReply, what: string) =>
     message: `That ${what} does not exist.`,
   });
 
+export const coreUnavailable = (reply: FastifyReply) =>
+  reply.code(503).send({
+    error: "core_unavailable",
+    message: "4mica core is unreachable. Retry shortly.",
+  });
+
 export interface ValidationIssue {
   path: string;
   message: string;

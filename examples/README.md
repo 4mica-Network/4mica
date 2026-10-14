@@ -11,6 +11,8 @@ your dashboard. The buyer pays for that route.
 | [`example-seller-hono`](./example-seller-hono) | Seller | Hono | 3001 |
 | [`example-seller-next`](./example-seller-next) | Seller | Next.js | 3002 |
 | [`example-buyer`](./example-buyer) | Buyer | — | targets 3000 |
+| [`example-shop-app`](./example-shop-app) | Seller, with a UI | Next.js | 3010 |
+| [`example-wallet-app`](./example-wallet-app) | Buyer, with a UI | Next.js | 3011 |
 
 ## What you need
 

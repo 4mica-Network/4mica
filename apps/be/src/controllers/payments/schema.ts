@@ -25,8 +25,9 @@ const hex32 = v.pipe(
 const hexBlob = v.pipe(
   v.string(),
   v.trim(),
-  v.regex(/^0x[0-9a-fA-F]*$/, "must be a 0x-prefixed hex value"),
+  v.regex(/^(0x)?[0-9a-fA-F]*$/, "must be a hex value"),
   v.maxLength(20_000),
+  v.transform((value) => (value.startsWith("0x") ? value : `0x${value}`)),
 );
 
 export const ReportPaymentSchema = v.object({
@@ -69,6 +70,7 @@ export const ListPaymentsQuerySchema = v.object({
   direction: v.optional(PaymentDirectionSchema, "all"),
   status: v.optional(PaymentStatusSchema),
   network: v.optional(PaymentNetworkSchema),
+  wallet: v.optional(address),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(100))),
   sort: v.optional(
     v.picklist(["createdAt", "-createdAt", "amount", "-amount"]),

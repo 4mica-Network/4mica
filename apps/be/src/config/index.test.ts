@@ -152,6 +152,7 @@ describe("parseEnv", () => {
         expect.stringContaining("not a live key"),
         expect.stringContaining("RATE_LIMIT_ENABLED"),
         expect.stringContaining("PUBLIC_API_URL"),
+        expect.stringContaining("CORE_URL"),
       ]),
     );
     expect(
@@ -160,6 +161,8 @@ describe("parseEnv", () => {
           ...PRODUCTION,
           CLERK_SECRET_KEY: "sk_live_abc",
           PUBLIC_API_URL: "https://api.app.4mica.io",
+          CORE_URL: "https://base.api.4mica.xyz",
+          CORE_SIGNER_KEY: `0x${"1".repeat(64)}`,
         }),
       ),
     ).toEqual([]);

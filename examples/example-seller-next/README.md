@@ -37,4 +37,4 @@ pnpm --filter @4mica/example-buyer start  # pays and prints the 200
 1. `createAppClient()` reads `FOURMICA_API_KEY` and `api.resource()` returns the listing.
 2. `createClient()` connects to 4Mica with the seller wallet.
 3. The paywall is built from the listing's `payToAddress`, `assetAddress`, `network` and `priceAmount`.
-4. After a payment is verified, `api.resolveCustomer()` applies the payer rules you set in the dashboard, and `api.reportPayment()` records the payment so it shows under **Payments**.
+4. After a payment is verified, `api.resolveCustomer()` applies the payer rules you set in the dashboard, and `api.reportPayment()` records the payment, with the certificate 4mica core issued for it, so it shows under **Payments**.

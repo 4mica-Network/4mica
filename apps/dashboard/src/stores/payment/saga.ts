@@ -40,6 +40,8 @@ export function* fetchPayments(): Generator {
           direction: filters.direction,
           status: filters.status,
           network: filters.network,
+          wallet: filters.wallet,
+          sort: filters.sort,
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getPayments>>;

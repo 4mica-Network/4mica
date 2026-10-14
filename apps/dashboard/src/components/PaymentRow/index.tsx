@@ -65,6 +65,17 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           <Tag size="sm" variant="neutral">
             {PAYMENT_NETWORKS[payment.network].label}
           </Tag>
+          {payment.onCore && (
+            <Tooltip title={t("payment.row.onCoreHint")} placement="bottom">
+              <Tag
+                size="sm"
+                variant="success"
+                data-testid={`payment-on-core-${payment.id}`}
+              >
+                {t("payment.row.onCore")}
+              </Tag>
+            </Tooltip>
+          )}
           <span className="text-ink-subtle text-xs">
             {formatDateTime(payment.settledAt ?? payment.createdAt)}
           </span>

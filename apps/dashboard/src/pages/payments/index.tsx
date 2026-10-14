@@ -1,3 +1,4 @@
+import { shortenAddress } from "@4mica/rules";
 import { EmptyState, Pagination, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -20,8 +21,11 @@ import {
 import type {
   PaymentDirection,
   PaymentNetwork,
+  PaymentSort,
   PaymentStatus,
 } from "@stores/payment/type";
+import { fetchActiveWallets } from "@stores/wallet/actions";
+import { selectActiveWallets } from "@stores/wallet/selector";
 import { ArrowRightLeft, TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -43,14 +47,20 @@ export function Payments() {
   const isLoading = useAppSelector(selectIsPaymentsLoading);
   const hasLoaded = useAppSelector(selectHasLoadedPayments);
   const error = useAppSelector(selectPaymentError);
+  const wallets = useAppSelector(selectActiveWallets);
 
   useEffect(() => {
     dispatch(fetchPayments());
     dispatch(fetchPaymentSummary());
+    dispatch(fetchActiveWallets());
   }, [dispatch]);
 
   const hasFilters = Boolean(
-    filters.q || filters.direction || filters.status || filters.network,
+    filters.q ||
+      filters.direction ||
+      filters.status ||
+      filters.network ||
+      filters.wallet,
   );
   const showSpinner = isLoading && !hasLoaded;
   const showError = Boolean(error) && !hasLoaded && !isLoading;
@@ -116,6 +126,36 @@ export function Payments() {
               ]}
               onChange={(network) => dispatch(setPaymentFilters({ network }))}
               data-testid="payment-network-filter"
+            />
+
+            <ListToolbar.Filter<string>
+              label={t("payment.toolbar.wallet")}
+              className="sm:w-52"
+              value={filters.wallet}
+              options={[
+                { value: "", title: t("payment.toolbar.allWallets") },
+                ...wallets.map((wallet) => ({
+                  value: wallet.address,
+                  title: `${wallet.label} · ${shortenAddress(wallet.address)}`,
+                })),
+              ]}
+              onChange={(wallet) => dispatch(setPaymentFilters({ wallet }))}
+              data-testid="payment-wallet-filter"
+            />
+
+            <ListToolbar.Filter<PaymentSort>
+              label={t("list.sort")}
+              value={filters.sort}
+              options={[
+                { value: "-createdAt", title: t("payment.sort.newest") },
+                { value: "createdAt", title: t("payment.sort.oldest") },
+                { value: "-amount", title: t("payment.sort.amountHigh") },
+                { value: "amount", title: t("payment.sort.amountLow") },
+              ]}
+              onChange={(sort) =>
+                dispatch(setPaymentFilters({ sort: sort || "-createdAt" }))
+              }
+              data-testid="payment-sort"
             />
           </ListToolbar.Filters>
         </ListToolbar>

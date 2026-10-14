@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Buyer (payer): pay for a seller's paywalled route over x402",
   "scripts": {
-    "start": "tsx src/buyer.ts"
+    "start": "tsx src/buyer.ts",
+    "deposit": "tsx src/deposit.ts"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",

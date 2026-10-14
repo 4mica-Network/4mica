@@ -36,6 +36,7 @@ const listQuerySchema = {
       type: "string",
       enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
     },
+    wallet: { type: "string", maxLength: 42 },
     q: { type: "string", maxLength: 100 },
     sort: {
       type: "string",
@@ -143,7 +144,7 @@ export const paymentRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["payments"],
         summary: "Report a payment your service took",
         description:
-          "Idempotent on `reqId`, which the payer mints once per payment — a retry after a timeout updates the existing row rather than creating a second one. Returns 201 the first time and 200 thereafter. The first report fixes the payer, recipient, network, asset and amount; a PENDING payment may later settle or fail, but SETTLED and FAILED are final. A report that contradicts any of that is a 409.",
+          "Idempotent on `reqId`, which the payer mints once per payment — a retry after a timeout updates the existing row rather than creating a second one. Returns 201 the first time and 200 thereafter. The first report fixes the payer, recipient, network, asset and amount; a PENDING payment may later settle or fail, but SETTLED and FAILED are final. A report that contradicts any of that is a 409. When 4mica core is configured, a non-FAILED report must carry the BLS certificate core issued (`guaranteeClaims` + `guaranteeSignature`); one that does not verify, or whose claims disagree with the report, is a 422.",
         security: [{ apiKeyAuth: [] }],
         response: {
           ...limitedResponses,
@@ -152,6 +153,7 @@ export const paymentRoutes: FastifyPluginCallback = (app, _opts, done) => {
           400: errorResponseSchema,
           401: errorResponseSchema,
           409: errorResponseSchema,
+          422: errorResponseSchema,
         },
       },
     },

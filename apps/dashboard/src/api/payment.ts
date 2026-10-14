@@ -4,6 +4,7 @@ import type {
   PaymentDirection,
   PaymentListResponse,
   PaymentNetwork,
+  PaymentSort,
   PaymentStats,
   PaymentStatus,
   PaymentSummary,
@@ -17,8 +18,9 @@ export interface ListPaymentsParams
   direction?: PaymentDirection | "all";
   status?: PaymentStatus;
   network?: PaymentNetwork;
+  wallet?: string;
   q?: string;
-  sort?: "createdAt" | "-createdAt" | "amount" | "-amount";
+  sort?: PaymentSort;
 }
 
 export const getPayments = (params: ListPaymentsParams = {}) =>

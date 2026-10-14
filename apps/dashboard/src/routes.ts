@@ -19,7 +19,6 @@ import { Payments } from "@/pages/payments";
 import { PlansSettings } from "@/pages/plans";
 import { ProfileSettings } from "@/pages/profile";
 import { TeamSettings } from "@/pages/team";
-import { Transactions } from "@/pages/transactions";
 import { Wallet } from "@/pages/wallet";
 
 export interface RouteMeta {
@@ -31,7 +30,6 @@ export interface RouteMeta {
 export const APP_PAGES: RouteMeta[] = [
   { index: true, component: Overview },
   { path: "balances", component: Balances },
-  { path: "transactions", component: Transactions },
   { path: "payments", component: Payments },
   { path: "payments/disputes", component: Disputes },
   { path: "wallet", component: Wallet },

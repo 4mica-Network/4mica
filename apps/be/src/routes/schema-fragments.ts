@@ -414,6 +414,7 @@ export const paymentResponseSchema = {
     agentSlug: nullStr,
     agentName: nullStr,
     direction: { type: "string", enum: ["sent", "received"] },
+    onCore: { type: "boolean" },
   },
 } as const;
 
@@ -735,6 +736,54 @@ export const verificationSentResponseSchema = {
   type: "object",
   required: ["sent"],
   properties: { sent: bool },
+} as const;
+
+export const balancesResponseSchema = {
+  type: "object",
+  required: ["network", "wallets"],
+  properties: {
+    network: {
+      type: "string",
+      enum: ["BASE", "BASE_SEPOLIA", "ETHEREUM_SEPOLIA"],
+      nullable: true,
+    },
+    wallets: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "label", "address", "role", "assets"],
+        properties: {
+          id: str,
+          label: str,
+          address: str,
+          role: { type: "string", enum: ["PAYER", "RECIPIENT", "BOTH"] },
+          assets: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "assetAddress",
+                "symbol",
+                "decimals",
+                "total",
+                "locked",
+                "available",
+              ],
+              properties: {
+                assetAddress: str,
+                symbol: str,
+                decimals: int,
+                total: str,
+                locked: str,
+                available: str,
+                updatedAt: nullDate,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
 } as const;
 
 export const errorResponseSchema = {

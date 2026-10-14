@@ -2,6 +2,7 @@ import { applyMiddleware, combineReducers, compose, createStore } from "redux";
 import createSagaMiddleware from "redux-saga";
 import agentReducer from "./agent/reducer";
 import apiListingReducer from "./apiListing/reducer";
+import balanceReducer from "./balance/reducer";
 import bannerReducer from "./banner/reducer";
 import customerReducer from "./customer/reducer";
 import developerReducer from "./developer/reducer";
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
   trust: trustReducer,
   agent: agentReducer,
   payment: paymentReducer,
+  balance: balanceReducer,
   customer: customerReducer,
   resourceKey: resourceKeyReducer,
 });

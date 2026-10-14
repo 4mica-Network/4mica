@@ -1,6 +1,11 @@
 import "dotenv/config";
 
-import { fromAppNetwork, paymentFromHeader, paywall } from "@4mica/sdk-express";
+import {
+  fromAppNetwork,
+  type PaywallGuarantee,
+  paymentFromHeader,
+  paywall,
+} from "@4mica/sdk-express";
 import { createAppClient, createClient } from "@4mica/sdk-node";
 import express from "express";
 
@@ -34,6 +39,7 @@ app.get(
   }),
   async (req, res) => {
     const paid = paymentFromHeader(req.get("x-payment") ?? "", 0);
+    const guarantee = res.locals.paymentGuarantee as PaywallGuarantee;
 
     const decision = await api.resolveCustomer({
       payerAddress: paid.payerAddress,
@@ -55,6 +61,8 @@ app.get(
         network,
         assetAddress: asset,
         amount: paid.amount,
+        guaranteeClaims: guarantee.claims,
+        guaranteeSignature: guarantee.signature,
         resource: `${req.protocol}://${req.get("host")}/quote`,
       })
       .catch((error) => console.error("[seller] report failed:", error));

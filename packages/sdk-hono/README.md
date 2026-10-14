@@ -82,6 +82,8 @@ app.get("/quote", async (c) => {
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
+      guaranteeClaims: c.get("paymentGuarantee").claims,
+      guaranteeSignature: c.get("paymentGuarantee").signature,
       resource: c.req.url,
     }),
   );
