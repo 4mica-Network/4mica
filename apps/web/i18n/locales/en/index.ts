@@ -30,6 +30,8 @@ export const en = {
     pricing: "Pricing",
     byCustomer: "By customer",
     byUseCase: "By use case",
+    developersOverview: "How it works",
+    developersOverviewDescription: "Deposit, spend, net, and settle in code",
     documentation: "Documentation",
     documentationDescription: "Guides, SDKs, and API reference",
     apiStatus: "API status",
@@ -200,6 +202,9 @@ export const en = {
         badge: "Deposit",
         title: "Deposit collateral once",
         desc: "Funds go into Aave and earn yield. A single collateral deposit covers all credit.",
+        layer: 2,
+        caption:
+          "Collateral is deposited once. It sits in Aave and earns yield.",
         code: `await client.user.approveErc20(usdc.address, AMOUNT);
 await client.user.deposit(AMOUNT, usdc.address);`,
       },
@@ -208,6 +213,9 @@ await client.user.deposit(AMOUNT, usdc.address);`,
         badge: "Spend",
         title: "Spend on credit: instant, off-chain",
         desc: "The agent signs an EIP-712 guarantee claim and receives BLS-signed credit. No gas, no chain transaction. Verified in milliseconds.",
+        layer: 0,
+        caption:
+          "Each request pays over x402 with a signed guarantee. Nothing touches the chain.",
         code: `const payment = await signGuarantee({
   cycleId:   "0xabc",  
   reqId:     "0x0",
@@ -224,6 +232,9 @@ await client.user.deposit(AMOUNT, usdc.address);`,
         badge: "Netting",
         title: "Netting across the cycle",
         desc: "Every 7 days the cycle closes. Bilateral flows collapse into one net position per participant.",
+        layer: 1,
+        caption:
+          "4Mica nets the cycle: 55 guarantees become one position per participant.",
         code: `// Cycle closes every 7 days, netting begins
 // Bilateral edges this cycle:
 Alice → Bob:  800 USDC  (40 guarantees)
@@ -237,6 +248,9 @@ Bob → Alice:  300 USDC  (15 guarantees)
         badge: "Settle",
         title: "Settle on-chain with one net payment",
         desc: "Net debtors pay once. Creditors claim once. Defaults are covered by vault collateral.",
+        layer: 3,
+        caption:
+          "One net payment settles on Base. Collateral covers any default.",
         code: `// Debtor pays net position to ClearingHouse
 await clearingHouse.payNetDebit(
   cycleId,
@@ -254,6 +268,137 @@ await clearingHouse.claimNetCredit(
 // 55 off-chain payments → 1 on-chain settlement`,
       },
     ],
+    layers: [
+      { name: "x402", role: "Payment protocol" },
+      { name: "4Mica", role: "Credit & clearing" },
+      { name: "Aave", role: "Yield" },
+      { name: "Base", role: "Settlement" },
+    ],
+    copy: "Copy",
+    copied: "Copied",
+    agenticPayments: {
+      kicker: "Agentic payments",
+      title:
+        "One request, one payment. What happens in between decides the cost.",
+      actors: ["Agent", "API", "4Mica Core", "Base"],
+      flows: [
+        {
+          id: "x402",
+          label: "x402, settled per request",
+          steps: [
+            {
+              from: 0,
+              to: 1,
+              label: "GET /resource",
+              desc: "The agent calls a paid API the way it calls any other.",
+            },
+            {
+              from: 1,
+              to: 0,
+              label: "402 Payment Required",
+              desc: "The API answers with its price and where to pay.",
+            },
+            {
+              from: 0,
+              to: 1,
+              label: "Retry with a signed transfer",
+              desc: "The agent signs a stablecoin transfer and sends the request again.",
+            },
+            {
+              from: 1,
+              to: 3,
+              label: "Settle the transfer on-chain",
+              desc: "Before serving anything, the transfer has to land on-chain.",
+            },
+            {
+              from: 3,
+              to: 1,
+              label: "Wait for confirmation",
+              desc: "Every request waits for a block and pays gas.",
+            },
+            {
+              from: 1,
+              to: 0,
+              label: "200 OK",
+              desc: "Only once the payment is final does the agent get its response.",
+            },
+            {
+              label: "× 55 requests this cycle: 55 on-chain transactions",
+              note: true,
+              desc: "Repeat it 55 times and you get 55 transactions, 55 gas fees and 55 waits.",
+            },
+          ],
+        },
+        {
+          id: "mica",
+          label: "The same request, cleared by 4Mica",
+          steps: [
+            {
+              from: 0,
+              to: 1,
+              label: "GET /resource",
+              desc: "The agent calls a paid API the way it calls any other.",
+            },
+            {
+              from: 1,
+              to: 0,
+              label: "402 Payment Required",
+              desc: "The API answers with its price, same as x402.",
+            },
+            {
+              from: 0,
+              to: 1,
+              label: "Retry with a signed guarantee",
+              desc: "Instead of moving money, the agent signs a guarantee backed by its collateral.",
+            },
+            {
+              from: 1,
+              to: 2,
+              label: "Verify the guarantee",
+              desc: "The API asks 4Mica Core to check the guarantee against the agent's credit.",
+            },
+            {
+              from: 2,
+              to: 1,
+              label: "BLS certificate",
+              brand: true,
+              desc: "Core answers in milliseconds with a BLS certificate the API can trust.",
+            },
+            {
+              from: 1,
+              to: 0,
+              label: "200 OK",
+              desc: "The agent gets its response straight away. Nothing has touched the chain.",
+            },
+            {
+              label: "× 55 requests this cycle: nothing on-chain",
+              note: true,
+              desc: "Repeat it 55 times. Still no transactions, no gas and no waiting.",
+            },
+            {
+              label: "Cycle closes, positions net",
+              note: true,
+              brand: true,
+              desc: "When the cycle closes, what the parties owe each other cancels out. One net position per participant remains.",
+            },
+            {
+              from: 2,
+              to: 3,
+              label: "One net settlement on-chain",
+              brand: true,
+              desc: "That one position settles on Base in a single transaction, while the collateral keeps earning yield.",
+            },
+          ],
+        },
+      ],
+      next: "Click the diagram to continue",
+      replay: "Click to replay",
+      stats: [
+        { value: "1", label: "on-chain transaction per cycle" },
+        { value: "ms", label: "to authorise a request" },
+        { value: "APY", label: "on the collateral" },
+      ],
+    },
     stats: [
       { value: "1 tx", label: "per settlement" },
       { value: "~0", label: "gas per call" },
@@ -679,6 +824,13 @@ await clearingHouse.claimNetCredit(
         avatar: "SR",
       },
     ],
+  },
+  developers: {
+    kicker: "Developers",
+    title: "Integrate credit-backed x402 payments",
+    lead: "Deposit once, pay per request on credit, and settle net on-chain. Everything below is the SDK code an agent runs.",
+    primaryCta: "Read the docs",
+    secondaryCta: "View on GitHub",
   },
   pricing: {
     seo: {
@@ -1202,6 +1354,20 @@ await clearingHouse.claimNetCredit(
         "open source collaboration",
       ],
       imageAlt: "4Mica careers",
+    },
+    developers: {
+      title: "Developers: x402 Credit and Clearing in Code | 4Mica",
+      description:
+        "See the SDK calls behind 4Mica: deposit collateral once, sign guarantees per request, net positions each cycle, and settle once on-chain.",
+      keywords: [
+        "4Mica SDK",
+        "x402 developers",
+        "x402 integration",
+        "agent payments SDK",
+        "BLS guarantees",
+        "net settlement",
+      ],
+      imageAlt: "4Mica developers: x402 credit and clearing in code",
     },
     partners: {
       title: "x402 Facilitator and Integration Partners | 4Mica",

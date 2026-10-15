@@ -3,7 +3,7 @@
 const { execSync } = require("node:child_process");
 const net = require("node:net");
 
-const startPort = parseInt(process.env.PORT || "3000", 10);
+const startPort = parseInt(process.env.PORT || "3200", 10);
 
 function checkPort(port) {
   return new Promise((resolve) => {
@@ -19,7 +19,7 @@ function checkPort(port) {
       server.close();
       resolve(true);
     });
-    server.listen(port);
+    server.listen(port, "0.0.0.0");
   });
 }
 
