@@ -88,7 +88,7 @@ Start the development server:
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3200](http://localhost:3200).
 
 ## Development
 

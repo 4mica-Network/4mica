@@ -68,6 +68,7 @@ const buildRoutes = () =>
     about: "/about",
     agentsRegister: "/agents/register",
     careers: "/careers",
+    developers: "/developers",
     interactiveProtocol: "/interactive-protocol",
     leadership: "/leadership",
     partners: "/partners",
