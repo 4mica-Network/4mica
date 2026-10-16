@@ -11,11 +11,11 @@ export default async function HowItWorksSection() {
   return (
     <section id="how-it-works" className="section-gloss py-24">
       <div className="mx-auto w-full max-w-300">
-        <div className="mb-16 text-center">
+        <div className="mb-12 text-center">
           <p className="section-kicker">
             {messages.home.sections.howItWorksKicker}
           </p>
-          <h2 className="section-title font-normal">
+          <h2 className="section-title font-normal text-[1.75rem] leading-tight md:text-5xl">
             {messages.home.sections.howItWorksTitle}
           </h2>
           <p className="section-lead mx-auto max-w-xl">

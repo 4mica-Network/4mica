@@ -13,7 +13,7 @@ import { STEPS } from "../data";
 const LAYERS = messages.home.layers;
 const BRAND_LAYER = 1;
 const LAYER_GAP_REM = 5.5;
-const STACK_MID_REM = 15.25;
+const LAYER_HALF_REM = 7;
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -47,12 +47,9 @@ function Layer({
 }) {
   const layer = LAYERS[index];
   const isBrand = index === BRAND_LAYER;
-  const offset = useTransform(
-    progress,
-    (p) => (index - (LAYERS.length - 1) / 2) * LAYER_GAP_REM * p,
-  );
-  const top = useTransform(offset, (o) => `${STACK_MID_REM - 7 + o}rem`);
-  const labelTop = useTransform(offset, (o) => `${STACK_MID_REM + o}rem`);
+  const offset = useTransform(progress, (p) => index * LAYER_GAP_REM * p);
+  const top = useTransform(offset, (o) => `${o}rem`);
+  const labelTop = useTransform(offset, (o) => `${LAYER_HALF_REM + o}rem`);
 
   return (
     <>
@@ -130,13 +127,13 @@ export default function HowItWorksSteps({ html }: { html: string[] }) {
             onViewportEnter={() => setActive(i)}
             viewport={{ margin: "-50% 0px -50% 0px" }}
           >
-            <p className="font-mono text-ink-muted text-md uppercase tracking-widest">
+            <p className="font-mono text-ink-muted text-sm uppercase tracking-widest md:text-md">
               <span className="text-brand">{item.num}</span> · {item.badge}
             </p>
-            <h3 className="mt-4 font-normal text-3xl text-ink-strong tracking-tight md:text-4xl">
+            <h3 className="mt-3 font-normal text-2xl text-ink-strong tracking-tight md:mt-4 md:text-4xl">
               {item.title}
             </h3>
-            <p className="mt-4 max-w-xl text-ink-muted text-lg leading-relaxed">
+            <p className="mt-3 max-w-xl text-base text-ink-muted leading-relaxed md:mt-4 md:text-lg">
               {item.desc}
             </p>
 
@@ -148,7 +145,7 @@ export default function HowItWorksSteps({ html }: { html: string[] }) {
                 <CopyButton code={item.code} />
               </div>
               <div
-                className="shiki-code overflow-x-auto p-5 font-mono text-md leading-6"
+                className="shiki-code overflow-x-auto p-4 font-mono text-sm leading-6 md:p-5 md:text-md"
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes source text at build time; html contains only its own token markup.
                 dangerouslySetInnerHTML={{ __html: html[i] }}
               />
@@ -158,7 +155,7 @@ export default function HowItWorksSteps({ html }: { html: string[] }) {
       </div>
 
       <div className="hidden xl:block">
-        <div className="sticky top-24 flex h-[calc(100vh-6rem)] flex-col justify-center">
+        <div className="sticky top-[max(6rem,calc(50vh-17.5rem))]">
           <div className="relative h-120 w-120">
             {LAYERS.map((layer, i) => (
               <Layer

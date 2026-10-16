@@ -119,7 +119,7 @@ export default function AgenticPaymentsSection() {
           : "hidden";
 
   return (
-    <section className="section-gloss mt-24 py-20 md:mt-40">
+    <section className="section-gloss mt-40 hidden py-20 md:block">
       <div className="mx-auto w-full max-w-300">
         <motion.div
           className="mb-10 text-center"
