@@ -4,7 +4,6 @@ import { useTheme } from "@context/ThemeProvider";
 import { motion } from "framer-motion";
 import type { CSSProperties, PointerEvent } from "react";
 import { useRef, useState } from "react";
-import { messages } from "@/i18n";
 import {
   micaLines,
   micaNet,
@@ -12,7 +11,8 @@ import {
   SCENARIO,
   x402Lines,
   x402Total,
-} from "../data";
+} from "@/app/(home)/data";
+import { messages } from "@/i18n";
 
 const ACCENTS = {
   dark: { red: "#f87171", green: "#4ade80" },

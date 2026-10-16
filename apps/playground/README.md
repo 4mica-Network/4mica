@@ -135,8 +135,9 @@ stores hashed credentials.
 
 | Port | Service |
 | --- | --- |
-| 3000 | `apps/web` dev |
+| 3000 | 4mica-core |
 | **3100** | **this app** |
+| 3200 | `apps/web` dev |
 | 4000 | `apps/be` |
 | 4173 | `apps/dashboard` |
 | 5433 | Postgres |

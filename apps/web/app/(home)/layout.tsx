@@ -1,5 +1,5 @@
-import GlobalNetworkBackground from "@components/GlobalNetworkBackgroundLazy";
 import Shell from "@components/Shell";
+import LiquidLines from "./_components/LiquidLines";
 
 export default function HomeLayout({
   children,
@@ -8,7 +8,7 @@ export default function HomeLayout({
 }>) {
   return (
     <>
-      <GlobalNetworkBackground />
+      <LiquidLines />
       <Shell>{children}</Shell>
     </>
   );

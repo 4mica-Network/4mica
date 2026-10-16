@@ -62,6 +62,12 @@ export const NAV_ITEMS: NavItem[] = [
       {
         items: [
           {
+            title: messages.navigation.developersOverview,
+            href: links.developers,
+            description: messages.navigation.developersOverviewDescription,
+            icon: "ri-code-s-slash-line",
+          },
+          {
             title: messages.navigation.documentation,
             href: links.docs,
             description: messages.navigation.documentationDescription,

@@ -10,7 +10,7 @@
   "tasks": [
     {
       "label": "Launch 4mica Development terminals",
-      "dependsOn": ["Web App(3000)"],
+      "dependsOn": ["Web App(3200)"],
       // Mark as the default build task so cmd/ctrl+shift+b launches local dev.
       "group": {
         "kind": "build",
@@ -18,8 +18,8 @@
       }
     },
     {
-      // Next.js app at http://localhost:3000.
-      "label": "Web App(3000)",
+      // Next.js app at http://localhost:3200.
+      "label": "Web App(3200)",
       "type": "shell",
       "command": "pnpm --filter @4mica/web dev",
       "isBackground": false,

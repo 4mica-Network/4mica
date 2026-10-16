@@ -4,6 +4,7 @@ import { getAllBlogPosts, getBlogPostMeta } from "@/lib/blog";
 import { ABOUT_SEO } from "./about";
 import { BLOG_SEO } from "./blog";
 import { CAREERS_SEO } from "./careers";
+import { DEVELOPERS_SEO } from "./developers";
 import { DPA_SEO } from "./dpa";
 import { HOME_SEO } from "./home";
 import { LEADERSHIP_SEO } from "./leadership";
@@ -69,6 +70,7 @@ const STATIC_PAGES = {
   "/about": ABOUT_SEO,
   "/blog": BLOG_SEO,
   "/careers": CAREERS_SEO,
+  "/developers": DEVELOPERS_SEO,
   "/team": LEADERSHIP_SEO,
   "/partners": PARTNERS_SEO,
   "/privacy": PRIVACY_SEO,

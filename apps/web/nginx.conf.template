@@ -78,7 +78,7 @@ server {
   location = /manifest.webmanifest { proxy_pass $mica_web; }
 
   # Marketing pages. Mirrors `reservedSegments`.
-  location ~ ^/(about|agents|blog|careers|docs|dpa|interactive-protocol|leadership|legal|partners|pricing|privacy|register|roadmap|solution|solutions|status|team|terms|waitlist)(/|$) {
+  location ~ ^/(about|agents|blog|careers|developers|docs|dpa|interactive-protocol|leadership|legal|partners|pricing|privacy|register|roadmap|solution|solutions|status|team|terms|waitlist)(/|$) {
     proxy_pass $mica_web;
   }
 
