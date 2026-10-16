@@ -56,13 +56,25 @@ fn public_params() -> CorePublicParameters {
     }
 }
 
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_secs()
+}
+
+/// A cycle still open for the next day, so only a refusal can expire it.
 fn active_cycle(cycle_id: B256) -> Value {
+    active_cycle_ending(cycle_id, unix_now() + 86_400)
+}
+
+fn active_cycle_ending(cycle_id: B256, period_end: u64) -> Value {
     json!({
         "cycle_id": format!("{cycle_id:#x}"),
         "cycle_id_text": "0x0:1700000000",
         "asset_address": Address::ZERO.to_string(),
         "period_start": 1_700_000_000u64,
-        "period_end": 1_700_086_400u64,
+        "period_end": period_end,
     })
 }
 
@@ -198,8 +210,8 @@ async fn a_cutoff_refusal_names_the_cutoff() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A cycle is held until core rejects a payment signed against it. Only then is it re-read, so the
-/// next payment is scoped to the cycle core will actually accept.
+/// A cycle is held until core rejects a payment signed against it, so the next payment is scoped to
+/// the cycle core will actually accept.
 #[tokio::test]
 #[serial_test::file_serial]
 async fn a_cycle_mismatch_is_what_expires_the_cached_cycle() -> anyhow::Result<()> {
@@ -245,6 +257,52 @@ async fn a_cycle_mismatch_is_what_expires_the_cached_cycle() -> anyhow::Result<(
         NEXT_CYCLE,
         "the refusal must have expired the cached cycle"
     );
+    Ok(())
+}
+
+/// Once a cycle's period ends core opens the next one, so the client stops reusing it.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_cycle_is_reread_once_its_period_ends() -> anyhow::Result<()> {
+    let reads = Arc::new(Mutex::new(CycleReads::default()));
+    let cycle_reads = reads.clone();
+
+    let core_url = spawn(
+        Router::new()
+            .route(
+                "/core/public-params",
+                get(|| async { Json(public_params()) }),
+            )
+            .route(
+                "/core/cycles/active",
+                get(move || {
+                    let reads = cycle_reads.clone();
+                    async move {
+                        reads.lock().unwrap().0 += 1;
+                        Json(active_cycle_ending(FIRST_CYCLE, unix_now() - 1))
+                    }
+                }),
+            ),
+    )
+    .await?;
+
+    let client = Client::connect(
+        ClientBuilder::default()
+            .rpc_url(core_url)
+            .signer(PrivateKeySigner::random())
+            .bearer_token("test-token")
+            .contract_address(CONTRACT.to_string())
+            .build()?,
+    )
+    .await?;
+
+    for _ in 0..2 {
+        client
+            .payment
+            .new_payment(RECIPIENT, U256::from(10u64), Asset::Native)
+            .await?;
+    }
+    assert_eq!(reads.lock().unwrap().0, 2, "an ended cycle must be re-read");
     Ok(())
 }
 
