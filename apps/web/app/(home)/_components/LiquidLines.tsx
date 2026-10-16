@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "@context/ThemeProvider";
 import {
   motion,
   useMotionValueEvent,
@@ -27,6 +28,8 @@ precision highp float;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform float uDpr;
+uniform vec3 uColor;
+uniform vec3 uBackground;
 
 float hash(vec2 v) {
   return fract(sin(dot(v, vec2(12.9898, 78.233))) * 43758.5453);
@@ -67,7 +70,7 @@ void main() {
   float grain = hash(floor(gl_FragCoord.xy / uDpr)) - 0.5;
   float fade = mix(0.4, 1.0, smoothstep(0.08, 0.58, gl_FragCoord.x / uResolution.x));
   float a = clamp(min(silk, 1.0) * (1.0 + grain * 0.35), 0.0, 1.0) * 0.75 * fade;
-  gl_FragColor = vec4(vec3(a), 1.0);
+  gl_FragColor = vec4(mix(uBackground, uColor, a), 1.0);
 }
 `;
 
@@ -107,10 +110,18 @@ const createProgram = (gl: WebGLRenderingContext) => {
   return program;
 };
 
+const readToken = (name: string) =>
+  getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim()
+    .split(/\s+/)
+    .map((channel) => Number(channel) / 255);
+
 export default function LiquidLines() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visibleRef = useRef(true);
   const reduceMotion = useReducedMotion();
+  const { theme } = useTheme();
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, FADE_DISTANCE], [1, 0]);
 
@@ -130,6 +141,10 @@ export default function LiquidLines() {
     const uResolution = gl.getUniformLocation(program, "uResolution");
     const uTime = gl.getUniformLocation(program, "uTime");
     const uDpr = gl.getUniformLocation(program, "uDpr");
+    const [r, g, b] = readToken("--ink-strong");
+    gl.uniform3f(gl.getUniformLocation(program, "uColor"), r, g, b);
+    const [br, bg, bb] = readToken("--surface-deep");
+    gl.uniform3f(gl.getUniformLocation(program, "uBackground"), br, bg, bb);
 
     const draw = (seconds: number) => {
       if (!canvas.width || !canvas.height) return;
@@ -166,12 +181,12 @@ export default function LiquidLines() {
       gl.deleteBuffer(gl.getParameter(gl.ARRAY_BUFFER_BINDING));
       gl.deleteProgram(program);
     };
-  }, [reduceMotion]);
+  }, [theme, reduceMotion]);
 
   return (
     <motion.div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 bg-black"
+      className="pointer-events-none fixed inset-0 z-0 bg-surface-deep"
       style={{ opacity }}
     >
       <canvas ref={canvasRef} className="size-full" />
