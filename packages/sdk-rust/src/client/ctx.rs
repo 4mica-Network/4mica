@@ -17,7 +17,7 @@ use url::Url;
 
 use crate::{
     auth::{AuthSession, AuthTokens},
-    client::facilitator::Facilitator,
+    client::{facilitator::Facilitator, payment::unix_now},
     config::{Config, CredentialsConfig},
     contract::{
         ClearingHouse::{self, ClearingHouseInstance},
@@ -49,8 +49,8 @@ struct Inner<S> {
     /// Core4Mica's own EIP-712 domain separator, resolved at startup. Fixed for the lifetime of a
     /// deployment.
     core_domain_separator: B256,
-    /// The cycle each asset's payments are currently scoped to. Held until core rejects a request
-    /// signed against it, since only core decides when a cycle closes.
+    /// The cycle each asset's payments are currently scoped to. Held until its period ends, or
+    /// until core rejects a request signed against it.
     active_cycles: RwLock<HashMap<Address, ActiveCycle>>,
     /// The latest checkpoint cutoff known per asset. A payment at or below it can never be
     /// collected, so payments are held back past it.
@@ -61,6 +61,8 @@ struct Inner<S> {
 #[derive(Clone, Copy)]
 pub(crate) struct ActiveCycle {
     pub(crate) id: B256,
+    /// Unix seconds; core opens the next cycle from this moment on.
+    period_end: u64,
 }
 
 impl TryFrom<ActiveCycleResponse> for ActiveCycle {
@@ -74,6 +76,7 @@ impl TryFrom<ActiveCycleResponse> for ActiveCycle {
                     response.cycle_id
                 ))
             })?,
+            period_end: response.period_end,
         })
     }
 }
@@ -347,13 +350,15 @@ impl<S> ClientCtx<S> {
         guarantee_registry_domain(self.0.chain_id, self.0.guarantee_registry_address)
     }
 
-    /// The cycle payments for `asset` must be signed for, fetched once and reused until
-    /// [`Self::forget_active_cycle`] drops it.
+    /// The cycle payments for `asset` must be signed for, fetched once and reused until its period
+    /// ends or [`Self::forget_active_cycle`] drops it.
     pub(crate) async fn active_cycle(&self, asset: Address) -> Result<ActiveCycle, ClientError>
     where
         S: Signer + Sync,
     {
-        if let Some(cached) = self.0.active_cycles.read().await.get(&asset) {
+        if let Some(cached) = self.0.active_cycles.read().await.get(&asset)
+            && unix_now() < cached.period_end
+        {
             return Ok(*cached);
         }
 
