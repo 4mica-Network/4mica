@@ -91,13 +91,7 @@ export const en = {
       titleConnector: "for",
       titleLine2: "the agentic economy",
       subtitle:
-        "4Mica gives agents one place to pay on credit, earn yield, and settle transactions without clearing every request on-chain.",
-      supportedOn: "Supported on",
-      supportedNetworks: {
-        base: "Base Mainnet",
-        ethereumSepolia: "Base/Ethereum Sepolia Testnets",
-        baseSepolia: "Base Sepolia",
-      },
+        "4Mica gives agents one place to pay on credit, earn yield, and settle on any chain, in any asset, without per-transaction fees or locked capital.",
     },
     faqs: [
       {
@@ -204,7 +198,7 @@ export const en = {
         desc: "Funds go into Aave and earn yield. A single collateral deposit covers all credit.",
         layer: 2,
         caption:
-          "Collateral is deposited once. It sits in Aave and earns yield.",
+          "Collateral is deposited once and keeps earning yield underneath.",
         code: `await client.user.approveErc20(usdc.address, AMOUNT);
 await client.user.deposit(AMOUNT, usdc.address);`,
       },
@@ -250,7 +244,7 @@ Bob → Alice:  300 USDC  (15 guarantees)
         desc: "Net debtors pay once. Creditors claim once. Defaults are covered by vault collateral.",
         layer: 3,
         caption:
-          "One net payment settles on Base. Collateral covers any default.",
+          "One net payment settles on-chain. Collateral covers any default.",
         code: `// Debtor pays net position to ClearingHouse
 await clearingHouse.payNetDebit(
   cycleId,
@@ -271,15 +265,12 @@ await clearingHouse.claimNetCredit(
     layers: [
       { name: "x402", role: "Payment protocol" },
       { name: "4Mica", role: "Credit & clearing" },
-      { name: "Aave", role: "Yield" },
-      { name: "Base", role: "Settlement" },
+      { name: "Yield", role: "Collateral keeps earning" },
+      { name: "Settlement", role: "Net positions, on-chain" },
     ],
-    copy: "Copy",
-    copied: "Copied",
     agenticPayments: {
       kicker: "Agentic payments",
-      title:
-        "One request, one payment. What happens in between decides the cost.",
+      title: "Every request is a payment. Not every payment needs the chain.",
       actors: ["Agent", "API", "4Mica Core", "Base"],
       flows: [
         {
@@ -394,9 +385,9 @@ await clearingHouse.claimNetCredit(
       next: "Click the diagram to continue",
       replay: "Click to replay",
       stats: [
-        { value: "1", label: "on-chain transaction per cycle" },
-        { value: "ms", label: "to authorise a request" },
-        { value: "APY", label: "on the collateral" },
+        { from: "55", to: "1", label: "on-chain transactions per cycle" },
+        { from: "~1 s", to: "ms", label: "to authorise a request" },
+        { from: "0%", to: "~5%", label: "APY on the collateral" },
       ],
     },
     stats: [
@@ -491,6 +482,10 @@ await clearingHouse.claimNetCredit(
       howItWorksTitle: "Separate payment authorisation from settlement",
       howItWorksLead:
         "Pay with programmable cryptographic credit. Payment clearing runs off-chain, so thousands of API payments settle in one on-chain transaction.",
+      stackKicker: "Architecture",
+      stackTitle: "Built in layers, settled once",
+      stackLead:
+        "Collateral earns at the bottom, credit clears in the middle, and only net positions reach the chain.",
       howItWorksProtocolNote:
         "Same x402 protocol. Same HTTP clients. Works with any x402 facilitator.",
       replaceTransactions: "Replace thousands of transactions",
@@ -828,9 +823,14 @@ await clearingHouse.claimNetCredit(
   developers: {
     kicker: "Developers",
     title: "Integrate credit-backed x402 payments",
-    lead: "Deposit once, pay per request on credit, and settle net on-chain. Everything below is the SDK code an agent runs.",
+    lead: "Deposit once, pay per request on credit, and settle net on-chain. Below is the SDK code an agent runs, and what it saves.",
     primaryCta: "Read the docs",
     secondaryCta: "View on GitHub",
+    supportedOn: "Multi-chain. Live on",
+    supportedNetworks: {
+      base: "Base Mainnet",
+      testnets: "Base/Ethereum Sepolia testnets",
+    },
   },
   pricing: {
     seo: {

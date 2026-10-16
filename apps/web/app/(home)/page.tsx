@@ -11,7 +11,6 @@ import HowItWorksSection from "./_components/HowItWorksSection";
 import PartnersSection from "./_components/PartnersSection";
 import ScrollToTopButton from "./_components/ScrollToTopButton";
 import UseCasesSection from "./_components/UseCasesSection";
-import WhatYoureMissingSection from "./_components/WhatYoureMissingSection";
 
 export default function Home() {
   return (
@@ -20,7 +19,6 @@ export default function Home() {
       <Header />
       <HeroSection />
       <AgenticPaymentsSection />
-      <WhatYoureMissingSection />
       <HowItWorksSection />
       <UseCasesSection />
       <PartnersSection />

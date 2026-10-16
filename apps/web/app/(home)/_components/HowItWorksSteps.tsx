@@ -15,27 +15,6 @@ const BRAND_LAYER = 1;
 const LAYER_GAP_REM = 5.5;
 const LAYER_HALF_REM = 7;
 
-function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-md text-white/70 uppercase tracking-widest transition-colors hover:bg-white/5 hover:text-white"
-    >
-      <i className={copied ? "ri-check-line" : "ri-file-copy-line"} />
-      {copied ? messages.home.copied : messages.home.copy}
-    </button>
-  );
-}
-
 function Layer({
   index,
   isActive,
@@ -100,7 +79,7 @@ function Layer({
   );
 }
 
-export default function HowItWorksSteps({ html }: { html: string[] }) {
+export default function HowItWorksSteps() {
   const [active, setActive] = useState<number | null>(null);
   const introRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -133,23 +112,9 @@ export default function HowItWorksSteps({ html }: { html: string[] }) {
             <h3 className="mt-3 font-normal text-2xl text-ink-strong tracking-tight md:mt-4 md:text-4xl">
               {item.title}
             </h3>
-            <p className="mt-3 max-w-xl text-base text-ink-muted leading-relaxed md:mt-4 md:text-lg">
-              {item.desc}
+            <p className="mt-3 max-w-xl text-base text-ink-muted leading-relaxed xl:hidden">
+              {item.caption}
             </p>
-
-            <div className="mt-6 overflow-hidden rounded-md border border-overlay/10 bg-[#101010]">
-              <div className="flex items-center justify-between border-white/10 border-b px-5 py-2.5">
-                <span className="font-mono text-md text-white/70 uppercase tracking-widest">
-                  {item.badge}
-                </span>
-                <CopyButton code={item.code} />
-              </div>
-              <div
-                className="shiki-code overflow-x-auto p-4 font-mono text-sm leading-6 md:p-5 md:text-md"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes source text at build time; html contains only its own token markup.
-                dangerouslySetInnerHTML={{ __html: html[i] }}
-              />
-            </div>
           </motion.div>
         ))}
       </div>

@@ -130,23 +130,6 @@ export default function HeroSection() {
             </a>
           </motion.div>
         </div>
-
-        <motion.p variants={item} className="font-light text-ink-muted text-md">
-          {messages.home.hero.supportedOn}{" "}
-          <a
-            href={links.api.base}
-            className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
-          >
-            {messages.home.hero.supportedNetworks.base}
-          </a>
-          ,{" "}
-          <a
-            href={links.api.ethereumSepolia}
-            className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
-          >
-            {messages.home.hero.supportedNetworks.ethereumSepolia}
-          </a>
-        </motion.p>
       </motion.div>
     </section>
   );

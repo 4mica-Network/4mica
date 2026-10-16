@@ -226,7 +226,11 @@ export default function AgenticPaymentsSection() {
           <div className="grid grid-cols-3 gap-5">
             {content.stats.map((s) => (
               <div key={s.label} className="border-overlay/20 border-t pt-4">
-                <p className="text-4xl text-brand">{s.value}</p>
+                <p className="flex flex-wrap items-baseline gap-x-2 text-3xl">
+                  <span className="text-ink-subtle">{s.from}</span>
+                  <i className="ri-arrow-right-line text-ink-subtle text-xl" />
+                  <span className="text-brand">{s.to}</span>
+                </p>
                 <p className="mt-2 font-mono text-ink-muted text-sm uppercase tracking-wider">
                   {s.label}
                 </p>

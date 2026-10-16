@@ -6,6 +6,7 @@ import { metaFor } from "@seo/pages";
 import { pageSchema } from "@seo/structuredData";
 import { messages } from "@/i18n";
 import DocsCalloutSection from "./DocsCalloutSection";
+import WhatYoureMissingSection from "./WhatYoureMissingSection";
 
 export const metadata = metaFor(links.developers);
 
@@ -46,9 +47,27 @@ export default function DevelopersPage() {
               {content.secondaryCta}
             </a>
           </div>
+
+          <p className="mt-8 font-light text-ink-muted text-md">
+            {content.supportedOn}{" "}
+            <a
+              href={links.api.base}
+              className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+            >
+              {content.supportedNetworks.base}
+            </a>
+            ,{" "}
+            <a
+              href={links.api.ethereumSepolia}
+              className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
+            >
+              {content.supportedNetworks.testnets}
+            </a>
+          </p>
         </section>
 
         <DocsCalloutSection />
+        <WhatYoureMissingSection />
       </div>
       <Footer />
     </div>
