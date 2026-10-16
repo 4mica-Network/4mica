@@ -47,7 +47,7 @@ function Layer({
   return (
     <>
       <motion.div
-        className="absolute left-14 size-56"
+        className="absolute left-4 size-56"
         style={{ top, zIndex: LAYERS.length - index }}
       >
         <div
@@ -68,7 +68,7 @@ function Layer({
       <motion.button
         type="button"
         onClick={onSelect}
-        className="group absolute left-82 flex -translate-y-1/2 cursor-pointer items-start gap-3 whitespace-nowrap rounded-sm text-left font-mono uppercase tracking-widest focus-visible:outline-2 focus-visible:outline-brand/60 focus-visible:outline-offset-4"
+        className="group absolute left-[18.5rem] flex -translate-y-1/2 cursor-pointer items-start gap-3 whitespace-nowrap rounded-sm text-left font-mono uppercase tracking-widest focus-visible:outline-2 focus-visible:outline-brand/60 focus-visible:outline-offset-4"
         style={{ top: labelTop, opacity: labelOpacity }}
       >
         <div
@@ -78,7 +78,7 @@ function Layer({
         />
         <div>
           <p
-            className={`text-md transition-colors duration-500 ${
+            className={`text-sm transition-colors duration-500 ${
               isBrand
                 ? "text-brand"
                 : isActive
@@ -88,7 +88,7 @@ function Layer({
           >
             {layer.name}
           </p>
-          <p className="mt-1 text-ink-subtle text-md transition-colors duration-300 group-hover:text-ink-muted">
+          <p className="mt-1 text-ink-subtle text-sm transition-colors duration-300 group-hover:text-ink-muted">
             {layer.role}
           </p>
         </div>
@@ -141,7 +141,7 @@ export default function HowItWorksSteps() {
   };
 
   return (
-    <div className="grid gap-16 xl:grid-cols-2">
+    <div className="grid gap-16 xl:grid-cols-[1fr_1.25fr]">
       <div className="flex min-w-0 flex-col gap-16 xl:gap-0">
         <motion.div
           className="hidden xl:block xl:h-[50vh]"
@@ -175,7 +175,7 @@ export default function HowItWorksSteps() {
 
       <div className="hidden xl:block">
         <div className="sticky top-[max(6rem,calc(50vh-15rem))]">
-          <div ref={stackRef} className="relative h-120 w-120">
+          <div ref={stackRef} className="relative h-120 w-full">
             {LAYERS.map((layer, i) => (
               <Layer
                 key={layer.name}
