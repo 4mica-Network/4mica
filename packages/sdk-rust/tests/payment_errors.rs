@@ -367,12 +367,10 @@ async fn an_uncoded_refusal_is_not_reinterpreted() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A cycle can close while a payer still has payments in it that no checkpoint covers. Core keeps
-/// accepting one until settlement reads the cycle, so the client must go back for the cycle its
-/// payments are in rather than whichever one is open now.
+/// Each checkpoint asks core for exactly the cycle it covers: the active one, or the one named.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn a_checkpoint_targets_the_cycle_the_payments_are_in() -> anyhow::Result<()> {
+async fn each_checkpoint_names_the_cycle_it_covers() -> anyhow::Result<()> {
     let asked_for = Arc::new(Mutex::new(Vec::<String>::new()));
     let batch_cycles = asked_for.clone();
 
@@ -382,10 +380,9 @@ async fn a_checkpoint_targets_the_cycle_the_payments_are_in() -> anyhow::Result<
                 "/core/public-params",
                 get(|| async { Json(public_params()) }),
             )
-            // Core has already moved on to the next cycle.
             .route(
                 "/core/cycles/active",
-                get(|| async { Json(active_cycle(FIRST_CYCLE)) }),
+                get(|| async { Json(active_cycle(NEXT_CYCLE)) }),
             )
             .route(
                 "/core/payers/{payer}/checkpoint-batch",
@@ -420,17 +417,32 @@ async fn a_checkpoint_targets_the_cycle_the_payments_are_in() -> anyhow::Result<
     )
     .await?;
 
-    // Pay once, which fixes the cycle this client is working in.
-    client
-        .payment
-        .new_payment(RECIPIENT, U256::from(10u64), Asset::Native)
-        .await?;
-    assert!(client.payment.checkpoint(Asset::Native).await?.is_none());
-
-    let query = asked_for.lock().unwrap().join(" ");
     assert!(
-        query.contains(&format!("cycle_id={FIRST_CYCLE:#x}")),
-        "the checkpoint must name the cycle the payments are in, asked: {query}"
+        client
+            .payment
+            .checkpoint_active_cycle(Asset::Native)
+            .await?
+            .is_none()
+    );
+    assert!(
+        client
+            .payment
+            .checkpoint_cycle(Asset::Native, FIRST_CYCLE)
+            .await?
+            .is_none()
+    );
+
+    let asked = asked_for.lock().unwrap().clone();
+    assert_eq!(asked.len(), 2);
+    assert!(
+        asked[0].contains(&format!("cycle_id={NEXT_CYCLE:#x}")),
+        "the active-cycle checkpoint must name the active cycle, asked: {}",
+        asked[0]
+    );
+    assert!(
+        asked[1].contains(&format!("cycle_id={FIRST_CYCLE:#x}")),
+        "a named checkpoint must name that cycle, asked: {}",
+        asked[1]
     );
     Ok(())
 }

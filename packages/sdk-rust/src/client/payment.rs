@@ -124,15 +124,11 @@ where
             .await
     }
 
-    /// Signs the checkpoint covering everything core holds for the payer in the cycle this
-    /// client's payments are scoped to, and submits it.
+    /// Signs and submits a checkpoint covering the payer's outstanding payments in `asset`'s active
+    /// cycle.
     ///
-    /// That cycle may have closed since the last payment went into it. Core still accepts a
-    /// checkpoint for it, and covering it is what keeps the authorization tail short if the payer
-    /// later defaults.
-    ///
-    /// Returns `None` when there is nothing new to cover.
-    pub async fn checkpoint(
+    /// Returns `None` when there is nothing to cover.
+    pub async fn checkpoint_active_cycle(
         &self,
         asset: Asset,
     ) -> Result<Option<CheckpointAcceptedResponse>, PaymentError> {
@@ -140,8 +136,10 @@ where
         self.checkpoint_cycle(asset, cycle.id).await
     }
 
-    /// The same, for a cycle named outright — the one a refusal pointed at, say, rather than the
-    /// one this client is paying into now.
+    /// Signs and submits a checkpoint covering the payer's outstanding payments in `cycle_id`, such
+    /// as the cycle a `CHECKPOINT_REQUIRED` refusal names.
+    ///
+    /// Returns `None` when there is nothing to cover.
     pub async fn checkpoint_cycle(
         &self,
         asset: Asset,
@@ -206,8 +204,8 @@ where
             .await?)
     }
 
-    /// The latest checkpoint the payer signed in `asset`'s active cycle, plus every payment it
-    /// does not yet cover.
+    /// The payer's latest checkpoint in `asset`'s active cycle and the payments it does not cover
+    /// yet.
     pub async fn checkpoint_batch(
         &self,
         asset: Asset,
@@ -223,8 +221,7 @@ where
             .await?)
     }
 
-    /// The same, for a cycle named outright. A cycle that has closed still answers, until
-    /// settlement has read what it holds.
+    /// The payer's latest checkpoint in `cycle_id` and the payments it does not cover yet.
     pub async fn checkpoint_batch_for_cycle(
         &self,
         asset: Asset,
@@ -244,7 +241,7 @@ where
 
     /// Submits a checkpoint the payer has already signed.
     ///
-    /// Resubmitting the latest accepted checkpoint succeeds and covers nothing.
+    /// Submitting a checkpoint that was already accepted succeeds and covers nothing.
     pub async fn submit_checkpoint(
         &self,
         signed: SignedCheckpoint,

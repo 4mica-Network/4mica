@@ -89,14 +89,11 @@ everything they have authorized in the cycle up to a timestamp cutoff. One signa
 every payment beneath it, which is what keeps settlement bounded no matter how many payments a
 cycle holds.
 
-`payment.checkpoint(asset)` does the whole loop — read what is outstanding, total it, sign, submit —
-and returns `None` when there is nothing new to cover. Resubmitting a checkpoint already accepted
-succeeds and covers nothing, so retrying is always safe.
+`payment.checkpoint_active_cycle(asset)` signs and submits a checkpoint for the asset's active cycle,
+and returns `None` when there is nothing to cover. `payment.checkpoint_cycle(asset, cycle_id)`
+checkpoints a named cycle instead, such as the one a `CHECKPOINT_REQUIRED` refusal names.
 
-It checkpoints the cycle this client is paying into, which may have closed since the last payment
-went in. That still works: a closed cycle keeps accepting checkpoints until its settlement reads
-them, and covering it then is what keeps the on-chain tail short if the payer later defaults. Use
-`checkpoint_cycle` to name a different one.
+Submitting a checkpoint that was already accepted succeeds and covers nothing, so retrying is safe.
 
 Payments are stamped strictly after the latest cutoff, so a payment signed immediately after a
 checkpoint may wait out the remainder of the current second.
@@ -433,10 +430,10 @@ All withdraw terminals return `Result<WithdrawReceipt, WithdrawError>`; `receipt
 - `verify_guarantee(receipt: &GuaranteeReceipt) -> Result<Guarantee, PaymentError>`: Check a receipt came from the operator and read the guarantee it attests
 - `list_received() -> Result<Vec<RecipientPaymentInfo>, PaymentError>`: Payments guaranteed to the signer as a recipient
 - `active_cycle(asset: Asset) -> Result<ActiveCycleResponse, PaymentError>`: The cycle payments must be signed for right now
-- `checkpoint(asset: Asset) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: Sign and submit the checkpoint covering everything outstanding in the cycle this client is paying into
-- `checkpoint_cycle(asset: Asset, cycle_id: B256) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: The same, for a cycle named outright
-- `checkpoint_batch(asset: Asset) -> Result<CheckpointBatchResponse, PaymentError>`: The latest checkpoint plus every payment it does not yet cover
-- `checkpoint_batch_for_cycle(asset: Asset, cycle_id: B256) -> Result<CheckpointBatchResponse, PaymentError>`: The same, for a cycle named outright
+- `checkpoint_active_cycle(asset: Asset) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: Sign and submit the checkpoint covering everything outstanding in the asset's active cycle
+- `checkpoint_cycle(asset: Asset, cycle_id: B256) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: Sign and submit the checkpoint covering everything outstanding in `cycle_id`
+- `checkpoint_batch(asset: Asset) -> Result<CheckpointBatchResponse, PaymentError>`: The latest checkpoint in the asset's active cycle plus every payment it does not yet cover
+- `checkpoint_batch_for_cycle(asset: Asset, cycle_id: B256) -> Result<CheckpointBatchResponse, PaymentError>`: The latest checkpoint in `cycle_id` plus every payment it does not yet cover
 - `submit_checkpoint(signed: SignedCheckpoint) -> Result<CheckpointAcceptedResponse, PaymentError>`: Submit a checkpoint signed elsewhere
 
 #### `client.settlement`
@@ -670,19 +667,18 @@ contract unchanged.
 ```rust
 use sdk_4mica::{Asset, error::PaymentError};
 
-match client.payment.sign_request(payload).await {
-    Ok(request) => { /* hand it to the recipient */ }
-    Err(PaymentError::CheckpointRequired(details)) => {
-        println!("{} outstanding, max {}", details.uncheckpointed, details.max_uncheckpointed);
-        client.payment.checkpoint(Asset::Native).await?;
-        // Sign a fresh payload and retry.
-    }
-    Err(err) => return Err(err.into()),
+// Core refuses the recipient's issuance, so the payer learns of it from the recipient.
+if let PaymentError::CheckpointRequired(details) = refusal {
+    println!("{} outstanding, max {}", details.uncheckpointed, details.max_uncheckpointed);
+    client
+        .payment
+        .checkpoint_cycle(Asset::Native, details.cycle_id.parse()?)
+        .await?;
+    // Sign a fresh payload and retry.
 }
 ```
 
-`checkpoint` reads what is outstanding, totals it, signs and submits in one call, and returns
-`None` when there is nothing new to cover.
+`checkpoint_cycle` signs and submits in one call, and returns `None` when there is nothing to cover.
 
 ### Settlement
 
