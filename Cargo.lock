@@ -1526,7 +1526,9 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crypto-4mica"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f1e82298385f05d0a38cfd81d6fc292b6d46f705e784f118df3c74b1f3f581d"
 dependencies = [
  "alloy",
  "anyhow",
@@ -3885,7 +3887,9 @@ dependencies = [
 
 [[package]]
 name = "rpc-4mica"
-version = "2.0.0-alpha.3"
+version = "2.0.0-alpha.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f16633b4bcba8413f0e8bb0ff8e672a23e38536777e1c8303974f453c9a4afe"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
