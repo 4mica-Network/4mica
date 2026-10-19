@@ -1,6 +1,7 @@
 "use client";
 
 import { links, routes } from "@4mica/url";
+import GlyphSonar from "@components/GlyphSonar";
 import ThemeToggle from "@components/ThemeToggle";
 import Link from "next/link";
 import { messages } from "@/i18n";
@@ -26,7 +27,14 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="flex w-full select-none justify-center pt-36 pb-6 text-md">
+    <footer className="relative isolate flex w-full select-none justify-center pt-36 pb-6 text-md">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 hidden w-screen -translate-x-1/2 xl:block"
+      >
+        <GlyphSonar className="absolute inset-y-0 left-0 h-full w-[max(0px,calc(50vw-37.5rem))]" />
+        <GlyphSonar className="absolute inset-y-0 right-0 h-full w-[max(0px,calc(50vw-37.5rem))]" />
+      </div>
       <div className="flex size-full max-w-300 flex-col items-center justify-center">
         <div className="grid size-full grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <div className="flex flex-col gap-y-3">
