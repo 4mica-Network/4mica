@@ -5,6 +5,7 @@ import JsonLd from "@components/JsonLd";
 import { metaFor } from "@seo/pages";
 import { pageSchema } from "@seo/structuredData";
 import { messages } from "@/i18n";
+import CodeSamplesSection from "./CodeSamplesSection";
 import DocsCalloutSection from "./DocsCalloutSection";
 import WhatYoureMissingSection from "./WhatYoureMissingSection";
 
@@ -66,6 +67,7 @@ export default function DevelopersPage() {
           </p>
         </section>
 
+        <CodeSamplesSection />
         <DocsCalloutSection />
         <WhatYoureMissingSection />
       </div>

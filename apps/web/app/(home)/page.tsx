@@ -3,14 +3,14 @@ import Header from "@components/Header";
 import JsonLd from "@components/JsonLd";
 import { homeSchema } from "@seo/structuredData";
 import AgenticPaymentsSection from "./_components/AgenticPaymentsSection";
-import CodeSamplesSection from "./_components/CodeSamplesSection";
+import BlogSection from "./_components/BlogSection";
 import FaqSection from "./_components/FaqSection";
 import FinalCtaSection from "./_components/FinalCtaSection";
 import HeroSection from "./_components/HeroSection";
 import HowItWorksSection from "./_components/HowItWorksSection";
 import PartnersSection from "./_components/PartnersSection";
 import ScrollToTopButton from "./_components/ScrollToTopButton";
-import UseCasesSection from "./_components/UseCasesSection";
+import TeamsSection from "./_components/TeamsSection";
 
 export default function Home() {
   return (
@@ -20,9 +20,9 @@ export default function Home() {
       <HeroSection />
       <AgenticPaymentsSection />
       <HowItWorksSection />
-      <UseCasesSection />
       <PartnersSection />
-      <CodeSamplesSection />
+      <TeamsSection />
+      <BlogSection />
       <FaqSection />
       <FinalCtaSection />
       <Footer />

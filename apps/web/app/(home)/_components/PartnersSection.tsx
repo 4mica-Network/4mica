@@ -1,21 +1,10 @@
 "use client";
 
-import { links } from "@4mica/url";
 import SectionBackdrop from "@components/SectionBackdrop";
-import { motion, type Variants } from "framer-motion";
-import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { messages } from "@/i18n";
-import { PARTNERS, PRIMITIVES, TRUST_POINTS } from "../data";
-
-const arrowNudge: Variants = {
-  rest: { x: 0 },
-  hover: {
-    x: 4,
-    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
-  },
-};
+import { TRUST_POINTS } from "../data";
+import PrimitivesPipeline from "./PrimitivesPipeline";
 
 export default function PartnersSection() {
   const orbitRef = useRef<SVGSVGElement>(null);
@@ -45,7 +34,7 @@ export default function PartnersSection() {
         position="background"
       />
       <div className="mx-auto w-full max-w-300">
-        <div className="mb-16 w-full overflow-hidden">
+        <div className="w-full overflow-hidden">
           <div className="border-overlay/10 border-b px-6 py-10 text-center sm:px-8">
             <div className="mx-auto mb-2 flex w-48 justify-center text-brand">
               <svg
@@ -145,47 +134,7 @@ export default function PartnersSection() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3">
-            {PRIMITIVES.map((p) => {
-              return (
-                <div
-                  key={p.name}
-                  className="group relative flex min-w-0 flex-col gap-4 border-overlay/10 border-b p-6 transition-colors duration-500 hover:bg-overlay/[0.018] md:border-r md:last:border-r-0"
-                >
-                  <div className="pointer-events-none absolute inset-0 z-20 border border-overlay/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                  <div
-                    className="pointer-events-none absolute inset-0 z-20 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                    style={{
-                      padding: "1px",
-                      background:
-                        "linear-gradient(115deg, rgba(255,255,255,0), rgba(255,255,255,0.32), rgba(255,255,255,0.04), rgba(255,255,255,0))",
-                      mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                      maskComposite: "exclude",
-                      WebkitMask:
-                        "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                      WebkitMaskComposite: "xor",
-                    }}
-                  />
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-overlay/[0.035] text-ink-strong ring-1 ring-overlay/10 transition-colors duration-500 group-hover:bg-overlay/6 group-hover:ring-overlay/15">
-                    <i className={`${p.icon} text-3xl`} />
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="font-medium text-ink-strong text-xl">
-                        {p.name}
-                      </span>
-                      <span className="font-medium text-ink-muted text-md uppercase tracking-widest transition-colors duration-500 group-hover:text-ink-body">
-                        {p.role}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-ink-muted text-md leading-relaxed transition-colors duration-500 group-hover:text-ink-body">
-                      {p.desc}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <PrimitivesPipeline />
 
           <div className="grid w-full grid-cols-1 sm:grid-cols-3">
             {TRUST_POINTS.map((t) => (
@@ -206,75 +155,6 @@ export default function PartnersSection() {
                 </div>
               </div>
             ))}
-          </div>
-
-          <div className="border-overlay/10 border-t px-6 py-8 pb-0 text-left sm:px-8">
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-medium text-ink-strong text-xl">
-                  Teams building on 4Mica
-                </p>
-                <p className="mt-1.5 text-ink-muted text-md leading-relaxed">
-                  Trusted by fast-growing companies around the world.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <motion.div className="flex" initial="rest" whileHover="hover">
-                  <Link
-                    href="/pricing"
-                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-ink-strong px-4 py-2 font-semibold text-md text-surface-deep transition-colors duration-200 hover:bg-ink-strong/90"
-                  >
-                    Get started
-                    <motion.span
-                      aria-hidden="true"
-                      className="inline-flex"
-                      variants={arrowNudge}
-                    >
-                      <i className="ri-arrow-right-line text-lg leading-none" />
-                    </motion.span>
-                  </Link>
-                </motion.div>
-
-                <Link
-                  href={links.social.githubCore}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-soft btn-lg inline-flex h-10 items-center justify-center gap-1.5"
-                >
-                  <i className="ri-github-fill" />
-                  View on GitHub
-                </Link>
-              </div>
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-4">
-              {PARTNERS.map((partner) => (
-                <Link
-                  key={partner.name}
-                  href={partner.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-center rounded-md p-3 transition-all duration-300"
-                  aria-label={`${partner.name} homepage`}
-                >
-                  <Image
-                    src={partner.logo}
-                    alt={`${partner.name} logo`}
-                    width={160}
-                    height={48}
-                    className={`max-h-12 w-auto object-contain grayscale filter transition-all duration-300 hover:grayscale-0 ${
-                      "invertOnLight" in partner && partner.invertOnLight
-                        ? "invert dark:invert-0"
-                        : ""
-                    } ${
-                      "invertOnDark" in partner && partner.invertOnDark
-                        ? "dark:invert"
-                        : ""
-                    }`}
-                  />
-                </Link>
-              ))}
-            </div>
           </div>
         </div>
       </div>

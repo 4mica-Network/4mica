@@ -509,6 +509,11 @@ await clearingHouse.claimNetCredit(
       finalCtaLead:
         "Batch thousands of payments, settle once, and let your collateral earn yield while your agents scale.",
       viewSource: "View Source",
+      blogKicker: "Blog",
+      blogTitle: "Latest from the blog",
+      blogLead:
+        "Engineering notes on x402, credit-backed clearing, and the infrastructure behind agentic payments.",
+      blogViewAll: "View all posts",
     },
   },
   sharedContent: {
