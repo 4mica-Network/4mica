@@ -406,6 +406,9 @@ pub enum PaymentError {
         recovered: Address,
     },
 
+    #[error("refusing to sign a checkpoint over core's batch: {0}")]
+    UntrustedCheckpointBatch(String),
+
     #[error(
         "payer {} has {} uncheckpointed guarantees (max {}); submit a checkpoint and retry",
         .0.payer, .0.uncheckpointed, .0.max_uncheckpointed

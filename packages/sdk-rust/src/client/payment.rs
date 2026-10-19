@@ -1,6 +1,7 @@
 //! Payment guarantees: the payer signs a request, the recipient redeems it for a receipt the
 //! operator signed, and either side can verify that receipt offline.
 
+use std::collections::HashSet;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use alloy::primitives::{Address, B256, U256};
@@ -146,7 +147,14 @@ where
         cycle_id: B256,
     ) -> Result<Option<CheckpointAcceptedResponse>, PaymentError> {
         let batch = self.checkpoint_batch_for_cycle(asset, cycle_id).await?;
-        let Some(payload) = checkpoint_payload(self.ctx.signer_address(), &batch)? else {
+        let Some(payload) = checkpoint_payload(
+            self.ctx.signer_address(),
+            asset.address(),
+            cycle_id,
+            &self.ctx.clearing_house_domain(),
+            &batch,
+        )?
+        else {
             return Ok(None);
         };
 
@@ -317,33 +325,110 @@ where
 /// The checkpoint that covers `batch`, or `None` when it covers nothing new.
 fn checkpoint_payload(
     payer: Address,
+    asset: Address,
+    cycle_id: B256,
+    domain: &Eip712Domain,
     batch: &CheckpointBatchResponse,
 ) -> Result<Option<CheckpointPayload>, PaymentError> {
     if batch.authorizations.is_empty() {
         return Ok(None);
     }
 
-    let mut cumulative_gross = match &batch.previous {
-        Some(previous) => previous.payload.cumulative_gross,
-        None => U256::ZERO,
+    let batch_cycle = batch
+        .cycle_id
+        .parse::<B256>()
+        .map_err(|_| PaymentError::Decode(format!("unreadable cycle id: {}", batch.cycle_id)))?;
+    if batch_cycle != cycle_id {
+        return Err(untrusted(format!(
+            "batch is for cycle {batch_cycle:#x}, not {cycle_id:#x}"
+        )));
+    }
+    if batch.asset_address.parse::<Address>().ok() != Some(asset) {
+        return Err(untrusted(format!(
+            "batch is for asset {}, not {asset}",
+            batch.asset_address
+        )));
+    }
+
+    let (mut cumulative_gross, previous_cutoff) = match &batch.previous {
+        Some(previous) => {
+            let checkpoint = &previous.payload;
+            if checkpoint.payer.parse::<Address>().ok() != Some(payer)
+                || checkpoint.cycle_id != cycle_id
+                || checkpoint.asset_address.parse::<Address>().ok() != Some(asset)
+            {
+                return Err(untrusted(
+                    "previous checkpoint is for another payer, cycle or asset".to_string(),
+                ));
+            }
+            let digest = checkpoint
+                .signing_digest(domain)
+                .map_err(|err| untrusted(format!("previous checkpoint: {err}")))?;
+            if recover(&previous.signature, digest) != Some(payer) {
+                return Err(untrusted(
+                    "previous checkpoint is not signed by the payer".to_string(),
+                ));
+            }
+            (checkpoint.cumulative_gross, checkpoint.timestamp_cutoff)
+        }
+        None => (U256::ZERO, 0),
     };
-    let mut timestamp_cutoff = 0u64;
+
+    let mut req_ids = HashSet::with_capacity(batch.authorizations.len());
+    let mut timestamp_cutoff = previous_cutoff;
     for authorization in &batch.authorizations {
+        let payment = &authorization.payload;
+        let req_id = payment.req_id();
+        if payment.user_address().parse::<Address>().ok() != Some(payer)
+            || payment.cycle_id() != cycle_id
+            || payment.asset_address().parse::<Address>().ok() != Some(asset)
+        {
+            return Err(untrusted(format!(
+                "authorization {req_id} is for another payer, cycle or asset"
+            )));
+        }
+        let digest = payment
+            .signing_digest(domain)
+            .map_err(|err| untrusted(format!("authorization {req_id}: {err}")))?;
+        if recover(&authorization.signature, digest) != Some(payer) {
+            return Err(untrusted(format!(
+                "authorization {req_id} is not signed by the payer"
+            )));
+        }
+        if payment.timestamp() <= previous_cutoff {
+            return Err(untrusted(format!(
+                "authorization {req_id} is already covered by the previous checkpoint"
+            )));
+        }
+        if !req_ids.insert(req_id) {
+            return Err(untrusted(format!("authorization {req_id} appears twice")));
+        }
+
         cumulative_gross = cumulative_gross
-            .checked_add(authorization.payload.amount())
+            .checked_add(payment.amount())
             .ok_or_else(|| PaymentError::InvalidParams("cumulative gross overflows".to_string()))?;
-        timestamp_cutoff = timestamp_cutoff.max(authorization.payload.timestamp());
+        timestamp_cutoff = timestamp_cutoff.max(payment.timestamp());
     }
 
     Ok(Some(CheckpointPayload {
         payer: payer.to_string(),
-        cycle_id: batch.cycle_id.parse().map_err(|_| {
-            PaymentError::Decode(format!("unreadable cycle id: {}", batch.cycle_id))
-        })?,
+        cycle_id,
         asset_address: batch.asset_address.clone(),
         cumulative_gross,
         timestamp_cutoff,
     }))
+}
+
+fn untrusted(reason: String) -> PaymentError {
+    PaymentError::UntrustedCheckpointBatch(reason)
+}
+
+fn recover(signature: &str, digest: B256) -> Option<Address> {
+    signature
+        .parse::<Signature>()
+        .ok()?
+        .recover_address_from_prehash(&digest)
+        .ok()
 }
 
 pub(crate) fn unix_now() -> u64 {
@@ -358,29 +443,63 @@ mod tests {
     use super::*;
     use alloy::signers::SignerSync;
     use alloy::signers::local::PrivateKeySigner;
-    use rpc::{CheckpointPayload, SignedCheckpoint, guarantee_registry_domain};
+    use rpc::{
+        CheckpointPayload, SignedCheckpoint, clearing_house_domain, guarantee_registry_domain,
+    };
 
     const CHAIN_ID: u64 = 31337;
     const REGISTRY: &str = "0x0000000000000000000000000000000000065e61";
-    const PAYER: &str = "0x1234567890123456789012345678901234567890";
+    const CLEARING_HOUSE: &str = "0x00000000000000000000000000000000000c1ea4";
     const RECIPIENT: &str = "0x00000000000000000000000000000000000000Be";
-    const ASSET: &str = "0x0000000000000000000000000000000000000000";
+    const ASSET: Address = Address::ZERO;
+    const CYCLE: B256 = B256::repeat_byte(0x11);
 
-    fn domain() -> alloy::sol_types::Eip712Domain {
+    fn domain() -> Eip712Domain {
         guarantee_registry_domain(CHAIN_ID, REGISTRY.parse().unwrap())
     }
 
+    fn payer_domain() -> Eip712Domain {
+        clearing_house_domain(CHAIN_ID, CLEARING_HOUSE.parse().unwrap())
+    }
+
+    fn payer() -> PrivateKeySigner {
+        PrivateKeySigner::from_bytes(&B256::repeat_byte(0x01)).unwrap()
+    }
+
+    /// Request ids follow the timestamp, so payments at distinct times never collide.
     fn payment(amount: u64, timestamp: u64) -> PaymentRequestPayload {
         PaymentRequestPayload::new(
-            PAYER.to_string(),
+            payer().address().to_string(),
             RECIPIENT.to_string(),
-            B256::repeat_byte(0x11),
-            U256::from(amount),
+            CYCLE,
+            U256::from(timestamp),
             U256::from(amount),
             timestamp,
             Some(ASSET.to_string()),
             B256::repeat_byte(0x22),
         )
+    }
+
+    fn signed_by(signer: &PrivateKeySigner, payload: PaymentRequestPayload) -> PaymentRequest {
+        let digest = payload.signing_digest(&payer_domain()).unwrap();
+        let signature = signer.sign_hash_sync(&digest).unwrap();
+        PaymentRequest::new(payload, alloy::hex::encode_prefixed(signature.as_bytes()))
+    }
+
+    fn checkpoint_by(signer: &PrivateKeySigner, gross: u64, cutoff: u64) -> SignedCheckpoint {
+        let payload = CheckpointPayload {
+            payer: payer().address().to_string(),
+            cycle_id: CYCLE,
+            asset_address: ASSET.to_string(),
+            cumulative_gross: U256::from(gross),
+            timestamp_cutoff: cutoff,
+        };
+        let digest = payload.signing_digest(&payer_domain()).unwrap();
+        let signature = signer.sign_hash_sync(&digest).unwrap();
+        SignedCheckpoint {
+            payload,
+            signature: alloy::hex::encode_prefixed(signature.as_bytes()),
+        }
     }
 
     fn issued(signer: &PrivateKeySigner) -> (Guarantee, GuaranteeReceipt) {
@@ -448,44 +567,44 @@ mod tests {
     }
 
     fn batch(
-        previous: Option<(u64, u64)>,
-        authorizations: Vec<(u64, u64)>,
+        previous: Option<SignedCheckpoint>,
+        authorizations: Vec<PaymentRequest>,
     ) -> CheckpointBatchResponse {
         CheckpointBatchResponse {
-            cycle_id: format!("{:#x}", B256::repeat_byte(0x11)),
+            cycle_id: format!("{CYCLE:#x}"),
             cycle_id_text: "0x0:1700000000".to_string(),
             asset_address: ASSET.to_string(),
-            payer: PAYER.to_string(),
-            previous: previous.map(|(gross, cutoff)| SignedCheckpoint {
-                payload: CheckpointPayload {
-                    payer: PAYER.to_string(),
-                    cycle_id: B256::repeat_byte(0x11),
-                    asset_address: ASSET.to_string(),
-                    cumulative_gross: U256::from(gross),
-                    timestamp_cutoff: cutoff,
-                },
-                signature: "0x00".to_string(),
-            }),
-            authorizations: authorizations
-                .into_iter()
-                .map(|(amount, timestamp)| {
-                    PaymentRequest::new(payment(amount, timestamp), "0x00".to_string())
-                })
-                .collect(),
+            payer: payer().address().to_string(),
+            previous,
+            authorizations,
             max_uncheckpointed: 2,
+        }
+    }
+
+    fn payments(entries: &[(u64, u64)]) -> Vec<PaymentRequest> {
+        entries
+            .iter()
+            .map(|&(amount, timestamp)| signed_by(&payer(), payment(amount, timestamp)))
+            .collect()
+    }
+
+    fn build(batch: &CheckpointBatchResponse) -> Result<Option<CheckpointPayload>, PaymentError> {
+        checkpoint_payload(payer().address(), ASSET, CYCLE, &payer_domain(), batch)
+    }
+
+    fn refused(batch: &CheckpointBatchResponse) -> String {
+        match build(batch) {
+            Err(PaymentError::UntrustedCheckpointBatch(reason)) => reason,
+            other => panic!("expected the batch to be refused, got {other:?}"),
         }
     }
 
     #[test]
     fn a_checkpoint_extends_the_previous_one() {
-        let payer = PAYER.parse().unwrap();
-        let payload = checkpoint_payload(
-            payer,
-            &batch(
-                Some((50, 1_699_999_000)),
-                vec![(10, 1_700_000_000), (7, 1_700_000_500)],
-            ),
-        )
+        let payload = build(&batch(
+            Some(checkpoint_by(&payer(), 50, 1_699_999_000)),
+            payments(&[(10, 1_700_000_000), (7, 1_700_000_500)]),
+        ))
         .expect("builds")
         .expect("covers the batch");
 
@@ -495,8 +614,7 @@ mod tests {
 
     #[test]
     fn a_first_checkpoint_starts_from_zero() {
-        let payer = PAYER.parse().unwrap();
-        let payload = checkpoint_payload(payer, &batch(None, vec![(10, 1_700_000_000)]))
+        let payload = build(&batch(None, payments(&[(10, 1_700_000_000)])))
             .expect("builds")
             .expect("covers the batch");
 
@@ -507,11 +625,10 @@ mod tests {
     /// The cutoff is the newest payment covered, not whatever arrived last.
     #[test]
     fn the_cutoff_is_the_latest_payment_whatever_the_order() {
-        let payer = PAYER.parse().unwrap();
-        let payload = checkpoint_payload(
-            payer,
-            &batch(None, vec![(1, 1_700_000_900), (1, 1_700_000_100)]),
-        )
+        let payload = build(&batch(
+            None,
+            payments(&[(1, 1_700_000_900), (1, 1_700_000_100)]),
+        ))
         .expect("builds")
         .expect("covers the batch");
 
@@ -520,11 +637,93 @@ mod tests {
 
     #[test]
     fn an_empty_batch_needs_no_checkpoint() {
-        let payer = PAYER.parse().unwrap();
-        assert!(
-            checkpoint_payload(payer, &batch(None, vec![]))
-                .expect("builds")
-                .is_none()
-        );
+        assert!(build(&batch(None, vec![])).expect("builds").is_none());
+    }
+
+    /// An operator that slips in a payment the payer never signed would inflate what the payer
+    /// can be charged on default.
+    #[test]
+    fn a_payment_the_payer_did_not_sign_is_refused() {
+        let mut authorizations = payments(&[(10, 1_700_000_000)]);
+        authorizations.push(signed_by(
+            &PrivateKeySigner::random(),
+            payment(1_000_000, 1_700_000_100),
+        ));
+
+        let reason = refused(&batch(None, authorizations));
+        assert!(reason.contains("not signed by the payer"), "{reason}");
+    }
+
+    #[test]
+    fn a_payment_with_a_tampered_amount_is_refused() {
+        let mut authorizations = payments(&[(10, 1_700_000_000)]);
+        let PaymentRequestPayload::V1(inner) = &mut authorizations[0].payload;
+        inner.amount = U256::from(10_000u64);
+
+        let reason = refused(&batch(None, authorizations));
+        assert!(reason.contains("not signed by the payer"), "{reason}");
+    }
+
+    #[test]
+    fn another_payers_payment_is_refused() {
+        let stranger = PrivateKeySigner::random();
+        let mut theirs = payment(10, 1_700_000_000);
+        let PaymentRequestPayload::V1(inner) = &mut theirs;
+        inner.user_address = stranger.address().to_string();
+
+        let reason = refused(&batch(None, vec![signed_by(&stranger, theirs)]));
+        assert!(reason.contains("another payer"), "{reason}");
+    }
+
+    #[test]
+    fn a_payment_from_another_cycle_is_refused() {
+        let mut elsewhere = payment(10, 1_700_000_000);
+        let PaymentRequestPayload::V1(inner) = &mut elsewhere;
+        inner.cycle_id = B256::repeat_byte(0x33);
+
+        let reason = refused(&batch(None, vec![signed_by(&payer(), elsewhere)]));
+        assert!(reason.contains("another payer, cycle or asset"), "{reason}");
+    }
+
+    #[test]
+    fn a_payment_counted_twice_is_refused() {
+        let once = payments(&[(10, 1_700_000_000)]);
+        let twice = vec![once[0].clone(), once[0].clone()];
+
+        let reason = refused(&batch(None, twice));
+        assert!(reason.contains("appears twice"), "{reason}");
+    }
+
+    #[test]
+    fn a_payment_the_previous_checkpoint_covers_is_refused() {
+        let reason = refused(&batch(
+            Some(checkpoint_by(&payer(), 50, 1_700_000_000)),
+            payments(&[(10, 1_700_000_000)]),
+        ));
+        assert!(reason.contains("already covered"), "{reason}");
+    }
+
+    /// The previous total is carried forward, so a forged one inflates the new checkpoint just as
+    /// a forged payment would.
+    #[test]
+    fn a_previous_checkpoint_the_payer_did_not_sign_is_refused() {
+        let reason = refused(&batch(
+            Some(checkpoint_by(
+                &PrivateKeySigner::random(),
+                1_000_000,
+                1_699_999_000,
+            )),
+            payments(&[(10, 1_700_000_000)]),
+        ));
+        assert!(reason.contains("previous checkpoint"), "{reason}");
+    }
+
+    #[test]
+    fn a_batch_for_another_cycle_is_refused() {
+        let mut other = batch(None, payments(&[(10, 1_700_000_000)]));
+        other.cycle_id = format!("{:#x}", B256::repeat_byte(0x33));
+
+        let reason = refused(&other);
+        assert!(reason.contains("batch is for cycle"), "{reason}");
     }
 }

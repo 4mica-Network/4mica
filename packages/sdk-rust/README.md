@@ -95,6 +95,11 @@ checkpoints a named cycle instead, such as the one a `CHECKPOINT_REQUIRED` refus
 
 Submitting a checkpoint that was already accepted succeeds and covers nothing, so retrying is safe.
 
+The checkpoint total is what the payer can be charged on-chain if they default, so it is built only
+from what the payer signed. Every payment in core's batch, and the checkpoint it extends, must carry
+the payer's own signature for that cycle and asset, and each payment may be counted once. Otherwise
+nothing is signed and the call fails with `PaymentError::UntrustedCheckpointBatch`.
+
 Payments are stamped strictly after the latest cutoff, so a payment signed immediately after a
 checkpoint may wait out the remainder of the current second.
 
@@ -934,6 +939,7 @@ use sdk_4mica::error::{
 - `AddressMismatch { signer, payer }`, `InvalidPayerAddress`, `SigningFailed(String)`
 - `MalformedReceipt(GuaranteeDecodeError)`, `UnreadableReceiptSignature`, `ReceiptSignerMismatch { expected, recovered }`
 - `CheckpointRequired(..)`, `CycleMismatch(..)`, `TimestampNotPastCutoff(..)` — core's coded refusals, each carrying the detail needed to recover: the outstanding count, the cycle to re-sign for, or the cutoff to stamp past
+- `UntrustedCheckpointBatch(String)` — core's checkpoint batch holds something the payer did not sign, so no checkpoint was signed
 - `InvalidParams(String)`, `Decode(String)`, `Rpc(rpc::ApiClientError)`, `Client(ClientError)`, `Auth(AuthError)`
 
 #### Account Errors
