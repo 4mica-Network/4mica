@@ -56,12 +56,14 @@ function FeaturedCard({ post }: { post: BlogPostMeta }) {
               <span className="truncate font-medium text-ink-strong">
                 {post.author}
               </span>
-              <span aria-hidden="true">·</span>
-              <span className="whitespace-nowrap">
+              <span aria-hidden="true" className="hidden sm:inline">
+                ·
+              </span>
+              <span className="hidden whitespace-nowrap sm:inline">
                 {post.readingMinutes} {messages.blog.minRead}
               </span>
             </span>
-            <span className="inline-flex items-center gap-1.5 text-ink-body transition-colors group-hover:text-ink-strong">
+            <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-ink-body transition-colors group-hover:text-ink-strong">
               {messages.blog.readPost}
               <i className="ri-arrow-right-line text-md" />
             </span>
@@ -134,7 +136,7 @@ export default function BlogSection() {
   if (!latest) return null;
 
   return (
-    <section id="blog" className="section-gloss py-24">
+    <section id="blog" className="section-gloss pt-24 pb-6 md:pb-24">
       <div className="mx-auto w-full max-w-300">
         <div className="mb-12 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div>

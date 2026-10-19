@@ -28,7 +28,7 @@ export default function PartnersSection() {
   }, []);
 
   return (
-    <section className="section-gloss relative isolate overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25">
+    <section className="section-gloss relative isolate hidden overflow-hidden rounded-md border border-overlay/10 bg-surface-deep/25 md:block">
       <SectionBackdrop
         src="/bg/abstract-silver-silk.avif"
         position="background"

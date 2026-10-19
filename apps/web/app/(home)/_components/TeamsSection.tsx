@@ -33,7 +33,7 @@ export default function TeamsSection() {
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 hidden items-center justify-center gap-3 md:flex">
           <motion.div className="flex" initial="rest" whileHover="hover">
             <Link
               href="/pricing"

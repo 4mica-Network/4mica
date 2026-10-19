@@ -5,7 +5,6 @@ import { homeSchema } from "@seo/structuredData";
 import AgenticPaymentsSection from "./_components/AgenticPaymentsSection";
 import BlogSection from "./_components/BlogSection";
 import FaqSection from "./_components/FaqSection";
-import FinalCtaSection from "./_components/FinalCtaSection";
 import HeroSection from "./_components/HeroSection";
 import HowItWorksSection from "./_components/HowItWorksSection";
 import PartnersSection from "./_components/PartnersSection";
@@ -24,7 +23,6 @@ export default function Home() {
       <TeamsSection />
       <BlogSection />
       <FaqSection />
-      <FinalCtaSection />
       <Footer />
       <ScrollToTopButton />
     </div>
