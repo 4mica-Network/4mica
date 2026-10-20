@@ -57,7 +57,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
   const descriptor = buildAgentDescriptor(agent, profile);
 
   return (
-    <article className="flex flex-col gap-10">
+    <article className="mx-auto flex w-full max-w-3xl flex-col gap-10">
       <JsonLd descriptor={descriptor} />
 
       <ProfileNav
