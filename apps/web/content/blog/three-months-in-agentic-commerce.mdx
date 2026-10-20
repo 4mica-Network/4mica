@@ -1,0 +1,86 @@
+---
+title: My thoughts on the last three months in agentic commerce
+description: The payment rails for agents are built. The clearing layer is the race now — and the question is whether it asks who an agent is, or whether it is good for the money.
+date: 2026-06-18
+author: Akash Madhusudan
+authorAvatar: /assets/akash.jpg
+authorRole: CEO & Co-Founder
+category: Insights
+tags: [clearing, agents, collateral]
+thumbnail: /blog/three-months-in-agentic-commerce/hero.svg
+thumbnailAlt: Impasto painting of a field of round flowers in red, yellow, and pink on teal
+keywords:
+  [
+    agentic commerce,
+    payment clearing,
+    multilateral netting,
+    headless merchants,
+    collateral-based payments,
+  ]
+---
+
+An AI agent picks up a task. To finish it, it calls a search API, two model providers, a data vendor, and a compute host. Five services it has never dealt with before, each paid in fractions of a cent, and then it's gone.
+
+Now run that a million times an hour.
+
+That's what "AI agents that spend money" actually looks like, and over the last three months the biggest names in payments have been racing to own it. Coinbase and Stripe shipped payment rails and protocols for it. On June 10th, Mastercard did too. Tens of millions of dollars have already moved through one of these systems alone.
+
+Building the rails turned out to be the easy part. The hard part is what happens after the payment: clearing. And that race has now started in earnest. In just the last few months a wave of settlement layers has shipped: stablecoin issuers settling sub-cent payments between agents, venture-backed startups raising real money to build agentic settlement on-chain. A few months ago almost nobody was talking about how any of this actually settles at scale. Now everybody is.
+
+So the question worth asking isn't whether clearing gets built. It's who it gets built for.
+
+Nearly every version of clearing that is taking shape has a wall around it somewhere. Some settle only in a single issuer's stablecoin. Some run on only one chain, behind a machine-ID scheme that vouches for each agent. The card networks take every kind of payment but gate membership as a way to credential agents. Even though the payment rails and protocols underneath are open standards that anyone can use, the clearing layer being built on top is where the walls quietly go back up.
+
+The open version, the one any agent can use on any payment rail without asking permission first, is the seat still sitting empty. That's the one I care about, and it's the one we have built. Let me walk you through this.
+
+## What clearing actually is
+
+When you tap your card, the shop gets paid straight away, even though the actual money takes days to move between banks. Something in the middle efficiently keeps track of who owes what, and that something is clearing. You never see it, but nothing in modern finance works without it.
+
+Now picture those millions of agents paying millions of services every hour. You simply cannot settle each tiny payment one at a time. You need something that can tally who owes what across the whole network of different rails, payment terminals, etc., and move only the difference. (The name for moving only the difference is multilateral netting.) It's the reason ten friends on a holiday don't pay each other back after every round. They keep a tab and settle up at the end. Thank you, Splitwise.
+
+That is precisely the layer that is most crucial for scalable agentic commerce.
+
+## Two ways to build it
+
+Strip (not Stripe) away the brand names and there are really only two ways to decide whether an agent is allowed to pay.
+
+You can ask who it is. It applies, it gets approved, and only approved members get to take part. Mastercard works this way and calls it a "credentialed" service. Some of the newer on-chain settlement layers do a version of it too, with a machine identity standing in for the corporate one. For agents that look like the companies we already know, big names with legal teams behind them, this is the right model.
+
+Or you can simply check if it's good for the money it spends. You don't check the agent's identity at all. It locks a deposit on a public blockchain, anyone can verify the deposit is real, and because of the immutability of that deposit, that is the end of the negotiation. There is no need for an application, or an approval. Nobody gets to decide whether to let it in.
+
+One model asks who you are, while the other just checks whether you're good for the money. That single difference decides who gets left out. And it decides how big this whole economy is allowed to get.
+
+## Why "who you are" runs out
+
+Asking who you are has a quiet ceiling. It only works with agents you can actually identify.
+
+It works for some. An agent running on a company's account carries that company's name. But the fastest-growing corner of this economy has no company behind it, on either side of the trade. The services being sold are often just an endpoint and a price, with no website and no legal entity at all. [Noah Levine](https://www.linkedin.com/in/noahjlevine) at a16z calls these [headless merchants](https://a16zcrypto.com/posts/article/ai-agent-commerce-headless-merchant/), and the agents buying from them are increasingly the same: software spun up for a single job, with nobody to run a check on.
+
+You can't background-check a thing that has no identity. As Levine puts it, when a processor approves a merchant it takes on that merchant's risk, and here there's nothing to assess. These agents fail the approval step not because they're suspect, but because there's nothing there to approve.
+
+And yet every one of them can still post a deposit that proves it can cover its bill.
+
+That's the whole point. A credential proves who you are, but only works if you're someone. A deposit proves itself, and works for anyone.
+
+## The machine economy is already here
+
+If machine economy still sounds theoretical, look at what's happening with AI itself.
+
+Running a model costs money every single time, and business spending on it [has grown thirteenfold since the start of 2025](https://www.economist.com/business/2026/06/14/companies-are-scrambling-to-curtail-soaring-ai-costs). As that bill climbed, a market of cheaper providers has grown underneath the big names: DeepInfra, Together, Fireworks, and others, all selling much the same thing for less. Buyers move between them constantly and stay loyal to none. Those providers are headless merchants in the flesh. They have an endpoint, a price, with absolutely no storefront.
+
+It has already produced a familiar shape. Lots of buyers, lots of providers, and a routing layer sitting on top (like OpenRouter), sending each request to whoever fits best. Lots of parties paying lots of parties. A payment graph, live today, with humans still in the loop.
+
+Now take the human out of the loop. When agents are the ones choosing and paying, that graph turns into millions of tiny debts between parties that have never met and never will. That is exactly what clearing should enable, without having to block any entity due to the lack of a credential.
+
+## Where we come in
+
+Plenty of people now see clearing as the missing layer, and that's a very good sign; it's a clear signal that the market has matured. It tells you this is a category, not a single product.
+
+At 4Mica we're building the open version of it: a neutral clearing layer for machine commerce, live today. It doesn't need a fast new blockchain of its own to work. Once clearing is in place, any chain can carry the load. And unlike some approaches that tie you to a single coin or a single chain, 4Mica is obsessively neutral: post collateral, settle on whatever chain you're already on.
+
+The whole argument comes down to two lines. Approval-based payments serve every agent that can prove who it is. Deposit-based payments serve every agent that can prove what it has. The second group is already bigger, it's growing faster, and it's the one still missing a clearing layer it can actually use.
+
+The last era of clearing networks ran on membership and trust. The next one will run on cryptography and collateral.
+
+_Originally published on [LinkedIn](https://www.linkedin.com/pulse/my-thoughts-last-three-months-agentic-commerce-akash-madhusudan-tnjje/)._

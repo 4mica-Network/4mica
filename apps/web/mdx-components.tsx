@@ -26,7 +26,7 @@ const thClass =
 const tdClass = "border-white/5 border-b px-4 py-2 text-left";
 
 const linkClass =
-  "text-brand-teal underline underline-offset-2 transition-colors hover:text-brand-soft";
+  "text-ink-strong underline underline-offset-2 transition-colors hover:text-ink-body";
 
 const components = {
   h1: (props: HeadingProps) => (
