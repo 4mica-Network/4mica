@@ -88,7 +88,6 @@ export function ProfileSettings() {
   const savingIdentity = useAppSelector(selectIsSectionSaving("identity"));
   const savingColors = useAppSelector(selectIsSectionSaving("colors"));
   const savingPrivate = useAppSelector(selectIsSectionSaving("private"));
-  const savingHidden = useAppSelector(selectIsSectionSaving("hidden"));
   const savingSeo = useAppSelector(selectIsSectionSaving("allowSEOIndexing"));
   const savingEmailVis = useAppSelector(
     selectIsSectionSaving("allowEmailVisibility"),
@@ -111,7 +110,6 @@ export function ProfileSettings() {
       name: user?.name ?? "",
       username: user?.username ?? "",
       bio: user?.bio ?? "",
-      description: user?.description ?? "",
     }),
     [user],
   );
@@ -168,10 +166,6 @@ export function ProfileSettings() {
       identity.draft.bio.trim().length > TEXT_MAX_LENGTH
         ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
         : undefined,
-    description:
-      identity.draft.description.trim().length > TEXT_MAX_LENGTH
-        ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
-        : undefined,
   };
   const isUsernamePending =
     candidate !== savedUsername && usernameStatus === "checking";
@@ -211,10 +205,7 @@ export function ProfileSettings() {
       titleKey="page.settings.profile.title"
       descriptionKey="page.settings.profile.description"
     >
-      <SettingsSection
-        title={t("settings.profile.identity")}
-        description={t("settings.profile.identityHint")}
-      >
+      <section className="flex flex-col gap-3">
         {pendingVerification.token ? (
           <SurfaceCard className="flex items-center justify-between gap-4">
             <div>
@@ -351,22 +342,8 @@ export function ProfileSettings() {
               onChange={(v) => identity.set("bio", v)}
             />
           </FieldRow>
-
-          <FieldRow
-            title={t("settings.profile.description")}
-            description={t("settings.profile.descriptionHint")}
-            htmlFor="profile-description"
-          >
-            <TextArea
-              id="profile-description"
-              value={identity.draft.description}
-              error={identityErrors.description ?? issues.description}
-              maxLength={TEXT_MAX_LENGTH}
-              onChange={(v) => identity.set("description", v)}
-            />
-          </FieldRow>
         </EditableCard>
-      </SettingsSection>
+      </section>
 
       <SettingsSection
         title={t("settings.profile.visibility")}
@@ -381,14 +358,6 @@ export function ProfileSettings() {
           onToggle={(v) => toggle("private", v)}
         />
         <SwitchCard
-          id="profile-hidden"
-          title={t("settings.profile.hidden")}
-          description={t("settings.profile.hiddenHint")}
-          checked={user.hidden}
-          isSaving={savingHidden}
-          onToggle={(v) => toggle("hidden", v)}
-        />
-        <SwitchCard
           id="profile-seo"
           title={t("settings.profile.seo")}
           description={t("settings.profile.seoHint")}
@@ -396,14 +365,16 @@ export function ProfileSettings() {
           isSaving={savingSeo}
           onToggle={(v) => toggle("allowSEOIndexing", v)}
         />
-        <SwitchCard
-          id="profile-email-visibility"
-          title={t("settings.profile.emailVisibility")}
-          description={t("settings.profile.emailVisibilityHint")}
-          checked={user.allowEmailVisibility}
-          isSaving={savingEmailVis}
-          onToggle={(v) => toggle("allowEmailVisibility", v)}
-        />
+        {user.emailVerified && (
+          <SwitchCard
+            id="profile-email-visibility"
+            title={t("settings.profile.emailVisibility")}
+            description={t("settings.profile.emailVisibilityHint")}
+            checked={user.allowEmailVisibility}
+            isSaving={savingEmailVis}
+            onToggle={(v) => toggle("allowEmailVisibility", v)}
+          />
+        )}
         <SwitchCard
           id="profile-phone-visibility"
           title={t("settings.profile.phoneVisibility")}

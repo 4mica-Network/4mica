@@ -20,13 +20,11 @@ const BASE_USER = {
   name: "Ada Lovelace",
   username: "ada",
   bio: "",
-  description: "",
   primaryBrandColor: "",
   secondaryBrandColor: "",
   verified: false,
   emailVerified: false,
   private: true,
-  hidden: false,
   allowSEOIndexing: false,
   allowEmailVisibility: true,
   allowPhoneNumberVisibility: true,
@@ -168,5 +166,30 @@ describe("profile account status", () => {
     expect(
       screen.queryByRole("button", { name: "Confirm email" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("profile visibility", () => {
+  it("hides the email toggle until the address is verified", () => {
+    renderPage({ emailVerified: false });
+
+    expect(
+      screen.queryByText("Show email on public profile"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers the email toggle once the address is verified", () => {
+    renderPage({ emailVerified: true });
+
+    expect(
+      screen.getByText("Show email on public profile"),
+    ).toBeInTheDocument();
+  });
+
+  it("no longer offers a discovery toggle or a description field", () => {
+    renderPage({ emailVerified: true });
+
+    expect(screen.queryByText("Hide from discovery")).not.toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
   });
 });

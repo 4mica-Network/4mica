@@ -4,7 +4,6 @@ const PublicProfileSchema = v.object({
   username: v.string(),
   name: v.string(),
   bio: v.nullable(v.string()),
-  description: v.nullable(v.string()),
   avatarUrl: v.nullable(v.string()),
   verified: v.boolean(),
   memberSince: v.string(),

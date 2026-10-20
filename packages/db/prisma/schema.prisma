@@ -147,10 +147,8 @@ model User {
   phoneNumber                    String?                   @unique @map("phone_number") @db.VarChar(20)
   phoneNumberVerified            Boolean                   @default(false) @map("phone_number_verified")
   avatarUrl                      String?                   @map("avatar_url")
-  description                    String?
   bio                            String?
   private                        Boolean                   @default(true)
-  hidden                         Boolean                   @default(false)
   verified                       Boolean                   @default(false)
   locked                         Boolean                   @default(false)
   banned                         Boolean                   @default(false)

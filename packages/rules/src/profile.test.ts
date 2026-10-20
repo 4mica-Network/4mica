@@ -4,7 +4,6 @@ import { isProfileRenderable } from "./profile";
 const visible = {
   username: "alice",
   banned: false,
-  hidden: false,
   private: false,
 };
 
@@ -18,7 +17,6 @@ describe("isProfileRenderable", () => {
     expect(isProfileRenderable(null)).toBe(false);
     expect(isProfileRenderable({ ...visible, username: null })).toBe(false);
     expect(isProfileRenderable({ ...visible, banned: true })).toBe(false);
-    expect(isProfileRenderable({ ...visible, hidden: true })).toBe(false);
     expect(isProfileRenderable({ ...visible, private: true })).toBe(false);
     expect(isProfileRenderable({ ...visible, deletedAt: new Date() })).toBe(
       false,

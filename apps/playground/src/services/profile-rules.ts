@@ -5,7 +5,6 @@ import { safeBrandColor } from "@/utils/brandColor";
 export interface ProfileGateRow {
   username: string | null;
   private: boolean;
-  hidden: boolean;
   banned: boolean;
   deletedAt: Date | null;
 }
@@ -14,7 +13,6 @@ export interface ProfileRow extends ProfileGateRow {
   id: string;
   name: string;
   bio: string | null;
-  description: string | null;
   avatarUrl: string | null;
   verified: boolean;
   createdAt: Date;
@@ -22,6 +20,7 @@ export interface ProfileRow extends ProfileGateRow {
   allowEmailVisibility: boolean;
   allowPhoneNumberVisibility: boolean;
   email: string | null;
+  emailVerified: boolean;
   phoneNumber: string | null;
   allowCustomBrandColor: boolean;
   primaryBrandColor: string;
@@ -38,12 +37,11 @@ export const toPublicProfile = (
   username: row.username ?? "",
   name: row.name,
   bio: row.bio,
-  description: row.description,
   avatarUrl: row.avatarUrl,
   verified: row.verified,
   memberSince: row.createdAt.toISOString(),
 
-  email: row.allowEmailVisibility ? row.email : null,
+  email: row.allowEmailVisibility && row.emailVerified ? row.email : null,
   phoneNumber: row.allowPhoneNumberVisibility ? row.phoneNumber : null,
 
   primaryBrandColor: safeBrandColor(

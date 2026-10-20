@@ -16,7 +16,6 @@ const RENDERABLE_OWNER = {
   username: { not: null },
   deletedAt: null,
   banned: false,
-  hidden: false,
   private: false,
 } as const;
 

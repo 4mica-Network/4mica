@@ -19,8 +19,6 @@ const PROFILE = {
   name: "4Mica Workspace",
   email: "workspace@4mica.io",
   bio: "Credit-layer infrastructure for the agentic economy.",
-  description:
-    "We run settlement agents and publish the APIs that let autonomous agents transact on credit. Everything on this profile is live in sandbox mode.",
   avatarUrl: null,
 } as const;
 
@@ -428,12 +426,10 @@ const seed = async (): Promise<void> => {
     email: PROFILE.email,
     emailVerified: true,
     bio: PROFILE.bio,
-    description: PROFILE.description,
     avatarUrl: PROFILE.avatarUrl,
     // The public-profile opt-in. Leave any of these at their defaults and the
     // playground correctly refuses to render the page.
     private: false,
-    hidden: false,
     verified: true,
     allowSEOIndexing: true,
     allowEmailVisibility: true,

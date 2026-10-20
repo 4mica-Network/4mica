@@ -71,10 +71,8 @@ const FULL_USER = {
   emailVerified: true,
   phoneNumber: null,
   phoneNumberVerified: false,
-  description: null,
   bio: null,
   private: true,
-  hidden: false,
   verified: false,
   locked: false,
   banned: false,
@@ -715,11 +713,16 @@ describe("account routes", () => {
         method: "PATCH",
         url: "/me/profile",
         headers: AUTH,
-        payload: { verified: true, banned: false, locked: false, hidden: true },
+        payload: {
+          verified: true,
+          banned: false,
+          locked: false,
+          private: false,
+        },
       });
 
       const data = update.mock.calls[0][0].data;
-      expect(data).toEqual({ hidden: true });
+      expect(data).toEqual({ private: false });
       for (const field of ["verified", "banned", "locked"]) {
         expect(data).not.toHaveProperty(field);
       }
