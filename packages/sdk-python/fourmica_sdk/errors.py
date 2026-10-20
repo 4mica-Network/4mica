@@ -8,7 +8,7 @@ on codes this SDK predates.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 class FourMicaError(Exception):
@@ -20,11 +20,21 @@ class ConfigError(FourMicaError):
 
 
 class RpcError(FourMicaError):
-    """Raised when an API call to the core service fails."""
+    """Raised when an API call to the core service fails. ``code`` and
+    ``details`` are what core attached to a coded refusal — stable across
+    message wording changes, so branch on ``code`` rather than the text."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        code: Optional[str] = None,
+        details: Any = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.code = code
+        self.details = details
 
 
 class InvalidParamsError(FourMicaError):
@@ -109,39 +119,145 @@ class SigningError(PaymentError):
     """Raised when payment signing fails."""
 
 
+class InvalidPayerAddressError(PaymentError):
+    """The payload's payer is not a valid address."""
+
+    def __init__(self) -> None:
+        super().__init__("payer address is not a valid address")
+
+
 class AddressMismatchError(PaymentError):
-    """Raised when the signer address does not equal ``claims.user_address``."""
+    """The signer was asked to sign for a payer other than itself."""
 
-    def __init__(self, signer: str, claims_user: str) -> None:
-        super().__init__(
-            f"address mismatch: signer {signer} != claims.user_address {claims_user}"
-        )
+    def __init__(self, signer: str, payer: str) -> None:
+        super().__init__(f"signer {signer} cannot sign for payer {payer}")
         self.signer = signer
-        self.claims_user = claims_user
+        self.payer = payer
 
 
-class InvalidCertificateError(PaymentError):
-    """Raised when a BLS certificate cannot be decoded or verified structurally."""
+class MalformedReceiptError(PaymentError):
+    """A guarantee receipt that does not decode: not hex, too short, an
+    unknown layout, or a payload that is not its layout."""
 
 
-class CertificateMismatchError(PaymentError):
-    """Raised when a certificate's BLS signature does not verify."""
+class UnreadableReceiptSignatureError(PaymentError):
+    """A guarantee receipt whose signature is not a readable ECDSA signature."""
 
 
-class GuaranteeDomainMismatchError(PaymentError):
-    """Raised when a certificate's domain separator is not the expected one."""
+class ReceiptSignerMismatchError(PaymentError):
+    """A guarantee receipt signed by someone other than the operator."""
+
+    def __init__(self, expected: str, recovered: str) -> None:
+        super().__init__(
+            f"guarantee receipt was signed by {recovered}, not by the operator "
+            f"{expected}"
+        )
+        self.expected = expected
+        self.recovered = recovered
 
 
-class UnsupportedGuaranteeVersionError(PaymentError):
-    """Raised for a guarantee claims version this client has no domain for."""
+class UntrustedCheckpointBatchError(PaymentError):
+    """Core's checkpoint batch failed a check, so it was not signed: an
+    operator that slipped in a payment the payer never made would inflate what
+    the payer can be charged on default."""
 
-    def __init__(self, version: int) -> None:
-        super().__init__(f"unsupported guarantee version: {version}")
-        self.version = version
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"refusing to sign a checkpoint over core's batch: {reason}")
+        self.reason = reason
 
 
-class VerificationError(FourMicaError):
-    """Raised when BLS material or guarantee claims bytes cannot be decoded."""
+class CoreRefusalError(PaymentError, RpcError):
+    """A coded refusal from core, carrying the decoded ``details`` the caller
+    needs to act on. Still an :class:`RpcError`, so handlers written against
+    core's plain errors keep catching it."""
+
+    def __init__(
+        self,
+        message: str,
+        details: Any,
+        status_code: Optional[int] = None,
+        code: Optional[str] = None,
+    ) -> None:
+        RpcError.__init__(
+            self, message, status_code=status_code, code=code, details=details
+        )
+
+
+class CheckpointRequiredError(CoreRefusalError):
+    """``CHECKPOINT_REQUIRED``: the payer holds too many guarantees past its
+    latest checkpoint. Submit one and retry."""
+
+    def __init__(self, details: Any, **kwargs: Any) -> None:
+        super().__init__(
+            f"payer {details.payer} has {details.uncheckpointed} uncheckpointed "
+            f"guarantees (max {details.max_uncheckpointed}); submit a checkpoint "
+            "and retry",
+            details,
+            **kwargs,
+        )
+
+
+class CheckpointMismatchError(CoreRefusalError):
+    """``CHECKPOINT_MISMATCH``: the checkpoint no longer matches what core
+    holds. Re-read the batch and sign again."""
+
+    def __init__(self, details: Any, reason: str, **kwargs: Any) -> None:
+        super().__init__(
+            f"checkpoint for cycle {details.cycle_id} no longer matches what core "
+            f"holds: {reason}",
+            details,
+            **kwargs,
+        )
+        self.reason = reason
+
+
+class CycleMismatchError(CoreRefusalError):
+    """``CYCLE_MISMATCH``: signed for a cycle other than the active one."""
+
+    def __init__(self, details: Any, **kwargs: Any) -> None:
+        super().__init__(
+            f"payment was signed for cycle {details.signed_cycle_id} but the "
+            f"active cycle is {details.active_cycle_id}",
+            details,
+            **kwargs,
+        )
+
+
+class FutureTimestampError(CoreRefusalError):
+    """``FUTURE_TIMESTAMP``: stamped later than core's clock."""
+
+    def __init__(self, details: Any, **kwargs: Any) -> None:
+        super().__init__(
+            f"payment timestamp {details.timestamp} is later than core's clock "
+            f"{details.server_time}",
+            details,
+            **kwargs,
+        )
+
+
+class StaleTimestampError(CoreRefusalError):
+    """``STALE_TIMESTAMP``: stamped before the active cycle opened."""
+
+    def __init__(self, details: Any, **kwargs: Any) -> None:
+        super().__init__(
+            f"payment timestamp {details.timestamp} is before cycle "
+            f"{details.cycle_id} opened at {details.period_start}",
+            details,
+            **kwargs,
+        )
+
+
+class TimestampNotPastCutoffError(CoreRefusalError):
+    """``TIMESTAMP_NOT_PAST_CUTOFF``: stamped at or before the payer's latest
+    checkpoint cutoff."""
+
+    def __init__(self, details: Any, **kwargs: Any) -> None:
+        super().__init__(
+            f"payment timestamp {details.timestamp} is not past the payer's "
+            f"checkpoint cutoff {details.timestamp_cutoff}",
+            details,
+            **kwargs,
+        )
 
 
 # --- on-chain -----------------------------------------------------------
@@ -197,15 +313,26 @@ class UnsupportedAssetError(ContractError):
         self.asset = asset
 
 
-class StablecoinWithdrawShortfallError(ContractError):
-    """The stablecoin withdrawal delivered less than requested."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+class InsufficientLiquidityError(ContractError):
+    """The pool cannot pay this much out right now; its strategy holds the
+    rest. Retry later, or withdraw less."""
 
 
-class AaveNotConfiguredError(ContractError):
-    """Aave is not configured for this deployment."""
+class PoolInsolventError(ContractError):
+    """The pool has shares outstanding but nothing backing them, so no
+    deposit can be priced."""
+
+
+class DepositsDisabledError(ContractError):
+    """The Treasury is not accepting deposits."""
+
+
+class StablecoinDepositsDisabledError(ContractError):
+    """The Treasury is not accepting deposits of this stablecoin."""
+
+
+class PausedError(ContractError):
+    """The Treasury is paused."""
 
 
 class ValueMismatchError(ContractError):
@@ -213,7 +340,7 @@ class ValueMismatchError(ContractError):
 
 
 class ZeroCollateralCreditError(ContractError):
-    """The deposit was too small to mint any scaled collateral."""
+    """The deposit was too small to mint any pool shares."""
 
 
 class Erc20AllowanceRequiredError(FourMicaError):
@@ -289,45 +416,55 @@ class X402Error(FourMicaError):
 __all__: List[str] = [
     "AddressMismatchError",
     "AmountZeroError",
-    "AaveNotConfiguredError",
     "AuthConfigError",
     "AuthDecodeError",
     "AuthError",
     "AuthStatusError",
     "AuthTransportError",
     "AuthUrlError",
-    "CertificateMismatchError",
     "ChainRpcUnavailableError",
+    "CheckpointMismatchError",
+    "CheckpointRequiredError",
     "ClientError",
     "ClientInitializationError",
     "ConfigError",
     "ContractError",
+    "CoreRefusalError",
+    "CycleMismatchError",
+    "DepositsDisabledError",
     "Erc20AllowanceRequiredError",
     "FacilitatorNotConfiguredError",
     "FacilitatorRejectedError",
     "FourMicaError",
+    "FutureTimestampError",
     "GracePeriodNotElapsedError",
-    "GuaranteeDomainMismatchError",
     "InsufficientAvailableError",
-    "InvalidCertificateError",
+    "InsufficientLiquidityError",
     "InvalidParamsError",
+    "InvalidPayerAddressError",
+    "MalformedReceiptError",
     "MissingTokenDomainSeparatorError",
     "NoWithdrawalRequestedError",
     "OutcomeUnknownError",
+    "PausedError",
     "PaymentError",
     "Permit2AllowanceRequiredError",
+    "PoolInsolventError",
+    "ReceiptSignerMismatchError",
     "RevertedOnChainError",
     "RpcError",
     "SigningError",
     "SponsorshipError",
     "SponsorshipTransportError",
-    "StablecoinWithdrawShortfallError",
+    "StablecoinDepositsDisabledError",
+    "StaleTimestampError",
+    "TimestampNotPastCutoffError",
     "TransferFailedError",
     "UnknownRevertError",
+    "UnreadableReceiptSignatureError",
     "UnsupportedAssetError",
-    "UnsupportedGuaranteeVersionError",
+    "UntrustedCheckpointBatchError",
     "ValueMismatchError",
-    "VerificationError",
     "X402Error",
     "ZeroCollateralCreditError",
 ]

@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..errors import X402Error
-from ..models import BLSCert, PaymentSignature
+from ..guarantee import GuaranteeReceipt
+from ..models import PaymentRequest
 from ..utils import ValidationError, normalize_bytes32_hex
 
 SCHEME_4MICA_CREDIT = "4mica-credit"
@@ -278,8 +279,7 @@ class X402SignedPayment:
     header: str
     envelope: Dict[str, Any]
     x402_version: int
-    payload: Dict[str, Any]
-    signature: PaymentSignature
+    payload: PaymentRequest
 
 
 @dataclass
@@ -290,7 +290,11 @@ class SettlementReceipt:
     success: bool
     tx_hash: Optional[str]
     network_id: Optional[str]
-    certificate: Optional[BLSCert]
+    receipt: Optional[GuaranteeReceipt]
+    """The operator's guarantee receipt, when the facilitator relays one —
+    verify it with :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`.
+    Read from ``receipt`` or, as facilitators have named it, ``certificate``;
+    anything not shaped ``{receipt, signature}`` stays only in ``raw``."""
     error: Optional[str]
     raw: Dict[str, Any]
 
@@ -298,18 +302,21 @@ class SettlementReceipt:
     def from_raw(cls, raw: Any) -> "SettlementReceipt":
         if not isinstance(raw, dict):
             raw = {}
-        certificate_raw = raw.get("certificate")
-        certificate = None
-        if isinstance(certificate_raw, dict):
-            claims = _pick(certificate_raw, "claims")
-            signature = _pick(certificate_raw, "signature")
-            if claims is not None and signature is not None:
-                certificate = BLSCert(claims=str(claims), signature=str(signature))
+        receipt = None
+        for key in ("receipt", "certificate"):
+            candidate = raw.get(key)
+            if (
+                isinstance(candidate, dict)
+                and candidate.get("receipt") is not None
+                and candidate.get("signature") is not None
+            ):
+                receipt = GuaranteeReceipt.from_rpc(candidate)
+                break
         return cls(
             success=bool(raw.get("success")),
             tx_hash=_pick(raw, "txHash", "tx_hash"),
             network_id=_pick(raw, "networkId", "network_id", "network"),
-            certificate=certificate,
+            receipt=receipt,
             error=_pick(raw, "error", "errorReason", "invalidReason"),
             raw=raw,
         )

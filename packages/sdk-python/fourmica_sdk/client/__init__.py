@@ -7,16 +7,15 @@ and a terminal does it (``.send()``, ``.approve()``, ``.action()``).
 
 from __future__ import annotations
 
+from typing import Union
+
 from ..auth import AuthTokens
 from ..config import Config
-from ..models import (
-    PaymentGuaranteeRequestClaims,
-    PaymentSignature,
-    SigningScheme,
-)
+from ..models import PaymentRequest, PaymentRequestPayload
 from .account import AccountClient
 from .ctx import ClientCtx
 from .deposit import DepositClient
+from .model import Asset
 from .payment import PaymentClient
 from .settlement import SettlementClient
 from .tokens import TokensClient
@@ -65,14 +64,16 @@ class Client:
     async def logout(self) -> None:
         await self._ctx.logout()
 
-    async def sign_payment(
-        self,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme = SigningScheme.EIP712,
-    ) -> PaymentSignature:
-        """Signs a guarantee request as the payer — the ``FlowSigner`` surface
-        :class:`~fourmica_sdk.X402Flow` consumes."""
-        return await self.payment.sign_request(claims, scheme)
+    async def new_payment(
+        self, recipient: str, amount: int, asset: Union[Asset, str, None] = None
+    ) -> PaymentRequestPayload:
+        """A payment scoped to the live settlement cycle — half of the
+        ``FlowSigner`` surface :class:`~fourmica_sdk.X402Flow` consumes."""
+        return await self.payment.new_payment(recipient, amount, asset)
+
+    async def sign_payment(self, payload: PaymentRequestPayload) -> PaymentRequest:
+        """Signs a payment as the payer — the other half of ``FlowSigner``."""
+        return await self.payment.sign_request(payload)
 
     async def aclose(self) -> None:
         await self._ctx.aclose()
