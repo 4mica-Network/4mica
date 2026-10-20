@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AgentRow } from "@/components/AgentRow";
 import { ApiListingRow } from "@/components/ApiListingRow";
+import { CardAside, CardMain, CardShell } from "@/components/CardShell";
 import { ListCard } from "@/components/ListCard";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileHeader } from "@/components/ProfileHeader";
@@ -48,79 +49,74 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   ]);
 
   return (
-    <div
-      className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col justify-center gap-3"
-      data-fit-viewport
-    >
-      <div className="flex justify-end">
+    <CardShell
+      actions={
         <ProfileActions
           title={profile.name || `@${profile.username}`}
           url={links.profile(profile.username)}
         />
-      </div>
+      }
+    >
+      <CardAside>
+        <ProfileHeader profile={profile} />
+      </CardAside>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-overlay/10 bg-overlay/[0.02] md:grid md:max-h-[40rem] md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
-        <aside className="max-h-[45%] shrink-0 overflow-y-auto border-overlay/10 border-b p-6 sm:p-8 md:max-h-none md:border-r md:border-b-0">
-          <ProfileHeader profile={profile} />
-        </aside>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <ProfileTabs
-            agentCount={agents.length}
-            apiCount={listings.length}
-            agents={
-              <ListCard>
-                {agents.length > 0 ? (
-                  agents.map((agent) => (
-                    <AgentRow
-                      agent={agent}
-                      key={agent.ref}
-                      isOwner={profile.isOwner}
-                      username={profile.username}
-                    />
-                  ))
-                ) : (
-                  <EmptyState
-                    className="flex-1"
-                    variant="plain"
-                    title={messages.profile.noAgentsTitle}
-                    description={
-                      profile.isOwner
-                        ? messages.profile.noAgentsOwner
-                        : messages.profile.noAgents
-                    }
+      <CardMain>
+        <ProfileTabs
+          agentCount={agents.length}
+          apiCount={listings.length}
+          agents={
+            <ListCard>
+              {agents.length > 0 ? (
+                agents.map((agent) => (
+                  <AgentRow
+                    agent={agent}
+                    key={agent.ref}
+                    isOwner={profile.isOwner}
+                    username={profile.username}
                   />
-                )}
-              </ListCard>
-            }
-            apis={
-              <ListCard>
-                {listings.length > 0 ? (
-                  listings.map((listing) => (
-                    <ApiListingRow
-                      key={listing.ref}
-                      listing={listing}
-                      isOwner={profile.isOwner}
-                      username={profile.username}
-                    />
-                  ))
-                ) : (
-                  <EmptyState
-                    className="flex-1"
-                    variant="plain"
-                    title={messages.profile.noApisTitle}
-                    description={
-                      profile.isOwner
-                        ? messages.profile.noApisOwner
-                        : messages.profile.noApis
-                    }
+                ))
+              ) : (
+                <EmptyState
+                  className="flex-1"
+                  variant="plain"
+                  title={messages.profile.noAgentsTitle}
+                  description={
+                    profile.isOwner
+                      ? messages.profile.noAgentsOwner
+                      : messages.profile.noAgents
+                  }
+                />
+              )}
+            </ListCard>
+          }
+          apis={
+            <ListCard>
+              {listings.length > 0 ? (
+                listings.map((listing) => (
+                  <ApiListingRow
+                    key={listing.ref}
+                    listing={listing}
+                    isOwner={profile.isOwner}
+                    username={profile.username}
                   />
-                )}
-              </ListCard>
-            }
-          />
-        </div>
-      </section>
-    </div>
+                ))
+              ) : (
+                <EmptyState
+                  className="flex-1"
+                  variant="plain"
+                  title={messages.profile.noApisTitle}
+                  description={
+                    profile.isOwner
+                      ? messages.profile.noApisOwner
+                      : messages.profile.noApis
+                  }
+                />
+              )}
+            </ListCard>
+          }
+        />
+      </CardMain>
+    </CardShell>
   );
 }

@@ -169,8 +169,6 @@ export const en = {
     installLead: "Add the client packages to your project.",
 
     // API listing
-    apiLead:
-      "Pay per call with credit-backed guarantees. No prepaid balance, no gas on the request path.",
     callTitle: "Call this API",
     callLead:
       "Wrap the fetch you already use. The client answers the 402, signs a guarantee, and retries — you get the response.",
@@ -207,6 +205,37 @@ export const en = {
       "The agent's wallet address is only shown to you, the owner.",
     inactiveAgent:
       "This agent cannot sign payments until it is active. The setup below still applies.",
+  },
+
+  flow: {
+    stepsLabel: "Steps",
+    done: "Done",
+    next: "Next: {{title}}",
+    overview: "Overview",
+    setup: "Set up payment",
+    integrate: "Integrate",
+    reviews: "Reviews",
+    support: "Support",
+    actions: "Page actions",
+  },
+
+  facts: {
+    network: "Network",
+    asset: "Asset",
+    operator: "Operator",
+    status: "Status",
+    hint: {
+      endpoint: "Where your requests go",
+      network: "Chain the payment settles on",
+      asset: "Token you pay in",
+      pricing: "The seller's note on pricing",
+      payTo: "Wallet that receives each payment",
+      docs: "The seller's own documentation",
+      category: "What kind of API this is",
+      published: "Listed on 4Mica since",
+      operator: "Account that runs this agent",
+      registered: "Registered on 4Mica since",
+    },
   },
 
   payWith: {
