@@ -105,6 +105,10 @@ cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.3
 
 Put it beside this repo, or point `FOURMICA_CORE_DIR` at it.
 
+`packages/sdk-rust` already builds against the `2.0.0-alpha.4` crates (core
+`v2.0.0-alpha.4`). This stack stays on `v2.0.0-alpha.3` until the facilitator
+moves to them.
+
 ---
 
 ## 3. Bring it up
