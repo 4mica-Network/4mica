@@ -53,7 +53,7 @@ export async function CodeBlock({
       <div className="code-surface overflow-x-auto p-4">
         <div
           className={cn(
-            "shiki-code font-mono text-md leading-6",
+            "shiki-code font-mono text-[13px] leading-[1.375rem]",
             showLineNumbers && "shiki-numbered",
           )}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes the source at render time; `html` contains only its own token markup.

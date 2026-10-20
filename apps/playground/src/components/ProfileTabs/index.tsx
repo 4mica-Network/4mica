@@ -32,7 +32,7 @@ export function ProfileTabs({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-12 shrink-0 items-center border-overlay/10 border-b px-2">
         <div
-          className="inline-flex items-center gap-0.5 rounded-md border border-overlay/[0.06] p-0.5"
+          className="inline-flex items-center gap-0.5 rounded-md border border-overlay/6 p-0.5"
           role="tablist"
         >
           {tabs.map((tab) => {
@@ -57,7 +57,7 @@ export function ProfileTabs({
                 {selected && (
                   <motion.span
                     aria-hidden="true"
-                    className="absolute inset-0 rounded bg-overlay/[0.06]"
+                    className="absolute inset-0 rounded bg-overlay/6"
                     layoutId="profile-tab-pill"
                     transition={
                       reduceMotion

@@ -7,9 +7,14 @@ import { messages } from "@/i18n";
 export interface ProfileActionsProps {
   url: string;
   title: string;
+  label?: string;
 }
 
-export function ProfileActions({ url, title }: ProfileActionsProps) {
+export function ProfileActions({
+  url,
+  title,
+  label = messages.profile.actions,
+}: ProfileActionsProps) {
   const share = async (): Promise<string | null> => {
     if (typeof navigator.share !== "function") {
       return copyText(url, messages.profile.linkCopied);
@@ -25,7 +30,7 @@ export function ProfileActions({ url, title }: ProfileActionsProps) {
 
   return (
     <ActionGroup
-      label={messages.profile.actions}
+      label={label}
       actions={[
         {
           id: "copy",

@@ -86,7 +86,7 @@ export function ActionGroup({
     <fieldset
       aria-label={label}
       className={cn(
-        "m-0 inline-flex min-w-0 items-center gap-0.5 rounded-md border border-overlay/[0.06] p-0.5",
+        "m-0 inline-flex min-w-0 items-center gap-0.5 rounded-md border border-overlay/6 p-0.5",
         className,
       )}
     >
@@ -102,7 +102,7 @@ export function ActionGroup({
               iconOnly ? "px-1.5" : "px-2",
               isDone
                 ? "bg-success/10 text-ink-body"
-                : "text-ink-muted hover:bg-overlay/[0.06] hover:text-ink-body",
+                : "text-ink-muted hover:bg-overlay/6 hover:text-ink-body",
             )}
             key={id}
             onClick={() => trigger(action)}
