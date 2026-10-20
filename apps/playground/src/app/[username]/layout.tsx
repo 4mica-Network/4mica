@@ -37,7 +37,7 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
     <div className="profile-scope relative min-h-screen" style={brandStyle}>
       <TopBar />
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-14 sm:py-20">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-14 sm:px-6 sm:py-20">
         {/*
           Owner-only, and only while the profile is still private: a published
           profile should look to its owner exactly as it looks to everyone else.

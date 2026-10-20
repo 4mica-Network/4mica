@@ -36,6 +36,11 @@ export const en = {
       "None of your agents are public yet. Publish one to show it here.",
     noApisOwner:
       "None of your APIs are public yet. Publish one to show it here.",
+    actions: "Profile actions",
+    copyLink: "Copy link",
+    share: "Share",
+    linkCopied: "Link copied",
+    shared: "Shared",
   },
 
   agent: {

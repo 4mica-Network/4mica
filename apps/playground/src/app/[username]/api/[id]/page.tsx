@@ -45,7 +45,7 @@ export default async function ApiListingPage({
   const descriptor = buildApiListingDescriptor(listing, profile);
 
   return (
-    <article className="flex flex-col gap-10">
+    <article className="mx-auto flex w-full max-w-3xl flex-col gap-10">
       <JsonLd descriptor={descriptor} />
 
       <ProfileNav
