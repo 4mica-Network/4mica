@@ -107,6 +107,11 @@ nothing is signed and the call fails with `PaymentError::UntrustedCheckpointBatc
 Payments are stamped strictly after the latest cutoff, so a payment signed immediately after a
 checkpoint may wait out the remainder of the current second.
 
+Core refuses a payment stamped later than its own clock, so payments are stamped by core's clock,
+not this machine's. Each active-cycle read reports core's time, and the SDK keeps an estimate that
+errs slightly behind it. A payer whose clock runs fast is therefore not refused. A payer whose clock
+runs slow still stamps inside the cycle it signs for.
+
 ## Payload Versions
 
 The SDK signs at its own `PAYMENT_PAYLOAD_VERSION`. Core accepts every version it can read, listed
@@ -668,8 +673,9 @@ let sdk_4mica::Guarantee::V1(v1) = guarantee;
 println!("guaranteed {} to {}", v1.amount, v1.recipient);
 ```
 
-`receipt` is exactly what `Core4Mica.verifyGuarantee` takes on-chain, so it can be handed to the
-contract unchanged.
+`receipt` and `signature` are exactly what `GuaranteeRegistry.verifyGuarantee` takes on-chain, so
+they can be handed to the contract unchanged. The registry's address is in core's public parameters,
+and `sdk_4mica::contract::GuaranteeRegistry` binds it.
 
 #### Checkpoint
 
@@ -909,9 +915,11 @@ use sdk_4mica::error::{
 
 **`DepositError`**
 
-- `InvalidParams(String)`, `AmountZero`, `UnsupportedAsset(Address)`, `AaveNotConfigured`
+- `InvalidParams(String)`, `AmountZero`, `UnsupportedAsset(Address)`
+- `DepositsDisabled`, `StablecoinDepositsDisabled(Address)`, `Paused`: The treasury is not taking this deposit right now
+- `PoolInsolvent(Address)`: The pool has shares outstanding but nothing backing them, so no deposit can be priced
 - `ValueMismatch { expected, actual }`: Fee-on-transfer token delivered less than signed for
-- `ZeroCollateralCredit { asset, amount }`: Amount too small to mint any scaled collateral
+- `ZeroCollateralCredit { asset, amount }`: Amount too small to mint any pool shares
 - `AuthorizationExpired { expires_at, now }`: The authorization's deadline already elapsed
 - `Permit2AllowanceRequired { message, eip2612_nonce }`: Permit2 needs a one-time approval; when `eip2612_nonce` is present, `permit2().sponsor_approval()` can sign it instead
 - `Erc20AllowanceRequired { token, spender, allowance, needed }`: The self-funded fallback needs an allowance; grant it with `client.tokens.approve`
@@ -923,8 +931,8 @@ use sdk_4mica::error::{
 **`WithdrawError`** — one enum for request, cancel and finalize:
 
 - `InvalidParams(String)`, `AmountZero`, `InsufficientAvailable`, `NoWithdrawalRequested`,
-  `GracePeriodNotElapsed`, `TransferFailed`, `UnsupportedAsset(Address)`,
-  `StablecoinWithdrawShortfall { … }`
+  `GracePeriodNotElapsed`, `TransferFailed`, `UnsupportedAsset(Address)`, `Paused`
+- `InsufficientLiquidity { asset, requested, available }`: The pool cannot pay this much out right now; retry later or withdraw at most `available`
 - `Sponsorship(SponsorshipError)`, `Client(ClientError)`, `UnknownRevert { … }`, `Transport(String)`
 
 #### Cycle Settlement Errors
@@ -943,6 +951,7 @@ use sdk_4mica::error::{
 - `AddressMismatch { signer, payer }`, `InvalidPayerAddress`, `SigningFailed(String)`
 - `MalformedReceipt(GuaranteeDecodeError)`, `UnreadableReceiptSignature`, `ReceiptSignerMismatch { expected, recovered }`
 - `CheckpointRequired(..)`, `CycleMismatch(..)`, `TimestampNotPastCutoff(..)` — core's coded refusals, each carrying the detail needed to recover: the outstanding count, the cycle to re-sign for, or the cutoff to stamp past
+- `FutureTimestamp(..)`, `StaleTimestamp(..)` — the payment was stamped past core's clock, or before its cycle opened. Both carry core's `server_time`, which the SDK adopts, so a fresh payment is stamped right
 - `CheckpointMismatch { details, reason }` — core refused a checkpoint because a payment or another checkpoint landed after its batch was read. Read the batch again and re-sign
 - `UntrustedCheckpointBatch(String)` — core's checkpoint batch holds something the payer did not sign, so no checkpoint was signed
 - `InvalidParams(String)`, `Decode(String)`, `Rpc(rpc::ApiClientError)`, `Client(ClientError)`, `Auth(AuthError)`
@@ -951,7 +960,7 @@ use sdk_4mica::error::{
 
 **`AccountError`**
 
-- `UnsupportedAsset(Address)`, `AaveNotConfigured`, `Decode(String)`
+- `UnsupportedAsset(Address)`, `Decode(String)`
 - `Rpc(rpc::ApiClientError)`, `Auth(AuthError)`, `Client(ClientError)`, `UnknownRevert { … }`, `Transport(String)`
 
 #### Token Errors

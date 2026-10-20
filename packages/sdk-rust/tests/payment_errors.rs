@@ -619,3 +619,136 @@ async fn a_checkpoint_refused_twice_reports_the_mismatch() -> anyhow::Result<()>
     assert_eq!(traffic.lock().unwrap().submitted.len(), 2);
     Ok(())
 }
+
+/// A core that serves `cycle` as the active one and nothing else.
+async fn client_with_active_cycle(cycle: Value) -> anyhow::Result<Client<PrivateKeySigner>> {
+    let core_url = spawn(
+        Router::new()
+            .route(
+                "/core/public-params",
+                get(|| async { Json(public_params()) }),
+            )
+            .route(
+                "/core/cycles/active",
+                get(move || {
+                    let cycle = cycle.clone();
+                    async move { Json(cycle) }
+                }),
+            ),
+    )
+    .await?;
+
+    Ok(Client::connect(
+        ClientBuilder::default()
+            .rpc_url(core_url)
+            .signer(PrivateKeySigner::random())
+            .bearer_token("test-token")
+            .contract_address(CONTRACT.to_string())
+            .build()?,
+    )
+    .await?)
+}
+
+/// The active cycle as a core whose clock reads `server_time` reports it.
+fn active_cycle_at(server_time: u64, period_start: u64) -> Value {
+    json!({
+        "cycle_id": format!("{FIRST_CYCLE:#x}"),
+        "cycle_id_text": "0x0:1700000000",
+        "asset_address": Address::ZERO.to_string(),
+        "period_start": period_start,
+        "period_end": server_time + 86_400,
+        "server_time": server_time,
+    })
+}
+
+async fn stamped(client: &Client<PrivateKeySigner>) -> u64 {
+    client
+        .payment
+        .new_payment(RECIPIENT, U256::from(10u64), Asset::Native)
+        .await
+        .expect("build payment")
+        .timestamp()
+}
+
+/// Core refuses a payment stamped past its own clock, so a payer whose clock runs ahead must stamp
+/// by core's, and one whose clock lags must not fall behind the cycle it signs for.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn payments_are_stamped_by_cores_clock() -> anyhow::Result<()> {
+    for skew in [3_600i64, -3_600] {
+        let core_time = (unix_now() as i64 + skew) as u64;
+        let client = client_with_active_cycle(active_cycle_at(core_time, 1_700_000_000)).await?;
+
+        let timestamp = stamped(&client).await;
+        let core_now = (unix_now() as i64 + skew) as u64;
+        assert!(
+            timestamp <= core_now,
+            "core is {skew}s off; stamped {timestamp}, core reads {core_now}"
+        );
+        assert!(
+            timestamp + 2 >= core_time,
+            "core is {skew}s off; stamped {timestamp}, core read {core_time}"
+        );
+    }
+    Ok(())
+}
+
+/// Erring behind core's clock must not push a payment before the cycle it is signed for.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_payment_in_a_cycle_that_just_opened_is_stamped_inside_it() -> anyhow::Result<()> {
+    let opened = unix_now();
+    let client = client_with_active_cycle(active_cycle_at(opened, opened)).await?;
+
+    assert!(stamped(&client).await >= opened);
+    Ok(())
+}
+
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_future_timestamp_reports_cores_clock_and_resets_ours() -> anyhow::Result<()> {
+    let core_time = unix_now() - 3_600;
+    let (client, _) = client_refusing_with(json!({
+        "error": "request timestamp is later than the server clock",
+        "code": "FUTURE_TIMESTAMP",
+        "details": { "timestamp": unix_now(), "server_time": core_time },
+    }))
+    .await?;
+
+    match refused(&client).await {
+        PaymentError::FutureTimestamp(details) => assert_eq!(details.server_time, core_time),
+        other => panic!("expected a future timestamp, got {other:?}"),
+    }
+    assert!(
+        stamped(&client).await <= core_time + 1,
+        "the next payment must be stamped by the clock core reported"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_stale_timestamp_names_the_cycle_it_missed() -> anyhow::Result<()> {
+    let (client, _) = client_refusing_with(json!({
+        "error": "request timestamp is before the active cycle started",
+        "code": "STALE_TIMESTAMP",
+        "details": {
+            "cycle_id": format!("{FIRST_CYCLE:#x}"),
+            "cycle_id_text": "0x0:1700000000",
+            "timestamp": 1_699_999_999u64,
+            "period_start": 1_700_000_000u64,
+            "period_end": 1_700_086_400u64,
+            "server_time": unix_now(),
+        },
+    }))
+    .await?;
+
+    match refused(&client).await {
+        PaymentError::StaleTimestamp(details) => {
+            assert_eq!(details.period_start, 1_700_000_000);
+            assert_eq!(details.cycle_id, format!("{FIRST_CYCLE:#x}"));
+        }
+        other => panic!("expected a stale timestamp, got {other:?}"),
+    }
+    Ok(())
+}

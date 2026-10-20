@@ -2,6 +2,8 @@ use alloy::sol;
 
 sol! {
     #[sol(rpc)]
+    /// The Treasury contract, which holds collateral. It still signs under the EIP-712 name
+    /// "Core4Mica".
     contract Core4Mica {
         error AmountZero();
         error InsufficientAvailable();
@@ -13,36 +15,30 @@ sol! {
         error InvalidRecipient();
         error UnsupportedAsset(address asset);
         error InvalidAsset(address asset);
-        error UnsupportedGuaranteeType(bytes32 typeHash);
-        error MalformedGuarantee();
-        error AaveNotConfigured();
         error FeeTooHigh();
         error TreasuryClaimExceedsAvailable();
-        error StablecoinWithdrawShortfall(address asset, uint256 requested, uint256 actual);
-        error AaveProviderReconfigurationBlocked();
-        error UserScaledBalanceUnderflow(address asset, address user, uint256 deduction, uint256 balance);
+        /// The pool cannot pay `requested` out right now: its idle assets plus what the strategy
+        /// can release fall short.
+        error InsufficientLiquidity(address asset, uint256 requested, uint256 available);
+        /// The pool has shares outstanding but nothing backing them.
+        error PoolInsolvent(address asset);
+        error UserShareUnderflow(address asset, address user, uint256 deduction, uint256 balance);
+        error DepositsDisabled();
+        error StablecoinDepositsDisabled(address asset);
+        error EnforcedPause();
         error ZeroAddress();
-        error InvalidAToken(address asset, address aToken);
         error ReconciliationLoss(address asset, uint256 tracked, uint256 observed);
-        error SurplusClaimExceedsAvailable();
         /// The deposited asset delivered less than `expected` (fee-on-transfer tokens), or a
         /// native-value deposit did not match `msg.value`.
         error ValueMismatch(uint256 expected, uint256 actual);
-        /// `amount` was too small to mint any scaled collateral.
+        /// `amount` was too small to mint any pool shares.
         error ZeroCollateralCredit(address asset, uint256 amount);
-        error EscrowScaledUnderflow(address asset, uint256 requested, uint256 available);
         error AuthorizationExpired(uint256 validBefore);
         error AuthorizationNotYetValid(uint256 validAfter);
         error AuthorizationAlreadyUsed(address user, bytes32 nonce);
 
         function withdrawalGracePeriod() external view returns (uint256);
-        function aaveAddressesProvider() external view returns (address);
         function yieldFeeBps() external view returns (uint256);
-
-        /// TODO(#22): move key to registry
-        function GUARANTEE_VERIFICATION_KEY() external view returns (
-            bytes32 x1, bytes32 x2, bytes32 y1, bytes32 y2
-        );
 
         event CollateralDeposited(address indexed user, address indexed asset, uint256 amount);
         event CollateralWithdrawn(address indexed user, address indexed asset, uint256 amount);
@@ -50,19 +46,9 @@ sol! {
         event WithdrawalCanceled(address indexed user, address indexed asset);
         event AuthorizationUsed(address indexed user, bytes32 indexed nonce);
         event WithdrawalGracePeriodUpdated(uint256 newGracePeriod);
-        event GuaranteeVerifierUpdated(bytes32 indexed typeHash, address verifier, address signer, bool enabled);
-        event GuaranteeSignerUpdated(bytes32 indexed typeHash, address signer);
-        event GuaranteeTypeEnabledUpdated(bytes32 indexed typeHash, bool enabled);
         event StablecoinAssetUpdated(address indexed asset, bool enabled);
-        event AaveConfigured(address indexed provider, address indexed pool);
         event YieldFeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
         event ProtocolYieldClaimed(address indexed asset, address indexed to, uint256 amount);
-        event SurplusATokensClaimed(
-            address indexed asset,
-            address indexed to,
-            uint256 scaledAmount,
-            uint256 nominalAmount
-        );
 
         struct WithdrawalRequest {
             uint256 timestamp;
@@ -74,14 +60,6 @@ sol! {
             uint256 collateral;
             uint256 withdrawalRequestTimestamp;
             uint256 withdrawalRequestAmount;
-        }
-
-        /// How a guarantee layout is verified: which adapter hashes it, whose signature attests
-        /// it, and whether it is currently accepted.
-        struct GuaranteeConfig {
-            address signer;
-            address verifier;
-            bool enabled;
         }
 
         /// A client's EIP-3009 authorization to move the deposit amount from `from` into the
@@ -142,14 +120,8 @@ sol! {
         }
 
         /// @param manager Address of AccessManager
-        /// @param guaranteeVerifier Adapter for the guarantee layout this deployment accepts
-        /// @param guaranteeSigner Address whose signature attests that layout's receipts
-        constructor(
-            address manager,
-            address guaranteeVerifier,
-            address guaranteeSigner,
-            address[] memory stablecoins_
-        );
+        /// @param minGracePeriod_ Floor the withdrawal grace period can never be lowered past
+        constructor(address manager, address[] memory stablecoins_, uint256 minGracePeriod_);
 
         function deposit() external payable;
         function depositStablecoin(address asset, uint256 amount) external;
@@ -183,25 +155,15 @@ sol! {
         function CANCEL_WITHDRAWAL_TYPEHASH() external view returns (bytes32);
 
         function setWithdrawalGracePeriod(uint256 _gracePeriod) external;
-        function configureGuaranteeVerifier(address verifier, address signer, bool enabled) external;
-        function setGuaranteeSigner(bytes32 typeHash, address signer) external;
-        function setGuaranteeTypeEnabled(bytes32 typeHash, bool enabled) external;
-        function configureAave(address poolAddressesProvider, address[] calldata aTokens) external;
-        function addStablecoinAsset(address asset, address aToken) external;
+        function addStablecoinAsset(address asset, address strategy_) external;
         function setYieldFeeBps(uint256 feeBps) external;
         function claimProtocolYield(address asset, address to, uint256 amount) external;
-        function claimSurplusATokens(address asset, address to, uint256 scaledAmount) external;
-        function getGuaranteeConfig(bytes32 typeHash) external view returns (GuaranteeConfig memory config);
         function getUserAllAssets(address userAddr)
             external
             view
             returns (UserAssetInfo[] memory);
 
         function getERC20Tokens() external view returns (address[] memory);
-
-        /// True when `signature` is the configured signer's over `guarantee`, whose first word
-        /// names the layout.
-        function verifyGuarantee(bytes calldata guarantee, bytes calldata signature) external view returns (bool);
 
         function collateral(address userAddr) external view returns (uint256);
         function collateral(address userAddr, address asset) external view returns (uint256);
@@ -211,12 +173,15 @@ sol! {
         function protocolYieldShare(address user, address asset) external view returns (uint256);
         function userNetYield(address user, address asset) external view returns (uint256);
         function withdrawableBalance(address user, address asset) external view returns (uint256);
-        function totalUserScaledBalance(address asset) external view returns (uint256);
-        function protocolScaledBalance(address asset) external view returns (uint256);
-        function surplusScaledBalance(address asset) external view returns (uint256);
-        function contractScaledATokenBalance(address asset) external view returns (uint256);
-        function reconciliationDustToleranceScaled() external view returns (uint256);
-        function stablecoinAToken(address asset) external view returns (address);
+        /// The ERC-4626 strategy backing `asset`'s pool, or zero while its assets sit idle.
+        function strategy(address asset) external view returns (address);
+        /// Underlying value backing `asset`'s pool: idle holdings plus the strategy position.
+        function poolAssets(address asset) external view returns (uint256);
+        /// Pool shares outstanding across users, the protocol and escrow.
+        function poolShares(address asset) external view returns (uint256);
+        function userShares(address user, address asset) external view returns (uint256);
+        function totalUserShares(address asset) external view returns (uint256);
+        function protocolShares(address asset) external view returns (uint256);
 
         function getUser(address userAddr) external view returns (
             uint256 assetCollateral,
@@ -228,6 +193,35 @@ sol! {
             uint256 withdrawalRequestTimestamp,
             uint256 withdrawalRequestAmount
         );
+    }
+}
+
+sol! {
+    #[sol(rpc)]
+    contract GuaranteeRegistry {
+        error ZeroAddress();
+        error UnsupportedGuaranteeType(bytes32 typeHash);
+        error MalformedGuarantee();
+
+        event GuaranteeVerifierUpdated(bytes32 indexed typeHash, address verifier, address signer, bool enabled);
+        event GuaranteeSignerUpdated(bytes32 indexed typeHash, address signer);
+        event GuaranteeTypeEnabledUpdated(bytes32 indexed typeHash, bool enabled);
+
+        /// How a guarantee layout is verified: which adapter hashes it, whose signature attests
+        /// it, and whether it is currently accepted.
+        struct GuaranteeConfig {
+            address signer;
+            address verifier;
+            bool enabled;
+        }
+
+        function configureGuaranteeVerifier(address verifier, address signer, bool enabled) external;
+        function setGuaranteeSigner(bytes32 typeHash, address signer) external;
+        function setGuaranteeTypeEnabled(bytes32 typeHash, bool enabled) external;
+        function getGuaranteeConfig(bytes32 typeHash) external view returns (GuaranteeConfig memory config);
+        /// True when `signature` is the configured signer's over `guarantee`, whose first word
+        /// names the layout. Takes a [`rpc::GuaranteeReceipt`]'s two fields as they are.
+        function verifyGuarantee(bytes calldata guarantee, bytes calldata signature) external view returns (bool);
     }
 }
 

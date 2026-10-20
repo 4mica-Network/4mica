@@ -22,8 +22,8 @@ pub use alloy::primitives::{Address, U256};
 pub use rpc::{
     ActiveCycleResponse, CheckpointAcceptedResponse, CheckpointBatchResponse,
     CheckpointMismatchDetails, CheckpointPayload, CheckpointRequiredDetails, CycleMismatchDetails,
-    Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
-    TimestampNotPastCutoffDetails, ValidationRequirement,
+    FutureTimestampDetails, Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload,
+    SignedCheckpoint, StaleTimestampDetails, TimestampNotPastCutoffDetails, ValidationRequirement,
 };
 
 pub use auth::{AuthClient, AuthSession, AuthTokens};

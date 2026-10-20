@@ -2,16 +2,18 @@
 //! operator signed, and either side can verify that receipt offline.
 
 use std::collections::HashSet;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::signers::{Signature, Signer};
 use alloy::sol_types::Eip712Domain;
 use rpc::{
     ActiveCycleResponse, ApiClientError, CheckpointAcceptedResponse, CheckpointBatchResponse,
-    CheckpointPayload, ERROR_CODE_CHECKPOINT_MISMATCH, ERROR_CODE_CHECKPOINT_REQUIRED,
-    ERROR_CODE_CYCLE_MISMATCH, ERROR_CODE_TIMESTAMP_NOT_PAST_CUTOFF, Guarantee, GuaranteeReceipt,
-    PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
+    CheckpointPayload, CycleMismatchDetails, ERROR_CODE_CHECKPOINT_MISMATCH,
+    ERROR_CODE_CHECKPOINT_REQUIRED, ERROR_CODE_CYCLE_MISMATCH, ERROR_CODE_FUTURE_TIMESTAMP,
+    ERROR_CODE_STALE_TIMESTAMP, ERROR_CODE_TIMESTAMP_NOT_PAST_CUTOFF, FutureTimestampDetails,
+    Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
+    StaleTimestampDetails, TimestampNotPastCutoffDetails,
 };
 
 use crate::{
@@ -87,8 +89,10 @@ where
 {
     /// A payment payload for the configured signer, scoped to the asset's active settlement cycle.
     ///
-    /// Waits out the remainder of the current second when the payer's last checkpoint covers it,
-    /// since a payment must be stamped strictly after what the checkpoint already accounts for.
+    /// Stamped by core's clock as last reported, not this machine's, since core refuses a payment
+    /// stamped later than its own clock. Waits out the remainder of the current second when the
+    /// payer's last checkpoint covers it, since a payment must be stamped strictly after what the
+    /// checkpoint already accounts for.
     pub async fn new_payment(
         &self,
         recipient: Address,
@@ -96,7 +100,10 @@ where
         asset: Asset,
     ) -> Result<PaymentRequestPayload, PaymentError> {
         let cycle = self.ctx.active_cycle(asset.address()).await?;
-        let timestamp = self.next_payment_timestamp(asset.address()).await;
+        let timestamp = self
+            .next_payment_timestamp(asset.address())
+            .await
+            .max(cycle.period_start);
 
         Ok(PaymentRequestPayload::new(
             self.ctx.signer_address().to_string(),
@@ -182,16 +189,17 @@ where
 
     /// The timestamp to stamp a payment with, never at or before what a checkpoint already covers.
     async fn next_payment_timestamp(&self, asset: Address) -> u64 {
-        let now = unix_now();
         let Some(cutoff) = self.ctx.payment_cutoff(asset).await else {
-            return now;
+            return self.ctx.core_now();
         };
-        if now > cutoff {
-            return now;
+        loop {
+            let now_ms = self.ctx.core_now_ms();
+            let past_cutoff_ms = (cutoff + 1) * 1000;
+            if now_ms >= past_cutoff_ms {
+                return now_ms / 1000;
+            }
+            tokio::time::sleep(Duration::from_millis(past_cutoff_ms - now_ms)).await;
         }
-
-        tokio::time::sleep(Duration::from_secs(cutoff + 1 - now)).await;
-        unix_now().max(cutoff + 1)
     }
 }
 
@@ -218,12 +226,14 @@ where
 
     /// The cycle payments for `asset` must be signed for right now.
     pub async fn active_cycle(&self, asset: Asset) -> Result<ActiveCycleResponse, PaymentError> {
-        Ok(self
+        let cycle = self
             .ctx
             .rpc_proxy()
             .await?
             .get_active_cycle(asset.address().to_string())
-            .await?)
+            .await?;
+        self.ctx.record_core_time(cycle.server_time);
+        Ok(cycle)
     }
 
     /// The payer's latest checkpoint in `asset`'s active cycle and the payments it does not cover
@@ -304,13 +314,34 @@ where
             Some(ERROR_CODE_CYCLE_MISMATCH) => {
                 self.ctx.forget_active_cycle(asset).await;
                 match err.details() {
-                    Some(details) => PaymentError::CycleMismatch(Box::new(details)),
+                    Some(details) => {
+                        let details: CycleMismatchDetails = details;
+                        self.ctx.record_core_time(details.server_time);
+                        PaymentError::CycleMismatch(Box::new(details))
+                    }
                     None => PaymentError::Rpc(err),
                 }
             }
+            Some(ERROR_CODE_FUTURE_TIMESTAMP) => match err.details() {
+                Some(details) => {
+                    let details: FutureTimestampDetails = details;
+                    self.ctx.record_core_time(details.server_time);
+                    PaymentError::FutureTimestamp(Box::new(details))
+                }
+                None => PaymentError::Rpc(err),
+            },
+            Some(ERROR_CODE_STALE_TIMESTAMP) => match err.details() {
+                Some(details) => {
+                    let details: StaleTimestampDetails = details;
+                    self.ctx.record_core_time(details.server_time);
+                    PaymentError::StaleTimestamp(Box::new(details))
+                }
+                None => PaymentError::Rpc(err),
+            },
             Some(ERROR_CODE_TIMESTAMP_NOT_PAST_CUTOFF) => match err.details() {
                 Some(details) => {
-                    let details: rpc::TimestampNotPastCutoffDetails = details;
+                    let details: TimestampNotPastCutoffDetails = details;
+                    self.ctx.record_core_time(details.server_time);
                     // A cutoff belongs to the payer it names. Issuance is the recipient's call, so
                     // the refusal often describes someone else, and holding back this client's own
                     // payments for a stranger's cutoff would be nothing but a delay.
@@ -456,13 +487,6 @@ fn recover(signature: &str, digest: B256) -> Option<Address> {
         .ok()?
         .recover_address_from_prehash(&digest)
         .ok()
-}
-
-pub(crate) fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

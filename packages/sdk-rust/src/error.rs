@@ -5,7 +5,8 @@ use anyhow::Error as AnyError;
 use reqwest::StatusCode;
 use rpc::{
     ApiClientError, CheckpointMismatchDetails, CheckpointRequiredDetails, CycleMismatchDetails,
-    GuaranteeDecodeError, TimestampNotPastCutoffDetails,
+    FutureTimestampDetails, GuaranteeDecodeError, StaleTimestampDetails,
+    TimestampNotPastCutoffDetails,
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -149,12 +150,16 @@ pub enum WithdrawError {
     TransferFailed,
     #[error("unsupported asset: {0}")]
     UnsupportedAsset(Address),
-    #[error("stablecoin withdraw shortfall for {asset}: requested {requested}, actual {actual}")]
-    StablecoinWithdrawShortfall {
+    /// The pool cannot pay this much out right now; its strategy holds the rest. Retry later or
+    /// withdraw `available` or less.
+    #[error("insufficient liquidity in {asset}: requested {requested}, available {available}")]
+    InsufficientLiquidity {
         asset: Address,
         requested: String,
-        actual: String,
+        available: String,
     },
+    #[error("the treasury is paused")]
+    Paused,
 
     #[error(transparent)]
     Sponsorship(#[from] SponsorshipError),
@@ -176,13 +181,20 @@ pub enum DepositError {
     AmountZero,
     #[error("unsupported asset: {0}")]
     UnsupportedAsset(Address),
-    #[error("Aave is not configured")]
-    AaveNotConfigured,
+    #[error("deposits are disabled")]
+    DepositsDisabled,
+    #[error("deposits of {0} are disabled")]
+    StablecoinDepositsDisabled(Address),
+    /// The pool has shares outstanding but nothing backing them, so no deposit can be priced.
+    #[error("the {0} pool is insolvent")]
+    PoolInsolvent(Address),
+    #[error("the treasury is paused")]
+    Paused,
     /// The token delivered less than `amount` — typically a fee-on-transfer token. The
     /// authorization is unusable as signed; re-sign for the amount that will actually arrive.
     #[error("asset transfer delivered {actual} but {expected} was expected")]
     ValueMismatch { expected: String, actual: String },
-    /// `amount` was too small to mint any scaled collateral. Permanently unusable — a submitter
+    /// `amount` was too small to mint any pool shares. Permanently unusable — a submitter
     /// should drop the authorization rather than retry it.
     #[error("deposit of {amount} in {asset} credits zero collateral")]
     ZeroCollateralCredit { asset: Address, amount: String },
@@ -428,6 +440,16 @@ pub enum PaymentError {
     )]
     CycleMismatch(Box<CycleMismatchDetails>),
     #[error(
+        "payment timestamp {} is later than core's clock {}",
+        .0.timestamp, .0.server_time
+    )]
+    FutureTimestamp(Box<FutureTimestampDetails>),
+    #[error(
+        "payment timestamp {} is before cycle {} opened at {}",
+        .0.timestamp, .0.cycle_id, .0.period_start
+    )]
+    StaleTimestamp(Box<StaleTimestampDetails>),
+    #[error(
         "payment timestamp {} is not past the payer's checkpoint cutoff {}",
         .0.timestamp, .0.timestamp_cutoff
     )]
@@ -451,8 +473,6 @@ pub enum PaymentError {
 pub enum AccountError {
     #[error("unsupported asset: {0}")]
     UnsupportedAsset(Address),
-    #[error("Aave is not configured")]
-    AaveNotConfigured,
     #[error("failed to decode API response: {0}")]
     Decode(String),
     #[error("unknown revert (selector {selector:#x})")]
@@ -603,17 +623,21 @@ impl_from_alloy_error!(WithdrawError, {
     Core4Mica::Core4MicaErrors::GracePeriodNotElapsed(_) => Self::GracePeriodNotElapsed,
     Core4Mica::Core4MicaErrors::TransferFailed(_) => Self::TransferFailed,
     Core4Mica::Core4MicaErrors::UnsupportedAsset(err) => Self::UnsupportedAsset(err.asset),
-    Core4Mica::Core4MicaErrors::StablecoinWithdrawShortfall(err) => Self::StablecoinWithdrawShortfall {
+    Core4Mica::Core4MicaErrors::InsufficientLiquidity(err) => Self::InsufficientLiquidity {
         asset: err.asset,
         requested: err.requested.to_string(),
-        actual: err.actual.to_string(),
+        available: err.available.to_string(),
     },
+    Core4Mica::Core4MicaErrors::EnforcedPause(_) => Self::Paused,
 });
 
 impl_from_alloy_error!(DepositError, {
     Core4Mica::Core4MicaErrors::AmountZero(_) => Self::AmountZero,
     Core4Mica::Core4MicaErrors::UnsupportedAsset(err) => Self::UnsupportedAsset(err.asset),
-    Core4Mica::Core4MicaErrors::AaveNotConfigured(_) => Self::AaveNotConfigured,
+    Core4Mica::Core4MicaErrors::DepositsDisabled(_) => Self::DepositsDisabled,
+    Core4Mica::Core4MicaErrors::StablecoinDepositsDisabled(err) => Self::StablecoinDepositsDisabled(err.asset),
+    Core4Mica::Core4MicaErrors::PoolInsolvent(err) => Self::PoolInsolvent(err.asset),
+    Core4Mica::Core4MicaErrors::EnforcedPause(_) => Self::Paused,
     Core4Mica::Core4MicaErrors::ValueMismatch(err) => Self::ValueMismatch {
         expected: err.expected.to_string(),
         actual: err.actual.to_string(),
@@ -630,5 +654,4 @@ impl_from_alloy_error!(TokenError);
 
 impl_from_alloy_error!(AccountError, {
     Core4Mica::Core4MicaErrors::UnsupportedAsset(err) => Self::UnsupportedAsset(err.asset),
-    Core4Mica::Core4MicaErrors::AaveNotConfigured(_) => Self::AaveNotConfigured,
 });

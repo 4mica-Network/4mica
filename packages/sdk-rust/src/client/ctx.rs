@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use alloy::sol_types::Eip712Domain;
 use alloy::{
@@ -17,7 +19,7 @@ use url::Url;
 
 use crate::{
     auth::{AuthSession, AuthTokens},
-    client::{facilitator::Facilitator, payment::unix_now},
+    client::facilitator::Facilitator,
     config::{Config, CredentialsConfig},
     contract::{
         ClearingHouse::{self, ClearingHouseInstance},
@@ -55,12 +57,17 @@ struct Inner<S> {
     /// The latest checkpoint cutoff known per asset. A payment at or below it can never be
     /// collected, so payments are held back past it.
     payment_cutoffs: RwLock<HashMap<Address, u64>>,
+    /// Core's clock minus ours, in milliseconds, taken as a lower bound: the last `server_time`
+    /// core reported, set against when its answer arrived. Zero until core reports one.
+    clock_offset_ms: AtomicI64,
 }
 
 /// The settlement cycle a payment must be signed for, as core reports it.
 #[derive(Clone, Copy)]
 pub(crate) struct ActiveCycle {
     pub(crate) id: B256,
+    /// Unix seconds; a payment stamped earlier is refused as stale.
+    pub(crate) period_start: u64,
     /// Unix seconds; core opens the next cycle from this moment on.
     period_end: u64,
 }
@@ -76,6 +83,7 @@ impl TryFrom<ActiveCycleResponse> for ActiveCycle {
                     response.cycle_id
                 ))
             })?,
+            period_start: response.period_start,
             period_end: response.period_end,
         })
     }
@@ -144,6 +152,7 @@ impl<S> ClientCtx<S> {
             core_domain_separator,
             active_cycles: RwLock::new(HashMap::new()),
             payment_cutoffs: RwLock::new(HashMap::new()),
+            clock_offset_ms: AtomicI64::new(0),
         })))
     }
 
@@ -357,7 +366,7 @@ impl<S> ClientCtx<S> {
         S: Signer + Sync,
     {
         if let Some(cached) = self.0.active_cycles.read().await.get(&asset)
-            && unix_now() < cached.period_end
+            && self.core_now() < cached.period_end
         {
             return Ok(*cached);
         }
@@ -369,6 +378,7 @@ impl<S> ClientCtx<S> {
             .get_active_cycle(asset.to_string())
             .await
             .map_err(|e| ClientError::Rpc(e.to_string()))?;
+        self.record_core_time(response.server_time);
         let cycle = ActiveCycle::try_from(response)?;
 
         self.0.active_cycles.write().await.insert(asset, cycle);
@@ -392,6 +402,31 @@ impl<S> ClientCtx<S> {
 
     pub(crate) async fn payment_cutoff(&self, asset: Address) -> Option<u64> {
         self.0.payment_cutoffs.read().await.get(&asset).copied()
+    }
+
+    /// Learns core's clock from a `server_time` it just reported. Zero, from a core that
+    /// predates it, teaches nothing.
+    pub(crate) fn record_core_time(&self, server_time: u64) {
+        if server_time == 0 {
+            return;
+        }
+        // The report left core before it reached us and was truncated to the second, so core was
+        // at least this far ahead. Erring low is the safe side: core refuses a payment stamped
+        // even a second past its own clock.
+        let offset = (server_time as i64 * 1000).saturating_sub(local_now_ms());
+        self.0.clock_offset_ms.store(offset, Ordering::Relaxed);
+    }
+
+    /// Core's clock as best known, in unix milliseconds, never ahead of the real one.
+    pub(crate) fn core_now_ms(&self) -> u64 {
+        local_now_ms()
+            .saturating_add(self.0.clock_offset_ms.load(Ordering::Relaxed))
+            .max(0) as u64
+    }
+
+    /// Core's clock as best known, in unix seconds, never ahead of the real one.
+    pub(crate) fn core_now(&self) -> u64 {
+        self.core_now_ms() / 1000
     }
 
     pub(crate) fn signer(&self) -> &S {
@@ -491,4 +526,11 @@ impl<S> ClientCtx<S> {
         let provider = self.get_wallet_provider().await?;
         Ok(ClearingHouse::new(clearing_house_address, provider))
     }
+}
+
+fn local_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or(0)
 }
