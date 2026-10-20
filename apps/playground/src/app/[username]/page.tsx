@@ -48,7 +48,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 md:min-h-[calc(100dvh-14rem)] md:justify-center">
+    <div
+      className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col justify-center gap-3"
+      data-fit-viewport
+    >
       <div className="flex justify-end">
         <ProfileActions
           title={profile.name || `@${profile.username}`}
@@ -56,12 +59,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         />
       </div>
 
-      <section className="grid overflow-hidden rounded-2xl border border-overlay/10 bg-overlay/[0.02] md:min-h-[36rem] md:grid-cols-[19rem_minmax(0,1fr)]">
-        <aside className="border-overlay/10 border-b p-6 sm:p-8 md:border-r md:border-b-0">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-overlay/10 bg-overlay/[0.02] md:grid md:max-h-[40rem] md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
+        <aside className="max-h-[45%] shrink-0 overflow-y-auto border-overlay/10 border-b p-6 sm:p-8 md:max-h-none md:border-r md:border-b-0">
           <ProfileHeader profile={profile} />
         </aside>
 
-        <div className="flex min-h-[22rem] min-w-0 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <ProfileTabs
             agentCount={agents.length}
             apiCount={listings.length}

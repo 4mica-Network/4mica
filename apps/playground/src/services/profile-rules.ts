@@ -42,6 +42,7 @@ export const toPublicProfile = (
   memberSince: row.createdAt.toISOString(),
 
   email: row.allowEmailVisibility && row.emailVerified ? row.email : null,
+  emailVerified: row.emailVerified,
   phoneNumber: row.allowPhoneNumberVisibility ? row.phoneNumber : null,
 
   primaryBrandColor: safeBrandColor(
