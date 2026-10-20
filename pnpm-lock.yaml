@@ -48,9 +48,6 @@ catalogs:
     '@modelcontextprotocol/sdk':
       specifier: ^1.30.0
       version: 1.30.0
-    '@noble/curves':
-      specifier: ^2.2.0
-      version: 2.2.0
     '@prisma/adapter-pg':
       specifier: 7.9.1
       version: 7.9.1
@@ -1433,9 +1430,6 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@noble/curves':
-        specifier: 'catalog:'
-        version: 2.2.0
       '@quillai-network/wachai-validation-sdk':
         specifier: 'catalog:'
         version: 0.1.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)

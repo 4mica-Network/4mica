@@ -1,37 +1,33 @@
-/** Payer-side request signing. */
+/** Payer-side signing: the payloads a payer authorizes under the ClearingHouse domain. */
 
 import type { Account } from "viem";
-import { eip191PayloadForClaims, guaranteeTypedData } from "@/digest";
-import { AddressMismatchError, SigningError } from "@/errors";
 import {
-  type CorePublicParameters,
-  type PaymentGuaranteeRequestClaims,
-  type PaymentSignature,
-  SigningScheme,
+  AddressMismatchError,
+  InvalidParamsError,
+  InvalidPayerAddressError,
+  SigningError,
+} from "@/errors";
+import {
+  checkpointTypedData,
+  type FourMicaEip712Domain,
+  paymentAuthorizationTypedData,
+} from "@/guarantee";
+import {
+  type CheckpointPayload,
+  PaymentRequest,
+  type PaymentRequestPayload,
+  SignedCheckpoint,
 } from "@/models";
 import { normalizeAddress, ValidationError } from "@/utils";
 
-export type {
-  GuaranteeClaimsMessage,
-  GuaranteeEip712Domain,
-  GuaranteeTypedData,
-} from "@/digest";
-export {
-  eip191PayloadForClaims,
-  encodeTypeString,
-  GUARANTEE_CLAIMS_V1_TYPE,
-  GUARANTEE_EIP712_DOMAIN_TYPE,
-  GUARANTEE_VALIDATION_TYPE,
-  guaranteeTypedData,
-  VALIDATED_GUARANTEE_CLAIMS_V1_TYPE,
-} from "@/digest";
-
 /**
- * Signs payment guarantee requests using EIP-712 or EIP-191.
+ * Signs the payloads a payer authorizes — payment requests and checkpoints —
+ * under the ClearingHouse domain. Both are signed as EIP-712 typed data, so
+ * a local, JSON-RPC or browser-wallet account all work.
  *
- * Refuses to sign claims naming anyone but its own signer as the payer.
+ * Refuses to sign for any payer but its own signer.
  */
-export class PaymentSigner {
+export class PayerSigner {
   readonly signer: Account;
 
   constructor(signer: Account) {
@@ -42,59 +38,62 @@ export class PaymentSigner {
     return this.signer.address;
   }
 
-  async signRequest(
-    params: CorePublicParameters,
-    claims: PaymentGuaranteeRequestClaims,
-    scheme: SigningScheme = SigningScheme.EIP712,
-  ): Promise<PaymentSignature> {
-    if (
-      normalizeAddress(this.signer.address) !==
-      normalizeAddress(claims.userAddress)
-    ) {
-      throw new AddressMismatchError(this.signer.address, claims.userAddress);
-    }
+  async signPaymentRequest(
+    domain: FourMicaEip712Domain,
+    payload: PaymentRequestPayload,
+  ): Promise<PaymentRequest> {
+    this.requireSignerIs(payload.userAddress);
+    const signature = await this.signTypedData(() =>
+      paymentAuthorizationTypedData(domain, payload),
+    );
+    return new PaymentRequest(payload, signature);
+  }
 
+  async signCheckpoint(
+    domain: FourMicaEip712Domain,
+    payload: CheckpointPayload,
+  ): Promise<SignedCheckpoint> {
+    this.requireSignerIs(payload.payer);
+    const signature = await this.signTypedData(() =>
+      checkpointTypedData(domain, payload),
+    );
+    return new SignedCheckpoint(payload, signature);
+  }
+
+  private requireSignerIs(payer: string): void {
+    let expected: string;
     try {
-      if (scheme === SigningScheme.EIP712) {
-        if (!this.signer.signTypedData) {
-          throw new SigningError(
-            "signTypedData is not supported for this account",
-          );
-        }
-        const typed = guaranteeTypedData(params, claims);
-        // The union of the two struct layouts defeats viem's typed-data
-        // generics; the digest-vector tests pin the actual bytes.
-        const signature = await this.signer.signTypedData(
-          typed as unknown as Parameters<
-            NonNullable<Account["signTypedData"]>
-          >[0],
-        );
-        return { signature, scheme };
-      }
+      expected = normalizeAddress(payer);
+    } catch {
+      throw new InvalidPayerAddressError();
+    }
+    const signer = normalizeAddress(this.signer.address);
+    if (signer !== expected) {
+      throw new AddressMismatchError(signer, expected);
+    }
+  }
 
-      if (scheme === SigningScheme.EIP191) {
-        if (!this.signer.signMessage) {
-          throw new SigningError(
-            "signMessage is not supported for this account",
-          );
-        }
-        // The message is the raw ABI encoding, not its hex spelling.
-        const payload = eip191PayloadForClaims(claims);
-        const signature = await this.signer.signMessage({
-          message: { raw: payload },
-        });
-        return { signature, scheme };
+  private async signTypedData(
+    build: () => Parameters<NonNullable<Account["signTypedData"]>>[0],
+  ): Promise<string> {
+    if (!this.signer.signTypedData) {
+      throw new SigningError("signTypedData is not supported for this account");
+    }
+    let typedData: Parameters<NonNullable<Account["signTypedData"]>>[0];
+    try {
+      typedData = build();
+    } catch (err) {
+      if (err instanceof InvalidParamsError || err instanceof ValidationError) {
+        throw new SigningError(`failed to sign the payment: ${err.message}`);
       }
-
-      throw new SigningError(`unsupported signing scheme: ${scheme}`);
-    } catch (err: unknown) {
-      if (err instanceof AddressMismatchError || err instanceof SigningError) {
-        throw err;
-      }
-      if (err instanceof ValidationError) {
-        throw new SigningError(err.message);
-      }
-      throw new SigningError(err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    try {
+      return await this.signer.signTypedData(typedData);
+    } catch (err) {
+      throw new SigningError(
+        `failed to sign the payment: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

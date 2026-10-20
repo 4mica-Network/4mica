@@ -1,11 +1,4 @@
-import {
-  type Account,
-  createPublicClient,
-  getContract,
-  type Hex,
-  http,
-} from "viem";
-import { core4micaAbi } from "@/abi/core4mica";
+import type { Account, Hex } from "viem";
 import { AuthSession, type AuthTokens } from "@/auth";
 import { Facilitator } from "@/client/facilitator";
 import type { Config } from "@/config";
@@ -17,22 +10,76 @@ import {
 import {
   AuthMissingConfigError,
   ChainRpcUnavailableError,
-  ClientError,
   ClientInitializationError,
   MissingTokenDomainSeparatorError,
   SigningError,
 } from "@/errors";
-import { type CorePublicParameters, GUARANTEE_CLAIMS_VERSION } from "@/models";
-import { RpcProxy } from "@/rpc";
-import { PaymentSigner } from "@/signing";
 import {
-  bytesFromHex,
-  hexFromBytes,
-  normalizeAddress,
-  normalizeBytes32Hex,
-} from "@/utils";
+  clearingHouseDomain,
+  type FourMicaEip712Domain,
+  guaranteeRegistryDomain,
+} from "@/guarantee";
+import { type CorePublicParameters, PAYMENT_PAYLOAD_VERSION } from "@/models";
+import { RpcProxy } from "@/rpc";
+import { PayerSigner } from "@/signing";
+import { bytesFromHex, normalizeAddress, normalizeBytes32Hex } from "@/utils";
 
-const BLS_G1_COMPRESSED_BYTES = 48;
+/** The settlement cycle a payment must be signed for, as core reports it. */
+export interface ActiveCycle {
+  /** On-chain bytes32 cycle id, 0x-prefixed hex. */
+  id: string;
+  /** Unix seconds; a payment stamped earlier is refused as stale. */
+  periodStart: number;
+  /** Unix seconds; core opens the next cycle from this moment on. */
+  periodEnd: number;
+}
+
+/**
+ * The ClearingHouse, the GuaranteeRegistry and the guarantee signer, which
+ * every payment is signed or verified against — so a core that omits one is
+ * refused at connect rather than at the first payment.
+ */
+function signingAddresses(params: CorePublicParameters): {
+  clearingHouse: string;
+  guaranteeRegistry: string;
+  guaranteeSigner: string;
+} {
+  const resolve = (what: string, raw: string): string => {
+    try {
+      return normalizeAddress(raw);
+    } catch {
+      throw new ClientInitializationError(`${what}: invalid address: ${raw}`);
+    }
+  };
+  return {
+    clearingHouse: resolve(
+      "clearing house address",
+      params.clearingHouseAddress,
+    ),
+    guaranteeRegistry: resolve(
+      "guarantee registry address",
+      params.guaranteeRegistryAddress,
+    ),
+    guaranteeSigner: resolve("guarantee signer", params.guaranteeSigner),
+  };
+}
+
+/**
+ * Refuses a core that cannot read what this client signs, rather than letting
+ * every payment fail later with a decode error.
+ */
+function requirePayloadVersionSupport(params: CorePublicParameters): void {
+  if (
+    params.supportedPaymentPayloadVersions.includes(PAYMENT_PAYLOAD_VERSION)
+  ) {
+    return;
+  }
+  throw new ClientInitializationError(
+    `this client signs payment payload v${PAYMENT_PAYLOAD_VERSION}, which core ` +
+      `does not accept (core accepts [${params.supportedPaymentPayloadVersions.join(", ")}]); ` +
+      "upgrade core or downgrade the SDK",
+  );
+}
 
 /** Shared state behind a connected {@link Client}. */
 export class ClientCtx {
@@ -42,12 +89,15 @@ export class ClientCtx {
   readonly publicParams: CorePublicParameters;
   readonly contractAddress: string;
   readonly chainId: number;
-  readonly operatorPublicKey: Uint8Array;
   readonly ethereumHttpRpcUrl?: string;
-  readonly guaranteeDomain: Uint8Array;
-  readonly guaranteeDomains: Map<number, Uint8Array>;
+  /** The address whose signature attests this operator's guarantee receipts. */
+  readonly guaranteeSigner: string;
+  /** The domain every payer-signed payload is verified under. */
+  readonly clearingHouseDomain: FourMicaEip712Domain;
+  /** The domain the operator's guarantee receipts are verified under. */
+  readonly guaranteeDomain: FourMicaEip712Domain;
   readonly signer: Account;
-  readonly paymentSigner: PaymentSigner;
+  readonly payerSigner: PayerSigner;
   readonly facilitator: Facilitator;
   readonly coreDomainSeparator: Hex;
   readonly permit2DomainSeparator: Hex;
@@ -55,6 +105,21 @@ export class ClientCtx {
   private gatewayPromise?: Promise<ContractGateway>;
   private tokenDomainSeparators = new Map<string, string>();
   private tokenDomainFetch?: Promise<void>;
+  /**
+   * The cycle each asset's payments are scoped to, held until its period
+   * ends or core refuses a request signed against it.
+   */
+  private activeCycles = new Map<string, ActiveCycle>();
+  /**
+   * The latest checkpoint cutoff known per asset. A payment at or below it
+   * can never be collected, so payments are held back past it.
+   */
+  private paymentCutoffs = new Map<string, number>();
+  /**
+   * Core's clock minus ours, in ms, taken as a lower bound: the last
+   * `server_time` core reported, against when its answer arrived.
+   */
+  private clockOffsetMs = 0;
 
   private constructor(init: {
     cfg: Config;
@@ -63,8 +128,6 @@ export class ClientCtx {
     publicParams: CorePublicParameters;
     contractAddress: string;
     ethereumHttpRpcUrl?: string;
-    guaranteeDomain: Uint8Array;
-    guaranteeDomains: Map<number, Uint8Array>;
   }) {
     this.cfg = init.cfg;
     this.rpc = init.rpc;
@@ -72,12 +135,19 @@ export class ClientCtx {
     this.publicParams = init.publicParams;
     this.contractAddress = init.contractAddress;
     this.chainId = init.publicParams.chainId;
-    this.operatorPublicKey = init.publicParams.publicKey;
     this.ethereumHttpRpcUrl = init.ethereumHttpRpcUrl;
-    this.guaranteeDomain = init.guaranteeDomain;
-    this.guaranteeDomains = init.guaranteeDomains;
+    const addresses = signingAddresses(init.publicParams);
+    this.guaranteeSigner = addresses.guaranteeSigner;
+    this.clearingHouseDomain = clearingHouseDomain(
+      this.chainId,
+      addresses.clearingHouse,
+    );
+    this.guaranteeDomain = guaranteeRegistryDomain(
+      this.chainId,
+      addresses.guaranteeRegistry,
+    );
     this.signer = init.cfg.signer;
-    this.paymentSigner = new PaymentSigner(init.cfg.signer);
+    this.payerSigner = new PayerSigner(init.cfg.signer);
     this.facilitator = new Facilitator(init.cfg.facilitatorUrl);
     this.coreDomainSeparator = init.publicParams.coreDomainSeparator
       ? (normalizeBytes32Hex(init.publicParams.coreDomainSeparator) as Hex)
@@ -90,31 +160,16 @@ export class ClientCtx {
     let publicParams: CorePublicParameters;
     let contractAddress: string;
     let ethereumHttpRpcUrl: string | undefined;
-    let guaranteeDomain: Uint8Array;
-    let guaranteeDomains: Map<number, Uint8Array>;
     try {
       publicParams = await rpc.getPublicParams();
-
-      if (publicParams.publicKey.length !== BLS_G1_COMPRESSED_BYTES) {
-        throw new ClientInitializationError(
-          "invalid operator public key: expected " +
-            `${BLS_G1_COMPRESSED_BYTES} bytes, got ` +
-            `${publicParams.publicKey.length}`,
-        );
-      }
+      requirePayloadVersionSupport(publicParams);
+      signingAddresses(publicParams);
 
       contractAddress = normalizeAddress(
         cfg.contractAddress ?? publicParams.contractAddress,
       );
       ethereumHttpRpcUrl =
         cfg.ethereumHttpRpcUrl || publicParams.ethereumHttpRpcUrl || undefined;
-
-      ({ guaranteeDomain, guaranteeDomains } =
-        await ClientCtx.fetchGuaranteeMetadata(
-          publicParams,
-          contractAddress,
-          ethereumHttpRpcUrl,
-        ));
     } catch (err) {
       await rpc.aclose();
       throw err;
@@ -140,129 +195,71 @@ export class ClientCtx {
       publicParams,
       contractAddress,
       ethereumHttpRpcUrl,
-      guaranteeDomain,
-      guaranteeDomains,
     });
-  }
-
-  private static async fetchGuaranteeMetadata(
-    publicParams: CorePublicParameters,
-    contractAddress: string,
-    ethereumHttpRpcUrl: string | undefined,
-  ): Promise<{
-    guaranteeDomain: Uint8Array;
-    guaranteeDomains: Map<number, Uint8Array>;
-  }> {
-    if (
-      !publicParams.supportedGuaranteeVersions.includes(
-        GUARANTEE_CLAIMS_VERSION,
-      )
-    ) {
-      throw new ClientInitializationError(
-        `this client signs guarantee v${GUARANTEE_CLAIMS_VERSION}, which ` +
-          "core does not support (core supports " +
-          `[${publicParams.supportedGuaranteeVersions.join(", ")}]); ` +
-          "upgrade core or downgrade the SDK",
-      );
-    }
-
-    let guaranteeDomains: Map<number, Uint8Array>;
-    if (publicParams.guaranteeDomains.length > 0) {
-      guaranteeDomains = new Map(
-        publicParams.guaranteeDomains.map((entry) => [
-          entry.version,
-          bytesFromHex(entry.domainSeparator),
-        ]),
-      );
-    } else {
-      guaranteeDomains = await ClientCtx.readGuaranteeDomains(
-        publicParams,
-        contractAddress,
-        ethereumHttpRpcUrl,
-      );
-    }
-
-    const guaranteeDomain = guaranteeDomains.get(GUARANTEE_CLAIMS_VERSION);
-    if (guaranteeDomain === undefined) {
-      throw new ClientInitializationError(
-        `missing guarantee domain metadata for v${GUARANTEE_CLAIMS_VERSION}`,
-      );
-    }
-    return { guaranteeDomain, guaranteeDomains };
-  }
-
-  /**
-   * Read each supported version's domain off the contract, one call apiece —
-   * the fallback for a core too old to publish them.
-   */
-  private static async readGuaranteeDomains(
-    publicParams: CorePublicParameters,
-    contractAddress: string,
-    ethereumHttpRpcUrl: string | undefined,
-  ): Promise<Map<number, Uint8Array>> {
-    if (!ethereumHttpRpcUrl) {
-      throw new ChainRpcUnavailableError();
-    }
-
-    const publicClient = createPublicClient({
-      transport: http(ethereumHttpRpcUrl),
-    });
-    const contract = getContract({
-      address: contractAddress as Hex,
-      abi: core4micaAbi,
-      client: { public: publicClient },
-    });
-
-    const expected = publicParams.guaranteeDomainSeparator
-      ? normalizeBytes32Hex(publicParams.guaranteeDomainSeparator)
-      : undefined;
-
-    const domains = new Map<number, Uint8Array>();
-    try {
-      for (const version of publicParams.supportedGuaranteeVersions) {
-        const [, domainSeparator, , enabled] =
-          await contract.read.getGuaranteeVersionConfig([BigInt(version)]);
-        const domain = bytesFromHex(domainSeparator as string);
-
-        if (!enabled) {
-          if (version === GUARANTEE_CLAIMS_VERSION) {
-            throw new ClientInitializationError(
-              `guarantee v${GUARANTEE_CLAIMS_VERSION} is disabled on-chain`,
-            );
-          }
-          continue;
-        }
-        domains.set(version, domain);
-
-        if (
-          version === GUARANTEE_CLAIMS_VERSION &&
-          expected !== undefined &&
-          expected !== hexFromBytes(domain)
-        ) {
-          throw new ClientInitializationError(
-            "guarantee domain mismatch between core metadata and contract " +
-              `for version ${version}`,
-          );
-        }
-      }
-    } catch (err) {
-      if (err instanceof ClientError) {
-        throw err;
-      }
-      throw new ClientInitializationError(
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
-    return domains;
   }
 
   get signerAddress(): string {
     return normalizeAddress(this.signer.address);
   }
 
-  guaranteeDomainForVersion(version: number): Uint8Array | undefined {
-    return this.guaranteeDomains.get(Number(version));
+  /**
+   * The cycle payments for `asset` must be signed for, fetched once and
+   * reused until its period ends or {@link forgetActiveCycle} drops it.
+   */
+  async activeCycle(asset: string): Promise<ActiveCycle> {
+    const key = normalizeAddress(asset);
+    const cached = this.activeCycles.get(key);
+    if (cached !== undefined && this.coreNow() < cached.periodEnd) {
+      return cached;
+    }
+    const response = await this.rpc.getActiveCycle(key);
+    this.recordCoreTime(response.serverTime);
+    const cycle: ActiveCycle = {
+      id: response.cycleId,
+      periodStart: response.periodStart,
+      periodEnd: response.periodEnd,
+    };
+    this.activeCycles.set(key, cycle);
+    return cycle;
+  }
+
+  /** Drop the cached cycle for `asset`, so the next payment re-reads it. */
+  forgetActiveCycle(asset: string): void {
+    this.activeCycles.delete(normalizeAddress(asset));
+  }
+
+  recordPaymentCutoff(asset: string, cutoff: number): void {
+    const key = normalizeAddress(asset);
+    this.paymentCutoffs.set(
+      key,
+      Math.max(this.paymentCutoffs.get(key) ?? 0, Number(cutoff)),
+    );
+  }
+
+  paymentCutoff(asset: string): number | undefined {
+    return this.paymentCutoffs.get(normalizeAddress(asset));
+  }
+
+  /**
+   * Learn core's clock from a `server_time` it just reported. Zero, from a
+   * core that predates it, teaches nothing.
+   */
+  recordCoreTime(serverTime: number): void {
+    if (!serverTime) return;
+    // The report left core before it reached us and was truncated to the
+    // second, so core was at least this far ahead. Erring low is the safe
+    // side: core refuses a payment stamped even a second past its clock.
+    this.clockOffsetMs = Number(serverTime) * 1000 - Date.now();
+  }
+
+  /** Core's clock as best known, in unix ms, never ahead of the real one. */
+  coreNowMs(): number {
+    return Math.max(Date.now() + this.clockOffsetMs, 0);
+  }
+
+  /** Core's clock as best known, in unix seconds. */
+  coreNow(): number {
+    return Math.floor(this.coreNowMs() / 1000);
   }
 
   /**

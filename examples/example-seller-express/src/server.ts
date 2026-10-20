@@ -61,7 +61,7 @@ app.get(
         network,
         assetAddress: asset,
         amount: paid.amount,
-        guaranteeClaims: guarantee.claims,
+        guaranteeClaims: guarantee.receipt,
         guaranteeSignature: guarantee.signature,
         resource: `${req.protocol}://${req.get("host")}/quote`,
       })

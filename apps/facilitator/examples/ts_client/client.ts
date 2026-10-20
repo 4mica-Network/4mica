@@ -26,13 +26,14 @@ async function main(): Promise<void> {
 
   try {
     const flow = X402Flow.fromClient(client);
-    // The 402 body advertises the requirements; the claim is signed straight
-    // from them — no tab step, the reqId is a random local nonce.
+    // The 402 body advertises the requirements; the payment is signed straight
+    // from them for the asset's active settlement cycle, which the client reads
+    // from core — no tab step, the reqId is a random local nonce.
     const requirements = PaymentRequirementsV1.fromRaw(
       (await (await fetch(resourceUrl as string)).json())
         .accepts?.[0] as Record<string, unknown>,
     );
-    const payment = await flow.signPayment(requirements, client.signerAddress);
+    const payment = await flow.signPayment(requirements);
     console.log(`X-PAYMENT: ${payment.header}\n`);
     const resp = await fetch(resourceUrl as string, {
       headers: { "X-PAYMENT": payment.header },

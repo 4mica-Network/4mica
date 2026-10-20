@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PaywallConfig, PaywallInput } from "@/server";
-import { createPaywall, SCHEME_4MICA_CREDIT, utf8ToBase64 } from "@/server";
+import {
+  base64ToUtf8,
+  createPaywall,
+  SCHEME_4MICA_CREDIT,
+  utf8ToBase64,
+} from "@/server";
 
 const config: PaywallConfig = {
   payTo: "0x1111111111111111111111111111111111111111",
@@ -63,7 +68,7 @@ describe("createPaywall", () => {
     const verifier = {
       issueGuarantee: vi
         .fn()
-        .mockResolvedValue({ claims: "0xabc", signature: "0xdef" }),
+        .mockResolvedValue({ receipt: "0xabc", signature: "0xdef" }),
     };
     const paywall = createPaywall(verifier, config);
 
@@ -73,8 +78,17 @@ describe("createPaywall", () => {
 
     expect(decision.ok).toBe(true);
     if (!decision.ok) throw new Error("expected allow");
-    expect(decision.guarantee.claims).toBe("0xabc");
-    expect(decision.responseHeaders["X-PAYMENT-RESPONSE"]).toBeTruthy();
+    expect(decision.guarantee).toEqual({
+      receipt: "0xabc",
+      signature: "0xdef",
+      raw: { receipt: "0xabc", signature: "0xdef" },
+    });
+    expect(
+      JSON.parse(base64ToUtf8(decision.responseHeaders["X-PAYMENT-RESPONSE"])),
+    ).toEqual({
+      success: true,
+      guarantee: { receipt: "0xabc", signature: "0xdef" },
+    });
     expect(verifier.issueGuarantee).toHaveBeenCalledWith({ any: "payload" });
   });
 
@@ -108,7 +122,7 @@ describe("createPaywall", () => {
       rpc: {
         issueGuarantee: vi
           .fn()
-          .mockResolvedValue({ claims: "0x1", signature: "0x2" }),
+          .mockResolvedValue({ receipt: "0x1", signature: "0x2" }),
       },
     };
     const paywall = createPaywall(client, config);
@@ -123,7 +137,7 @@ describe("createPaywall", () => {
     const verifier = {
       issueGuarantee: vi
         .fn()
-        .mockResolvedValue({ claims: "0xa", signature: "0xb" }),
+        .mockResolvedValue({ receipt: "0xa", signature: "0xb" }),
     };
     const paywall = createPaywall(verifier, config);
 

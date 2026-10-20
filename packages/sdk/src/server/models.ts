@@ -14,8 +14,8 @@ export type { X402PaymentEnvelope } from "@/x402/models";
  */
 export interface GuaranteeVerifier {
   issueGuarantee(
-    payload: unknown,
-  ): Promise<{ claims: string; signature: string }>;
+    payload: Record<string, unknown>,
+  ): Promise<{ receipt: string; signature: string }>;
 }
 
 /** A bare verifier, or anything exposing one at `.rpc` (e.g. the SDK `Client`). */
@@ -54,13 +54,19 @@ export interface PaywallConfig {
   buildRequirements?: (input: PaywallInput) => X402PaymentRequired;
 }
 
+/**
+ * The operator's guarantee receipt for the payment that unlocked the request:
+ * the `GuaranteeV1` bytes `GuaranteeRegistry.verifyGuarantee` takes, and the
+ * operator's ECDSA signature over them. Decode or verify it with
+ * `GuaranteeReceipt` / `verifyGuaranteeReceipt` from `@4mica/sdk`.
+ */
 export interface PaywallGuarantee {
-  /** ABI-encoded guarantee claims (hex). */
-  claims: string;
-  /** BLS12-381 G2 signature (hex). */
+  /** Guarantee type hash, then the guarantee ABI-encoded (hex). */
+  receipt: string;
+  /** Operator ECDSA signature over the guarantee (hex). */
   signature: string;
   /** Raw guarantee record returned by the core RPC. */
-  raw: { claims: string; signature: string };
+  raw: { receipt: string; signature: string };
 }
 
 export type PaywallDecision =

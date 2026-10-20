@@ -1,24 +1,21 @@
 /**
- * The 402 → signed-claim → settle flow for the `4mica-credit` scheme.
+ * The 402 → signed-payment → settle flow for the `4mica-credit` scheme.
  *
- * There is no tab step any more: a claim carries a random 32-byte `req_id`,
- * core binds the guarantee to the open settlement cycle at issuance, and the
- * facilitator's `/settle` turns the signed claim into a BLS certificate.
+ * A payment is scoped to the asset's live settlement cycle, carries a random
+ * 32-byte `req_id` and a salted commitment to the recipient, and is signed
+ * under the ClearingHouse domain. The facilitator's `/settle` redeems it for
+ * the operator's guarantee receipt.
  */
 
+import { Asset } from "@/client/model";
 import { X402Error } from "@/errors";
-import {
-  PaymentGuaranteeRequestClaims,
-  type PaymentSignature,
-  SigningScheme,
-} from "@/models";
+import type { PaymentRequest, PaymentRequestPayload } from "@/models";
 import type { FetchFn } from "@/rpc";
 import { isRecord } from "@/serde";
 import { utf8ToBase64 } from "@/server/base64";
 import {
   normalizeAddress,
   parseU256,
-  randomU256,
   ValidationError,
   validateUrl,
 } from "@/utils";
@@ -32,7 +29,6 @@ import {
   type X402PaymentEnvelope,
   type X402PaymentEnvelopeV1,
   type X402PaymentEnvelopeV2,
-  type X402PaymentPayload,
   type X402PaymentRequired,
   type X402SettledPayment,
   type X402SignedPayment,
@@ -41,27 +37,29 @@ import {
 export * from "@/x402/models";
 
 /**
- * Minimal signing interface required by {@link X402Flow}.
- * Implemented by the SDK {@link Client}.
+ * What {@link X402Flow} needs of a payer: a payload scoped to the live
+ * settlement cycle, and a signature over it. Implemented by the SDK
+ * {@link Client}.
  */
 export interface FlowSigner {
-  signPayment(
-    claims: PaymentGuaranteeRequestClaims,
-    scheme: SigningScheme,
-  ): Promise<PaymentSignature>;
+  newPayment(
+    recipient: string,
+    amount: bigint,
+    asset: Asset,
+  ): Promise<PaymentRequestPayload>;
+  signPayment(payload: PaymentRequestPayload): Promise<PaymentRequest>;
 }
 
 /**
  * Handles the x402 HTTP 402 payment protocol for 4Mica.
  *
- * Builds and signs payment claims with a random `reqId` (no server
- * round-trip), and optionally settles the payment against a facilitator
- * service.
+ * Builds a payment for the live settlement cycle, signs it, and optionally
+ * settles it against a facilitator service.
  *
  * @example
  * ```ts
  * const flow = X402Flow.fromClient(client);
- * const signed = await flow.signPayment(paymentRequirements, userAddress);
+ * const signed = await flow.signPayment(paymentRequirements);
  * // attach signed.header as the X-PAYMENT request header
  * ```
  */
@@ -90,7 +88,6 @@ export class X402Flow {
    */
   async signPayment(
     paymentRequirements: PaymentRequirementsV1 | Record<string, unknown>,
-    userAddress: string,
   ): Promise<X402SignedPayment> {
     const requirements =
       paymentRequirements instanceof PaymentRequirementsV1
@@ -98,16 +95,14 @@ export class X402Flow {
         : PaymentRequirementsV1.fromRaw(paymentRequirements);
     X402Flow.validateScheme(requirements.scheme);
 
-    const claims = this.buildClaims(requirements, userAddress);
-    const signature = await this.sign(claims);
-    const paymentPayload = buildPaymentPayload(claims, signature);
+    const request = await this.sign(await this.buildPayment(requirements));
     const envelope: X402PaymentEnvelopeV1 = {
       x402Version: 1,
       scheme: requirements.scheme,
       network: requirements.network,
-      payload: paymentPayload,
+      payload: request.toPayload(),
     };
-    return finish(1, envelope, paymentPayload, signature);
+    return finish(1, envelope, request);
   }
 
   /**
@@ -117,7 +112,6 @@ export class X402Flow {
   async signPaymentV2(
     paymentRequired: X402PaymentRequired,
     accepted: PaymentRequirementsV2 | Record<string, unknown>,
-    userAddress: string,
   ): Promise<X402SignedPayment> {
     const requirements =
       accepted instanceof PaymentRequirementsV2
@@ -128,20 +122,18 @@ export class X402Flow {
       throw new X402Error("expected x402 version 2");
     }
 
-    const claims = this.buildClaims(requirements, userAddress);
-    const signature = await this.sign(claims);
-    const paymentPayload = buildPaymentPayload(claims, signature);
+    const request = await this.sign(await this.buildPayment(requirements));
     const envelope: X402PaymentEnvelopeV2 = {
       x402Version: 2,
       accepted: requirements.toPayload(),
-      payload: paymentPayload,
+      payload: request.toPayload(),
       resource: paymentRequired.resource.toPayload(),
     };
     // Spec v2 §5.1.2: return at least the info the server advertised.
     if (paymentRequired.extensions !== undefined) {
       envelope.extensions = paymentRequired.extensions;
     }
-    return finish(2, envelope, paymentPayload, signature);
+    return finish(2, envelope, request);
   }
 
   /**
@@ -207,11 +199,9 @@ export class X402Flow {
     return { payment, settlement: SettlementReceipt.fromRaw(settlement) };
   }
 
-  private async sign(
-    claims: PaymentGuaranteeRequestClaims,
-  ): Promise<PaymentSignature> {
+  private async sign(payload: PaymentRequestPayload): Promise<PaymentRequest> {
     try {
-      return await this.signer.signPayment(claims, SigningScheme.EIP712);
+      return await this.signer.signPayment(payload);
     } catch (err) {
       if (err instanceof X402Error) throw err;
       throw new X402Error(
@@ -220,40 +210,45 @@ export class X402Flow {
     }
   }
 
-  protected buildClaims(
+  /** The payment these requirements ask for, scoped to the live settlement cycle. */
+  protected async buildPayment(
     requirements: PaymentRequirements,
-    userAddress: string,
-  ): PaymentGuaranteeRequestClaims {
+  ): Promise<PaymentRequestPayload> {
+    let recipient: string;
     let amount: bigint;
+    let asset: Asset;
     try {
+      recipient = normalizeAddress(requirements.payTo.trim());
       amount = parseU256(requirements.amount);
+      asset = Asset.coerce(normalizeAddress(requirements.asset.trim()));
     } catch (err) {
-      throw new X402Error(`invalid amount: ${String(err)}`);
-    }
-    // A random reqId: uniqueness is all core asks of it now that requests no
-    // longer count up a tab.
-    const reqId = randomU256();
-    let claims: PaymentGuaranteeRequestClaims;
-    try {
-      claims = PaymentGuaranteeRequestClaims.new(
-        normalizeAddress(userAddress),
-        normalizeAddress(requirements.payTo),
-        reqId,
-        amount,
-        Math.floor(Date.now() / 1000),
-        requirements.asset,
+      throw new X402Error(
+        `invalid payment requirements: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+    const validation = validationFromExtra(requirements.extra);
+
+    let payload: PaymentRequestPayload;
+    try {
+      payload = await this.signer.newPayment(recipient, amount, asset);
     } catch (err) {
-      if (err instanceof ValidationError) {
-        throw new X402Error(err.message);
-      }
+      if (err instanceof X402Error) throw err;
+      throw new X402Error(
+        `failed to build payment: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    // Echo the advertised spelling of the recipient rather than a re-encoded
+    // one, so a resource server that compares it as a string still matches.
+    // What the payer commits to is the address either way.
+    try {
+      payload = payload.with({ recipientAddress: requirements.payTo.trim() });
+      return validation === undefined
+        ? payload
+        : payload.withValidation(validation);
+    } catch (err) {
+      if (err instanceof ValidationError) throw new X402Error(err.message);
       throw err;
     }
-
-    const validation = validationFromExtra(requirements.extra);
-    return validation === undefined
-      ? claims
-      : claims.withValidation(validation);
   }
 
   private static validateScheme(scheme: string): void {
@@ -280,24 +275,17 @@ function coerceRequirements(
     : PaymentRequirementsV2.fromRaw(requirements);
 }
 
-/** Assemble the wire payload for a signed claim. */
-export function buildPaymentPayload(
-  claims: PaymentGuaranteeRequestClaims,
-  signature: PaymentSignature,
-): X402PaymentPayload {
-  return {
-    claims: claims.toPayload(),
-    signature: signature.signature,
-    scheme: signature.scheme,
-  };
-}
-
 function finish(
   x402Version: number,
   envelope: X402PaymentEnvelope,
-  payload: X402PaymentPayload,
-  signature: PaymentSignature,
+  request: PaymentRequest,
 ): X402SignedPayment {
   const header = utf8ToBase64(JSON.stringify(envelope));
-  return { header, envelope, x402Version, payload, signature };
+  return {
+    header,
+    envelope,
+    x402Version,
+    payload: request.toPayload(),
+    request,
+  };
 }

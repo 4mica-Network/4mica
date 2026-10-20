@@ -1,7 +1,15 @@
 import { prisma } from "@4mica/db";
+import {
+  Guarantee,
+  GuaranteeReceipt,
+  guaranteeRegistryDomain,
+  verifyGuaranteeReceipt,
+} from "@4mica/sdk";
 import { clearUserCache } from "@auth/user-store";
 import { paymentRoutes } from "@routes/payments";
 import { hashSecret } from "@utils/secrets";
+import { zeroAddress } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 
@@ -1214,16 +1222,41 @@ describe("payment routes", () => {
   });
 
   describe("4mica core verification", () => {
-    const CERT = { guaranteeClaims: "0xc1a1", guaranteeSignature: "0x5157" };
+    // A real operator key: the mocked core client verifies receipts with the
+    // SDK's own ECDSA check, so these tests sign and forge genuine receipts.
+    const OPERATOR = privateKeyToAccount(`0x${"11".repeat(32)}`);
+    const IMPOSTOR = privateKeyToAccount(`0x${"22".repeat(32)}`);
+    const REGISTRY = guaranteeRegistryDomain(
+      84532,
+      "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    );
 
-    const coreClaims = (over: Record<string, unknown> = {}) => ({
-      reqId: 0xabc123n,
-      userAddress: "0x3D8E1f5a7c9B2D4E6a8C0F2B4D6E8A1c3F5B7D09",
-      recipientAddress: "0x6c5CC69E4C4863DbC3439Ab2673806ea7715eBD5",
-      assetAddress: "0x0000000000000000000000000000000000000000",
-      amount: 10_000n,
-      ...over,
-    });
+    type GuaranteeFields = Partial<ConstructorParameters<typeof Guarantee>[0]>;
+
+    const coreGuarantee = (over: GuaranteeFields = {}) =>
+      new Guarantee({
+        cycleId: 7n,
+        reqId: 0xabc123n,
+        client: "0x3D8E1f5a7c9B2D4E6a8C0F2B4D6E8A1c3F5B7D09",
+        recipient: "0x6c5CC69E4C4863DbC3439Ab2673806ea7715eBD5",
+        asset: zeroAddress,
+        amount: 10_000n,
+        timestamp: 1_760_000_000,
+        ...over,
+      });
+
+    const signedReceipt = async (
+      over: GuaranteeFields = {},
+      signer = OPERATOR,
+    ) => {
+      const guarantee = coreGuarantee(over);
+      return {
+        guaranteeClaims: guarantee.receiptBytes(),
+        guaranteeSignature: await signer.sign({
+          hash: guarantee.signingDigest(REGISTRY),
+        }),
+      };
+    };
 
     const report = async (payload: Record<string, unknown>) => {
       const instance = await app();
@@ -1242,40 +1275,49 @@ describe("payment routes", () => {
         payment: { verifyGuarantee },
         rpc: { getSupportedTokens },
       });
-      verifyGuarantee.mockResolvedValue(coreClaims());
+      verifyGuarantee.mockImplementation((receipt: GuaranteeReceipt) =>
+        verifyGuaranteeReceipt(receipt, REGISTRY, OPERATOR.address),
+      );
       getSupportedTokens.mockResolvedValue({
         chainId: 84532,
         tokens: [{ symbol: "USDC", address: CHECKSUMMED, decimals: 6 }],
       });
     });
 
-    it("records a payment whose certificate verifies and matches", async () => {
-      const res = await report(CERT);
+    it("records a payment whose receipt verifies and matches", async () => {
+      const receipt = await signedReceipt();
+
+      const res = await report(receipt);
 
       expect(res.statusCode).toBe(201);
       expect(verifyGuarantee).toHaveBeenCalledWith(
-        expect.objectContaining({
-          claims: CERT.guaranteeClaims,
-          signature: CERT.guaranteeSignature,
-        }),
+        new GuaranteeReceipt(
+          receipt.guaranteeClaims,
+          receipt.guaranteeSignature,
+        ),
       );
-      expect(payment.create).toHaveBeenCalledTimes(1);
+      expect(payment.create.mock.calls[0][0].data).toMatchObject(receipt);
     });
 
-    it("accepts the certificate in core's unprefixed hex and stores it prefixed", async () => {
+    it("accepts the receipt in core's unprefixed hex and stores it prefixed", async () => {
+      const receipt = await signedReceipt();
+
       const res = await report({
-        guaranteeClaims: "c1a1",
-        guaranteeSignature: "5157",
+        guaranteeClaims: receipt.guaranteeClaims.slice(2),
+        guaranteeSignature: receipt.guaranteeSignature.slice(2),
       });
 
       expect(res.statusCode).toBe(201);
       expect(verifyGuarantee).toHaveBeenCalledWith(
-        expect.objectContaining({ claims: "0xc1a1", signature: "0x5157" }),
+        new GuaranteeReceipt(
+          receipt.guaranteeClaims,
+          receipt.guaranteeSignature,
+        ),
       );
-      expect(payment.create.mock.calls[0][0].data).toMatchObject(CERT);
+      expect(payment.create.mock.calls[0][0].data).toMatchObject(receipt);
     });
 
-    it("requires the certificate once core is configured", async () => {
+    it("requires the receipt once core is configured", async () => {
       const res = await report({});
 
       expect(res.statusCode).toBe(400);
@@ -1283,10 +1325,44 @@ describe("payment routes", () => {
       expect(payment.create).not.toHaveBeenCalled();
     });
 
-    it("rejects a certificate core did not sign", async () => {
-      verifyGuarantee.mockRejectedValue(new Error("signature mismatch"));
+    it("requires the operator signature alongside the receipt", async () => {
+      const { guaranteeClaims } = await signedReceipt();
 
-      const res = await report(CERT);
+      const res = await report({ guaranteeClaims });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("guaranteeSignature");
+      expect(payment.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        "signed by a key that is not core's operator",
+        () => signedReceipt({}, IMPOSTOR),
+      ],
+      [
+        "whose guarantee was altered after signing",
+        async () => ({
+          ...(await signedReceipt()),
+          guaranteeClaims: coreGuarantee({ amount: 1n }).receiptBytes(),
+        }),
+      ],
+      [
+        "that does not decode as a guarantee",
+        async () => ({
+          ...(await signedReceipt()),
+          guaranteeClaims: "0xc1a1",
+        }),
+      ],
+      [
+        "whose signature is not 65 bytes",
+        async () => ({
+          ...(await signedReceipt()),
+          guaranteeSignature: "0x5157",
+        }),
+      ],
+    ])("rejects a receipt %s", async (_, receipt) => {
+      const res = await report(await receipt());
 
       expect(res.statusCode).toBe(422);
       expect(res.json()).toMatchObject({
@@ -1296,16 +1372,14 @@ describe("payment routes", () => {
       expect(payment.create).not.toHaveBeenCalled();
     });
 
-    it.each([
+    it.each<[string, GuaranteeFields]>([
       ["amount", { amount: 99n }],
-      ["payerAddress", { userAddress: MY_ADDRESS }],
-      ["recipientAddress", { recipientAddress: OTHER_ADDRESS }],
+      ["payerAddress", { client: MY_ADDRESS }],
+      ["recipientAddress", { recipient: OTHER_ADDRESS }],
       ["reqId", { reqId: 1n }],
-      ["assetAddress", { assetAddress: CHECKSUMMED }],
+      ["assetAddress", { asset: CHECKSUMMED }],
     ])("rejects a report whose %s disagrees with the guarantee", async (field, over) => {
-      verifyGuarantee.mockResolvedValue(coreClaims(over));
-
-      const res = await report(CERT);
+      const res = await report(await signedReceipt(over));
 
       expect(res.statusCode).toBe(422);
       expect(res.json().issues[0].path).toBe(field);
@@ -1313,28 +1387,26 @@ describe("payment routes", () => {
     });
 
     it("accepts a whole amount written with trailing zero decimals", async () => {
-      const res = await report({ ...CERT, amount: "10000.000" });
+      const res = await report({
+        ...(await signedReceipt()),
+        amount: "10000.000",
+      });
 
       expect(res.statusCode).toBe(201);
     });
 
     it("accepts the amount in display units of the native asset", async () => {
-      verifyGuarantee.mockResolvedValue(
-        coreClaims({ amount: 10_000_000_000_000_000n }),
-      );
-
-      const res = await report({ ...CERT, amount: "0.01" });
+      const res = await report({
+        ...(await signedReceipt({ amount: 10_000_000_000_000_000n })),
+        amount: "0.01",
+      });
 
       expect(res.statusCode).toBe(201);
     });
 
     it("reads an ERC-20's decimals from core to check a display amount", async () => {
-      verifyGuarantee.mockResolvedValue(
-        coreClaims({ assetAddress: CHECKSUMMED, amount: 1_500_000n }),
-      );
-
       const res = await report({
-        ...CERT,
+        ...(await signedReceipt({ asset: CHECKSUMMED, amount: 1_500_000n })),
         assetAddress: CHECKSUMMED,
         amount: "1.5",
       });
@@ -1346,13 +1418,13 @@ describe("payment routes", () => {
     it("answers 503 when core cannot be reached", async () => {
       getCoreClient.mockRejectedValue(new Error("ECONNREFUSED"));
 
-      const res = await report(CERT);
+      const res = await report(await signedReceipt());
 
       expect(res.statusCode).toBe(503);
       expect(res.json().error).toBe("core_unavailable");
     });
 
-    it("does not ask for a certificate on a failed payment", async () => {
+    it("does not ask for a receipt on a failed payment", async () => {
       const res = await report({ status: "FAILED", failureReason: "declined" });
 
       expect(res.statusCode).toBe(201);

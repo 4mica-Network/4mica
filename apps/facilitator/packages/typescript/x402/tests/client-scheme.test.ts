@@ -1,5 +1,4 @@
-import { GUARANTEE_CLAIMS_V1_TYPE, SupportedTokensResponse } from '@4mica/sdk'
-import { type Hex, verifyTypedData } from 'viem'
+import { SupportedTokensResponse } from '@4mica/sdk'
 import { privateKeyToAccount } from 'viem/accounts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,15 +40,11 @@ describe('FourMicaEvmScheme', () => {
   })
 
   it('passes V2 resource metadata through to the SDK flow', async () => {
-    const signPaymentV2 = vi.fn().mockResolvedValue({
-      payload: {
-        claims: {
-          version: 'v2',
-          validation_request_hash: '0x' + '11'.repeat(32),
-          validation_subject_hash: '0x' + '22'.repeat(32),
-        },
-      },
-    })
+    const wire = {
+      payload: { version: 'v1', cycle_id: `0x${'33'.repeat(32)}` },
+      signature: `0x${'44'.repeat(65)}`,
+    }
+    const signPaymentV2 = vi.fn().mockResolvedValue({ payload: wire })
 
     spyOnCreateX402Flow().mockResolvedValue({
       signPayment: vi.fn(),
@@ -82,8 +77,10 @@ describe('FourMicaEvmScheme', () => {
 
     const result = await scheme.createPaymentPayload(2, requirements as never)
 
-    expect(result.x402Version).toBe(2)
+    expect(result).toEqual({ x402Version: 2, payload: wire })
     expect(signPaymentV2).toHaveBeenCalledTimes(1)
+    // The payer is the flow's own signer; no user address is passed in.
+    expect(signPaymentV2.mock.calls[0]).toHaveLength(2)
 
     const paymentRequired = signPaymentV2.mock.calls[0]?.[0]
     expect(paymentRequired.resource).toEqual({
@@ -186,9 +183,7 @@ describe('FourMicaEvmScheme', () => {
   })
 })
 
-describe('FourMicaEvmScheme signing from an advertised domain', () => {
-  const CONTRACT: Hex = '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2'
-  const DOMAIN = { name: '4Mica-base-sepolia', version: '1', verifyingContract: CONTRACT }
+describe('FourMicaEvmScheme always signs through core', () => {
   const BASE = {
     scheme: '4mica-credit',
     network: 'eip155:84532',
@@ -196,6 +191,13 @@ describe('FourMicaEvmScheme signing from an advertised domain', () => {
     amount: '1000',
     payTo: '0x1111111111111111111111111111111111111111',
     maxTimeoutSeconds: 300,
+  }
+  // What a seller on @4mica/x402 2.0.0-alpha.2 still advertises. A payment
+  // needs core's active cycle id, so a domain in extra cannot replace core.
+  const STALE_DOMAIN = {
+    name: '4Mica-base-sepolia',
+    version: '1',
+    verifyingContract: '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2',
   }
 
   beforeEach(() => {
@@ -206,60 +208,52 @@ describe('FourMicaEvmScheme signing from an advertised domain', () => {
     vi.restoreAllMocks()
   })
 
-  // The same path mcpc takes: everything needed to sign is in the 402.
-  it('signs locally when the requirements carry the domain, never connecting to core', async () => {
-    const createX402Flow = spyOnCreateX402Flow()
-    const account = privateKeyToAccount(`0x${'11'.repeat(32)}`)
-    const scheme = await FourMicaEvmScheme.create(account, { networks: [] })
-
-    const result = await scheme.createPaymentPayload(2, {
-      ...BASE,
-      extra: { ...DOMAIN, rpcUrl: 'https://never.contacted.example' },
+  it('connects to the core the seller names even when extra carries an EIP-712 domain', async () => {
+    const signPayment = vi.fn().mockResolvedValue({ payload: { payload: {}, signature: '0x' } })
+    const createX402Flow = spyOnCreateX402Flow().mockResolvedValue({
+      signPayment,
+      signPaymentV2: vi.fn(),
     } as never)
-
-    expect(createX402Flow).not.toHaveBeenCalled()
-    const payload = result.payload as {
-      claims: Record<string, string | number>
-      signature: Hex
-      scheme: string
-    }
-    expect(payload.scheme).toBe('eip712')
-    expect(payload.claims).toMatchObject({
-      version: 'v1',
-      user_address: account.address.toLowerCase(),
-      recipient_address: BASE.payTo,
-      amount: '0x3e8',
-      asset_address: USDC,
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
     })
 
-    const { claims } = payload
-    await expect(
-      verifyTypedData({
-        address: account.address,
-        domain: { ...DOMAIN, chainId: 84532 },
-        types: { SolGuaranteeRequestClaimsV1: GUARANTEE_CLAIMS_V1_TYPE },
-        primaryType: 'SolGuaranteeRequestClaimsV1',
-        message: {
-          user: claims.user_address as Hex,
-          recipient: claims.recipient_address as Hex,
-          reqId: BigInt(claims.req_id),
-          amount: BigInt(claims.amount),
-          asset: claims.asset_address as Hex,
-          timestamp: BigInt(claims.timestamp),
-        },
-        signature: payload.signature,
-      })
-    ).resolves.toBe(true)
+    await scheme.createPaymentPayload(1, {
+      ...BASE,
+      extra: { ...STALE_DOMAIN, rpcUrl: 'https://seller.core.example/' },
+    } as never)
+
+    expect(createX402Flow).toHaveBeenCalledTimes(1)
+    expect(createX402Flow.mock.calls[0]?.[1]).toBe('https://seller.core.example/')
+    expect(signPayment).toHaveBeenCalledTimes(1)
+    expect(signPayment.mock.calls[0]).toHaveLength(1)
   })
 
-  it('rejects a partial domain instead of guessing the rest', async () => {
-    spyOnCreateX402Flow()
+  it('falls back to the hosted core for the network', async () => {
+    const createX402Flow = spyOnCreateX402Flow().mockResolvedValue({
+      signPayment: vi.fn(),
+      signPaymentV2: vi.fn().mockResolvedValue({ payload: {} }),
+    } as never)
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
+    })
+
+    await scheme.createPaymentPayload(2, { ...BASE, extra: STALE_DOMAIN } as never)
+
+    expect(createX402Flow.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
+      'https://base.sepolia.api.4mica.xyz/',
+    ])
+  })
+
+  it('refuses a network with no known core', async () => {
+    const createX402Flow = spyOnCreateX402Flow()
     const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
       networks: [],
     })
 
     await expect(
-      scheme.createPaymentPayload(2, { ...BASE, extra: { name: DOMAIN.name } } as never)
-    ).rejects.toThrow(/partial EIP-712 domain in extra \(missing version, verifyingContract\)/)
+      scheme.createPaymentPayload(2, { ...BASE, network: 'eip155:1' } as never)
+    ).rejects.toThrow('No core API URL known for network eip155:1')
+    expect(createX402Flow).not.toHaveBeenCalled()
   })
 })

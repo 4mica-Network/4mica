@@ -39,7 +39,8 @@ app.get("/quote", (c) => c.json({ ok: true, guarantee: c.get("paymentGuarantee")
 ```
 
 Without a valid `X-PAYMENT` header the middleware returns `402` with the payment requirements.
-Otherwise it verifies the payment, sets `c.get("paymentGuarantee")`, runs the handler and merges
+Otherwise it verifies the payment, sets `c.get("paymentGuarantee")` to the guarantee receipt
+(`{ receipt, signature, raw }`), runs the handler and merges
 `X-PAYMENT-RESPONSE` onto the response.
 
 ## App API
@@ -82,7 +83,7 @@ app.get("/quote", async (c) => {
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
-      guaranteeClaims: c.get("paymentGuarantee").claims,
+      guaranteeClaims: c.get("paymentGuarantee").receipt,
       guaranteeSignature: c.get("paymentGuarantee").signature,
       resource: c.req.url,
     }),

@@ -10,7 +10,7 @@ import { formatAmount } from './apify/billing.js'
  * scripts. Run it before and after a paid run: the
  * buyer's lock rises by the cap, the seller's by the refund. Core does not list the
  * guarantees signed *to* a wallet before the cycle commits, so what a wallet is owed is
- * shown by the certificates in the tool results, not here.
+ * shown by the guarantee receipts in the tool results, not here.
  */
 const NETWORK = process.env.NETWORK || 'eip155:84532'
 const CORE_URL = process.env.CORE_URL

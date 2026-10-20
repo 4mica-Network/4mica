@@ -104,7 +104,7 @@ export const GET = withPaywall(
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
-      guaranteeClaims: guarantee.claims,
+      guaranteeClaims: guarantee.receipt,
       guaranteeSignature: guarantee.signature,
       resource: request.url,
     });
@@ -121,7 +121,7 @@ export const GET = withPaywall(
 );
 ```
 
-The third handler argument is the certificate 4mica core issued for the payment.
+The third handler argument is the guarantee receipt 4mica core issued for the payment.
 Report it with the payment: the 4Mica API verifies it against core and refuses
 a report it cannot match to a real guarantee.
 
@@ -138,7 +138,7 @@ The full reference and error table are in [`@4mica/sdk` → docs/app-api.md](../
 
 ## Notes
 
-- The paywall only **verifies** payment (issues a guarantee). On-chain settlement (`remunerate`) is
-  an out-of-band recipient operation.
+- The paywall only **verifies** payment (issues a guarantee). On-chain settlement (the cycle-clearing
+  claim flow) is an out-of-band recipient operation.
 - All heavy lifting lives in `@4mica/sdk/server`'s runtime-neutral `createPaywall`; this package is
   a thin mapping to Next's route/middleware shapes.

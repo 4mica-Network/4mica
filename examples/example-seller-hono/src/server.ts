@@ -56,7 +56,7 @@ app.get("/quote", async (c) => {
       network,
       assetAddress: asset,
       amount: paid.amount,
-      guaranteeClaims: guarantee.claims,
+      guaranteeClaims: guarantee.receipt,
       guaranteeSignature: guarantee.signature,
       resource: c.req.url,
     })

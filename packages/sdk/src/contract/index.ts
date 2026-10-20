@@ -11,7 +11,7 @@ import {
   parseGwei,
 } from "viem";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
-import { core4micaAbi } from "@/abi/core4mica";
+import { treasuryAbi } from "@/abi/treasury";
 import { getChain } from "@/chain";
 import type {
   ClearingHouseContract,
@@ -22,7 +22,6 @@ import type {
   TxReceiptWaitOptions,
 } from "@/contract/models";
 import {
-  AaveNotConfiguredError,
   AlreadyClaimedError,
   AlreadyPaidError,
   AmountZeroError,
@@ -33,17 +32,21 @@ import {
   ClaimExceedsFundedLiquidityError,
   ContractError,
   CycleNotFoundError,
-  EscrowScaledUnderflowError,
+  DepositsDisabledError,
+  EscrowUnderflowError,
   ExactPaymentRequiredError,
   GracePeriodNotElapsedError,
   InsufficientAvailableError,
+  InsufficientLiquidityError,
   InvalidCycleStatusError,
   InvalidProofError,
   NoWithdrawalRequestedError,
+  PausedError,
   PaymentFinalityPendingError,
   PaymentWindowElapsedError,
+  PoolInsolventError,
   RevertedOnChainError,
-  StablecoinWithdrawShortfallError,
+  StablecoinDepositsDisabledError,
   TransferFailedError,
   UnknownRevertError,
   UnsupportedAssetError,
@@ -63,7 +66,7 @@ function revertU256(value: unknown): bigint {
 }
 
 /**
- * Map a decoded Core4Mica / ClearingHouse custom error to its typed SDK
+ * Map a decoded Treasury / ClearingHouse custom error to its typed SDK
  * exception. Reverts with no matching decoder fall through to
  * {@link UnknownRevertError}; anything without revert data stays a plain
  * {@link ContractError} carrying the extracted message.
@@ -96,23 +99,31 @@ function decodeRevert(error: unknown, context: string): ContractError | null {
       return new TransferFailedError(`${context}: transfer failed`);
     case "UnsupportedAsset":
       return new UnsupportedAssetError(String(args[0] ?? "unknown"));
-    case "StablecoinWithdrawShortfall":
-      return new StablecoinWithdrawShortfallError(
-        `${context}: stablecoin withdrawal delivered less than requested`,
+    case "InsufficientLiquidity":
+      return new InsufficientLiquidityError(
+        revertStr(args[0]),
+        revertU256(args[1]),
+        revertU256(args[2]),
       );
-    case "AaveNotConfigured":
-      return new AaveNotConfiguredError(`${context}: Aave is not configured`);
+    case "PoolInsolvent":
+      return new PoolInsolventError(revertStr(args[0]));
+    case "DepositsDisabled":
+      return new DepositsDisabledError(`${context}: deposits are disabled`);
+    case "StablecoinDepositsDisabled":
+      return new StablecoinDepositsDisabledError(revertStr(args[0]));
+    case "EnforcedPause":
+      return new PausedError(`${context}: the treasury is paused`);
     case "ValueMismatch":
       return new ValueMismatchError(
         `${context}: token delivered a different amount than expected`,
       );
     case "ZeroCollateralCredit":
       return new ZeroCollateralCreditError(
-        `${context}: deposit too small to mint scaled collateral`,
+        `${context}: deposit too small to mint any pool shares`,
       );
-    case "EscrowScaledUnderflow":
-      return new EscrowScaledUnderflowError(
-        `${context}: escrow holds less scaled collateral than needed`,
+    case "EscrowUnderflow":
+      return new EscrowUnderflowError(
+        `${context}: escrow holds less than the operation needs`,
       );
     case "AuthorizationExpired":
       return new AuthorizationExpiredError(revertU256(args[0]));
@@ -243,7 +254,7 @@ export class ContractGateway {
 
     const contract = getContract({
       address: contractAddress,
-      abi: core4micaAbi,
+      abi: treasuryAbi,
       client: {
         public: publicClient,
         wallet: walletClient,
@@ -328,22 +339,6 @@ export class ContractGateway {
       throw new RevertedOnChainError(hash);
     }
     return receipt;
-  }
-
-  async getGuaranteeDomain(): Promise<string> {
-    return this.contract.read.guaranteeDomainSeparator();
-  }
-
-  async getGuaranteeVersionConfig(
-    version: number,
-  ): Promise<{ domainSeparator: string; decoder: string; enabled: boolean }> {
-    const [, domainSeparator, decoder, enabled] =
-      await this.contract.read.getGuaranteeVersionConfig([BigInt(version)]);
-    return {
-      domainSeparator: domainSeparator as string,
-      decoder: decoder as string,
-      enabled,
-    };
   }
 
   async erc20Allowance(token: string, spender?: string): Promise<bigint> {
@@ -583,53 +578,68 @@ export class ContractGateway {
     );
   }
 
-  async totalUserScaledBalance(token: string): Promise<bigint> {
+  /** The user's pool shares in `token`. */
+  async userShares(user: string, token: string): Promise<bigint> {
     return this.view(
       () =>
-        this.contract.read.totalUserScaledBalance([
+        this.contract.read.userShares([
+          normalizeAddress(user) as Hex,
           normalizeAddress(token) as Hex,
         ]) as Promise<bigint>,
-      "totalUserScaledBalance failed",
+      "userShares failed",
     );
   }
 
-  async protocolScaledBalance(token: string): Promise<bigint> {
+  async totalUserShares(token: string): Promise<bigint> {
     return this.view(
       () =>
-        this.contract.read.protocolScaledBalance([
+        this.contract.read.totalUserShares([
           normalizeAddress(token) as Hex,
         ]) as Promise<bigint>,
-      "protocolScaledBalance failed",
+      "totalUserShares failed",
     );
   }
 
-  async surplusScaledBalance(token: string): Promise<bigint> {
+  async protocolShares(token: string): Promise<bigint> {
     return this.view(
       () =>
-        this.contract.read.surplusScaledBalance([
+        this.contract.read.protocolShares([
           normalizeAddress(token) as Hex,
         ]) as Promise<bigint>,
-      "surplusScaledBalance failed",
+      "protocolShares failed",
     );
   }
 
-  async contractScaledATokenBalance(token: string): Promise<bigint> {
+  /** Pool shares outstanding across users, the protocol and escrow. */
+  async poolShares(token: string): Promise<bigint> {
     return this.view(
       () =>
-        this.contract.read.contractScaledATokenBalance([
+        this.contract.read.poolShares([
           normalizeAddress(token) as Hex,
         ]) as Promise<bigint>,
-      "contractScaledATokenBalance failed",
+      "poolShares failed",
     );
   }
 
-  async stablecoinAToken(token: string): Promise<string> {
+  /** Underlying value backing the pool: idle holdings plus the strategy position. */
+  async poolAssets(token: string): Promise<bigint> {
     return this.view(
       () =>
-        this.contract.read.stablecoinAToken([
+        this.contract.read.poolAssets([
+          normalizeAddress(token) as Hex,
+        ]) as Promise<bigint>,
+      "poolAssets failed",
+    );
+  }
+
+  /** The ERC-4626 strategy backing the pool, or the zero address while its assets sit idle. */
+  async strategy(token: string): Promise<string> {
+    return this.view(
+      () =>
+        this.contract.read.strategy([
           normalizeAddress(token) as Hex,
         ]) as Promise<string>,
-      "stablecoinAToken failed",
+      "strategy failed",
     );
   }
 

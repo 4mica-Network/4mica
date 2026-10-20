@@ -22,9 +22,6 @@ OUT="$CORE_REPO/contracts/out"
 ABI_DIR="$ROOT/contracts/abi"
 PY_DIR="$ROOT/packages/sdk-python/fourmica_sdk/contract/abi"
 
-# Core4Mica.json is not refreshed: core renamed the contract to Treasury, so
-# that ABI is frozen at the commit in packages/sdk/scripts/refresh-abis.mjs
-# until the TypeScript SDK moves to Treasury.json. Delete it then.
 for artifact in "Treasury.sol/Treasury.json" "ClearingHouse.sol/ClearingHouse.json"; do
   if [ ! -f "$OUT/$artifact" ]; then
     echo "missing $OUT/$artifact — run 'forge build' in $CORE_REPO/contracts" >&2

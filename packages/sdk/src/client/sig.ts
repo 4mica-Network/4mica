@@ -42,7 +42,7 @@ const randomNonce = (): string =>
 
 /**
  * Sign an EIP-3009 `receiveWithAuthorization` crediting `amount` of `token`
- * to the signer via the Core4Mica contract. Only tokens implementing EIP-3009
+ * to the signer via the Treasury contract. Only tokens implementing EIP-3009
  * (USDC and similar) can redeem this.
  */
 export async function eip3009Authorization(

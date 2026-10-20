@@ -8,7 +8,7 @@ export interface Config {
   signer: Account;
   /** Override for the Ethereum HTTP RPC URL (defaults to the value returned by the core service). */
   ethereumHttpRpcUrl?: string;
-  /** Override for the Core4Mica contract address (defaults to the value returned by the core service). */
+  /** Override for the Treasury contract address (defaults to the value returned by the core service). */
   contractAddress?: string;
   /** Static bearer token for authenticated RPC calls. Mutually exclusive with SIWE auth. */
   bearerToken?: string;
