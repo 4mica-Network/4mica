@@ -1,0 +1,68 @@
+---
+title: AI agents will break every payment rail we have (Part 1/2)
+description: Card networks, ACH and per-request on-chain settlement all fail at agent scale. The fix is decades old — separate authorization from settlement and clear.
+date: 2026-03-19
+author: Akash Madhusudan
+authorAvatar: /assets/akash.jpg
+authorRole: CEO & Co-Founder
+category: Insights
+tags: [payments, x402, settlement]
+thumbnail: /blog/ai-agents-break-every-payment-rail/hero.svg
+thumbnailAlt: Impasto painting of rows of crashing ocean waves
+keywords:
+  [
+    agent micropayments,
+    stablecoin payment rails,
+    x402 settlement,
+    multilateral netting,
+    payment clearing,
+  ]
+---
+
+AI agents are going to break every payment rail we have. A lot of companies have realised this, and the infrastructure being built right now is focused entirely on how agents pay. However, nobody is talking about how those payments settle at scale; that's a problem, and it's coming fast.
+
+Let me walk you through why.
+
+## Traditional payment rails were not built for this
+
+When a human buys something online, a card network handles it. The flow is familiar: enter card details, authorize, settle in a day or two, pay 2-3% in interchange and processing fees. For a $50 purchase, nobody cares about 2%. The system works.
+
+But for an AI agent making 10,000 API calls per day that each cost $0.001 gives us only $10 in actual value. On card rails, the processing fees alone would exceed the total value of all those transactions. Minimum transaction thresholds on most card networks start at $0.50. The agent would literally not be allowed to make most of these payments, and the ones it could make would cost more in fees than the service itself.
+
+Bank transfers and ACH are even worse. Batch windows measured in hours, no programmability, no real-time confirmation. An agent that needs to pay for an API response in milliseconds cannot wait for ACH to clear overnight.
+
+This is why stablecoin rails have emerged as the natural infrastructure for agent micropayments. These rails let an agent pay $0.001 with near-zero fees; no card network middleman, no minimum transaction size, no T+1 settlement window. Coinbase and Cloudflare recognized this when they built x402, and now Stripe and Paradigm have launched Tempo and MPP for the same reason. Even Visa is contributing card payment specs to these new protocols, acknowledging that their own rails aren't suited for high-frequency agent commerce.
+
+It's not just me claiming this, even the incumbents are investing in stablecoin rails that will power agent micropayments. But stablecoin rails have their own scaling problem, and that's what the rest of this piece is about.
+
+## The x402 model works, until it does not
+
+The x402 protocol is elegant and simple. Server returns HTTP 402, client pays on-chain, server verifies, delivers the data. On L2s where gas is cheap and finality is fast, this works. An agent making 1,000 API calls a day pays a few cents in total gas.
+
+On Ethereum mainnet, the same agent pays $500/day in gas to access $1 worth of data. Mainnet gas ranges from a few cents during quiet periods to $2+ during congestion, and that variance is the problem. You cannot design agent infrastructure around hoping for low gas. Not to mention the severe block congestion this causes. The math is hilarious, which is why every developer builds on L2s.
+
+But Cloudflare's network already sends over a billion 402 responses to bots and crawlers every day. However, these are purely content monetisation signals, or as I like to call them, failed sales. The purpose-built agent commerce volume is still at its nascence, which means the settlement problems that will arise at true scale have not surfaced yet. They eventually will.
+
+## L2s are not the answer
+
+Vitalik recently posted that the original L2 vision has expired. The rollup-centric roadmap assumed L1 would stay expensive. It didn't. Mainnet gas is low, gas limits are increasing through 2026, L1 is scaling directly. And no one could be happier about that than me; I spent my PhD arguing against the claims of L2s solving the scalability trilemma, there's a whole rant in my PhD thesis about it (have a look for yourself: [My thesis](https://kuleuven.limo.libis.be/discovery/fulldisplay?docid=lirias4158026&context=SearchWebhook&vid=32KUL_KUL:Lirias&lang=en)).
+
+As predicted, L2 decentralization has stalled. Several major L2s still run centralized sequencers or multisig bridges. At least one team has said they may never go beyond Stage 1. Vitalik's framing is blunt: an L2 connected through a multisig bridge is not inheriting Ethereum's security. It's a separate chain with a bridge.
+
+For agent payments this creates real problems. If you're handling real volume, you want Ethereum's security budget, not an L2's fraud proof window. An agent on Base can't verify a payment on Arbitrum without bridging. And payment infrastructure locked to one L2 cuts itself off from DeFi across the ecosystem...
+
+## Per-request settlement does not scale anywhere
+
+Even on L2s, per-request settlement hits a ceiling. An L2 doing 2000 TPS sounds good, until a single popular API with 10000 agents saturates that capacity just with payment transactions. The problem isn't the chain. Per-request on-chain verification is architecturally wrong for high-frequency micropayments on any chain. Moreover, existing off-chain solutions like channels do not solve this at all; agent-to-API transactions are unidirectional, leading to quick collateral drain that constantly needs replenishing. Capital-inefficient solutions make me cringe.
+
+## The answer already exists, and it's several decades old
+
+The financial system solved this problem a long time ago. No bank settles every card tap individually, DTCC does not process every stock trade individually; they use clearing. The architecture for agent payments should look the same - separate authorization from settlement. Let agents deposit collateral once and transact instantly using cryptographic payment guarantees verified off-chain. Accumulate obligations between counterparties, and when it's time to settle, compress everything through multilateral netting; thus, only letting net flows hit the chain. This compresses settlement volume across hundreds of agents by orders of magnitude. One yield-bearing deposit, instant access to thousands of APIs and services. Capital stays secure and productive on the L1 in a yield-bearing position instead of sitting idle (because capital-inefficient architectures make me cringe hard). Settlement happens on L1 with full Ethereum (or other L1) finality. No value extracted from base layer. The difference between traditional clearing and what's possible now is trust. DTCC requires you to trust the clearinghouse. Cryptographic payment guarantees, built on research that already exists in the literature, replace that trust with math any counterparty can independently verify. No trusted intermediary required.
+
+## The settlement bottleneck is coming, guys
+
+x402 is gaining real traction. Many posts compare real x402 volume with "washed" volume, but they miss the point. There is still real volume, and all signals towards a future boom are present. Coinbase and Cloudflare have laid the foundation, Circle has built a whole product around it, and very recently AWS published production-grade reference architectures for deploying x402 on both the agent side and the provider side. Vitalik and Davide Crapis are publishing research on ZK API usage credits that converges on the same conclusion I reached during my PhD: use cryptography, not trust, for high-frequency payments. Each one of these developments makes it easier to deploy x402 endpoints. More endpoints means more agent transaction volume, and more volume makes the settlement bottleneck more urgent. Someone needs to build the clearing layer for this, and some are trying but end up reinventing basic aggregation with the same capital inefficiency problems (remember how that makes me cringe). As the title suggests, there is another part of this blog upcoming, where I dive into the existing solutions that suggest off-chain payment verification. I am not making any promises, but it will be spicy.
+
+If you're thinking about this problem too, please reach out? My DMs are open.
+
+_Originally published on [LinkedIn](https://www.linkedin.com/pulse/ai-agents-break-every-payment-rail-we-have-part-12-akash-madhusudan-oxb3e/)._

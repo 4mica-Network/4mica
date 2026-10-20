@@ -1,0 +1,66 @@
+---
+title: The actual demand for machine commerce
+description: Cloudflare Radar shows AI agents refused twice as often as training crawlers — and priced ten times as often. The demand is measured; the mechanism is still missing.
+date: 2026-09-01
+author: Akash Madhusudan
+authorAvatar: /assets/akash.jpg
+authorRole: CEO & Co-Founder
+category: Insights
+tags: [402, agents, data]
+thumbnail: /blog/actual-demand-for-machine-commerce/hero.svg
+thumbnailAlt: Impasto painting of a rising field of orange reeds under a swirling violet sky
+keywords:
+  [
+    HTTP 402,
+    machine commerce,
+    AI agent traffic,
+    Cloudflare Radar,
+    pay per crawl,
+    agent payments,
+  ]
+---
+
+Nowadays, asking an AI assistant to plan a trip, compare prices or summarise the news is something many of us do often; behind every such answer, information is fetched from different sources at the moment of asking, on behalf of exactly one person, and this is done at machine frequency. [Cloudflare](https://www.linkedin.com/company/cloudflare)'s measurement calls this traffic class "user action", and its share of AI bot traffic has roughly doubled this year. This is a different class of visitors from the crawlers we have known for two decades; a training crawler reads for the archive, whereas an AI agent reads because somebody wants the answer right now.
+
+During my PhD I [researched](https://link.springer.com/chapter/10.1007/978-3-031-35486-1_25) payments in ephemeral markets where strangers trust each other with money with no one in charge. I did not expect the clearest real-world example of such a market to be machines reading the web and transacting with each other, but that is what the data now shows; so let's walk through it together.
+
+The web's first answer to this new reader was refusal, via the error code HTTP 403, i.e., access denied. Look below for a cute video I generated with Gemini to explain what 403 is :)
+
+<video src="/blog/actual-demand-for-machine-commerce/403-error.mp4" controls playsInline preload="metadata" aria-label="The 403 error, explained" />
+
+## 403 errors happen often, everywhere on the web
+
+![Bar chart of the share of requests answered 403: agents 22.8% vs training crawlers 12.0% across all industries, 82.8% vs 20.0% in Publishing, and 4.4% vs 6.4% in Retail](/blog/actual-demand-for-machine-commerce/403-by-industry.png)
+
+_Fig 1: 403 errors by industry_
+
+Fig 1. represents AI-related 403 errors that [Cloudflare Radar](https://radar.cloudflare.com/explorer?dataSet=ai.bots) tracked throughout this year, and shows how agents have been refused about twice as often as training crawlers: 22.8% of agent requests receive a 403, against 12% for trainers. To be precise, industry by industry, agents fare worse in 85 of the 130 industries Radar follows. While the median gap of 403s between agents and crawlers sits at 1.33x, the aggregate is pulled up by a handful of sectors that refuse agents much harder. Publishing is the extreme case: Year-to-date, it refused 83% of agent fetches and only 20% of trainer requests, i.e., agents are turned away 4x more. At the other end sits Retail, the single largest destination for agent traffic (receiving 22% of it), which refuses agents less often than trainers (4.4% against 6.4%).
+
+Thus, one must wonder: why allow crawlers to take an entire archive, while blocking the agent that arrives to answer one reader's live intent? Simple answer is that training crawlers are vetted. They are known quantities with published identities that bot-management systems routinely allowlist, whereas the agent class is newer, noisier and harder to verify. On vetting grounds alone, agents should indeed be blocked more often, and some share of these 403s is surely just that.
+
+Vetting, however, cannot explain the second asymmetry in the same dataset. Interestingly, agents are not only refused twice as often as trainers; they are also priced ten times as often (0.86% of their requests receive a 402, against 0.08% for trainers). Look below for a cute video I generated with Gemini to explain what 402 is :)
+
+<video src="/blog/actual-demand-for-machine-commerce/402-error.mp4" controls playsInline preload="metadata" aria-label="The 402 error, explained" />
+
+If the blocking was just for security, no prices would be quoted. Nor can vetting explain the industry map: Publishing and Retail see the same agents carrying the same published identities, yet one rejects them 4 times more than the trainer rate while the other allows them through more readily than trainers. The treatment tracks what the content is worth, not how the visitor is verified, and these patterns point to economics. The fight with trainers is being settled through licensing deals, i.e., negotiated, upfront and in bulk, whereas agent traffic is attributable to a single request from a single person, which makes it chargeable per event. Hence, when a site refuses an agent, the refusal is doing mixed work: partly a security default aimed at an unverified class, and partly a price too high to accept, issued for lack of an alternative. The rest of this article concerns the second part, because it is the part that moved the moment an interesting mechanism appeared.
+
+## 402 is not a myth, it's real and it's slowly climbing the ranks in the 4xx category
+
+On 27 August 2025, Cloudflare made custom 402 responses generally available, giving any site on its network a standard way to answer a machine with a price instead of a refusal. It's important to be careful with causality here, since what we observe is timing and mechanism rather than proof; that being said, the correlation is quite difficult to dismiss. The step in the curve begins the week following custom 402 responses. As visualised in Fig 2, in August 2025, 402s were 0.034% of user-action agent requests, a rate that had been flat all year; in September 2025 it was 0.425%, i.e., 12x higher within a single month, and it has not returned to its old level since. Year over year, the monthly 402 rate is now between 30 and 74 times higher (!!!!), depending on the month.
+
+![Two line charts from January 2025 to July 2026: the 403 rate for user-action agents hovers between 10% and 26%, while the 402 rate is flat near zero until custom 402 responses go GA on 27 August 2025, then climbs past 1% and reaches about 1.4% by July 2026](/blog/actual-demand-for-machine-commerce/rise-of-402.png)
+
+_Fig 2: The rise of 402_
+
+Before following the argument further, the two serious objections to it deserve to be stated properly, namely, size and substance:
+
+- For the year to date, 402s are 0.86% of agent requests while refusals are 22.8%, meaning the priced market is two orders of magnitude smaller than the refused demand behind it, and anything below 1% invites the conclusion that there is no market here at all.
+- A 402 is a price quoted, not a price paid, and 97% of the 402s served to agents this year went to a single bot, ChatGPT-User. In other words, what I call a market here could simply be a handful of publishers experimenting on a single company's agent.
+
+The answer to the first objection is that the gap is the measurement I care about most. The demand is not in question, since it is measured monthly in public data, and neither is the willingness of some sites to price it, since that is measured too. A two-orders gap between measured demand and measured pricing is therefore not evidence of a missing market; it is the size of the missing mechanism, very clearly stated in percentage points. More specifically, it tells us how much of this market can at most be waiting for a payment path. Some of that wall is vetting and will never convert; the argument only needs a fraction of it. Note that the event itself supports this reading: in the month custom 402 responses appeared, the 402 series moved twelvefold while the 403 series barely moved at all. The pricing did not come at the cost of refusals; it appeared alongside them, from sites that previously had only two possible answers, allow or refuse.
+
+The answer to the second objection requires conceding half of it. A 402 is indeed an offer rather than a settlement; however, serving a 402 requires a deliberate act of configuration, and sites do not quote prices to the traffic they intend to ignore. For instance, [Snopes.com](https://www.linkedin.com/company/snopes.com) goes as far as publishing its price directly in the response header (1 US cent per crawl), i.e., a standing offer to any machine that reads it, and five titles under a single media group have made the same choice; as of the time of writing, the sites throwing 402 is somewhere between 10 and 24 of the top ~3,700 domains (per CrawlIndex's August count by [Fidget Labs](https://nl.linkedin.com/company/fidget-labs)), showing a supply side exactly as young as its demand side. And where the full rail already exists, the offers clear: StableTravel's travel-data services, built on Amadeus, [Seats.aero](https://seats.aero) and [FlightAware](https://www.linkedin.com/company/flightaware) over MPP, have processed 7,500 paid calls from 416 paying agents at roughly 2 cents each. As for the single buyer, a market with one buyer is not a failed market, it is simply a very young one. All of these numbers are small, and a year ago all of them were zero.
+
+Lastly, let's take the argument one step beyond the data. Suppose the gap closes from the refusal side and even a tenth of today's 403s become 402s. Pricing per call at machine frequency produces obligations by the million, sized in fractions of a cent, between parties with no relationship before the transaction and none after it; these are precisely the markets with ephemeral participating relationships I have been worried about, now at a scale no retail setting ever reached. Moving money once per penny is not viable, since any per-transfer cost at that size consumes the payment itself. Hence, every payments era has converged on the same resolution, and I see no reason this one will differ: instant guarantees at the time of payment, net settlement underneath. The demand is now measured; the mechanism is still missing. At 4Mica, we have built the neutral version of that layer, and everything above is the reason why.
+
+_Originally published on [LinkedIn](https://www.linkedin.com/pulse/actual-demand-machine-commerce-akash-madhusudan-wqo5e/)._
