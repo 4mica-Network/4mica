@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import globalFontsVariables from "../fonts";
 import "./globals.css";
 import { LinkConfig } from "@4mica/url";
+import VerticalThreads from "@components/VerticalThreads";
 import ThemeProvider, { themeInitScript } from "@context/ThemeProvider";
 import { metaFor } from "@seo/pages";
 
@@ -47,7 +48,10 @@ export default function RootLayout({
         suppressHydrationWarning={true}
         className={`${globalFontsVariables} antialiased`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <VerticalThreads />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

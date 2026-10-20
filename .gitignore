@@ -157,3 +157,4 @@ vite.config.ts.timestamp-*
 
 # Prisma generated client (run `pnpm db:generate`)
 packages/db/src/generated/
+.taste-skill

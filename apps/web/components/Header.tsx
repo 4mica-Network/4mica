@@ -48,7 +48,7 @@ export default function Header() {
       }`}
     >
       <nav
-        className={`flex size-full max-w-300 items-center justify-between ${
+        className={`flex size-full max-w-300 items-center justify-between content-grid ${
           isMobileMenuOpen ? "overflow-hidden" : ""
         }`}
       >

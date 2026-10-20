@@ -1,8 +1,8 @@
 import SectionBackdrop from "@components/SectionBackdrop";
 import { highlight } from "@lib/shiki";
 import Image from "next/image";
+import { STEPS } from "@/app/(home)/data";
 import { messages } from "@/i18n";
-import { STEPS } from "../data";
 
 export default async function DocsCalloutSection() {
   const highlighted = await Promise.all(
