@@ -9,9 +9,9 @@ use alloy::signers::{Signature, Signer};
 use alloy::sol_types::Eip712Domain;
 use rpc::{
     ActiveCycleResponse, ApiClientError, CheckpointAcceptedResponse, CheckpointBatchResponse,
-    CheckpointPayload, ERROR_CODE_CHECKPOINT_REQUIRED, ERROR_CODE_CYCLE_MISMATCH,
-    ERROR_CODE_TIMESTAMP_NOT_PAST_CUTOFF, Guarantee, GuaranteeReceipt, PaymentRequest,
-    PaymentRequestPayload, SignedCheckpoint,
+    CheckpointPayload, ERROR_CODE_CHECKPOINT_MISMATCH, ERROR_CODE_CHECKPOINT_REQUIRED,
+    ERROR_CODE_CYCLE_MISMATCH, ERROR_CODE_TIMESTAMP_NOT_PAST_CUTOFF, Guarantee, GuaranteeReceipt,
+    PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
 };
 
 use crate::{
@@ -142,6 +142,20 @@ where
     ///
     /// Returns `None` when there is nothing to cover.
     pub async fn checkpoint_cycle(
+        &self,
+        asset: Asset,
+        cycle_id: B256,
+    ) -> Result<Option<CheckpointAcceptedResponse>, PaymentError> {
+        match self.sign_and_submit_checkpoint(asset, cycle_id).await {
+            // Only once: a payer paid faster than a round trip would chase the batch forever.
+            Err(PaymentError::CheckpointMismatch { .. }) => {
+                self.sign_and_submit_checkpoint(asset, cycle_id).await
+            }
+            result => result,
+        }
+    }
+
+    async fn sign_and_submit_checkpoint(
         &self,
         asset: Asset,
         cycle_id: B256,
@@ -317,6 +331,19 @@ where
                 Some(details) => PaymentError::CheckpointRequired(Box::new(details)),
                 None => PaymentError::Rpc(err),
             },
+            Some(ERROR_CODE_CHECKPOINT_MISMATCH) => {
+                let reason = match &err {
+                    ApiClientError::Api { message, .. } => message.clone(),
+                    _ => String::new(),
+                };
+                match err.details() {
+                    Some(details) => PaymentError::CheckpointMismatch {
+                        details: Box::new(details),
+                        reason,
+                    },
+                    None => PaymentError::Rpc(err),
+                }
+            }
             _ => PaymentError::Rpc(err),
         }
     }

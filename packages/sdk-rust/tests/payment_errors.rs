@@ -8,12 +8,14 @@
 use std::sync::{Arc, Mutex};
 
 use alloy::primitives::{Address, B256, U256, address};
+use alloy::signers::SignerSync;
 use alloy::signers::local::PrivateKeySigner;
 use axum::http::StatusCode;
 use axum::{Json, Router, routing::get, routing::post};
 use rpc::{
     CLEARING_HOUSE_EIP712_NAME, CLEARING_HOUSE_EIP712_VERSION, CorePublicParameters,
-    PAYMENT_PAYLOAD_VERSION,
+    PAYMENT_PAYLOAD_VERSION, PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
+    clearing_house_domain,
 };
 use sdk_4mica::error::PaymentError;
 use sdk_4mica::{Asset, Client, ClientBuilder};
@@ -444,5 +446,176 @@ async fn each_checkpoint_names_the_cycle_it_covers() -> anyhow::Result<()> {
         "a named checkpoint must name that cycle, asked: {}",
         asked[1]
     );
+    Ok(())
+}
+
+/// A payment `payer` signed in the first cycle, as core lists it in a checkpoint batch.
+fn signed_payment(payer: &PrivateKeySigner, amount: u64, timestamp: u64) -> PaymentRequest {
+    let payload = PaymentRequestPayload::new(
+        payer.address().to_string(),
+        RECIPIENT.to_string(),
+        FIRST_CYCLE,
+        U256::from(timestamp),
+        U256::from(amount),
+        timestamp,
+        None,
+        B256::repeat_byte(0x33),
+    );
+    let digest = payload
+        .signing_digest(&clearing_house_domain(CHAIN_ID, CLEARING_HOUSE))
+        .expect("valid addresses");
+    let signature = payer.sign_hash_sync(&digest).expect("sign");
+    PaymentRequest::new(payload, alloy::hex::encode_prefixed(signature.as_bytes()))
+}
+
+/// What the mock core saw of a checkpoint exchange.
+#[derive(Default)]
+struct CheckpointTraffic {
+    batch_reads: usize,
+    submitted: Vec<SignedCheckpoint>,
+}
+
+/// A core where a second payment lands right after the payer first reads its batch, and which
+/// refuses the first `refusals` checkpoints as no longer matching.
+async fn client_racing_a_payment(
+    refusals: usize,
+) -> anyhow::Result<(Client<PrivateKeySigner>, Arc<Mutex<CheckpointTraffic>>)> {
+    let payer = PrivateKeySigner::random();
+    let first = signed_payment(&payer, 10, 1_700_000_100);
+    let late = signed_payment(&payer, 7, 1_700_000_200);
+
+    let traffic = Arc::new(Mutex::new(CheckpointTraffic::default()));
+    let batch_traffic = traffic.clone();
+    let submit_traffic = traffic.clone();
+    let payer_address = payer.address();
+
+    let core_url = spawn(
+        Router::new()
+            .route(
+                "/core/public-params",
+                get(|| async { Json(public_params()) }),
+            )
+            .route(
+                "/core/payers/{payer}/checkpoint-batch",
+                get(move || {
+                    let traffic = batch_traffic.clone();
+                    let (first, late) = (first.clone(), late.clone());
+                    async move {
+                        let mut traffic = traffic.lock().unwrap();
+                        traffic.batch_reads += 1;
+                        let authorizations = if traffic.batch_reads == 1 {
+                            vec![first]
+                        } else {
+                            vec![first, late]
+                        };
+                        Json(json!({
+                            "cycle_id": format!("{FIRST_CYCLE:#x}"),
+                            "cycle_id_text": "0x0:1700000000",
+                            "asset_address": Address::ZERO.to_string(),
+                            "payer": payer_address.to_string(),
+                            "previous": null,
+                            "authorizations": authorizations,
+                            "max_uncheckpointed": 64,
+                        }))
+                    }
+                }),
+            )
+            .route(
+                "/core/checkpoints",
+                post(move |Json(signed): Json<SignedCheckpoint>| {
+                    let traffic = submit_traffic.clone();
+                    async move {
+                        let mut traffic = traffic.lock().unwrap();
+                        traffic.submitted.push(signed.clone());
+                        let checkpoint = signed.payload;
+                        if traffic.submitted.len() <= refusals {
+                            return (
+                                StatusCode::BAD_REQUEST,
+                                Json(json!({
+                                    "error": "checkpoint cumulative gross does not match the covered authorizations",
+                                    "code": "CHECKPOINT_MISMATCH",
+                                    "details": {
+                                        "cycle_id": format!("{FIRST_CYCLE:#x}"),
+                                        "cycle_id_text": "0x0:1700000000",
+                                        "asset_address": checkpoint.asset_address,
+                                        "payer": checkpoint.payer,
+                                    },
+                                })),
+                            );
+                        }
+                        (
+                            StatusCode::OK,
+                            Json(json!({
+                                "cycle_id": format!("{FIRST_CYCLE:#x}"),
+                                "cycle_id_text": "0x0:1700000000",
+                                "asset_address": checkpoint.asset_address,
+                                "payer": checkpoint.payer,
+                                "cumulative_gross": checkpoint.cumulative_gross.to_string(),
+                                "timestamp_cutoff": checkpoint.timestamp_cutoff,
+                                "covered": 2,
+                            })),
+                        )
+                    }
+                }),
+            ),
+    )
+    .await?;
+
+    let client = Client::connect(
+        ClientBuilder::default()
+            .rpc_url(core_url)
+            .signer(payer)
+            .bearer_token("test-token")
+            .contract_address(CONTRACT.to_string())
+            .build()?,
+    )
+    .await?;
+    Ok((client, traffic))
+}
+
+/// A payment landing mid-checkpoint makes the first one stale; the retry re-reads the batch and
+/// covers the late payment too.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_checkpoint_overtaken_by_a_payment_is_signed_again() -> anyhow::Result<()> {
+    let (client, traffic) = client_racing_a_payment(1).await?;
+
+    let accepted = client
+        .payment
+        .checkpoint_cycle(Asset::Native, FIRST_CYCLE)
+        .await?
+        .expect("the batch has payments to cover");
+    assert_eq!(accepted.cumulative_gross, "17");
+    assert_eq!(accepted.timestamp_cutoff, 1_700_000_200);
+
+    let traffic = traffic.lock().unwrap();
+    assert_eq!(traffic.batch_reads, 2, "the retry must re-read the batch");
+    assert_eq!(traffic.submitted.len(), 2);
+    assert_eq!(
+        traffic.submitted[0].payload.cumulative_gross,
+        U256::from(10u64)
+    );
+    Ok(())
+}
+
+/// A payer paid faster than it can checkpoint gets the refusal back rather than an endless retry.
+#[tokio::test]
+#[serial_test::file_serial]
+async fn a_checkpoint_refused_twice_reports_the_mismatch() -> anyhow::Result<()> {
+    let (client, traffic) = client_racing_a_payment(usize::MAX).await?;
+
+    let err = client
+        .payment
+        .checkpoint_cycle(Asset::Native, FIRST_CYCLE)
+        .await
+        .expect_err("core refuses every checkpoint here");
+    match err {
+        PaymentError::CheckpointMismatch { details, reason } => {
+            assert_eq!(details.cycle_id, format!("{FIRST_CYCLE:#x}"));
+            assert!(reason.contains("cumulative gross"), "{reason}");
+        }
+        other => panic!("expected a checkpoint mismatch, got {other:?}"),
+    }
+    assert_eq!(traffic.lock().unwrap().submitted.len(), 2);
     Ok(())
 }

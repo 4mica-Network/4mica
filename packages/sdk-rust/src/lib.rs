@@ -20,9 +20,10 @@ pub mod x402;
 
 pub use alloy::primitives::{Address, U256};
 pub use rpc::{
-    ActiveCycleResponse, CheckpointAcceptedResponse, CheckpointBatchResponse, CheckpointPayload,
-    CheckpointRequiredDetails, CycleMismatchDetails, Guarantee, GuaranteeReceipt, PaymentRequest,
-    PaymentRequestPayload, SignedCheckpoint, TimestampNotPastCutoffDetails, ValidationRequirement,
+    ActiveCycleResponse, CheckpointAcceptedResponse, CheckpointBatchResponse,
+    CheckpointMismatchDetails, CheckpointPayload, CheckpointRequiredDetails, CycleMismatchDetails,
+    Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload, SignedCheckpoint,
+    TimestampNotPastCutoffDetails, ValidationRequirement,
 };
 
 pub use auth::{AuthClient, AuthSession, AuthTokens};

@@ -4,8 +4,8 @@ use alloy::primitives::{Address, B256, Bytes, U256};
 use anyhow::Error as AnyError;
 use reqwest::StatusCode;
 use rpc::{
-    ApiClientError, CheckpointRequiredDetails, CycleMismatchDetails, GuaranteeDecodeError,
-    TimestampNotPastCutoffDetails,
+    ApiClientError, CheckpointMismatchDetails, CheckpointRequiredDetails, CycleMismatchDetails,
+    GuaranteeDecodeError, TimestampNotPastCutoffDetails,
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -414,6 +414,14 @@ pub enum PaymentError {
         .0.payer, .0.uncheckpointed, .0.max_uncheckpointed
     )]
     CheckpointRequired(Box<CheckpointRequiredDetails>),
+    #[error(
+        "checkpoint for cycle {} no longer matches what core holds: {reason}",
+        .details.cycle_id
+    )]
+    CheckpointMismatch {
+        details: Box<CheckpointMismatchDetails>,
+        reason: String,
+    },
     #[error(
         "payment was signed for cycle {} but the active cycle is {}",
         .0.signed_cycle_id, .0.active_cycle_id

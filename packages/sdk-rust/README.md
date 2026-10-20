@@ -95,6 +95,10 @@ checkpoints a named cycle instead, such as the one a `CHECKPOINT_REQUIRED` refus
 
 Submitting a checkpoint that was already accepted succeeds and covers nothing, so retrying is safe.
 
+A payment or another checkpoint can land while a checkpoint is in flight, and core then refuses it as
+stale. `checkpoint_cycle` and `checkpoint_active_cycle` read the batch and sign once more. If core
+refuses again, they return `PaymentError::CheckpointMismatch`.
+
 The checkpoint total is what the payer can be charged on-chain if they default, so it is built only
 from what the payer signed. Every payment in core's batch, and the checkpoint it extends, must carry
 the payer's own signature for that cycle and asset, and each payment may be counted once. Otherwise
@@ -939,6 +943,7 @@ use sdk_4mica::error::{
 - `AddressMismatch { signer, payer }`, `InvalidPayerAddress`, `SigningFailed(String)`
 - `MalformedReceipt(GuaranteeDecodeError)`, `UnreadableReceiptSignature`, `ReceiptSignerMismatch { expected, recovered }`
 - `CheckpointRequired(..)`, `CycleMismatch(..)`, `TimestampNotPastCutoff(..)` — core's coded refusals, each carrying the detail needed to recover: the outstanding count, the cycle to re-sign for, or the cutoff to stamp past
+- `CheckpointMismatch { details, reason }` — core refused a checkpoint because a payment or another checkpoint landed after its batch was read. Read the batch again and re-sign
 - `UntrustedCheckpointBatch(String)` — core's checkpoint batch holds something the payer did not sign, so no checkpoint was signed
 - `InvalidParams(String)`, `Decode(String)`, `Rpc(rpc::ApiClientError)`, `Client(ClientError)`, `Auth(AuthError)`
 
