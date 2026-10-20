@@ -3,13 +3,18 @@ import type { Network, PaymentPayload, PaymentRequirements, SettleResponse } fro
 
 const DEFAULT_FACILITATOR_URL = 'https://x402.4mica.xyz'
 
-export interface CertificateResponse {
-  claims: string
+/**
+ * The operator's guarantee receipt a 4mica `/settle` returns: the receipt
+ * bytes and core's ECDSA signature over them, both 0x-hex. Verify it with
+ * `@4mica/sdk`'s `client.payment.verifyGuarantee(GuaranteeReceipt.fromRpc(receipt))`.
+ */
+export interface GuaranteeReceiptResponse {
+  receipt: string
   signature: string
 }
 
 export type FourMicaSettleResponse = SettleResponse & {
-  certificate?: CertificateResponse
+  receipt?: GuaranteeReceiptResponse
   txHash?: string
   networkId?: string
   error?: string
@@ -95,16 +100,7 @@ function normalizeSettleResponse(
             ? payload.message
             : undefined
 
-  const certificate =
-    payload.certificate &&
-    typeof payload.certificate === 'object' &&
-    typeof (payload.certificate as Record<string, unknown>).claims === 'string' &&
-    typeof (payload.certificate as Record<string, unknown>).signature === 'string'
-      ? {
-          claims: (payload.certificate as Record<string, string>).claims,
-          signature: (payload.certificate as Record<string, string>).signature,
-        }
-      : undefined
+  const receipt = readGuaranteeReceipt(payload.receipt) ?? readGuaranteeReceipt(payload.certificate)
 
   return {
     success: Boolean(payload.success ?? errorReason === undefined),
@@ -119,7 +115,7 @@ function normalizeSettleResponse(
             : undefined,
     transaction,
     network,
-    certificate,
+    receipt,
     txHash:
       typeof payload.txHash === 'string'
         ? payload.txHash
@@ -134,4 +130,16 @@ function normalizeSettleResponse(
           : network,
     error: typeof payload.error === 'string' ? payload.error : undefined,
   }
+}
+
+/**
+ * A `{ receipt, signature }` pair, read from `receipt` or, as facilitators
+ * have named it, `certificate`; anything else is not a guarantee receipt.
+ */
+function readGuaranteeReceipt(value: unknown): GuaranteeReceiptResponse | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const { receipt, signature } = value as Record<string, unknown>
+  return typeof receipt === 'string' && typeof signature === 'string'
+    ? { receipt, signature }
+    : undefined
 }

@@ -83,6 +83,6 @@ jq -rn --argjson bb "$BUYER_BEFORE" --argjson ba "$BUYER_AFTER" --argjson sb "$S
   def r6: . * 1e6 | round / 1e6;
   ((($ba.locked | tonumber) - ($bb.locked | tonumber)) - (($sa.locked | tonumber) - ($sb.locked | tonumber))) | r6 |
   "\n  When the cycle commits, core nets the four guarantees to \(.) USDC in one settlement: no refund transaction, no per-run transaction."'
-echo "  Proof: the certificates in each result's structuredContent, signed by core's operator key."
+echo "  Proof: the guarantee receipts in each result's structuredContent, signed by core's operator key."
 
 "$MCPC" @demo close >/dev/null

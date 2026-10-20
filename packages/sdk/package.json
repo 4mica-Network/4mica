@@ -79,7 +79,6 @@
     "check:exports": "attw --pack . --profile node16 && publint --strict"
   },
   "dependencies": {
-    "@noble/curves": "catalog:",
     "@quillai-network/wachai-validation-sdk": "catalog:",
     "viem": "catalog:"
   },

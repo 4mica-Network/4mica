@@ -17,7 +17,7 @@ const client = await Client.connect(cfg);
 const flow = X402Flow.fromClient(client);
 ```
 
-There is no tab step: each payment carries a random 32-byte `reqId` minted locally — uniqueness is all core asks of it — and the core service binds the guarantee to the open settlement cycle at issuance. Nothing is fetched before signing. Both signing methods always use EIP-712 and error unless the scheme is exactly `4mica-credit`.
+There is no tab step: each payment carries a random 32-byte `reqId` minted locally — uniqueness is all core asks of it. The only read before signing is the asset's active settlement cycle: the flow builds the payment with `client.newPayment`, scoped to that cycle and stamped by core's clock, and signs it with the client as the payer. Both signing methods always use EIP-712 and error unless the scheme is exactly `4mica-credit`.
 
 ## What the SDK expects
 
@@ -48,7 +48,7 @@ const body = (await res.json()) as ResourceResponse;
 const requirements = body.accepts[0];
 
 // 3) Build the X-PAYMENT header
-const payment = await flow.signPayment(requirements, "0xUser");
+const payment = await flow.signPayment(requirements);
 
 // 4) Call the protected resource with the header
 await fetch("https://resource-url/resource", {
@@ -58,7 +58,7 @@ await fetch("https://resource-url/resource", {
 
 ## Version 2
 
-Version 2 delivers requirements in a base64-encoded `payment-required` header and signs them into a `PAYMENT-SIGNATURE` header. If `accepted.extra.validation` is present, the SDK attaches the validation requirement to the signed claims.
+Version 2 delivers requirements in a base64-encoded `payment-required` header and signs them into a `PAYMENT-SIGNATURE` header. If `accepted.extra.validation` is present, the SDK attaches the validation requirement to the signed payment.
 
 ```ts
 import { X402PaymentRequired } from "@4mica/sdk";
@@ -76,7 +76,7 @@ const paymentRequired = X402PaymentRequired.fromRaw(JSON.parse(decoded));
 const accepted = paymentRequired.accepts[0];
 
 // 4) Build the PAYMENT-SIGNATURE header
-const signed = await flow.signPaymentV2(paymentRequired, accepted, "0xUser");
+const signed = await flow.signPaymentV2(paymentRequired, accepted);
 
 // 5) Call the protected resource with the header
 await fetch("https://resource-url/resource", {
@@ -106,8 +106,11 @@ async function settle(
     return;
   }
   console.log("tx:", settled.settlement.txHash);
+  // settled.settlement.receipt is the operator's GuaranteeReceipt, when relayed
 }
 ```
+
+The signed payment carries the request in two forms: `payment.payload` is the wire object the envelope holds (`{ payload, signature }`), and `payment.request` is the same `PaymentRequest`, typed. When the facilitator relays the operator's receipt, `settlement.receipt` holds it as a `GuaranteeReceipt` — check it with `client.payment.verifyGuarantee`.
 
 <Note>
   `settlePayment` only hits `/settle`. Resource servers should still verify a

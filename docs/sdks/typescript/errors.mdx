@@ -10,17 +10,40 @@ All SDK errors extend `FourMicaError`. Import the specific classes to branch on 
 | Error                    | When it is thrown                                             |
 | ------------------------ | ------------------------------------------------------------ |
 | `ConfigError`            | Invalid `ConfigBuilder` input.                               |
-| `RpcError`               | The 4Mica core service returned an error, or the request never arrived. Carries `.status` and `.body`. |
+| `RpcError`               | The 4Mica core service returned an error, or the request never arrived. Carries `.status` and `.body`, plus `.code` and `.details` when core attached a coded refusal. |
+| `CoreRefusalError`       | A coded refusal from core, with its `details` decoded. Extends `RpcError`. See [Coded refusals](#coded-refusals). |
 | `ClientError`            | Client-side connection failures: `ClientInitializationError`, `ChainRpcUnavailableError`, … |
-| `PaymentError`           | The guarantee flow: `SigningError`, `AddressMismatchError`, `CertificateMismatchError`, `GuaranteeDomainMismatchError`, … |
-| `ContractError`          | An on-chain call failed. Known reverts are typed: `AmountZeroError`, `InsufficientAvailableError`, …, with `UnknownRevertError` as the fallthrough. |
+| `PaymentError`           | The guarantee flow: `SigningError`, `AddressMismatchError`, the receipt errors below, and `UntrustedCheckpointBatchError`, … |
+| `ContractError`          | An on-chain call failed. Known reverts are typed: `AmountZeroError`, `InsufficientAvailableError`, `InsufficientLiquidityError`, `PoolInsolventError`, `DepositsDisabledError`, `StablecoinDepositsDisabledError`, `PausedError`, …, with `UnknownRevertError` as the fallthrough. |
 | `Erc20AllowanceRequiredError` | A self-funded token pull needs an allowance that is not in place. Call the matching `approve()` terminal and retry. |
-| `VerificationError`      | BLS material or guarantee claims bytes failed to decode.     |
 | `X402Error`              | An x402 flow error: bad scheme, invalid requirements, or settlement transport. |
 | `AuthError`              | Base class for all authentication errors.                    |
 | `AuthMissingConfigError` | `login()` was called but auth is not configured.             |
 
 The `Auth*` family also includes `AuthUrlError`, `AuthTransportError`, `AuthDecodeError`, `AuthApiError`, and `AuthConfigError`, all extending `AuthError`.
+
+## Coded refusals
+
+When core refuses with a stable code, the SDK throws a `CoreRefusalError` subclass carrying the decoded `details`. Each extends `RpcError`, so handlers written against `RpcError` keep catching them; branch on the class (or `.code`), not the message.
+
+| Error                         | `code`                      | Meaning                                                              |
+| ----------------------------- | --------------------------- | -------------------------------------------------------------------- |
+| `CheckpointRequiredError`     | `CHECKPOINT_REQUIRED`       | The payer holds too many guarantees past its latest checkpoint. Submit one and retry. |
+| `CheckpointMismatchError`     | `CHECKPOINT_MISMATCH`       | The checkpoint no longer matches what core holds. Re-read the batch and sign again. |
+| `CycleMismatchError`          | `CYCLE_MISMATCH`            | The payment was signed for a cycle other than the active one.        |
+| `FutureTimestampError`        | `FUTURE_TIMESTAMP`          | The payment is stamped later than core's clock.                      |
+| `StaleTimestampError`         | `STALE_TIMESTAMP`           | The payment is stamped before the active cycle opened.               |
+| `TimestampNotPastCutoffError` | `TIMESTAMP_NOT_PAST_CUTOFF` | The payment is stamped at or before the payer's latest checkpoint cutoff. |
+
+## Receipt errors
+
+`client.payment.verifyGuarantee` and `verifyGuaranteeReceipt` throw these `PaymentError`s:
+
+| Error                             | When it is thrown                                                  |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `MalformedReceiptError`           | The receipt does not decode: not hex, too short, or an unknown layout. |
+| `UnreadableReceiptSignatureError` | The receipt's signature is not a readable ECDSA signature.         |
+| `ReceiptSignerMismatchError`      | The receipt was signed by someone other than the operator signer. Carries `.expected` and `.recovered`. |
 
 ## Distinguishing errors
 
@@ -28,18 +51,22 @@ Import the classes you want to handle and branch with `instanceof`.
 
 ```ts
 import {
-  CertificateMismatchError, // the certificate's BLS signature does not verify
+  CheckpointRequiredError, // core wants a checkpoint before issuing more
   ContractError, // on-chain call failed or unexpected result
   Erc20AllowanceRequiredError, // a token pull needs an approve() first
-  RpcError, // 4Mica core service error (has .status and .body)
+  ReceiptSignerMismatchError, // the receipt was not signed by the operator
+  RpcError, // 4Mica core service error (has .status, .body, .code, .details)
 } from "@4mica/sdk";
 
 try {
-  const verified = await client.payment.verifyGuarantee(cert);
+  const receipt = await client.payment.issueGuarantee(request);
+  const guarantee = await client.payment.verifyGuarantee(receipt);
   await client.settlement.claim(cycleId).send();
 } catch (err) {
-  if (err instanceof CertificateMismatchError) {
-    // bad certificate — the operator did not sign these claims
+  if (err instanceof CheckpointRequiredError) {
+    // the payer must checkpoint err.details.cycleId before core issues more
+  } else if (err instanceof ReceiptSignerMismatchError) {
+    // bad receipt — the operator did not sign this guarantee
   } else if (err instanceof Erc20AllowanceRequiredError) {
     await client.settlement.pay(cycleId).selfFunded().approve();
   } else if (err instanceof ContractError) {

@@ -1,9 +1,4 @@
-import {
-  type CorePublicParameters,
-  RpcProxy,
-  resolveNetworkRpcUrl,
-  type SupportedTokensResponse,
-} from '@4mica/sdk'
+import { RpcProxy, resolveNetworkRpcUrl, type SupportedTokensResponse } from '@4mica/sdk'
 import { SDK_DEFAULT_ASSET_TRANSFER_METHOD } from '@x402/core/server'
 import type {
   AssetAmount,
@@ -14,8 +9,6 @@ import type {
   Price,
   SchemeNetworkServer,
 } from '@x402/core/types'
-import { chainIdOf, DOMAIN_EXTRA_KEYS } from '../domain.js'
-import type { FourMicaDomainExtra } from '../types.js'
 
 export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532', 'eip155:8453']
 
@@ -43,10 +36,12 @@ export interface FourMicaEvmSchemeOptions {
  *
  * A `Money` price resolves to the stablecoin core lists for the network
  * (`GET /core/tokens`), so the advertised `asset` is always one core accepts a
- * guarantee against. Every requirement also carries core's EIP-712 domain in
- * `extra` (`name`, `version`, `verifyingContract`, from
- * `GET /core/public-params`), so a payer can sign without calling core. Both
- * are fetched once per network and cached for the life of the instance.
+ * guarantee against. The token list is fetched once per network and cached
+ * for the life of the instance.
+ *
+ * No EIP-712 domain is advertised in `extra`: every payment carries core's
+ * active settlement cycle, so a payer connects to core to sign it and reads
+ * the domain from there.
  */
 export class FourMicaEvmScheme implements SchemeNetworkServer {
   readonly scheme = '4mica-credit'
@@ -64,7 +59,6 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   private readonly coreUrls: Partial<Record<Network, string>>
   private readonly stablecoinSymbol: string
   private readonly defaultAssets = new Map<Network, Promise<DefaultAsset>>()
-  private readonly domains = new Map<Network, Promise<FourMicaDomainExtra>>()
 
   constructor(options: FourMicaEvmSchemeOptions = {}) {
     this.coreUrls = options.coreUrls ?? {}
@@ -74,11 +68,6 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   /** Core's token list. Private static so tests can stub the network call. */
   private static loadSupportedTokens(coreUrl: string): Promise<SupportedTokensResponse> {
     return new RpcProxy(coreUrl).getSupportedTokens()
-  }
-
-  /** Core's public parameters. Private static so tests can stub the network call. */
-  private static loadPublicParams(coreUrl: string): Promise<CorePublicParameters> {
-    return new RpcProxy(coreUrl).getPublicParams()
   }
 
   /**
@@ -147,10 +136,9 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   /**
    * Build payment requirements for this scheme/network combination.
    *
-   * Adds core's EIP-712 domain to `extra` so the payer can sign without a
-   * round trip to core. A domain the resource server set itself is kept; only
-   * the missing keys are filled in. The chain id is not added: a client takes
-   * it from `network`.
+   * The requirements go out as built: a 4mica-credit payer needs nothing in
+   * them beyond `payTo`, `asset`, `amount` and the optional `extra.validation`
+   * and `extra.rpcUrl`, and takes everything else from core.
    *
    * @param paymentRequirements - The base payment requirements
    * @param supportedKind - The supported kind from facilitator (unused)
@@ -173,15 +161,7 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   ): Promise<PaymentRequirements> {
     void supportedKind
     void extensionKeys
-
-    const extra: Record<string, unknown> = { ...(paymentRequirements.extra ?? {}) }
-    const missing = DOMAIN_EXTRA_KEYS.filter((key) => typeof extra[key] !== 'string')
-    if (missing.length === 0) return paymentRequirements
-
-    const domain = await this.getDomain(paymentRequirements.network as Network)
-    for (const key of missing) extra[key] = domain[key]
-
-    return { ...paymentRequirements, extra }
+    return paymentRequirements
   }
 
   /**
@@ -222,8 +202,7 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
       amount: this.convertToTokenAmount(amount.toString(), asset.decimals),
       asset: asset.address,
       // No EIP-3009 domain hints: a 4mica-credit payer signs against core's
-      // guarantee domain, never the token's. `enhancePaymentRequirements` adds
-      // that domain for every kind of price.
+      // ClearingHouse domain, never the token's, and reads it from core.
       extra: {},
     }
   }
@@ -282,34 +261,6 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     }
 
     return { address: token.address, decimals: token.decimals }
-  }
-
-  /**
-   * Core's EIP-712 domain for `network`, fetched once and cached. A failed
-   * lookup is not cached, so the next 402 retries.
-   */
-  private getDomain(network: Network): Promise<FourMicaDomainExtra> {
-    return cachedLookup(this.domains, network, () => this.resolveDomain(network))
-  }
-
-  private async resolveDomain(network: Network): Promise<FourMicaDomainExtra> {
-    const coreUrl = this.coreUrlFor(network)
-
-    const params = await FourMicaEvmScheme.loadPublicParams(coreUrl)
-    // The client derives the chain id from `network`, so a core that serves a
-    // different chain would hand out a domain no signature can satisfy.
-    const expectedChainId = chainIdOf(network)
-    if (expectedChainId !== undefined && params.chainId !== expectedChainId) {
-      throw new Error(
-        `Core at ${coreUrl} serves chain ${params.chainId}, not ${network}; check coreUrls`
-      )
-    }
-
-    return {
-      name: params.eip712Name,
-      version: params.eip712Version,
-      verifyingContract: params.contractAddress,
-    }
   }
 }
 

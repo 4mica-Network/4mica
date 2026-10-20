@@ -6,7 +6,7 @@
  * what to do, a route pin (`gasless()`, `selfFunded()`) narrows how, and a
  * terminal (`send()`, `sign()`, `verify()`) does it. Unpinned, `send()`
  * prefers the gasless route and falls back to the user's own transaction.
- * Unlike a deposit, gasless withdrawal works for ETH too: Core4Mica verifies
+ * Unlike a deposit, gasless withdrawal works for ETH too: the Treasury verifies
  * the signature itself rather than leaning on what the asset implements.
  *
  * Finalization is the exception: it offers no `sign()`, because it needs no

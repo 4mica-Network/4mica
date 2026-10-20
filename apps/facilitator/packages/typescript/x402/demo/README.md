@@ -129,8 +129,8 @@ curl -v http://localhost:3000/api/premium-data
 ## The Apify-shaped demo
 
 Two more servers share one seller (`src/apify/`): a real `4mica-credit` entry built by the
-scheme server, with the asset from core's token list and core's EIP-712 domain in `extra`, and
-two shape-only entries in front of it so the 402 reads like Apify's.
+scheme server, with the asset from core's token list, and two shape-only entries in front of it
+so the 402 reads like Apify's.
 
 - `pnpm run actor-server` (or `pnpm demo:actor` from the package root) mocks
   `POST /v2/acts/<actor>/run-sync-get-dataset-items`. Unpaid, it answers with Apify's 402: their
@@ -145,8 +145,8 @@ two shape-only entries in front of it so the 402 reads like Apify's.
   `_meta["x402/payment"]` (or the `PAYMENT-SIGNATURE` header). The result reads at a glance: a
   three-line receipt (cap, charged, refunded), then the dataset as a list. `structuredContent`
   carries the items, the billing with the refund guarantee's settlement, and the cap's
-  settlement; the certificates in those settlements are core's signed word that both guarantees
-  were issued. `_meta["x402/payment-response"]` carries only `success`, `network` and `amount`,
+  settlement; the guarantee receipts in those settlements are core's signed word that both
+  guarantees were issued. `_meta["x402/payment-response"]` carries only `success`, `network` and `amount`,
   the last being what the run cost.
 
 The `upto` and `exact` entries are shape-only. The 4mica facilitator does not serve them, so a
@@ -157,7 +157,7 @@ payer that picks one is told so and nothing runs. Only the third entry is real.
 The buyer signs the cap (`ACTOR_PRICE`) before the run, the way `upto` authorizes a maximum.
 The run is metered per result (`RESULT_PRICE`), and after it the seller pays the unused part of
 the cap back as an ordinary `4mica-credit` guarantee from itself to the buyer, signed with
-`SELLER_PRIVATE_KEY` under the same domain and settled through the same facilitator. Core nets
+`SELLER_PRIVATE_KEY` against the same core and settled through the same facilitator. Core nets
 the two guarantees when the cycle commits, so one run of five results at `$0.0016` settles at
 `$0.008` of a `$0.01` cap, with no refund transaction and no new primitive. The cent-scale
 defaults keep a 2 USDC deposit good for hundreds of runs; `ACTOR_PRICE=$1.00` mirrors Apify's
@@ -174,8 +174,9 @@ Three things follow:
 - **What a wallet is owed is not visible in core before the cycle commits.** Core has no listing
   of open-cycle guarantees by recipient (`/core/recipients/<addr>/payments` reads the legacy
   transaction table), so the balance script shows locks only. The buyer's proof of the refund is
-  the certificate under `structuredContent.billing.refunded.settlement`, which the SDK's
-  `verifyGuarantee` checks against the operator's key.
+  the guarantee receipt under `structuredContent.billing.refunded.settlement.receipt`, which the
+  SDK's `client.payment.verifyGuarantee` checks against the signer core publishes as
+  `guaranteeSigner`.
 
 ```bash
 WALLET=seller pnpm run deposit     # deposits DEPOSIT_AMOUNT from SELLER_PRIVATE_KEY
@@ -191,9 +192,10 @@ The buyer is the `4mica-credit` branch of the mcpc fork at
 [4mica-Network/mcpc](https://github.com/4mica-Network/mcpc), which signs the scheme with
 `--x402 4mica-credit` and signs afresh on every call, since core accepts a request id once.
 
-The fork pins the Core4Mica contract per network and refuses an accept whose
-`extra.verifyingContract` differs from the pin. Point the servers at the core the fork pins for
-`NETWORK`; for Base Sepolia today that is the staging deployment:
+The fork pins the 4mica contracts per network. The seller no longer advertises an EIP-712
+domain in `extra`: every payment carries core's active settlement cycle, so the payer reads the
+domain (the ClearingHouse's) from the core it signs against. Point the servers at the core the
+fork pins for `NETWORK`; for Base Sepolia today that is the staging deployment:
 
 ```
 CORE_URL=https://staging.api.4mica.io

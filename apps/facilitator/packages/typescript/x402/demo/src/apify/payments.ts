@@ -138,14 +138,15 @@ export function readPaymentPayload({ header, meta }: PaymentSources): PaymentPay
 }
 
 /**
- * The buyer: the `user_address` in the signed claims of a `4mica-credit` payment, which is
- * what the facilitator verified and core bound the guarantee to. Read from the payload
- * rather than the verify or settle response, since not every facilitator echoes it back.
+ * The buyer: the `user_address` in the signed request of a `4mica-credit` payment
+ * (`payload.payload`, beside its `signature`), which is what the facilitator verified and
+ * core bound the guarantee to. Read from the payload rather than the verify or settle
+ * response, since not every facilitator echoes it back.
  */
 export function payerOf(payload: PaymentPayload): string | undefined {
-  const claims = payload.payload?.claims
-  if (!isRecord(claims)) return undefined
-  const candidate = claims.user_address ?? claims.userAddress
+  const request = payload.payload?.payload
+  if (!isRecord(request)) return undefined
+  const candidate = request.user_address ?? request.userAddress
   return typeof candidate === 'string' && isAddress(candidate) ? getAddress(candidate) : undefined
 }
 
@@ -204,7 +205,7 @@ export function settledFor(settlement: SettleResponse, billing: RunBilling): Set
 
 /**
  * What goes in `_meta["x402/payment-response"]`: the three fields a client acts on. The
- * full settlement, certificate included, is in `structuredContent.settlement`.
+ * full settlement, guarantee receipt included, is in `structuredContent.settlement`.
  */
 export function paymentResponseMeta(
   settlement: SettleResponse,
@@ -213,7 +214,7 @@ export function paymentResponseMeta(
   return { success: settlement.success, network: settlement.network, amount: billing.charged }
 }
 
-/** The `payment-refund` header value: the receipt as JSON, without the certificate. */
+/** The `payment-refund` header value: the refund as JSON, without the guarantee receipt. */
 export function refundHeader(receipt: RefundReceipt): string {
   return JSON.stringify(refundSummary(receipt))
 }

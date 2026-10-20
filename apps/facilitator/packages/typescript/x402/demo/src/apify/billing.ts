@@ -41,8 +41,8 @@ export function meterRun(cap: string, pricePerResult: string, results: number): 
 
 /**
  * The requirements the seller signs to pay the buyer back: the cap's entry with the roles
- * swapped. Same scheme, network, asset and EIP-712 domain, so the same facilitator settles
- * it and core nets the two guarantees against each other when the cycle commits.
+ * swapped. Same scheme, network, asset and core, so the same facilitator settles it and
+ * core nets the two guarantees against each other when the cycle commits.
  */
 export function refundRequirements(
   cap: PaymentRequirements,
@@ -63,7 +63,7 @@ export interface RefundReceipt {
   settlement: FourMicaSettleResponse
 }
 
-/** The receipt without the settlement's certificate, for a header or a tool result. */
+/** The refund without the settlement's guarantee receipt, for a header or a tool result. */
 export function refundSummary(receipt: RefundReceipt): {
   amount: string
   from: string
@@ -74,7 +74,7 @@ export function refundSummary(receipt: RefundReceipt): {
 
 /**
  * The billing a buyer's client gets back: the figures, and the refund if one was issued,
- * with its settlement, whose certificate is core's signed word that the buyer holds a
+ * with its settlement, whose guarantee receipt is core's signed word that the buyer holds a
  * guarantee for that amount.
  */
 export function billingSummary(

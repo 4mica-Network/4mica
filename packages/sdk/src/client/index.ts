@@ -10,6 +10,7 @@ import type { AuthTokens } from "@/auth";
 import { AccountClient } from "@/client/account";
 import { ClientCtx } from "@/client/ctx";
 import { DepositClient } from "@/client/deposit";
+import type { Asset } from "@/client/model";
 import { PaymentClient } from "@/client/payment";
 import { SettlementClient } from "@/client/settlement";
 import { TokensClient } from "@/client/tokens";
@@ -17,13 +18,12 @@ import { WithdrawClient } from "@/client/withdraw";
 import type { Config } from "@/config";
 import type {
   CorePublicParameters,
-  PaymentGuaranteeRequestClaims,
-  PaymentSignature,
+  PaymentRequest,
+  PaymentRequestPayload,
 } from "@/models";
-import { SigningScheme } from "@/models";
 
 export { AccountClient } from "@/client/account";
-export { ClientCtx } from "@/client/ctx";
+export { type ActiveCycle, ClientCtx } from "@/client/ctx";
 export {
   AuthorizedEip3009Deposit,
   AuthorizedPermit2Deposit,
@@ -46,7 +46,11 @@ export {
   sponsorshipUnavailable,
 } from "@/client/facilitator";
 export * from "@/client/model";
-export { PaymentClient } from "@/client/payment";
+export {
+  type AssetLike,
+  checkpointPayload,
+  PaymentClient,
+} from "@/client/payment";
 export {
   AuthorizedPay,
   ClaimBuilder,
@@ -158,14 +162,20 @@ export class Client {
   }
 
   /**
-   * Sign a guarantee request as the payer — the `FlowSigner` surface
-   * {@link X402Flow} consumes.
+   * A payment scoped to the live settlement cycle — half of the `FlowSigner`
+   * surface {@link X402Flow} consumes.
    */
-  async signPayment(
-    claims: PaymentGuaranteeRequestClaims,
-    scheme: SigningScheme = SigningScheme.EIP712,
-  ): Promise<PaymentSignature> {
-    return this.payment.signRequest(claims, scheme);
+  async newPayment(
+    recipient: string,
+    amount: bigint | number | string,
+    asset?: Asset | string | null,
+  ): Promise<PaymentRequestPayload> {
+    return this.payment.newPayment(recipient, amount, asset);
+  }
+
+  /** Sign a payment as the payer — the other half of `FlowSigner`. */
+  async signPayment(payload: PaymentRequestPayload): Promise<PaymentRequest> {
+    return this.payment.signRequest(payload);
   }
 
   /** Release client resources. Safe to call multiple times. */

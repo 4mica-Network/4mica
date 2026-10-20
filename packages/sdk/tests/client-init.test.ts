@@ -2,20 +2,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientCtx } from "@/client/ctx";
 import { ConfigBuilder } from "@/config";
 import { ChainRpcUnavailableError, ClientInitializationError } from "@/errors";
+import { clearingHouseDomain, guaranteeRegistryDomain } from "@/guarantee";
 import { CorePublicParameters } from "@/models";
 
 const CONTRACT_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678";
 const TEST_PRIVATE_KEY = `0x${"11".repeat(32)}`;
 
+const CLEARING_HOUSE = "0x00000000000000000000000000000000C1ea4111";
+const REGISTRY = "0x0000000000000000000000000000000000065E61";
+const OPERATOR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+
 const PARAMS: Record<string, unknown> = {
-  public_key: `0x${"00".repeat(48)}`,
+  guarantee_signer: OPERATOR,
   contract_address: CONTRACT_ADDRESS,
-  eip712_name: "4mica",
+  guarantee_registry_address: REGISTRY,
+  clearing_house_address: CLEARING_HOUSE,
+  eip712_name: "4micaClearingHouse",
   eip712_version: "1",
   chain_id: 84532,
-  supported_guarantee_versions: [1],
-  guarantee_domains: [{ version: 1, domain_separator: `0x${"11".repeat(32)}` }],
+  supported_payment_payload_versions: [1],
 };
+
+const without = (key: string) =>
+  Object.fromEntries(Object.entries(PARAMS).filter(([k]) => k !== key));
 
 const state = vi.hoisted(() => ({
   paramsRaw: {} as Record<string, unknown> | Error,
@@ -68,33 +77,48 @@ beforeEach(() => {
 });
 
 describe("ClientCtx.create", () => {
-  it("resolves published guarantee domains", async () => {
+  it("resolves the signing domains from core", async () => {
     const ctx = await ClientCtx.create(config());
-    expect(Array.from(ctx.guaranteeDomain)).toEqual(Array(32).fill(0x11));
-    expect(ctx.guaranteeDomainForVersion(1)).toEqual(ctx.guaranteeDomain);
+    expect(ctx.clearingHouseDomain).toEqual(
+      clearingHouseDomain(84532, CLEARING_HOUSE),
+    );
+    expect(ctx.guaranteeDomain).toEqual(
+      guaranteeRegistryDomain(84532, REGISTRY),
+    );
+    expect(ctx.guaranteeSigner).toBe(OPERATOR);
     expect(ctx.contractAddress.toLowerCase()).toBe(CONTRACT_ADDRESS);
     expect(ctx.chainId).toBe(84532);
   });
 
   it("fails fast when core cannot take v1", async () => {
-    useParams({ ...PARAMS, supported_guarantee_versions: [2] });
+    useParams({ ...PARAMS, supported_payment_payload_versions: [2] });
     await expect(ClientCtx.create(config())).rejects.toThrow(
-      /signs guarantee v1/,
+      /signs payment payload v1/,
     );
   });
 
-  it("rejects a bad operator key", async () => {
-    useParams({ ...PARAMS, public_key: "0x0102" });
+  it("refuses a core that accepts no payload version", async () => {
+    useParams({ ...PARAMS, supported_payment_payload_versions: [] });
     await expect(ClientCtx.create(config())).rejects.toThrow(
-      /operator public key/,
+      /core accepts \[\]/,
     );
   });
 
-  it("needs an Ethereum endpoint when core publishes no domains", async () => {
-    useParams({ ...PARAMS, guarantee_domains: [] });
-    await expect(ClientCtx.create(config())).rejects.toThrow(
-      ChainRpcUnavailableError,
-    );
+  it("accepts a core that predates payload versions", async () => {
+    useParams(without("supported_payment_payload_versions"));
+    await expect(ClientCtx.create(config())).resolves.toBeInstanceOf(ClientCtx);
+  });
+
+  it.each([
+    ["clearing_house_address", "clearing house address"],
+    ["guarantee_registry_address", "guarantee registry address"],
+    ["guarantee_signer", "guarantee signer"],
+  ])("refuses a core missing %s", async (field, label) => {
+    // Every payment is signed or verified against these, so a core that
+    // omits one is refused at connect rather than at the first payment.
+    useParams(without(field));
+    await expect(ClientCtx.create(config())).rejects.toThrow(label);
+    expect(state.closed).toBe(true);
   });
 
   it("gateway() needs an Ethereum endpoint", async () => {
@@ -149,7 +173,7 @@ describe("ClientCtx.create", () => {
   });
 
   it("is a ClientInitializationError when the handshake fails", async () => {
-    useParams({ ...PARAMS, supported_guarantee_versions: [2] });
+    useParams({ ...PARAMS, supported_payment_payload_versions: [2] });
     await expect(ClientCtx.create(config())).rejects.toThrow(
       ClientInitializationError,
     );
