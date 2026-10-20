@@ -8,11 +8,8 @@
  */
 
 import { X402Error } from "@/errors";
-import {
-  BLSCert,
-  type PaymentSignature,
-  ValidationRequirement,
-} from "@/models";
+import { GuaranteeReceipt } from "@/guarantee";
+import { type PaymentRequest, ValidationRequirement } from "@/models";
 import { getAny, isRecord } from "@/serde";
 import { normalizeBytes32Hex, ValidationError } from "@/utils";
 
@@ -344,12 +341,14 @@ export class X402PaymentRequired {
   }
 }
 
-/** The signed payment payload carried inside an envelope. */
-export interface X402PaymentPayload {
-  claims: Record<string, unknown>;
+/**
+ * The signed payment carried inside an envelope: a {@link PaymentRequest} in
+ * its wire form, the version-tagged payload and the payer's signature.
+ */
+export type X402PaymentPayload = {
+  payload: Record<string, unknown>;
   signature: string;
-  scheme: string;
-}
+};
 
 export interface X402PaymentEnvelopeV1 {
   x402Version: number;
@@ -376,8 +375,10 @@ export interface X402SignedPayment {
   header: string;
   envelope: X402PaymentEnvelope;
   x402Version: number;
+  /** The signed payment as the envelope carries it. */
   payload: X402PaymentPayload;
-  signature: PaymentSignature;
+  /** The same payment, typed. */
+  request: PaymentRequest;
 }
 
 /**
@@ -388,7 +389,13 @@ export class SettlementReceipt {
   success: boolean;
   txHash?: string;
   networkId?: string;
-  certificate?: BLSCert;
+  /**
+   * The operator's guarantee receipt, when the facilitator relays one —
+   * verify it with `client.payment.verifyGuarantee`. Read from `receipt` or,
+   * as facilitators have named it, `certificate`; anything not shaped
+   * `{receipt, signature}` stays only in `raw`.
+   */
+  receipt?: GuaranteeReceipt;
   error?: string;
   raw: Record<string, unknown>;
 
@@ -396,27 +403,30 @@ export class SettlementReceipt {
     success: boolean;
     txHash?: string;
     networkId?: string;
-    certificate?: BLSCert;
+    receipt?: GuaranteeReceipt;
     error?: string;
     raw: Record<string, unknown>;
   }) {
     this.success = init.success;
     this.txHash = init.txHash;
     this.networkId = init.networkId;
-    this.certificate = init.certificate;
+    this.receipt = init.receipt;
     this.error = init.error;
     this.raw = init.raw;
   }
 
   static fromRaw(raw: unknown): SettlementReceipt {
     const record: Record<string, unknown> = isRecord(raw) ? raw : {};
-    let certificate: BLSCert | undefined;
-    const certificateRaw = record.certificate;
-    if (isRecord(certificateRaw)) {
-      const claims = getAny(certificateRaw, "claims");
-      const signature = getAny(certificateRaw, "signature");
-      if (claims !== undefined && signature !== undefined) {
-        certificate = new BLSCert(String(claims), String(signature));
+    let receipt: GuaranteeReceipt | undefined;
+    for (const key of ["receipt", "certificate"]) {
+      const candidate = record[key];
+      if (
+        isRecord(candidate) &&
+        candidate.receipt !== undefined &&
+        candidate.signature !== undefined
+      ) {
+        receipt = GuaranteeReceipt.fromRpc(candidate);
+        break;
       }
     }
     const pick = (...keys: string[]): string | undefined => {
@@ -427,7 +437,7 @@ export class SettlementReceipt {
       success: Boolean(record.success),
       txHash: pick("txHash", "tx_hash"),
       networkId: pick("networkId", "network_id", "network"),
-      certificate,
+      receipt,
       error: pick("error", "errorReason", "invalidReason"),
       raw: record,
     });

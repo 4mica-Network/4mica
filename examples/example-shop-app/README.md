@@ -5,7 +5,7 @@ paid route, `GET /insight`, priced from your 4Mica listing. Its page shows the
 listing and its price; sales show up under **Payments** in your 4Mica
 dashboard.
 
-- `app/insight/route.ts` — the paywalled product, reported with core's certificate
+- `app/insight/route.ts` — the paywalled product, reported with core's guarantee receipt
 - `app/api/shop/route.ts` — listing details for the page
 - `app/page.tsx` — the shop page
 

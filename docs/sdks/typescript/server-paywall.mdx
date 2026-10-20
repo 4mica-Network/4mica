@@ -22,7 +22,8 @@ const paywall = createPaywall(client.rpc, {
 
 <Note>
   The verifier can be `client.rpc`, the `client` itself, or any object exposing an
-  `issueGuarantee` method (a bare `GuaranteeVerifier`).
+  `issueGuarantee(payload)` method that resolves to `{ receipt, signature }` (a
+  bare `GuaranteeVerifier`).
 </Note>
 
 ## Configuration
@@ -55,7 +56,28 @@ if (result instanceof Response) return result; // 402 — payment required
 // Payment verified — run your handler, then merge result.headers
 const body = await runHandler();
 return new Response(body, { headers: result.headers });
-// result.guarantee holds the issued guarantee (claims + signature)
+// result.guarantee holds the operator's receipt: { receipt, signature, raw }
+```
+
+`result.guarantee.receipt` is the signed guarantee bytes and `result.guarantee.signature` the operator's ECDSA signature over them; the same pair is returned to the payer in `X-PAYMENT-RESPONSE`, base64-encoded JSON of `{ success: true, guarantee: { receipt, signature } }`. To check it yourself, wrap it in a `GuaranteeReceipt` and call `client.payment.verifyGuarantee`:
+
+```ts
+import { GuaranteeReceipt } from "@4mica/sdk";
+
+const { receipt, signature } = result.guarantee;
+const guarantee = await client.payment.verifyGuarantee(
+  new GuaranteeReceipt(receipt, signature),
+);
+```
+
+When you record the payment in your dashboard with `app.reportPayment` (an app client from `createAppClient` in `@4mica/sdk/app`), the receipt and signature go in the `guaranteeClaims` and `guaranteeSignature` fields:
+
+```ts
+await app.reportPayment({
+  // …reqId, payerAddress, recipientAddress, network, amount
+  guaranteeClaims: result.guarantee.receipt,
+  guaranteeSignature: result.guarantee.signature,
+});
 ```
 
 ## Low-level primitive

@@ -25,7 +25,6 @@ try {
   const signed = await X402Flow.fromClient(client).signPaymentV2(
     challenge,
     accepted,
-    client.signerAddress,
   );
 
   const paid = await fetch(url, { headers: { "X-PAYMENT": signed.header } });

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { Abi, AbiFunction } from "viem";
 import { describe, expect, it } from "vitest";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
-import { core4micaAbi } from "@/abi/core4mica";
+import { treasuryAbi } from "@/abi/treasury";
 
 /** The generated ABIs must match `contracts/abi/*.json` exactly. */
 function loadSource(name: string): Abi {
@@ -26,26 +26,25 @@ const CORE_FUNCTIONS = [
   "cancelWithdrawal",
   "finalizeWithdrawal",
   "getUserAllAssets",
-  "getGuaranteeVersionConfig",
-  "guaranteeDomainSeparator",
   "principalBalance",
   "withdrawableBalance",
   "guaranteeCapacity",
   "grossYield",
   "protocolYieldShare",
   "userNetYield",
-  "totalUserScaledBalance",
-  "protocolScaledBalance",
-  "surplusScaledBalance",
-  "contractScaledATokenBalance",
-  "stablecoinAToken",
+  "userShares",
+  "totalUserShares",
+  "protocolShares",
+  "poolShares",
+  "poolAssets",
+  "strategy",
 ];
 
 const CLEARING_FUNCTIONS = ["payNetDebit", "claimNetCreditFor"];
 
 describe("vendored contract ABIs", () => {
-  it("core4micaAbi matches contracts/abi/Core4Mica.json", () => {
-    expect(core4micaAbi).toEqual(loadSource("Core4Mica"));
+  it("treasuryAbi matches contracts/abi/Treasury.json", () => {
+    expect(treasuryAbi).toEqual(loadSource("Treasury"));
   });
 
   it("clearingHouseAbi matches contracts/abi/ClearingHouse.json", () => {
@@ -53,9 +52,9 @@ describe("vendored contract ABIs", () => {
   });
 
   it("declares every function the SDK calls", () => {
-    const core = functionNames(core4micaAbi);
+    const core = functionNames(treasuryAbi);
     for (const name of CORE_FUNCTIONS) {
-      expect(core.has(name), `Core4Mica.${name}`).toBe(true);
+      expect(core.has(name), `Treasury.${name}`).toBe(true);
     }
     const clearing = functionNames(clearingHouseAbi);
     for (const name of CLEARING_FUNCTIONS) {
@@ -64,7 +63,7 @@ describe("vendored contract ABIs", () => {
   });
 
   it("carries no tab-era entries", () => {
-    const core = functionNames(core4micaAbi);
+    const core = functionNames(treasuryAbi);
     for (const gone of ["remunerate", "payTabInERC20Token", "recordPayment"]) {
       expect(core.has(gone), gone).toBe(false);
     }

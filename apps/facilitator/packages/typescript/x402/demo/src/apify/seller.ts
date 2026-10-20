@@ -45,7 +45,7 @@ export type PaymentOutcome =
 
 /**
  * The seller half of an Apify-shaped run endpoint: one real `4mica-credit` entry built
- * by the scheme server (asset from core's token list, EIP-712 domain in `extra`), two
+ * by the scheme server (asset from core's token list), two
  * shape-only entries in front of it, verify and settle through the facilitator, and a
  * refund of the unused cap after the run, paid as a guarantee back to the buyer.
  */
@@ -53,7 +53,7 @@ export class DemoSeller {
   private constructor(
     private readonly server: x402ResourceServer,
     private readonly facilitator: FourMicaFacilitatorClient,
-    /** Signs the refunds. It signs under the domain the cap advertises, so it never calls core. */
+    /** Signs the refunds, against the same core as the cap: a payment needs core's active cycle. */
     private readonly payer: FourMicaPayerScheme,
     /** The seller's wallet: `payTo` on the cap, `user` on the refund. */
     readonly address: string,
@@ -99,7 +99,7 @@ export class DemoSeller {
     const token = await tokenOf(requirements.asset, options.network, options.coreUrl)
 
     const payer = await FourMicaPayerScheme.create(options.signer, {
-      networks: [],
+      networks: [options.network],
       ...(coreUrls ? { coreUrls } : {}),
     })
 

@@ -127,7 +127,7 @@ export function createPaywall(
       return requireResponse(input, config);
     }
 
-    let payload: unknown;
+    let payload: Record<string, unknown>;
     try {
       payload = parsePaymentHeader(paymentHeader).payload;
     } catch (err) {
@@ -139,21 +139,24 @@ export function createPaywall(
     }
 
     try {
-      const cert = await guarantor.issueGuarantee(payload);
-      const claims = typeof cert.claims === "string" ? cert.claims : "";
+      const issued = await guarantor.issueGuarantee(payload);
+      const receipt = typeof issued.receipt === "string" ? issued.receipt : "";
       const signature =
-        typeof cert.signature === "string" ? cert.signature : "";
+        typeof issued.signature === "string" ? issued.signature : "";
       const guarantee: PaywallGuarantee = {
-        claims,
+        receipt,
         signature,
-        raw: { claims, signature },
+        raw: { receipt, signature },
       };
       return {
         ok: true,
         guarantee,
         responseHeaders: {
           [PAYMENT_RESPONSE_HEADER]: utf8ToBase64(
-            JSON.stringify({ success: true, guarantee: { claims, signature } }),
+            JSON.stringify({
+              success: true,
+              guarantee: { receipt, signature },
+            }),
           ),
         },
       };

@@ -19,7 +19,7 @@ const BASE_PRICE = 100;
 
 const verifier: PaywallVerifier = {
   async issueGuarantee() {
-    return { claims: "0xdemoClaims", signature: "0xdemoSignature" };
+    return { receipt: "0xdemoReceipt", signature: "0xdemoSignature" };
   },
 };
 

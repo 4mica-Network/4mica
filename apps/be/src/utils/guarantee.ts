@@ -1,4 +1,4 @@
-import type { PaymentGuaranteeClaims } from "@4mica/sdk";
+import type { Guarantee } from "@4mica/sdk";
 import { zeroAddress } from "viem";
 
 export interface ReportedGuarantee {
@@ -18,31 +18,30 @@ const toUnits = (amount: string, decimals: number): bigint | null => {
 };
 
 export const guaranteeMismatch = (
-  claims: PaymentGuaranteeClaims,
+  guarantee: Guarantee,
   report: ReportedGuarantee,
   decimals: number,
 ): keyof ReportedGuarantee | null => {
-  if (claims.reqId !== BigInt(report.reqId)) {
+  if (guarantee.reqId !== BigInt(report.reqId)) {
     return "reqId";
   }
-  if (claims.userAddress.toLowerCase() !== report.payerAddress.toLowerCase()) {
+  if (guarantee.client.toLowerCase() !== report.payerAddress.toLowerCase()) {
     return "payerAddress";
   }
   if (
-    claims.recipientAddress.toLowerCase() !==
-    report.recipientAddress.toLowerCase()
+    guarantee.recipient.toLowerCase() !== report.recipientAddress.toLowerCase()
   ) {
     return "recipientAddress";
   }
   if (
-    claims.assetAddress.toLowerCase() !==
+    guarantee.asset.toLowerCase() !==
     (report.assetAddress ?? zeroAddress).toLowerCase()
   ) {
     return "assetAddress";
   }
   if (
-    claims.amount !== toUnits(report.amount, 0) &&
-    claims.amount !== toUnits(report.amount, decimals)
+    guarantee.amount !== toUnits(report.amount, 0) &&
+    guarantee.amount !== toUnits(report.amount, decimals)
   ) {
     return "amount";
   }

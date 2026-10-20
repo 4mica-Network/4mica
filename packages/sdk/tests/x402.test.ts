@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { type Hex, recoverAddress } from "viem";
+import { afterEach, describe, expect, it } from "vitest";
+import type { Asset } from "@/client/model";
 import { X402Error } from "@/errors";
-import {
-  type PaymentGuaranteeRequestClaims,
-  type PaymentSignature,
-  SigningScheme,
-} from "@/models";
+import { clearingHouseDomain } from "@/guarantee";
+import { PaymentRequest, PaymentRequestPayload } from "@/models";
 import type { FetchFn } from "@/rpc";
+import { randomU256 } from "@/utils";
 import {
   PaymentRequirementsV1,
   PaymentRequirementsV2,
@@ -14,23 +14,52 @@ import {
   X402PaymentRequired,
   X402ResourceInfo,
 } from "@/x402";
+import {
+  CLEARING_HOUSE_ADDRESS,
+  connect,
+  MOCK_CORE_CHAIN_ID,
+  MockCore,
+  ok,
+  PAYER,
+} from "./helpers/core";
 
 const USER = "0x0000000000000000000000000000000000000001";
 const PAY_TO = "0x0000000000000000000000000000000000000003";
 const NATIVE = "0x0000000000000000000000000000000000000000";
 
-class StubSigner {
-  signedClaims: PaymentGuaranteeRequestClaims[] = [];
+const CYCLE = `0x${"11".repeat(32)}`;
 
-  async signPayment(
-    claims: PaymentGuaranteeRequestClaims,
-    _scheme: SigningScheme,
-  ): Promise<PaymentSignature> {
-    void _scheme;
-    this.signedClaims.push(claims);
-    return { signature: "0xdeadbeef", scheme: SigningScheme.EIP712 };
+class StubSigner {
+  built: [string, bigint, Asset][] = [];
+  signed: PaymentRequestPayload[] = [];
+
+  async newPayment(
+    recipient: string,
+    amount: bigint,
+    asset: Asset,
+  ): Promise<PaymentRequestPayload> {
+    this.built.push([recipient, amount, asset]);
+    return PaymentRequestPayload.new({
+      userAddress: USER,
+      recipientAddress: recipient,
+      cycleId: CYCLE,
+      reqId: randomU256(),
+      amount,
+      timestamp: 1_700_000_000,
+      erc20Token: asset.erc20Token,
+    });
+  }
+
+  async signPayment(payload: PaymentRequestPayload): Promise<PaymentRequest> {
+    this.signed.push(payload);
+    return new PaymentRequest(payload, "0xdeadbeef");
   }
 }
+
+afterEach(() => {
+  // connect() stubs the global fetch.
+  globalThis.fetch = fetch;
+});
 
 const v1Requirements = (extra: Record<string, unknown> = {}) =>
   new PaymentRequirementsV1({
@@ -78,18 +107,17 @@ describe("X402Flow", () => {
           payTo: PAY_TO,
           asset: NATIVE,
         }),
-        USER,
       ),
     ).rejects.toThrow(X402Error);
   });
 
-  it("signs a v1 payment with a random reqId and no server round-trip", async () => {
+  it("signs a v1 payment the signer built for the live cycle", async () => {
     const signer = new StubSigner();
     const failingFetch: FetchFn = async () => {
-      throw new Error("no HTTP call belongs in signing");
+      throw new Error("signing makes no facilitator call");
     };
     const flow = new X402Flow(signer, failingFetch);
-    const signed = await flow.signPayment(v1Requirements(), USER);
+    const signed = await flow.signPayment(v1Requirements());
 
     const envelope = decodeHeader(signed.header);
     expect(envelope.x402Version).toBe(1);
@@ -98,21 +126,29 @@ describe("X402Flow", () => {
     expect(signed.x402Version).toBe(1);
     expect(signed.envelope).toEqual(envelope);
 
-    const claims = envelope.payload.claims;
-    expect(claims.version).toBe("v1");
-    expect(claims.amount).toBe("0x5");
-    expect(claims.recipient_address).toBe(PAY_TO);
-    expect(claims.validation).toBeUndefined();
-    // 32 random bytes: astronomically unlikely to be small.
-    expect(BigInt(claims.req_id)).toBeGreaterThan(2n ** 64n);
+    expect(Object.keys(envelope.payload).sort()).toEqual([
+      "payload",
+      "signature",
+    ]);
+    expect(envelope.payload.signature).toBe("0xdeadbeef");
+    const payment = envelope.payload.payload;
+    expect(payment.version).toBe("v1");
+    expect(payment.amount).toBe("0x5");
+    expect(payment.cycle_id).toBe(CYCLE);
+    expect(payment.recipient_address).toBe(PAY_TO);
+    expect(payment.validation).toBeUndefined();
+    expect(signed.payload).toEqual(envelope.payload);
+    expect(signed.request.toPayload()).toEqual(envelope.payload);
+    expect(signer.built).toHaveLength(1);
+    expect(signer.built[0][2].isNative).toBe(true);
   });
 
   it("draws a fresh reqId per payment", async () => {
     const flow = new X402Flow(new StubSigner());
-    const first = await flow.signPayment(v1Requirements(), USER);
-    const second = await flow.signPayment(v1Requirements(), USER);
-    expect(decodeHeader(first.header).payload.claims.req_id).not.toBe(
-      decodeHeader(second.header).payload.claims.req_id,
+    const first = await flow.signPayment(v1Requirements());
+    const second = await flow.signPayment(v1Requirements());
+    expect(decodeHeader(first.header).payload.payload.req_id).not.toBe(
+      decodeHeader(second.header).payload.payload.req_id,
     );
   });
 
@@ -121,14 +157,14 @@ describe("X402Flow", () => {
     const required = paymentRequired(accepted);
     required.extensions = { quota: "10" };
     const flow = new X402Flow(new StubSigner());
-    const signed = await flow.signPaymentV2(required, accepted, USER);
+    const signed = await flow.signPaymentV2(required, accepted);
 
     const envelope = decodeHeader(signed.header);
     expect(envelope.x402Version).toBe(2);
     expect(envelope.accepted.amount).toBe("10");
     expect(envelope.resource.url).toBe("https://api.example.com/data");
     expect(envelope.extensions).toEqual({ quota: "10" });
-    expect(envelope.payload.claims.amount).toBe("0xa");
+    expect(envelope.payload.payload.amount).toBe("0xa");
     expect(signed.x402Version).toBe(2);
   });
 
@@ -137,12 +173,12 @@ describe("X402Flow", () => {
     const required = paymentRequired(accepted);
     required.x402Version = 1;
     const flow = new X402Flow(new StubSigner());
-    await expect(flow.signPaymentV2(required, accepted, USER)).rejects.toThrow(
+    await expect(flow.signPaymentV2(required, accepted)).rejects.toThrow(
       X402Error,
     );
   });
 
-  it("attaches extra.validation to the signed claims", async () => {
+  it("attaches extra.validation to the signed payment", async () => {
     const signer = new StubSigner();
     const flow = new X402Flow(signer);
     const accepted = v2Accepted({
@@ -156,18 +192,17 @@ describe("X402Flow", () => {
     const signed = await flow.signPaymentV2(
       paymentRequired(accepted),
       accepted,
-      USER,
     );
 
-    const claims = decodeHeader(signed.header).payload.claims;
-    expect(claims.version).toBe("v1");
-    expect(claims.validation).toEqual({
+    const payment = decodeHeader(signed.header).payload.payload;
+    expect(payment.version).toBe("v1");
+    expect(payment.validation).toEqual({
       validator: "eip155:1:0x1111111111111111111111111111111111111111",
       subject: `0x${"42".repeat(32)}`,
       deadline: 1700000600,
       params: "0xdeadbeef",
     });
-    expect(signer.signedClaims.at(-1)?.validation?.validator).toBe(
+    expect(signer.signed.at(-1)?.validation?.validator).toBe(
       "eip155:1:0x1111111111111111111111111111111111111111",
     );
   });
@@ -176,29 +211,27 @@ describe("X402Flow", () => {
     const flow = new X402Flow(new StubSigner());
     const accepted = v2Accepted({ validation: { validator: "v" } });
     await expect(
-      flow.signPaymentV2(paymentRequired(accepted), accepted, USER),
+      flow.signPaymentV2(paymentRequired(accepted), accepted),
     ).rejects.toThrow(X402Error);
   });
 
   it("parses raw requirement objects", async () => {
     const flow = new X402Flow(new StubSigner());
-    const signed = await flow.signPayment(
-      {
-        scheme: SCHEME_4MICA_CREDIT,
-        network: "testnet",
-        maxAmountRequired: "5",
-        payTo: PAY_TO,
-        asset: NATIVE,
-      },
-      USER,
-    );
-    expect(decodeHeader(signed.header).payload.claims.amount).toBe("0x5");
+    const signed = await flow.signPayment({
+      scheme: SCHEME_4MICA_CREDIT,
+      network: "testnet",
+      maxAmountRequired: "5",
+      payTo: PAY_TO,
+      asset: NATIVE,
+    });
+    expect(decodeHeader(signed.header).payload.payload.amount).toBe("0x5");
 
     await expect(
-      flow.signPayment(
-        { scheme: SCHEME_4MICA_CREDIT, network: "testnet", payTo: PAY_TO },
-        USER,
-      ),
+      flow.signPayment({
+        scheme: SCHEME_4MICA_CREDIT,
+        network: "testnet",
+        payTo: PAY_TO,
+      }),
     ).rejects.toThrow(X402Error);
   });
 
@@ -213,13 +246,13 @@ describe("X402Flow", () => {
           success: true,
           txHash: "0xabc",
           networkId: "testnet",
-          certificate: { claims: "0x01", signature: "0x02" },
+          certificate: { receipt: "0x01", signature: "0x02" },
         }),
         { status: 200 },
       );
     };
     const flow = new X402Flow(new StubSigner(), fetch);
-    const payment = await flow.signPayment(requirements, USER);
+    const payment = await flow.signPayment(requirements);
     const settled = await flow.settlePayment(
       payment,
       requirements,
@@ -235,7 +268,7 @@ describe("X402Flow", () => {
 
     expect(settled.settlement.success).toBe(true);
     expect(settled.settlement.txHash).toBe("0xabc");
-    expect(settled.settlement.certificate?.claims).toBe("0x01");
+    expect(settled.settlement.receipt?.receipt).toBe("0x01");
   });
 
   it("reports a rejected settlement as success: false, not an exception", async () => {
@@ -246,7 +279,7 @@ describe("X402Flow", () => {
         { status: 200 },
       );
     const flow = new X402Flow(new StubSigner(), fetch);
-    const payment = await flow.signPayment(requirements, USER);
+    const payment = await flow.signPayment(requirements);
     const settled = await flow.settlePayment(
       payment,
       requirements,
@@ -258,7 +291,7 @@ describe("X402Flow", () => {
 
   it("refuses to settle when the requirements version disagrees with the payment", async () => {
     const flow = new X402Flow(new StubSigner());
-    const payment = await flow.signPayment(v1Requirements(), USER);
+    const payment = await flow.signPayment(v1Requirements());
     await expect(
       flow.settlePayment(payment, v2Accepted(), "http://facilitator.test"),
     ).rejects.toThrow(X402Error);
@@ -269,7 +302,7 @@ describe("X402Flow", () => {
     const fetch: FetchFn = async () =>
       new Response(JSON.stringify({ error: "boom" }), { status: 500 });
     const flow = new X402Flow(new StubSigner(), fetch);
-    const payment = await flow.signPayment(requirements, USER);
+    const payment = await flow.signPayment(requirements);
     await expect(
       flow.settlePayment(payment, requirements, "http://facilitator.test"),
     ).rejects.toThrow(X402Error);
@@ -277,9 +310,107 @@ describe("X402Flow", () => {
 
   it("rejects an invalid facilitator url", async () => {
     const flow = new X402Flow(new StubSigner());
-    const payment = await flow.signPayment(v1Requirements(), USER);
+    const payment = await flow.signPayment(v1Requirements());
     await expect(
       flow.settlePayment(payment, v1Requirements(), "not-a-url"),
     ).rejects.toThrow(X402Error);
+  });
+
+  it("echoes the recipient as the server spelled it", async () => {
+    // A resource server that compares payTo as a string must still match;
+    // the payer commits to the address either way.
+    const lowered = PAY_TO.toLowerCase();
+    const flow = new X402Flow(new StubSigner());
+    const signed = await flow.signPayment(
+      new PaymentRequirementsV1({
+        scheme: SCHEME_4MICA_CREDIT,
+        network: "testnet",
+        maxAmountRequired: "5",
+        payTo: ` ${lowered} `,
+        asset: NATIVE,
+      }),
+    );
+    expect(signed.request.payload.recipientAddress).toBe(lowered);
+  });
+
+  it.each([
+    ["payTo", "nope"],
+    ["asset", "0x12"],
+    ["maxAmountRequired", "lots"],
+  ])("refuses a malformed %s before building a payment", async (field, value) => {
+    const signer = new StubSigner();
+    const requirements = {
+      scheme: SCHEME_4MICA_CREDIT,
+      network: "testnet",
+      maxAmountRequired: "5",
+      payTo: PAY_TO,
+      asset: NATIVE,
+      [field]: value,
+    };
+    await expect(
+      new X402Flow(signer).signPayment(requirements),
+    ).rejects.toThrow(/invalid payment requirements/);
+    expect(signer.built).toHaveLength(0);
+  });
+
+  it("does not read a BLS-shaped certificate as a receipt", async () => {
+    const requirements = v1Requirements();
+    const fetch: FetchFn = async () =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          certificate: { claims: "0x01", signature: "0x02" },
+        }),
+        { status: 200 },
+      );
+    const flow = new X402Flow(new StubSigner(), fetch);
+    const settled = await flow.settlePayment(
+      await flow.signPayment(requirements),
+      requirements,
+      "http://facilitator.test",
+    );
+    expect(settled.settlement.receipt).toBeUndefined();
+    expect(settled.settlement.raw.certificate).toBeDefined();
+  });
+
+  it("signs for the live cycle through a connected Client", async () => {
+    // The Client is a FlowSigner: the payment is scoped to the cycle core
+    // reports, for the advertised asset, and signed by the client's own key.
+    const token = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+    const core = new MockCore({
+      "GET /core/cycles/active": (request) =>
+        ok({
+          cycle_id: CYCLE,
+          cycle_id_text: "t",
+          asset_address: request.url.searchParams.get("asset"),
+          period_start: 1_700_000_000,
+          period_end: Math.floor(Date.now() / 1000) + 86_400,
+        }),
+    });
+    const client = await connect(core);
+
+    const signed = await X402Flow.fromClient(client).signPayment(
+      new PaymentRequirementsV1({
+        scheme: SCHEME_4MICA_CREDIT,
+        network: "testnet",
+        maxAmountRequired: "5",
+        payTo: PAY_TO,
+        asset: token,
+      }),
+    );
+
+    const payload = signed.request.payload;
+    expect(payload.cycleId).toBe(CYCLE);
+    expect(payload.userAddress).toBe(PAYER.address);
+    expect(payload.assetAddress).toBe(token);
+    expect(core.requests.at(-1)?.url.searchParams.get("asset")).toBe(token);
+    await expect(
+      recoverAddress({
+        hash: payload.signingDigest(
+          clearingHouseDomain(MOCK_CORE_CHAIN_ID, CLEARING_HOUSE_ADDRESS),
+        ),
+        signature: signed.request.signature as Hex,
+      }),
+    ).resolves.toBe(PAYER.address);
   });
 });

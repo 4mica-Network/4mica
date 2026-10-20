@@ -16,13 +16,13 @@ Merkle root. This SDK provides:
 - **Gasless routes**: sign an EIP-3009, Permit2, or EIP-2612 authorization and let a configured
   facilitator submit and pay the gas — deposits, withdrawals, and cycle settlement included
 - **X402 Flow Helper**: generate `X-PAYMENT` headers for 402-protected HTTP resources — tab-free,
-  with a random per-payment `reqId` and no server round-trip before signing
+  with a random per-payment `reqId`, scoped to the asset's active settlement cycle
 - **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a
   route behind an x402 payment
 - **App API** (`@4mica/sdk/app`): read the pricing, policy and FAQs you set in the dashboard for
   one API listing or agent, check a payer's rules, and record payments, using a secret key from
   that listing or agent. See [docs/app-api.md](docs/app-api.md)
-- **Golden-vector parity**: EIP-712/EIP-191 digests and the guarantee envelope are pinned by the
+- **Golden-vector parity**: EIP-712 digests, guarantee receipts, and checkpoints are pinned by the
   same fixtures the Rust and Python SDKs test against
 
 ## Universal: runtime-neutral core + thin adapters
@@ -53,6 +53,7 @@ const paywall = createPaywall(client.rpc, {
 const result = await paywall.handle(request);
 if (result instanceof Response) return result; // 402
 // ...run your handler, then merge result.headers onto the response
+// result.guarantee is the operator's receipt: { receipt, signature, raw }
 
 // Or the low-level, framework-agnostic primitive:
 const decision = await paywall.protect({ method, url, header: (n) => headers.get(n) });
@@ -98,15 +99,16 @@ The SDK requires a signing key and can use sensible defaults for the rest:
 - `network` (optional): select a network by shorthand or CAIP-2 id. Defaults to `ethereum-sepolia`.
 - `rpcUrl` (optional): override the core API URL directly (for self-hosted deployments).
 - `ethereumHttpRpcUrl` (optional): Ethereum JSON-RPC endpoint; fetched from core if omitted
-- `contractAddress` (optional): Core4Mica contract address; fetched from core if omitted
+- `contractAddress` (optional): Treasury contract address; fetched from core if omitted
 - `facilitatorUrl` (optional): facilitator that sponsors gas; without one, every operation is self-funded
 - `bearerToken` (optional): static bearer token for auth (replaces SIWE)
 - `authUrl` and `authRefreshMarginSecs` (optional): SIWE auth config. SIWE is on by default
   (defaults to `rpcUrl` and 60 seconds); disable it entirely with `disableAuth()`.
 
 > Note: `ethereumHttpRpcUrl` and `contractAddress` are fetched from the core service by default.
-> Connecting validates that core supports the guarantee version this SDK signs and resolves the
-> guarantee domain separators; the Ethereum RPC is only contacted lazily, on first on-chain use.
+> Connecting validates that core accepts the payment payload version this SDK signs and resolves the
+> ClearingHouse, GuaranteeRegistry, and operator signer addresses core publishes; the Ethereum RPC
+> is only contacted lazily, on first on-chain use.
 
 ### 1) Using ConfigBuilder
 
@@ -219,7 +221,7 @@ Every field on the client is an intent-builder sub-client: an entry captures wha
 ### Quick tour
 
 ```ts
-import { Client, ConfigBuilder, PaymentGuaranteeRequestClaims } from '@4mica/sdk';
+import { Client, ConfigBuilder } from '@4mica/sdk';
 
 const client = await Client.connect(
   new ConfigBuilder().network('base-sepolia').walletPrivateKey('0x...').build(),
@@ -228,20 +230,17 @@ const client = await Client.connect(
 // Payer: deposit collateral (native ETH; pass a token address for ERC-20).
 await client.deposit.of(null, 1_000_000_000_000_000n).send();
 
-// Payer: sign a payment guarantee request.
-const claims = PaymentGuaranteeRequestClaims.new(
-  client.signerAddress, // user
-  '0xRecipient',        // recipient
-  reqId,                // random uint256 nonce
-  1000n,                // amount
-  Math.floor(Date.now() / 1000),
-  null,                 // asset (null = native)
+// Payer: build a payment for the asset's active settlement cycle, then sign it.
+const payload = await client.payment.newPayment(
+  '0xRecipient', // recipient
+  1000n,         // amount
+  null,          // asset (null = native)
 );
-const signature = await client.payment.signRequest(claims);
+const request = await client.payment.signRequest(payload);
 
-// Recipient: redeem the signed request for a BLS certificate, then verify it.
-const cert = await client.payment.issueGuarantee(claims, signature);
-const verified = await client.payment.verifyGuarantee(cert);
+// Recipient: redeem the signed request for the operator's receipt, then verify it.
+const receipt = await client.payment.issueGuarantee(request);
+const guarantee = await client.payment.verifyGuarantee(receipt);
 
 // After the cycle clears: debtor pays, creditor claims.
 await client.settlement.pay(cycleId).send();
@@ -269,7 +268,7 @@ const auth = await client.deposit.of(usdc, 1_000_000n).eip3009().sign();
 await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).verify();
 await client.deposit.of(usdc, 1_000_000n).eip3009().authorization(auth).send();
 
-// Withdrawals work for ETH too — Core4Mica verifies the signature itself:
+// Withdrawals work for ETH too — the Treasury verifies the signature itself:
 await client.withdraw.request(null, amount).gasless().send();
 
 // Settlement debits pin the authorization nonce to the cycle id:
@@ -289,8 +288,9 @@ approval surfaces as `Permit2AllowanceRequiredError`.
 The X402 helper turns `paymentRequirements` from a `402 Payment Required` response into an
 `X-PAYMENT` header (and optional `/settle` call) that the facilitator will accept.
 
-There is **no tab step**: each payment carries a random 32-byte `reqId` minted locally, and core
-binds the guarantee to the open settlement cycle at issuance. Nothing is fetched before signing.
+There is **no tab step**: each payment carries a random 32-byte `reqId` minted locally. The only
+read before signing is the asset's active settlement cycle, which the payment is scoped to and
+stamped against by core's clock.
 
 #### What the SDK expects from `paymentRequirements`
 
@@ -320,7 +320,7 @@ const body = await res.json();
 const requirements = body.accepts[0];
 
 // 3) Build the X-PAYMENT header with the SDK
-const payment = await flow.signPayment(requirements, client.signerAddress);
+const payment = await flow.signPayment(requirements);
 
 // 4) Call the protected resource with the header
 await fetch('https://resource-url/resource', {
@@ -354,7 +354,7 @@ const paymentRequired = X402PaymentRequired.fromRaw(JSON.parse(decoded));
 const accepted = paymentRequired.accepts[0];
 
 // 4) Build the PAYMENT-SIGNATURE header with the SDK
-const signed = await flow.signPaymentV2(paymentRequired, accepted, client.signerAddress);
+const signed = await flow.signPaymentV2(paymentRequired, accepted);
 
 // 5) Call the protected resource with the header
 await fetch('https://resource-url/resource', {
@@ -375,7 +375,7 @@ const settled = await flow.settlePayment(payment, requirements, facilitatorUrl);
 if (!settled.settlement.success) {
   console.error('settlement rejected:', settled.settlement.error);
 } else {
-  console.log('tx:', settled.settlement.txHash, 'cert:', settled.settlement.certificate);
+  console.log('tx:', settled.settlement.txHash, 'receipt:', settled.settlement.receipt);
 }
 ```
 
@@ -383,11 +383,14 @@ Notes:
 
 - `signPayment` and `signPaymentV2` always use EIP-712 signing and error unless the scheme is
   exactly `4mica-credit`.
-- `client.payment.signRequest` supports `SigningScheme.EIP712` (default) and `SigningScheme.EIP191`.
+- `client.payment.signRequest` signs an EIP-712 `PaymentAuthorization` under the ClearingHouse
+  domain.
 - `settlePayment` only hits `/settle`; resource servers should still call `/verify` first when
   enforcing access.
-- `client.payment.verifyGuarantee` BLS-verifies the certificate against the operator key from
-  `/core/public-params` (requires the optional `@noble/curves` dependency).
+- `settled.settlement.receipt` is the operator's `GuaranteeReceipt` when the facilitator relays
+  one; check it with `client.payment.verifyGuarantee`.
+- `client.payment.verifyGuarantee` checks the receipt's ECDSA signature offline against the
+  operator signer core publishes in `/core/public-params`.
 
 ### API Methods Summary
 
@@ -409,11 +412,12 @@ the `ClearingHouse`. `cycleId` is core's text cycle id (`cycle_id_text` in clear
 
 #### `client.payment`
 
-- `signRequest(claims, scheme?)` — sign a guarantee request as the payer
-- `issueGuarantee(claims, signature)` — redeem a payer's signature for a BLS certificate (recipient)
-- `verifyGuarantee(cert)` — BLS-verify + decode + domain-check a certificate
+- `newPayment(recipient, amount, asset?)` — a payment payload scoped to the asset's active cycle
+- `signRequest(payload)` — sign the payload as the payer, returning a `PaymentRequest`
+- `issueGuarantee(request)` — redeem a signed request for the operator's `GuaranteeReceipt` (recipient)
+- `verifyGuarantee(receipt)` — check the operator's signature offline and decode the `Guarantee`
 - `listReceived()` — payments guaranteed to the signer as a recipient
-- `guaranteeDomain` / `guaranteeDomains` — the domain separator(s) certs are issued under
+- `checkpointActiveCycle(asset?)` / `checkpointCycle(asset, cycleId)` — sign and submit a checkpoint
 
 #### `client.settlement`
 
@@ -424,26 +428,26 @@ the `ClearingHouse`. `cycleId` is core's text cycle id (`cycle_id_text` in clear
 #### `client.account`
 
 - `assets()` — the signer's position in every asset
-- `principalBalance(asset?)` / `withdrawableBalance(asset?)` / `stablecoinPosition(token)`
+- `principalBalance(asset?)` / `withdrawableBalance(asset?)` / `stablecoinPosition(token)` (pool
+  shares: `userShares`, `totalUserShares`, `protocolShares`, `poolShares`, `poolAssets`, `strategy`)
 - `assetBalance(asset?)` — the balance guarantees are accounted against (may lag the chain)
 
 #### `client.tokens`
 
 - `supported()` — depositable assets and their metadata
-- `approve(token, amount)` — ERC-20 allowance for the Core4Mica contract
+- `approve(token, amount)` — ERC-20 allowance for the Treasury contract
 
 ### Validated guarantees
 
 A payer can agree that a guarantee only becomes payable once an external validator approves it, by
-attaching a `ValidationRequirement` to the claims (or letting `X402Flow` read it from
-`extra.validation`):
+attaching a `ValidationRequirement` to the payload before signing (or letting `X402Flow` read it
+from `extra.validation`). The requirement is bound into the salted recipient commitment the payer
+signs:
 
 ```ts
-import { PaymentGuaranteeRequestClaims, ValidationRequirement } from '@4mica/sdk';
+import { ValidationRequirement } from '@4mica/sdk';
 
-const claims = PaymentGuaranteeRequestClaims.new(
-  user, recipient, reqId, amount, timestamp, asset,
-).withValidation(
+const payload = (await client.payment.newPayment(recipient, amount, asset)).withValidation(
   new ValidationRequirement({
     validator: 'validator-id',        // must be on core's allowlist
     subject: '0x…32-byte hash…',      // what the validator must approve
@@ -451,8 +455,36 @@ const claims = PaymentGuaranteeRequestClaims.new(
     params: '0x…',                    // optional validator-specific policy bytes
   }),
 );
-const signature = await client.payment.signRequest(claims);
+const request = await client.payment.signRequest(payload);
 ```
+
+### Checkpoints
+
+A checkpoint is the payer's signed running total of its payments in a cycle. Core caps how many
+guarantees a payer may hold past its latest checkpoint; past the cap, issuance is refused with
+`CheckpointRequiredError`. Only the payer can sign its checkpoint, so run these on the payer's
+client — for the active cycle, or for the cycle a refusal names:
+
+```ts
+import { CheckpointRequiredError } from '@4mica/sdk';
+
+await client.payment.checkpointActiveCycle(asset); // undefined when there is nothing to cover
+
+try {
+  await client.payment.issueGuarantee(request);
+} catch (err) {
+  if (err instanceof CheckpointRequiredError) {
+    await client.payment.checkpointCycle(err.details.assetAddress, err.details.cycleId);
+    // then retry the issuance
+  }
+}
+```
+
+Both methods retry once when core answers `CheckpointMismatchError` (the batch moved while it was
+being signed). Core's batch is checked before it is signed — every payment must be one the payer
+signed, in this cycle and asset, past the previous checkpoint, and counted once — and a batch that
+fails those checks throws `UntrustedCheckpointBatchError` instead of being signed. `cycleId` here
+is the on-chain `bytes32` id, not the text id settlement takes.
 
 ## Error Handling
 
@@ -461,12 +493,14 @@ All SDK errors extend `FourMicaError`, in per-area families mirroring the Rust S
 ```ts
 import {
   ConfigError,                 // invalid ConfigBuilder input
-  RpcError,                    // 4Mica core service error (has .status and .body)
+  RpcError,                    // 4Mica core service error (has .status, .body, .code, .details)
+  CoreRefusalError,            //   ├ core's coded refusals (an RpcError): CheckpointRequiredError,
+                               //   │ CheckpointMismatchError, CycleMismatchError, …
   ClientError,                 //   ├ ClientInitializationError, ChainRpcUnavailableError, …
-  PaymentError,                //   ├ SigningError, AddressMismatchError,
-                               //   │ CertificateMismatchError, GuaranteeDomainMismatchError, …
+  PaymentError,                //   ├ SigningError, AddressMismatchError, MalformedReceiptError,
+                               //   │ ReceiptSignerMismatchError, UntrustedCheckpointBatchError, …
   ContractError,               //   ├ typed on-chain reverts: AmountZeroError,
-                               //   │ InsufficientAvailableError, …, UnknownRevertError
+                               //   │ InsufficientLiquidityError, PausedError, …, UnknownRevertError
   Erc20AllowanceRequiredError, // a self-funded token pull needs an allowance first
   X402Error,                   // x402 flow error (bad scheme, settlement transport)
   AuthError,                   // base class for all auth errors

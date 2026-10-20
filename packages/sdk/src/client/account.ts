@@ -52,13 +52,12 @@ export class AccountClient {
         user,
         tokenAddress,
       ),
-      totalUserScaledBalance:
-        await gateway.totalUserScaledBalance(tokenAddress),
-      protocolScaledBalance: await gateway.protocolScaledBalance(tokenAddress),
-      surplusScaledBalance: await gateway.surplusScaledBalance(tokenAddress),
-      contractScaledATokenBalance:
-        await gateway.contractScaledATokenBalance(tokenAddress),
-      stablecoinAToken: await gateway.stablecoinAToken(tokenAddress),
+      userShares: await gateway.userShares(user, tokenAddress),
+      totalUserShares: await gateway.totalUserShares(tokenAddress),
+      protocolShares: await gateway.protocolShares(tokenAddress),
+      poolShares: await gateway.poolShares(tokenAddress),
+      poolAssets: await gateway.poolAssets(tokenAddress),
+      strategy: await gateway.strategy(tokenAddress),
     };
   }
 

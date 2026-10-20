@@ -7,7 +7,7 @@ Quick-start references that follow the standard x402 flow: the client only talks
 - `server/` – mock FastAPI paywall that issues requirements and settles payments.
 - `rust_client/` – Rust helper that discovers requirements, signs headers, and retries the resource.
 - `python_client/` – Python helper that mirrors the Rust flow using the SDK.
-- `ts_client/` – TypeScript helper using the npm `sdk-4mica` package.
+- `ts_client/` – TypeScript helper using the npm `@4mica/sdk` package.
 
 ## Server-driven mock paid API (`mock_paid_api.py`)
 
@@ -65,13 +65,11 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Environment variables (loaded from `examples/.env` and then `.env`):
+Environment variables (loaded from `.env` in the working directory):
 
 ```
-PAYER_KEY=0x...           # payer's private key used to sign the guarantee
-USER_ADDRESS=0x...        # payer's address to place in the guarantee claims
+PAYER_KEY=0x...           # payer's private key; signs the payment (or 4MICA_WALLET_PRIVATE_KEY)
 RESOURCE_URL=http://localhost:9000/protected
-ASSET_ADDRESS=0x...       # optional sanity check for claims.asset_address
 ```
 
 Run from the repo root or inside `examples/python_client`:
@@ -82,8 +80,9 @@ python examples/python_client/client.py
 
 ## TypeScript helper (`examples/ts_client`)
 
-Matches the Rust/Python helpers using the TypeScript SDK (`sdk-4mica`). Requires Node 18+ (built-in
-`fetch`).
+Matches the Rust/Python helpers using the TypeScript SDK (`@4mica/sdk`). Requires Node 22+.
+`flow.signPayment(requirements)` signs as the configured wallet, for the asset's active settlement
+cycle, which it reads from core (the hosted Base Sepolia core by default).
 
 Install dependencies:
 
@@ -92,13 +91,11 @@ cd examples/ts_client
 npm install
 ```
 
-Environment variables (loaded from `examples/.env` and then `.env`):
+Environment variables (loaded from `.env` in the working directory):
 
 ```
-PAYER_KEY=0x...           # payer's private key used to sign the guarantee
-USER_ADDRESS=0x...        # payer's address to place in the guarantee claims
+PAYER_KEY=0x...           # payer's private key; signs the payment (or 4MICA_WALLET_PRIVATE_KEY)
 RESOURCE_URL=http://localhost:9000/protected
-ASSET_ADDRESS=0x...       # optional sanity check for claims.asset_address
 ```
 
 Run from the repo root or inside `examples/ts_client`:
