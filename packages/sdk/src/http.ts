@@ -39,9 +39,19 @@ export async function requestJson<T>(
     decodeError: DecodeErrorFactory;
     httpError: HttpErrorFactory;
     allowEmptyOk?: boolean;
+    wrapTransportError?: (err: unknown) => Error;
+    isSuccess?: (response: Response) => boolean;
   },
 ): Promise<T> {
-  const response = await fetchFn(url, init);
+  let response: Response;
+  try {
+    response = await fetchFn(url, init);
+  } catch (err) {
+    if (options.wrapTransportError) {
+      throw options.wrapTransportError(err);
+    }
+    throw err;
+  }
 
   let text = "";
   try {
@@ -66,7 +76,8 @@ export async function requestJson<T>(
     }
   }
 
-  if (!response.ok) {
+  const ok = options.isSuccess ? options.isSuccess(response) : response.ok;
+  if (!ok) {
     const message = `${response.status}: ${extractErrorMessage(payload)}`;
     throw options.httpError(message, response, payload);
   }

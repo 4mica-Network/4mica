@@ -2,15 +2,14 @@ import Footer from "@components/Footer";
 import Header from "@components/Header";
 import JsonLd from "@components/JsonLd";
 import { homeSchema } from "@seo/structuredData";
-import CodeSamplesSection from "./_components/CodeSamplesSection";
-import DocsCalloutSection from "./_components/DocsCalloutSection";
+import AgenticPaymentsSection from "./_components/AgenticPaymentsSection";
+import BlogSection from "./_components/BlogSection";
 import FaqSection from "./_components/FaqSection";
-import FinalCtaSection from "./_components/FinalCtaSection";
 import HeroSection from "./_components/HeroSection";
+import HowItWorksSection from "./_components/HowItWorksSection";
 import PartnersSection from "./_components/PartnersSection";
 import ScrollToTopButton from "./_components/ScrollToTopButton";
-import UseCasesSection from "./_components/UseCasesSection";
-import WhatYoureMissingSection from "./_components/WhatYoureMissingSection";
+import TeamsSection from "./_components/TeamsSection";
 
 export default function Home() {
   return (
@@ -18,13 +17,12 @@ export default function Home() {
       <JsonLd data={homeSchema()} />
       <Header />
       <HeroSection />
-      <WhatYoureMissingSection />
-      <DocsCalloutSection />
-      <UseCasesSection />
+      <AgenticPaymentsSection />
+      <HowItWorksSection />
       <PartnersSection />
-      <CodeSamplesSection />
+      <TeamsSection />
+      <BlogSection />
       <FaqSection />
-      <FinalCtaSection />
       <Footer />
       <ScrollToTopButton />
     </div>

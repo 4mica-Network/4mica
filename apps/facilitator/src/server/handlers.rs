@@ -405,7 +405,7 @@ async fn supported_handler(State(state): State<SharedState>) -> impl IntoRespons
 async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
     let supported = state.supported().await;
     Json(HomeResponse {
-        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate X-PAYMENT headers, and /settle to mint certificates or forward debit settlements.",
+        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to mint certificates or forward debit settlements.",
         supported,
         health: "/health",
         docs: "See README.md for a full flow walkthrough.",

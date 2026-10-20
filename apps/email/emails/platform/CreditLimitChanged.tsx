@@ -28,9 +28,8 @@ export const CreditLimitChanged = ({
 
       <Text style={styles.paragraph}>
         {userName}, the credit limit on your account is now{" "}
-        <strong>{formatMoney(newLimit.amount, newLimit.currency)}</strong>,
-        effective {formatDate(effectiveAt)}. Your agents can spend up to this
-        amount before settlement.
+        <strong>{formatMoney(newLimit.amount, newLimit.currency)}</strong>. Your
+        agents can spend up to this amount before settlement.
       </Text>
 
       <DetailList

@@ -34,6 +34,7 @@ export interface User {
   name: string;
   email: string | null;
   emailVerified: boolean;
+  pendingEmail: string | null;
   phoneNumber: string | null;
   phoneNumberVerified: boolean;
   avatarUrl: string | null;
@@ -49,7 +50,6 @@ export interface User {
   language: string;
   timeZone: string;
   privacyMode: boolean;
-  twoFactorEnabled: boolean;
   defaultHome: string;
   disableBranding: boolean;
   allowCustomBrandColor: boolean;
@@ -116,11 +116,6 @@ export const USERNAME_STATUS = {
 export type UsernameStatus =
   (typeof USERNAME_STATUS)[keyof typeof USERNAME_STATUS];
 
-/**
- * The advisory availability probe behind the onboarding handle picker. `value`
- * is the candidate the status belongs to, so an out-of-order response for a
- * handle the user has already edited past can be discarded.
- */
 export interface UsernameCheck {
   value: string;
   status: UsernameStatus;
@@ -131,7 +126,6 @@ export type UserState = {
   business: Business | null;
   usernameCheck: UsernameCheck;
   isLoading: boolean;
-  /** Keyed by card id, so each card shows its own spinner. */
   savingSections: Record<string, boolean>;
   rollback: Partial<User> | null;
   businessRollback: Partial<Business> | null;

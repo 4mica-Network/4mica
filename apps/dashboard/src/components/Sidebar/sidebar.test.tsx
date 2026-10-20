@@ -52,7 +52,6 @@ describe("sidebar identity", () => {
     ["the app", "/"],
     ["settings", "/settings/profile"],
   ])("falls back to New user when the name is blank in %s", (_where, path) => {
-    // `User.name` is @default("") — blank, not null, is the unset case.
     renderAt(path, { name: "", email: null } as unknown as User);
 
     expect(screen.getByText("New user")).toBeInTheDocument();

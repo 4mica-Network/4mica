@@ -1,0 +1,1138 @@
+{
+  "abi": [
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "manager",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "core4Mica_",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "receive",
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "authority",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "claimNetCreditFor",
+      "inputs": [
+        {
+          "name": "creditor",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "netCredit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "proof",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "commitCycle",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "merkleRoot",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "totalNetDebit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "totalNetCredit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "paymentSubmissionDeadline",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "paymentFinalityDeadline",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "core4Mica",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract ICore4MicaSettlement"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "finalizeCycle",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "fundCreditorsFromPoolBatch",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "entries",
+          "type": "tuple[]",
+          "internalType": "struct ClearingHouse.CreditorEntry[]",
+          "components": [
+            {
+              "name": "creditor",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "netCredit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "proof",
+              "type": "bytes32[]",
+              "internalType": "bytes32[]"
+            }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "getCycle",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "tuple",
+          "internalType": "struct ClearingHouse.OnchainCycle",
+          "components": [
+            {
+              "name": "asset",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "merkleRoot",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            },
+            {
+              "name": "totalNetDebit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "totalNetCredit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "totalPaidIn",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "totalClaimedOut",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "totalDefaultCovered",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "totalResolvedDebit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "paymentSubmissionDeadline",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "paymentFinalityDeadline",
+              "type": "uint64",
+              "internalType": "uint64"
+            },
+            {
+              "name": "status",
+              "type": "uint8",
+              "internalType": "enum ClearingHouse.CycleStatus"
+            },
+            {
+              "name": "exists",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ]
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getParticipantState",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "participant",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "tuple",
+          "internalType": "struct ClearingHouse.ParticipantState",
+          "components": [
+            {
+              "name": "netDebit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "netCredit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "paid",
+              "type": "bool",
+              "internalType": "bool"
+            },
+            {
+              "name": "claimed",
+              "type": "bool",
+              "internalType": "bool"
+            },
+            {
+              "name": "defaulted",
+              "type": "bool",
+              "internalType": "bool"
+            }
+          ]
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "isConsumingScheduledOp",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bytes4",
+          "internalType": "bytes4"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "markCycleShortfall",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "participantLeaf",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "participant",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "role",
+          "type": "uint8",
+          "internalType": "enum ClearingHouse.ParticipantRole"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "leaf",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "payNetDebit",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "netDebit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "proof",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "payNetDebitWithAuthorization",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "netDebit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "proof",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        },
+        {
+          "name": "auth",
+          "type": "tuple",
+          "internalType": "struct ReceiveAuthorization",
+          "components": [
+            {
+              "name": "from",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "validAfter",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "validBefore",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "nonce",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            },
+            {
+              "name": "v",
+              "type": "uint8",
+              "internalType": "uint8"
+            },
+            {
+              "name": "r",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            },
+            {
+              "name": "s",
+              "type": "bytes32",
+              "internalType": "bytes32"
+            }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "payNetDebitWithPermit2",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "netDebit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "proof",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        },
+        {
+          "name": "p",
+          "type": "tuple",
+          "internalType": "struct Permit2Authorization",
+          "components": [
+            {
+              "name": "from",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "nonce",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "deadline",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "signature",
+              "type": "bytes",
+              "internalType": "bytes"
+            }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setAuthority",
+      "inputs": [
+        {
+          "name": "newAuthority",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "settleDefaultsFromCollateralBatch",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "entries",
+          "type": "tuple[]",
+          "internalType": "struct ClearingHouse.DebtorEntry[]",
+          "components": [
+            {
+              "name": "debtor",
+              "type": "address",
+              "internalType": "address"
+            },
+            {
+              "name": "netDebit",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "proof",
+              "type": "bytes32[]",
+              "internalType": "bytes32[]"
+            }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "event",
+      "name": "AuthorityUpdated",
+      "inputs": [
+        {
+          "name": "authority",
+          "type": "address",
+          "indexed": false,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "CreditorClaimed",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "creditor",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "CycleCommitted",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "merkleRoot",
+          "type": "bytes32",
+          "indexed": false,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "totalNetDebit",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "totalNetCredit",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "paymentSubmissionDeadline",
+          "type": "uint64",
+          "indexed": false,
+          "internalType": "uint64"
+        },
+        {
+          "name": "paymentFinalityDeadline",
+          "type": "uint64",
+          "indexed": false,
+          "internalType": "uint64"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "CycleFinalized",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "CycleShortfall",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "funded",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "totalNetCredit",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "DebtorDefaulted",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "debtor",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "DebtorPaid",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "debtor",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "SettlementSkipped",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "participant",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "indexed": false,
+          "internalType": "string"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "error",
+      "name": "AccessManagedInvalidAuthority",
+      "inputs": [
+        {
+          "name": "authority",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "AccessManagedRequiredDelay",
+      "inputs": [
+        {
+          "name": "caller",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "delay",
+          "type": "uint32",
+          "internalType": "uint32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "AccessManagedUnauthorized",
+      "inputs": [
+        {
+          "name": "caller",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "AlreadyClaimed",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "creditor",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "AlreadyPaid",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "debtor",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "AmountZero",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "AuthorizationCycleMismatch",
+      "inputs": [
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ClaimConversionShortfall",
+      "inputs": [
+        {
+          "name": "requested",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "got",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ClaimExceedsFundedLiquidity",
+      "inputs": [
+        {
+          "name": "available",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "requested",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ClaimedCreditExceedsCommitted",
+      "inputs": [
+        {
+          "name": "attempted",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "total",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleAlreadyCommitted",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleClaimsUnresolved",
+      "inputs": [
+        {
+          "name": "claimed",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleDebtUnresolved",
+      "inputs": [
+        {
+          "name": "resolved",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleFullyFunded",
+      "inputs": [
+        {
+          "name": "funded",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleNotFound",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleNotZeroSum",
+      "inputs": [
+        {
+          "name": "totalNetDebit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "totalNetCredit",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "CycleUnderfunded",
+      "inputs": [
+        {
+          "name": "available",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "required",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ExactPaymentRequired",
+      "inputs": [
+        {
+          "name": "expected",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "actual",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "InvalidCycleStatus",
+      "inputs": [
+        {
+          "name": "cycleId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "status",
+          "type": "uint8",
+          "internalType": "enum ClearingHouse.CycleStatus"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "InvalidDeadline",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidProof",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NativeAssetUnsupported",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "NativeTransferFailed",
+      "inputs": [
+        {
+          "name": "recipient",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "PaymentFinalityPending",
+      "inputs": [
+        {
+          "name": "deadline",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "PaymentWindowElapsed",
+      "inputs": [
+        {
+          "name": "deadline",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ReentrancyGuardReentrantCall",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ResolvedDebitExceedsCommitted",
+      "inputs": [
+        {
+          "name": "attempted",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "total",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "SafeERC20FailedOperation",
+      "inputs": [
+        {
+          "name": "token",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "UnauthorizedEthSender",
+      "inputs": [
+        {
+          "name": "sender",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "ZeroAddress",
+      "inputs": []
+    }
+  ]
+}

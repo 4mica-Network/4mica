@@ -28,8 +28,8 @@ use sdk_4mica::contract::PERMIT2_ADDRESS;
 use crate::limits::{SponsorGuard, SponsorLimits};
 use crate::relayer::{DepositToken, Relayer};
 
-pub(crate) use error::classify_core4mica_revert;
 pub use error::{DepositError, Permit2AllowanceDetails};
+pub(crate) use error::{classify_core4mica_revert, revert_without_data};
 
 use eip712::{
     permit_digest, permit_transfer_from_digest, permit2_domain_separator,
@@ -628,8 +628,34 @@ fn parse_u256(value: &str) -> Result<U256, String> {
 mod tests {
     use super::*;
     use alloy::primitives::address;
+    use alloy::transports::RpcError;
 
     const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
+
+    /// A node's JSON-RPC error response, as alloy surfaces it from a contract call. Built from the
+    /// wire form so the test does not depend on the `json-rpc` feature of the alloy meta crate.
+    fn rpc_error(code: i64, message: &str) -> alloy::contract::Error {
+        let payload = serde_json::json!({ "code": code, "message": message });
+        alloy::contract::Error::TransportError(RpcError::ErrorResp(
+            serde_json::from_value(payload).expect("error payload"),
+        ))
+    }
+
+    // A token without EIP-3009 reverts `receiveWithAuthorization` with empty data, which nodes
+    // report as error 3 and no `data`. That is the EVM answering, and the SDK's fallback to the
+    // Permit2 route keys off SIMULATION_REVERTED — CHAIN_ERROR would strand the deposit.
+    #[test]
+    fn data_less_revert_is_a_simulation_revert() {
+        let err = classify_call_error(rpc_error(3, "execution reverted"));
+        assert_eq!(err.code(), "SIMULATION_REVERTED");
+        assert!(err.to_string().contains("without data"), "{err}");
+    }
+
+    #[test]
+    fn transport_failure_stays_a_chain_error() {
+        let err = classify_call_error(rpc_error(-32000, "connection refused"));
+        assert_eq!(err.code(), "CHAIN_ERROR");
+    }
 
     fn auth(from: Address) -> ReceiveAuthorization {
         ReceiveAuthorization {

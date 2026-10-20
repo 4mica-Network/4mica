@@ -1,7 +1,9 @@
 import { HttpError } from "@4mica/http";
 import {
   checkUsernameAvailability,
+  confirmEmailVerification as confirmEmailVerificationRequest,
   getMe,
+  sendEmailVerification as sendEmailVerificationRequest,
   type UsernameAvailability,
   updateAccount as updateAccountRequest,
   updateNotifications as updateNotificationsRequest,
@@ -9,14 +11,17 @@ import {
   upsertBusiness as upsertBusinessRequest,
 } from "@api/user";
 import i18n from "@i18n";
-import { notifyError } from "@utils/notification";
+import { toIssueMap, toMessage } from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   checkUsernameFailed,
   checkUsernameSucceeded,
   fetchUserFailed,
   fetchUserPending,
   fetchUserSucceeded,
+  sendEmailVerificationFailed,
+  sendEmailVerificationSucceeded,
   type UpdateMeta,
   updateBusinessFailed,
   updateBusinessSucceeded,
@@ -26,32 +31,6 @@ import {
 import actionTypes from "./actionTypes";
 import { selectUser } from "./selector";
 import type { Business, NotificationPlacement, User } from "./type";
-
-interface ApiIssue {
-  path: string;
-  message: string;
-}
-
-const toIssueMap = (error: unknown): Record<string, string> => {
-  if (!(error instanceof HttpError)) {
-    return {};
-  }
-
-  const issues = (error.body as { issues?: ApiIssue[] } | null)?.issues;
-  if (!Array.isArray(issues)) {
-    return {};
-  }
-
-  return Object.fromEntries(issues.map((i) => [i.path, i.message]));
-};
-
-const toMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof HttpError) {
-    const body = error.body as { message?: string } | null;
-    return body?.message ?? fallback;
-  }
-  return fallback;
-};
 
 function* placement(): Generator<unknown, NotificationPlacement> {
   const user = (yield select(selectUser)) as User | null;
@@ -142,6 +121,85 @@ export function* updateBusiness(action: {
   }
 }
 
+export function* sendEmailVerification(action: {
+  type: string;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    yield call(sendEmailVerificationRequest);
+    yield put(sendEmailVerificationSucceeded(action.meta));
+
+    notifySuccess({
+      title: i18n.t("store.user.verificationSentTitle", {
+        defaultValue: "Check your inbox",
+      }),
+      content: i18n.t("store.user.verificationSentBody", {
+        defaultValue:
+          "We sent you a link. Open it while signed in and press confirm.",
+      }),
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  } catch (error) {
+    const message = toMessage(
+      error,
+      i18n.t("store.user.verificationFailedBody", {
+        defaultValue: "We couldn't send the verification email.",
+      }),
+    );
+
+    yield put(sendEmailVerificationFailed(message, action.meta));
+
+    notifyError({
+      title: i18n.t("store.user.verificationFailedTitle", {
+        defaultValue: "Couldn't send the email",
+      }),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
+/** The API's error codes for a link that could not be spent. */
+const CONFIRM_OUTCOMES: Record<string, string> = {
+  invalid_token: "invalid",
+  token_expired: "expired",
+  email_taken: "taken",
+};
+
+export function* confirmEmailVerification(action: {
+  type: string;
+  payload: string;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    const user = yield call(() =>
+      confirmEmailVerificationRequest(action.payload),
+    );
+    yield put(updateUserSucceeded(user as User, action.meta));
+
+    notifySuccess({
+      title: i18n.t("page.settings.profile.verify.success.title"),
+      content: i18n.t("page.settings.profile.verify.success.body"),
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  } catch (error) {
+    const code =
+      error instanceof HttpError
+        ? (error.body as { error?: string } | null)?.error
+        : undefined;
+    const outcome = (code && CONFIRM_OUTCOMES[code]) ?? "invalid";
+    const message = i18n.t(`page.settings.profile.verify.${outcome}.body`);
+
+    yield put(sendEmailVerificationFailed(message, action.meta));
+
+    notifyError({
+      title: i18n.t(`page.settings.profile.verify.${outcome}.title`),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
 export function* checkUsername(action: {
   type: string;
   payload: string;
@@ -153,16 +211,10 @@ export function* checkUsername(action: {
     const { username, available, reason } = response as UsernameAvailability;
     yield put(checkUsernameSucceeded(username, available, reason));
   } catch {
-    // Deliberately quiet: this probe is advisory, the write is the authority,
-    // and a toast on every failed keystroke check would be noise.
     yield put(checkUsernameFailed(action.payload));
   }
 }
 
-/**
- * Write the business, then flip the flag — and only in that order, so a failed
- * business write can never leave an account marked onboarded with no entity.
- */
 export function* completeOnboarding(action: {
   type: string;
   payload: Partial<Business>;
@@ -218,6 +270,14 @@ export default [
   takeEvery(actionTypes.FETCH_USER_REQUESTED, fetchUser),
   takeLatest(actionTypes.CHECK_USERNAME_REQUESTED, checkUsername),
   takeLatest(actionTypes.COMPLETE_ONBOARDING_REQUESTED, completeOnboarding),
+  takeLatest(
+    actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED,
+    sendEmailVerification,
+  ),
+  takeLatest(
+    actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
+    confirmEmailVerification,
+  ),
   takeEvery(actionTypes.UPDATE_PROFILE_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_ACCOUNT_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_NOTIFICATIONS_REQUESTED, updateUser),

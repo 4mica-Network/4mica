@@ -104,6 +104,8 @@ export const config = {
     dryRun: env.EMAIL_DRY_RUN === "true",
     apiKey: env.RESEND_API_KEY,
     from: `${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM_ADDRESS}>`,
+    /** Bare address, so a template can substitute its own display name. */
+    address: env.EMAIL_FROM_ADDRESS,
     replyTo: env.EMAIL_REPLY_TO,
   },
   shutdown: {

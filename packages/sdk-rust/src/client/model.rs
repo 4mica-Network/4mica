@@ -32,11 +32,16 @@ pub struct StablecoinPosition {
     pub protocol_yield_share: U256,
     pub user_net_yield: U256,
     pub withdrawable_balance: U256,
-    pub total_user_scaled_balance: U256,
-    pub protocol_scaled_balance: U256,
-    pub surplus_scaled_balance: U256,
-    pub contract_scaled_a_token_balance: U256,
-    pub stablecoin_a_token: Address,
+    /// The signer's pool shares.
+    pub user_shares: U256,
+    pub total_user_shares: U256,
+    pub protocol_shares: U256,
+    /// Shares outstanding across users, the protocol and escrow.
+    pub pool_shares: U256,
+    /// Underlying value backing the pool.
+    pub pool_assets: U256,
+    /// The ERC-4626 strategy backing the pool, or zero while its assets sit idle.
+    pub strategy: Address,
 }
 
 #[derive(Debug, Clone)]

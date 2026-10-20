@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use alloy::sol_types::Eip712Domain;
 use alloy::{
     network::{EthereumWallet, TxSigner},
     primitives::{Address, B256},
     providers::{DynProvider, Provider, ProviderBuilder},
     signers::{Signature, Signer},
 };
-use crypto::bls::BlsPublicKey;
 use rpc::{
-    ApiClientError, CorePublicParameters, GUARANTEE_CLAIMS_VERSION, RpcProxy,
-    SupportedTokensResponse,
+    ActiveCycleResponse, ApiClientError, CorePublicParameters, PAYMENT_PAYLOAD_VERSION, RpcProxy,
+    SupportedTokensResponse, clearing_house_domain, guarantee_registry_domain,
 };
 use tokio::sync::{OnceCell, RwLock};
 use url::Url;
@@ -38,9 +40,9 @@ struct Inner<S> {
     provider: OnceCell<DynProvider>,
     wallet_provider: OnceCell<DynProvider>,
     contract_address: Address,
-    operator_public_key: BlsPublicKey,
-    guarantee_domain: [u8; 32],
-    guarantee_domains: HashMap<u64, [u8; 32]>,
+    clearing_house_address: Address,
+    guarantee_registry_address: Address,
+    guarantee_signer: Address,
     auth_session: Option<AuthSession<S>>,
     chain_id: u64,
     /// Token EIP-712 domain separators, memoised. Immutable per token per chain, so a hit never
@@ -49,6 +51,42 @@ struct Inner<S> {
     /// Core4Mica's own EIP-712 domain separator, resolved at startup. Fixed for the lifetime of a
     /// deployment.
     core_domain_separator: B256,
+    /// The cycle each asset's payments are currently scoped to. Held until its period ends, or
+    /// until core rejects a request signed against it.
+    active_cycles: RwLock<HashMap<Address, ActiveCycle>>,
+    /// The latest checkpoint cutoff known per asset. A payment at or below it can never be
+    /// collected, so payments are held back past it.
+    payment_cutoffs: RwLock<HashMap<Address, u64>>,
+    /// Core's clock minus ours, in milliseconds, taken as a lower bound: the last `server_time`
+    /// core reported, set against when its answer arrived. Zero until core reports one.
+    clock_offset_ms: AtomicI64,
+}
+
+/// The settlement cycle a payment must be signed for, as core reports it.
+#[derive(Clone, Copy)]
+pub(crate) struct ActiveCycle {
+    pub(crate) id: B256,
+    /// Unix seconds; a payment stamped earlier is refused as stale.
+    pub(crate) period_start: u64,
+    /// Unix seconds; core opens the next cycle from this moment on.
+    period_end: u64,
+}
+
+impl TryFrom<ActiveCycleResponse> for ActiveCycle {
+    type Error = ClientError;
+
+    fn try_from(response: ActiveCycleResponse) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: response.cycle_id.parse().map_err(|_| {
+                ClientError::Initialization(format!(
+                    "core reported an unreadable cycle id: {}",
+                    response.cycle_id
+                ))
+            })?,
+            period_start: response.period_start,
+            period_end: response.period_end,
+        })
+    }
 }
 
 /// Everything the sub-clients share: configuration, connections, and the metadata resolved once at
@@ -80,16 +118,18 @@ impl<S> ClientCtx<S> {
             .await
             .map_err(|e| ClientError::Rpc(e.to_string()))?;
 
-        let ethereum_http_rpc_url = Self::resolve_chain_rpc_url(&cfg, &public_params)?;
-        let operator_public_key = Self::parse_operator_public_key(&public_params.public_key)?;
-        let contract_address = Self::resolve_contract_address(&cfg, &public_params)?;
+        Self::require_payload_version_support(&public_params)?;
 
-        let (guarantee_domain, guarantee_domains) = Self::fetch_guarantee_metadata(
-            &public_params,
-            contract_address,
-            ethereum_http_rpc_url.as_ref(),
-        )
-        .await?;
+        let ethereum_http_rpc_url = Self::resolve_chain_rpc_url(&cfg, &public_params)?;
+        let contract_address = Self::resolve_contract_address(&cfg, &public_params)?;
+        let clearing_house_address = validate_address(&public_params.clearing_house_address)
+            .map_err(|e| ClientError::Initialization(format!("clearing house address: {e}")))?;
+        let guarantee_registry_address =
+            validate_address(&public_params.guarantee_registry_address).map_err(|e| {
+                ClientError::Initialization(format!("guarantee registry address: {e}"))
+            })?;
+        let guarantee_signer = validate_address(&public_params.guarantee_signer)
+            .map_err(|e| ClientError::Initialization(format!("guarantee signer: {e}")))?;
         let core_domain_separator =
             Self::resolve_core_domain_separator(&public_params, contract_address);
 
@@ -103,13 +143,16 @@ impl<S> ClientCtx<S> {
             provider: OnceCell::new(),
             wallet_provider: OnceCell::new(),
             contract_address,
-            operator_public_key,
-            guarantee_domain,
-            guarantee_domains,
+            clearing_house_address,
+            guarantee_registry_address,
+            guarantee_signer,
             auth_session,
             chain_id: public_params.chain_id,
             token_domain_separators: RwLock::new(HashMap::new()),
             core_domain_separator,
+            active_cycles: RwLock::new(HashMap::new()),
+            payment_cutoffs: RwLock::new(HashMap::new()),
+            clock_offset_ms: AtomicI64::new(0),
         })))
     }
 
@@ -147,11 +190,6 @@ impl<S> ClientCtx<S> {
             .map(|provider| provider.erased())
     }
 
-    fn parse_operator_public_key(bytes: &[u8]) -> Result<BlsPublicKey, ClientError> {
-        BlsPublicKey::from_bytes(bytes)
-            .map_err(|e| ClientError::Initialization(format!("invalid operator public key: {e}")))
-    }
-
     fn resolve_contract_address(
         cfg: &Config<S>,
         public_params: &CorePublicParameters,
@@ -163,121 +201,22 @@ impl<S> ClientCtx<S> {
         }
     }
 
-    /// The domain separator for every guarantee version this deployment supports, so certs can be
-    /// verified whichever version issued them. Requests are always signed at
-    /// [`GUARANTEE_CLAIMS_VERSION`], so that one must be supported and enabled.
-    ///
-    /// Takes what core publishes and reads the contract only when core publishes nothing, which is
-    /// all a core too old to do so leaves. That fallback is the one thing here that needs an
-    /// Ethereum endpoint.
-    async fn fetch_guarantee_metadata(
+    /// Refuses a core that cannot read what this client signs, rather than letting every payment
+    /// fail later with a decode error.
+    fn require_payload_version_support(
         public_params: &CorePublicParameters,
-        contract_address: Address,
-        chain_rpc_url: Option<&Url>,
-    ) -> Result<([u8; 32], HashMap<u64, [u8; 32]>), ClientError> {
-        if !public_params
-            .supported_guarantee_versions
-            .contains(&GUARANTEE_CLAIMS_VERSION)
+    ) -> Result<(), ClientError> {
+        if public_params
+            .supported_payment_payload_versions
+            .contains(&PAYMENT_PAYLOAD_VERSION)
         {
-            return Err(ClientError::Initialization(format!(
-                "this client signs guarantee v{GUARANTEE_CLAIMS_VERSION}, which core does not \
-                 support (core supports {:?}); upgrade core or downgrade the SDK",
-                public_params.supported_guarantee_versions
-            )));
+            return Ok(());
         }
-
-        let guarantee_domains = match Self::published_guarantee_domains(public_params)? {
-            Some(domains) => domains,
-            None => {
-                Self::read_guarantee_domains(public_params, contract_address, chain_rpc_url).await?
-            }
-        };
-
-        let guarantee_domain = guarantee_domains
-            .get(&GUARANTEE_CLAIMS_VERSION)
-            .copied()
-            .ok_or_else(|| {
-                ClientError::Initialization(format!(
-                    "missing guarantee domain metadata for v{GUARANTEE_CLAIMS_VERSION}"
-                ))
-            })?;
-
-        Ok((guarantee_domain, guarantee_domains))
-    }
-
-    /// The domains core published, or `None` from a core that publishes none.
-    fn published_guarantee_domains(
-        public_params: &CorePublicParameters,
-    ) -> Result<Option<HashMap<u64, [u8; 32]>>, ClientError> {
-        if public_params.guarantee_domains.is_empty() {
-            return Ok(None);
-        }
-
-        public_params
-            .guarantee_domains
-            .iter()
-            .map(|entry| {
-                let separator = entry.domain_separator.parse::<B256>().map_err(|e| {
-                    ClientError::Initialization(format!(
-                        "invalid guarantee domain separator for v{} from core: {e}",
-                        entry.version
-                    ))
-                })?;
-                Ok((entry.version, separator.into()))
-            })
-            .collect::<Result<HashMap<_, _>, _>>()
-            .map(Some)
-    }
-
-    /// Reads each supported version's domain off the contract, one call apiece.
-    async fn read_guarantee_domains(
-        public_params: &CorePublicParameters,
-        contract_address: Address,
-        chain_rpc_url: Option<&Url>,
-    ) -> Result<HashMap<u64, [u8; 32]>, ClientError> {
-        let url = chain_rpc_url.ok_or(ClientError::ChainRpcUnavailable)?;
-        let contract = Core4Mica::new(contract_address, Self::connect(url).await?);
-
-        let mut guarantee_domains = HashMap::new();
-        for &version in &public_params.supported_guarantee_versions {
-            let version_config = contract
-                .getGuaranteeVersionConfig(version)
-                .call()
-                .await
-                .map_err(|e| ClientError::Initialization(e.to_string()))?;
-
-            if !version_config.enabled {
-                if version == GUARANTEE_CLAIMS_VERSION {
-                    return Err(ClientError::Initialization(format!(
-                        "guarantee v{GUARANTEE_CLAIMS_VERSION} is disabled on-chain"
-                    )));
-                }
-                continue;
-            }
-            guarantee_domains.insert(version, version_config.domainSeparator.into());
-
-            if version == GUARANTEE_CLAIMS_VERSION
-                && !public_params.guarantee_domain_separator.is_empty()
-            {
-                let expected_domain = public_params
-                    .guarantee_domain_separator
-                    .parse::<B256>()
-                    .map_err(|e| {
-                        ClientError::Initialization(format!(
-                            "invalid guarantee domain separator from core: {e}"
-                        ))
-                    })?;
-
-                if expected_domain != version_config.domainSeparator {
-                    return Err(ClientError::Initialization(format!(
-                        "guarantee domain mismatch between core metadata and contract for \
-                         version {version}"
-                    )));
-                }
-            }
-        }
-
-        Ok(guarantee_domains)
+        Err(ClientError::Initialization(format!(
+            "this client signs payment payload v{PAYMENT_PAYLOAD_VERSION}, which core does not \
+             accept (core accepts {:?}); upgrade core or downgrade the SDK",
+            public_params.supported_payment_payload_versions
+        )))
     }
 
     /// Core4Mica's EIP-712 domain separator.
@@ -405,16 +344,89 @@ impl<S> ClientCtx<S> {
         &self.0.facilitator
     }
 
-    pub(crate) fn operator_public_key(&self) -> &BlsPublicKey {
-        &self.0.operator_public_key
+    /// The address whose signature attests this operator's guarantee receipts.
+    pub(crate) fn guarantee_signer(&self) -> Address {
+        self.0.guarantee_signer
     }
 
-    pub(crate) fn guarantee_domain(&self) -> &[u8; 32] {
-        &self.0.guarantee_domain
+    /// The domain every payer-signed payload is verified under.
+    pub(crate) fn clearing_house_domain(&self) -> Eip712Domain {
+        clearing_house_domain(self.0.chain_id, self.0.clearing_house_address)
     }
 
-    pub(crate) fn guarantee_domain_for_version(&self, version: u64) -> Option<&[u8; 32]> {
-        self.0.guarantee_domains.get(&version)
+    /// The domain the operator's guarantee receipts are verified under.
+    pub(crate) fn guarantee_domain(&self) -> Eip712Domain {
+        guarantee_registry_domain(self.0.chain_id, self.0.guarantee_registry_address)
+    }
+
+    /// The cycle payments for `asset` must be signed for, fetched once and reused until its period
+    /// ends or [`Self::forget_active_cycle`] drops it.
+    pub(crate) async fn active_cycle(&self, asset: Address) -> Result<ActiveCycle, ClientError>
+    where
+        S: Signer + Sync,
+    {
+        if let Some(cached) = self.0.active_cycles.read().await.get(&asset)
+            && self.core_now() < cached.period_end
+        {
+            return Ok(*cached);
+        }
+
+        let response = self
+            .rpc_proxy()
+            .await
+            .map_err(|e| ClientError::Rpc(e.to_string()))?
+            .get_active_cycle(asset.to_string())
+            .await
+            .map_err(|e| ClientError::Rpc(e.to_string()))?;
+        self.record_core_time(response.server_time);
+        let cycle = ActiveCycle::try_from(response)?;
+
+        self.0.active_cycles.write().await.insert(asset, cycle);
+        Ok(cycle)
+    }
+
+    /// Drops the cached cycle for `asset`, so the next payment re-reads it from core.
+    pub(crate) async fn forget_active_cycle(&self, asset: Address) {
+        self.0.active_cycles.write().await.remove(&asset);
+    }
+
+    pub(crate) async fn record_payment_cutoff(&self, asset: Address, cutoff: u64) {
+        self.0
+            .payment_cutoffs
+            .write()
+            .await
+            .entry(asset)
+            .and_modify(|known| *known = (*known).max(cutoff))
+            .or_insert(cutoff);
+    }
+
+    pub(crate) async fn payment_cutoff(&self, asset: Address) -> Option<u64> {
+        self.0.payment_cutoffs.read().await.get(&asset).copied()
+    }
+
+    /// Learns core's clock from a `server_time` it just reported. Zero, from a core that
+    /// predates it, teaches nothing.
+    pub(crate) fn record_core_time(&self, server_time: u64) {
+        if server_time == 0 {
+            return;
+        }
+        // The report left core before it reached us and was truncated to the second, so core was
+        // at least this far ahead. Erring low is the safe side: core refuses a payment stamped
+        // even a second past its own clock.
+        let offset = (server_time as i64 * 1000).saturating_sub(local_now_ms());
+        self.0.clock_offset_ms.store(offset, Ordering::Relaxed);
+    }
+
+    /// Core's clock as best known, in unix milliseconds, never ahead of the real one.
+    pub(crate) fn core_now_ms(&self) -> u64 {
+        local_now_ms()
+            .saturating_add(self.0.clock_offset_ms.load(Ordering::Relaxed))
+            .max(0) as u64
+    }
+
+    /// Core's clock as best known, in unix seconds, never ahead of the real one.
+    pub(crate) fn core_now(&self) -> u64 {
+        self.core_now_ms() / 1000
     }
 
     pub(crate) fn signer(&self) -> &S {
@@ -514,4 +526,11 @@ impl<S> ClientCtx<S> {
         let provider = self.get_wallet_provider().await?;
         Ok(ClearingHouse::new(clearing_house_address, provider))
     }
+}
+
+fn local_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or(0)
 }

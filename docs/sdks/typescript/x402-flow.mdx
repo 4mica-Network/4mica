@@ -13,19 +13,19 @@ Create a flow from your client:
 import { Client, ConfigBuilder, X402Flow } from "@4mica/sdk";
 
 const cfg = new ConfigBuilder().walletPrivateKey("0x...").build();
-const client = await Client.new(cfg);
+const client = await Client.connect(cfg);
 const flow = X402Flow.fromClient(client);
 ```
 
-Before signing, `X402Flow` resolves a tab by calling `extra.tabEndpoint`, which returns the next request id. Both signing methods always use EIP-712 and error if the scheme is not a 4Mica scheme.
+There is no tab step: each payment carries a random 32-byte `reqId` minted locally — uniqueness is all core asks of it — and the core service binds the guarantee to the open settlement cycle at issuance. Nothing is fetched before signing. Both signing methods always use EIP-712 and error unless the scheme is exactly `4mica-credit`.
 
 ## What the SDK expects
 
 At minimum, `paymentRequirements` must include:
 
-- `scheme` and `network` — the scheme must include `4mica` (for example `4mica-credit`).
+- `scheme` (exactly `4mica-credit`) and `network`.
 - `payTo` (recipient address), `asset`, and `maxAmountRequired` (v1) or `amount` (v2).
-- `extra.tabEndpoint` for tab resolution.
+- Optionally `extra.validation` (`{ validator, subject, deadline?, params? }`) to gate the payment on an external validator.
 
 ## Version 1
 
@@ -58,22 +58,22 @@ await fetch("https://resource-url/resource", {
 
 ## Version 2
 
-Version 2 delivers requirements in a base64-encoded `payment-required` header and signs them into a `PAYMENT-SIGNATURE` header. If `accepted.extra` contains a complete validation policy, the SDK builds V2 claims automatically; otherwise it falls back to V1.
+Version 2 delivers requirements in a base64-encoded `payment-required` header and signs them into a `PAYMENT-SIGNATURE` header. If `accepted.extra.validation` is present, the SDK attaches the validation requirement to the signed claims.
 
 ```ts
-import type { X402PaymentRequired, PaymentRequirementsV2 } from "@4mica/sdk";
+import { X402PaymentRequired } from "@4mica/sdk";
 
 // 1) GET the protected endpoint and read the payment-required header
 const res = await fetch("https://resource-url/resource");
 const header = res.headers.get("payment-required");
 if (!header) throw new Error("Missing payment-required header");
 
-// 2) Decode the header
+// 2) Decode and parse the challenge
 const decoded = Buffer.from(header, "base64").toString("utf8");
-const paymentRequired = JSON.parse(decoded) as X402PaymentRequired;
+const paymentRequired = X402PaymentRequired.fromRaw(JSON.parse(decoded));
 
 // 3) Select a payment option
-const accepted = paymentRequired.accepts[0] as PaymentRequirementsV2;
+const accepted = paymentRequired.accepts[0];
 
 // 4) Build the PAYMENT-SIGNATURE header
 const signed = await flow.signPaymentV2(paymentRequired, accepted, "0xUser");
@@ -86,7 +86,7 @@ await fetch("https://resource-url/resource", {
 
 ## Settle through a facilitator
 
-If your resource server proxies to a facilitator, reuse the SDK to settle a payment after verifying it. `settlePayment` POSTs to `{facilitatorUrl}/settle`.
+If your resource server proxies to a facilitator, reuse the SDK to settle a payment after verifying it. `settlePayment` POSTs `{ x402Version, paymentPayload, paymentRequirements }` to `{facilitatorUrl}/settle` — `paymentPayload` is the envelope object, not the base64 header.
 
 ```ts
 import type { PaymentRequirementsV1, X402SignedPayment } from "@4mica/sdk";
@@ -101,13 +101,18 @@ async function settle(
     paymentRequirements,
     facilitatorUrl,
   );
-  console.log("settlement result:", settled.settlement);
+  if (!settled.settlement.success) {
+    console.error("settlement rejected:", settled.settlement.error);
+    return;
+  }
+  console.log("tx:", settled.settlement.txHash);
 }
 ```
 
 <Note>
   `settlePayment` only hits `/settle`. Resource servers should still verify a
-  payment before granting access.
+  payment before granting access. Rejections come back as HTTP 200 with
+  `success: false` — check the receipt, not just the absence of an exception.
 </Note>
 
 ## Next steps

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { LinkConfig } from "@4mica/url";
 import * as v from "valibot";
 
 const LOG_LEVELS = ["error", "warn", "info", "http", "debug"] as const;
@@ -34,8 +35,6 @@ const EnvSchema = v.object({
   ),
   CLERK_JWT_KEY: v.string(),
   CLERK_AUTHORIZED_PARTIES: v.string(),
-  // Optional on purpose. Empty disables sending rather than failing boot, so
-  // local dev and tests need no email service running.
   EMAIL_SERVICE_URL: v.union([
     v.literal(""),
     v.pipe(
@@ -43,6 +42,49 @@ const EnvSchema = v.object({
       v.startsWith("http", "EMAIL_SERVICE_URL must be an http(s) URL"),
     ),
   ]),
+  PUBLIC_API_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith("http", "PUBLIC_API_URL must be an http(s) URL"),
+    ),
+  ]),
+  VALKEY_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith(
+        "redis",
+        "VALKEY_URL must be a redis:// or rediss:// URL — Valkey speaks the Redis protocol, and ioredis misreads valkey:// as a hostname",
+      ),
+    ),
+  ]),
+  UNSUBSCRIBE_SECRET: v.string(),
+  CORE_URL: v.union([
+    v.literal(""),
+    v.pipe(v.string(), v.startsWith("http", "CORE_URL must be an http(s) URL")),
+  ]),
+  CORE_SIGNER_KEY: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.regex(
+        /^0x[0-9a-fA-F]{64}$/,
+        "CORE_SIGNER_KEY must be a 0x-prefixed 32-byte hex private key",
+      ),
+    ),
+  ]),
+  ONBOARDING_TICK_MS: numeric("ONBOARDING_TICK_MS", 10_000, 3_600_000),
+  ONBOARDING_BATCH_SIZE: numeric("ONBOARDING_BATCH_SIZE", 1, 500),
+  ONBOARDING_STEP_GAP_MS: numeric(
+    "ONBOARDING_STEP_GAP_MS",
+    60_000,
+    2_592_000_000,
+  ),
+  ONBOARDING_DRIP_EPOCH: v.pipe(
+    v.string(),
+    v.isoTimestamp("ONBOARDING_DRIP_EPOCH must be an ISO 8601 timestamp"),
+  ),
   SHUTDOWN_DRAIN_MS: numeric("SHUTDOWN_DRAIN_MS", 0, 60_000),
   SHUTDOWN_TIMEOUT_MS: numeric("SHUTDOWN_TIMEOUT_MS", 1_000, 120_000),
   RATE_LIMIT_ENABLED: v.picklist(
@@ -53,6 +95,8 @@ const EnvSchema = v.object({
   RATE_LIMIT_IP_MAX: numeric("RATE_LIMIT_IP_MAX", 1, 1_000_000),
   RATE_LIMIT_USER_MAX: numeric("RATE_LIMIT_USER_MAX", 1, 1_000_000),
   RATE_LIMIT_SENSITIVE_MAX: numeric("RATE_LIMIT_SENSITIVE_MAX", 1, 10_000),
+  RATE_LIMIT_API_KEY_MAX: numeric("RATE_LIMIT_API_KEY_MAX", 1, 1_000_000),
+  TRUST_PROXY_HOPS: numeric("TRUST_PROXY_HOPS", 0, 5),
 });
 
 export type Env = v.InferOutput<typeof EnvSchema>;
@@ -71,6 +115,16 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     CLERK_JWT_KEY: source.CLERK_JWT_KEY ?? "",
     CLERK_AUTHORIZED_PARTIES: source.CLERK_AUTHORIZED_PARTIES ?? "",
     EMAIL_SERVICE_URL: source.EMAIL_SERVICE_URL ?? "",
+    PUBLIC_API_URL: source.PUBLIC_API_URL ?? "",
+    VALKEY_URL: source.VALKEY_URL ?? "",
+    UNSUBSCRIBE_SECRET: source.UNSUBSCRIBE_SECRET ?? "",
+    CORE_URL: source.CORE_URL ?? "",
+    CORE_SIGNER_KEY: source.CORE_SIGNER_KEY ?? "",
+    ONBOARDING_TICK_MS: source.ONBOARDING_TICK_MS ?? "300000",
+    ONBOARDING_BATCH_SIZE: source.ONBOARDING_BATCH_SIZE ?? "25",
+    ONBOARDING_STEP_GAP_MS: source.ONBOARDING_STEP_GAP_MS ?? "259200000",
+    ONBOARDING_DRIP_EPOCH:
+      source.ONBOARDING_DRIP_EPOCH ?? "2026-09-15T00:00:00.000Z",
     SHUTDOWN_DRAIN_MS: source.SHUTDOWN_DRAIN_MS ?? "5000",
     SHUTDOWN_TIMEOUT_MS: source.SHUTDOWN_TIMEOUT_MS ?? "20000",
     RATE_LIMIT_ENABLED:
@@ -80,6 +134,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     RATE_LIMIT_IP_MAX: source.RATE_LIMIT_IP_MAX ?? "300",
     RATE_LIMIT_USER_MAX: source.RATE_LIMIT_USER_MAX ?? "120",
     RATE_LIMIT_SENSITIVE_MAX: source.RATE_LIMIT_SENSITIVE_MAX ?? "10",
+    RATE_LIMIT_API_KEY_MAX: source.RATE_LIMIT_API_KEY_MAX ?? "600",
+    TRUST_PROXY_HOPS: source.TRUST_PROXY_HOPS ?? "1",
   });
 
   if (!result.success) {
@@ -98,7 +154,58 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     );
   }
 
+  if (
+    result.output.VALKEY_URL &&
+    result.output.UNSUBSCRIBE_SECRET.length > 0 &&
+    result.output.UNSUBSCRIBE_SECRET.length < 32
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - UNSUBSCRIBE_SECRET: must be at least 32 characters",
+    );
+  }
+
+  if (
+    result.output.NODE_ENV === "production" &&
+    result.output.CLERK_AUTHORIZED_PARTIES.trim() === ""
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - CLERK_AUTHORIZED_PARTIES: must list the dashboard origin(s) in production",
+    );
+  }
+
   return result.output;
+};
+
+export const productionWarnings = (env: Env): string[] => {
+  if (env.NODE_ENV !== "production") {
+    return [];
+  }
+
+  const warnings: string[] = [];
+
+  if (!env.CLERK_SECRET_KEY.startsWith("sk_live_")) {
+    warnings.push("CLERK_SECRET_KEY is not a live key");
+  }
+  if (env.RATE_LIMIT_ENABLED !== "true") {
+    warnings.push("RATE_LIMIT_ENABLED is off");
+  }
+  if (env.PUBLIC_API_URL === "") {
+    warnings.push(
+      "PUBLIC_API_URL is unset; emailed links will point at localhost",
+    );
+  }
+  if (env.CORE_URL === "" || env.CORE_SIGNER_KEY === "") {
+    warnings.push(
+      "CORE_URL or CORE_SIGNER_KEY is unset; reported payments are not verified against 4mica core",
+    );
+  }
+  if (env.TRUST_PROXY_HOPS === 0) {
+    warnings.push(
+      "TRUST_PROXY_HOPS is 0; behind nginx every client shares one IP",
+    );
+  }
+
+  return warnings;
 };
 
 const env = parseEnv(process.env);
@@ -117,8 +224,9 @@ export const config = {
   clerkAuthorizedParties: env.CLERK_AUTHORIZED_PARTIES.split(",")
     .map((party) => party.trim())
     .filter(Boolean),
-  /** `undefined` when unset — see src/services/email.ts. */
   emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
+  publicApiUrl: env.PUBLIC_API_URL || `http://localhost:${env.PORT}`,
+  appUrl: new LinkConfig(process.env).appBase,
   shutdown: {
     drainMs: env.SHUTDOWN_DRAIN_MS,
     timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
@@ -129,5 +237,20 @@ export const config = {
     ipMax: env.RATE_LIMIT_IP_MAX,
     userMax: env.RATE_LIMIT_USER_MAX,
     sensitiveMax: env.RATE_LIMIT_SENSITIVE_MAX,
+    apiKeyMax: env.RATE_LIMIT_API_KEY_MAX,
+  },
+  trustProxyHops: env.TRUST_PROXY_HOPS,
+  core: {
+    url: env.CORE_URL || undefined,
+    signerKey: (env.CORE_SIGNER_KEY || undefined) as `0x${string}` | undefined,
+  },
+  onboarding: {
+    valkeyUrl: env.VALKEY_URL || undefined,
+    unsubscribeSecret: env.UNSUBSCRIBE_SECRET || undefined,
+    enabled: Boolean(env.VALKEY_URL && env.UNSUBSCRIBE_SECRET),
+    tickMs: env.ONBOARDING_TICK_MS,
+    batchSize: env.ONBOARDING_BATCH_SIZE,
+    stepGapMs: env.ONBOARDING_STEP_GAP_MS,
+    epoch: new Date(env.ONBOARDING_DRIP_EPOCH),
   },
 } as const;

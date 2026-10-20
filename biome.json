@@ -25,6 +25,7 @@
       "!**/.all-contributorsrc",
       "!**/.turbo",
       "!**/.claude",
+      "!**/.agents",
       "!packages/cli/templates",
       "!apps/**/coverage",
       "!apps/**/cypress",

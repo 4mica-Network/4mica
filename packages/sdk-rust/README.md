@@ -22,9 +22,8 @@ Add the SDK to your `Cargo.toml`:
 sdk-4mica = "2.0.0-alpha.4"
 ```
 
-Examples below that build claims by hand also use `rand` to generate a `req_id` nonce; add
-`rand = "0.10"` if you do the same. `X402Flow` generates the nonce internally, so callers
-using it need nothing extra.
+`new_payment` and `X402Flow` generate the request id and blinding salt for you, so nothing extra
+is needed. Add `rand = "0.10"` only if you build payloads by hand.
 
 ## The Builder Grammar
 
@@ -70,10 +69,10 @@ paying, and `req_id` is a random nonce you generate rather than a value you fetc
 the window closes, all guarantees in it are netted multilaterally into one net debit or
 net credit per participant, committed on-chain as a Merkle root, and settled.
 
-A `cycle_id` is the text form `{asset_address}:{period_start}`, for example
-`0x0000000000000000000000000000000000000000:1784210160`. You obtain one from the
-guarantee claims (`claims.cycle_id`) or from your settlement tooling, then pass it to the
-settlement builders below.
+A cycle has two identifiers. `cycle_id` is the `bytes32` a payment is signed against, and
+`cycle_id_text` is the readable form `{asset_address}:{period_start}`, for example
+`0x0000000000000000000000000000000000000000:1784210160`. The settlement builders below take the
+text form; `payment.active_cycle(asset)` returns both.
 
 That gives each side one settlement call per cycle:
 
@@ -82,19 +81,49 @@ That gives each side one settlement call per cycle:
 
 Both are single netted amounts covering every payment in the window, not one call per payment.
 
-## Guarantee Versions
+## Checkpoints
 
-The SDK signs at its own `GUARANTEE_CLAIMS_VERSION`. Core accepts every version it can decode,
-listed in `/core/public-params` as `supported_guarantee_versions`, so an older client keeps
-working; a client newer than the core it talks to fails at construction with a clear message.
+A payer may hold only so many guarantees that no checkpoint covers yet. At the bound, core refuses
+the next one with `CHECKPOINT_REQUIRED` and the payer signs a **checkpoint**: a running total of
+everything they have authorized in the cycle up to a timestamp cutoff. One signature stands in for
+every payment beneath it, which is what keeps settlement bounded no matter how many payments a
+cycle holds.
+
+`payment.checkpoint_active_cycle(asset)` signs and submits a checkpoint for the asset's active cycle,
+and returns `None` when there is nothing to cover. `payment.checkpoint_cycle(asset, cycle_id)`
+checkpoints a named cycle instead, such as the one a `CHECKPOINT_REQUIRED` refusal names.
+
+Submitting a checkpoint that was already accepted succeeds and covers nothing, so retrying is safe.
+
+A payment or another checkpoint can land while a checkpoint is in flight, and core then refuses it as
+stale. `checkpoint_cycle` and `checkpoint_active_cycle` read the batch and sign once more. If core
+refuses again, they return `PaymentError::CheckpointMismatch`.
+
+The checkpoint total is what the payer can be charged on-chain if they default, so it is built only
+from what the payer signed. Every payment in core's batch, and the checkpoint it extends, must carry
+the payer's own signature for that cycle and asset, and each payment may be counted once. Otherwise
+nothing is signed and the call fails with `PaymentError::UntrustedCheckpointBatch`.
+
+Payments are stamped strictly after the latest cutoff, so a payment signed immediately after a
+checkpoint may wait out the remainder of the current second.
+
+Core refuses a payment stamped later than its own clock, so payments are stamped by core's clock,
+not this machine's. Each active-cycle read reports core's time, and the SDK keeps an estimate that
+errs slightly behind it. A payer whose clock runs fast is therefore not refused. A payer whose clock
+runs slow still stamps inside the cycle it signs for.
+
+## Payload Versions
+
+The SDK signs at its own `PAYMENT_PAYLOAD_VERSION`. Core accepts every version it can read, listed
+in `/core/public-params` as `supported_payment_payload_versions`, so an older client keeps working;
+a client newer than the core it talks to fails at construction with a clear message. The guarantee
+core signs in return is versioned independently.
 
 ## Validated Guarantees
 
 A guarantee that carries a `validation` requirement is payable only once the named validator
 approves it, and is cancelled if that has not happened by the deadline. Core resolves only
 validators it whitelists, listed in `/core/public-params` as `validators`.
-
-- `payment.sign_request(...)` signs the claims a guarantee is issued against.
 
 ## Initialization and Configuration
 
@@ -209,8 +238,8 @@ endpoints.
 
 The X402 helper turns the `paymentRequirements` emitted by a `402 Payment Required` response into an X-PAYMENT header (and optional `/settle` call) that the facilitator will accept. The examples in `https://github.com/4mica-Network/x402-4mica/examples` model the expected flow: the client speaks to the resource server, and the resource server talks to the facilitator for `/verify` and `/settle`.
 
-Signing is entirely local. `X402Flow` generates a random `req_id` nonce itself and makes no
-network call before signing, so no endpoint needs to be advertised for it.
+`X402Flow` generates the request id and blinding salt itself and reads the active settlement cycle
+from core, so the resource server advertises nothing beyond the requirements below.
 
 #### What the SDK expects from `paymentRequirements`
 
@@ -252,7 +281,6 @@ struct ResourceResponse {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let payer_signer = PrivateKeySigner::from_str(&std::env::var("PAYER_KEY")?)?;
-    let user_address = payer_signer.address().to_string();
     let payer = Client::builder().signer(payer_signer).connect().await?;
 
     // 1) GET the protected endpoint and parse JSON body
@@ -268,7 +296,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3) Build the X-PAYMENT header with the SDK
     let flow = X402Flow::new(payer)?;
     let signed = flow
-        .sign_payment(payment_requirements, user_address)
+        .sign_payment(payment_requirements)
         .await?;
     let x_payment_header = signed.header;
 
@@ -303,7 +331,6 @@ use std::str::FromStr;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let payer_signer = PrivateKeySigner::from_str(&std::env::var("PAYER_KEY")?)?;
-    let user_address = payer_signer.address().to_string();
     let payer = Client::builder().signer(payer_signer).connect().await?;
 
     // 1) GET the protected endpoint and extract payment-required header
@@ -326,7 +353,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4) Build the PAYMENT-SIGNATURE header with the SDK
     let flow = X402Flow::new(payer)?;
     let signed = flow
-        .sign_payment_v2(payment_required, accepted, user_address)
+        .sign_payment_v2(payment_required, accepted)
         .await?;
     let payment_signature_header = signed.header;
 
@@ -372,7 +399,7 @@ async fn settle(
 
 Notes:
 
-- `sign_payment` and `sign_payment_v2` sign the x402 v1 and v2 flows respectively; both use EIP-712 and error if the scheme is not 4mica.
+- `sign_payment` and `sign_payment_v2` sign the x402 v1 and v2 flows respectively; both sign as the flow's own signer and error if the scheme is not 4mica.
 - `settle_payment` only hits `/settle`; resource servers should still call the facilitator `/verify` first when enforcing access (see the Python example for the end-to-end pattern).
 
 ### API Methods Summary
@@ -411,11 +438,17 @@ All withdraw terminals return `Result<WithdrawReceipt, WithdrawError>`; `receipt
 
 #### `client.payment`
 
-- `sign_request(claims: PaymentGuaranteeRequestClaims, scheme: SigningScheme) -> Result<PaymentSignature, PaymentError>`: Sign a payment as the payer
-- `issue_guarantee(claims, signature, scheme) -> Result<BLSCert, PaymentError>`: Redeem a payer's signature for a guarantee, as the recipient
-- `verify_guarantee(cert: &BLSCert) -> Result<PaymentGuaranteeClaims, PaymentError>`: Verify a certificate and extract its claims
+- `new_payment(recipient: Address, amount: U256, asset: Asset) -> Result<PaymentRequestPayload, PaymentError>`: A payment payload scoped to the asset's active cycle, with the request id and blinding salt generated for you
+- `sign_request(payload: PaymentRequestPayload) -> Result<PaymentRequest, PaymentError>`: Sign a payment as the payer
+- `issue_guarantee(request: PaymentRequest) -> Result<GuaranteeReceipt, PaymentError>`: Redeem a payer's signed payment for a guarantee, as the recipient
+- `verify_guarantee(receipt: &GuaranteeReceipt) -> Result<Guarantee, PaymentError>`: Check a receipt came from the operator and read the guarantee it attests
 - `list_received() -> Result<Vec<RecipientPaymentInfo>, PaymentError>`: Payments guaranteed to the signer as a recipient
-- `guarantee_domain() -> &[u8; 32]`: The EIP-712 domain guarantees are signed under
+- `active_cycle(asset: Asset) -> Result<ActiveCycleResponse, PaymentError>`: The cycle payments must be signed for right now
+- `checkpoint_active_cycle(asset: Asset) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: Sign and submit the checkpoint covering everything outstanding in the asset's active cycle
+- `checkpoint_cycle(asset: Asset, cycle_id: B256) -> Result<Option<CheckpointAcceptedResponse>, PaymentError>`: Sign and submit the checkpoint covering everything outstanding in `cycle_id`
+- `checkpoint_batch(asset: Asset) -> Result<CheckpointBatchResponse, PaymentError>`: The latest checkpoint in the asset's active cycle plus every payment it does not yet cover
+- `checkpoint_batch_for_cycle(asset: Asset, cycle_id: B256) -> Result<CheckpointBatchResponse, PaymentError>`: The latest checkpoint in `cycle_id` plus every payment it does not yet cover
+- `submit_checkpoint(signed: SignedCheckpoint) -> Result<CheckpointAcceptedResponse, PaymentError>`: Submit a checkpoint signed elsewhere
 
 #### `client.settlement`
 
@@ -463,7 +496,9 @@ A payment does need the debtor's signature — it pulls money out of their walle
 - `signer_address() -> Address`: The address this client signs as
 - `login() -> Result<AuthTokens, AuthError>`: Sign in with the configured signer
 
-> **Note:** `BLSCert` exposes typed claims and signatures. Use `cert.claims().to_hex()` or `cert.signature().to_hex()` when you need hex strings.
+> **Note:** `verify_guarantee` is offline — it reaches neither the chain nor the operator. The same
+> check is available standalone as `sdk_4mica::verify_guarantee_receipt`, for a service that holds
+> no `Client`.
 
 > **Note:** Each sub-client returns its own error type — see [Error Handling](#error-handling). The umbrella `sdk_4mica::Error` implements `From` for all of them, for callers that funnel everything into one `?`.
 
@@ -598,78 +633,67 @@ println!("USDC withdrawal finalized: {:?}", receipt.tx_hash);
 #### Sign a Payment
 
 ```rust
-use sdk_4mica::{PaymentGuaranteeRequestClaims, SigningScheme, U256};
+use sdk_4mica::{Asset, U256};
 
-// Create payment claims for ETH payment.
-// req_id is a random per-request nonce (see the note below); the guarantee is
-// bound to the active settlement cycle for you.
-let req_id = U256::from_be_bytes(rand::random::<[u8; 32]>());
-
-let claims = PaymentGuaranteeRequestClaims::new(
-    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(), // user_address
-    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(), // recipient_address
-    req_id,                                                     // req_id
-    U256::from(1_000_000_000_000_000_000u128),                  // amount (1 ETH)
-    1704067200,                                                 // timestamp
-    None,                                                       // erc20_token (None for ETH)
-);
-
-// Sign using EIP-712 (recommended)
-match client.payment.sign_request(claims.clone(), SigningScheme::Eip712).await {
-    Ok(payment_sig) => {
-        println!("Signature: {}", payment_sig.signature);
-        println!("Scheme: {:?}", payment_sig.scheme);
-    }
-    Err(e) => {
-        eprintln!("Signing failed: {}", e);
-    }
-}
-
-// Or use EIP-191 (personal_sign)
-let payment_sig = client.payment.sign_request(claims, SigningScheme::Eip191).await?;
-
-// For ERC20 token payment, pass the token address
-let usdc_token = "0x1234567890123456789012345678901234567890".to_string();
-let claims_usdc = PaymentGuaranteeRequestClaims::new(
-    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
-    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
-    U256::from_be_bytes(rand::random::<[u8; 32]>()),
-    U256::from(1000_000_000u128), // 1000 USDC
-    1704067200,
-    Some(usdc_token),
-);
-let payment_sig_usdc = client.payment.sign_request(claims_usdc, SigningScheme::Eip712).await?;
-```
-
-> **Note on `req_id`:** `req_id` is a per-request nonce, **not** a sequential counter. Use a freshly generated random `U256` for each guarantee request. Replay protection comes from two independent checks: a request is bound to one settlement cycle via its signed `timestamp` (a request whose timestamp predates the active cycle is rejected as stale), and within a cycle the `(req_id, ...)` digest must be unique, so reusing a `req_id` for an otherwise-identical request is rejected as a duplicate. Random `req_id`s avoid accidental collisions; they do not need to increase or follow any order. `X402Flow` does this for you.
-
-#### Issue Payment Guarantee
-
-```rust
-use sdk_4mica::{PaymentGuaranteeRequestClaims, SigningScheme, U256};
-
-// First, the user signs the payment (see User Client example above)
-let claims = PaymentGuaranteeRequestClaims::new(
-    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
-    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
-    U256::from_be_bytes(rand::random::<[u8; 32]>()), // req_id
-    U256::from(1_000_000_000_000_000_000u128),       // 1 ETH
-    1704067200,
-    None, // None for ETH
-);
-
-let payment_sig = client.payment.sign_request(claims.clone(), SigningScheme::Eip712).await?;
-
-let bls_cert = client.payment.issue_guarantee(
-    claims,
-    payment_sig.signature,
-    payment_sig.scheme,
+// The payload is scoped to the asset's active settlement cycle. The request id and the
+// blinding salt are generated for you.
+let payload = client.payment.new_payment(
+    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".parse()?, // recipient
+    U256::from(1_000_000_000_000_000_000u128),             // 1 ETH
+    Asset::Native,
 ).await?;
 
-// The issued claims name the cycle the guarantee was bound to.
-let issued = client.payment.verify_guarantee(&bls_cert)?;
-println!("Guarantee bound to cycle: {:#x}", issued.cycle_id);
+let request = client.payment.sign_request(payload).await?;
+println!("Signature: {}", request.signature);
+
+// For an ERC-20 payment, name the token instead.
+let usdc = "0x1234567890123456789012345678901234567890".parse()?;
+let payload = client.payment.new_payment(
+    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".parse()?,
+    U256::from(1_000_000_000u128), // 1000 USDC
+    Asset::Erc20(usdc),
+).await?;
+let request_usdc = client.payment.sign_request(payload).await?;
 ```
+
+Build the payload yourself with `PaymentRequestPayload::new` only if you need to control the
+request id, timestamp or salt. The request id is a per-payment nonce, not a counter: use a fresh
+random `U256`. Within a cycle a repeated request id is rejected as a duplicate, and a payment must
+be stamped inside the active cycle and after the payer's latest checkpoint cutoff.
+
+#### Issue and Verify a Guarantee
+
+```rust
+// As the recipient, redeem the payer's signed payment.
+let receipt = client.payment.issue_guarantee(request).await?;
+
+// Check it came from the operator this client trusts. Offline: no chain, no core.
+let guarantee = client.payment.verify_guarantee(&receipt)?;
+let sdk_4mica::Guarantee::V1(v1) = guarantee;
+println!("guaranteed {} to {}", v1.amount, v1.recipient);
+```
+
+`receipt` and `signature` are exactly what `GuaranteeRegistry.verifyGuarantee` takes on-chain, so
+they can be handed to the contract unchanged. The registry's address is in core's public parameters,
+and `sdk_4mica::contract::GuaranteeRegistry` binds it.
+
+#### Checkpoint
+
+```rust
+use sdk_4mica::{Asset, error::PaymentError};
+
+// Core refuses the recipient's issuance, so the payer learns of it from the recipient.
+if let PaymentError::CheckpointRequired(details) = refusal {
+    println!("{} outstanding, max {}", details.uncheckpointed, details.max_uncheckpointed);
+    client
+        .payment
+        .checkpoint_cycle(Asset::Native, details.cycle_id.parse()?)
+        .await?;
+    // Sign a fresh payload and retry.
+}
+```
+
+`checkpoint_cycle` signs and submits in one call, and returns `None` when there is nothing to cover.
 
 ### Settlement
 
@@ -729,7 +753,7 @@ Here's a complete example showing a payment flow with ETH:
 
 ```rust
 use alloy::signers::local::PrivateKeySigner;
-use sdk_4mica::{Asset, Client, PaymentGuaranteeRequestClaims, SigningScheme, U256};
+use sdk_4mica::{Asset, Client, U256};
 use std::str::FromStr;
 
 #[tokio::main]
@@ -750,30 +774,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     println!("Deposited collateral: {:?}", receipt.tx_hash);
 
-    // 3. User signs a payment. No setup call is needed first: the guarantee is bound
+    // 3. User signs a payment. No setup call is needed first: the payload is bound
     //    to whichever settlement cycle is open.
-    let user_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string();
-    let recipient_address = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string();
-    let claims = PaymentGuaranteeRequestClaims::new(
-        user_address.clone(),
-        recipient_address.clone(),
-        U256::from_be_bytes(rand::random::<[u8; 32]>()), // req_id nonce
-        U256::from(1_000_000_000_000_000_000u128),       // 1 ETH
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs(),
-        None, // None for ETH
-    );
-    let payment_sig = user_client.payment.sign_request(claims.clone(), SigningScheme::Eip712).await?;
+    let recipient_address = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".parse()?;
+    let payload = user_client
+        .payment
+        .new_payment(
+            recipient_address,
+            U256::from(1_000_000_000_000_000_000u128), // 1 ETH
+            Asset::Native,
+        )
+        .await?;
+    let request = user_client.payment.sign_request(payload).await?;
     println!("Payment signed");
 
-    // 4. Recipient issues the guarantee
-    let bls_cert = recipient_client
-        .payment
-        .issue_guarantee(claims, payment_sig.signature, payment_sig.scheme)
-        .await?;
-    let issued = recipient_client.payment.verify_guarantee(&bls_cert)?;
-    println!("Guarantee issued in cycle {:#x}", issued.cycle_id);
+    // 4. Recipient redeems it for a guarantee and checks the operator signed it
+    let receipt = recipient_client.payment.issue_guarantee(request).await?;
+    let guarantee = recipient_client.payment.verify_guarantee(&receipt)?;
+    let sdk_4mica::Guarantee::V1(v1) = guarantee;
+    println!("Guaranteed {} to {}", v1.amount, v1.recipient);
 
     // 5. Later, once the cycle is netted and committed on-chain, each side makes
     //    one settlement call covering every payment in that window:
@@ -790,7 +809,7 @@ Here's a complete example showing a payment flow with an ERC20 token:
 
 ```rust
 use alloy::signers::local::PrivateKeySigner;
-use sdk_4mica::{Address, Asset, Client, PaymentGuaranteeRequestClaims, SigningScheme, U256};
+use sdk_4mica::{Address, Asset, Client, U256};
 use std::str::FromStr;
 
 #[tokio::main]
@@ -821,28 +840,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Deposited USDC collateral over {:?}", receipt.route);
 
     // 3. User signs a USDC payment
-    let user_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string();
-    let recipient_address = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string();
-    let claims = PaymentGuaranteeRequestClaims::new(
-        user_address.clone(),
-        recipient_address.clone(),
-        U256::from_be_bytes(rand::random::<[u8; 32]>()), // req_id nonce
-        U256::from(1000_000_000u128),                    // 1,000 USDC
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs(),
-        Some(usdc_token.clone()),
-    );
-    let payment_sig = user_client.payment.sign_request(claims.clone(), SigningScheme::Eip712).await?;
+    let recipient_address = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".parse()?;
+    let payload = user_client
+        .payment
+        .new_payment(
+            recipient_address,
+            U256::from(1_000_000_000u128), // 1,000 USDC
+            Asset::Erc20(usdc_address),
+        )
+        .await?;
+    let request = user_client.payment.sign_request(payload).await?;
     println!("Payment signed");
 
-    // 4. Recipient issues the guarantee
-    let bls_cert = recipient_client
-        .payment
-        .issue_guarantee(claims, payment_sig.signature, payment_sig.scheme)
-        .await?;
-    let issued = recipient_client.payment.verify_guarantee(&bls_cert)?;
-    println!("Guarantee issued in cycle {:#x}", issued.cycle_id);
+    // 4. Recipient redeems it for a guarantee and checks the operator signed it
+    let receipt = recipient_client.payment.issue_guarantee(request).await?;
+    let guarantee = recipient_client.payment.verify_guarantee(&receipt)?;
+    let sdk_4mica::Guarantee::V1(v1) = guarantee;
+    println!("Guaranteed {} to {}", v1.amount, v1.recipient);
 
     // 5. At cycle settlement the payer approves the ClearingHouse for the ERC20
     //    net debit (self-funded only), then pays it:
@@ -901,9 +915,11 @@ use sdk_4mica::error::{
 
 **`DepositError`**
 
-- `InvalidParams(String)`, `AmountZero`, `UnsupportedAsset(Address)`, `AaveNotConfigured`
+- `InvalidParams(String)`, `AmountZero`, `UnsupportedAsset(Address)`
+- `DepositsDisabled`, `StablecoinDepositsDisabled(Address)`, `Paused`: The treasury is not taking this deposit right now
+- `PoolInsolvent(Address)`: The pool has shares outstanding but nothing backing them, so no deposit can be priced
 - `ValueMismatch { expected, actual }`: Fee-on-transfer token delivered less than signed for
-- `ZeroCollateralCredit { asset, amount }`: Amount too small to mint any scaled collateral
+- `ZeroCollateralCredit { asset, amount }`: Amount too small to mint any pool shares
 - `AuthorizationExpired { expires_at, now }`: The authorization's deadline already elapsed
 - `Permit2AllowanceRequired { message, eip2612_nonce }`: Permit2 needs a one-time approval; when `eip2612_nonce` is present, `permit2().sponsor_approval()` can sign it instead
 - `Erc20AllowanceRequired { token, spender, allowance, needed }`: The self-funded fallback needs an allowance; grant it with `client.tokens.approve`
@@ -915,8 +931,8 @@ use sdk_4mica::error::{
 **`WithdrawError`** — one enum for request, cancel and finalize:
 
 - `InvalidParams(String)`, `AmountZero`, `InsufficientAvailable`, `NoWithdrawalRequested`,
-  `GracePeriodNotElapsed`, `TransferFailed`, `UnsupportedAsset(Address)`,
-  `StablecoinWithdrawShortfall { … }`
+  `GracePeriodNotElapsed`, `TransferFailed`, `UnsupportedAsset(Address)`, `Paused`
+- `InsufficientLiquidity { asset, requested, available }`: The pool cannot pay this much out right now; retry later or withdraw at most `available`
 - `Sponsorship(SponsorshipError)`, `Client(ClientError)`, `UnknownRevert { … }`, `Transport(String)`
 
 #### Cycle Settlement Errors
@@ -932,15 +948,19 @@ use sdk_4mica::error::{
 
 **`PaymentError`** — signing, issuing, verifying and listing:
 
-- `AddressMismatch { signer, claims }`, `InvalidUserAddress`, `InvalidRecipientAddress`, `SigningFailed(String)`
-- `InvalidCertificate(anyhow::Error)`, `CertificateMismatch`, `GuaranteeDomainMismatch`, `UnsupportedGuaranteeVersion(u64)`
-- `InvalidParams(String)`, `Decode(String)`, `Rpc(rpc::ApiClientError)`, `Auth(AuthError)`
+- `AddressMismatch { signer, payer }`, `InvalidPayerAddress`, `SigningFailed(String)`
+- `MalformedReceipt(GuaranteeDecodeError)`, `UnreadableReceiptSignature`, `ReceiptSignerMismatch { expected, recovered }`
+- `CheckpointRequired(..)`, `CycleMismatch(..)`, `TimestampNotPastCutoff(..)` — core's coded refusals, each carrying the detail needed to recover: the outstanding count, the cycle to re-sign for, or the cutoff to stamp past
+- `FutureTimestamp(..)`, `StaleTimestamp(..)` — the payment was stamped past core's clock, or before its cycle opened. Both carry core's `server_time`, which the SDK adopts, so a fresh payment is stamped right
+- `CheckpointMismatch { details, reason }` — core refused a checkpoint because a payment or another checkpoint landed after its batch was read. Read the batch again and re-sign
+- `UntrustedCheckpointBatch(String)` — core's checkpoint batch holds something the payer did not sign, so no checkpoint was signed
+- `InvalidParams(String)`, `Decode(String)`, `Rpc(rpc::ApiClientError)`, `Client(ClientError)`, `Auth(AuthError)`
 
 #### Account Errors
 
 **`AccountError`**
 
-- `UnsupportedAsset(Address)`, `AaveNotConfigured`, `Decode(String)`
+- `UnsupportedAsset(Address)`, `Decode(String)`
 - `Rpc(rpc::ApiClientError)`, `Auth(AuthError)`, `Client(ClientError)`, `UnknownRevert { … }`, `Transport(String)`
 
 #### Token Errors
@@ -979,15 +999,15 @@ cargo build --release
 ## Security Considerations
 
 - **Never commit private keys**: Always use environment variables or secure key management systems
-- **Validate addresses**: The SDK validates addresses automatically and returns `PaymentError::AddressMismatch` if the signer doesn't match the claims
-- **Signature verification**: The SDK ensures the signer address matches the claims user address before signing
-- **Use EIP-712**: Prefer EIP-712 signing over EIP-191 for better security and structured data hashing
+- **Validate addresses**: The SDK validates addresses automatically and returns `PaymentError::AddressMismatch` if the signer doesn't match the payer
+- **Signature verification**: The SDK ensures the signer address matches the payload's payer before signing
+- **Verify every receipt**: `payment.verify_guarantee` recovers the operator's signature over the guarantee. A receipt that has not been through it attests nothing
 - **Handle errors properly**: Always handle errors explicitly. The SDK provides specific error types for each failure scenario to help you build robust applications
 - **Check signer addresses**: When acting as a recipient, ensure your signer address matches the recipient address. The SDK will return `InvalidParams` errors for mismatches
 - **Validate amounts**: The SDK prevents zero-amount transactions at the contract level, but you should validate amounts in your application for better UX
 - **ERC20 Approvals**: A self-funded ERC20 deposit needs an approval first — `deposit.of(…).self_funded().approve()` — while gasless routes carry their own authorization and need none. Approve only the amount you need. Paying an ERC20 net debit self-funded needs a _separate_ approval via `settlement.pay(…).self_funded().approve()` — a different contract from the one the deposit approval targets
-- **Asset Matching**: Cycles are scoped to a single asset. Ensure the asset in your payment claims matches the asset you intend to settle in; the contract will reject mismatched assets
-- **Use random `req_id`s**: Never reuse or sequence `req_id`. A duplicate within a cycle is rejected, and `X402Flow` generates one for you
+- **Asset Matching**: Cycles are scoped to a single asset. Ensure the asset in your payment matches the asset you intend to settle in; the contract will reject mismatched assets
+- **Use random request ids**: Never reuse or sequence a request id. A duplicate within a cycle is rejected; `new_payment` and `X402Flow` generate one for you
 - **Multi-Asset Management**: Each asset (ETH and each ERC20 token) has its own collateral balance and withdrawal request. Use `client.account.assets()` to view all your asset balances
 
 ## License

@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseEnv } from "./index";
+import { parseEnv, productionWarnings } from "./index";
 
 const VALID: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/test",
   CLERK_PUBLISHABLE_KEY: "pk_test_abc",
   CLERK_SECRET_KEY: "sk_test_abc",
+};
+
+const PRODUCTION: NodeJS.ProcessEnv = {
+  ...VALID,
+  NODE_ENV: "production",
+  CLERK_AUTHORIZED_PARTIES: "https://app.4mica.io",
 };
 
 describe("parseEnv", () => {
@@ -53,9 +59,7 @@ describe("parseEnv", () => {
 
   it("turns rate limiting off under NODE_ENV=test but on elsewhere", () => {
     expect(parseEnv(VALID).RATE_LIMIT_ENABLED).toBe("false");
-    expect(
-      parseEnv({ ...VALID, NODE_ENV: "production" }).RATE_LIMIT_ENABLED,
-    ).toBe("true");
+    expect(parseEnv(PRODUCTION).RATE_LIMIT_ENABLED).toBe("true");
     expect(
       parseEnv({ ...VALID, RATE_LIMIT_ENABLED: "true" }).RATE_LIMIT_ENABLED,
     ).toBe("true");
@@ -75,6 +79,99 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...VALID, RATE_LIMIT_IP_MAX: "many" })).toThrow(
       /RATE_LIMIT_IP_MAX must be numeric/,
     );
+  });
+
+  it("leaves the onboarding drip unconfigured by default", () => {
+    const env = parseEnv(VALID);
+
+    expect(env.VALKEY_URL).toBe("");
+    expect(env.UNSUBSCRIBE_SECRET).toBe("");
+    expect(env.ONBOARDING_STEP_GAP_MS).toBe(259_200_000);
+  });
+
+  it("accepts a redis:// URL, which is what Valkey speaks", () => {
+    expect(
+      parseEnv({ ...VALID, VALKEY_URL: "redis://valkey:6379" }).VALKEY_URL,
+    ).toBe("redis://valkey:6379");
+  });
+
+  it("rejects a valkey:// URL, which ioredis would misread as a hostname", () => {
+    expect(() =>
+      parseEnv({ ...VALID, VALKEY_URL: "valkey://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a URL that is not a redis:// URL at all", () => {
+    expect(() =>
+      parseEnv({ ...VALID, VALKEY_URL: "http://127.0.0.1:6379" }),
+    ).toThrow(/must be a redis:\/\/ or rediss:\/\/ URL/);
+  });
+
+  it("rejects a weak unsubscribe secret once the drip is armed", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        VALKEY_URL: "redis://127.0.0.1:6379",
+        UNSUBSCRIBE_SECRET: "too-short",
+      }),
+    ).toThrow(/UNSUBSCRIBE_SECRET: must be at least 32 characters/);
+  });
+
+  it("ignores a weak unsubscribe secret when Valkey is unset", () => {
+    expect(() =>
+      parseEnv({ ...VALID, UNSUBSCRIBE_SECRET: "too-short" }),
+    ).not.toThrow();
+  });
+
+  it("trusts exactly one proxy hop by default", () => {
+    expect(parseEnv(VALID).TRUST_PROXY_HOPS).toBe(1);
+    expect(parseEnv({ ...VALID, TRUST_PROXY_HOPS: "2" }).TRUST_PROXY_HOPS).toBe(
+      2,
+    );
+    expect(() => parseEnv({ ...VALID, TRUST_PROXY_HOPS: "9" })).toThrow(
+      /TRUST_PROXY_HOPS must be at most 5/,
+    );
+  });
+
+  it("requires authorized parties in production, where azp is the only origin check", () => {
+    expect(() =>
+      parseEnv({ ...PRODUCTION, CLERK_AUTHORIZED_PARTIES: "" }),
+    ).toThrow(/CLERK_AUTHORIZED_PARTIES/);
+    expect(() => parseEnv({ ...VALID, NODE_ENV: "development" })).not.toThrow();
+  });
+
+  it("warns about risky but legal production settings", () => {
+    expect(productionWarnings(parseEnv(VALID))).toEqual([]);
+
+    const warnings = productionWarnings(
+      parseEnv({ ...PRODUCTION, RATE_LIMIT_ENABLED: "false" }),
+    );
+
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("not a live key"),
+        expect.stringContaining("RATE_LIMIT_ENABLED"),
+        expect.stringContaining("PUBLIC_API_URL"),
+        expect.stringContaining("CORE_URL"),
+      ]),
+    );
+    expect(
+      productionWarnings(
+        parseEnv({
+          ...PRODUCTION,
+          CLERK_SECRET_KEY: "sk_live_abc",
+          PUBLIC_API_URL: "https://api.app.4mica.io",
+          CORE_URL: "https://base.api.4mica.xyz",
+          CORE_SIGNER_KEY: `0x${"1".repeat(64)}`,
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects a non-ISO drip epoch", () => {
+    expect(() =>
+      parseEnv({ ...VALID, ONBOARDING_DRIP_EPOCH: "yesterday" }),
+    ).toThrow(/ONBOARDING_DRIP_EPOCH must be an ISO 8601 timestamp/);
   });
 });
 

@@ -53,7 +53,7 @@ routes = {
         "accepts": {
             "scheme": "4mica-credit",
             "price": "$0.10",
-            "network": "eip155:11155111",
+            "network": "eip155:84532",
             "payTo": "0xYourAddress",
         },
         "description": "Access to premium FastAPI content",
@@ -84,7 +84,7 @@ from x402.http.clients import x402_httpx_transport
 from fourmica_x402.client_scheme import FourMicaEvmScheme
 
 client = x402Client()
-client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+client.register("eip155:84532", FourMicaEvmScheme("0xYourPrivateKey"))
 
 async with httpx.AsyncClient(
     transport=x402_httpx_transport(client)

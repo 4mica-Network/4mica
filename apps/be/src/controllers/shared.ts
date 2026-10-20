@@ -1,3 +1,4 @@
+import type { SellerWalletResult } from "@controllers/wallets/repository";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import * as v from "valibot";
 
@@ -35,6 +36,12 @@ export const notFound = (reply: FastifyReply, what: string) =>
     message: `That ${what} does not exist.`,
   });
 
+export const coreUnavailable = (reply: FastifyReply) =>
+  reply.code(503).send({
+    error: "core_unavailable",
+    message: "4mica core is unreachable. Retry shortly.",
+  });
+
 export interface ValidationIssue {
   path: string;
   message: string;
@@ -45,6 +52,16 @@ export const invalidBody = (reply: FastifyReply, issues: ValidationIssue[]) =>
     error: "invalid_request",
     message: "The request body failed validation.",
     issues,
+  });
+
+export const sellerWalletError = (
+  reply: FastifyReply,
+  result: Extract<SellerWalletResult, { ok: false }>,
+) =>
+  reply.code(400).send({
+    error: result.error,
+    message: result.message,
+    issues: result.issues,
   });
 
 export const parseBody = <TSchema extends v.GenericSchema>(

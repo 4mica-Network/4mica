@@ -20,7 +20,10 @@ pub mod x402;
 
 pub use alloy::primitives::{Address, U256};
 pub use rpc::{
-    PaymentGuaranteeClaims, PaymentGuaranteeRequestClaims, SigningScheme, ValidationRequirement,
+    ActiveCycleResponse, CheckpointAcceptedResponse, CheckpointBatchResponse,
+    CheckpointMismatchDetails, CheckpointPayload, CheckpointRequiredDetails, CycleMismatchDetails,
+    FutureTimestampDetails, Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload,
+    SignedCheckpoint, StaleTimestampDetails, TimestampNotPastCutoffDetails, ValidationRequirement,
 };
 
 pub use auth::{AuthClient, AuthSession, AuthTokens};
@@ -28,6 +31,7 @@ pub use client::model::{
     Asset, AssetBalanceInfo, AssetPosition, ClaimReceipt, DepositReceipt, PayReceipt,
     RecipientPaymentInfo, Route, StablecoinPosition, TokenRoute, WithdrawReceipt,
 };
+pub use client::payment::verify_guarantee_receipt;
 pub use client::route;
 pub use client::{
     Client, account::AccountClient, deposit::DepositClient, payment::PaymentClient,
@@ -40,9 +44,7 @@ pub use contract::Core4Mica::{
     Permit2Authorization, ReceiveAuthorization, WithdrawalCancelAuthorization,
     WithdrawalRequestAuthorization,
 };
-pub use crypto::bls::BLSCert;
 pub use error::Error;
-pub use sig::PaymentSignature;
 pub use x402::{FlowSigner, X402Flow, X402SettledPayment, X402SignedPayment};
 
 /// The names most integrations need, importable in one line.

@@ -54,9 +54,6 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
     getMeHandler,
   );
 
-  // Sensitive because it is a lookup over the public handle namespace and the
-  // dashboard calls it from a typeahead. `guards` keeps it authenticated, which
-  // is also what gives the per-user limiter a key to work with.
   app.get(
     "/me/username-available",
     {

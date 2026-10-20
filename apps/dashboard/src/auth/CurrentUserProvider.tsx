@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useAppDispatch } from "@stores/hooks";
 import { fetchUser } from "@stores/user/actions";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { FullScreenLoader } from "@/auth/FullScreenLoader";
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, userId, getToken } = useAuth();
@@ -25,6 +26,10 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       dispatch(fetchUser());
     }
   }, [dispatch, isSignedIn, tokenReady, userId]);
+
+  if (!tokenReady) {
+    return <FullScreenLoader messageKey="auth.loading" />;
+  }
 
   return <>{children}</>;
 }

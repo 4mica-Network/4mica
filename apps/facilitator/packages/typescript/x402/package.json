@@ -1,6 +1,6 @@
 {
   "name": "@4mica/x402",
-  "version": "1.2.5",
+  "version": "2.0.0-alpha.2",
   "type": "module",
   "description": "TypeScript x402 utilities for interacting with the 4Mica payment network",
   "license": "MIT",
@@ -33,21 +33,29 @@
       "import": "./dist/client/index.js"
     }
   },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "check:exports": "attw --pack . --profile esm-only && publint --strict",
     "test": "vitest run",
     "lint": "biome check .",
     "lint:write": "biome check --write --diagnostic-level=error .",
     "fmt": "biome format .",
     "fmt:write": "biome format --write .",
-    "demo:server": "pnpm --filter @4mica/x402-demo server",
-    "demo:client": "pnpm --filter @4mica/x402-demo client",
-    "demo:dev": "pnpm --filter @4mica/x402-demo dev"
+    "demo:server": "pnpm --filter @4mica/x402-demo run server",
+    "demo:client": "pnpm --filter @4mica/x402-demo run client",
+    "demo:dev": "pnpm --filter @4mica/x402-demo run dev",
+    "demo:actor": "pnpm --filter @4mica/x402-demo run actor-server",
+    "demo:mcp": "pnpm --filter @4mica/x402-demo run mcp-server",
+    "demo:balance": "pnpm --filter @4mica/x402-demo run balance"
   },
   "dependencies": {
     "@x402/core": "catalog:",
     "@x402/extensions": "catalog:",
-    "@4mica/sdk": "catalog:",
+    "@4mica/sdk": "workspace:^",
     "viem": "catalog:"
   },
   "devDependencies": {
@@ -56,6 +64,7 @@
     "@types/express": "catalog:",
     "@types/node": "catalog:node26",
     "express": "catalog:",
+    "publint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

@@ -4,6 +4,4 @@ export interface NetworkInfo {
   caip2: string;
   /** Hosted 4Mica core API URL for this network. */
   rpcUrl: string;
-  /** Reliable public Ethereum RPC for on-chain calls (fallback when server doesn't provide one). */
-  publicRpcUrl: string;
 }

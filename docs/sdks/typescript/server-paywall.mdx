@@ -17,7 +17,6 @@ const paywall = createPaywall(client.rpc, {
   asset: "0x0000000000000000000000000000000000000000", // zero address = native ETH
   network: "base-sepolia",
   amount: "1000", // integer string in the asset's base units
-  tabEndpoint: "https://your-recipient.example/tab",
 });
 ```
 
@@ -36,13 +35,12 @@ const paywall = createPaywall(client.rpc, {
 | `asset`              | Yes      | Token address, or the zero address for native ETH.                      |
 | `network`            | Yes      | Network id (shorthand or CAIP-2) advertised to the payer.               |
 | `amount`             | Yes      | Amount required, as an integer string in the asset's base units.        |
-| `tabEndpoint`        | Yes      | Endpoint the payer calls to open a tab (advertised via `extra.tabEndpoint`). |
-| `scheme`             | No       | Advertised scheme. Defaults to `"4mica"`.                               |
+| `scheme`             | No       | Advertised scheme. Defaults to `"4mica-credit"`.                        |
 | `x402Version`        | No       | Advertised x402 version.                                                |
 | `description`        | No       | Human-readable description of the protected resource.                   |
 | `mimeType`           | No       | MIME type of the protected resource.                                    |
 | `maxTimeoutSeconds`  | No       | Maximum time the payer has to complete payment.                         |
-| `extra`              | No       | Extra requirements, such as a V2 validation policy.                     |
+| `extra`              | No       | Extra requirements, such as `{ validation: { validator, subject, … } }` to gate the payment on a validator. |
 | `resource`           | No       | Override the described resource in the 402 body.                        |
 | `buildRequirements`  | No       | Fully override the advertised 402 body. Takes precedence over the fields above. |
 
@@ -81,7 +79,7 @@ if (!decision.ok) {
 
 <Note>
   The paywall only **verifies** payment. On-chain settlement stays out of band as
-  a recipient operation — see the cycle-clearing `claimNetCredit` flow in
+  a recipient operation — see the cycle-clearing `settlement.claim` flow in
   [Client operations](/sdks/typescript/client-operations).
 </Note>
 

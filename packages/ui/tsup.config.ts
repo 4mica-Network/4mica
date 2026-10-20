@@ -17,6 +17,7 @@ export default defineConfig({
     "components/link/index.tsx",
     "components/modal/index.tsx",
     "components/modal/useModalA11y.ts",
+    "components/popup-confirm/index.tsx",
     "components/select/index.tsx",
     "components/spinner/index.tsx",
     "components/stack/index.tsx",

@@ -10,7 +10,7 @@ export const recordBannerInteraction = (
   type: BannerInteractionType,
 ) =>
   httpClient.request<void, { type: BannerInteractionType }>({
-    url: `/banners/${id}/interactions`,
+    url: `/banners/${encodeURIComponent(id)}/interactions`,
     method: HttpMethod.POST,
     data: { type },
   });

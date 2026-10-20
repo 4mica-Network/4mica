@@ -10,11 +10,13 @@ export default defineConfig({
       "@controllers": fileURLToPath(
         new URL("./src/controllers", import.meta.url),
       ),
+      "@jobs": fileURLToPath(new URL("./src/jobs", import.meta.url)),
       "@lifecycle": fileURLToPath(new URL("./src/lifecycle", import.meta.url)),
       "@logger": fileURLToPath(new URL("./src/logger", import.meta.url)),
       "@plugins": fileURLToPath(new URL("./src/plugins", import.meta.url)),
       "@routes": fileURLToPath(new URL("./src/routes", import.meta.url)),
       "@services": fileURLToPath(new URL("./src/services", import.meta.url)),
+      "@utils": fileURLToPath(new URL("./src/utils", import.meta.url)),
     },
   },
   test: {
@@ -25,6 +27,9 @@ export default defineConfig({
       LOG_LEVEL: "error",
       CLERK_PUBLISHABLE_KEY: "pk_test_dGVzdC5jbGVyay5hY2NvdW50cy5kZXYk",
       CLERK_SECRET_KEY: "sk_test_000000000000000000000000000000000000000000",
+      PUBLIC_API_URL: "http://api.test",
+      APP_URL: "http://app.test",
+      UNSUBSCRIBE_SECRET: "test-unsubscribe-secret-at-least-32-chars",
     },
     server: {
       deps: {

@@ -25,15 +25,11 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.10",
-          network: "eip155:11155111", // Ethereum Sepolia
+          network: "eip155:84532", // Base Sepolia
           payTo: "0xYourAddress",
         },
         description: "Access to premium content",
       },
-    },
-    // Payment tab config
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
     }
   )
 );
@@ -69,7 +65,7 @@ const scheme = await FourMicaEvmScheme.create(account);
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
+      network: "eip155:84532", // Base Sepolia
       client: scheme,
     },
   ],
@@ -80,6 +76,11 @@ const response = await fetchWithPayment("https://api.example.com/premium-content
 const data = await response.json();
 console.log(data);
 ```
+
+`@x402/fetch` only pays in assets the scheme client recognises. `FourMicaEvmScheme` recognises
+whatever 4mica core lists for the network (`GET /core/tokens`), so the server's advertised USDC
+passes the client's spend controls and the default `$1` per-payment cap applies to it. Pass
+`spendControls` to change the cap or allow other assets.
 
 ### Using with Axios
 
@@ -101,7 +102,7 @@ const scheme = await FourMicaEvmScheme.create(account);
 const api = wrapAxiosWithPaymentFromConfig(axios.create(), {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
+      network: "eip155:84532", // Base Sepolia
       client: scheme,
     },
   ],
@@ -115,7 +116,7 @@ console.log(data);
 
 ## Server Configuration
 
-### `paymentMiddlewareFromConfig(routes, tabConfig, ...options)`
+### `paymentMiddlewareFromConfig(routes, ...options)`
 
 The recommended middleware factory for most use cases. Automatically configures the 4mica facilitator and registers the `FourMicaEvmScheme` for all supported networks.
 
@@ -129,7 +130,7 @@ The recommended middleware factory for most use cases. Automatically configures 
     accepts: {
       scheme: "4mica-credit",
       price: "$0.10",
-      network: "eip155:11155111", // or "eip155:80002" for Polygon Amoy
+      network: "eip155:84532", // or "eip155:8453" for Base mainnet
       payTo: "0xRecipientAddress",
     },
     description: "What the user is paying for",
@@ -137,45 +138,40 @@ The recommended middleware factory for most use cases. Automatically configures 
 }
 ```
 
-2. **`tabConfig`** (required): Payment tab configuration
+2. **`facilitatorClients`** (optional): Additional facilitator client(s) for other payment schemes
+3. **`schemes`** (optional): Additional scheme registrations for other networks/schemes
+4. **`paywallConfig`** (optional): Configuration for the built-in paywall UI
+5. **`paywall`** (optional): Custom paywall provider
+6. **`syncFacilitatorOnStart`** (optional): Whether to sync with facilitator on startup (defaults to true)
 
-```typescript
-{
-  // Full URL endpoint for opening payment tabs
-  // This is injected into paymentRequirements.extra and clients use it to open tabs
-  advertisedEndpoint: "https://api.example.com/tabs/open",
-  
-  // Lifetime of payment tabs in seconds
-  ttlSeconds: 3600, // optional, defaults to facilitator's default
-}
-```
+#### Validation-gated payments
 
-3. **`facilitatorClients`** (optional): Additional facilitator client(s) for other payment schemes
-4. **`schemes`** (optional): Additional scheme registrations for other networks/schemes
-5. **`paywallConfig`** (optional): Configuration for the built-in paywall UI
-6. **`paywall`** (optional): Custom paywall provider
-7. **`syncFacilitatorOnStart`** (optional): Whether to sync with facilitator on startup (defaults to true)
-
-#### V2 Requirements Extra
-
-When using x402 V2, `paymentRequirements.extra` must include the validation policy fields expected by the 4mica SDKs and facilitator:
+To gate a payment on an external validator, advertise a nested `validation`
+object in `paymentRequirements.extra`. The payer signs the same requirement
+into their claims, and the guarantee only becomes payable once the validator
+approves it:
 
 ```typescript
 const extra = {
-  validationRegistryAddress: '0x3333333333333333333333333333333333333333',
-  validatorAddress: '0x4444444444444444444444444444444444444444',
-  validatorAgentId: '7',
-  minValidationScore: 80,
-  jobHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  requiredValidationTag: 'hard-finality', // optional
-  tabEndpoint: 'https://api.example.com/tabs/open',
+  validation: {
+    validator: 'validator-id',         // must be on core's allowlist
+    subject: '0x…32-byte hash…',       // what the validator must approve
+    deadline: 1700000600,              // optional; core tightens it to the cycle cutoff
+    params: '0x…',                     // optional validator-specific policy bytes
+  },
 }
 ```
 
 #### Supported Networks
 
-- `eip155:11155111` - Ethereum Sepolia
-- `eip155:80002` - Polygon Amoy
+- `eip155:8453` - Base
+- `eip155:84532` - Base Sepolia
+- `eip155:11155111` - Ethereum Sepolia (x402 v1 only)
+
+A `price` such as `"$0.10"` resolves to the stablecoin 4mica core lists for the network
+(`GET /core/tokens`), so the advertised `asset` is always one core accepts. Pass
+`{ coreUrls: { "eip155:84532": "http://localhost:3000/" } }` to `new FourMicaEvmScheme(...)` and
+register it through the `schemes` parameter to point a network at a self-hosted core.
 
 ### Advanced Server Usage
 
@@ -208,17 +204,7 @@ const resourceServer = new x402ResourceServer([
 ])
   .register("eip155:8453", new ExactEvmScheme()); // Add Base mainnet with exact scheme
 
-app.use(
-  paymentMiddleware(
-    routes,
-    resourceServer,
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 3600,
-    },
-    paywallConfig
-  )
-);
+app.use(paymentMiddleware(routes, resourceServer, paywallConfig));
 ```
 
 #### Using `paymentMiddlewareFromHTTPServer` with HTTP Hooks
@@ -242,16 +228,7 @@ const httpServer = new x402HTTPResourceServer(resourceServer, routes)
     console.log("Protected request:", context.path);
   });
 
-app.use(
-  paymentMiddlewareFromHTTPServer(
-    httpServer,
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 3600,
-    },
-    paywallConfig
-  )
-);
+app.use(paymentMiddlewareFromHTTPServer(httpServer, paywallConfig));
 ```
 
 ## Client Configuration
@@ -262,20 +239,34 @@ app.use(
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 
-const sepoliaScheme = await FourMicaEvmScheme.create(sepoliaAccount);
-const amoyScheme = await FourMicaEvmScheme.create(amoyAccount);
+const baseSepoliaScheme = await FourMicaEvmScheme.create(baseSepoliaAccount);
+const baseScheme = await FourMicaEvmScheme.create(baseAccount);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
   schemes: [
     {
-      network: "eip155:11155111", // Ethereum Sepolia
-      client: sepoliaScheme,
+      network: "eip155:84532", // Base Sepolia
+      client: baseSepoliaScheme,
     },
     {
-      network: "eip155:80002", // Polygon Amoy
-      client: amoyScheme,
+      network: "eip155:8453", // Base mainnet
+      client: baseScheme,
     },
   ],
+});
+```
+
+### Paying on a self-hosted core
+
+`FourMicaEvmScheme.create` connects to every hosted network up front. Pass `coreUrls` to
+override a network's core API URL and `networks` to limit the connections to the ones you use;
+a resource server can also steer payers with `extra.rpcUrl` in its requirements, which wins over
+both.
+
+```typescript
+const scheme = await FourMicaEvmScheme.create(account, {
+  coreUrls: { "eip155:84532": "http://localhost:3000/" },
+  networks: ["eip155:84532"],
 });
 ```
 
@@ -288,7 +279,7 @@ import { FourMicaEvmScheme } from "@4mica/x402/client";
 const scheme = await FourMicaEvmScheme.create(account);
 
 const client = new x402Client()
-  .register("eip155:11155111", scheme);
+  .register("eip155:84532", scheme);
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 ```
@@ -311,7 +302,7 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.05",
-          network: "eip155:11155111",
+          network: "eip155:84532",
           payTo: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
         },
         description: "API data access",
@@ -320,15 +311,11 @@ app.use(
         accepts: {
           scheme: "4mica-credit",
           price: "$0.20",
-          network: "eip155:11155111",
+          network: "eip155:84532",
           payTo: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
         },
         description: "Computation service",
       },
-    },
-    {
-      advertisedEndpoint: "https://api.example.com/tabs/open",
-      ttlSeconds: 7200, // 2 hours
     }
   )
 );
@@ -358,7 +345,7 @@ async function main() {
   const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [
       {
-        network: "eip155:11155111",
+        network: "eip155:84532",
         client: scheme,
       },
     ],
@@ -386,18 +373,16 @@ main();
 
 1. **Server Setup**: The middleware automatically registers the `FourMicaEvmScheme` and injects the 4mica facilitator client, so you don't need to configure them manually.
 
-2. **Tab Management**: When a client requests a protected resource, the middleware handles the tab lifecycle:
-   - The `advertisedEndpoint` is injected into `paymentRequirements.extra.tabEndpoint`
-   - Clients use this endpoint to open payment tabs
-   - The middleware automatically processes tab opening requests when they arrive at the advertised endpoint
-
-3. **Payment Flow**:
+2. **Payment Flow** (tab-free):
    - Client makes initial request to protected resource
    - Server responds with `402 Payment Required` including payment requirements
-   - Client requests a tab from the advertised endpoint
-   - Client signs a payment guarantee using the 4mica SDK
+   - Client signs a payment guarantee straight from those requirements using
+     the 4mica SDK — a random 32-byte `reqId` is minted locally; there is no
+     server round-trip before signing
    - Client retries the request with the payment payload
-   - Server verifies and settles the payment via the 4mica facilitator
+   - Server verifies and settles the payment via the 4mica facilitator, which
+     issues the BLS guarantee certificate and binds it to the open settlement
+     cycle
    - Server returns the protected resource
 
 ## License

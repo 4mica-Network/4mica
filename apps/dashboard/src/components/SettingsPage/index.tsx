@@ -1,8 +1,8 @@
 import { useAppSelector } from "@stores/hooks";
 import { selectIsUserLoading } from "@stores/user/selector";
-import { useTitle } from "ahooks";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export function SettingsPage({
   titleKey,
@@ -16,7 +16,7 @@ export function SettingsPage({
   const { t } = useTranslation();
   const isLoading = useAppSelector(selectIsUserLoading);
   const title = t(titleKey);
-  useTitle(`${title} - ${t("org")}`);
+  usePageTitle(title);
 
   return (
     <div className="flex size-full min-h-0 flex-col">

@@ -1,16 +1,5 @@
 import * as v from "valibot";
 
-/**
- * Environment parsing, mirroring apps/be/src/config/index.ts: every key is
- * defaulted at the call site, one safeParse, issues rendered with getDotPath.
- *
- * The Next-specific twist is the public/server split. Next only inlines
- * `process.env.NEXT_PUBLIC_*` for *literal* member accesses — reading through a
- * parameter (`source.NEXT_PUBLIC_X`) is not rewritten and comes back undefined
- * in the browser. So the public object below is built from literals, and no
- * secret is ever referenced through a NEXT_PUBLIC_ name.
- */
-
 const LOG_LEVELS = ["error", "warn", "info", "http", "debug"] as const;
 
 const PortSchema = v.pipe(
@@ -26,8 +15,6 @@ const format = (issues: v.BaseIssue<unknown>[]): string =>
   issues
     .map((issue) => `  - ${v.getDotPath(issue) ?? "(root)"}: ${issue.message}`)
     .join("\n");
-
-// -- Public -----------------------------------------------------------------
 
 const PublicEnvSchema = v.object({
   NEXT_PUBLIC_BASE_URL: v.pipe(v.string(), v.url("must be an absolute URL")),
@@ -65,11 +52,6 @@ export const parsePublicEnv = (source: {
   return result.output;
 };
 
-/**
- * Eager, so a misconfigured deploy fails at boot rather than on first render.
- * The literal member accesses below are what Next rewrites at build time — do
- * not refactor them into a loop or a spread.
- */
 export const publicEnv: PublicEnv = parsePublicEnv({
   NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
@@ -77,8 +59,6 @@ export const publicEnv: PublicEnv = parsePublicEnv({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 });
-
-// -- Server -----------------------------------------------------------------
 
 const ServerEnvSchema = v.object({
   NODE_ENV: v.picklist(["development", "test", "production"]),
@@ -120,12 +100,6 @@ export const parseEnv = (source: NodeJS.ProcessEnv): ServerEnv => {
 
 let cached: ServerEnv | undefined;
 
-/**
- * Lazy and memoised. Lazy because `next build` evaluates every route module
- * without a real database URL; memoised so repeated calls are free. Throws in
- * the browser so a stray client import fails loudly instead of shipping
- * `undefined` secrets.
- */
 export const serverEnv = (): ServerEnv => {
   if (typeof window !== "undefined") {
     throw new Error("serverEnv() was called in the browser");

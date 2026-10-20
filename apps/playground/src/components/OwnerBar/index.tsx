@@ -6,25 +6,21 @@ import { useState, useTransition } from "react";
 import { revalidateProfile } from "@/actions/revalidate";
 import { messages } from "@/i18n";
 import { links } from "@/services/links";
+import { runAction } from "@/utils/runAction";
 
 export interface OwnerBarProps {
   username: string;
 }
 
-/**
- * Shown only to the owner of a profile that is still private, to explain why
- * nobody else can see the page. Once published there is no bar at all — the
- * owner sees the same page as the public.
- */
 export function OwnerBar({ username }: OwnerBarProps) {
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState(false);
+  const [status, setStatus] = useState<"idle" | "done" | "failed">("idle");
 
   const refresh = () => {
     startTransition(async () => {
-      await revalidateProfile(username);
-      setDone(true);
-      setTimeout(() => setDone(false), 1500);
+      const result = await runAction(() => revalidateProfile(username));
+      setStatus(result.ok ? "done" : "failed");
+      setTimeout(() => setStatus("idle"), 1500);
     });
   };
 
@@ -53,7 +49,11 @@ export function OwnerBar({ username }: OwnerBarProps) {
             )
           }
         >
-          {done ? messages.owner.refreshed : messages.owner.refreshAction}
+          {status === "done"
+            ? messages.owner.refreshed
+            : status === "failed"
+              ? messages.owner.refreshFailed
+              : messages.owner.refreshAction}
         </Button>
 
         <Button

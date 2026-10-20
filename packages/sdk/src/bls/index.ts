@@ -245,3 +245,74 @@ export async function signatureToWordsAsync(
   const curves = await loadCurvesAsync();
   return signatureToWordsWith(curves, signatureHex);
 }
+
+const BLS_G1_COMPRESSED_BYTES = 48;
+
+/**
+ * Verify a BLS signature (G2, basic scheme — the ciphersuite core signs
+ * guarantee certificates with) against the operator's compressed G1 public
+ * key and the raw claims bytes.
+ *
+ * @throws {@link VerificationError} if the key or signature cannot be decoded.
+ */
+export async function verifyBlsSignature(
+  publicKey: Uint8Array,
+  message: Uint8Array,
+  signatureHex: string,
+): Promise<boolean> {
+  if (publicKey.length !== BLS_G1_COMPRESSED_BYTES) {
+    throw new VerificationError(
+      `invalid operator public key length: expected ${BLS_G1_COMPRESSED_BYTES} ` +
+        `bytes, got ${publicKey.length}`,
+    );
+  }
+  const curves = await loadCurvesAsync();
+  const bls = curves.bls12_381;
+  const longSignatures = bls.longSignatures;
+  const g1Point = bls.G1?.Point ?? bls.G1?.ProjectivePoint;
+  const g2Point = bls.G2.Point ?? bls.G2.ProjectivePoint;
+  if (!longSignatures || !g1Point || !g2Point) {
+    throw new VerificationError("unsupported @noble/curves BLS export");
+  }
+
+  // Some @noble/curves builds accept only hex strings in fromHex, others
+  // accept bytes; try bytes first and fall back to the hex spelling.
+  const fromHex = (
+    point: { fromHex(bytes: Uint8Array | string): unknown },
+    bytes: Uint8Array,
+  ): unknown => {
+    try {
+      return point.fromHex(bytes);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("hex string expected")) {
+        let hex = "";
+        for (const byte of bytes) {
+          hex += byte.toString(16).padStart(2, "0");
+        }
+        return point.fromHex(hex);
+      }
+      throw err;
+    }
+  };
+
+  let pubkey: unknown;
+  let signature: unknown;
+  try {
+    pubkey = fromHex(g1Point, publicKey);
+    signature = fromHex(g2Point, normalizeSignature(signatureHex).bytes);
+  } catch (err) {
+    throw new VerificationError(
+      `invalid BLS material: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  try {
+    return longSignatures.verify(
+      signature,
+      longSignatures.hash(message),
+      pubkey,
+    );
+  } catch {
+    return false;
+  }
+}

@@ -1,3 +1,4 @@
+import { HEX_COLOR_PATTERN } from "@4mica/rules";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MESSAGE,
@@ -5,22 +6,15 @@ import {
   USERNAME_PATTERN,
   usernameUnavailableReason,
 } from "@4mica/url";
+import {
+  email,
+  httpsUrl,
+  phoneNumber,
+  singleLine,
+  webUrl,
+} from "@controllers/schema-primitives";
 import * as v from "valibot";
 
-const trimmed = (max: number) => v.pipe(v.string(), v.trim(), v.maxLength(max));
-
-/**
- * The one handle rule, shared with the availability check and with the
- * playground's route params via @4mica/url.
- *
- * `toLowerCase` runs before the pattern so "Ada" normalises to "ada" instead of
- * 400ing — the playground lowercases when it resolves a profile, so a
- * mixed-case handle stored here would be unreachable at its own public URL.
- * The availability check keeps handles out of the marketing site's namespace —
- * public profiles are served bare off the same apex domain, so without it a
- * user could claim `pricing` and shadow that page — and out of the blacklist,
- * which bars role and brand names like `admin` or `stripe`.
- */
 const usernameFormatPipe = v.pipe(
   v.string(),
   v.trim(),
@@ -38,21 +32,38 @@ const usernamePipe = v.pipe(
   ),
 );
 
-/**
- * GET /me/username-available — the candidate handle, not an identity.
- *
- * Format only: a reserved or blacklisted handle is well-formed, so the handler
- * answers it as a 200 `{ available: false, reason }` rather than a 400. The
- * client is asking a question, and "no, and here's why" is a valid answer.
- */
+const isTimeZone = (value: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const LANGUAGES = ["en", "de", "fr", "es"] as const;
+
+export const DEFAULT_HOMES = [
+  "overview",
+  "balances",
+  "transactions",
+  "payments",
+  "agents",
+] as const;
+
+const requiredUsername = v.pipe(
+  v.nullable(v.string()),
+  v.transform((value) => (value ?? "").trim()),
+  v.minLength(1, "a username is required"),
+  usernamePipe,
+);
+
 export const CheckUsernameSchema = v.object({ username: usernameFormatPipe });
 
 export type CheckUsernameInput = v.InferOutput<typeof CheckUsernameSchema>;
 
 const nullableText = (max: number) =>
   v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(max)));
-
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export const NOTIFICATION_PLACEMENTS = [
   "topLeft",
@@ -69,14 +80,19 @@ export const BUSINESS_TYPES = [
   "NON_PROFIT",
 ] as const;
 
-/** PATCH /me/profile — public-facing identity. */
 export const UpdateProfileSchema = v.partial(
   v.object({
-    name: trimmed(120),
-    username: v.nullable(usernamePipe),
+    name: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(2, "must be at least 2 characters"),
+      v.maxLength(120),
+      singleLine,
+    ),
+    username: requiredUsername,
     bio: nullableText(2000),
     description: nullableText(2000),
-    avatarUrl: v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2048))),
+    avatarUrl: v.nullable(httpsUrl(2048)),
     private: v.boolean(),
     hidden: v.boolean(),
     allowSEOIndexing: v.boolean(),
@@ -84,42 +100,38 @@ export const UpdateProfileSchema = v.partial(
     allowPhoneNumberVisibility: v.boolean(),
     primaryBrandColor: v.union([
       v.literal(""),
-      v.pipe(v.string(), v.regex(HEX_COLOR, "must be a hex colour")),
+      v.pipe(v.string(), v.regex(HEX_COLOR_PATTERN, "must be a hex colour")),
     ]),
     secondaryBrandColor: v.union([
       v.literal(""),
-      v.pipe(v.string(), v.regex(HEX_COLOR, "must be a hex colour")),
+      v.pipe(v.string(), v.regex(HEX_COLOR_PATTERN, "must be a hex colour")),
     ]),
     allowCustomBrandColor: v.boolean(),
     disableBranding: v.boolean(),
   }),
 );
 
-/** PATCH /me/account — credentials, locale and app preferences. */
 export const UpdateAccountSchema = v.partial(
   v.object({
-    email: v.pipe(v.string(), v.trim(), v.email(), v.maxLength(255)),
-    phoneNumber: v.nullable(
-      v.pipe(
-        v.string(),
-        v.trim(),
-        v.maxLength(20),
-        v.regex(/^\+?[0-9 ()-]{6,20}$/, "must be a valid phone number"),
-      ),
-    ),
+    email: email(255),
+    phoneNumber: v.nullable(phoneNumber),
     theme: v.picklist(["dark", "light", "system"]),
     appTheme: v.picklist(["dark", "light", "system"]),
-    language: v.pipe(v.string(), v.trim(), v.minLength(2), v.maxLength(10)),
-    timeZone: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
-    defaultHome: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
+    language: v.picklist(LANGUAGES, "is not a supported language"),
+    timeZone: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1),
+      v.maxLength(64),
+      v.check(isTimeZone, "must be an IANA time zone"),
+    ),
+    defaultHome: v.picklist(DEFAULT_HOMES, "is not a page you can land on"),
     privacyMode: v.boolean(),
-    twoFactorEnabled: v.boolean(),
     completeOnboarding: v.boolean(),
     lastViewed: nullableText(255),
   }),
 );
 
-/** PATCH /me/notifications — every opt-in toggle. */
 export const UpdateNotificationsSchema = v.partial(
   v.object({
     allowNotification: v.boolean(),
@@ -134,30 +146,24 @@ export const UpdateNotificationsSchema = v.partial(
   }),
 );
 
-/** PUT /me/business — the legal entity behind the account. */
 export const UpsertBusinessSchema = v.partial(
   v.object({
-    legalName: trimmed(255),
+    legalName: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1, "cannot be empty"),
+      v.maxLength(255),
+    ),
     tradingName: nullableText(255),
     businessType: v.nullable(v.picklist(BUSINESS_TYPES)),
     registrationNumber: nullableText(64),
     taxId: nullableText(64),
     vatNumber: nullableText(64),
     industry: nullableText(128),
-    website: v.nullable(
-      v.union([
-        v.literal(""),
-        v.pipe(v.string(), v.trim(), v.url(), v.maxLength(255)),
-      ]),
-    ),
+    website: v.nullable(v.union([v.literal(""), webUrl(255)])),
     description: nullableText(2000),
-    supportEmail: v.nullable(
-      v.union([
-        v.literal(""),
-        v.pipe(v.string(), v.trim(), v.email(), v.maxLength(255)),
-      ]),
-    ),
-    supportPhone: nullableText(20),
+    supportEmail: v.nullable(v.union([v.literal(""), email(255)])),
+    supportPhone: v.nullable(v.union([v.literal(""), phoneNumber])),
     addressLine1: nullableText(255),
     addressLine2: nullableText(255),
     city: nullableText(128),

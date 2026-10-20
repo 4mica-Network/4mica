@@ -1,8 +1,10 @@
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import axios, { isAxiosError } from "axios";
 import { EmailClientError, type EmailValidationIssue } from "./errors";
+import type { OnboardingStepId, OnboardingStepPayload } from "./onboarding";
 import type {
   AccountDeletedPayload,
+  AccountVerificationPayload,
   ActionRequiredPayload,
   AgentCreatedPayload,
   AnnouncementPayload,
@@ -169,8 +171,16 @@ export class EmailClient {
     return this.send("welcome", payload);
   }
 
+  sendOnboardingStep(id: OnboardingStepId, payload: OnboardingStepPayload) {
+    return this.send(id, payload);
+  }
+
   sendActionRequired(payload: ActionRequiredPayload) {
     return this.send("action-required", payload);
+  }
+
+  sendAccountVerification(payload: AccountVerificationPayload) {
+    return this.send("account-verification", payload);
   }
 
   sendWaitlistConfirmation(payload: WaitlistConfirmationPayload) {

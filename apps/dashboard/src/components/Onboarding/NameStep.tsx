@@ -23,6 +23,7 @@ export function NameStep({
       >
         <TextInput
           id="onboarding-name"
+          autoComplete="name"
           value={value}
           onChange={onChange}
           placeholder={t("onboarding.name.placeholder")}

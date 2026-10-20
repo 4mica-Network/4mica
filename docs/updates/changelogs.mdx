@@ -8,6 +8,38 @@ Track product, SDK, protocol, and network changes that affect builders. Changelo
 ## Latest Changes
 
 <Update
+  label="September 2026"
+  description="SDK 2.0 and the tab-free protocol on Base Sepolia"
+  rss={{
+    title: "September 2026 - SDK 2.0 and the tab-free protocol",
+    description: "@4mica/sdk 2.0.0-alpha and @4mica/x402 2.0.0-alpha: no tab handshake, settlement cycles, and gasless deposits, live on Base Sepolia."
+  }}
+>
+  ## SDK 2.0 and the tab-free protocol
+
+  `@4mica/sdk` 2.0.0-alpha, its framework packages, and `@4mica/x402` 2.0.0-alpha ship the protocol that
+  4Mica core runs today. What changes for you:
+
+  - **No tab handshake.** A payer signs its guarantee claim straight from the seller's payment
+    requirements with a random request id. `openTab`, `extra.tabEndpoint` and `POST /tabs` are gone.
+  - **Settlement cycles.** Guarantees net into one on-chain settlement per cycle through the
+    ClearingHouse; net debtors pay and net creditors claim, gaslessly through the facilitator if
+    they choose.
+  - **Gasless deposits and withdrawals** through the facilitator, by EIP-3009 authorization or a
+    sponsored Permit2 approval for tokens without it.
+  - **Prices resolve against core.** A `"$0.10"` price advertises the stablecoin core lists for the
+    network, and the client accepts it under `@x402/fetch` spend controls.
+  - **Base Sepolia first.** The SDKs now default to Base Sepolia, core at
+    `https://base.sepolia.api.4mica.xyz/` and the facilitator at `https://x402.4mica.xyz/`. Base
+    mainnet stays on the previous protocol version until its upgrade; Ethereum Sepolia is legacy,
+    x402 v1 only.
+
+  Migration: install the alpha packages (`pnpm install @4mica/x402@alpha`, `@4mica/sdk@alpha`; `latest` stays on 1.x until Base mainnet upgrades) and remove any tab configuration. Everything else is
+  unchanged for a seller using
+  `paymentMiddlewareFromConfig` or a buyer using `wrapFetchWithPaymentFromConfig`.
+</Update>
+
+<Update
   label="June 2026"
   description="New website and documentation experience"
   rss={{
