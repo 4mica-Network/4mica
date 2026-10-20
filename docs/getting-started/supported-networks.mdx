@@ -10,24 +10,33 @@ Use the network ID in payment requirements, SDK configuration, and scheme regist
 ## Values
 
 ```txt
-Base
-Network ID: eip155:8453
-API URL: https://base.api.4mica.xyz/
-Use for: Production
-
 Base Sepolia
 Network ID: eip155:84532
-API URL: https://base.sepolia.api.4mica.xyz/
-Use for: Development, examples, demos, and integration testing
+Core API URL: https://base.sepolia.api.4mica.xyz/
+Facilitator URL: https://x402.4mica.xyz/
+Accepted collateral: USDC 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f, USDT 0x0a215D8ba66387DCA84B284D18c3B4ec3de6E54a (Aave test tokens)
+Use for: Development, examples, demos, integration testing, and pilots
+
+Base
+Network ID: eip155:8453
+Core API URL: https://base.api.4mica.xyz/
+Use for: Production traffic on the previous protocol version; the 2.0 upgrade is pending
 
 Ethereum Sepolia
 Network ID: eip155:11155111
-API URL: https://ethereum.sepolia.api.4mica.xyz/
-Use for: Ethereum testnet compatibility and cross-network testing
+Core API URL: https://ethereum.sepolia.api.4mica.xyz/
+Use for: Legacy, x402 v1 only
 ```
+
+The Base Sepolia tokens are Aave's testnet tokens, minted through Aave's public faucet contract
+rather than a Circle faucet; see the [quickstart](/getting-started/quickstart) for the one-line mint.
+Ask core which tokens it accepts on any network with
+[`GET /core/tokens`](/api-reference/operator/tokens).
 
 ## Choosing a network
 
-- Start with **Base Sepolia** for most development work.
-- Use **Ethereum Sepolia** only when your test flow needs Ethereum Sepolia.
-- Use **Base** when you are ready for production traffic.
+- Start with **Base Sepolia**. It is the network the SDKs default to and the one the 2.0 protocol
+  runs on today.
+- **Base** still runs the previous protocol version. SDK 2.0 clients cannot pay there until the
+  mainnet upgrade lands; this page will change when it does.
+- **Ethereum Sepolia** is kept for legacy integrations and serves x402 v1 only.

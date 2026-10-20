@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "packages/sdk-python/**"
+      - "contracts/abi/**"
       - ".github/workflows/sdk-python-ci.yml"
   workflow_dispatch:
 
@@ -41,13 +42,11 @@ jobs:
       - name: Pytest
         run: uv run pytest -q
 
+      # The package's ABIs are copies of the monorepo source of truth written
+      # by scripts/refresh-abis.sh; a hand edit on either side fails here.
       - name: ABI drift check
         run: |
-          for fn in payNetDebit claimNetCreditFor; do
-            jq -e --arg fn "$fn" '.abi[] | select(.type=="function" and .name==$fn)' \
-              fourmica_sdk/contract/abi/clearing_house.json > /dev/null
-          done
-          for fn in deposit depositStablecoin getGuaranteeVersionConfig depositStablecoinWithAuthorization; do
-            jq -e --arg fn "$fn" '.abi[] | select(.type=="function" and .name==$fn)' \
-              fourmica_sdk/contract/abi/core4mica.json > /dev/null
-          done
+          diff <(jq -S . ../../contracts/abi/Core4Mica.json) \
+               <(jq -S . fourmica_sdk/contract/abi/core4mica.json)
+          diff <(jq -S . ../../contracts/abi/ClearingHouse.json) \
+               <(jq -S . fourmica_sdk/contract/abi/clearing_house.json)

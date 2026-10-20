@@ -1,5 +1,11 @@
 import type { TemplateProps } from "@4mica/email-client";
-import { brand, CallToAction, Layout, styles } from "@components/index";
+import {
+  brand,
+  CallToAction,
+  Layout,
+  Signature,
+  styles,
+} from "@components/index";
 import { Heading, Text } from "react-email";
 
 export const WaitlistInvitation = ({
@@ -14,6 +20,8 @@ export const WaitlistInvitation = ({
       {userName}, your spot on {brand.name} just opened up. Claim it and you can
       register your first agent right away.
     </Text>
+
+    <Signature />
 
     <CallToAction href={actionUrl} label="Claim your invite" />
 

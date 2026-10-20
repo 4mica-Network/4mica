@@ -94,7 +94,6 @@ describe("user reducer optimistic updates", () => {
     );
     state = reducer(state, updateProfile({ hidden: true }, "visibility"));
 
-    // The first snapshot must survive so a rollback restores the true original.
     expect(state.rollback).toEqual({ private: true });
 
     state = reducer(

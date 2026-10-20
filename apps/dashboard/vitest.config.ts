@@ -20,6 +20,7 @@ export default defineConfig({
     // jsdom across the board rather than a second project: the store tests are
     // environment-agnostic, and one environment keeps the config readable.
     environment: "jsdom",
+    execArgv: ["--no-experimental-webstorage"],
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },

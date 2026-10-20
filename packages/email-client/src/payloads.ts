@@ -38,16 +38,28 @@ const base = BaseEmailSchema.entries;
 
 // --- Onboarding -------------------------------------------------------------
 
-export const WelcomeSchema = v.object({
+export const OnboardingStepSchema = v.object({
   ...base,
   ctaUrl: v.optional(absoluteUrl),
+  unsubscribeUrl: v.optional(absoluteUrl),
 });
+
+export const WelcomeSchema = OnboardingStepSchema;
 
 export const ActionRequiredSchema = v.object({
   ...base,
   actionText: nonEmpty("actionText"),
   actionUrl: absoluteUrl,
   reason: v.optional(v.string()),
+});
+
+export const AccountVerificationSchema = v.object({
+  ...base,
+  verifyUrl: absoluteUrl,
+  expiresInHours: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(168)),
+    24,
+  ),
 });
 
 // --- Waitlist & access ------------------------------------------------------
@@ -196,6 +208,9 @@ export const AnnouncementSchema = v.object({
 
 export type WelcomePayload = v.InferInput<typeof WelcomeSchema>;
 export type ActionRequiredPayload = v.InferInput<typeof ActionRequiredSchema>;
+export type AccountVerificationPayload = v.InferInput<
+  typeof AccountVerificationSchema
+>;
 export type WaitlistConfirmationPayload = v.InferInput<
   typeof WaitlistConfirmationSchema
 >;

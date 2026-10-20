@@ -3,8 +3,6 @@ import { messages } from "@/i18n";
 
 export const FAQS = messages.home.faqs;
 
-export const USE_CASES = messages.home.useCases;
-
 export const STEPS = messages.home.steps;
 
 export const STATS = messages.home.stats;

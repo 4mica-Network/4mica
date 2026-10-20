@@ -40,6 +40,8 @@ export type CheckboxProps = {
   name?: string;
   children?: ReactNode;
   onChange?: (checked: boolean) => void;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
   "data-testid"?: string;
 } & VariantProps<typeof checkboxStyles>;
 
@@ -52,6 +54,8 @@ export const Checkbox = ({
   variant = "rounded",
   name,
   onChange,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
   ...props
 }: CheckboxProps) => {
   const prefix = props["data-testid"]
@@ -64,6 +68,8 @@ export const Checkbox = ({
       role="checkbox"
       name={name}
       aria-checked={checked}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
       className={cn(

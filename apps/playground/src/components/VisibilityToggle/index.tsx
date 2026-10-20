@@ -9,6 +9,12 @@ import {
 } from "@/actions/visibility";
 import { messages } from "@/i18n";
 import type { Visibility } from "@/types";
+import { runAction } from "@/utils/runAction";
+
+const ERRORS: Record<string, string> = {
+  unauthorized: messages.visibility.errorUnauthorized,
+  not_found: messages.visibility.errorNotFound,
+};
 
 const OPTIONS = [
   { value: "PUBLIC", label: messages.visibility.public, icon: Eye },
@@ -35,14 +41,17 @@ export function VisibilityToggle({ kind, id, current }: VisibilityToggleProps) {
     setError(null);
 
     startTransition(async () => {
-      const result =
+      const result = await runAction(() =>
         kind === "agent"
-          ? await setAgentVisibility(id, next)
-          : await setApiListingVisibility(id, next);
+          ? setAgentVisibility(id, next)
+          : setApiListingVisibility(id, next),
+      );
 
       if (!result.ok) {
         setValue(previous); // roll back
-        setError(result.error ?? "failed");
+        setError(
+          ERRORS[result.error ?? ""] ?? messages.visibility.errorGeneric,
+        );
       }
     });
   };

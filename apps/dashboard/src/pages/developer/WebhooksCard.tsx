@@ -1,37 +1,35 @@
-import {
-  Button,
-  ComboBox,
-  EmptyState,
-  InputField,
-  Spinner,
-  Switch,
-  Tag,
-} from "@4mica/ui";
+import { Button, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
 import {
   createWebhook,
   deleteWebhook,
+  developerPendingKeys,
   rotateWebhookSecret,
   updateWebhook,
 } from "@stores/developer/actions";
 import {
+  selectDeveloperError,
   selectDeveloperIssues,
-  selectIsPending,
+  selectIsDeveloperPending,
   selectWebhookEvents,
   selectWebhooks,
 } from "@stores/developer/selector";
 import type { Webhook } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-// `Webhook` is already the store's entity type in this file.
 import { Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, FieldRow, SettingsSection } from "@/components/form";
+import { ConfirmAction } from "@/components/ConfirmAction";
+import { ComboBox, FieldRow, TextInput } from "@/components/form";
+import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function WebhookRow({ webhook }: { webhook: Webhook }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const events = useAppSelector(selectWebhookEvents);
-  const isPending = useAppSelector(selectIsPending(`webhook:${webhook.id}`));
+  const isPending = useAppSelector(
+    selectIsDeveloperPending(developerPendingKeys.webhook(webhook.id)),
+  );
   const [expanded, setExpanded] = useState(false);
 
   const options = useMemo(
@@ -42,7 +40,7 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
   const enabled = webhook.status === "ENABLED";
 
   return (
-    <Card className="flex flex-col gap-3">
+    <SurfaceCard className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate font-medium text-ink-strong text-sm">
@@ -67,7 +65,7 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
           </Tag>
           <Switch
             data-testid={`webhook-${webhook.id}`}
-            aria-label={t("developer.webhooks.toggle")}
+            aria-label={t("developer.webhooks.toggle", { url: webhook.url })}
             initialState={enabled}
             disabled={isPending}
             onToggle={(next) =>
@@ -131,28 +129,33 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
         </Button>
 
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            intent="soft"
-            disabled={isPending}
-            onClick={() => dispatch(rotateWebhookSecret({ id: webhook.id }))}
+          <ConfirmAction
+            title={t("developer.webhooks.rotateConfirm")}
+            description={t("developer.webhooks.rotateConsequence")}
+            confirmLabel={t("developer.webhooks.rotate")}
+            onConfirm={() => dispatch(rotateWebhookSecret({ id: webhook.id }))}
           >
-            {t("developer.webhooks.rotate")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            intent="ghost"
-            aria-label={t("developer.webhooks.delete")}
-            disabled={isPending}
-            onClick={() => dispatch(deleteWebhook({ id: webhook.id }))}
+            <Button type="button" size="sm" intent="soft" disabled={isPending}>
+              {t("developer.webhooks.rotate")}
+            </Button>
+          </ConfirmAction>
+          <ConfirmAction
+            title={t("developer.webhooks.deleteConfirm", { url: webhook.url })}
+            onConfirm={() => dispatch(deleteWebhook({ id: webhook.id }))}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              intent="ghost"
+              aria-label={t("developer.webhooks.delete", { url: webhook.url })}
+              disabled={isPending}
+            >
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
+            </Button>
+          </ConfirmAction>
         </div>
       </div>
-    </Card>
+    </SurfaceCard>
   );
 }
 
@@ -162,7 +165,8 @@ export function WebhooksCard() {
   const webhooks = useAppSelector(selectWebhooks);
   const events = useAppSelector(selectWebhookEvents);
   const issues = useAppSelector(selectDeveloperIssues);
-  const isCreating = useAppSelector(selectIsPending("createWebhook"));
+  const error = useAppSelector(selectDeveloperError);
+  const isCreating = useAppSelector(selectIsDeveloperPending("createWebhook"));
 
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
@@ -173,22 +177,35 @@ export function WebhooksCard() {
     [events],
   );
 
-  const canSubmit = url.trim().length > 0 && selected.length > 0;
+  const trimmedUrl = url.trim();
+  const urlError =
+    trimmedUrl === ""
+      ? undefined
+      : !trimmedUrl.startsWith("https://")
+        ? t("validation.httpsUrl")
+        : trimmedUrl.length > 2048
+          ? t("validation.tooLong", { max: 2048 })
+          : undefined;
+  const canSubmit =
+    trimmedUrl.length > 0 && urlError === undefined && selected.length > 0;
+
+  useOnSuccess(isCreating, error !== null, () => {
+    setUrl("");
+    setDescription("");
+    setSelected([]);
+  });
 
   const create = () => {
-    if (!canSubmit) {
+    if (!canSubmit || isCreating) {
       return;
     }
     dispatch(
       createWebhook({
-        url: url.trim(),
+        url: trimmedUrl,
         description: description.trim() || null,
         events: selected.map(String),
       }),
     );
-    setUrl("");
-    setDescription("");
-    setSelected([]);
   };
 
   return (
@@ -196,7 +213,7 @@ export function WebhooksCard() {
       title={t("developer.webhooks.title")}
       description={t("developer.webhooks.description")}
     >
-      <Card>
+      <SurfaceCard>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -208,12 +225,14 @@ export function WebhooksCard() {
             description={t("developer.webhooks.urlHint")}
             htmlFor="webhook-url"
           >
-            <InputField
-              id="webhook-url"
+            <TextInput
+              type="url"
+              inputMode="url"
               value={url}
               placeholder="https://api.example.com/4mica/webhooks"
-              error={issues.url}
-              onChange={(e) => setUrl(e.target.value)}
+              error={urlError ?? issues.url}
+              maxLength={2048}
+              onChange={setUrl}
             />
           </FieldRow>
 
@@ -222,12 +241,11 @@ export function WebhooksCard() {
             description={t("developer.webhooks.descriptionHint")}
             htmlFor="webhook-description"
           >
-            <InputField
-              id="webhook-description"
+            <TextInput
               value={description}
               error={issues.description}
               maxLength={255}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
             />
           </FieldRow>
 
@@ -254,9 +272,6 @@ export function WebhooksCard() {
               type="submit"
               size="sm"
               intent="invert"
-              // Same box as the API-key submit button so both primary actions
-              // on this page match. min-w rather than w so a longer label grows
-              // the button instead of wrapping onto a second line.
               className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
               disabled={!canSubmit || isCreating}
             >
@@ -270,7 +285,7 @@ export function WebhooksCard() {
             </Button>
           </div>
         </form>
-      </Card>
+      </SurfaceCard>
 
       {webhooks.length === 0 ? (
         <EmptyState

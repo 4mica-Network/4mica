@@ -7,9 +7,8 @@ const PROOF = [`0x${"dd".repeat(32)}`] as const;
 
 type ClearingHouseMock = {
   write: {
-    claimNetCredit: ReturnType<typeof vi.fn>;
+    claimNetCreditFor: ReturnType<typeof vi.fn>;
     payNetDebit: ReturnType<typeof vi.fn>;
-    markDefaulted: ReturnType<typeof vi.fn>;
   };
 };
 
@@ -25,6 +24,7 @@ function createGateway(opts?: {
   const publicClient = {
     waitForTransactionReceipt: vi.fn(async ({ hash }: { hash: string }) => ({
       hash,
+      transactionHash: hash,
       status: "success",
     })),
   };
@@ -35,9 +35,8 @@ function createGateway(opts?: {
   const contract = { address: DUMMY_ADDRESS, write: {} };
   const clearingHouse: ClearingHouseMock = {
     write: {
-      claimNetCredit: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),
+      claimNetCreditFor: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),
       payNetDebit: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),
-      markDefaulted: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),
     },
   };
 
@@ -77,11 +76,23 @@ describe("ContractGateway transaction queue", () => {
       },
     });
 
-    const p1 = gateway.claimNetCredit(DUMMY_ADDRESS, CYCLE_ID, 1n, [...PROOF]);
-    const p2 = gateway.claimNetCredit(DUMMY_ADDRESS, CYCLE_ID, 2n, [...PROOF]);
+    const p1 = gateway.claimNetCreditFor(
+      DUMMY_ADDRESS,
+      DUMMY_ADDRESS,
+      CYCLE_ID,
+      1n,
+      [...PROOF],
+    );
+    const p2 = gateway.claimNetCreditFor(
+      DUMMY_ADDRESS,
+      DUMMY_ADDRESS,
+      CYCLE_ID,
+      2n,
+      [...PROOF],
+    );
     await Promise.all([p1, p2]);
 
-    expect(clearingHouse.write.claimNetCredit).toHaveBeenCalledTimes(2);
+    expect(clearingHouse.write.claimNetCreditFor).toHaveBeenCalledTimes(2);
     expect(maxInFlight).toBe(1);
   });
 
@@ -104,17 +115,23 @@ describe("ContractGateway transaction queue", () => {
     expect(results[1].status).toBe("fulfilled");
   });
 
-  it("submits markDefaulted with an explicit gas limit", async () => {
+  it("submits claimNetCreditFor with an explicit gas limit and the creditor first", async () => {
     const { gateway, clearingHouse } = createGateway();
 
-    await gateway.markDefaulted(DUMMY_ADDRESS, CYCLE_ID, DUMMY_ADDRESS, 5n, [
-      ...PROOF,
-    ]);
+    await gateway.claimNetCreditFor(
+      DUMMY_ADDRESS,
+      DUMMY_ADDRESS,
+      CYCLE_ID,
+      5n,
+      [...PROOF],
+    );
 
-    expect(clearingHouse.write.markDefaulted).toHaveBeenCalledTimes(1);
-    expect(clearingHouse.write.markDefaulted.mock.calls[0]?.[1]).toMatchObject({
-      gas: 1_000_000n,
-    });
+    expect(clearingHouse.write.claimNetCreditFor).toHaveBeenCalledTimes(1);
+    const [args, options] =
+      clearingHouse.write.claimNetCreditFor.mock.calls[0] ?? [];
+    expect(args?.[0]?.toLowerCase()).toBe(DUMMY_ADDRESS);
+    expect(args?.[1]).toBe(CYCLE_ID);
+    expect(options).toMatchObject({ gas: 1_000_000n });
   });
 
   it("attaches the native payable value on payNetDebit", async () => {

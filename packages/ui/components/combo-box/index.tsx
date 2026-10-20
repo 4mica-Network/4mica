@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useId, useMemo, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
+import { isOpenKey } from "../../lib/focusable";
 import { Checkbox } from "../checkbox";
 import { Dropdown } from "../dropdown";
 import { InputField } from "../input-field";
@@ -11,7 +12,13 @@ export type ComboBoxOption = {
 };
 
 export type ComboBoxProps = {
+  id?: string;
   label?: string;
+  selectedText?: (count: number) => string;
+  noResultsText?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
   options: ComboBoxOption[];
   selectedValues: Array<string | number>;
   onChange: (selected: Array<string | number>) => void;
@@ -23,7 +30,13 @@ export type ComboBoxProps = {
 };
 
 export const ComboBox = ({
+  id,
   label,
+  selectedText = (count) => `${count} selected`,
+  noResultsText = "No results",
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
   options,
   selectedValues,
   onChange,
@@ -36,6 +49,16 @@ export const ComboBox = ({
   const [visible, setVisible] = useState(false);
   const [search, setSearch] = useState("");
   const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const generatedId = useId();
+  const triggerId = id ?? `combo-${generatedId}`;
+  const panelId = `${triggerId}-panel`;
+
+  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (isOpenKey(event.key)) {
+      event.preventDefault();
+      if (!disabled) setVisible(true);
+    }
+  };
 
   const filteredOptions = useMemo(
     () =>
@@ -59,16 +82,27 @@ export const ComboBox = ({
       {...(dataTestId ? { "data-testid": `${dataTestId}-root` } : {})}
     >
       {label && (
-        <p className="mb-2 font-medium text-ink-muted text-sm">{label}</p>
+        <label
+          htmlFor={triggerId}
+          className="mb-2 block font-medium text-ink-muted text-sm"
+        >
+          {label}
+        </label>
       )}
 
       <button
         ref={anchorRef}
+        id={triggerId}
         type="button"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={visible}
+        aria-controls={visible ? panelId : undefined}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         disabled={disabled}
         onClick={() => !disabled && setVisible(!visible)}
+        onKeyDown={handleTriggerKeyDown}
         className={cn(
           "flex w-full items-center rounded-lg border border-overlay/15 px-3 py-2.5 text-left text-ink-body text-sm outline-none transition",
           disabled
@@ -86,7 +120,7 @@ export const ComboBox = ({
           )}
         >
           {selectedValues.length > 0
-            ? `${selectedValues.length} selected`
+            ? selectedText(selectedValues.length)
             : placeholder}
         </span>
         <ChevronDown
@@ -102,6 +136,8 @@ export const ComboBox = ({
         anchorRef={anchorRef}
         placement="bottom"
         onClickOutside={() => setVisible(false)}
+        autoFocus
+        id={panelId}
         matchAnchorWidth
         className="p-0"
       >
@@ -110,17 +146,17 @@ export const ComboBox = ({
           {...(dataTestId ? { "data-testid": `${dataTestId}-panel` } : {})}
         >
           <InputField
-            type="text"
+            type="search"
+            aria-label={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={searchPlaceholder}
             {...(dataTestId ? { "data-testid": `${dataTestId}-search` } : {})}
           />
 
-          <div
-            className="flex max-h-50 flex-col overflow-y-auto overflow-x-hidden"
-            role="listbox"
-            aria-multiselectable
+          <fieldset
+            className="m-0 flex max-h-50 min-w-0 flex-col overflow-y-auto overflow-x-hidden border-0 p-0"
+            aria-labelledby={triggerId}
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => (
@@ -147,10 +183,10 @@ export const ComboBox = ({
                   ? { "data-testid": `${dataTestId}-no-results` }
                   : {})}
               >
-                No results
+                {noResultsText}
               </div>
             )}
-          </div>
+          </fieldset>
         </div>
       </Dropdown>
     </div>

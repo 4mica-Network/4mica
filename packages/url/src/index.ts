@@ -21,31 +21,40 @@ const defaultEnv = (): Env => {
     : {};
 };
 
+const CANONICAL_BASE = "https://4mica.io";
+
 const stripTrailingSlash = (url: string): string => url.replace(/\/$/, "");
 const toRoot = (url: string): string => url.replace(/^https?:\/\//, "");
 
 const resolveUrl = (url: string): string =>
   url.startsWith("http") ? url : `https://${url}`;
 
-// Treat unset AND empty/whitespace-only env vars as absent. Docker's
-// `ENV FOO=$FOO` with no build arg sets FOO to "", which `??` would keep,
-// producing an invalid base like "https:/".
-const firstNonEmpty = (...values: (string | undefined)[]): string | undefined =>
-  values.find((value) => value != null && value.trim() !== "");
+const hasHost = (value: string): boolean =>
+  value
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .trim() !== "";
+
+const firstUsableBase = (
+  ...values: (string | undefined)[]
+): string | undefined =>
+  values.find(
+    (value) => value != null && value.trim() !== "" && hasHost(value),
+  );
 
 const resolveBases = (env: Env): Bases => {
   const base = stripTrailingSlash(
     resolveUrl(
-      firstNonEmpty(
+      firstUsableBase(
         env.NEXT_PUBLIC_BASE_URL,
         env.VITE_BASE_URL,
         env.BASE_URL,
-      ) ?? "https://4mica.io",
+      ) ?? CANONICAL_BASE,
     ),
   );
   const appBase = stripTrailingSlash(
     resolveUrl(
-      firstNonEmpty(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
+      firstUsableBase(env.NEXT_PUBLIC_APP_URL, env.VITE_APP_URL, env.APP_URL) ??
         base,
     ),
   );
@@ -59,6 +68,7 @@ const buildRoutes = () =>
     about: "/about",
     agentsRegister: "/agents/register",
     careers: "/careers",
+    developers: "/developers",
     interactiveProtocol: "/interactive-protocol",
     leadership: "/leadership",
     partners: "/partners",
@@ -71,29 +81,16 @@ const buildRoutes = () =>
     logo: "/assets/logo_transparent.png",
   }) as const;
 
-/**
- * Root path segments that can never be a username.
- *
- * Public profiles are served bare (`4mica.io/<username>`) from the same apex
- * domain as the marketing site, so every segment the marketing site owns has to
- * be excluded from the handle namespace. The list is derived from `routes` so it
- * cannot drift, plus the pages that exist only as files under `apps/web/app`.
- *
- * `apps/web/nginx.conf.template` encodes the same list as proxy rules, and
- * `apps/playground/src/main.test.ts` asserts the two stay in sync.
- */
 export const reservedSegments: ReadonlySet<string> = new Set([
   ...Object.values(buildRoutes())
     .filter((route) => route.startsWith("/") && route !== "/")
     .map((route) => route.slice(1).split("/")[0]),
-  // apps/web pages that have no entry in `routes`
   "careers",
   "dpa",
   "legal",
   "pricing",
   "solution",
   "solutions",
-  // auth and playground literals
   "api",
   "docs",
   "sign-in",
@@ -101,7 +98,6 @@ export const reservedSegments: ReadonlySet<string> = new Set([
   "sso-callback",
   "status",
   "waitlist",
-  // framework and static assets
   "_next",
   "assets",
   "bg",
@@ -115,33 +111,9 @@ export const reservedSegments: ReadonlySet<string> = new Set([
   "sitemap.xml",
 ]);
 
-/** True when `segment` is a marketing route and so NOT claimable as a handle. */
 export const isReservedSegment = (segment: string): boolean =>
   reservedSegments.has(segment.toLowerCase());
 
-/**
- * Handles nobody may claim, mapped to why.
- *
- * Deliberately separate from `reservedSegments`, which is about *path
- * collisions* — every entry there is a real page on 4mica.io and has a matching
- * proxy rule in apps/web/nginx.conf.template. These are not routes. They are
- * names that would let someone impersonate the company, a role, or a
- * third-party brand.
- *
- * Merging the two sets would break in both directions: the sync test in
- * apps/playground/src/main.test.ts would demand ~300 nginx rules for pages that
- * do not exist, and apps/playground/src/middleware.ts passes reserved segments
- * through to apps/web, so `4mica.io/google` would render a marketing 404
- * instead of the correct "no such profile" page.
- *
- * Overlap with `reservedSegments` is intentional and harmless — a name that is
- * both stays blocked if the route behind it is ever deleted.
- *
- * A Map rather than a list of records: it dedupes by construction, answers in
- * O(1), and keeps each reason next to the name it explains. The reasons are
- * internal documentation — callers surface a generic "not available", so the
- * policy is not published to whoever is probing for handles.
- */
 export const blacklistedUsernames: ReadonlyMap<string, string> = new Map([
   // Core system and role names
   ["admin", "Reserved for system use"],
@@ -285,11 +257,6 @@ export const blacklistedUsernames: ReadonlyMap<string, string> = new Map([
   ["sale", "Reserved for product messaging"],
   ["discount", "Reserved for product messaging"],
   ["promo", "Reserved for product messaging"],
-
-  // ---------------------------------------------------------------------
-  // Third-party brands. Not exhaustive and not meant to be — this covers the
-  // names most likely to be squatted for a convincing impersonation.
-  // ---------------------------------------------------------------------
 
   // Big tech
   ["apple", "Reserved for brand protection (company)"],
@@ -555,15 +522,6 @@ export const usernameUnavailableReason = (
   return isBlacklistedUsername(segment) ? "blacklisted" : null;
 };
 
-/**
- * The handle character class and bounds.
- *
- * This lives beside `reservedSegments` because the two are one rule: what may
- * become a public profile handle. It used to be copied into
- * apps/be/src/controllers/me/schema.ts and apps/playground/src/schema/params.ts
- * with a "must never diverge" comment on the copy; the dashboard needing a
- * client-side check made a third copy the breaking point.
- */
 export const USERNAME_PATTERN = /^[a-z0-9_-]+$/;
 export const USERNAME_MIN_LENGTH = 2;
 export const USERNAME_MAX_LENGTH = 64;
@@ -571,18 +529,11 @@ export const USERNAME_MAX_LENGTH = 64;
 export const USERNAME_MESSAGE =
   "username may only contain lowercase letters, numbers, - and _";
 
-/** Format only — says nothing about whether the handle is free or reserved. */
 export const isValidUsername = (value: string): boolean =>
   value.length >= USERNAME_MIN_LENGTH &&
   value.length <= USERNAME_MAX_LENGTH &&
   USERNAME_PATTERN.test(value);
 
-/**
- * The shape `generateUsername()` in apps/be mints for every new account:
- * `user-` plus 8 characters of Crockford base32 minus i/l/o/u. Callers use this
- * to tell "the system picked this" from "the person picked this" — the
- * onboarding wizard will not let a generated handle count as a chosen one.
- */
 export const GENERATED_USERNAME_PREFIX = "user-";
 export const GENERATED_USERNAME_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 export const GENERATED_USERNAME_SUFFIX_LENGTH = 8;
@@ -607,8 +558,17 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     signin: `${appBase}/sign-in`,
     signup: `${appBase}/sign-up`,
     waitlist: `${appBase}/waitlist`,
+    assets: {
+      base: CANONICAL_BASE,
+      logo: `${CANONICAL_BASE}${routes.logo}`,
+    },
     docs: "https://docs.4mica.io",
     docsChangelog: "https://docs.4mica.io/updates/changelogs",
+    docsWallet: "https://docs.4mica.io/core-concepts/wallet",
+    docsDeposits:
+      "https://docs.4mica.io/core-concepts/deposits-and-withdrawals",
+    docsNoCustody: "https://docs.4mica.io/core-concepts/no-custodial-risk",
+    docsSecurity: "https://docs.4mica.io/core-concepts/security",
     status: "https://status.4mica.io",
     facilitator: "https://x402.4mica.xyz",
     facilitatorSettle: "https://x402.4mica.xyz/settle",
@@ -733,3 +693,5 @@ export type Routes = typeof routes;
 export type RouteKey = keyof Routes;
 export type Links = typeof links;
 export type LinkKey = keyof Links;
+
+export { DEFAULT_REDIRECT, safeRedirectPath } from "./redirect";

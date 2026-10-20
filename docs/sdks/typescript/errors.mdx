@@ -10,11 +10,13 @@ All SDK errors extend `FourMicaError`. Import the specific classes to branch on 
 | Error                    | When it is thrown                                             |
 | ------------------------ | ------------------------------------------------------------ |
 | `ConfigError`            | Invalid `ConfigBuilder` input.                               |
-| `RpcError`               | The 4Mica core service returned an error. Carries `.status` and `.body`. |
-| `SigningError`           | The signing scheme is unsupported, or the signer address does not match the claims. |
-| `ContractError`          | An on-chain call failed or returned an unexpected result.    |
-| `VerificationError`      | A BLS certificate failed to decode or its domain did not match. |
-| `X402Error`              | An x402 flow error: bad scheme, tab resolution, or settlement. |
+| `RpcError`               | The 4Mica core service returned an error, or the request never arrived. Carries `.status` and `.body`. |
+| `ClientError`            | Client-side connection failures: `ClientInitializationError`, `ChainRpcUnavailableError`, … |
+| `PaymentError`           | The guarantee flow: `SigningError`, `AddressMismatchError`, `CertificateMismatchError`, `GuaranteeDomainMismatchError`, … |
+| `ContractError`          | An on-chain call failed. Known reverts are typed: `AmountZeroError`, `InsufficientAvailableError`, …, with `UnknownRevertError` as the fallthrough. |
+| `Erc20AllowanceRequiredError` | A self-funded token pull needs an allowance that is not in place. Call the matching `approve()` terminal and retry. |
+| `VerificationError`      | BLS material or guarantee claims bytes failed to decode.     |
+| `X402Error`              | An x402 flow error: bad scheme, invalid requirements, or settlement transport. |
 | `AuthError`              | Base class for all authentication errors.                    |
 | `AuthMissingConfigError` | `login()` was called but auth is not configured.             |
 
@@ -26,22 +28,20 @@ Import the classes you want to handle and branch with `instanceof`.
 
 ```ts
 import {
-  ConfigError, // invalid ConfigBuilder input
-  RpcError, // 4Mica core service error (has .status and .body)
-  SigningError, // signing scheme unsupported or address mismatch
+  CertificateMismatchError, // the certificate's BLS signature does not verify
   ContractError, // on-chain call failed or unexpected result
-  VerificationError, // BLS certificate decode or domain mismatch
-  X402Error, // x402 flow error
-  AuthError, // base class for all auth errors
-  AuthMissingConfigError, // auth not configured when login() is called
+  Erc20AllowanceRequiredError, // a token pull needs an approve() first
+  RpcError, // 4Mica core service error (has .status and .body)
 } from "@4mica/sdk";
 
 try {
-  const verified = await client.recipient.verifyPaymentGuarantee(cert);
-  await client.recipient.claimNetCredit(cycleId);
+  const verified = await client.payment.verifyGuarantee(cert);
+  await client.settlement.claim(cycleId).send();
 } catch (err) {
-  if (err instanceof VerificationError) {
-    // bad certificate — decode failed or domain mismatch
+  if (err instanceof CertificateMismatchError) {
+    // bad certificate — the operator did not sign these claims
+  } else if (err instanceof Erc20AllowanceRequiredError) {
+    await client.settlement.pay(cycleId).selfFunded().approve();
   } else if (err instanceof ContractError) {
     // on-chain settlement failed
   } else if (err instanceof RpcError) {

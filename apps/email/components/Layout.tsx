@@ -11,7 +11,7 @@ import {
   Section,
   Text,
 } from "react-email";
-import { brand, palette, styles } from "./theme";
+import { brand, palette, responsiveCss, styles } from "./theme";
 
 export interface LayoutProps {
   /** Inbox preview line. Keep under ~90 characters. */
@@ -23,10 +23,14 @@ export interface LayoutProps {
 
 export const Layout = ({ preview, children, footerNote }: LayoutProps) => (
   <Html lang="en">
-    <Head />
+    <Head>
+      <meta content="width=device-width, initial-scale=1" name="viewport" />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS, no interpolated user input */}
+      <style dangerouslySetInnerHTML={{ __html: responsiveCss }} />
+    </Head>
     <Preview>{preview}</Preview>
     <Body style={styles.body}>
-      <Container style={styles.container}>
+      <Container className="mica-card" style={styles.container}>
         <Section style={{ marginBottom: "24px" }}>
           <Link href={brand.website}>
             <Img
@@ -34,6 +38,7 @@ export const Layout = ({ preview, children, footerNote }: LayoutProps) => (
               height="28"
               src={brand.logoUrl}
               style={{ display: "block" }}
+              width="39"
             />
           </Link>
         </Section>

@@ -1,12 +1,14 @@
-import type { ComponentType } from "react";
+import { type ComponentType, createElement } from "react";
+import { Navigate } from "react-router-dom";
 import { AccountSettings } from "@/pages/account";
 import { AgentAdvanced } from "@/pages/agent-advanced";
 import { AgentDetail } from "@/pages/agent-detail";
 import { Agents } from "@/pages/agents";
-import { Apps } from "@/pages/apps";
-import { Balances } from "@/pages/balances";
+import { ApiDetail } from "@/pages/api-detail";
+import { Apis } from "@/pages/apis";
 import { BusinessSettings } from "@/pages/business";
 import { ComplianceSettings } from "@/pages/compliance";
+import { CustomerDetail } from "@/pages/customer-detail";
 import { Customers } from "@/pages/customers";
 import { DeveloperSettings } from "@/pages/developer";
 import { Disputes } from "@/pages/disputes";
@@ -17,7 +19,6 @@ import { Payments } from "@/pages/payments";
 import { PlansSettings } from "@/pages/plans";
 import { ProfileSettings } from "@/pages/profile";
 import { TeamSettings } from "@/pages/team";
-import { Transactions } from "@/pages/transactions";
 import { Wallet } from "@/pages/wallet";
 
 export interface RouteMeta {
@@ -28,16 +29,20 @@ export interface RouteMeta {
 
 export const APP_PAGES: RouteMeta[] = [
   { index: true, component: Overview },
-  { path: "balances", component: Balances },
-  { path: "transactions", component: Transactions },
+  {
+    path: "balances",
+    component: () => createElement(Navigate, { to: "/", replace: true }),
+  },
   { path: "payments", component: Payments },
   { path: "payments/disputes", component: Disputes },
   { path: "wallet", component: Wallet },
   { path: "customers", component: Customers },
+  { path: "customers/:id", component: CustomerDetail },
   { path: "agents", component: Agents },
   { path: "agents/:id", component: AgentDetail },
   { path: "agents/:id/advanced", component: AgentAdvanced },
-  { path: "apps", component: Apps },
+  { path: "apis", component: Apis },
+  { path: "apis/:id", component: ApiDetail },
   { path: "help", component: Help },
 ];
 
@@ -47,8 +52,8 @@ export interface SettingsRouteMeta {
 }
 
 export const SETTINGS_PAGES: SettingsRouteMeta[] = [
-  { path: "account", component: AccountSettings },
   { path: "profile", component: ProfileSettings },
+  { path: "account", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
   { path: "notifications", component: NotificationSettings },

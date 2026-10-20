@@ -14,10 +14,6 @@ const healthResponseSchema = {
     uptime: { type: "number", description: "Process uptime in seconds" },
     timestamp: { type: "string", format: "date-time" },
     db: { type: "string", enum: ["ok", "down", "unknown"] },
-    agents: {
-      type: "integer",
-      description: "Row count, omitted when the database is down",
-    },
   },
 } as const;
 

@@ -32,6 +32,19 @@ export const updateNotifications = (data: Partial<User>) =>
     data,
   });
 
+export const sendEmailVerification = () =>
+  httpClient.request<{ sent: boolean }>({
+    url: "/me/email/verification",
+    method: HttpMethod.POST,
+  });
+
+export const confirmEmailVerification = (token: string) =>
+  httpClient.request<User, { token: string }>({
+    url: "/me/email/verification/confirm",
+    method: HttpMethod.POST,
+    data: { token },
+  });
+
 export type UsernameUnavailability = UsernameUnavailableReason | "taken";
 export interface UsernameAvailability {
   username: string;
@@ -41,8 +54,9 @@ export interface UsernameAvailability {
 
 export const checkUsernameAvailability = (username: string) =>
   httpClient.request<UsernameAvailability>({
-    url: `/me/username-available?username=${encodeURIComponent(username)}`,
+    url: "/me/username-available",
     method: HttpMethod.GET,
+    params: { username },
   });
 
 export const getBusiness = () =>

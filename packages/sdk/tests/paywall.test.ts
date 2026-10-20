@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PaywallConfig, PaywallInput } from "@/server";
-import { createPaywall, utf8ToBase64 } from "@/server";
+import { createPaywall, SCHEME_4MICA_CREDIT, utf8ToBase64 } from "@/server";
 
 const config: PaywallConfig = {
   payTo: "0x1111111111111111111111111111111111111111",
   asset: "0x0000000000000000000000000000000000000000",
   network: "base-sepolia",
   amount: "1000",
-  tabEndpoint: "https://recipient.example/tab",
 };
 
 function inputWith(header: string | null): PaywallInput {
@@ -22,7 +21,7 @@ function paymentHeader(payload: unknown): string {
   return utf8ToBase64(
     JSON.stringify({
       x402Version: 1,
-      scheme: "4mica",
+      scheme: SCHEME_4MICA_CREDIT,
       network: "base-sepolia",
       payload,
     }),
@@ -39,11 +38,25 @@ describe("createPaywall", () => {
     expect(decision.ok).toBe(false);
     if (decision.ok) throw new Error("expected 402");
     expect(decision.status).toBe(402);
-    expect(decision.body.accepts[0]?.payTo).toBe(config.payTo);
-    expect(decision.body.accepts[0]?.extra?.tabEndpoint).toBe(
-      config.tabEndpoint,
-    );
+    const accepts = decision.body.accepts[0];
+    expect(accepts?.payTo).toBe(config.payTo);
+    expect(accepts?.scheme).toBe(SCHEME_4MICA_CREDIT);
+    expect(accepts?.extra).toEqual({});
     expect(verifier.issueGuarantee).not.toHaveBeenCalled();
+  });
+
+  it("advertises extra.validation when configured", async () => {
+    const validation = {
+      validator: "eip155:1:0x1111111111111111111111111111111111111111",
+      subject: `0x${"42".repeat(32)}`,
+    };
+    const paywall = createPaywall(
+      { issueGuarantee: vi.fn() },
+      { ...config, extra: { validation } },
+    );
+    const decision = await paywall.protect(inputWith(null));
+    if (decision.ok) throw new Error("expected 402");
+    expect(decision.body.accepts[0]?.extra.validation).toEqual(validation);
   });
 
   it("allows the request and sets X-PAYMENT-RESPONSE when the guarantee is issued", async () => {
@@ -119,6 +132,9 @@ describe("createPaywall", () => {
     );
     expect(denied).toBeInstanceOf(Response);
     expect((denied as Response).status).toBe(402);
+    const body = await (denied as Response).json();
+    expect(body.accepts[0].payTo).toBe(config.payTo);
+    expect(body.accepts[0].extra).toBeUndefined();
 
     const allowed = await paywall.handle(
       new Request("https://api.example/protected", {

@@ -11,8 +11,10 @@
 use alloy::primitives::{Address, B256, Signature, U256, address, b256, keccak256};
 use alloy::signers::local::PrivateKeySigner;
 use axum::{Json, Router, routing::get, routing::post};
-use crypto::bls::KeyMaterial;
-use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION, GuaranteeVersionDomain};
+use rpc::{
+    CLEARING_HOUSE_EIP712_NAME, CLEARING_HOUSE_EIP712_VERSION, CorePublicParameters,
+    PAYMENT_PAYLOAD_VERSION,
+};
 use sdk_4mica::client::model::{Asset, TokenRoute};
 use sdk_4mica::error::DepositError;
 use sdk_4mica::{Client, ClientBuilder};
@@ -24,6 +26,8 @@ use tokio::net::TcpListener;
 
 const CHAIN_ID: u64 = 1337;
 const CONTRACT: Address = address!("00000000000000000000000000000000c04e4a1c");
+const CLEARING_HOUSE: Address = address!("00000000000000000000000000000000c1ea4111");
+const GUARANTEE_REGISTRY: Address = address!("0000000000000000000000000000000000065e61");
 const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
 const OTHER_ADDRESS: Address = address!("000000000000000000000000000000000000bad0");
 
@@ -40,15 +44,13 @@ const TOKEN_DOMAIN: B256 =
 /// Hardcoded rather than derived in-test so a bug in the SDK's derivation cannot cancel out.
 const PERMIT2_DOMAIN: B256 =
     b256!("1f520b5ee38ad937955892c3dfc7055e8eeb515d905781b6951e4c687917c530");
-const GUARANTEE_DOMAIN: B256 =
-    b256!("3333333333333333333333333333333333333333333333333333333333333333");
 /// Core4Mica's own domain. No deposit signs under it, so any appearance here is a bug.
 const CORE_DOMAIN: B256 = b256!("4444444444444444444444444444444444444444444444444444444444444444");
 
 /// Matches `DEPOSIT_AUTHORIZATION_TTL_SECS` in `sdk/src/client/user.rs`.
 const EXPECTED_TTL_SECS: u64 = 3600;
 
-const BLS_SECRET: &str = "0x4573DBD225C8E065FC30FF774C9EF81BD29D34E559D80E2276EE7824812399D3";
+const GUARANTEE_SIGNER: Address = address!("0000000000000000000000000000000000005164");
 
 fn word_address(value: Address) -> [u8; 32] {
     let mut word = [0u8; 32];
@@ -177,19 +179,6 @@ fn json_rpc_result(id: &Value, result: Value) -> Json<Value> {
     Json(json!({"jsonrpc": "2.0", "id": id, "result": result}))
 }
 
-fn encode_guarantee_version_config() -> String {
-    // (G1Point verificationKey, bytes32 domainSeparator, address decoder, bool enabled).
-    // G1Point is a static 4-word struct, so the whole return is head-only: 7 words.
-    let mut out = Vec::with_capacity(32 * 7);
-    out.extend_from_slice(&[0u8; 32 * 4]);
-    out.extend_from_slice(GUARANTEE_DOMAIN.as_slice());
-    out.extend_from_slice(&word_address(Address::ZERO));
-    let mut enabled = [0u8; 32];
-    enabled[31] = 1;
-    out.extend_from_slice(&enabled);
-    format!("0x{}", alloy::hex::encode(out))
-}
-
 async fn handle_rpc(
     axum::extract::State(log): axum::extract::State<Arc<Mutex<CallLog>>>,
     Json(body): Json<Value>,
@@ -227,11 +216,6 @@ async fn handle_rpc(
                 .unwrap_or([0; 4]);
             log.lock().unwrap().eth_calls.push((to, sel));
 
-            // Intentionally unhandled: the SDK must not ask the chain for a domain separator.
-            // If it regresses to an eth_call, this returns a JSON-RPC error and the test fails.
-            if sel == selector("getGuaranteeVersionConfig(uint64)") {
-                return json_rpc_result(&id, json!(encode_guarantee_version_config()));
-            }
             // Zero: these tests never grant the self-funded allowance, so a fallback that
             // pre-checks it must refuse rather than broadcast.
             if sel == selector("allowance(address,address)") {
@@ -263,20 +247,16 @@ async fn spawn(router: Router) -> anyhow::Result<String> {
 }
 
 fn public_params(eth_rpc_url: &str) -> CorePublicParameters {
-    let operator_key = KeyMaterial::from_str(BLS_SECRET).expect("valid test BLS key");
     CorePublicParameters {
-        public_key: operator_key.public_key().to_vec(),
+        guarantee_signer: GUARANTEE_SIGNER.to_string(),
         contract_address: CONTRACT.to_string(),
+        guarantee_registry_address: GUARANTEE_REGISTRY.to_string(),
+        clearing_house_address: CLEARING_HOUSE.to_string(),
         ethereum_http_rpc_url: eth_rpc_url.to_string(),
-        eip712_name: "4mica".into(),
-        eip712_version: "1".into(),
+        eip712_name: CLEARING_HOUSE_EIP712_NAME.into(),
+        eip712_version: CLEARING_HOUSE_EIP712_VERSION.into(),
         chain_id: CHAIN_ID,
-        supported_guarantee_versions: vec![GUARANTEE_CLAIMS_VERSION],
-        guarantee_domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        guarantee_domains: vec![GuaranteeVersionDomain {
-            version: GUARANTEE_CLAIMS_VERSION,
-            domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        }],
+        supported_payment_payload_versions: vec![PAYMENT_PAYLOAD_VERSION],
         core_domain_separator: format!("0x{}", alloy::hex::encode(CORE_DOMAIN)),
         validators: vec![],
     }

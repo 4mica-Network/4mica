@@ -9,7 +9,7 @@ use alloy::primitives::{Address, B256, U256};
 use alloy::sol_types::SolInterface;
 use thiserror::Error;
 
-use crate::deposit::{DepositError, Permit2AllowanceDetails};
+use crate::deposit::{DepositError, Permit2AllowanceDetails, revert_without_data};
 use crate::limits::ThrottleError;
 use crate::relayer::{ClearingHouse::ClearingHouseErrors, NoRelayer};
 
@@ -351,7 +351,11 @@ enum CallFailure {
 
 fn split_call_error(err: alloy::contract::Error, context: &'static str) -> CallFailure {
     let Some(data) = err.as_revert_data() else {
-        return CallFailure::Chain(anyhow::Error::new(err).context(context));
+        // A revert with empty data is still the EVM answering; see `revert_without_data`.
+        return match revert_without_data(&err) {
+            Some(reason) => CallFailure::Reverted(reason),
+            None => CallFailure::Chain(anyhow::Error::new(err).context(context)),
+        };
     };
 
     let reason = ClearingHouseErrors::abi_decode(&data)

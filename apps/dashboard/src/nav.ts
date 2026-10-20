@@ -1,5 +1,4 @@
 import {
-  ArrowRightLeft,
   BadgeCheck,
   Bell,
   Blocks,
@@ -9,7 +8,6 @@ import {
   Code,
   CreditCard,
   House,
-  Landmark,
   type LucideIcon,
   Settings,
   ShieldCheck,
@@ -35,12 +33,6 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     titleKey: "nav.section.money",
     items: [
-      { to: "/balances", labelKey: "nav.balances", icon: Landmark },
-      {
-        to: "/transactions",
-        labelKey: "nav.transactions",
-        icon: ArrowRightLeft,
-      },
       { to: "/payments", labelKey: "nav.payments", icon: CreditCard },
       { to: "/wallet", labelKey: "nav.wallet", icon: Wallet },
     ],
@@ -50,13 +42,13 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: "/customers", labelKey: "nav.customers", icon: Users },
       { to: "/agents", labelKey: "nav.agents", icon: Bot },
-      { to: "/apps", labelKey: "nav.apps", icon: Blocks },
+      { to: "/apis", labelKey: "nav.apis", icon: Blocks },
     ],
   },
 ];
 
 export const FOOTER_ITEMS: NavItem[] = [
-  { to: "/settings/profile", labelKey: "nav.settings", icon: Settings },
+  { to: "/settings", labelKey: "nav.settings", icon: Settings },
   { to: "/help", labelKey: "nav.help", icon: CircleHelp },
 ];
 

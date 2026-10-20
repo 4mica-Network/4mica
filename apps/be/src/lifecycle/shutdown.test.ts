@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 import { resetServiceState, setServiceState } from "./state";
 
-const { count } = vi.hoisted(() => ({ count: vi.fn() }));
+const { queryRaw } = vi.hoisted(() => ({ queryRaw: vi.fn() }));
 
 vi.mock("@4mica/db", () => ({
-  prisma: { agent: { count } },
+  prisma: { $queryRaw: queryRaw },
   disconnect: vi.fn(async () => {}),
 }));
 
@@ -18,8 +18,8 @@ const echoRoutes: FastifyPluginCallback = (app, _opts, done) => {
 
 describe("draining", () => {
   beforeEach(() => {
-    count.mockReset();
-    count.mockResolvedValue(1);
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([{ "?column?": 1 }]);
   });
 
   afterEach(() => {
@@ -70,7 +70,7 @@ describe("draining", () => {
       state: "draining",
       db: "unknown",
     });
-    expect(count).not.toHaveBeenCalled();
+    expect(queryRaw).not.toHaveBeenCalled();
 
     await app.close();
   });

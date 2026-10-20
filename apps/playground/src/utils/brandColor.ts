@@ -1,10 +1,4 @@
-/**
- * Same hex pattern the API validates on write
- * (apps/be/src/controllers/me/schema.ts). Re-checked on read because the value
- * lands in a `style` attribute — a stored `javascript:` or `expression(...)`
- * string must never reach the DOM just because it passed validation once.
- */
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+import { isHexColor } from "@4mica/rules";
 
 export const safeBrandColor = (
   value: string | null | undefined,
@@ -14,5 +8,5 @@ export const safeBrandColor = (
     return null;
   }
   const trimmed = value.trim();
-  return HEX_COLOR.test(trimmed) ? trimmed : null;
+  return isHexColor(trimmed) ? trimmed : null;
 };

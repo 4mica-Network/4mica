@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   creator: SITE_NAME,
   publisher: SITE_NAME,
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    shortcut: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/icon.png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -29,19 +34,27 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <ClerkProvider publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
-      <html className="dark" lang="en" suppressHydrationWarning={true}>
-        <head>
-          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}
-          <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        </head>
-        <body
-          suppressHydrationWarning={true}
-          className={`${fontVariables} min-h-screen bg-surface-deep text-ink-body antialiased`}
+    <html className="dark" lang="en" suppressHydrationWarning={true}>
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body
+        suppressHydrationWarning={true}
+        className={`${fontVariables} min-h-screen bg-surface-deep text-ink-body antialiased`}
+      >
+        {/*
+          ClerkProvider is a client component, so wrapping <html> would put the
+          document — and the theme script in <head> — inside a client tree,
+          where React never executes a script tag. It only has to be above the
+          components that use Clerk, which all live in children.
+        */}
+        <ClerkProvider
+          publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         >
           <ThemeProvider>{children}</ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

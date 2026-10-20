@@ -64,6 +64,10 @@ const response = await fetchWithPayment("https://api.example.com/data");
 const data = await response.json();
 ```
 
+<Note>
+`@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
+</Note>
+
 <Warning>
 Start on Base Sepolia (`eip155:84532`) with small amounts. Move to production only after limits, logs, and withdrawal checks are routine.
 </Warning>

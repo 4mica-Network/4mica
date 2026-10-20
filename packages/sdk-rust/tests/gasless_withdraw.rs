@@ -11,8 +11,10 @@
 use alloy::primitives::{Address, B256, Signature, U256, address, b256, keccak256};
 use alloy::signers::local::PrivateKeySigner;
 use axum::{Json, Router, routing::get, routing::post};
-use crypto::bls::KeyMaterial;
-use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION, GuaranteeVersionDomain};
+use rpc::{
+    CLEARING_HOUSE_EIP712_NAME, CLEARING_HOUSE_EIP712_VERSION, CorePublicParameters,
+    PAYMENT_PAYLOAD_VERSION,
+};
 use sdk_4mica::error::{SponsorshipError, WithdrawError};
 use sdk_4mica::{Asset, Client, ClientBuilder, Route};
 use serde_json::{Value, json};
@@ -23,6 +25,8 @@ use tokio::net::TcpListener;
 
 const CHAIN_ID: u64 = 1337;
 const CONTRACT: Address = address!("00000000000000000000000000000000c04e4a1c");
+const CLEARING_HOUSE: Address = address!("00000000000000000000000000000000c1ea4111");
+const GUARANTEE_REGISTRY: Address = address!("0000000000000000000000000000000000065e61");
 const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
 
 /// Core4Mica's own domain separator, distinct from the token's so a test fails loudly if the SDK
@@ -30,14 +34,12 @@ const TOKEN: Address = address!("000000000000000000000000000000000000d0c5");
 const CORE_DOMAIN: B256 = b256!("4444444444444444444444444444444444444444444444444444444444444444");
 const TOKEN_DOMAIN: B256 =
     b256!("1111111111111111111111111111111111111111111111111111111111111111");
-const GUARANTEE_DOMAIN: B256 =
-    b256!("3333333333333333333333333333333333333333333333333333333333333333");
 
 /// Matches `AUTHORIZATION_TTL_SECS` in `sdk/src/client/sig.rs`.
 const EXPECTED_TTL_SECS: u64 = 3600;
 
 const AMOUNT: u64 = 1_000_000;
-const BLS_SECRET: &str = "0x4573DBD225C8E065FC30FF774C9EF81BD29D34E559D80E2276EE7824812399D3";
+const GUARANTEE_SIGNER: Address = address!("0000000000000000000000000000000000005164");
 
 // Canonical EIP-712 `encodeType` strings the contract hashes. Spelled out here so a field reorder
 // in the SDK fails rather than cancelling out.
@@ -116,11 +118,6 @@ fn expected_core_domain(chain_id: u64, contract: Address) -> B256 {
     keccak256(encoded)
 }
 
-fn selector(signature: &str) -> [u8; 4] {
-    let hash = keccak256(signature.as_bytes());
-    [hash[0], hash[1], hash[2], hash[3]]
-}
-
 /// Every JSON-RPC call the SDK made, so tests can assert that signing stays off the chain and —
 /// crucially — whether a transaction was ever broadcast.
 #[derive(Default)]
@@ -139,19 +136,6 @@ impl CallLog {
 
 fn json_rpc_result(id: &Value, result: Value) -> Json<Value> {
     Json(json!({"jsonrpc": "2.0", "id": id, "result": result}))
-}
-
-fn encode_guarantee_version_config() -> String {
-    // (G1Point verificationKey, bytes32 domainSeparator, address decoder, bool enabled).
-    // G1Point is a static 4-word struct, so the whole return is head-only: 7 words.
-    let mut out = Vec::with_capacity(32 * 7);
-    out.extend_from_slice(&[0u8; 32 * 4]);
-    out.extend_from_slice(GUARANTEE_DOMAIN.as_slice());
-    out.extend_from_slice(&word_address(Address::ZERO));
-    let mut enabled = [0u8; 32];
-    enabled[31] = 1;
-    out.extend_from_slice(&enabled);
-    format!("0x{}", alloy::hex::encode(out))
 }
 
 async fn handle_rpc(
@@ -206,9 +190,6 @@ async fn handle_rpc(
                 .unwrap_or([0; 4]);
             log.lock().unwrap().eth_calls.push((to, sel));
 
-            if sel == selector("getGuaranteeVersionConfig(uint64)") {
-                return json_rpc_result(&id, json!(encode_guarantee_version_config()));
-            }
             // No `DOMAIN_SEPARATOR()` case, deliberately: the separator comes from core over HTTP,
             // so an eth_call for one is a regression and fails here as a JSON-RPC error.
             Json(json!({
@@ -237,21 +218,17 @@ async fn spawn(router: Router) -> anyhow::Result<String> {
 }
 
 fn public_params(eth_rpc_url: &str) -> CorePublicParameters {
-    let operator_key = KeyMaterial::from_str(BLS_SECRET).expect("valid test BLS key");
     CorePublicParameters {
-        public_key: operator_key.public_key().to_vec(),
+        guarantee_signer: GUARANTEE_SIGNER.to_string(),
         contract_address: CONTRACT.to_string(),
+        guarantee_registry_address: GUARANTEE_REGISTRY.to_string(),
+        clearing_house_address: CLEARING_HOUSE.to_string(),
         chain_id: CHAIN_ID,
         ethereum_http_rpc_url: eth_rpc_url.to_string(),
-        guarantee_domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        guarantee_domains: vec![GuaranteeVersionDomain {
-            version: GUARANTEE_CLAIMS_VERSION,
-            domain_separator: format!("0x{}", alloy::hex::encode(GUARANTEE_DOMAIN)),
-        }],
         core_domain_separator: format!("0x{}", alloy::hex::encode(CORE_DOMAIN)),
-        supported_guarantee_versions: vec![GUARANTEE_CLAIMS_VERSION],
-        eip712_name: "4Mica".into(),
-        eip712_version: "1".into(),
+        supported_payment_payload_versions: vec![PAYMENT_PAYLOAD_VERSION],
+        eip712_name: CLEARING_HOUSE_EIP712_NAME.into(),
+        eip712_version: CLEARING_HOUSE_EIP712_VERSION.into(),
         validators: Vec::new(),
     }
 }
@@ -550,11 +527,10 @@ async fn signing_never_touches_the_chain() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A core too old to publish the guarantee domains is no obstacle either — the client reads them
-/// off the contract instead, which is the one thing at startup that still needs an endpoint.
+/// Everything the client resolves at startup comes from core, so constructing one costs no chain
+/// access at all.
 #[tokio::test]
-async fn a_core_that_publishes_no_guarantee_domains_reads_them_from_the_chain() -> anyhow::Result<()>
-{
+async fn connecting_makes_no_chain_calls() -> anyhow::Result<()> {
     let log = Arc::new(Mutex::new(CallLog::default()));
     let eth_url = spawn(
         Router::new()
@@ -563,8 +539,7 @@ async fn a_core_that_publishes_no_guarantee_domains_reads_them_from_the_chain() 
     )
     .await?;
 
-    let mut params = public_params(&eth_url);
-    params.guarantee_domains = Vec::new();
+    let params = public_params(&eth_url);
     let core_url = spawn(Router::new().route(
         "/core/public-params",
         get(move || {
@@ -574,7 +549,7 @@ async fn a_core_that_publishes_no_guarantee_domains_reads_them_from_the_chain() 
     ))
     .await?;
 
-    let client = Client::connect(
+    Client::connect(
         ClientBuilder::default()
             .rpc_url(core_url)
             .signer(PrivateKeySigner::random())
@@ -584,13 +559,8 @@ async fn a_core_that_publishes_no_guarantee_domains_reads_them_from_the_chain() 
     )
     .await?;
 
-    assert_eq!(client.payment.guarantee_domain(), &GUARANTEE_DOMAIN.0);
-    let want = selector("getGuaranteeVersionConfig(uint64)");
     let calls = log.lock().unwrap().eth_calls.clone();
-    assert!(
-        calls.iter().any(|(_, sel)| *sel == want),
-        "expected the version config to be read from the contract, saw {calls:?}"
-    );
+    assert!(calls.is_empty(), "connecting made chain calls: {calls:?}");
     Ok(())
 }
 

@@ -19,6 +19,7 @@ import {
   createdApiKeyResponseSchema,
   createdWebhookResponseSchema,
   errorResponseSchema,
+  idParam,
   limitedResponses,
   webhookEventsResponseSchema,
   webhookResponseSchema,
@@ -27,7 +28,7 @@ import {
 const idParamSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: { id: idParam },
 } as const;
 
 export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {

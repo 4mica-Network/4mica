@@ -13,31 +13,21 @@ const SIZES = {
 
 export interface ModalProps {
   isOpen: boolean;
-  /** Called by the close button, Escape and the overlay, unless each is disabled. */
   onClose: () => void;
   title?: ReactNode;
   description?: ReactNode;
   children: ReactNode;
-  /** Sits in a bordered strip below the body, for actions. */
   footer?: ReactNode;
   size?: keyof typeof SIZES;
   showClose?: boolean;
+  closeLabel?: string;
   disableOverlayClose?: boolean;
   disableEscapeClose?: boolean;
-  /** Applied to the panel. */
   className?: string;
-  /** Applied to the body between header and footer. */
   contentClassName?: string;
   "data-testid"?: string;
 }
 
-/**
- * A centred, portalled dialog.
- *
- * Sits at z-9990 rather than the z-9999 `Dropdown` uses, so a `Select` opened
- * inside a modal still paints above the panel. Toasts are also 9999 and so stay
- * on top, which is what we want for transient errors raised by a modal's own form.
- */
 export const Modal = ({
   isOpen,
   onClose,
@@ -47,6 +37,7 @@ export const Modal = ({
   footer,
   size = "md",
   showClose = true,
+  closeLabel = "Close",
   disableOverlayClose = false,
   disableEscapeClose = false,
   className,
@@ -84,8 +75,6 @@ export const Modal = ({
           <motion.div
             key="panel"
             ref={panelRef}
-            // -1 keeps the panel focusable as a fallback when it holds no
-            // tabbable children, without making it a tab stop of its own.
             tabIndex={-1}
             role="dialog"
             aria-modal="true"
@@ -127,7 +116,7 @@ export const Modal = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    aria-label="Close"
+                    aria-label={closeLabel}
                     className="-mt-1 -mr-1 shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/40"
                     data-testid={`${prefix}-close`}
                   >

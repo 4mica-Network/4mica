@@ -51,7 +51,6 @@ export interface TagProps
   extends HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof tag> {
   children?: ReactNode;
-  /** Hex colour that overrides the variant, tinted for the background. */
   color?: string;
   icon?: ReactNode;
   onClose?: () => void;

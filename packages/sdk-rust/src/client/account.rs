@@ -110,28 +110,33 @@ where
             .call()
             .await
             .map_err(AccountError::from)?;
-        let total_user_scaled_balance = contract
-            .totalUserScaledBalance(token)
+        let user_shares = contract
+            .userShares(signer_address, token)
             .call()
             .await
             .map_err(AccountError::from)?;
-        let protocol_scaled_balance = contract
-            .protocolScaledBalance(token)
+        let total_user_shares = contract
+            .totalUserShares(token)
             .call()
             .await
             .map_err(AccountError::from)?;
-        let surplus_scaled_balance = contract
-            .surplusScaledBalance(token)
+        let protocol_shares = contract
+            .protocolShares(token)
             .call()
             .await
             .map_err(AccountError::from)?;
-        let contract_scaled_a_token_balance = contract
-            .contractScaledATokenBalance(token)
+        let pool_shares = contract
+            .poolShares(token)
             .call()
             .await
             .map_err(AccountError::from)?;
-        let stablecoin_a_token = contract
-            .stablecoinAToken(token)
+        let pool_assets = contract
+            .poolAssets(token)
+            .call()
+            .await
+            .map_err(AccountError::from)?;
+        let strategy = contract
+            .strategy(token)
             .call()
             .await
             .map_err(AccountError::from)?;
@@ -144,11 +149,12 @@ where
             protocol_yield_share,
             user_net_yield,
             withdrawable_balance,
-            total_user_scaled_balance,
-            protocol_scaled_balance,
-            surplus_scaled_balance,
-            contract_scaled_a_token_balance,
-            stablecoin_a_token,
+            user_shares,
+            total_user_shares,
+            protocol_shares,
+            pool_shares,
+            pool_assets,
+            strategy,
         })
     }
 }

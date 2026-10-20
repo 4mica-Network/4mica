@@ -1,5 +1,5 @@
-import { useTitle } from "ahooks";
 import { useTranslation } from "react-i18next";
+import { usePageTitle } from "@/hooks/usePageTitle";
 
 export function SettingsPanel({
   titleKey,
@@ -10,7 +10,7 @@ export function SettingsPanel({
 }) {
   const { t } = useTranslation();
   const title = t(titleKey);
-  useTitle(`${title} - ${t("org")}`);
+  usePageTitle(title);
   return (
     <section className="mx-auto w-full lg:max-w-3xl">
       <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>

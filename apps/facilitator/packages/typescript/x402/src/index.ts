@@ -6,4 +6,8 @@ export type {
   SchemeNetworkServer,
 } from '@x402/core/types'
 
-export type { FourMicaPaymentRequirementsV2, FourMicaV2RequirementsExtra } from './types.js'
+export type {
+  FourMicaPaymentRequirements,
+  FourMicaRequirementsExtra,
+  FourMicaValidationExtra,
+} from './types.js'

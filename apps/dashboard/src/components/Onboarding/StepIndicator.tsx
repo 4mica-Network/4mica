@@ -1,16 +1,10 @@
 import { cn } from "@4mica/ui";
 import { useTranslation } from "react-i18next";
 
-/**
- * Local to onboarding rather than in @4mica/ui: it has exactly one consumer,
- * and "completed / current / upcoming, cannot jump ahead" is wizard semantics,
- * not generic progress. Promote it when a second consumer shows up.
- */
 export function StepIndicator({
   current,
   total,
 }: {
-  /** 0-based. */
   current: number;
   total: number;
 }) {

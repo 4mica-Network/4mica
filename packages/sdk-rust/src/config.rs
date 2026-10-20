@@ -11,7 +11,7 @@ use crate::{
 };
 
 const DEFAULT_AUTH_REFRESH_MARGIN_SECS: u64 = 60;
-const DEFAULT_RPC_URL: &str = "https://ethereum.sepolia.api.4mica.xyz/";
+const DEFAULT_RPC_URL: &str = "https://base.sepolia.api.4mica.xyz/";
 
 /// A network this SDK has a default core endpoint for. Parses from the shorthand (`"base"`) or
 /// the CAIP-2 id (`"eip155:8453"`).
