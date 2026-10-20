@@ -40,9 +40,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   const handle = profile ? `@${profile.username}` : "4mica.io";
   const blurb = profile
     ? truncate(
-        profile.bio ||
-          profile.description ||
-          "Agents and APIs on the 4Mica credit layer.",
+        profile.bio || "Agents and APIs on the 4Mica credit layer.",
         BIO_LIMIT,
       )
     : "Credit-layer infrastructure for the agentic economy.";
