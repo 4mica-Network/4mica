@@ -8,6 +8,7 @@ const PublicProfileSchema = v.object({
   verified: v.boolean(),
   memberSince: v.string(),
   email: v.nullable(v.string()),
+  emailVerified: v.boolean(),
   phoneNumber: v.nullable(v.string()),
   primaryBrandColor: v.nullable(v.string()),
   secondaryBrandColor: v.nullable(v.string()),

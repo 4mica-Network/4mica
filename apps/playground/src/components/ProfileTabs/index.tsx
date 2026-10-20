@@ -46,7 +46,7 @@ export function ProfileTabs({
                   "relative inline-flex h-6 items-center gap-1.5 rounded px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
                   selected
                     ? "text-ink-body"
-                    : "text-ink-subtle hover:text-ink-body",
+                    : "text-ink-muted hover:text-ink-body",
                 )}
                 id={`profile-tab-${tab.id}`}
                 key={tab.id}
@@ -78,7 +78,7 @@ export function ProfileTabs({
 
       <div
         aria-labelledby={`profile-tab-${active}`}
-        className="flex min-h-0 flex-1 flex-col"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
         id={`profile-panel-${active}`}
         role="tabpanel"
       >

@@ -41,6 +41,14 @@ export const en = {
     share: "Share",
     linkCopied: "Link copied",
     shared: "Shared",
+    contact: "Contact",
+    email: "Email",
+    phone: "Phone",
+    copyEmail: "Copy email address",
+    copyPhone: "Copy phone number",
+    emailCopied: "Email copied",
+    phoneCopied: "Phone copied",
+    copyVerifiedEmail: "Copy verified email address",
   },
 
   agent: {

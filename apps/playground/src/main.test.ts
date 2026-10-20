@@ -214,7 +214,6 @@ describe("toPublicProfile", () => {
       "deletedAt",
       "clerkUserId",
       "id",
-      "emailVerified",
       "allowEmailVisibility",
       "allowPhoneNumberVisibility",
       "allowCustomBrandColor",
