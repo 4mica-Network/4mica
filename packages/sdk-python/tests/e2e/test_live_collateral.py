@@ -27,7 +27,7 @@ async def _native_collateral(client) -> int:
 
 
 async def test_native_deposit_reaches_chain_and_api(payer):
-    # principalBalance is stablecoin-only (Aave scaled accounting) and reverts
+    # principalBalance is stablecoin-only (pool-share accounting) and reverts
     # UnsupportedAsset for ETH — native collateral reads via getUserAllAssets.
     before = await _native_collateral(payer)
 

@@ -1,114 +1,281 @@
-"""PaymentClient tests. BLS certificates are produced with py_ecc's G2Basic —
-the same basic-scheme DST core signs under."""
+"""PaymentClient offline: receipt verification against the connected operator,
+issuance, and the checks a checkpoint batch must pass before the payer signs
+over it."""
 
 import pytest
-from py_ecc.bls import G2Basic
-from stubs import TEST_ADDRESS, FakeRpc, make_ctx
+from eth_account import Account
+from stubs import (
+    CLEARING_HOUSE_ADDRESS,
+    GUARANTEE_REGISTRY_ADDRESS,
+    OPERATOR_PRIVATE_KEY,
+    TEST_ADDRESS,
+    TEST_PRIVATE_KEY,
+    FakeRpc,
+    make_ctx,
+)
 
-from fourmica_sdk.client.payment import PaymentClient
+from fourmica_sdk.client.payment import PaymentClient, checkpoint_payload
 from fourmica_sdk.errors import (
-    CertificateMismatchError,
-    GuaranteeDomainMismatchError,
     InvalidParamsError,
+    ReceiptSignerMismatchError,
+    UntrustedCheckpointBatchError,
 )
-from fourmica_sdk.guarantee import encode_guarantee_claims
+from fourmica_sdk.guarantee import (
+    Guarantee,
+    GuaranteeReceipt,
+    clearing_house_domain_separator,
+    guarantee_registry_domain_separator,
+)
 from fourmica_sdk.models import (
-    BLSCert,
-    PaymentGuaranteeClaims,
-    PaymentGuaranteeRequestClaims,
-    PaymentSignature,
-    SigningScheme,
+    CheckpointBatchResponse,
+    CheckpointPayload,
+    PaymentRequest,
+    PaymentRequestPayload,
+    SignedCheckpoint,
 )
 
-DOMAIN = b"\x11" * 32
-_SECRET = G2Basic.KeyGen(b"\x42" * 32)
-_PUBLIC = G2Basic.SkToPk(_SECRET)
-
-
-def signed_cert(claims: PaymentGuaranteeClaims) -> BLSCert:
-    blob = encode_guarantee_claims(claims)
-    signature = G2Basic.Sign(_SECRET, blob)
-    return BLSCert(claims=blob.hex(), signature="0x" + signature.hex())
-
-
-def cert_claims(**overrides) -> PaymentGuaranteeClaims:
-    values = dict(
-        domain=DOMAIN,
-        user_address="0x1234567890123456789012345678901234567890",
-        recipient_address=TEST_ADDRESS,
-        cycle_id=100,
-        req_id=7,
-        amount=1000,
-        asset_address="0x0000000000000000000000000000000000000000",
-        timestamp=1_700_000_000,
-        version=1,
-    )
-    values.update(overrides)
-    return PaymentGuaranteeClaims(**values)
+CHAIN_ID = 84532
+ASSET = "0x0000000000000000000000000000000000000000"
+RECIPIENT = "0x00000000000000000000000000000000000000Be"
+CYCLE = "0x" + "11" * 32
+OTHER_CYCLE = "0x" + "33" * 32
+PAYER = Account.from_key(TEST_PRIVATE_KEY)
+DOMAIN = clearing_house_domain_separator(CHAIN_ID, CLEARING_HOUSE_ADDRESS)
 
 
 def payment_client(rpc=None) -> PaymentClient:
-    from stubs import make_public_params
-
-    ctx = make_ctx(
-        rpc=rpc,
-        public_params=make_public_params(public_key=_PUBLIC),
-        guarantee_domain=DOMAIN,
-    )
-    return PaymentClient(ctx)
+    return PaymentClient(make_ctx(rpc=rpc))
 
 
-def test_verify_guarantee_accepts_a_valid_certificate():
-    claims = cert_claims()
-    verified = payment_client().verify_guarantee(signed_cert(claims))
-    assert verified == claims
+# --- receipts --------------------------------------------------------------
 
 
-def test_verify_guarantee_rejects_a_tampered_certificate():
-    cert = signed_cert(cert_claims())
-    tampered_claims = encode_guarantee_claims(cert_claims(amount=2000))
-    tampered = BLSCert(claims=tampered_claims.hex(), signature=cert.signature)
-    with pytest.raises(CertificateMismatchError):
-        payment_client().verify_guarantee(tampered)
+def receipt_signed_by(key: str) -> tuple:
+    guarantee = Guarantee.from_payment(payment(1_000, 1_700_000_000), CYCLE)
+    domain = guarantee_registry_domain_separator(CHAIN_ID, GUARANTEE_REGISTRY_ADDRESS)
+    signature = Account.from_key(key).unsafe_sign_hash(guarantee.signing_digest(domain))
+    return guarantee, GuaranteeReceipt.new(guarantee, "0x" + signature.signature.hex())
 
 
-def test_verify_guarantee_rejects_a_foreign_domain():
-    cert = signed_cert(cert_claims(domain=b"\x99" * 32))
-    with pytest.raises(GuaranteeDomainMismatchError):
-        payment_client().verify_guarantee(cert)
+def test_verify_guarantee_accepts_the_connected_operators_receipt():
+    guarantee, receipt = receipt_signed_by(OPERATOR_PRIVATE_KEY)
+    assert payment_client().verify_guarantee(receipt) == guarantee
 
 
-async def test_issue_guarantee_posts_tagged_payload():
-    rpc = FakeRpc(issue_guarantee=BLSCert(claims="00", signature="0x00"))
+def test_verify_guarantee_refuses_anyone_elses_receipt():
+    _, receipt = receipt_signed_by(TEST_PRIVATE_KEY)
+    with pytest.raises(ReceiptSignerMismatchError):
+        payment_client().verify_guarantee(receipt)
+
+
+async def test_issue_guarantee_posts_the_signed_request():
+    _, receipt = receipt_signed_by(OPERATOR_PRIVATE_KEY)
+    rpc = FakeRpc(issue_guarantee=receipt)
     client = payment_client(rpc)
-    claims = PaymentGuaranteeRequestClaims.new(
-        user_address="0x1234567890123456789012345678901234567890",
-        recipient_address=TEST_ADDRESS,
-        req_id=7,
-        amount=1000,
-        timestamp=1_700_000_000,
+    request = signed_by(PAYER, payment(1_000, 1_700_000_000))
+
+    assert await client.issue_guarantee(request) is receipt
+    assert rpc.calls == [("issue_guarantee", request)]
+
+
+async def test_sign_request_signs_under_the_clearing_house_domain():
+    client = payment_client()
+    payload = payment(1_000, 1_700_000_000)
+    signed = await client.sign_request(payload)
+    assert (
+        Account._recover_hash(
+            payload.signing_digest(DOMAIN), signature=signed.signature
+        )
+        == TEST_ADDRESS
     )
-    signature = PaymentSignature(
-        signature="0x" + "ab" * 65, scheme=SigningScheme.EIP712
+
+
+# --- checkpoint batches ----------------------------------------------------
+
+
+def payment(amount: int, timestamp: int, **overrides) -> PaymentRequestPayload:
+    """Request ids follow the timestamp, so payments at distinct times never
+    collide."""
+    values = dict(
+        user_address=PAYER.address,
+        recipient_address=RECIPIENT,
+        cycle_id=CYCLE,
+        req_id=timestamp,
+        amount=amount,
+        asset_address=ASSET,
+        timestamp=timestamp,
+        salt="0x" + "22" * 32,
     )
-
-    await client.issue_guarantee(claims, signature)
-
-    _, body = rpc.calls[0][0], rpc.calls[0][1]
-    assert body["claims"]["version"] == "v1"
-    assert body["signature"] == "0x" + "ab" * 65
-    assert body["scheme"] == "eip712"
+    values.update(overrides)
+    return PaymentRequestPayload(**values)
 
 
-async def test_issue_guarantee_requires_signer_to_be_recipient():
-    client = payment_client(FakeRpc())
-    claims = PaymentGuaranteeRequestClaims.new(
-        user_address="0x1234567890123456789012345678901234567890",
-        recipient_address="0x00000000000000000000000000000000000000Be",
-        req_id=7,
-        amount=1000,
-        timestamp=1_700_000_000,
+def signed_by(signer, payload: PaymentRequestPayload) -> PaymentRequest:
+    signature = signer.unsafe_sign_hash(payload.signing_digest(DOMAIN))
+    return PaymentRequest(payload=payload, signature="0x" + signature.signature.hex())
+
+
+def checkpoint_by(signer, gross: int, cutoff: int) -> SignedCheckpoint:
+    payload = CheckpointPayload(
+        payer=PAYER.address,
+        cycle_id=CYCLE,
+        asset_address=ASSET,
+        cumulative_gross=gross,
+        timestamp_cutoff=cutoff,
     )
-    signature = PaymentSignature(signature="0x00", scheme=SigningScheme.EIP712)
-    with pytest.raises(InvalidParamsError, match="recipient"):
-        await client.issue_guarantee(claims, signature)
+    signature = signer.unsafe_sign_hash(payload.signing_digest(DOMAIN))
+    return SignedCheckpoint(payload=payload, signature="0x" + signature.signature.hex())
+
+
+def payments(*entries) -> list:
+    return [signed_by(PAYER, payment(amount, ts)) for amount, ts in entries]
+
+
+def batch(previous=None, authorizations=(), **overrides) -> CheckpointBatchResponse:
+    values = dict(
+        cycle_id=CYCLE,
+        cycle_id_text="0x0:1700000000",
+        asset_address=ASSET,
+        payer=PAYER.address,
+        previous=previous,
+        authorizations=list(authorizations),
+        max_uncheckpointed=2,
+    )
+    values.update(overrides)
+    return CheckpointBatchResponse(**values)
+
+
+def build(b: CheckpointBatchResponse):
+    return checkpoint_payload(PAYER.address, ASSET, CYCLE, DOMAIN, b)
+
+
+def refused(b: CheckpointBatchResponse) -> str:
+    with pytest.raises(UntrustedCheckpointBatchError) as excinfo:
+        build(b)
+    return excinfo.value.reason
+
+
+def test_a_checkpoint_extends_the_previous_one():
+    payload = build(
+        batch(
+            checkpoint_by(PAYER, 50, 1_699_999_000),
+            payments((10, 1_700_000_000), (7, 1_700_000_500)),
+        )
+    )
+    assert payload.cumulative_gross == 67
+    assert payload.timestamp_cutoff == 1_700_000_500
+    assert payload.payer == PAYER.address
+    assert payload.cycle_id == CYCLE
+
+
+def test_a_first_checkpoint_starts_from_zero():
+    payload = build(batch(None, payments((10, 1_700_000_000))))
+    assert payload.cumulative_gross == 10
+    assert payload.timestamp_cutoff == 1_700_000_000
+
+
+def test_the_cutoff_is_the_latest_payment_whatever_the_order():
+    payload = build(batch(None, payments((1, 1_700_000_900), (1, 1_700_000_100))))
+    assert payload.timestamp_cutoff == 1_700_000_900
+
+
+def test_an_empty_batch_needs_no_checkpoint():
+    assert build(batch(None, [])) is None
+
+
+def test_addresses_match_whatever_their_casing():
+    """Core may spell an address in any casing; it is the same address."""
+    lowered = payment(10, 1_700_000_000, user_address=PAYER.address.lower())
+    payload = build(
+        batch(None, [signed_by(PAYER, lowered)], payer=PAYER.address.lower())
+    )
+    assert payload.cumulative_gross == 10
+
+
+def test_a_payment_the_payer_did_not_sign_is_refused():
+    """An operator that slips in a payment the payer never signed would
+    inflate what the payer can be charged on default."""
+    forged = signed_by(Account.create(), payment(1_000_000, 1_700_000_100))
+    reason = refused(batch(None, payments((10, 1_700_000_000)) + [forged]))
+    assert "not signed by the payer" in reason
+
+
+def test_a_payment_with_a_tampered_amount_is_refused():
+    authorizations = payments((10, 1_700_000_000))
+    authorizations[0].payload.amount = 10_000
+    assert "not signed by the payer" in refused(batch(None, authorizations))
+
+
+def test_another_payers_payment_is_refused():
+    stranger = Account.create()
+    theirs = signed_by(
+        stranger, payment(10, 1_700_000_000, user_address=stranger.address)
+    )
+    assert "another payer" in refused(batch(None, [theirs]))
+
+
+def test_a_payment_from_another_cycle_is_refused():
+    elsewhere = signed_by(PAYER, payment(10, 1_700_000_000, cycle_id=OTHER_CYCLE))
+    assert "another payer, cycle or asset" in refused(batch(None, [elsewhere]))
+
+
+def test_a_payment_in_another_asset_is_refused():
+    token = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+    elsewhere = signed_by(PAYER, payment(10, 1_700_000_000, asset_address=token))
+    assert "another payer, cycle or asset" in refused(batch(None, [elsewhere]))
+
+
+def test_a_payment_counted_twice_is_refused():
+    once = payments((10, 1_700_000_000))
+    assert "appears twice" in refused(batch(None, once + once))
+
+
+def test_a_payment_the_previous_checkpoint_covers_is_refused():
+    reason = refused(
+        batch(
+            checkpoint_by(PAYER, 50, 1_700_000_000),
+            payments((10, 1_700_000_000)),
+        )
+    )
+    assert "already covered" in reason
+
+
+def test_a_previous_checkpoint_the_payer_did_not_sign_is_refused():
+    """The previous total is carried forward, so a forged one inflates the new
+    checkpoint just as a forged payment would."""
+    reason = refused(
+        batch(
+            checkpoint_by(Account.create(), 1_000_000, 1_699_999_000),
+            payments((10, 1_700_000_000)),
+        )
+    )
+    assert "previous checkpoint" in reason
+
+
+def test_a_previous_checkpoint_for_another_cycle_is_refused():
+    previous = checkpoint_by(PAYER, 50, 1_699_999_000)
+    previous.payload.cycle_id = OTHER_CYCLE
+    reason = refused(batch(previous, payments((10, 1_700_000_000))))
+    assert "previous checkpoint is for another payer, cycle or asset" in reason
+
+
+def test_a_batch_for_another_cycle_is_refused():
+    reason = refused(batch(None, payments((10, 1_700_000_000)), cycle_id=OTHER_CYCLE))
+    assert "batch is for cycle" in reason
+
+
+def test_a_batch_for_another_asset_is_refused():
+    reason = refused(
+        batch(
+            None,
+            payments((10, 1_700_000_000)),
+            asset_address="0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        )
+    )
+    assert "batch is for asset" in reason
+
+
+def test_a_total_past_u256_is_refused():
+    previous = checkpoint_by(PAYER, 2**256 - 5, 1_699_999_000)
+    with pytest.raises(InvalidParamsError, match="overflows"):
+        build(batch(previous, payments((10, 1_700_000_000))))

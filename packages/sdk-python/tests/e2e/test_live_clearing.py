@@ -18,12 +18,12 @@ import os
 
 import pytest
 from live_stack import (
-    build_claims,
     cycle_text_ids,
     ensure_collateral,
     is_pending_cycle_error,
     poll,
     requires_live_stack,
+    signed_payment,
     wait_for_onchain_cycle,
 )
 
@@ -45,12 +45,11 @@ COLLATERAL = 10**15
 async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     await ensure_collateral(payer, None, COLLATERAL)
 
-    claims = build_claims(payer, recipient)
-    signature = await payer.payment.sign_request(claims)
-    cert = await recipient.payment.issue_guarantee(claims, signature)
-    verified = recipient.payment.verify_guarantee(cert)
+    request = await signed_payment(payer, recipient)
+    receipt = await recipient.payment.issue_guarantee(request)
+    verified = recipient.payment.verify_guarantee(receipt)
 
-    candidates = cycle_text_ids(None, claims.timestamp)
+    candidates = cycle_text_ids(None, request.payload.timestamp)
     timeout = int(os.environ.get("E2E_CLEARING_TIMEOUT", "1500"))
 
     async def committed_pay_action():
@@ -71,14 +70,14 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     )
     cycle_id, pay_action = prepared
 
-    # Core prepared the debit for this debtor, in the cycle the certificate
+    # Core prepared the debit for this debtor, in the cycle the receipt
     # named, covering at least the guarantee issued above (earlier guarantees
     # in the same window aggregate into the same net position).
     assert pay_action.function_name == "payNetDebit"
     assert pay_action.action == ClearingSettlementAction.PAY_NET_DEBIT
     assert pay_action.participant.lower() == payer.signer_address.lower()
     assert int(pay_action.cycle_id, 16) == verified.cycle_id
-    assert pay_action.amount >= claims.amount
+    assert pay_action.amount >= verified.amount
     assert pay_action.proof, "committed cycle carries no Merkle proof"
 
     # The action can be served before commitCycle lands on-chain; pay only
@@ -97,7 +96,7 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     claim_action = await recipient.settlement.claim(cycle_id).action()
     assert claim_action.function_name == "claimNetCreditFor"
     assert claim_action.participant.lower() == recipient.signer_address.lower()
-    assert claim_action.amount >= claims.amount
+    assert claim_action.amount >= verified.amount
 
     claim_receipt = await recipient.settlement.claim(cycle_id).send()
     assert claim_receipt.route == Route.SELF_FUNDED
@@ -108,5 +107,5 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     proof = await recipient._ctx.rpc.get_clearing_participant_proof(
         cycle_id, recipient.signer_address
     )
-    assert proof.net_credit >= claims.amount
+    assert proof.net_credit >= verified.amount
     assert proof.merkle_root.startswith("0x")

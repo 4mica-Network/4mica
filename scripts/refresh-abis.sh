@@ -22,7 +22,10 @@ OUT="$CORE_REPO/contracts/out"
 ABI_DIR="$ROOT/contracts/abi"
 PY_DIR="$ROOT/packages/sdk-python/fourmica_sdk/contract/abi"
 
-for artifact in "Core4Mica.sol/Core4Mica.json" "ClearingHouse.sol/ClearingHouse.json"; do
+# Core4Mica.json is not refreshed: core renamed the contract to Treasury, so
+# that ABI is frozen at the commit in packages/sdk/scripts/refresh-abis.mjs
+# until the TypeScript SDK moves to Treasury.json. Delete it then.
+for artifact in "Treasury.sol/Treasury.json" "ClearingHouse.sol/ClearingHouse.json"; do
   if [ ! -f "$OUT/$artifact" ]; then
     echo "missing $OUT/$artifact — run 'forge build' in $CORE_REPO/contracts" >&2
     exit 1
@@ -30,7 +33,7 @@ for artifact in "Core4Mica.sol/Core4Mica.json" "ClearingHouse.sol/ClearingHouse.
 done
 
 mkdir -p "$ABI_DIR"
-jq '{abi: .abi}' "$OUT/Core4Mica.sol/Core4Mica.json" > "$ABI_DIR/Core4Mica.json"
+jq '{abi: .abi}' "$OUT/Treasury.sol/Treasury.json" > "$ABI_DIR/Treasury.json"
 jq '{abi: .abi}' "$OUT/ClearingHouse.sol/ClearingHouse.json" > "$ABI_DIR/ClearingHouse.json"
 printf '4mica-core %s (%s)\n' \
   "$(git -C "$CORE_REPO" rev-parse HEAD)" \
@@ -51,14 +54,13 @@ done
 for fn in deposit depositStablecoin depositStablecoinWithAuthorization depositStablecoinWithPermit2 \
   requestWithdrawal cancelWithdrawal finalizeWithdrawal finalizeWithdrawalFor \
   requestWithdrawalWithAuthorization cancelWithdrawalWithAuthorization \
-  getUserAllAssets getGuaranteeVersionConfig guaranteeDomainSeparator \
-  withdrawableBalance principalBalance guaranteeCapacity \
-  grossYield protocolYieldShare userNetYield totalUserScaledBalance \
-  protocolScaledBalance surplusScaledBalance contractScaledATokenBalance stablecoinAToken; do
-  require_fn "$ABI_DIR/Core4Mica.json" "$fn"
+  getUserAllAssets withdrawableBalance principalBalance guaranteeCapacity \
+  grossYield protocolYieldShare userNetYield userShares totalUserShares protocolShares \
+  poolShares poolAssets strategy; do
+  require_fn "$ABI_DIR/Treasury.json" "$fn"
 done
 
-cp "$ABI_DIR/Core4Mica.json" "$PY_DIR/core4mica.json"
+cp "$ABI_DIR/Treasury.json" "$PY_DIR/treasury.json"
 cp "$ABI_DIR/ClearingHouse.json" "$PY_DIR/clearing_house.json"
 
 node "$ROOT/packages/sdk/scripts/refresh-abis.mjs"

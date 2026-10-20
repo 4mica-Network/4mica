@@ -1,4 +1,4 @@
-"""Async web3 gateway for the Core4Mica and ClearingHouse contracts.
+"""Async web3 gateway for the Treasury and ClearingHouse contracts.
 
 ABI JSON under ``abi/`` is vendored from the ``4mica-core`` repo's forge
 artifacts — refresh with ``scripts/refresh_abis.sh``, never edit by hand.
@@ -51,14 +51,17 @@ except ImportError:  # pragma: no cover - compatibility path or removed
         async_geth_poa_middleware = None  # type: ignore
 
 from ..errors import (
-    AaveNotConfiguredError,
     AmountZeroError,
     ContractError,
+    DepositsDisabledError,
     GracePeriodNotElapsedError,
     InsufficientAvailableError,
+    InsufficientLiquidityError,
     NoWithdrawalRequestedError,
+    PausedError,
+    PoolInsolventError,
     RevertedOnChainError,
-    StablecoinWithdrawShortfallError,
+    StablecoinDepositsDisabledError,
     TransferFailedError,
     UnsupportedAssetError,
     ValueMismatchError,
@@ -82,15 +85,18 @@ _REVERT_EXCEPTIONS: Dict[str, Type[ContractError]] = {
     "GracePeriodNotElapsed": GracePeriodNotElapsedError,
     "TransferFailed": TransferFailedError,
     "UnsupportedAsset": UnsupportedAssetError,
-    "StablecoinWithdrawShortfall": StablecoinWithdrawShortfallError,
-    "AaveNotConfigured": AaveNotConfiguredError,
+    "InsufficientLiquidity": InsufficientLiquidityError,
+    "PoolInsolvent": PoolInsolventError,
+    "DepositsDisabled": DepositsDisabledError,
+    "StablecoinDepositsDisabled": StablecoinDepositsDisabledError,
+    "EnforcedPause": PausedError,
     "ValueMismatch": ValueMismatchError,
     "ZeroCollateralCredit": ZeroCollateralCreditError,
 }
 
 
 class ContractGateway:
-    """Thin async wrapper around the Core4Mica contract plus the ERC-20 and
+    """Thin async wrapper around the Treasury contract plus the ERC-20 and
     ClearingHouse instances the flows touch. All transactions sign with the
     configured local account."""
 
@@ -115,7 +121,7 @@ class ContractGateway:
         self.contract_address = normalize_address(contract_address)
         self.contract = self.w3.eth.contract(
             address=self.contract_address,
-            abi=load_abi("core4mica.json"),
+            abi=load_abi("treasury.json"),
         )
         self._clearing_house_abi = load_abi("clearing_house.json")
         self._erc20_cache: Dict[str, Any] = {}
@@ -436,39 +442,11 @@ class ContractGateway:
             for asset in result
         ]
 
-    async def get_guarantee_version_config(self, version: int) -> Dict[str, Any]:
-        try:
-            result = await self.contract.functions.getGuaranteeVersionConfig(
-                int(version)
-            ).call()
-        except Exception as exc:
-            raise self._decode_contract_error(exc) from exc
-
-        if isinstance(result, dict):
-            domain = result.get("domainSeparator")
-            decoder = result.get("decoder")
-            enabled = result.get("enabled")
-        else:
-            domain = result[1]
-            decoder = result[2]
-            enabled = result[3]
-
-        return {
-            "domain_separator": bytes(domain),
-            "decoder": normalize_address(decoder),
-            "enabled": bool(enabled),
-        }
-
     async def _view(self, func) -> Any:
         try:
             return await func.call()
         except Exception as exc:
             raise self._decode_contract_error(exc) from exc
-
-    async def guarantee_domain_separator(self) -> bytes:
-        return bytes(
-            await self._view(self.contract.functions.guaranteeDomainSeparator())
-        )
 
     async def principal_balance(self, user: str, asset: str) -> int:
         return parse_u256(
@@ -524,41 +502,51 @@ class ContractGateway:
             )
         )
 
-    async def total_user_scaled_balance(self, token: str) -> int:
+    async def user_shares(self, user: str, token: str) -> int:
         return parse_u256(
             await self._view(
-                self.contract.functions.totalUserScaledBalance(normalize_address(token))
-            )
-        )
-
-    async def protocol_scaled_balance(self, token: str) -> int:
-        return parse_u256(
-            await self._view(
-                self.contract.functions.protocolScaledBalance(normalize_address(token))
-            )
-        )
-
-    async def surplus_scaled_balance(self, token: str) -> int:
-        return parse_u256(
-            await self._view(
-                self.contract.functions.surplusScaledBalance(normalize_address(token))
-            )
-        )
-
-    async def contract_scaled_a_token_balance(self, token: str) -> int:
-        return parse_u256(
-            await self._view(
-                self.contract.functions.contractScaledATokenBalance(
-                    normalize_address(token)
+                self.contract.functions.userShares(
+                    normalize_address(user), normalize_address(token)
                 )
             )
         )
 
-    async def stablecoin_a_token(self, token: str) -> str:
-        return normalize_address(
+    async def total_user_shares(self, token: str) -> int:
+        return parse_u256(
             await self._view(
-                self.contract.functions.stablecoinAToken(normalize_address(token))
+                self.contract.functions.totalUserShares(normalize_address(token))
             )
+        )
+
+    async def protocol_shares(self, token: str) -> int:
+        return parse_u256(
+            await self._view(
+                self.contract.functions.protocolShares(normalize_address(token))
+            )
+        )
+
+    async def pool_shares(self, token: str) -> int:
+        """Pool shares outstanding across users, the protocol and escrow."""
+        return parse_u256(
+            await self._view(
+                self.contract.functions.poolShares(normalize_address(token))
+            )
+        )
+
+    async def pool_assets(self, token: str) -> int:
+        """Underlying value backing the pool: idle holdings plus the strategy
+        position."""
+        return parse_u256(
+            await self._view(
+                self.contract.functions.poolAssets(normalize_address(token))
+            )
+        )
+
+    async def strategy(self, token: str) -> str:
+        """The ERC-4626 strategy backing the pool, or the zero address while
+        its assets sit idle."""
+        return normalize_address(
+            await self._view(self.contract.functions.strategy(normalize_address(token)))
         )
 
     # --- ClearingHouse ---------------------------------------------------

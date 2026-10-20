@@ -1,4 +1,5 @@
-"""Payer-side request signing."""
+"""Payer-side signing: the signer interface, and the payloads a payer
+authorizes under the ClearingHouse domain."""
 
 from __future__ import annotations
 
@@ -8,15 +9,19 @@ from typing import Protocol, Union
 from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
 
-from .digest import eip191_payload_for_claims, eip712_message_for_claims
-from .errors import AddressMismatchError, SigningError
-from .models import (
-    CorePublicParameters,
-    PaymentGuaranteeRequestClaims,
-    PaymentSignature,
-    SigningScheme,
+from .errors import (
+    AddressMismatchError,
+    InvalidParamsError,
+    InvalidPayerAddressError,
+    SigningError,
 )
-from .utils import ValidationError, normalize_address
+from .models import (
+    CheckpointPayload,
+    PaymentRequest,
+    PaymentRequestPayload,
+    SignedCheckpoint,
+)
+from .utils import ValidationError, parse_address
 
 
 class EvmSigner(Protocol):
@@ -80,10 +85,12 @@ class LocalAccountSigner:
         )
 
 
-class PaymentSigner:
-    """Signs payment guarantee requests using EIP-712 or EIP-191.
+class PayerSigner:
+    """Signs the payloads a payer authorizes — payment requests and
+    checkpoints — under the ClearingHouse domain. Both are signed by digest,
+    as the contract verifies them.
 
-    Refuses to sign claims naming anyone but its own signer as the payer.
+    Refuses to sign for any payer but its own signer.
     """
 
     def __init__(self, signer: Union[EvmSigner, str]) -> None:
@@ -97,32 +104,39 @@ class PaymentSigner:
     def address(self) -> str:
         return self._signer.address
 
-    async def sign_request(
-        self,
-        params: CorePublicParameters,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme = SigningScheme.EIP712,
-    ) -> PaymentSignature:
-        if normalize_address(self._signer.address) != normalize_address(
-            claims.user_address
-        ):
-            raise AddressMismatchError(self._signer.address, claims.user_address)
+    async def sign_payment_request(
+        self, domain_separator: Union[str, bytes], payload: PaymentRequestPayload
+    ) -> PaymentRequest:
+        self._require_signer_is(payload.user_address)
+        signature = await self._sign(lambda: payload.signing_digest(domain_separator))
+        return PaymentRequest(payload=payload, signature=signature)
 
+    async def sign_checkpoint(
+        self, domain_separator: Union[str, bytes], payload: CheckpointPayload
+    ) -> SignedCheckpoint:
+        self._require_signer_is(payload.payer)
+        signature = await self._sign(lambda: payload.signing_digest(domain_separator))
+        return SignedCheckpoint(payload=payload, signature=signature)
+
+    def _require_signer_is(self, payer: str) -> None:
         try:
-            if scheme == SigningScheme.EIP712:
-                full_message = eip712_message_for_claims(params, claims)
-                signature = await self._signer.sign_typed_data(full_message)
-            elif scheme == SigningScheme.EIP191:
-                payload = eip191_payload_for_claims(claims)
-                signature = await self._signer.sign_message(payload)
-            else:
-                raise SigningError(f"unsupported signing scheme: {scheme}")
-        except (ValueError, ValidationError) as exc:
-            raise SigningError(str(exc)) from exc
+            expected = parse_address(payer, "payer")
+        except ValidationError as exc:
+            raise InvalidPayerAddressError() from exc
+        signer = parse_address(self._signer.address, "signer")
+        if signer != expected:
+            raise AddressMismatchError(signer, expected)
 
-        return PaymentSignature(
-            signature=_normalize_signature(signature), scheme=scheme
-        )
+    async def _sign(self, digest) -> str:
+        try:
+            message_hash = digest()
+        except (InvalidParamsError, ValidationError, ValueError) as exc:
+            raise SigningError(f"failed to sign the payment: {exc}") from exc
+        try:
+            signature = await self._signer.sign_hash(message_hash)
+        except Exception as exc:
+            raise SigningError(f"failed to sign the payment: {exc}") from exc
+        return _normalize_signature(signature)
 
 
 def _normalize_signature(signature: Union[str, bytes]) -> str:

@@ -46,7 +46,7 @@ jobs:
       # by scripts/refresh-abis.sh; a hand edit on either side fails here.
       - name: ABI drift check
         run: |
-          diff <(jq -S . ../../contracts/abi/Core4Mica.json) \
-               <(jq -S . fourmica_sdk/contract/abi/core4mica.json)
+          diff <(jq -S . ../../contracts/abi/Treasury.json) \
+               <(jq -S . fourmica_sdk/contract/abi/treasury.json)
           diff <(jq -S . ../../contracts/abi/ClearingHouse.json) \
                <(jq -S . fourmica_sdk/contract/abi/clearing_house.json)

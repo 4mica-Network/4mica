@@ -5,7 +5,9 @@ metadata resolved once at connect time. Port of ``sdk-rust/src/client/ctx.rs``.
 from __future__ import annotations
 
 import asyncio
-from typing import Dict, Optional
+import time
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
 
 from ..auth import AuthClient, AuthSession
 from ..config import Config
@@ -18,13 +20,36 @@ from ..errors import (
     ClientInitializationError,
     MissingTokenDomainSeparatorError,
 )
-from ..models import GUARANTEE_CLAIMS_VERSION, CorePublicParameters
+from ..guarantee import (
+    clearing_house_domain_separator,
+    guarantee_registry_domain_separator,
+)
+from ..models import PAYMENT_PAYLOAD_VERSION, CorePublicParameters
 from ..rpc import RpcProxy
-from ..signing import EvmSigner, LocalAccountSigner, PaymentSigner
-from ..utils import normalize_address, normalize_bytes32_hex
+from ..signing import EvmSigner, LocalAccountSigner, PayerSigner
+from ..utils import (
+    ValidationError,
+    normalize_address,
+    normalize_bytes32_hex,
+    parse_address,
+)
 from .facilitator import Facilitator
 
-_BLS_G1_COMPRESSED_BYTES = 48
+
+@dataclass(frozen=True)
+class ActiveCycle:
+    """The settlement cycle a payment must be signed for, as core reports it."""
+
+    id: str
+    """On-chain bytes32 cycle id, 0x-prefixed hex."""
+    period_start: int
+    """Unix seconds; a payment stamped earlier is refused as stale."""
+    period_end: int
+    """Unix seconds; core opens the next cycle from this moment on."""
+
+
+def _local_now_ms() -> int:
+    return int(time.time() * 1000)
 
 
 class ClientCtx:
@@ -38,8 +63,6 @@ class ClientCtx:
         public_params: CorePublicParameters,
         contract_address: str,
         ethereum_http_rpc_url: Optional[str],
-        guarantee_domain: bytes,
-        guarantee_domains: Dict[int, bytes],
         signer: EvmSigner,
     ) -> None:
         self.cfg = cfg
@@ -48,12 +71,24 @@ class ClientCtx:
         self.public_params = public_params
         self.contract_address = contract_address
         self.chain_id = public_params.chain_id
-        self.operator_public_key = public_params.public_key
         self.ethereum_http_rpc_url = ethereum_http_rpc_url
-        self.guarantee_domain = guarantee_domain
-        self.guarantee_domains = guarantee_domains
+        # guarantee_signer is the address whose signature attests this
+        # operator's guarantee receipts.
+        (
+            self.clearing_house_address,
+            self.guarantee_registry_address,
+            self.guarantee_signer,
+        ) = _signing_addresses(public_params)
+        #: The domain every payer-signed payload is verified under.
+        self.clearing_house_domain_separator = clearing_house_domain_separator(
+            self.chain_id, self.clearing_house_address
+        )
+        #: The domain the operator's guarantee receipts are verified under.
+        self.guarantee_domain_separator = guarantee_registry_domain_separator(
+            self.chain_id, self.guarantee_registry_address
+        )
         self.signer = signer
-        self.payment_signer = PaymentSigner(signer)
+        self.payer_signer = PayerSigner(signer)
         #: Facilitator that sponsors gas; unconfigured, every gasless call
         #: fails with FacilitatorNotConfiguredError and auto routes self-fund.
         self.facilitator = Facilitator(cfg.facilitator_url)
@@ -73,6 +108,15 @@ class ClientCtx:
         self._gateway_lock = asyncio.Lock()
         self._token_domain_separators: Dict[str, str] = {}
         self._token_domain_lock = asyncio.Lock()
+        # The cycle each asset's payments are scoped to, held until its period
+        # ends or core refuses a request signed against it.
+        self._active_cycles: Dict[str, ActiveCycle] = {}
+        # The latest checkpoint cutoff known per asset. A payment at or below
+        # it can never be collected, so payments are held back past it.
+        self._payment_cutoffs: Dict[str, int] = {}
+        # Core's clock minus ours, in ms, taken as a lower bound: the last
+        # server_time core reported against when its answer arrived.
+        self._clock_offset_ms = 0
 
     @classmethod
     async def create(cls, cfg: Config) -> "ClientCtx":
@@ -89,23 +133,14 @@ class ClientCtx:
         rpc = RpcProxy(cfg.rpc_url)
         try:
             public_params = await rpc.get_public_params()
-
-            if len(public_params.public_key) != _BLS_G1_COMPRESSED_BYTES:
-                raise ClientInitializationError(
-                    "invalid operator public key: expected "
-                    f"{_BLS_G1_COMPRESSED_BYTES} bytes, got "
-                    f"{len(public_params.public_key)}"
-                )
+            cls._require_payload_version_support(public_params)
+            _signing_addresses(public_params)
 
             contract_address = normalize_address(
                 cfg.contract_address or public_params.contract_address
             )
             ethereum_http_rpc_url = (
                 cfg.ethereum_http_rpc_url or public_params.ethereum_http_rpc_url or None
-            )
-
-            guarantee_domain, guarantee_domains = await cls._fetch_guarantee_metadata(
-                public_params, contract_address, ethereum_http_rpc_url
             )
         except BaseException:
             await rpc.aclose()
@@ -130,131 +165,71 @@ class ClientCtx:
             public_params=public_params,
             contract_address=contract_address,
             ethereum_http_rpc_url=ethereum_http_rpc_url,
-            guarantee_domain=guarantee_domain,
-            guarantee_domains=guarantee_domains,
             signer=signer,
         )
 
     @staticmethod
-    async def _fetch_guarantee_metadata(
-        public_params: CorePublicParameters,
-        contract_address: str,
-        ethereum_http_rpc_url: Optional[str],
-    ) -> tuple[bytes, Dict[int, bytes]]:
-        """The domain separator for every guarantee version this deployment
-        supports, so certs can be verified whichever version issued them.
-        Requests are always signed at ``GUARANTEE_CLAIMS_VERSION``, so that one
-        must be supported and enabled.
-
-        Takes what core publishes and reads the contract only when core
-        publishes nothing — the one path here that needs an Ethereum endpoint.
-        """
-        if GUARANTEE_CLAIMS_VERSION not in public_params.supported_guarantee_versions:
-            raise ClientInitializationError(
-                f"this client signs guarantee v{GUARANTEE_CLAIMS_VERSION}, which "
-                f"core does not support (core supports "
-                f"{public_params.supported_guarantee_versions}); upgrade core or "
-                "downgrade the SDK"
-            )
-
-        domains: Dict[int, bytes] = {}
-        if public_params.guarantee_domains:
-            for entry in public_params.guarantee_domains:
-                domains[entry.version] = bytes.fromhex(
-                    entry.domain_separator.removeprefix("0x")
-                )
-        else:
-            domains = await ClientCtx._read_guarantee_domains(
-                public_params, contract_address, ethereum_http_rpc_url
-            )
-
-        guarantee_domain = domains.get(GUARANTEE_CLAIMS_VERSION)
-        if guarantee_domain is None:
-            raise ClientInitializationError(
-                f"missing guarantee domain metadata for v{GUARANTEE_CLAIMS_VERSION}"
-            )
-        return guarantee_domain, domains
-
-    @staticmethod
-    async def _read_guarantee_domains(
-        public_params: CorePublicParameters,
-        contract_address: str,
-        ethereum_http_rpc_url: Optional[str],
-    ) -> Dict[int, bytes]:
-        """Reads each supported version's domain off the contract, one call
-        apiece — the fallback for a core too old to publish them."""
-        from ..contract import AsyncHTTPProvider, AsyncWeb3
-        from ..ssl_utils import get_web3_ssl_context
-        from ..utils import load_abi
-
-        if not ethereum_http_rpc_url:
-            raise ChainRpcUnavailableError()
-
-        ssl_context = get_web3_ssl_context()
-        request_kwargs = {"ssl": ssl_context} if ssl_context is not None else {}
-        w3 = AsyncWeb3(
-            AsyncHTTPProvider(ethereum_http_rpc_url, request_kwargs=request_kwargs)
+    def _require_payload_version_support(params: CorePublicParameters) -> None:
+        """Refuses a core that cannot read what this client signs, rather than
+        letting every payment fail later with a decode error."""
+        if PAYMENT_PAYLOAD_VERSION in params.supported_payment_payload_versions:
+            return
+        raise ClientInitializationError(
+            f"this client signs payment payload v{PAYMENT_PAYLOAD_VERSION}, which "
+            "core does not accept (core accepts "
+            f"{params.supported_payment_payload_versions}); upgrade core or "
+            "downgrade the SDK"
         )
-        contract = w3.eth.contract(
-            address=contract_address, abi=load_abi("core4mica.json")
-        )
-
-        expected = (
-            normalize_bytes32_hex(public_params.guarantee_domain_separator)
-            if public_params.guarantee_domain_separator
-            else None
-        )
-
-        domains: Dict[int, bytes] = {}
-        try:
-            for version in public_params.supported_guarantee_versions:
-                result = await contract.functions.getGuaranteeVersionConfig(
-                    int(version)
-                ).call()
-                if isinstance(result, dict):
-                    domain = bytes(result.get("domainSeparator"))
-                    enabled = bool(result.get("enabled"))
-                else:
-                    domain = bytes(result[1])
-                    enabled = bool(result[3])
-
-                if not enabled:
-                    if version == GUARANTEE_CLAIMS_VERSION:
-                        raise ClientInitializationError(
-                            f"guarantee v{GUARANTEE_CLAIMS_VERSION} is disabled on-chain"
-                        )
-                    continue
-                domains[version] = domain
-
-                if (
-                    version == GUARANTEE_CLAIMS_VERSION
-                    and expected is not None
-                    and expected != "0x" + domain.hex()
-                ):
-                    raise ClientInitializationError(
-                        "guarantee domain mismatch between core metadata and "
-                        f"contract for version {version}"
-                    )
-        except ClientError:
-            raise
-        except Exception as exc:
-            raise ClientInitializationError(str(exc)) from exc
-        finally:
-            provider = getattr(w3, "provider", None)
-            disconnect = getattr(provider, "disconnect", None)
-            if callable(disconnect):
-                result = disconnect()
-                if hasattr(result, "__await__"):
-                    await result
-
-        return domains
 
     @property
     def signer_address(self) -> str:
         return normalize_address(self.signer.address)
 
-    def guarantee_domain_for_version(self, version: int) -> Optional[bytes]:
-        return self.guarantee_domains.get(int(version))
+    async def active_cycle(self, asset: str) -> ActiveCycle:
+        """The cycle payments for *asset* must be signed for, fetched once and
+        reused until its period ends or :meth:`forget_active_cycle` drops it."""
+        key = normalize_address(asset)
+        cached = self._active_cycles.get(key)
+        if cached is not None and self.core_now() < cached.period_end:
+            return cached
+        response = await self.rpc.get_active_cycle(key)
+        self.record_core_time(response.server_time)
+        cycle = ActiveCycle(
+            id=response.cycle_id,
+            period_start=response.period_start,
+            period_end=response.period_end,
+        )
+        self._active_cycles[key] = cycle
+        return cycle
+
+    def forget_active_cycle(self, asset: str) -> None:
+        """Drops the cached cycle for *asset*, so the next payment re-reads it."""
+        self._active_cycles.pop(normalize_address(asset), None)
+
+    def record_payment_cutoff(self, asset: str, cutoff: int) -> None:
+        key = normalize_address(asset)
+        self._payment_cutoffs[key] = max(self._payment_cutoffs.get(key, 0), int(cutoff))
+
+    def payment_cutoff(self, asset: str) -> Optional[int]:
+        return self._payment_cutoffs.get(normalize_address(asset))
+
+    def record_core_time(self, server_time: int) -> None:
+        """Learns core's clock from a ``server_time`` it just reported. Zero,
+        from a core that predates it, teaches nothing."""
+        if not server_time:
+            return
+        # The report left core before it reached us and was truncated to the
+        # second, so core was at least this far ahead. Erring low is the safe
+        # side: core refuses a payment stamped even a second past its clock.
+        self._clock_offset_ms = int(server_time) * 1000 - _local_now_ms()
+
+    def core_now_ms(self) -> int:
+        """Core's clock as best known, in unix ms, never ahead of the real one."""
+        return max(_local_now_ms() + self._clock_offset_ms, 0)
+
+    def core_now(self) -> int:
+        """Core's clock as best known, in unix seconds."""
+        return self.core_now_ms() // 1000
 
     async def gateway(self) -> ContractGateway:
         """The transaction gateway, connected on first use so a client that
@@ -325,3 +300,20 @@ class ClientCtx:
             await self.auth_session.aclose()
         if self._gateway is not None:
             await self._gateway.aclose()
+
+
+def _signing_addresses(params: CorePublicParameters) -> Tuple[str, str, str]:
+    """The ClearingHouse, the GuaranteeRegistry and the guarantee signer, which
+    every payment is signed or verified against — so a core that omits one is
+    refused at connect rather than at the first payment."""
+    resolved = []
+    for what, raw in (
+        ("clearing house address", params.clearing_house_address),
+        ("guarantee registry address", params.guarantee_registry_address),
+        ("guarantee signer", params.guarantee_signer),
+    ):
+        try:
+            resolved.append(parse_address(raw, what))
+        except ValidationError as exc:
+            raise ClientInitializationError(f"{what}: {exc}") from exc
+    return resolved[0], resolved[1], resolved[2]

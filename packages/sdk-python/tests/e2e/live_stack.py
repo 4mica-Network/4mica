@@ -27,7 +27,6 @@ The recipient wallet needs the ``guarantee:issue`` scope in core's DB:
 
 import asyncio
 import os
-import secrets
 import sys
 import time
 from pathlib import Path
@@ -42,7 +41,7 @@ if str(ROOT) not in sys.path:
 from fourmica_sdk import (  # noqa: E402
     Client,
     ConfigBuilder,
-    PaymentGuaranteeRequestClaims,
+    PaymentRequest,
     RpcError,
 )
 
@@ -154,20 +153,20 @@ async def mint_mock_erc20(client: Client, token: str, to: str, amount: int) -> N
     await gateway._send(contract.functions.mint(to, amount))
 
 
-def build_claims(
+async def signed_payment(
     payer_client: Client,
     recipient_client: Client,
     amount: Optional[int] = None,
     erc20_token: Optional[str] = None,
-) -> PaymentGuaranteeRequestClaims:
-    return PaymentGuaranteeRequestClaims.new(
-        user_address=payer_client.signer_address,
-        recipient_address=recipient_client.signer_address,
-        req_id=int.from_bytes(secrets.token_bytes(32), "big"),
-        amount=amount if amount is not None else guarantee_amount(),
-        timestamp=int(time.time()),
-        erc20_token=erc20_token,
+) -> PaymentRequest:
+    """A payment from *payer_client* to *recipient_client*, scoped to the
+    cycle core reports as active and signed by the payer."""
+    payload = await payer_client.payment.new_payment(
+        recipient_client.signer_address,
+        amount if amount is not None else guarantee_amount(),
+        erc20_token,
     )
+    return await payer_client.payment.sign_request(payload)
 
 
 def cycle_text_ids(asset: Optional[str], issued_at: int) -> list:
