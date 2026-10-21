@@ -9,6 +9,7 @@ import {
   FormTextArea,
   FormTextInput,
 } from "@/components/form";
+import { PriceField } from "@/components/PriceField";
 import { NETWORK_OPTIONS } from "@/lib/networks";
 import { STATUS_OPTIONS, VISIBILITY_OPTIONS } from "./constants";
 import {
@@ -40,10 +41,10 @@ export function AgentFormFields({
 }: AgentFormFieldsProps) {
   const { t } = useTranslation();
   const show = (index: number) => step === undefined || step === index;
-  const [walletId, payerWalletId] = useWatch<
+  const [walletId, payerWalletId, network] = useWatch<
     AgentValues,
-    ["walletId", "payerWalletId"]
-  >({ name: ["walletId", "payerWalletId"] });
+    ["walletId", "payerWalletId", "network"]
+  >({ name: ["walletId", "payerWalletId", "network"] });
 
   const chosenSeller = wallets.find((w) => w.id === walletId);
   const chosenPayer = payerWallets.find((w) => w.id === payerWalletId);
@@ -189,39 +190,13 @@ export function AgentFormFields({
             />
           </FieldRow>
 
-          <FieldRow
+          <PriceField
+            network={network ?? null}
+            idPrefix={idPrefix}
             title={t("agent.fields.price.title")}
             description={t("agent.fields.price.description")}
-            htmlFor={`${idPrefix}-price`}
-          >
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <FormTextInput
-                  name="priceAmount"
-                  inputMode="decimal"
-                  placeholder="0.002"
-                />
-              </div>
-              <div className="w-28">
-                <FormTextInput
-                  id={`${idPrefix}-currency`}
-                  name="priceCurrency"
-                  aria-label={t("form.currency")}
-                  format="uppercase"
-                  maxLength={16}
-                  placeholder="USD"
-                />
-              </div>
-            </div>
-          </FieldRow>
-
-          <FieldRow
-            title={t("agent.fields.asset.title")}
-            description={t("agent.fields.asset.description")}
-            htmlFor={`${idPrefix}-asset`}
-          >
-            <FormTextInput name="assetAddress" placeholder="0x…" />
-          </FieldRow>
+            placeholder="0.002"
+          />
         </>
       )}
 

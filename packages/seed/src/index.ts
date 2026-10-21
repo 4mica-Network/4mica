@@ -53,7 +53,7 @@ const AGENTS = [
     payToAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.002",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     priceLabel: "$0.002 per research run",
     endpointUrl: "https://agents.4mica.io/atlas/brief",
     x402Endpoint: "https://agents.4mica.io/atlas/x402",
@@ -122,7 +122,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.01",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
   {
@@ -142,7 +142,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.05",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
   {
@@ -161,7 +161,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.01",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
 ] as const;

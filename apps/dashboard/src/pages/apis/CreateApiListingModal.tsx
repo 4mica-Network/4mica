@@ -17,6 +17,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -58,9 +59,8 @@ export function CreateApiListingModal({
       summary: "",
       description: "",
       walletId: "",
-      assetAddress: "",
+      assetAddress: NATIVE_ASSET,
       priceAmount: "",
-      priceCurrency: "USD",
       priceLabel: "",
       url: "",
       method: "GET" as const,
@@ -124,9 +124,8 @@ export function CreateApiListingModal({
         tags: data.tags,
         visibility: data.visibility,
         walletId: blankToNull(data.walletId),
-        assetAddress: blankToNull(data.assetAddress),
+        assetAddress: fromAssetFormValue(data.assetAddress),
         priceAmount: blankToNull(data.priceAmount),
-        priceCurrency: blankToNull(data.priceCurrency),
         priceLabel: blankToNull(data.priceLabel),
       }),
     );
