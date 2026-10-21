@@ -94,12 +94,13 @@ curl -L https://foundry.paradigm.xyz | bash && foundryup
 ### The core checkout must match the facilitator
 
 The root `Cargo.toml` pins `rpc-4mica` and `crypto-4mica` at `=2.0.0-alpha.4`
-for both the Rust SDK and the facilitator. A core on another tag speaks a
-different protocol, and the mismatch surfaces at `/settle`. Pin it explicitly:
+for both the Rust SDK and the facilitator, and this guide follows core
+`v2.0.0-alpha.5`'s dev stack. A core speaking a different protocol fails at
+`/settle`, so pin it explicitly:
 
 ```bash
 git clone git@github.com:4mica-Network/4mica-core.git ../4mica-core
-cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.4
+cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.5
 ```
 
 Put it beside this repo, or point `FOURMICA_CORE_DIR` at it.
@@ -114,7 +115,7 @@ scripts/dev-stack.sh up
 
 That does four things, in order:
 
-1. **`make dev-up` in 4mica-core.** Postgres, anvil (`--hardfork prague`), the
+1. **`make dev-up` in 4mica-core.** Postgres, anvil on chain 84532 (see §8), the
    `Core4MicaFullStack` forge deploy, migrations, the facilitator's wallet role,
    then `core-service`. Core's own script owns this because it is careful in
    ways worth not re-deriving: it reads the chain id back off anvil rather than
@@ -148,7 +149,7 @@ pnpm --filter @4mica/playground dev  # :3100
 ```bash
 curl localhost:3000/core/health
 curl localhost:3000/core/tokens        # the assets core accepts
-curl localhost:8080/supported          # must list ("4mica-credit", "eip155:31337")
+curl localhost:8080/supported          # must list ("4mica-credit", "eip155:84532")
 scripts/dev-stack.sh status
 ```
 
@@ -167,8 +168,7 @@ advertise an address that has been proved this way, which is why the listing
 form asks you to *pick* a wallet rather than type an address.
 
 Give it the role **Recipient** or **Both**, and put it on the chain your stack
-is running (`eip155:31337` locally — see the note in §8 if the network picker
-does not offer it).
+is running: Base Sepolia, `eip155:84532`, locally (see §8).
 
 ### b. Create the API
 
@@ -310,13 +310,17 @@ another, and 4Mica settles per chain.
 
 ## 8. Things that will bite you
 
-**A bare anvil chain is `eip155:31337`, which is not a `PaymentNetwork`.** The
-enum in `packages/db` has `BASE`, `BASE_SEPOLIA` and `ETHEREUM_SEPOLIA` only —
-deliberately, so a typo cannot reach a payment snippet. The dashboard's wallet
-picker therefore offers those three, and a wallet on 31337 cannot be linked.
+**The local chain borrows Base Sepolia's id.** Core's dev stack runs a bare
+anvil on chain 84532, so wallets, listings and payments use `BASE_SEPOLIA` as
+they would on the testnet. Only the id is borrowed: the tokens are mocks core
+deploys, and nothing touches the real chain. Point clients at the local URLs
+explicitly — anything that maps `eip155:84532` to an endpoint, such as the Rust
+SDK's `.network("base-sepolia")`, reaches the real testnet instead.
 
-**Fork Base Sepolia instead.** The forked chain keeps its own id, 84532, which
-*is* `BASE_SEPOLIA`, so the whole product works unchanged:
+**Fork Base Sepolia for its real tokens.** The seeded listings price in Base
+Sepolia's USDC, which only a fork has; on the bare chain, list your API with a
+token from `/core/tokens`. A forked chain has the same id but keeps the chain's
+state:
 
 ```bash
 cd ../4mica-core
@@ -330,13 +334,6 @@ Core reads the chain id back off the fork rather than assuming, so everything
 downstream follows. A forked deploy registers the chain's existing tokens
 rather than deploying mocks, which is why the token address is named
 explicitly. Then run `scripts/dev-stack.sh` from `role` onwards.
-
-The alternative — adding a `LOCAL` member to the enum — is possible but it
-would put a "Local" option in the production network picker, so it is not the
-default. If you do it, it is deliberately a type error in
-`apps/playground/src/lib/snippets/networks.ts`,
-`apps/dashboard/src/lib/networks.ts` and `apps/be/src/services/siwe.ts` — fix
-all three or it will not compile.
 
 **The agent network default is `ETHEREUM_SEPOLIA`.** Omitting `network` on
 create does not mean "whatever chain the wallet is on"; a `BASE_SEPOLIA` wallet

@@ -61,8 +61,8 @@ pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 require_core_dir() {
   [ -d "$CORE_DIR" ] || die "no 4mica-core checkout at $CORE_DIR
      Clone it beside this repo, or set FOURMICA_CORE_DIR."
-  [ -f "$CORE_DIR/Makefile" ] || die "$CORE_DIR has no Makefile — is it on v2.0.0-alpha.4?
-     git -C \"$CORE_DIR\" fetch --tags origin && git -C \"$CORE_DIR\" checkout v2.0.0-alpha.4"
+  [ -f "$CORE_DIR/Makefile" ] || die "$CORE_DIR has no Makefile — is it on v2.0.0-alpha.5?
+     git -C \"$CORE_DIR\" fetch --tags origin && git -C \"$CORE_DIR\" checkout v2.0.0-alpha.5"
 }
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ start_facilitator() {
   local chain_id
   chain_id="$(curl -fsS "$CORE_URL/core/public-params" \
     | sed -n 's/.*"chain_id"[: ]*\([0-9]*\).*/\1/p' | head -1)"
-  chain_id="${chain_id:-31337}"
+  chain_id="${chain_id:-84532}"
 
   log "Starting facilitator on :${FACILITATOR_PORT} (chain ${chain_id})…"
   mkdir -p "$DEV_DIR"
