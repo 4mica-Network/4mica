@@ -56,10 +56,7 @@ export function NotificationSettings() {
       titleKey="page.settings.notifications.title"
       descriptionKey="page.settings.notifications.description"
     >
-      <SettingsSection
-        title={t("settings.notifications.channels")}
-        description={t("settings.notifications.channelsHint")}
-      >
+      <section className="flex flex-col gap-3">
         <SwitchCard
           id="notif-enabled"
           title={t("settings.notifications.inApp")}
@@ -93,7 +90,7 @@ export function NotificationSettings() {
             />
           </SettingRow>
         </InstantCard>
-      </SettingsSection>
+      </section>
 
       <SettingsSection
         title={t("settings.notifications.emails")}
