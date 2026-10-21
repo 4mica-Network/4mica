@@ -66,7 +66,7 @@ export function useChecklist(): {
       id: "profile",
       title: t("checklist.profile"),
       hint: t("checklist.profileHint"),
-      to: "/settings/account",
+      to: "/settings/profile",
       done: isProfileRenderable(user),
     },
     {

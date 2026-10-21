@@ -28,6 +28,7 @@ import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { CredentialsSection } from "./CredentialsSection";
 
 const TEXT_MAX_LENGTH = 2000;
 
@@ -344,6 +345,8 @@ export function ProfileSettings() {
           </FieldRow>
         </EditableCard>
       </section>
+
+      <CredentialsSection user={user} />
 
       <SettingsSection
         title={t("settings.profile.visibility")}

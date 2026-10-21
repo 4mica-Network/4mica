@@ -1,6 +1,6 @@
 import { INITIAL_STATE } from "@stores/user/reducer";
 import type { User } from "@stores/user/type";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
@@ -68,6 +68,12 @@ const renderPage = (
   return dispatched;
 };
 
+const statusCard = () =>
+  within(
+    screen.getByText("Account status").parentElement
+      ?.parentElement as HTMLElement,
+  );
+
 describe("profile account status", () => {
   beforeEach(() => {
     notifySuccess.mockReset();
@@ -78,7 +84,7 @@ describe("profile account status", () => {
     const dispatched = renderPage({ emailVerified: false });
 
     const button = screen.getByRole("button", { name: "Verify email" });
-    expect(screen.queryByText("Unverified")).not.toBeInTheDocument();
+    expect(statusCard().queryByText("Unverified")).not.toBeInTheDocument();
 
     await userEvent.click(button);
 
@@ -90,7 +96,7 @@ describe("profile account status", () => {
   it("shows the badge, and no button, once verified", () => {
     renderPage({ emailVerified: true });
 
-    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(statusCard().getByText("Verified")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Verify email" }),
     ).not.toBeInTheDocument();
@@ -191,5 +197,19 @@ describe("profile visibility", () => {
 
     expect(screen.queryByText("Hide from discovery")).not.toBeInTheDocument();
     expect(screen.queryByText("Description")).not.toBeInTheDocument();
+  });
+});
+
+describe("profile credentials", () => {
+  it("edits the sign-in email and phone number here", () => {
+    renderPage({ email: "ada@4mica.io", phoneNumber: "+15550100" });
+
+    expect(screen.getByText("Contact details")).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i, { selector: "input" })).toHaveValue(
+      "ada@4mica.io",
+    );
+    expect(screen.getByLabelText(/phone/i, { selector: "input" })).toHaveValue(
+      "+15550100",
+    );
   });
 });

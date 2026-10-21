@@ -11,7 +11,7 @@ import {
   type LucideIcon,
   Settings,
   ShieldCheck,
-  User,
+  SlidersHorizontal,
   Users,
   Wallet,
 } from "lucide-react";
@@ -54,7 +54,7 @@ export const FOOTER_ITEMS: NavItem[] = [
 
 export const SETTINGS_NAV: NavItem[] = [
   { to: "/settings/profile", labelKey: "nav.profile", icon: BadgeCheck },
-  { to: "/settings/account", labelKey: "nav.account", icon: User },
+  { to: "/settings/general", labelKey: "nav.account", icon: SlidersHorizontal },
   { to: "/settings/business", labelKey: "nav.business", icon: Building2 },
   { to: "/settings/team", labelKey: "nav.team", icon: Users },
   { to: "/settings/notifications", labelKey: "nav.notifications", icon: Bell },

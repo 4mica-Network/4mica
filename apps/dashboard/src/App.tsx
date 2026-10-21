@@ -35,6 +35,10 @@ export function App() {
             {SETTINGS_PAGES.map(({ path, component: Component }) => (
               <Route key={path} path={path} element={<Component />} />
             ))}
+            <Route
+              path="account"
+              element={<Navigate to="/settings/general" replace />}
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
