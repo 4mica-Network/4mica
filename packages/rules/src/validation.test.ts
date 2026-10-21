@@ -8,6 +8,7 @@ import {
   isUuidShaped,
   isWebUrl,
   SIGNED_DECIMAL_AMOUNT_PATTERN,
+  toE164,
 } from "./validation";
 
 describe("validation", () => {
@@ -48,5 +49,23 @@ describe("validation", () => {
   it("detects uuid-shaped values", () => {
     expect(isUuidShaped("0f8fad5b-d9cb-469f-a165-70867728950e")).toBe(true);
     expect(isUuidShaped("my-agent")).toBe(false);
+  });
+});
+
+describe("toE164", () => {
+  it("compacts a formatted international number", () => {
+    expect(toE164("+1 (555) 010-0123")).toBe("+15550100123");
+    expect(toE164("+44 20 7946 0958")).toBe("+442079460958");
+  });
+
+  it("needs a country code", () => {
+    expect(toE164("555 010 0123")).toBeNull();
+    expect(toE164("+0 555 010 0123")).toBeNull();
+  });
+
+  it("rejects numbers that are too short or too long", () => {
+    expect(toE164("+1234567")).toBeNull();
+    expect(toE164("+1234567890123456")).toBeNull();
+    expect(toE164(null)).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import {
   confirmEmailHandler,
   sendVerificationEmailHandler,
+  syncPhoneVerificationHandler,
   verifyEmailHandler,
 } from "@controllers/verification/index";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
@@ -65,6 +66,29 @@ export const verificationRoutes: FastifyPluginCallback = (app, _opts, done) => {
       },
     },
     confirmEmailHandler,
+  );
+
+  app.post(
+    "/me/phone/verification/sync",
+    {
+      onRequest: base.onRequest,
+      preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      schema: {
+        tags: ["verification"],
+        summary: "Record a phone number Clerk has verified",
+        description:
+          "The SMS code is checked by Clerk in the dashboard. This reads the result back from Clerk and marks the account's number verified only if Clerk agrees.",
+        security: [{ bearerAuth: [] }],
+        response: {
+          ...limitedResponses,
+          200: userResponseSchema,
+          401: errorResponseSchema,
+          409: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    },
+    syncPhoneVerificationHandler,
   );
 
   app.get(

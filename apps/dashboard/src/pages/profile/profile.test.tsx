@@ -212,3 +212,34 @@ describe("profile credentials", () => {
     );
   });
 });
+
+describe("profile phone verification", () => {
+  it("offers to verify a saved international number", () => {
+    renderPage({ phoneNumber: "+15550100123", phoneNumberVerified: false });
+
+    expect(
+      screen.getByRole("button", { name: "Verify phone" }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for a country code before it can verify", () => {
+    renderPage({ phoneNumber: "555 010 0123", phoneNumberVerified: false });
+
+    expect(
+      screen.queryByRole("button", { name: "Verify phone" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Add the country code, like +1 or +44, to verify this number.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the badge once the number is verified", () => {
+    renderPage({ phoneNumber: "+15550100123", phoneNumberVerified: true });
+
+    expect(
+      screen.queryByRole("button", { name: "Verify phone" }),
+    ).not.toBeInTheDocument();
+  });
+});

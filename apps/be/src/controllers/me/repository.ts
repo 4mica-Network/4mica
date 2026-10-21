@@ -1,4 +1,5 @@
 import { prisma } from "@4mica/db";
+import { toE164 } from "@4mica/rules";
 import type {
   UpdateAccountInput,
   UpdateNotificationsInput,
@@ -116,10 +117,41 @@ const routeEmailChange = async (
     : { ...rest, pendingEmail: email };
 };
 
+const samePhone = (a: string | null, b: string | null): boolean =>
+  (toE164(a) ?? a) === (toE164(b) ?? b);
+
+const routePhoneChange = async (
+  userId: string,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> => {
+  if (!("phoneNumber" in data)) {
+    return data;
+  }
+
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { phoneNumber: true },
+  });
+
+  return samePhone(
+    current?.phoneNumber ?? null,
+    (data.phoneNumber as string | null) ?? null,
+  )
+    ? data
+    : { ...data, phoneNumberVerified: false };
+};
+
 export const updateUser = async (userId: string, data: UpdatableUser) =>
   prisma.user.update({
     where: { id: userId },
-    data: await routeEmailChange(userId, data),
+    data: await routePhoneChange(userId, await routeEmailChange(userId, data)),
+    select: USER_SELECT,
+  });
+
+export const markPhoneVerified = async (userId: string) =>
+  prisma.user.update({
+    where: { id: userId },
+    data: { phoneNumberVerified: true },
     select: USER_SELECT,
   });
 

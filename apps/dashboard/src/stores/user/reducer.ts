@@ -192,6 +192,7 @@ export default function userReducer(
 
     case actionTypes.SEND_EMAIL_VERIFICATION_REQUESTED:
     case actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED:
+    case actionTypes.SYNC_PHONE_VERIFICATION_REQUESTED:
       return {
         ...state,
         savingSections: setSaving(
@@ -224,6 +225,19 @@ export default function userReducer(
         error:
           (action.payload as { message?: string })?.message ??
           "We couldn't send the verification email.",
+      };
+
+    case actionTypes.SYNC_PHONE_VERIFICATION_FAILED:
+      return {
+        ...state,
+        savingSections: setSaving(
+          state.savingSections,
+          action.meta?.section,
+          false,
+        ),
+        error:
+          (action.payload as { message?: string })?.message ??
+          "We couldn't confirm your phone number.",
       };
 
     case actionTypes.CHECK_USERNAME_REQUESTED:

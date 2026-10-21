@@ -1271,5 +1271,22 @@
   "compliance.attest.notSigned": "Not confirmed yet",
   "compliance.licensing.offHint": "Turn on Regulated business to fill these in",
   "form.token": "Token",
-  "form.tokenNeedsNetwork": "Choose a receiving wallet to pick the token buyers pay in"
+  "form.tokenNeedsNetwork": "Choose a receiving wallet to pick the token buyers pay in",
+  "settings.account.phoneVerify.action": "Verify phone",
+  "settings.account.phoneVerify.title": "Verify your phone number",
+  "settings.account.phoneVerify.sendLead": "We'll text a 6-digit code to {{phone}}. Message and data rates may apply.",
+  "settings.account.phoneVerify.codeLead": "Enter the 6-digit code we sent to {{phone}}.",
+  "settings.account.phoneVerify.code": "Verification code",
+  "settings.account.phoneVerify.send": "Send code",
+  "settings.account.phoneVerify.verify": "Verify",
+  "settings.account.phoneVerify.cancel": "Cancel",
+  "settings.account.phoneVerify.resend": "Resend code",
+  "settings.account.phoneVerify.resendIn": "Resend in {{seconds}}s",
+  "settings.account.phoneVerify.sendFailed": "We couldn't send a code to this number. Check it and try again.",
+  "settings.account.phoneVerify.codeRejected": "That code didn't work. Check it and try again.",
+  "settings.account.phoneVerify.needsCountryCode": "Add the country code, like +1 or +44, to verify this number.",
+  "settings.account.phoneVerify.successTitle": "Phone verified",
+  "settings.account.phoneVerify.successBody": "Your phone number is now verified.",
+  "settings.account.phoneVerify.failedTitle": "Couldn't verify your phone",
+  "settings.account.phoneVerify.syncFailed": "We couldn't confirm your phone number. Try again."
 }
