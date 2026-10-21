@@ -1,9 +1,4 @@
-import {
-  CURRENCY_CODE_PATTERN,
-  isUuidShaped,
-  SLUG_MAX_LENGTH,
-  SLUG_MESSAGE,
-} from "@4mica/rules";
+import { isUuidShaped, SLUG_MAX_LENGTH, SLUG_MESSAGE } from "@4mica/rules";
 import { USERNAME_PATTERN } from "@4mica/url";
 import {
   address,
@@ -44,13 +39,6 @@ const priceLabel = v.pipe(v.string(), v.trim(), v.maxLength(64), singleLine);
 
 const url = httpsUrl(2048);
 
-const priceCurrency = v.pipe(
-  v.string(),
-  v.trim(),
-  v.toUpperCase(),
-  v.regex(CURRENCY_CODE_PATTERN, "must be a currency code"),
-);
-
 const tags = v.pipe(
   v.array(
     v.pipe(
@@ -84,7 +72,6 @@ export const CreateApiListingSchema = v.object({
   walletId: v.optional(v.nullable(walletId)),
   assetAddress: v.optional(v.nullable(address)),
   priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
-  priceCurrency: v.optional(v.nullable(priceCurrency)),
   x402Endpoint: v.optional(v.nullable(url)),
 });
 
@@ -105,7 +92,6 @@ export const UpdateApiListingSchema = v.partial(
     walletId: v.nullable(walletId),
     assetAddress: v.nullable(address),
     priceAmount: v.nullable(positiveDecimalAmount),
-    priceCurrency: v.nullable(priceCurrency),
     x402Endpoint: v.nullable(url),
   }),
 );

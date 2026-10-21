@@ -1,3 +1,4 @@
+import type { PaymentNetwork } from "@4mica/db";
 import { slugify } from "@4mica/rules";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@controllers/shared";
 import { resolveSellerWallet } from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
+import { resolvePriceAsset } from "@utils/price-asset";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import { nextFreeSlug } from "@utils/slug";
 import type { FastifyReply, RouteHandler } from "fastify";
@@ -102,6 +104,11 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
     payToAddress = resolved.wallet.address;
   }
 
+  const priced = resolvePriceAsset(network, data.assetAddress ?? null);
+  if (!priced.ok) {
+    return invalidBody(reply, [priced.issue]);
+  }
+
   if (data.visibility === "PUBLIC" && !payToAddress) {
     return notPayable(reply);
   }
@@ -132,9 +139,9 @@ export const createApiListingHandler: RouteHandler = async (request, reply) => {
       walletId,
       network,
       payToAddress,
-      assetAddress: data.assetAddress ?? null,
+      assetAddress: priced.assetAddress,
       priceAmount: data.priceAmount ?? null,
-      priceCurrency: data.priceCurrency ?? null,
+      priceCurrency: priced.priceCurrency,
       x402Endpoint: data.x402Endpoint ?? null,
     });
 
@@ -189,6 +196,22 @@ export const updateApiListingHandler: RouteHandler = async (request, reply) => {
       data.network = resolved.wallet.network;
       data.payToAddress = resolved.wallet.address;
     }
+  }
+
+  if (walletId !== undefined || next.assetAddress !== undefined) {
+    const priced = resolvePriceAsset(
+      ("network" in data
+        ? data.network
+        : current.network) as PaymentNetwork | null,
+      next.assetAddress !== undefined
+        ? next.assetAddress
+        : current.assetAddress,
+    );
+    if (!priced.ok) {
+      return invalidBody(reply, [priced.issue]);
+    }
+    data.assetAddress = priced.assetAddress;
+    data.priceCurrency = priced.priceCurrency;
   }
 
   const payToAfter =

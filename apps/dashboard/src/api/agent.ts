@@ -43,7 +43,6 @@ export interface AgentInput {
   walletId?: string | null;
   assetAddress?: string | null;
   priceAmount?: string | null;
-  priceCurrency?: string | null;
   priceLabel?: string | null;
   endpointUrl?: string | null;
   x402Endpoint?: string | null;

@@ -13,6 +13,7 @@ import {
   resolveSellerWallet,
 } from "@controllers/wallets/repository";
 import { appLogger } from "@logger/index";
+import { resolvePriceAsset } from "@utils/price-asset";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
@@ -145,6 +146,11 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
     payToAddress = resolved.wallet.address;
   }
 
+  const priced = resolvePriceAsset(network, data.assetAddress ?? null);
+  if (!priced.ok) {
+    return invalidBody(reply, [priced.issue]);
+  }
+
   // Same bar as POST /publish: a public agent must be payable.
   if (data.visibility === "PUBLIC" && !payToAddress) {
     return notPayable(reply);
@@ -175,9 +181,9 @@ export const createAgentHandler: RouteHandler = async (request, reply) => {
 
       walletId,
       payToAddress,
-      assetAddress: data.assetAddress ?? null,
+      assetAddress: priced.assetAddress,
       priceAmount: data.priceAmount ?? null,
-      priceCurrency: data.priceCurrency ?? null,
+      priceCurrency: priced.priceCurrency,
       priceLabel: data.priceLabel ?? null,
       endpointUrl: data.endpointUrl ?? null,
       x402Endpoint: data.x402Endpoint ?? null,
@@ -287,6 +293,20 @@ export const updateAgentHandler: RouteHandler = async (request, reply) => {
       data.walletId = resolved.wallet.id;
       data.payToAddress = resolved.wallet.address;
     }
+  }
+
+  if (network !== undefined || next.assetAddress !== undefined) {
+    const priced = resolvePriceAsset(
+      effectiveNetwork,
+      next.assetAddress !== undefined
+        ? next.assetAddress
+        : current.assetAddress,
+    );
+    if (!priced.ok) {
+      return invalidBody(reply, [priced.issue]);
+    }
+    data.assetAddress = priced.assetAddress;
+    data.priceCurrency = priced.priceCurrency;
   }
 
   const payToAfter =
