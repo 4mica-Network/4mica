@@ -161,9 +161,14 @@ async fn settle_endpoint_returns_receipt() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.receipt.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -190,9 +195,14 @@ async fn settle_accepts_payload_without_top_level_version() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.receipt.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -219,9 +229,14 @@ async fn settle_endpoint_accepts_v2_payload() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.receipt.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -255,7 +270,12 @@ async fn settle_endpoint_accepts_v2_payload_with_checksum_addresses() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.receipt.is_some());
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -404,8 +424,9 @@ async fn verify_rejects_mismatched_versions() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("does not match paymentPayload x402Version"));
+    assert_eq!(payload.invalid_reason.as_deref(), Some("invalid_payload"));
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("does not match paymentPayload x402Version"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -435,8 +456,12 @@ async fn verify_rejects_mismatched_amount() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("payment amount"));
+    assert_eq!(
+        payload.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_amount_mismatch")
+    );
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("payment amount"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -463,8 +488,12 @@ async fn verify_rejects_v2_mismatched_amount() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("payment amount"));
+    assert_eq!(
+        payload.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_amount_mismatch")
+    );
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("payment amount"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -487,6 +516,10 @@ async fn verify_rejects_validation_the_requirements_did_not_ask_for() {
     .await;
 
     assert_rejected_because(&response, "requirements ask for no validation");
+    assert_eq!(
+        response.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_validation_mismatch")
+    );
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -554,6 +587,10 @@ async fn verify_rejects_a_validator_core_has_not_whitelisted() {
     .await;
 
     assert_rejected_because(&response, "not whitelisted by core");
+    assert_eq!(
+        response.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_validator_not_allowed")
+    );
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -752,7 +789,12 @@ async fn settle_propagates_issue_errors() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert!(payload["error"].as_str().unwrap().contains("issue failure"));
+    assert!(
+        payload["errorMessage"]
+            .as_str()
+            .unwrap()
+            .contains("issue failure")
+    );
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -784,9 +826,12 @@ async fn settle_passes_on_cores_error_code() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "CHECKPOINT_REQUIRED");
-    assert_eq!(payload["details"]["uncheckpointed"], 64);
-    assert!(payload["receipt"].is_null());
+    assert_eq!(
+        payload["errorReason"],
+        "invalid_4mica_credit_checkpoint_required"
+    );
+    assert_eq!(payload["extra"]["details"]["uncheckpointed"], 64);
+    assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(verifier.verify_calls(), 0);
 }
 
@@ -816,13 +861,13 @@ async fn settle_rejects_a_receipt_for_another_payment() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
     assert!(
-        payload["error"]
+        payload["errorMessage"]
             .as_str()
             .unwrap()
             .contains("receipt amount"),
         "{payload}"
     );
-    assert!(payload["receipt"].is_null());
+    assert!(payload["extra"]["receipt"].is_null());
 }
 
 #[tokio::test]
@@ -847,7 +892,7 @@ async fn settle_propagates_receipt_errors() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["error"].as_str(), Some("verify failure"));
+    assert_eq!(payload["errorMessage"].as_str(), Some("verify failure"));
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -875,12 +920,12 @@ async fn settle_rejects_mismatched_versions() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
     assert!(
-        payload["error"]
+        payload["errorMessage"]
             .as_str()
             .unwrap()
             .contains("does not match paymentPayload x402Version")
     );
-    assert!(payload["receipt"].is_null());
+    assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -1025,7 +1070,10 @@ async fn every_withdraw_action_reports_a_missing_relayer() {
             serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(payload["success"], false, "for {body}");
-        assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED", "for {body}");
+        assert_eq!(
+            payload["errorReason"], "sponsorship_unavailable",
+            "for {body}"
+        );
     }
 }
 
@@ -1045,7 +1093,7 @@ async fn withdraw_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// An unrecognised `action` must be refused outright rather than silently defaulting to one.
@@ -1108,7 +1156,7 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_ne!(
-        payload["errorCode"], "RATE_LIMITED",
+        payload["errorReason"], "rate_limited",
         "deposits must not consume the withdrawal budget"
     );
 }
@@ -1159,7 +1207,7 @@ async fn deposit_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1179,7 +1227,7 @@ async fn deposit_verify_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// The global limit must engage before any relayer or chain work, so it protects a facilitator
@@ -1219,7 +1267,7 @@ async fn deposit_is_rate_limited_globally() {
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let payload: Value = serde_json::from_slice(&body).unwrap();
         codes.push(
-            payload["errorCode"]
+            payload["errorReason"]
                 .as_str()
                 .unwrap_or_default()
                 .to_string(),
@@ -1227,9 +1275,9 @@ async fn deposit_is_rate_limited_globally() {
     }
 
     // First two get as far as the relayer lookup; the third is turned away by the limiter.
-    assert_eq!(codes[0], "NO_RELAYER_CONFIGURED");
-    assert_eq!(codes[1], "NO_RELAYER_CONFIGURED");
-    assert_eq!(codes[2], "RATE_LIMITED");
+    assert_eq!(codes[0], "sponsorship_unavailable");
+    assert_eq!(codes[1], "sponsorship_unavailable");
+    assert_eq!(codes[2], "rate_limited");
 }
 
 /// Throttling is transient and a client should retry; a malformed request never becomes valid.
@@ -1270,8 +1318,8 @@ async fn deposit_marks_throttling_as_retryable() {
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(payload["errorCode"], "RATE_LIMITED");
-    assert_eq!(payload["retryable"], true);
+    assert_eq!(payload["errorReason"], "rate_limited");
+    assert_eq!(payload["extra"]["retryable"], true);
 }
 
 /// Existing monitoring checks `status == "ok"`, so the enriched payload must stay a superset of
@@ -1367,14 +1415,14 @@ async fn permit2_allowance_error_carries_the_fix() {
 
     let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
         .expect("serialize failure");
-    assert_eq!(response["errorCode"], "PERMIT2_ALLOWANCE_REQUIRED");
+    assert_eq!(response["errorReason"], "permit2_allowance_required");
     assert_eq!(
-        response["permit2Allowance"]["spender"],
+        response["extra"]["details"]["spender"],
         "0x000000000022d473030f116ddee9f6b43ac78ba3"
     );
-    assert_eq!(response["permit2Allowance"]["allowance"], "0");
-    assert_eq!(response["permit2Allowance"]["required"], "1000");
-    assert_eq!(response["permit2Allowance"]["eip2612Nonce"], "7");
+    assert_eq!(response["extra"]["details"]["allowance"], "0");
+    assert_eq!(response["extra"]["details"]["required"], "1000");
+    assert_eq!(response["extra"]["details"]["eip2612Nonce"], "7");
 }
 
 /// A token without EIP-2612 cannot have its approval sponsored, and the absent nonce is how a
@@ -1395,9 +1443,9 @@ async fn permit2_allowance_error_omits_the_nonce_for_a_non_2612_token() {
 
     let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
         .expect("serialize failure");
-    assert!(response["permit2Allowance"].is_object());
+    assert!(response["extra"]["details"].is_object());
     assert!(
-        response["permit2Allowance"].get("eip2612Nonce").is_none(),
+        response["extra"]["details"].get("eip2612Nonce").is_none(),
         "an absent nonce must be omitted, not null: {response}"
     );
 }
@@ -1411,8 +1459,8 @@ async fn other_errors_carry_no_permit2_detail() {
         &DepositError::RateLimited,
     ))
     .expect("serialize failure");
-    assert_eq!(response["errorCode"], "RATE_LIMITED");
-    assert!(response.get("permit2Allowance").is_none());
+    assert_eq!(response["errorReason"], "rate_limited");
+    assert!(response["extra"].get("details").is_none());
 }
 
 /// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
@@ -1494,7 +1542,7 @@ async fn claim_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1513,7 +1561,7 @@ async fn claim_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// The request's own identifiers are checked before any relayer or core work, so a bad one gets a
@@ -1535,7 +1583,7 @@ async fn claim_rejects_a_malformed_creditor() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 #[tokio::test]
@@ -1555,7 +1603,7 @@ async fn claim_rejects_a_cycle_id_that_could_escape_its_url() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 // ── sponsored net-debit payments ────────────────────────────────────────────
@@ -1593,7 +1641,7 @@ async fn pay_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1612,7 +1660,7 @@ async fn pay_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1632,7 +1680,7 @@ async fn pay_rejects_a_cycle_id_that_could_escape_its_url() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 /// The debtor is `authorization.from` — a request with no authorization at all cannot name one, so
@@ -1656,7 +1704,7 @@ async fn pay_requires_an_authorization() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: PayResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.success);
-    assert_eq!(payload.error_code.as_deref(), Some("INVALID_REQUEST"));
+    assert_eq!(payload.error_reason.as_deref(), Some("invalid_payload"));
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.
@@ -1676,7 +1724,7 @@ async fn post_verify(state: SharedState, request: &VerifyRequest) -> VerifyRespo
     serde_json::from_slice(&body).expect("decode VerifyResponse")
 }
 
-/// Asserts `/verify` rejected the request, and that the reason names the actual cause rather than
+/// Asserts `/verify` rejected the request, and that the message names the actual cause rather than
 /// some unrelated earlier check firing first.
 #[track_caller]
 fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
@@ -1684,13 +1732,17 @@ fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
         !response.is_valid,
         "expected a rejection mentioning {expected:?}, but the request was accepted"
     );
-    let reason = response
-        .invalid_reason
-        .as_deref()
-        .expect("a rejection must carry a reason");
     assert!(
-        reason.contains(expected),
-        "expected reason to contain {expected:?}, got: {reason}"
+        response.invalid_reason.is_some(),
+        "a rejection must carry a reason"
+    );
+    let message = response
+        .invalid_message
+        .as_deref()
+        .expect("a rejection must carry a message");
+    assert!(
+        message.contains(expected),
+        "expected message to contain {expected:?}, got: {message}"
     );
 }
 
@@ -1895,10 +1947,7 @@ impl MockExact {
 impl ExactService for MockExact {
     async fn verify(&self, _: &VerifyRequest) -> Result<VerifyResponse, ValidationError> {
         self.verify_calls.fetch_add(1, Ordering::SeqCst);
-        Ok(VerifyResponse {
-            is_valid: true,
-            invalid_reason: None,
-        })
+        Ok(VerifyResponse::valid(None))
     }
 
     async fn settle(&self, _: &SettleRequest) -> Result<SettleResponse, ValidationError> {
@@ -1992,8 +2041,8 @@ async fn settle_routes_to_exact_service() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], true);
-    assert_eq!(payload["txHash"], "0xdeadbeef");
-    assert!(payload["receipt"].is_null());
+    assert_eq!(payload["transaction"], "0xdeadbeef");
+    assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(exact.settle_calls(), 1);
 }
 
@@ -2056,8 +2105,9 @@ impl MockIssuer {
         Self {
             refusal: Some(IssueError {
                 message: "issue failure".into(),
-                code: None,
+                original_code: None,
                 details: None,
+                refused: false,
             }),
             issue_calls: AtomicUsize::new(0),
         }
@@ -2067,8 +2117,9 @@ impl MockIssuer {
         Self {
             refusal: Some(IssueError {
                 message: format!("core refused the guarantee: {code}"),
-                code: Some(code.into()),
+                original_code: Some(code.into()),
                 details: Some(details),
+                refused: true,
             }),
             issue_calls: AtomicUsize::new(0),
         }

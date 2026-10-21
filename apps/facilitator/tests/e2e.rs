@@ -438,22 +438,22 @@ async fn e2e_facilitator_endpoints() {
         "unfunded/bogus-signature settle should fail at core: {settle_body}"
     );
     assert!(
-        settle_body["error"].is_string(),
+        settle_body["errorMessage"].is_string(),
         "failed settle should carry an error message: {settle_body}"
     );
     assert!(
-        settle_body["receipt"].is_null(),
+        settle_body["extra"]["receipt"].is_null(),
         "failed settle must not return a receipt: {settle_body}"
     );
     eprintln!(
         "[e2e] negative /settle reached core/guarantees, error: {}",
-        settle_body["error"]
+        settle_body["errorMessage"]
     );
 
     // --- /clearing/claim (negative): a well-formed claim for a cycle core has never seen.
     // The relayer is configured, so the request passes the sponsorship gate and the
     // facilitator asks core for the cycle's committed terms with its authenticated wallet —
-    // ACTION_UNAVAILABLE proves that round trip executed and core answered. The positive
+    // clearing_action_unavailable proves that round trip executed and core answered. The positive
     // path needs a committed, funded cycle, which only `4mica-core`'s integration tests can
     // arrange (`integration-tests/tests/sponsored_claim.rs`, run against this facilitator).
     let claim_body = json!({
@@ -470,8 +470,13 @@ async fn e2e_facilitator_endpoints() {
             body[ok_field], false,
             "{endpoint} must refuse a cycle core does not know: {body}"
         );
+        let reason = if ok_field == "isValid" {
+            "invalidReason"
+        } else {
+            "errorReason"
+        };
         assert_eq!(
-            body["errorCode"], "ACTION_UNAVAILABLE",
+            body[reason], "clearing_action_unavailable",
             "{endpoint} should surface core's refusal to serve the cycle's terms: {body}"
         );
     }
@@ -611,7 +616,7 @@ async fn run_gasless_deposit(
     // Preflight first: it must agree with the submit path, and it spends no gas.
     let (status, verify) = post_json(client, &format!("{base}/deposit/verify"), &body).await;
     assert!(status.is_success(), "/deposit/verify HTTP status {status}");
-    if verify["errorCode"] == "NO_RELAYER" {
+    if verify["invalidReason"] == "sponsorship_unavailable" {
         eprintln!("[e2e] gasless deposit skipped: facilitator has no relayer configured");
         return;
     }
@@ -619,13 +624,13 @@ async fn run_gasless_deposit(
     // environment gap like a missing relayer, not a facilitator defect, so it skips rather than
     // failing forever. The facilitator decodes the revert against the Core4Mica error ABI, so this
     // matches a name rather than a raw selector.
-    if verify["invalidReason"]
+    if verify["invalidMessage"]
         .as_str()
-        .is_some_and(|reason| reason.contains("DepositsDisabled"))
+        .is_some_and(|message| message.contains("DepositsDisabled"))
     {
         eprintln!(
             "[e2e] gasless deposit skipped: Core4Mica has deposits of {token} switched off: {}",
-            verify["invalidReason"]
+            verify["invalidMessage"]
         );
         return;
     }
@@ -633,7 +638,7 @@ async fn run_gasless_deposit(
     assert_eq!(
         verify["isValid"], true,
         "/deposit/verify rejected an SDK-signed authorization for {token}: {verify}\n  \
-         SIMULATION_REVERTED carries the decoded Core4Mica error — a token advertising \
+         simulation_reverted carries the decoded Core4Mica error — a token advertising \
          DOMAIN_SEPARATOR (EIP-2612) without EIP-3009 `receiveWithAuthorization`, or an \
          unregistered asset, both land here."
     );
@@ -641,8 +646,13 @@ async fn run_gasless_deposit(
     let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
     assert!(status.is_success(), "/deposit HTTP status {status}");
     assert_eq!(settle["success"], true, "/deposit failed: {settle}");
-    let tx_hash = settle["txHash"].as_str().expect("txHash in response");
-    assert!(tx_hash.starts_with("0x"), "unexpected txHash {tx_hash}");
+    let tx_hash = settle["transaction"]
+        .as_str()
+        .expect("transaction in response");
+    assert!(
+        tx_hash.starts_with("0x"),
+        "unexpected transaction {tx_hash}"
+    );
 
     // The payload binds `to` and `value`, so a facilitator cannot redirect the funds. Assert the
     // signer was credited — reading on-chain, which has no indexer lag.
@@ -664,11 +674,11 @@ async fn run_gasless_deposit(
         replay["success"], false,
         "replay should be refused: {replay}"
     );
-    // NONCE_ALREADY_USED when the token exposes `authorizationState`, SIMULATION_REVERTED when it
+    // nonce_already_used when the token exposes `authorizationState`, simulation_reverted when it
     // does not — either way the replay is caught before any gas is spent.
-    let replay_code = replay["errorCode"].as_str().unwrap_or_default();
+    let replay_code = replay["errorReason"].as_str().unwrap_or_default();
     assert!(
-        matches!(replay_code, "NONCE_ALREADY_USED" | "SIMULATION_REVERTED"),
+        matches!(replay_code, "nonce_already_used" | "simulation_reverted"),
         "replay must be refused before broadcast, got {replay_code}: {replay}"
     );
 
@@ -858,8 +868,8 @@ async fn run_happy_path(
 
         let indexing_lag = !settle_body_resp["success"].as_bool().unwrap_or(false)
             && matches!(
-                settle_body_resp["errorCode"].as_str(),
-                Some("USER_NOT_REGISTERED" | "INSUFFICIENT_COLLATERAL")
+                settle_body_resp["errorReason"].as_str(),
+                Some("invalid_4mica_credit_payer_not_registered" | "insufficient_funds")
             );
         if !indexing_lag || std::time::Instant::now() >= deadline {
             break;
@@ -873,7 +883,7 @@ async fn run_happy_path(
 
     if settle_body_resp["success"].as_bool().unwrap_or(false) {
         assert!(
-            settle_body_resp["receipt"].is_object(),
+            settle_body_resp["extra"]["receipt"].is_object(),
             "successful settle should return a receipt: {settle_body_resp}"
         );
         eprintln!("[e2e] happy path /settle returned a guarantee receipt ✔");
@@ -884,7 +894,7 @@ async fn run_happy_path(
     // If it stopped on a known core-side seeding gap, report exactly what to seed
     // and skip rather than fail — that state is provisioned by the core dev
     // harness, not this test.
-    let err = settle_body_resp["error"]
+    let err = settle_body_resp["errorMessage"]
         .as_str()
         .unwrap_or("")
         .to_lowercase();
@@ -904,7 +914,7 @@ async fn run_happy_path(
              Grant the facilitator auth wallet (anvil acct 11) the `guarantee:issue` scope, and \
              deposit collateral for the payer (anvil acct 1).\n  \
              Set E2E_SKIP_HAPPY=1 to skip this deliberately.",
-            settle_body_resp["error"]
+            settle_body_resp["errorMessage"]
         );
     }
 
@@ -1158,14 +1168,14 @@ async fn run_sponsored_permit_deposit(
 
     let (status, settle) = post_json(client, &format!("{base}/deposit"), &body).await;
     assert!(status.is_success(), "/deposit HTTP status {status}");
-    if settle["errorCode"] == "NO_RELAYER_CONFIGURED" {
+    if settle["errorReason"] == "sponsorship_unavailable" {
         eprintln!("[e2e] sponsored-permit deposit skipped: facilitator has no relayer configured");
         return;
     }
-    if settle["errorCode"] == "SIMULATION_REVERTED" {
+    if settle["errorReason"] == "simulation_reverted" {
         eprintln!(
             "[e2e] sponsored-permit deposit skipped: {}",
-            settle["error"]
+            settle["errorMessage"]
         );
         return;
     }

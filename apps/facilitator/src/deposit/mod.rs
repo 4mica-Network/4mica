@@ -627,6 +627,7 @@ fn parse_u256(value: &str) -> Result<U256, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::{ErrorCode, Refusal};
     use alloy::primitives::address;
     use alloy::transports::RpcError;
 
@@ -643,18 +644,18 @@ mod tests {
 
     // A token without EIP-3009 reverts `receiveWithAuthorization` with empty data, which nodes
     // report as error 3 and no `data`. That is the EVM answering, and the SDK's fallback to the
-    // Permit2 route keys off SIMULATION_REVERTED — CHAIN_ERROR would strand the deposit.
+    // Permit2 route keys off simulation_reverted — chain_unavailable would strand the deposit.
     #[test]
     fn data_less_revert_is_a_simulation_revert() {
         let err = classify_call_error(rpc_error(3, "execution reverted"));
-        assert_eq!(err.code(), "SIMULATION_REVERTED");
+        assert_eq!(err.code(), ErrorCode::SimulationReverted);
         assert!(err.to_string().contains("without data"), "{err}");
     }
 
     #[test]
     fn transport_failure_stays_a_chain_error() {
         let err = classify_call_error(rpc_error(-32000, "connection refused"));
-        assert_eq!(err.code(), "CHAIN_ERROR");
+        assert_eq!(err.code(), ErrorCode::ChainUnavailable);
     }
 
     fn auth(from: Address) -> ReceiveAuthorization {
@@ -709,7 +710,7 @@ mod tests {
             None,
         )
         .expect_err("expected zero rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     /// Permit2 gets its own code rather than the generic unknown-method one, so a client can tell
@@ -783,7 +784,7 @@ mod tests {
             Some(eip2612_permit()),
         )
         .expect_err("expected rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     /// The payload shape and the discriminator must agree, or the caller is confused about what it
@@ -799,7 +800,7 @@ mod tests {
             None,
         )
         .expect_err("expected mismatch rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     #[test]
@@ -813,7 +814,7 @@ mod tests {
             None,
         )
         .expect_err("expected missing-authorization rejection");
-        assert_eq!(none.code(), "INVALID_REQUEST");
+        assert_eq!(none.code(), ErrorCode::InvalidPayload);
 
         let both = DepositIntent::parse(
             "0x000000000000000000000000000000000000d0c5",
@@ -824,7 +825,7 @@ mod tests {
             None,
         )
         .expect_err("expected both-authorizations rejection");
-        assert_eq!(both.code(), "INVALID_REQUEST");
+        assert_eq!(both.code(), ErrorCode::InvalidPayload);
     }
 
     #[test]
@@ -838,6 +839,6 @@ mod tests {
             None,
         )
         .expect_err("expected unknown-method rejection");
-        assert_eq!(err.code(), "UNSUPPORTED_TRANSFER_METHOD");
+        assert_eq!(err.code(), ErrorCode::UnsupportedTransferMethod);
     }
 }

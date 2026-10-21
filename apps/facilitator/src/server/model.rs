@@ -15,6 +15,7 @@ use alloy::primitives::{Address, B256, U256};
 
 use crate::clearing::{ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
+use crate::error_code::Failure;
 use crate::limits::SponsorCounters;
 use crate::withdraw::{WithdrawError, WithdrawIntent};
 
@@ -198,11 +199,67 @@ impl SettleRequest {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+/// 4mica's additions to a response, under the `extra` key x402 leaves to schemes so a generic x402
+/// client passes them through.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResponseExtra {
+    /// Whether repeating the identical request later may succeed. Set on failures only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+    /// What the caller needs to act on the failure, when the message alone is not enough.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+    /// The operator's receipt for the guarantee core issued.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<GuaranteeReceipt>,
+}
+
+impl ResponseExtra {
+    fn failure(failure: &Failure) -> Option<Self> {
+        Some(Self {
+            retryable: Some(failure.retryable),
+            details: failure.details.clone(),
+            receipt: None,
+        })
+    }
+}
+
+/// The answer from every verify endpoint: x402's `/verify` and the sponsored actions' preflights.
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VerifyResponse {
     pub is_valid: bool,
+    /// A machine-readable reason, such as `insufficient_funds`. Absent when valid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invalid_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalid_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
+}
+
+impl VerifyResponse {
+    pub fn valid(payer: Option<String>) -> Self {
+        Self {
+            is_valid: true,
+            payer,
+            ..Self::default()
+        }
+    }
+
+    pub fn invalid(failure: impl Into<Failure>) -> Self {
+        let failure = failure.into();
+        Self {
+            is_valid: false,
+            extra: ResponseExtra::failure(&failure),
+            invalid_reason: Some(failure.reason),
+            invalid_message: Some(failure.message),
+            payer: None,
+        }
+    }
 }
 
 /// A gasless deposit: the payer's EIP-3009 authorization plus the amount and asset it was signed
@@ -265,137 +322,52 @@ fn parse_amount(value: &str, field: &str) -> Result<U256, DepositError> {
         .map_err(|err| DepositError::InvalidRequest(format!("invalid {field}: {err}")))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DepositVerifyResponse {
-    pub is_valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invalid_reason: Option<String>,
-    /// Stable code so clients branch on this rather than parsing `invalidReason`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// True when retrying the identical request may succeed — throttling and transient chain
-    /// errors. A bad signature or an expired authorization will never become valid.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permit2_allowance: Option<Permit2AllowanceResponse>,
-}
-
-/// What a client needs to satisfy a missing Permit2 approval, so it need not read the chain.
-///
-/// `eip2612Nonce` is the only value a chain-free client cannot derive: the token's domain
-/// separator already comes from core's `/core/tokens`, and the spender is the canonical Permit2.
-/// Present means the approval can be sponsored — sign an `eip2612Permit` and retry. Absent means
-/// the token has no EIP-2612 surface, so the payer must submit `approve(PERMIT2, …)` themselves.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Permit2AllowanceResponse {
-    pub spender: String,
-    pub allowance: String,
-    pub required: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip2612_nonce: Option<String>,
-}
-
-impl Permit2AllowanceResponse {
-    fn from_error(error: &DepositError) -> Option<Self> {
-        error.permit2_allowance_details().map(Self::from_details)
-    }
-
-    fn from_pay_error(error: &PayError) -> Option<Self> {
-        error.permit2_allowance_details().map(Self::from_details)
-    }
-
-    fn from_details(details: &crate::deposit::Permit2AllowanceDetails) -> Self {
-        Self {
-            spender: format!("{:#x}", details.spender),
-            allowance: details.allowance.to_string(),
-            required: details.required.to_string(),
-            eip2612_nonce: details.eip2612_nonce.map(|nonce| nonce.to_string()),
-        }
-    }
-}
-
-impl DepositVerifyResponse {
-    pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            invalid_reason: None,
-            error_code: None,
-            retryable: None,
-            permit2_allowance: None,
-        }
-    }
-
-    pub fn invalid(error: &DepositError) -> Self {
-        Self {
-            is_valid: false,
-            invalid_reason: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-            permit2_allowance: Permit2AllowanceResponse::from_error(error),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DepositResponse {
     pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tx_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
     /// Echoed back so a caller can reconcile without re-parsing its own request. Collateral is
     /// always credited to `from` — the relayer cannot redirect it.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`DepositVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
 }
 
 impl DepositResponse {
     pub fn success(tx_hash: B256, network: &str, intent: &DepositIntent) -> Self {
         Self {
             success: true,
-            tx_hash: Some(format!("{tx_hash:#x}")),
+            transaction: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
             from: Some(format!("{:#x}", intent.authorization.from())),
             asset: Some(format!("{:#x}", intent.asset)),
             amount: Some(intent.amount.to_string()),
-            error: None,
-            error_code: None,
-            retryable: None,
-            permit2_allowance: None,
+            ..Self::default()
         }
     }
 
     pub fn failure(error: &DepositError) -> Self {
+        let failure = Failure::from(error);
         Self {
             success: false,
-            tx_hash: None,
-            network: None,
-            from: None,
-            asset: None,
-            amount: None,
-            error: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-            permit2_allowance: Permit2AllowanceResponse::from_error(error),
+            transaction: failure.transaction.map(|hash| format!("{hash:#x}")),
+            extra: ResponseExtra::failure(&failure),
+            error_reason: Some(failure.reason),
+            error_message: Some(failure.message),
+            ..Self::default()
         }
     }
 }
@@ -452,93 +424,53 @@ fn parse_address(value: &str, field: &str) -> Result<Address, WithdrawError> {
         .map_err(|_| WithdrawError::InvalidRequest(format!("invalid {field} address: {value}")))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WithdrawVerifyResponse {
-    pub is_valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invalid_reason: Option<String>,
-    /// Stable code so clients branch on this rather than parsing `invalidReason`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// True when retrying the identical request may succeed — throttling and transient chain
-    /// errors. A bad signature or an expired authorization will never become valid.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-}
-
-impl WithdrawVerifyResponse {
-    pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            invalid_reason: None,
-            error_code: None,
-            retryable: None,
-        }
-    }
-
-    pub fn invalid(error: &WithdrawError) -> Self {
-        Self {
-            is_valid: false,
-            invalid_reason: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WithdrawResponse {
     pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tx_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
     /// Echoed back so a caller can reconcile without re-parsing its own request. The action always
     /// applies to `user` — the relayer cannot redirect it.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset: Option<String>,
     /// Present for `request` only; the other actions carry no amount.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`WithdrawVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
 }
 
 impl WithdrawResponse {
     pub fn success(tx_hash: B256, network: &str, intent: &WithdrawIntent) -> Self {
         Self {
             success: true,
-            tx_hash: Some(format!("{tx_hash:#x}")),
+            transaction: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
             user: Some(format!("{:#x}", intent.user())),
             asset: Some(format!("{:#x}", intent.asset())),
             amount: intent.amount().map(|amount| amount.to_string()),
-            error: None,
-            error_code: None,
-            retryable: None,
+            ..Self::default()
         }
     }
 
     pub fn failure(error: &WithdrawError) -> Self {
+        let failure = Failure::from(error);
         Self {
             success: false,
-            tx_hash: None,
-            network: None,
-            user: None,
-            asset: None,
-            amount: None,
-            error: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
+            transaction: failure.transaction.map(|hash| format!("{hash:#x}")),
+            extra: ResponseExtra::failure(&failure),
+            error_reason: Some(failure.reason),
+            error_message: Some(failure.message),
+            ..Self::default()
         }
     }
 }
@@ -557,65 +489,30 @@ pub struct ClaimRequest {
     pub creditor: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClaimVerifyResponse {
-    pub is_valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invalid_reason: Option<String>,
-    /// Stable code so clients branch on this rather than parsing `invalidReason`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`WithdrawVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-}
-
-impl ClaimVerifyResponse {
-    pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            invalid_reason: None,
-            error_code: None,
-            retryable: None,
-        }
-    }
-
-    pub fn invalid(error: &ClaimError) -> Self {
-        Self {
-            is_valid: false,
-            invalid_reason: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaimResponse {
     pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tx_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
     /// Echoed back so a caller can reconcile without re-parsing its own request. The payout always
     /// goes to `creditor` — the relayer cannot redirect it.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub creditor: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cycle_id: Option<String>,
     /// The committed net credit, as core proved it. In a Shortfall cycle the on-chain payout can
     /// be a pro-rata fraction of this.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`WithdrawVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
 }
 
 /// A sponsored net-debit payment. The caller names the cycle and supplies the debtor's
@@ -651,102 +548,53 @@ pub struct PayRequest {
     pub eip2612_permit: Option<Eip2612PermitRequest>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PayVerifyResponse {
-    pub is_valid: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invalid_reason: Option<String>,
-    /// Stable code so clients branch on this rather than parsing `invalidReason`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`WithdrawVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permit2_allowance: Option<Permit2AllowanceResponse>,
-}
-
-impl PayVerifyResponse {
-    pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            invalid_reason: None,
-            error_code: None,
-            retryable: None,
-            permit2_allowance: None,
-        }
-    }
-
-    pub fn invalid(error: &PayError) -> Self {
-        Self {
-            is_valid: false,
-            invalid_reason: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-            permit2_allowance: Permit2AllowanceResponse::from_pay_error(error),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PayResponse {
     pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tx_hash: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
     /// Echoed back so a caller can reconcile without re-parsing its own request. The funds always
     /// come from `debtor` — the signer — and go into the cycle's escrow.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debtor: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cycle_id: Option<String>,
     /// The committed net debit, as core proved it and the debtor signed it.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// See [`WithdrawVerifyResponse::retryable`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retryable: Option<bool>,
-    /// Present with `PERMIT2_ALLOWANCE_REQUIRED`. See [`Permit2AllowanceResponse`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub permit2_allowance: Option<Permit2AllowanceResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
 }
 
 impl PayResponse {
     pub fn success(tx_hash: B256, network: &str, terms: &PayTerms) -> Self {
         Self {
             success: true,
-            tx_hash: Some(format!("{tx_hash:#x}")),
+            transaction: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
             debtor: Some(format!("{:#x}", terms.debtor)),
             cycle_id: Some(format!("{:#x}", terms.cycle_id)),
             amount: Some(terms.amount.to_string()),
-            error: None,
-            error_code: None,
-            retryable: None,
-            permit2_allowance: None,
+            ..Self::default()
         }
     }
 
     pub fn failure(error: &PayError) -> Self {
+        let failure = Failure::from(error);
         Self {
             success: false,
-            tx_hash: None,
-            network: None,
-            debtor: None,
-            cycle_id: None,
-            amount: None,
-            error: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
-            permit2_allowance: Permit2AllowanceResponse::from_pay_error(error),
+            transaction: failure.transaction.map(|hash| format!("{hash:#x}")),
+            extra: ResponseExtra::failure(&failure),
+            error_reason: Some(failure.reason),
+            error_message: Some(failure.message),
+            ..Self::default()
         }
     }
 }
@@ -755,104 +603,91 @@ impl ClaimResponse {
     pub fn success(tx_hash: B256, network: &str, terms: &ClaimTerms) -> Self {
         Self {
             success: true,
-            tx_hash: Some(format!("{tx_hash:#x}")),
+            transaction: Some(format!("{tx_hash:#x}")),
             network: Some(network.to_string()),
             creditor: Some(format!("{:#x}", terms.creditor)),
             cycle_id: Some(format!("{:#x}", terms.cycle_id)),
             amount: Some(terms.amount.to_string()),
-            error: None,
-            error_code: None,
-            retryable: None,
+            ..Self::default()
         }
     }
 
     pub fn failure(error: &ClaimError) -> Self {
+        let failure = Failure::from(error);
         Self {
             success: false,
-            tx_hash: None,
-            network: None,
-            creditor: None,
-            cycle_id: None,
-            amount: None,
-            error: Some(error.to_string()),
-            error_code: Some(error.code().to_string()),
-            retryable: Some(error.is_retryable()),
+            transaction: failure.transaction.map(|hash| format!("{hash:#x}")),
+            extra: ResponseExtra::failure(&failure),
+            error_reason: Some(failure.reason),
+            error_message: Some(failure.message),
+            ..Self::default()
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+/// The answer from x402's `/settle`.
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettleResponse {
     pub success: bool,
-    pub error: Option<String>,
-    /// Core's code for a refused guarantee, such as `CHECKPOINT_REQUIRED`, so the seller can pass
-    /// it on to the payer.
+    /// A machine-readable reason, such as `invalid_4mica_credit_checkpoint_required`. Absent on
+    /// success.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error_code: Option<String>,
-    /// What core attached to `error_code`.
+    pub error_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub details: Option<Value>,
-    pub tx_hash: Option<String>,
-    pub network_id: Option<String>,
-    /// The operator's receipt for the guarantee core issued.
+    pub error_message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub receipt: Option<GuaranteeReceipt>,
+    pub payer: Option<String>,
+    /// The settlement transaction, or empty when none was broadcast, as for an issued guarantee.
+    #[serde(default)]
+    pub transaction: String,
+    pub network: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<ResponseExtra>,
 }
 
 impl SettleResponse {
-    pub fn invalid(reason: String, network: &str) -> Self {
+    pub fn failed(failure: Failure, network: &str) -> Self {
         Self {
             success: false,
-            error: Some(reason),
-            error_code: None,
-            details: None,
-            tx_hash: None,
-            network_id: Some(network.to_string()),
-            receipt: None,
-        }
-    }
-
-    pub fn rejected(err: &ValidationError, network: &str) -> Self {
-        let (error_code, details) = match err {
-            ValidationError::IssueGuarantee(refusal) => {
-                (refusal.code.clone(), refusal.details.clone())
-            }
-            _ => (None, None),
-        };
-        Self {
-            error_code,
-            details,
-            ..Self::invalid(err.to_string(), network)
+            extra: ResponseExtra::failure(&failure),
+            error_reason: Some(failure.reason),
+            error_message: Some(failure.message),
+            payer: None,
+            transaction: String::new(),
+            network: network.to_string(),
         }
     }
 
     pub fn from_exact(
         success: bool,
-        error: Option<String>,
-        tx_hash: Option<String>,
+        error_reason: Option<String>,
+        transaction: Option<String>,
         network: String,
     ) -> Self {
         Self {
             success,
-            error,
-            error_code: None,
-            details: None,
-            tx_hash,
-            network_id: Some(network),
-            receipt: None,
+            error_reason,
+            error_message: None,
+            payer: None,
+            transaction: transaction.unwrap_or_default(),
+            network,
+            extra: None,
         }
     }
 
-    pub fn four_mica_success(network: &str, receipt: GuaranteeReceipt) -> Self {
+    pub fn issued(network: &str, payer: &str, receipt: GuaranteeReceipt) -> Self {
         Self {
             success: true,
-            error: None,
-            error_code: None,
-            details: None,
-            tx_hash: None,
-            network_id: Some(network.to_string()),
-            receipt: Some(receipt),
+            error_reason: None,
+            error_message: None,
+            payer: Some(payer.to_string()),
+            transaction: String::new(),
+            network: network.to_string(),
+            extra: Some(ResponseExtra {
+                receipt: Some(receipt),
+                ..ResponseExtra::default()
+            }),
         }
     }
 }
@@ -860,30 +695,78 @@ impl SettleResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::ErrorCode;
     use crate::issuer::IssueError;
     use serde_json::json;
 
     #[test]
-    fn a_refused_guarantee_carries_cores_code_and_details() {
+    fn a_refused_guarantee_carries_its_reason_and_cores_details() {
         let err = ValidationError::IssueGuarantee(IssueError {
-            message: "core refused the guarantee".into(),
-            code: Some("CHECKPOINT_REQUIRED".into()),
+            message: "payer must submit a checkpoint".into(),
+            original_code: Some("CHECKPOINT_REQUIRED".into()),
             details: Some(json!({ "uncheckpointed": 64 })),
+            refused: true,
         });
 
-        let body = serde_json::to_value(SettleResponse::rejected(&err, "eip155:1")).unwrap();
+        let failure = err.failure(ErrorCode::UnexpectedSettleError);
+        let body = serde_json::to_value(SettleResponse::failed(failure, "eip155:1")).unwrap();
         assert_eq!(body["success"], false);
-        assert_eq!(body["errorCode"], "CHECKPOINT_REQUIRED");
-        assert_eq!(body["details"]["uncheckpointed"], 64);
-        assert!(body.get("receipt").is_none());
+        assert_eq!(
+            body["errorReason"],
+            "invalid_4mica_credit_checkpoint_required"
+        );
+        assert_eq!(body["errorMessage"], "payer must submit a checkpoint");
+        assert_eq!(body["transaction"], "");
+        assert_eq!(body["network"], "eip155:1");
+        assert_eq!(body["extra"]["retryable"], false);
+        assert_eq!(body["extra"]["details"]["uncheckpointed"], 64);
+        assert!(body["extra"].get("receipt").is_none());
     }
 
     #[test]
-    fn any_other_rejection_carries_no_code() {
-        let err = ValidationError::Mismatch("claim amount 1 does not match amount 2".into());
+    fn a_mismatch_reports_its_own_reason_without_details() {
+        let err = ValidationError::Mismatch(
+            ErrorCode::AmountMismatch,
+            "payment amount 1 does not match amount 2".into(),
+        );
 
-        let body = serde_json::to_value(SettleResponse::rejected(&err, "eip155:1")).unwrap();
-        assert!(body.get("errorCode").is_none());
-        assert!(body.get("details").is_none());
+        let body = serde_json::to_value(VerifyResponse::invalid(
+            err.failure(ErrorCode::UnexpectedVerifyError),
+        ))
+        .unwrap();
+        assert_eq!(body["isValid"], false);
+        assert_eq!(
+            body["invalidReason"],
+            "invalid_4mica_credit_amount_mismatch"
+        );
+        assert_eq!(
+            body["invalidMessage"],
+            "payment amount 1 does not match amount 2"
+        );
+        assert!(body["extra"].get("details").is_none());
+    }
+
+    #[test]
+    fn an_unexpected_failure_takes_the_phase_reason() {
+        let err = ValidationError::InvalidReceipt("receipt amount 0x1 differs".into());
+
+        assert_eq!(
+            err.failure(ErrorCode::UnexpectedSettleError).reason,
+            "unexpected_settle_error"
+        );
+    }
+
+    #[test]
+    fn a_pending_deposit_carries_its_transaction() {
+        let tx_hash = B256::repeat_byte(0xab);
+        let err = DepositError::ReceiptUnavailable {
+            tx_hash,
+            reason: "timed out".into(),
+        };
+
+        let body = serde_json::to_value(DepositResponse::failure(&err)).unwrap();
+        assert_eq!(body["errorReason"], "settlement_pending");
+        assert_eq!(body["transaction"], format!("{tx_hash:#x}"));
+        assert_eq!(body["extra"]["retryable"], false);
     }
 }

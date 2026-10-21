@@ -1,16 +1,15 @@
 //! Withdrawal-sponsorship failures, and how chain errors are turned into them.
 //!
-//! Mirrors [`crate::deposit::error`]: every variant carries a stable
-//! [`code`](WithdrawError::code) so callers branch on an identifier rather than on prose, and
+//! Mirrors [`crate::deposit::error`]: every variant maps to an [`ErrorCode`], and
 //! [`is_retryable`](WithdrawError::is_retryable) says whether repeating the identical request could
-//! ever help. The codes are deliberately the same strings where the meaning is the same, so a
-//! client's handling of `RATE_LIMITED` or `SIGNATURE_MISMATCH` does not depend on which endpoint
-//! produced it.
+//! ever help. Where the meaning is the same the code is too, so a client's handling of
+//! `rate_limited` or `invalid_signature` does not depend on which endpoint produced it.
 
 use alloy::primitives::{Address, B256, U256};
 use thiserror::Error;
 
 use crate::deposit::classify_core4mica_revert;
+use crate::error_code::{ErrorCode, Refusal};
 use crate::limits::ThrottleError;
 use crate::relayer::NoRelayer;
 
@@ -88,31 +87,6 @@ impl From<ThrottleError> for WithdrawError {
 }
 
 impl WithdrawError {
-    /// Stable, machine-readable code so clients can branch without string matching.
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::InvalidRequest(_) => "INVALID_REQUEST",
-            Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
-            Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
-            Self::NoRelayer(_) => "NO_RELAYER",
-            Self::Expired { .. } => "EXPIRED",
-            Self::NotYetValid { .. } => "NOT_YET_VALID",
-            Self::SignatureMismatch { .. } => "SIGNATURE_MISMATCH",
-            Self::NonceAlreadyUsed => "NONCE_ALREADY_USED",
-            Self::SimulationReverted(_) => "SIMULATION_REVERTED",
-            Self::Chain(_) => "CHAIN_ERROR",
-            Self::Broadcast(_) => "BROADCAST_FAILED",
-            Self::ReceiptUnavailable { .. } => "RECEIPT_UNAVAILABLE",
-            Self::RevertedOnChain { .. } => "REVERTED_ON_CHAIN",
-            Self::RateLimited => "RATE_LIMITED",
-            Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
-            Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
-            Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
-            Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
-            Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
-        }
-    }
-
     /// Whether this rejection came from throttling rather than the request itself. The single
     /// source of truth for both [`Self::is_retryable`] and the abuse counters.
     pub fn is_throttling(&self) -> bool {
@@ -131,6 +105,45 @@ impl WithdrawError {
     /// retry risks submitting twice.
     pub fn is_retryable(&self) -> bool {
         self.is_throttling() || matches!(self, Self::RelayerBalanceTooLow { .. } | Self::Chain(_))
+    }
+}
+
+impl Refusal for WithdrawError {
+    fn code(&self) -> ErrorCode {
+        match self {
+            Self::InvalidRequest(_) => ErrorCode::InvalidPayload,
+            Self::MalformedSignature(_) | Self::SignatureMismatch { .. } => {
+                ErrorCode::InvalidSignature
+            }
+            Self::NoRelayerConfigured | Self::NoRelayer(_) => ErrorCode::SponsorshipUnavailable,
+            Self::Expired { .. } => ErrorCode::AuthorizationExpired,
+            Self::NotYetValid { .. } => ErrorCode::AuthorizationNotYetValid,
+            Self::NonceAlreadyUsed => ErrorCode::NonceAlreadyUsed,
+            Self::SimulationReverted(_) => ErrorCode::SimulationReverted,
+            Self::Chain(_) => ErrorCode::ChainUnavailable,
+            Self::Broadcast(_) => ErrorCode::BroadcastFailed,
+            Self::ReceiptUnavailable { .. } => ErrorCode::SettlementPending,
+            Self::RevertedOnChain { .. } => ErrorCode::InvalidTransactionState,
+            Self::RateLimited | Self::AddressRateLimited { .. } | Self::TooManyInFlight => {
+                ErrorCode::RateLimited
+            }
+            Self::DuplicateInFlight => ErrorCode::DuplicateInFlight,
+            Self::RelayerBalanceTooLow { .. } => ErrorCode::RelayerUnderfunded,
+            Self::GasCeilingExceeded { .. } => ErrorCode::GasCeilingExceeded,
+        }
+    }
+
+    fn retryable(&self) -> bool {
+        self.is_retryable()
+    }
+
+    fn transaction(&self) -> Option<B256> {
+        match self {
+            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
+                Some(*tx_hash)
+            }
+            _ => None,
+        }
     }
 }
 

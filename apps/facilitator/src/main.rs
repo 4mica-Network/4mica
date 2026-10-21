@@ -2,6 +2,7 @@ mod auth;
 mod clearing;
 mod config;
 mod deposit;
+mod error_code;
 mod exact;
 mod issuer;
 mod limits;

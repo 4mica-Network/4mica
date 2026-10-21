@@ -177,13 +177,14 @@ impl LocalExactService {
         let response = x402_rs::proto::v1::VerifyResponse::try_from(response)
             .map_err(|err| ValidationError::Exact(err.to_string()))?;
         Ok(match response {
-            x402_rs::proto::v1::VerifyResponse::Valid { .. } => VerifyResponse {
-                is_valid: true,
-                invalid_reason: None,
-            },
-            x402_rs::proto::v1::VerifyResponse::Invalid { reason, .. } => VerifyResponse {
+            x402_rs::proto::v1::VerifyResponse::Valid { payer } => {
+                VerifyResponse::valid(Some(payer))
+            }
+            x402_rs::proto::v1::VerifyResponse::Invalid { reason, payer } => VerifyResponse {
                 is_valid: false,
                 invalid_reason: Some(reason.to_string()),
+                payer,
+                ..VerifyResponse::default()
             },
         })
     }

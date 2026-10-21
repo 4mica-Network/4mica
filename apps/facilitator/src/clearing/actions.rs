@@ -214,6 +214,7 @@ fn parse_b256(value: &str, field: &str) -> Result<B256, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::{ErrorCode, Refusal};
     use alloy::primitives::address;
 
     const CREDITOR: Address = address!("000000000000000000000000000000000000c0ed");
@@ -260,7 +261,7 @@ mod tests {
             CREDITOR,
         )
         .expect_err("wrong action");
-        assert_eq!(err.code(), "ACTION_MISMATCH");
+        assert_eq!(err.code(), ErrorCode::ClearingActionMismatch);
     }
 
     /// The proof proves whoever core names. Submitting one for a different creditor would pay them
@@ -273,7 +274,7 @@ mod tests {
             CREDITOR,
         )
         .expect_err("participant mismatch");
-        assert_eq!(err.code(), "ACTION_MISMATCH");
+        assert_eq!(err.code(), ErrorCode::ClearingActionMismatch);
     }
 
     const DEBTOR: Address = address!("000000000000000000000000000000000000debb");
@@ -307,7 +308,7 @@ mod tests {
         let mut action = pay_response(DEBTOR, TOKEN);
         action.action = ClearingSettlementAction::ClaimNetCredit;
         let err = parse_pay_terms(action, DEBTOR).expect_err("wrong action");
-        assert_eq!(err.code(), "ACTION_MISMATCH");
+        assert_eq!(err.code(), ErrorCode::ClearingActionMismatch);
     }
 
     #[test]
@@ -315,7 +316,7 @@ mod tests {
         let other = address!("000000000000000000000000000000000000dead");
         let err =
             parse_pay_terms(pay_response(other, TOKEN), DEBTOR).expect_err("participant mismatch");
-        assert_eq!(err.code(), "ACTION_MISMATCH");
+        assert_eq!(err.code(), ErrorCode::ClearingActionMismatch);
     }
 
     /// A native cycle has no token to sign an authorization against, so the request is refused
@@ -324,6 +325,6 @@ mod tests {
     fn a_native_asset_debit_is_refused() {
         let err =
             parse_pay_terms(pay_response(DEBTOR, Address::ZERO), DEBTOR).expect_err("native asset");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 }

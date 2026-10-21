@@ -8,6 +8,7 @@ use serde_json::Map;
 use thiserror::Error;
 
 use crate::clearing::ClearingActions;
+use crate::error_code::{ErrorCode, Failure};
 use crate::limits::SponsorGuard;
 use crate::relayer::{NoRelayer, Relayer};
 use crate::server::model::{
@@ -346,10 +347,9 @@ impl FourMicaHandler {
         )?;
         self.validate_payment_payload(&payload, &request.payment_requirements, x402_version)?;
 
-        Ok(VerifyResponse {
-            is_valid: true,
-            invalid_reason: None,
-        })
+        Ok(VerifyResponse::valid(Some(
+            payload.payload.user_address().to_string(),
+        )))
     }
 
     async fn settle(
@@ -383,7 +383,11 @@ impl FourMicaHandler {
             "4mica guarantee issued during settlement"
         );
 
-        Ok(SettleResponse::four_mica_success(&self.network, receipt))
+        Ok(SettleResponse::issued(
+            &self.network,
+            payload.payload.user_address(),
+            receipt,
+        ))
     }
 
     fn decode_payment_payload(
@@ -476,49 +480,68 @@ impl FourMicaHandler {
         let (signed, required) = match (signed, required) {
             (None, None) => return Ok(()),
             (Some(signed), None) => {
-                return Err(ValidationError::Mismatch(format!(
-                    "payment is gated on validator {} but the requirements ask for no validation",
-                    signed.validator
-                )));
+                return Err(ValidationError::Mismatch(
+                    ErrorCode::ValidationMismatch,
+                    format!(
+                        "payment is gated on validator {} but the requirements ask for no validation",
+                        signed.validator
+                    ),
+                ));
             }
             (None, Some(required)) => {
-                return Err(ValidationError::Mismatch(format!(
-                    "requirements ask for validation by {} but the payment carries none",
-                    required.validator
-                )));
+                return Err(ValidationError::Mismatch(
+                    ErrorCode::ValidationMismatch,
+                    format!(
+                        "requirements ask for validation by {} but the payment carries none",
+                        required.validator
+                    ),
+                ));
             }
             (Some(signed), Some(required)) => (signed, required),
         };
 
         if signed.validator != required.validator {
-            return Err(ValidationError::Mismatch(format!(
-                "payment validator '{}' does not match requirement '{}'",
-                signed.validator, required.validator
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::ValidationMismatch,
+                format!(
+                    "payment validator '{}' does not match requirement '{}'",
+                    signed.validator, required.validator
+                ),
+            ));
         }
         if signed.subject != required.subject {
-            return Err(ValidationError::Mismatch(format!(
-                "payment validation subject {} does not match requirement {}",
-                signed.subject, required.subject
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::ValidationMismatch,
+                format!(
+                    "payment validation subject {} does not match requirement {}",
+                    signed.subject, required.subject
+                ),
+            ));
         }
         if signed.deadline != required.deadline {
-            return Err(ValidationError::Mismatch(format!(
-                "payment validation deadline {:?} does not match requirement {:?}",
-                signed.deadline, required.deadline
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::ValidationMismatch,
+                format!(
+                    "payment validation deadline {:?} does not match requirement {:?}",
+                    signed.deadline, required.deadline
+                ),
+            ));
         }
         if signed.params != required.params {
             return Err(ValidationError::Mismatch(
+                ErrorCode::ValidationMismatch,
                 "payment validation params do not match requirement".into(),
             ));
         }
 
         if !self.validators.iter().any(|v| v == &signed.validator) {
-            return Err(ValidationError::Mismatch(format!(
-                "validator '{}' is not whitelisted by core",
-                signed.validator
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::ValidatorNotAllowed,
+                format!(
+                    "validator '{}' is not whitelisted by core",
+                    signed.validator
+                ),
+            ));
         }
 
         Ok(())
@@ -542,10 +565,13 @@ impl FourMicaHandler {
         )?;
 
         if recipient != required_pay_to {
-            return Err(ValidationError::Mismatch(format!(
-                "payment recipient {} does not match payTo {}",
-                recipient, required_pay_to
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::RecipientMismatch,
+                format!(
+                    "payment recipient {} does not match payTo {}",
+                    recipient, required_pay_to
+                ),
+            ));
         }
 
         let required_asset = parse_address(
@@ -560,10 +586,13 @@ impl FourMicaHandler {
         )?;
 
         if asset != required_asset {
-            return Err(ValidationError::Mismatch(format!(
-                "payment asset {} does not match requirement {}",
-                asset, required_asset
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::AssetMismatch,
+                format!(
+                    "payment asset {} does not match requirement {}",
+                    asset, required_asset
+                ),
+            ));
         }
 
         let amount_required = required_amount(reqs, version)?;
@@ -578,12 +607,15 @@ impl FourMicaHandler {
             } else {
                 "maxAmountRequired"
             };
-            return Err(ValidationError::Mismatch(format!(
-                "payment amount {} does not match {} {}",
-                payload.amount(),
-                amount_label,
-                amount_required
-            )));
+            return Err(ValidationError::Mismatch(
+                ErrorCode::AmountMismatch,
+                format!(
+                    "payment amount {} does not match {} {}",
+                    payload.amount(),
+                    amount_label,
+                    amount_required
+                ),
+            ));
         }
 
         Ok(())
@@ -624,7 +656,7 @@ fn ensure_receipt_matches_request(
     ];
     for (field, requested, issued) in addresses {
         if requested != issued {
-            return Err(ValidationError::Mismatch(format!(
+            return Err(ValidationError::InvalidReceipt(format!(
                 "receipt {field} {issued} differs from requested {requested}"
             )));
         }
@@ -646,7 +678,7 @@ fn ensure_receipt_matches_request(
     ];
     for (field, requested, issued) in numbers {
         if requested != issued {
-            return Err(ValidationError::Mismatch(format!(
+            return Err(ValidationError::InvalidReceipt(format!(
                 "receipt {field} {issued:#x} differs from requested {requested:#x}"
             )));
         }
@@ -789,12 +821,14 @@ pub enum ValidationError {
     InvalidRequirements(String),
     #[error("{0}")]
     InvalidPayment(String),
+    /// Core's receipt does not verify or is not for this payment: our fault, not the payer's.
     #[error("{0}")]
     InvalidReceipt(String),
     #[error(transparent)]
     IssueGuarantee(IssueError),
-    #[error("{0}")]
-    Mismatch(String),
+    /// The payment disagrees with the requirements it was made for.
+    #[error("{1}")]
+    Mismatch(ErrorCode, String),
     #[error("unsupported scheme {0}")]
     UnsupportedScheme(String),
     #[error("unsupported network {0}")]
@@ -806,6 +840,34 @@ pub enum ValidationError {
 
     #[error(transparent)]
     Other(anyhow::Error),
+}
+
+impl ValidationError {
+    /// What the caller is told. `unexpected` is reported for failures that are not the request's
+    /// fault: `unexpected_verify_error` or `unexpected_settle_error`.
+    pub fn failure(&self, unexpected: ErrorCode) -> Failure {
+        let reason = match self {
+            Self::InvalidHeader(_) | Self::InvalidPayment(_) => ErrorCode::InvalidPayload,
+            Self::InvalidRequirements(_) => ErrorCode::InvalidPaymentRequirements,
+            Self::IssueGuarantee(err) => err.code(),
+            Self::Mismatch(code, _) => *code,
+            Self::UnsupportedScheme(_) => ErrorCode::UnsupportedScheme,
+            Self::UnsupportedNetwork(_) => ErrorCode::InvalidNetwork,
+            Self::UnsupportedVersion(_) => ErrorCode::InvalidX402Version,
+            Self::InvalidReceipt(_) | Self::Exact(_) | Self::Other(_) => unexpected,
+        };
+        let (retryable, details) = match self {
+            Self::IssueGuarantee(err) => (!err.refused, err.details.clone()),
+            _ => (false, None),
+        };
+        Failure {
+            reason: reason.to_string(),
+            message: self.to_string(),
+            retryable,
+            details,
+            transaction: None,
+        }
+    }
 }
 
 #[cfg(test)]
