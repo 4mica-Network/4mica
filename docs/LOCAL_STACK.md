@@ -17,8 +17,8 @@ system has the shape it does.
 
 ```text
 ┌─ 4mica-core (Rust, :3000) ──────────────────────────────────────────────┐
-│  The ledger and the authority. Holds collateral accounting, issues BLS  │
-│  guarantee certificates, runs settlement cycles. Talks to the chain.    │
+│  The ledger and the authority. Holds collateral accounting, issues      │
+│  signed guarantee receipts, runs settlement cycles. Talks to the chain. │
 └────────────────────────────────────────────────────────────────────────┘
         ▲ /core/guarantees, /core/public-params, /core/tokens
         │
@@ -51,10 +51,10 @@ price*; nothing in it moves value.
 
 ### The one paragraph that explains the protocol
 
-> A payer signs a payment guarantee claim straight from the recipient's
-> `paymentRequirements`; the recipient hands the signed payload to the
-> facilitator, which verifies it and settles by issuing a BLS certificate
-> through 4mica core. There is no tab, no token allowance and no per-payment
+> A payer signs a payment straight from the recipient's `paymentRequirements`,
+> scoped to the asset's active settlement cycle; the recipient hands the signed
+> payload to the facilitator, which verifies it and settles by having 4mica core
+> issue the guarantee and return the operator's signed receipt. There is no tab, no token allowance and no per-payment
 > on-chain transaction: the payer's collateral backs the guarantee, and
 > guarantees net into one settlement per cycle.
 
@@ -64,12 +64,12 @@ One paid request on the wire:
 buyer  GET /quote                       → 402  + `payment-required` header
                                                (base64 JSON: scheme, network,
                                                 payTo, asset, amount)
-buyer  signs EIP-712 claims, random reqId
+buyer  signs an EIP-712 payment, random reqId
 buyer  GET /quote  PAYMENT-SIGNATURE    → seller POSTs facilitator /verify
                                           seller does the work only if valid
                                           seller POSTs facilitator /settle
                                         → 200  + `X-PAYMENT-RESPONSE`
-                                               (the BLS certificate)
+                                               (the guarantee receipt)
 ```
 
 **A published listing is a stored `paymentRequirements`.** That is why the
@@ -93,21 +93,16 @@ curl -L https://foundry.paradigm.xyz | bash && foundryup
 
 ### The core checkout must match the facilitator
 
-`apps/facilitator/Cargo.toml` pins `rpc-4mica`, `sdk-4mica` and `crypto-4mica`
-at `=2.0.0-alpha.3`. A core on an older tag speaks the **tab-based** protocol
-that 2.0 removed, and the mismatch surfaces at `/settle` as an error that reads
-like an auth failure. Pin it explicitly:
+The root `Cargo.toml` pins `rpc-4mica` and `crypto-4mica` at `=2.0.0-alpha.4`
+for both the Rust SDK and the facilitator. A core on another tag speaks a
+different protocol, and the mismatch surfaces at `/settle`. Pin it explicitly:
 
 ```bash
 git clone git@github.com:4mica-Network/4mica-core.git ../4mica-core
-cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.3
+cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.4
 ```
 
 Put it beside this repo, or point `FOURMICA_CORE_DIR` at it.
-
-`packages/sdk-rust` already builds against the `2.0.0-alpha.4` crates (core
-`v2.0.0-alpha.4`). This stack stays on `v2.0.0-alpha.3` until the facilitator
-moves to them.
 
 ---
 
@@ -117,31 +112,26 @@ moves to them.
 scripts/dev-stack.sh up
 ```
 
-That does five things, in order:
+That does four things, in order:
 
 1. **`make dev-up` in 4mica-core.** Postgres, anvil (`--hardfork prague`), the
-   `Core4MicaFullStack` forge deploy, migrations, then `core-service`. Core's
-   own script owns this because it is careful in ways worth not re-deriving:
-   it reads the chain id back off anvil rather than assuming, derives the
-   on-chain verification key from the BLS signing key so remuneration
-   verifies, and pre-checks core's solvency invariant
+   `Core4MicaFullStack` forge deploy, migrations, the facilitator's wallet role,
+   then `core-service`. Core's own script owns this because it is careful in
+   ways worth not re-deriving: it reads the chain id back off anvil rather than
+   assuming, and pre-checks core's solvency invariant
    (`cycle + resolution_cutoff + commit_delay + finality_window + seizure_margin
    < withdrawalGracePeriod`) — which core otherwise refuses to boot over, with
-   an error that names five variables and no fix.
+   an error that names five variables and no fix. Issuing a guarantee needs the
+   `guarantee:issue` scope, which core grants to anvil account #11; without it
+   every `/settle` returns 401.
 
-2. **Grants the facilitator its role.** Issuing a guarantee needs the
-   `guarantee:issue` scope; `DEFAULT_SCOPES` is only `payment:read`. Roles live
-   in core's `WalletRole` table and there is no admin endpoint, so the row goes
-   in with SQL. Skip this and every `/settle` returns 401.
+2. **Starts the facilitator** on `:8080`, pointed at the local core, as anvil
+   account #11. The same key is its relayer, so the gasless `POST /deposit`
+   route works; core's stack funds that account.
 
-3. **Starts the facilitator** on `:8080`, pointed at the local core, with a
-   relayer key so the gasless `POST /deposit` route works. The auth key and the
-   relayer key are deliberately different accounts: the first is an identity
-   and needs no balance, the second pays gas.
+3. **Starts 4Mica's postgres** on `:5433`, migrates and seeds it.
 
-4. **Starts 4Mica's postgres** on `:5433`, migrates and seeds it.
-
-5. **Writes `.dev/stack.env`** with the values core actually deployed, read
+4. **Writes `.dev/stack.env`** with the values core actually deployed, read
    back from core's generated `.env` and `GET /core/tokens` rather than
    restated — the contract address changes on every redeploy.
 
@@ -246,8 +236,8 @@ or use the facilitator's gasless route, `POST /deposit`. Then:
 pnpm --filter @4mica/example-buyer start
 ```
 
-You should see `402` → `200`, a body, and an `X-PAYMENT-RESPONSE` carrying real
-claims and a BLS signature.
+You should see `402` → `200`, a body, and an `X-PAYMENT-RESPONSE` carrying the
+operator's guarantee receipt.
 
 The facilitator log shows `/verify` then `/settle`, in that order. Always that
 order: verify gates the work, settle takes the credit.

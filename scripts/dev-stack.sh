@@ -3,16 +3,14 @@
 # The whole 4Mica stack, locally.
 #
 # This script owns only what 4mica-core does not. Core's own repo already has a
-# careful bring-up (`make dev-up`: postgres, anvil, contracts, migrations,
-# core-service) that reads the chain id back off anvil, derives the on-chain
-# verification key from the BLS key, and pre-checks the settlement solvency
-# invariant. Re-deriving any of that here would only let the two drift, so this
-# delegates and then adds:
+# careful bring-up (`make dev-up`: postgres, anvil, contracts, migrations, the
+# facilitator's wallet role, core-service) that reads the chain id back off
+# anvil and pre-checks the settlement solvency invariant. Re-deriving any of
+# that here would only let the two drift, so this delegates and then adds:
 #
-#   1. the facilitator's `WalletRole` row in core's database  (no admin API)
-#   2. the facilitator itself                                  (:8080)
-#   3. 4Mica's own postgres, migrations and seed                (:5433)
-#   4. the app env files, filled in from what core actually deployed
+#   1. the facilitator itself                                  (:8080)
+#   2. 4Mica's own postgres, migrations and seed                (:5433)
+#   3. the app env files, filled in from what core actually deployed
 #
 # Usage:
 #   scripts/dev-stack.sh up       # everything
@@ -33,8 +31,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Where the 4mica-core checkout lives. It must be on a revision whose crates
-# match apps/facilitator's `=2.0.0-alpha.3` pin, or /settle will fail on a
-# protocol mismatch that reads like an auth error.
+# match the workspace's `=2.0.0-alpha.4` pin in Cargo.toml, or /settle will
+# fail on a protocol mismatch.
 CORE_DIR="${FOURMICA_CORE_DIR:-$REPO_ROOT/../4mica-core}"
 
 DEV_DIR="$REPO_ROOT/.dev"
@@ -45,14 +43,12 @@ CORE_PORT="${CORE_PORT:-3000}"
 FACILITATOR_PORT="${FACILITATOR_PORT:-8080}"
 CORE_URL="http://127.0.0.1:${CORE_PORT}"
 
-# anvil account #1 — the facilitator's identity with core. Needs no balance:
-# it authenticates, it does not transact.
-FACILITATOR_KEY="${X402_AUTH_WALLET_PRIVATE_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}"
-FACILITATOR_ADDRESS="${X402_AUTH_WALLET_ADDRESS:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}"
-
-# anvil account #2 — pays gas for the optional gasless deposit route. Keep it
-# separate from the key above: one is an identity, this one spends.
-RELAYER_KEY="${X402_RELAYER_PRIVATE_KEY:-0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a}"
+# anvil account #11 — the wallet core's dev stack grants the facilitator role
+# (`guarantee:issue`) and funds. It is both the facilitator's identity with core
+# and the relayer that pays gas for the sponsored routes, as core prints it.
+FACILITATOR_KEY="${X402_AUTH_WALLET_PRIVATE_KEY:-0x701b615bbdfb9de65240bc28bd21bbc0d996645a3dd57e7b12bc2bdf6f192c82}"
+FACILITATOR_ADDRESS="${X402_AUTH_WALLET_ADDRESS:-0x71be63f3384f5fb98995898a86b02fb2426c5788}"
+RELAYER_KEY="${X402_RELAYER_PRIVATE_KEY:-$FACILITATOR_KEY}"
 
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m ✔\033[0m %s\n' "$*"; }
@@ -65,8 +61,8 @@ pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 require_core_dir() {
   [ -d "$CORE_DIR" ] || die "no 4mica-core checkout at $CORE_DIR
      Clone it beside this repo, or set FOURMICA_CORE_DIR."
-  [ -f "$CORE_DIR/Makefile" ] || die "$CORE_DIR has no Makefile — is it on v2.0.0-alpha.3?
-     git -C \"$CORE_DIR\" fetch --tags origin && git -C \"$CORE_DIR\" checkout v2.0.0-alpha.3"
+  [ -f "$CORE_DIR/Makefile" ] || die "$CORE_DIR has no Makefile — is it on v2.0.0-alpha.4?
+     git -C \"$CORE_DIR\" fetch --tags origin && git -C \"$CORE_DIR\" checkout v2.0.0-alpha.4"
 }
 
 # ---------------------------------------------------------------------------
@@ -92,27 +88,13 @@ start_core() {
 }
 
 # ---------------------------------------------------------------------------
-# Facilitator role
+# Facilitator role (delegated)
 # ---------------------------------------------------------------------------
-# `issue_payment_guarantee` requires the `guarantee:issue` scope, and
-# DEFAULT_SCOPES is only `payment:read`. There is no admin endpoint and no env
-# allowlist, so the row goes in directly or every /settle 401s.
+# Core's `make dev-up` already seeds it; this is for a core brought up some
+# other way, such as a forked chain.
 grant_facilitator_role() {
   require_core_dir
-  need docker
-
-  local address_lc
-  address_lc="$(printf '%s' "$FACILITATOR_ADDRESS" | tr '[:upper:]' '[:lower:]')"
-
-  log "Granting the facilitator wallet the facilitator role…"
-  docker exec -i 4mica-pg psql -U postgres -d "${POSTGRES_DB:-core}" <<SQL >/dev/null
-INSERT INTO "WalletRole" (address, role, scopes, status)
-VALUES ('${address_lc}', 'facilitator',
-        '["guarantee:issue","payment:read"]'::jsonb, 'active')
-ON CONFLICT (address) DO UPDATE
-  SET role = EXCLUDED.role, scopes = EXCLUDED.scopes, status = EXCLUDED.status;
-SQL
-  ok "facilitator role granted to ${address_lc}"
+  make -C "$CORE_DIR" roles
 }
 
 # ---------------------------------------------------------------------------
@@ -213,7 +195,6 @@ EOF
 cmd_up() {
   mkdir -p "$DEV_DIR"
   start_core
-  grant_facilitator_role
   start_facilitator
   start_app_db
   write_env
