@@ -58,18 +58,20 @@ function SectionHeader({
 }
 
 export function SettingsSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col">
+    <section id={id} className="flex scroll-mt-6 flex-col">
       <SectionHeader title={title} description={description} action={action} />
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </section>
