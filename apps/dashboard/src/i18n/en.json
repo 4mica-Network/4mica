@@ -32,8 +32,6 @@
   "settings.verified": "Verified",
   "settings.unverified": "Unverified",
   "settings.profile.visibilityHint": "Who can find and see your account.",
-  "settings.profile.accountStatusHint": "Verification unlocks higher limits.",
-  "settings.profile.accountStatus": "Account status",
   "settings.profile.verifyEmail": "Verify email",
   "settings.profile.name": "Display name",
   "settings.profile.username": "Username",

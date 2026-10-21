@@ -19,6 +19,7 @@ const actionTypes = (await import("@stores/user/actionTypes")).default;
 const BASE_USER = {
   name: "Ada Lovelace",
   username: "ada",
+  email: "ada@example.com",
   bio: "",
   primaryBrandColor: "",
   secondaryBrandColor: "",
@@ -69,12 +70,9 @@ const renderPage = (
 };
 
 const statusCard = () =>
-  within(
-    screen.getByText("Account status").parentElement
-      ?.parentElement as HTMLElement,
-  );
+  within(screen.getByText("Contact details").closest("section") as HTMLElement);
 
-describe("profile account status", () => {
+describe("profile email verification", () => {
   beforeEach(() => {
     notifySuccess.mockReset();
     notifyError.mockReset();
@@ -84,7 +82,8 @@ describe("profile account status", () => {
     const dispatched = renderPage({ emailVerified: false });
 
     const button = screen.getByRole("button", { name: "Verify email" });
-    expect(statusCard().queryByText("Unverified")).not.toBeInTheDocument();
+    const onlyThePhoneBadge = statusCard().getAllByText("Unverified");
+    expect(onlyThePhoneBadge).toHaveLength(1);
 
     await userEvent.click(button);
 
