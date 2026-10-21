@@ -1,33 +1,66 @@
 use async_trait::async_trait;
 use reqwest::Url;
-use rpc::{PaymentGuaranteeRequest, PaymentGuaranteeRequestClaims, SigningScheme};
-use sdk_4mica::BLSCert;
+use rpc::{ApiClientError, GuaranteeReceipt, PaymentRequest, RpcProxy};
+use serde_json::Value;
 use std::sync::Arc;
+use thiserror::Error;
 use tracing::debug;
 
 use crate::auth::AuthSession;
 
 #[async_trait]
 pub trait GuaranteeIssuer: Send + Sync {
-    async fn issue(
-        &self,
-        claims: PaymentGuaranteeRequestClaims,
-        signature: String,
-        scheme: SigningScheme,
-    ) -> Result<BLSCert, String>;
+    async fn issue(&self, request: PaymentRequest) -> Result<GuaranteeReceipt, IssueError>;
+}
+
+/// Why core issued no receipt.
+#[derive(Debug, Clone, Error)]
+#[error("{message}")]
+pub struct IssueError {
+    pub message: String,
+    /// Core's machine-readable code, such as `CHECKPOINT_REQUIRED`. Passed through untouched so
+    /// the payer can act on it.
+    pub code: Option<String>,
+    pub details: Option<Value>,
+}
+
+impl IssueError {
+    fn unavailable(message: String) -> Self {
+        Self {
+            message,
+            code: None,
+            details: None,
+        }
+    }
+}
+
+impl From<ApiClientError> for IssueError {
+    fn from(err: ApiClientError) -> Self {
+        match err {
+            ApiClientError::Api {
+                status,
+                message,
+                code,
+                details,
+            } => Self {
+                message: format!("core refused the guarantee ({status}): {message}"),
+                code,
+                details,
+            },
+            other => Self::unavailable(format!("core guarantee request failed: {other}")),
+        }
+    }
 }
 
 pub struct LiveGuaranteeIssuer {
-    client: reqwest::Client,
-    base_url: Url,
+    proxy: RpcProxy,
     auth: Option<Arc<AuthSession>>,
 }
 
 impl LiveGuaranteeIssuer {
     pub fn try_new(base_url: Url, auth: Option<Arc<AuthSession>>) -> anyhow::Result<Self> {
         Ok(Self {
-            client: reqwest::Client::new(),
-            base_url,
+            proxy: RpcProxy::new(base_url.as_str())?,
             auth,
         })
     }
@@ -35,45 +68,23 @@ impl LiveGuaranteeIssuer {
 
 #[async_trait]
 impl GuaranteeIssuer for LiveGuaranteeIssuer {
-    async fn issue(
-        &self,
-        claims: PaymentGuaranteeRequestClaims,
-        signature: String,
-        scheme: SigningScheme,
-    ) -> Result<BLSCert, String> {
-        let body = PaymentGuaranteeRequest::new(claims, signature, scheme);
-
-        let mut url = self.base_url.clone();
-        url.set_path("core/guarantees");
-
-        let payload = serde_json::to_string(&body).unwrap_or_else(|_| "<serialize_failed>".into());
-        debug!(url = %url, payload = %payload, "Sending core guarantee request");
-
-        let mut request = self.client.post(url).json(&body);
+    async fn issue(&self, request: PaymentRequest) -> Result<GuaranteeReceipt, IssueError> {
+        let mut proxy = self.proxy.clone();
         if let Some(auth) = &self.auth {
-            let token = auth.access_token().await.map_err(|err| err.to_string())?;
-            request = request.bearer_auth(token);
+            let token = auth.access_token().await.map_err(|err| {
+                IssueError::unavailable(format!("failed to authenticate with core: {err}"))
+            })?;
+            proxy = proxy.with_bearer_token(token);
         }
 
-        let response = request.send().await.map_err(|err| err.to_string())?;
-
-        let status = response.status();
-        let bytes = response.bytes().await.map_err(|err| err.to_string())?;
         debug!(
-            status = %status,
-            body = %String::from_utf8_lossy(&bytes),
-            "Core guarantee response"
+            req_id = %request.payload.req_id(),
+            cycle_id = %request.payload.cycle_id(),
+            "Sending core guarantee request"
         );
-
-        if !status.is_success() {
-            let message = parse_error_message(&bytes);
-            return Err(format!(
-                "core guarantee request failed ({status}): {message}"
-            ));
-        }
-
-        serde_json::from_slice::<BLSCert>(&bytes)
-            .map_err(|err| format!("failed to decode guarantee response: {err}"))
+        let receipt = proxy.issue_guarantee(request).await?;
+        debug!(receipt = %receipt.receipt, "Core guarantee response");
+        Ok(receipt)
     }
 }
 
@@ -100,6 +111,7 @@ pub(crate) fn parse_error_message(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use reqwest::StatusCode;
     use serde_json::json;
 
     #[test]
@@ -128,5 +140,19 @@ mod tests {
     fn parse_error_message_handles_empty_body() {
         let message = parse_error_message(&[]);
         assert_eq!(message, "unknown error");
+    }
+
+    #[test]
+    fn a_core_refusal_keeps_its_code_and_details() {
+        let err = IssueError::from(ApiClientError::Api {
+            status: StatusCode::CONFLICT,
+            message: "payer must submit a checkpoint".into(),
+            code: Some("CHECKPOINT_REQUIRED".into()),
+            details: Some(json!({ "uncheckpointed": 64 })),
+        });
+
+        assert_eq!(err.code.as_deref(), Some("CHECKPOINT_REQUIRED"));
+        assert_eq!(err.details, Some(json!({ "uncheckpointed": 64 })));
+        assert!(err.message.contains("payer must submit a checkpoint"));
     }
 }

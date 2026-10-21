@@ -180,12 +180,10 @@ impl LocalExactService {
             x402_rs::proto::v1::VerifyResponse::Valid { .. } => VerifyResponse {
                 is_valid: true,
                 invalid_reason: None,
-                certificate: None,
             },
             x402_rs::proto::v1::VerifyResponse::Invalid { reason, .. } => VerifyResponse {
                 is_valid: false,
                 invalid_reason: Some(reason.to_string()),
-                certificate: None,
             },
         })
     }

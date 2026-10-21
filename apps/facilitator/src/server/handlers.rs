@@ -405,7 +405,7 @@ async fn supported_handler(State(state): State<SharedState>) -> impl IntoRespons
 async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
     let supported = state.supported().await;
     Json(HomeResponse {
-        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to mint certificates or forward debit settlements.",
+        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to issue guarantees or forward debit settlements.",
         supported,
         health: "/health",
         docs: "See README.md for a full flow walkthrough.",
@@ -427,7 +427,6 @@ async fn verify_handler(
             return Json(VerifyResponse {
                 is_valid: false,
                 invalid_reason: Some(err.to_string()),
-                certificate: None,
             });
         }
     };
@@ -437,7 +436,6 @@ async fn verify_handler(
         return Json(VerifyResponse {
             is_valid: false,
             invalid_reason: Some(err.to_string()),
-            certificate: None,
         });
     }
 
@@ -448,7 +446,6 @@ async fn verify_handler(
             Json(VerifyResponse {
                 is_valid: false,
                 invalid_reason: Some(err.to_string()),
-                certificate: None,
             })
         }
     }
@@ -475,7 +472,7 @@ async fn settle_handler(
         Ok(response) => {
             if let Some(tx_hash) = response.tx_hash.as_deref() {
                 info!(tx_hash, "settlement forwarded to on-chain handler");
-            } else if response.certificate.is_some() {
+            } else if response.receipt.is_some() {
                 info!("settlement completed with 4mica guarantee");
             } else {
                 info!("settlement acknowledged (deferred)");
@@ -483,8 +480,13 @@ async fn settle_handler(
             Json(response)
         }
         Err(err) => {
-            warn!(reason = %err, "settlement validation failed");
-            Json(SettleResponse::invalid(err.to_string(), state.network()))
+            let response = SettleResponse::rejected(&err, state.network());
+            warn!(
+                reason = %err,
+                code = response.error_code.as_deref(),
+                "settlement validation failed"
+            );
+            Json(response)
         }
     }
 }

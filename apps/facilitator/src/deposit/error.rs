@@ -196,10 +196,14 @@ fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
     use alloy::sol_types::SolInterface;
 
     match decoded {
-        Core4MicaErrors::AaveNotConfigured(_) => {
-            "AaveNotConfigured: the deployment has no Aave pool, so stablecoin deposits are \
-             unavailable"
-                .to_string()
+        Core4MicaErrors::DepositsDisabled(_) => {
+            "DepositsDisabled: the deployment is not accepting deposits".to_string()
+        }
+        Core4MicaErrors::StablecoinDepositsDisabled(err) => {
+            format!(
+                "StablecoinDepositsDisabled: deposits of {} are switched off",
+                err.asset
+            )
         }
         Core4MicaErrors::UnsupportedAsset(err) => {
             format!(
@@ -290,7 +294,7 @@ pub(crate) fn revert_without_data(err: &alloy::contract::Error) -> Option<String
 /// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
 ///
 /// Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so clients see
-/// `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
+/// `DepositsDisabled` rather than a bare selector.
 pub(super) fn classify_call_error(err: alloy::contract::Error) -> DepositError {
     match classify_core4mica_revert(&err) {
         Some(reason) => DepositError::SimulationReverted(reason),

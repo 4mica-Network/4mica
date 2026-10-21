@@ -1,133 +1,90 @@
-use crypto::bls::BlsPublicKey;
-use sdk_4mica::{BLSCert, PaymentGuaranteeClaims};
+use alloy::sol_types::Eip712Domain;
+use sdk_4mica::{Address, Guarantee, GuaranteeReceipt, verify_guarantee_receipt};
 
-pub trait CertificateValidator: Send + Sync {
-    fn verify_certificate(&self, cert: &BLSCert) -> Result<PaymentGuaranteeClaims, String>;
+pub trait ReceiptValidator: Send + Sync {
+    fn verify_receipt(&self, receipt: &GuaranteeReceipt) -> Result<Guarantee, String>;
 }
 
-pub struct CertificateVerifier {
-    operator_public_key: BlsPublicKey,
-    guarantee_domain: Option<[u8; 32]>,
+/// Accepts receipts signed by the guarantee signer core names, under the GuaranteeRegistry domain.
+pub struct ReceiptVerifier {
+    domain: Eip712Domain,
+    signer: Address,
 }
 
-impl CertificateVerifier {
-    /// Fails if core's advertised operator key is not a valid BLS public key.
-    ///
-    /// Config only checks that the key is 48 bytes long; 48 bytes of the wrong thing is still not
-    /// a curve point. Returning an error keeps a malformed public-params response a startup
-    /// failure with a readable message rather than a panic in a constructor.
-    pub fn try_new(
-        operator_public_key: [u8; 48],
-        guarantee_domain: Option<[u8; 32]>,
-    ) -> Result<Self, String> {
-        let operator_public_key = BlsPublicKey::from_bytes(&operator_public_key)
-            .map_err(|err| format!("core advertised an invalid operator public key: {err}"))?;
-        Ok(Self {
-            operator_public_key,
-            guarantee_domain,
-        })
+impl ReceiptVerifier {
+    pub fn new(domain: Eip712Domain, signer: Address) -> Self {
+        Self { domain, signer }
     }
 }
 
-impl CertificateValidator for CertificateVerifier {
-    fn verify_certificate(&self, cert: &BLSCert) -> Result<PaymentGuaranteeClaims, String> {
-        cert.verify(&self.operator_public_key)
-            .map_err(|err| err.to_string())?;
-
-        let claims = PaymentGuaranteeClaims::try_from(cert.claims().as_bytes())
-            .map_err(|err| err.to_string())?;
-
-        if let Some(expected_domain) = self.guarantee_domain
-            && claims.domain != expected_domain
-        {
-            return Err(format!(
-                "guarantee domain mismatch: got 0x{}, expected 0x{} for version {}",
-                hex::encode(claims.domain),
-                hex::encode(expected_domain),
-                claims.version
-            ));
-        }
-
-        Ok(claims)
+impl ReceiptValidator for ReceiptVerifier {
+    fn verify_receipt(&self, receipt: &GuaranteeReceipt) -> Result<Guarantee, String> {
+        verify_guarantee_receipt(receipt, &self.domain, self.signer).map_err(|err| err.to_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto::bls::{KeyMaterial, Zeroizing};
-    use rpc::GUARANTEE_CLAIMS_VERSION;
-    use sdk_4mica::{PaymentGuaranteeClaims, U256};
+    use alloy::primitives::{B256, U256};
+    use alloy::signers::SignerSync;
+    use alloy::signers::local::PrivateKeySigner;
+    use rpc::{PaymentRequestPayload, guarantee_registry_domain};
 
-    fn build_claims(domain: [u8; 32]) -> PaymentGuaranteeClaims {
-        PaymentGuaranteeClaims {
-            domain,
-            user_address: "0x0000000000000000000000000000000000000001".into(),
-            recipient_address: "0x0000000000000000000000000000000000000002".into(),
-            cycle_id: U256::from(1u8),
-            req_id: U256::from(1u8),
-            amount: U256::from(10u8),
-            asset_address: "0x0000000000000000000000000000000000000003".into(),
-            timestamp: 123,
-            version: GUARANTEE_CLAIMS_VERSION,
-        }
+    fn domain() -> Eip712Domain {
+        guarantee_registry_domain(11155111, Address::repeat_byte(0x02))
     }
 
-    fn build_cert(domain: [u8; 32]) -> (BLSCert, [u8; 48]) {
-        let claims = build_claims(domain);
-        let claims_bytes: Vec<u8> = claims.try_into().expect("encode claims");
-        let key = KeyMaterial::from_bytes(Zeroizing::new(vec![1u8; 32])).expect("secret key");
-        let cert = BLSCert::sign(&key, claims_bytes.into()).expect("build cert");
-        let pubkey: [u8; 48] = key
-            .public_key()
-            .as_bytes()
-            .to_vec()
-            .try_into()
-            .expect("48-byte key");
-        (cert, pubkey)
-    }
-
-    #[test]
-    fn accepts_certificate_matching_the_active_domain() {
-        let (cert, pubkey) = build_cert([2u8; 32]);
-        let verifier = CertificateVerifier::try_new(pubkey, Some([2u8; 32])).expect("valid key");
-        let claims = verifier.verify_certificate(&cert).expect("valid cert");
-        assert_eq!(claims.version, GUARANTEE_CLAIMS_VERSION);
-    }
-
-    /// An unconfigured domain means "accept whatever core signed" — the BLS signature is still
-    /// checked, only the domain binding is skipped.
-    #[test]
-    fn accepts_certificate_when_no_domain_is_configured() {
-        let (cert, pubkey) = build_cert([0u8; 32]);
-        let verifier = CertificateVerifier::try_new(pubkey, None).expect("valid key");
-        let claims = verifier.verify_certificate(&cert).expect("valid cert");
-        assert_eq!(claims.version, GUARANTEE_CLAIMS_VERSION);
-    }
-
-    /// Config only length-checks the operator key, so a core serving 48 bytes of anything reaches
-    /// this constructor. It must surface as a startup error, not a panic.
-    #[test]
-    fn rejects_a_key_that_is_48_bytes_of_garbage() {
-        let Err(err) = CertificateVerifier::try_new([0xAB; 48], None) else {
-            panic!("0xAB repeated is not a curve point, so this must not construct");
-        };
-        assert!(
-            err.contains("invalid operator public key"),
-            "unexpected error: {err}"
+    fn receipt_signed_by(signer: &PrivateKeySigner) -> GuaranteeReceipt {
+        let payload = PaymentRequestPayload::new(
+            "0x0000000000000000000000000000000000000001".into(),
+            "0x0000000000000000000000000000000000000002".into(),
+            B256::repeat_byte(0x11),
+            U256::from(1u8),
+            U256::from(10u8),
+            1_700_000_000,
+            Some("0x0000000000000000000000000000000000000003".into()),
+            B256::repeat_byte(0x22),
         );
+        let guarantee = Guarantee::from_payment(&payload, U256::from(0x11u8)).expect("guarantee");
+        let signature = signer
+            .sign_hash_sync(&guarantee.signing_digest(&domain()))
+            .expect("sign");
+        GuaranteeReceipt::new(
+            &guarantee,
+            alloy::hex::encode_prefixed(signature.as_bytes()),
+        )
     }
 
     #[test]
-    fn rejects_domain_mismatch() {
-        let (cert, pubkey) = build_cert([0u8; 32]);
-        let verifier = CertificateVerifier::try_new(pubkey, Some([1u8; 32])).expect("valid key");
+    fn accepts_a_receipt_from_the_guarantee_signer() {
+        let operator = PrivateKeySigner::random();
+        let verifier = ReceiptVerifier::new(domain(), operator.address());
+
+        let guarantee = verifier
+            .verify_receipt(&receipt_signed_by(&operator))
+            .expect("the operator's receipt must verify");
+        assert_eq!(guarantee.version(), 1);
+    }
+
+    #[test]
+    fn rejects_a_receipt_from_anyone_else() {
+        let verifier = ReceiptVerifier::new(domain(), PrivateKeySigner::random().address());
+
         let err = verifier
-            .verify_certificate(&cert)
-            .expect_err("expected mismatch");
-        assert!(
-            err.contains("guarantee domain mismatch"),
-            "unexpected error: {err}"
-        );
+            .verify_receipt(&receipt_signed_by(&PrivateKeySigner::random()))
+            .expect_err("a receipt from another key must not verify");
+        assert!(err.contains("signed by"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn rejects_a_receipt_signed_for_another_registry() {
+        let operator = PrivateKeySigner::random();
+        let elsewhere = guarantee_registry_domain(11155111, Address::repeat_byte(0x09));
+        let verifier = ReceiptVerifier::new(elsewhere, operator.address());
+
+        verifier
+            .verify_receipt(&receipt_signed_by(&operator))
+            .expect_err("another registry's domain must not verify");
     }
 }

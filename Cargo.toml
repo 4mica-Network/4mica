@@ -1,10 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["packages/sdk-rust"]
-
-# The facilitator pins the 2.0.0-alpha.3 crates, which can't share one lockfile with the SDK's
-# alpha.4. It joins once it moves to the current SDK.
-exclude = ["apps/facilitator"]
+members = ["packages/sdk-rust", "apps/facilitator"]
 
 [workspace.package]
 edition = "2024"

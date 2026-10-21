@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use rpc::PaymentGuaranteeRequest;
-use sdk_4mica::BLSCert;
+use rpc::{GuaranteeReceipt, PaymentRequest};
 use sdk_4mica::contract::Core4Mica::{
     Permit2Authorization, ReceiveAuthorization, WithdrawalCancelAuthorization,
     WithdrawalRequestAuthorization,
@@ -54,7 +53,7 @@ pub struct X402PaymentPayloadV1 {
     pub x402_version: X402Version<1>,
     pub scheme: String,
     pub network: String,
-    pub payload: PaymentGuaranteeRequest,
+    pub payload: PaymentRequest,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -62,7 +61,7 @@ pub struct X402PaymentPayloadV1 {
 pub struct X402PaymentPayloadV2 {
     pub x402_version: X402Version<2>,
     pub accepted: PaymentRequirements,
-    pub payload: PaymentGuaranteeRequest,
+    pub payload: PaymentRequest,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -204,15 +203,6 @@ impl SettleRequest {
 pub struct VerifyResponse {
     pub is_valid: bool,
     pub invalid_reason: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub certificate: Option<CertificateResponse>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CertificateResponse {
-    pub claims: String,
-    pub signature: String,
 }
 
 /// A gasless deposit: the payer's EIP-3009 authorization plus the amount and asset it was signed
@@ -791,24 +781,23 @@ impl ClaimResponse {
     }
 }
 
-impl From<BLSCert> for CertificateResponse {
-    fn from(cert: BLSCert) -> Self {
-        Self {
-            claims: format!("0x{}", cert.claims().to_hex()),
-            signature: format!("0x{}", cert.signature().to_hex()),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettleResponse {
     pub success: bool,
     pub error: Option<String>,
+    /// Core's code for a refused guarantee, such as `CHECKPOINT_REQUIRED`, so the seller can pass
+    /// it on to the payer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    /// What core attached to `error_code`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
     pub tx_hash: Option<String>,
     pub network_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub certificate: Option<CertificateResponse>,
+    /// The operator's receipt for the guarantee core issued.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<GuaranteeReceipt>,
 }
 
 impl SettleResponse {
@@ -816,9 +805,25 @@ impl SettleResponse {
         Self {
             success: false,
             error: Some(reason),
+            error_code: None,
+            details: None,
             tx_hash: None,
             network_id: Some(network.to_string()),
-            certificate: None,
+            receipt: None,
+        }
+    }
+
+    pub fn rejected(err: &ValidationError, network: &str) -> Self {
+        let (error_code, details) = match err {
+            ValidationError::IssueGuarantee(refusal) => {
+                (refusal.code.clone(), refusal.details.clone())
+            }
+            _ => (None, None),
+        };
+        Self {
+            error_code,
+            details,
+            ..Self::invalid(err.to_string(), network)
         }
     }
 
@@ -831,19 +836,23 @@ impl SettleResponse {
         Self {
             success,
             error,
+            error_code: None,
+            details: None,
             tx_hash,
             network_id: Some(network),
-            certificate: None,
+            receipt: None,
         }
     }
 
-    pub fn four_mica_success(network: &str, certificate: CertificateResponse) -> Self {
+    pub fn four_mica_success(network: &str, receipt: GuaranteeReceipt) -> Self {
         Self {
             success: true,
             error: None,
+            error_code: None,
+            details: None,
             tx_hash: None,
             network_id: Some(network.to_string()),
-            certificate: Some(certificate),
+            receipt: Some(receipt),
         }
     }
 }
@@ -851,15 +860,30 @@ impl SettleResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto::bls::{KeyMaterial, Zeroizing};
+    use crate::issuer::IssueError;
+    use serde_json::json;
 
     #[test]
-    fn certificate_response_from_bls_cert_preserves_hex_fields() {
-        let key = KeyMaterial::from_bytes(Zeroizing::new(vec![7u8; 32])).expect("secret key");
-        let cert = BLSCert::sign(&key, vec![0xab, 0xcd].into()).expect("sign cert");
+    fn a_refused_guarantee_carries_cores_code_and_details() {
+        let err = ValidationError::IssueGuarantee(IssueError {
+            message: "core refused the guarantee".into(),
+            code: Some("CHECKPOINT_REQUIRED".into()),
+            details: Some(json!({ "uncheckpointed": 64 })),
+        });
 
-        let response = CertificateResponse::from(cert);
-        assert_eq!(response.claims, "0xabcd");
-        assert!(response.signature.starts_with("0x"));
+        let body = serde_json::to_value(SettleResponse::rejected(&err, "eip155:1")).unwrap();
+        assert_eq!(body["success"], false);
+        assert_eq!(body["errorCode"], "CHECKPOINT_REQUIRED");
+        assert_eq!(body["details"]["uncheckpointed"], 64);
+        assert!(body.get("receipt").is_none());
+    }
+
+    #[test]
+    fn any_other_rejection_carries_no_code() {
+        let err = ValidationError::Mismatch("claim amount 1 does not match amount 2".into());
+
+        let body = serde_json::to_value(SettleResponse::rejected(&err, "eip155:1")).unwrap();
+        assert!(body.get("errorCode").is_none());
+        assert!(body.get("details").is_none());
     }
 }

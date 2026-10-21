@@ -2,10 +2,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use alloy::primitives::{B256, Bytes};
-use rpc::{
-    PaymentGuaranteeClaims, PaymentGuaranteeRequest, PaymentGuaranteeRequestClaims,
-    PaymentGuaranteeRequestClaimsV1, ValidationRequirement,
-};
+use rpc::{Guarantee, PaymentRequest, PaymentRequestPayload, ValidationRequirement};
 use sdk_4mica::{Address, U256};
 use serde_json::Map;
 use thiserror::Error;
@@ -17,15 +14,16 @@ use crate::server::model::{
     HealthResponse, PaymentRequirements, RelayerHealth, SettleRequest, SettleResponse,
     SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
 };
-use crate::verifier::CertificateValidator;
-use crate::{exact::ExactService, issuer::GuaranteeIssuer};
+use crate::verifier::ReceiptValidator;
+use crate::{
+    exact::ExactService,
+    issuer::{GuaranteeIssuer, IssueError},
+};
 
 /// x402 protocol versions this facilitator speaks.
 ///
-/// Deliberately independent of the *guarantee* claims version: x402 v1 and v2 differ only in the
-/// envelope and requirements shape, and both carry the same guarantee claims underneath. Before
-/// guarantee v2 was dropped the two were conflated, which meant retiring a guarantee version would
-/// silently stop the facilitator answering an x402 version.
+/// Deliberately independent of the payment payload version: x402 v1 and v2 differ only in the
+/// envelope and requirements shape, and both carry the same signed payment request underneath.
 ///
 /// Must stay in step with the `X402Version<N>` envelopes in [`crate::server::model`], which are
 /// what actually constrain deserialization: a payload outside this set is rejected before any
@@ -279,7 +277,7 @@ impl AppState {
 pub(crate) struct FourMicaHandler {
     scheme: String,
     network: String,
-    verifier: Arc<dyn CertificateValidator>,
+    verifier: Arc<dyn ReceiptValidator>,
     issuer: Arc<dyn GuaranteeIssuer>,
     /// Validator identities core whitelisted. A signed validation requirement naming anything else
     /// is rejected before we ask core to issue, since core would reject it anyway.
@@ -290,7 +288,7 @@ impl FourMicaHandler {
     pub(crate) fn new(
         scheme: String,
         network: String,
-        verifier: Arc<dyn CertificateValidator>,
+        verifier: Arc<dyn ReceiptValidator>,
         issuer: Arc<dyn GuaranteeIssuer>,
         validators: Vec<String>,
     ) -> Self {
@@ -351,7 +349,6 @@ impl FourMicaHandler {
         Ok(VerifyResponse {
             is_valid: true,
             invalid_reason: None,
-            certificate: None,
         })
     }
 
@@ -367,41 +364,33 @@ impl FourMicaHandler {
         )?;
         self.validate_payment_payload(&payload, &request.payment_requirements, x402_version)?;
 
-        let certificate: sdk_4mica::BLSCert = self
+        let receipt = self
             .issuer
-            .issue(payload.claims.clone(), payload.signature, payload.scheme)
+            .issue(payload.clone())
             .await
             .map_err(ValidationError::IssueGuarantee)?;
 
-        let claims = self
+        let issued = self
             .verifier
-            .verify_certificate(&certificate)
-            .map_err(ValidationError::InvalidCertificate)?;
-
-        match &payload.claims {
-            PaymentGuaranteeRequestClaims::V1(claims_request) => {
-                self.ensure_certificate_matches_claims_v1(claims_request, &claims)?;
-            }
-        }
+            .verify_receipt(&receipt)
+            .map_err(ValidationError::InvalidReceipt)?;
+        ensure_receipt_matches_request(&payload.payload, &issued)?;
 
         tracing::info!(
-            cycle_id = format!("{:#x}", claims.cycle_id),
-            req_id = format!("{:#x}", claims.req_id),
-            amount = format!("{:#x}", claims.amount),
+            cycle_id = %payload.payload.cycle_id(),
+            req_id = format!("{:#x}", payload.payload.req_id()),
+            amount = format!("{:#x}", payload.payload.amount()),
             "4mica guarantee issued during settlement"
         );
 
-        Ok(SettleResponse::four_mica_success(
-            &self.network,
-            certificate.into(),
-        ))
+        Ok(SettleResponse::four_mica_success(&self.network, receipt))
     }
 
     fn decode_payment_payload(
         &self,
         payload: X402PaymentPayload,
         reqs: &PaymentRequirements,
-    ) -> Result<PaymentGuaranteeRequest, ValidationError> {
+    ) -> Result<PaymentRequest, ValidationError> {
         match payload {
             X402PaymentPayload::V1(envelope) => {
                 if envelope.scheme != self.scheme {
@@ -454,22 +443,19 @@ impl FourMicaHandler {
 
     fn validate_payment_payload(
         &self,
-        payload: &PaymentGuaranteeRequest,
+        request: &PaymentRequest,
         reqs: &PaymentRequirements,
         version: u8,
     ) -> Result<(), ValidationError> {
-        match &payload.claims {
-            PaymentGuaranteeRequestClaims::V1(claims) => {
-                tracing::debug!(
-                    req_id = format!("{:#x}", claims.req_id),
-                    amount = format!("{:#x}", claims.amount),
-                    validated = claims.validation.is_some(),
-                    "Decoded 4mica claims"
-                );
-                self.ensure_claims_v1_match_requirements(claims, reqs, version)?;
-                self.ensure_validation_matches_requirements(claims.validation.as_ref(), reqs)?;
-            }
-        }
+        let payload = &request.payload;
+        tracing::debug!(
+            req_id = format!("{:#x}", payload.req_id()),
+            amount = format!("{:#x}", payload.amount()),
+            validated = payload.validation().is_some(),
+            "Decoded 4mica payment"
+        );
+        self.ensure_payment_matches_requirements(payload, reqs, version)?;
+        self.ensure_validation_matches_requirements(payload.validation(), reqs)?;
         Ok(())
     }
 
@@ -491,13 +477,13 @@ impl FourMicaHandler {
             (None, None) => return Ok(()),
             (Some(signed), None) => {
                 return Err(ValidationError::Mismatch(format!(
-                    "claims are gated on validator {} but the requirements ask for no validation",
+                    "payment is gated on validator {} but the requirements ask for no validation",
                     signed.validator
                 )));
             }
             (None, Some(required)) => {
                 return Err(ValidationError::Mismatch(format!(
-                    "requirements ask for validation by {} but the claims carry none",
+                    "requirements ask for validation by {} but the payment carries none",
                     required.validator
                 )));
             }
@@ -506,25 +492,25 @@ impl FourMicaHandler {
 
         if signed.validator != required.validator {
             return Err(ValidationError::Mismatch(format!(
-                "claim validator '{}' does not match requirement '{}'",
+                "payment validator '{}' does not match requirement '{}'",
                 signed.validator, required.validator
             )));
         }
         if signed.subject != required.subject {
             return Err(ValidationError::Mismatch(format!(
-                "claim validation subject {} does not match requirement {}",
+                "payment validation subject {} does not match requirement {}",
                 signed.subject, required.subject
             )));
         }
         if signed.deadline != required.deadline {
             return Err(ValidationError::Mismatch(format!(
-                "claim validation deadline {:?} does not match requirement {:?}",
+                "payment validation deadline {:?} does not match requirement {:?}",
                 signed.deadline, required.deadline
             )));
         }
         if signed.params != required.params {
             return Err(ValidationError::Mismatch(
-                "claim validation params do not match requirement".into(),
+                "payment validation params do not match requirement".into(),
             ));
         }
 
@@ -538,9 +524,9 @@ impl FourMicaHandler {
         Ok(())
     }
 
-    fn ensure_claims_v1_match_requirements(
+    fn ensure_payment_matches_requirements(
         &self,
-        claims: &PaymentGuaranteeRequestClaimsV1,
+        payload: &PaymentRequestPayload,
         reqs: &PaymentRequirements,
         version: u8,
     ) -> Result<(), ValidationError> {
@@ -549,16 +535,16 @@ impl FourMicaHandler {
             "payTo address",
             ValidationError::InvalidRequirements,
         )?;
-        let claim_recipient = parse_address(
-            &claims.recipient_address,
-            "recipient address in claims",
-            ValidationError::InvalidClaims,
+        let recipient = parse_address(
+            payload.recipient_address(),
+            "recipient address in payment",
+            ValidationError::InvalidPayment,
         )?;
 
-        if claim_recipient != required_pay_to {
+        if recipient != required_pay_to {
             return Err(ValidationError::Mismatch(format!(
-                "claim recipient {} does not match payTo {}",
-                claim_recipient, required_pay_to
+                "payment recipient {} does not match payTo {}",
+                recipient, required_pay_to
             )));
         }
 
@@ -567,92 +553,105 @@ impl FourMicaHandler {
             "asset address",
             ValidationError::InvalidRequirements,
         )?;
-        let claim_asset = parse_address(
-            &claims.asset_address,
-            "asset address in claims",
-            ValidationError::InvalidClaims,
+        let asset = parse_address(
+            payload.asset_address(),
+            "asset address in payment",
+            ValidationError::InvalidPayment,
         )?;
 
-        if claim_asset != required_asset {
+        if asset != required_asset {
             return Err(ValidationError::Mismatch(format!(
-                "claim asset {} does not match requirement {}",
-                claim_asset, required_asset
+                "payment asset {} does not match requirement {}",
+                asset, required_asset
             )));
         }
 
         let amount_required = required_amount(reqs, version)?;
-        if claims.amount.is_zero() {
-            return Err(ValidationError::InvalidClaims(
-                "claim amount is zero".into(),
+        if payload.amount().is_zero() {
+            return Err(ValidationError::InvalidPayment(
+                "payment amount is zero".into(),
             ));
         }
-        if claims.amount != amount_required {
+        if payload.amount() != amount_required {
             let amount_label = if version == 2 {
                 "amount"
             } else {
                 "maxAmountRequired"
             };
             return Err(ValidationError::Mismatch(format!(
-                "claim amount {} does not match {} {}",
-                claims.amount, amount_label, amount_required
+                "payment amount {} does not match {} {}",
+                payload.amount(),
+                amount_label,
+                amount_required
             )));
         }
 
         Ok(())
     }
+}
 
-    fn ensure_certificate_matches_claims_v1(
-        &self,
-        request: &PaymentGuaranteeRequestClaimsV1,
-        issued: &PaymentGuaranteeClaims,
-    ) -> Result<(), ValidationError> {
-        // Addresses are compared parsed rather than as strings so a checksummed certificate still
-        // matches lowercase requested claims.
-        let address_pairs = [
-            (
-                "recipient address",
-                &request.recipient_address,
-                &issued.recipient_address,
-            ),
-            (
-                "asset address",
-                &request.asset_address,
-                &issued.asset_address,
-            ),
-            ("user address", &request.user_address, &issued.user_address),
-        ];
-        for (field, requested, issued) in address_pairs {
-            let requested = parse_address(
-                requested,
-                &format!("{field} in requested claims"),
-                ValidationError::InvalidClaims,
-            )?;
-            let issued = parse_address(
-                issued,
-                &format!("{field} in issued certificate"),
-                ValidationError::InvalidCertificate,
-            )?;
-            if requested != issued {
-                return Err(ValidationError::Mismatch(format!(
-                    "certificate {field} {issued} differs from requested {requested}"
-                )));
-            }
-        }
+/// Checks the receipt core signed is for exactly the payment the payer signed, so a seller is
+/// never handed a valid receipt for some other guarantee.
+fn ensure_receipt_matches_request(
+    payload: &PaymentRequestPayload,
+    issued: &Guarantee,
+) -> Result<(), ValidationError> {
+    let Guarantee::V1(issued) = issued;
+    let requested_address = |raw: &str, field: &str| {
+        parse_address(
+            raw,
+            &format!("{field} in payment"),
+            ValidationError::InvalidPayment,
+        )
+    };
 
-        if issued.req_id != request.req_id {
+    let addresses = [
+        (
+            "payer",
+            requested_address(payload.user_address(), "payer")?,
+            issued.client,
+        ),
+        (
+            "recipient",
+            requested_address(payload.recipient_address(), "recipient")?,
+            issued.recipient,
+        ),
+        (
+            "asset",
+            requested_address(payload.asset_address(), "asset")?,
+            issued.asset,
+        ),
+    ];
+    for (field, requested, issued) in addresses {
+        if requested != issued {
             return Err(ValidationError::Mismatch(format!(
-                "certificate req_id {:#x} differs from requested {:#x}",
-                issued.req_id, request.req_id
+                "receipt {field} {issued} differs from requested {requested}"
             )));
         }
-        if issued.amount != request.amount {
-            return Err(ValidationError::Mismatch(format!(
-                "certificate amount {} differs from requested {}",
-                issued.amount, request.amount
-            )));
-        }
-        Ok(())
     }
+
+    let numbers = [
+        ("req_id", payload.req_id(), issued.reqId),
+        ("amount", payload.amount(), issued.amount),
+        (
+            "cycle id",
+            U256::from_be_bytes(payload.cycle_id().0),
+            issued.cycleId,
+        ),
+        (
+            "timestamp",
+            U256::from(payload.timestamp()),
+            U256::from(issued.timestamp),
+        ),
+    ];
+    for (field, requested, issued) in numbers {
+        if requested != issued {
+            return Err(ValidationError::Mismatch(format!(
+                "receipt {field} {issued:#x} differs from requested {requested:#x}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub fn resolve_x402_version(
@@ -674,8 +673,8 @@ pub fn resolve_x402_version(
 }
 
 /// Parses an address, tagging the failure with the field it came from and the variant that says
-/// *whose* input was wrong — a bad `payTo` is the resource server's fault, a bad claim address is
-/// the payer's, and a bad issued address is core's. The underlying parse error is kept: "invalid
+/// *whose* input was wrong — a bad `payTo` is the resource server's fault, a bad payment address
+/// is the payer's. The underlying parse error is kept: "invalid
 /// checksum" and "wrong length" are very different operator problems.
 fn parse_address(
     value: &str,
@@ -789,11 +788,11 @@ pub enum ValidationError {
     #[error("{0}")]
     InvalidRequirements(String),
     #[error("{0}")]
-    InvalidClaims(String),
+    InvalidPayment(String),
     #[error("{0}")]
-    InvalidCertificate(String),
-    #[error("{0}")]
-    IssueGuarantee(String),
+    InvalidReceipt(String),
+    #[error(transparent)]
+    IssueGuarantee(IssueError),
     #[error("{0}")]
     Mismatch(String),
     #[error("unsupported scheme {0}")]
@@ -820,18 +819,18 @@ mod tests {
             "scheme": "4mica-credit",
             "network": "eip155:11155111",
             "payload": {
-                "claims": {
+                "payload": {
                     "version": "v1",
                     "user_address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                     "recipient_address": "0x1111111111111111111111111111111111111111",
-                    "tab_id": "0x1",
+                    "cycle_id": format!("0x{}", "11".repeat(32)),
                     "req_id": "0x0",
                     "amount": "0xa",
                     "asset_address": "0x2222222222222222222222222222222222222222",
-                    "timestamp": 1
+                    "timestamp": 1,
+                    "salt": format!("0x{}", "22".repeat(32))
                 },
-                "signature": "0x1111",
-                "scheme": "eip712"
+                "signature": "0x1111"
             }
         }))
         .expect("deserialize payload")
