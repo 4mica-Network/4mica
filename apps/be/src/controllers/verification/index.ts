@@ -1,8 +1,10 @@
+import { toE164 } from "@4mica/rules";
 import { invalidateUser } from "@auth/user-store";
 import { config } from "@config/index";
-import { getProfile } from "@controllers/me/repository";
+import { getProfile, markPhoneVerified } from "@controllers/me/repository";
 import { invalidBody, parseBody, requireUserId } from "@controllers/shared";
 import { appLogger } from "@logger/index";
+import { clerk } from "@services/clerk";
 import type { FastifyInstance, RouteHandler } from "fastify";
 import {
   consumeEmailVerification,
@@ -151,4 +153,61 @@ export const confirmEmailHandler: RouteHandler = async (request, reply) => {
 
   appLogger.info("Email verified", { userId });
   return reply.send(await getProfile(userId));
+};
+
+export const syncPhoneVerificationHandler: RouteHandler = async (
+  request,
+  reply,
+) => {
+  const userId = requireUserId(request, reply);
+  if (!userId) {
+    return reply;
+  }
+
+  const profile = await getProfile(userId);
+  const target = toE164(profile?.phoneNumber);
+  if (!profile || !target) {
+    return reply.code(409).send({
+      error: "no_phone",
+      message: "Add a phone number with its country code before verifying it.",
+    });
+  }
+
+  if (profile.phoneNumberVerified) {
+    return reply.send(profile);
+  }
+
+  let verified: boolean;
+  try {
+    const clerkUser = await clerk.users.getUser(profile.clerkUserId);
+    verified = clerkUser.phoneNumbers.some(
+      (phone) =>
+        toE164(phone.phoneNumber) === target &&
+        phone.verification?.status === "verified",
+    );
+  } catch (error) {
+    appLogger.warn("Could not read phone numbers from Clerk", {
+      userId,
+      error,
+    });
+    return reply.code(502).send({
+      error: "clerk_unavailable",
+      message: "Could not confirm the number right now. Try again.",
+    });
+  }
+
+  if (!verified) {
+    return reply.code(409).send({
+      error: "phone_not_verified",
+      message: "This number has not been verified yet.",
+    });
+  }
+
+  const updated = await markPhoneVerified(userId);
+  if (request.user) {
+    invalidateUser(request.user.clerkUserId);
+  }
+  appLogger.info("Phone number verified", { userId });
+
+  return reply.send(updated);
 };

@@ -28,6 +28,13 @@ export const isHttpsUrl = (value: string): boolean =>
 export const isPhoneNumber = (value: string): boolean =>
   PHONE_PATTERN.test(value);
 
+const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
+
+export const toE164 = (value: string | null | undefined): string | null => {
+  const compact = (value ?? "").replace(/[\s().-]/g, "");
+  return E164_PATTERN.test(compact) ? compact : null;
+};
+
 export const isHexColor = (value: string): boolean =>
   HEX_COLOR_PATTERN.test(value);
 

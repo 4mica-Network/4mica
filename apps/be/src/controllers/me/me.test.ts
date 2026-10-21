@@ -273,6 +273,42 @@ describe("account routes", () => {
     await app.close();
   });
 
+  it("PATCH /me/account forgets the phone verification when the number changes", async () => {
+    findUnique.mockResolvedValue({ ...FULL_USER, phoneNumber: "+15550100123" });
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { phoneNumber: "+15550100999" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data).toEqual({
+      phoneNumber: "+15550100999",
+      phoneNumberVerified: false,
+    });
+
+    await app.close();
+  });
+
+  it("PATCH /me/account keeps the verification when the same number is reformatted", async () => {
+    findUnique.mockResolvedValue({ ...FULL_USER, phoneNumber: "+15550100123" });
+    const app = await initApp([{ plugin: meRoutes }]);
+    await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { phoneNumber: "+1 (555) 010-0123" },
+    });
+
+    expect(update.mock.calls[0][0].data).toEqual({
+      phoneNumber: "+1 (555) 010-0123",
+    });
+
+    await app.close();
+  });
+
   it("PATCH /me/account parks a new email as pending instead of claiming it", async () => {
     const app = await initApp([{ plugin: meRoutes }]);
     const res = await app.inject({

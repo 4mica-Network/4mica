@@ -1,4 +1,4 @@
-import { isPhoneNumber } from "@4mica/rules";
+import { isPhoneNumber, toE164 } from "@4mica/rules";
 import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { sendEmailVerification, updateAccount } from "@stores/user/actions";
@@ -8,13 +8,14 @@ import {
 } from "@stores/user/selector";
 import type { User } from "@stores/user/type";
 import { hasErrors, isEmail } from "@utils/validation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { VerifiedBadge } from "@/components/badges";
 import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { useDraft } from "@/hooks/useDraft";
+import { PhoneVerificationDialog } from "./PhoneVerificationDialog";
 
 export function CredentialsSection({ user }: { user: User }) {
   const { t } = useTranslation();
@@ -34,6 +35,13 @@ export function CredentialsSection({ user }: { user: User }) {
   );
 
   const contact = useDraft(contactInitial);
+  const [verifyingPhone, setVerifyingPhone] = useState(false);
+
+  const savedPhone = toE164(user.phoneNumber);
+  const phoneEdited =
+    contact.draft.phoneNumber.trim() !== (user.phoneNumber ?? "").trim();
+  const canVerifyPhone =
+    !user.phoneNumberVerified && savedPhone !== null && !phoneEdited;
 
   const emailValue = contact.draft.email.trim();
   const phoneValue = contact.draft.phoneNumber.trim();
@@ -150,13 +158,27 @@ export function CredentialsSection({ user }: { user: User }) {
           description={t("settings.account.phoneHint")}
           htmlFor="account-phone"
           action={
-            <VerifiedBadge
-              verified={user.phoneNumberVerified}
-              labels={{
-                yes: t("settings.verified"),
-                no: t("settings.unverified"),
-              }}
-            />
+            canVerifyPhone ? (
+              <Button
+                type="button"
+                intent="invert"
+                size="sm"
+                className="btn-no-lift w-28 shrink-0"
+                onClick={() => setVerifyingPhone(true)}
+              >
+                <span className="flex w-full items-center justify-center text-xs">
+                  {t("settings.account.phoneVerify.action")}
+                </span>
+              </Button>
+            ) : (
+              <VerifiedBadge
+                verified={user.phoneNumberVerified}
+                labels={{
+                  yes: t("settings.verified"),
+                  no: t("settings.unverified"),
+                }}
+              />
+            )
           }
         >
           <TextInput
@@ -170,8 +192,21 @@ export function CredentialsSection({ user }: { user: User }) {
             maxLength={20}
             onChange={(v) => contact.set("phoneNumber", v)}
           />
+          {user.phoneNumber && !savedPhone && !phoneEdited && (
+            <p className="mt-2 text-ink-muted text-xs">
+              {t("settings.account.phoneVerify.needsCountryCode")}
+            </p>
+          )}
         </FieldRow>
       </EditableCard>
+
+      {savedPhone && verifyingPhone && (
+        <PhoneVerificationDialog
+          phoneNumber={savedPhone}
+          isOpen
+          onClose={() => setVerifyingPhone(false)}
+        />
+      )}
     </SettingsSection>
   );
 }

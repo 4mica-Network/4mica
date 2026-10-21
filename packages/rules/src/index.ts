@@ -34,4 +34,5 @@ export {
   isWebUrl,
   PHONE_PATTERN,
   SIGNED_DECIMAL_AMOUNT_PATTERN,
+  toE164,
 } from "./validation";
