@@ -977,3 +977,85 @@ export const resourceContextResponseSchema = {
     faqs: { type: "array", items: faqSchema },
   },
 } as const;
+
+const nullEnum = (values: readonly string[]) => ({
+  type: "string",
+  nullable: true,
+  enum: [...values, null],
+});
+
+const nullIsoDate = { type: "string", format: "date", nullable: true } as const;
+
+export const beneficialOwnerResponseSchema = {
+  type: "object",
+  required: ["id", "fullName", "role"],
+  properties: {
+    id: str,
+    fullName: str,
+    role: {
+      type: "string",
+      enum: ["OWNER", "DIRECTOR", "CONTROLLER", "SIGNATORY"],
+    },
+    ownershipPercent: { type: "integer", nullable: true },
+    dateOfBirth: { type: "string", format: "date" },
+    nationality: str,
+    countryOfResidence: str,
+    email: nullStr,
+    isPep: bool,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const complianceResponseSchema = {
+  type: "object",
+  required: ["kybStatus", "profile", "owners", "missing"],
+  properties: {
+    kybStatus: {
+      type: "string",
+      enum: ["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"],
+    },
+    profile: {
+      type: "object",
+      nullable: true,
+      properties: {
+        incorporationCountry: nullStr,
+        incorporatedOn: nullIsoDate,
+        monthlyVolume: nullEnum([
+          "UNDER_10K",
+          "FROM_10K_TO_100K",
+          "FROM_100K_TO_1M",
+          "OVER_1M",
+        ]),
+        customerBase: nullEnum(["BUSINESSES", "CONSUMERS", "BOTH"]),
+        customerRegions: { type: "array", items: str },
+        isRegulated: bool,
+        licenceType: nullStr,
+        licenceNumber: nullStr,
+        regulator: nullStr,
+        hasAmlPolicy: bool,
+        complianceOfficerName: nullStr,
+        complianceOfficerEmail: nullStr,
+        termsUrl: nullStr,
+        privacyUrl: nullStr,
+        refundPolicyUrl: nullStr,
+        fundsSource: nullEnum([
+          "BUSINESS_REVENUE",
+          "INVESTMENT",
+          "LOANS",
+          "PERSONAL_SAVINGS",
+          "OTHER",
+        ]),
+        fundsSourceDetail: nullStr,
+        sanctionsAttestedAt: nullDate,
+        prohibitedAttestedAt: nullDate,
+        accuracyAttestedAt: nullDate,
+        attestedBy: nullStr,
+        submittedAt: nullDate,
+        updatedAt: date,
+      },
+    },
+    owners: { type: "array", items: beneficialOwnerResponseSchema },
+    missing: { type: "array", items: str },
+  },
+} as const;

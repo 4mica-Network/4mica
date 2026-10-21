@@ -112,6 +112,23 @@ export const futureTimestamp = v.pipe(
   ),
 );
 
+export const countryCode = v.pipe(
+  v.string(),
+  v.trim(),
+  v.toUpperCase(),
+  v.regex(/^[A-Z]{2}$/, "must be an ISO 3166-1 alpha-2 country code"),
+);
+
+export const pastDate = v.pipe(
+  v.string(),
+  v.trim(),
+  v.isoDate("must be a date in YYYY-MM-DD form"),
+  v.check(
+    (value) => new Date(`${value}T00:00:00Z`).getTime() <= Date.now(),
+    "must not be in the future",
+  ),
+);
+
 export const MAX_INT32 = 2_147_483_647;
 
 export const DEFAULT_PAGE_SIZE = 20;

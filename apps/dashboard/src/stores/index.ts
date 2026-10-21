@@ -4,6 +4,7 @@ import agentReducer from "./agent/reducer";
 import apiListingReducer from "./apiListing/reducer";
 import balanceReducer from "./balance/reducer";
 import bannerReducer from "./banner/reducer";
+import complianceReducer from "./compliance/reducer";
 import customerReducer from "./customer/reducer";
 import developerReducer from "./developer/reducer";
 import paymentReducer from "./payment/reducer";
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
   balance: balanceReducer,
   customer: customerReducer,
   resourceKey: resourceKeyReducer,
+  compliance: complianceReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

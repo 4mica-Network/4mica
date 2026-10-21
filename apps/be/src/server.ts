@@ -133,6 +133,10 @@ export const initApp = async (
         tags: [
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
+          {
+            name: "compliance",
+            description: "KYB details, beneficial owners and review",
+          },
           { name: "verification", description: "Email verification" },
           { name: "developer", description: "API keys and webhooks" },
           {
