@@ -1,7 +1,7 @@
 export const en = {
   common: {
     brandName: "4Mica",
-    poweredBy: "Powered by 4Mica",
+    poweredBy: "Powered by",
     backToProfile: "Back to profile",
     viewDocs: "View docs",
     openApi: "Open API",
