@@ -108,8 +108,6 @@
   "settings.business.payoutCurrency": "Payout currency",
   "settings.business.statementDescriptor": "Statement descriptor",
   "settings.business.statementDescriptorHint": "Up to 22 characters shown on customer statements.",
-  "settings.notifications.channels": "Channels",
-  "settings.notifications.channelsHint": "How we reach you in the product.",
   "settings.notifications.smsHint": "Standard message rates may apply.",
   "settings.notifications.placementHint": "Where toasts appear on screen.",
   "settings.notifications.monthlyHint": "Volume, revenue and settlement summary.",
