@@ -51,7 +51,7 @@ export default function TeamsSection() {
           </motion.div>
 
           <Link
-            href={links.social.githubCore}
+            href={links.social.githubRepo}
             target="_blank"
             rel="noreferrer"
             className="btn btn-soft btn-lg inline-flex h-10 items-center justify-center gap-1.5"

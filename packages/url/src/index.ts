@@ -653,6 +653,7 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
       x: "https://x.com/0x4Mica",
       github: "https://github.com/4mica-Network",
       githubCore: "https://github.com/4mica-Network/4mica-core/",
+      githubRepo: "https://github.com/4mica-Network/4mica",
       githubX402Demo:
         "https://github.com/4mica-Network/x402-4mica/tree/main/packages/typescript/x402/demo",
       linkedin: "https://www.linkedin.com/company/4mica",
