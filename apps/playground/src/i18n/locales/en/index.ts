@@ -284,14 +284,10 @@ export const en = {
   },
 
   visibility: {
-    public: "Public",
     unlisted: "Unlisted",
     private: "Private",
     unlistedHint: "Reachable by direct link, hidden from your profile.",
     privateHint: "Only visible to you.",
-    errorUnauthorized: "Sign in again to change visibility.",
-    errorNotFound: "This item is no longer available.",
-    errorGeneric: "Could not change visibility. Try again.",
   },
 
   owner: {
