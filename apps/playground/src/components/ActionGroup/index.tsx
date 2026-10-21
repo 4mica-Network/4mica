@@ -24,6 +24,7 @@ export interface ActionGroupProps {
   label: string;
   actions: GroupAction[];
   iconOnly?: boolean;
+  size?: "sm" | "md";
   className?: string;
 }
 
@@ -43,8 +44,11 @@ export function ActionGroup({
   label,
   actions,
   iconOnly = false,
+  size = "sm",
   className,
 }: ActionGroupProps) {
+  const md = size === "md";
+  const iconSize = md ? "h-4 w-4" : "h-3.5 w-3.5";
   const [done, setDone] = useState<{ id: string; note: string } | null>(null);
   const reduceMotion = useReducedMotion();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,7 +90,10 @@ export function ActionGroup({
     <fieldset
       aria-label={label}
       className={cn(
-        "m-0 inline-flex min-w-0 items-center gap-0.5 rounded-md border border-overlay/6 p-0.5",
+        "m-0 inline-flex min-w-0 items-center gap-0.5",
+        md
+          ? "rounded-xl border border-overlay/10 bg-overlay/4 p-1"
+          : "rounded-md border border-overlay/6 p-0.5",
         className,
       )}
     >
@@ -98,8 +105,15 @@ export function ActionGroup({
           <motion.button
             aria-label={isDone ? done.note : (ariaLabel ?? text)}
             className={cn(
-              "relative inline-flex h-6 items-center gap-1.5 rounded text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
-              iconOnly ? "px-1.5" : "px-2",
+              "relative inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+              md ? "h-8 rounded-lg text-sm" : "h-6 rounded text-xs",
+              iconOnly
+                ? md
+                  ? "w-8 justify-center"
+                  : "px-1.5"
+                : md
+                  ? "px-3"
+                  : "px-2",
               isDone
                 ? "bg-success/10 text-ink-body"
                 : "text-ink-muted hover:bg-overlay/6 hover:text-ink-body",
@@ -110,7 +124,7 @@ export function ActionGroup({
             type="button"
             whileTap={reduceMotion ? undefined : { scale: 0.94 }}
           >
-            <span className="relative grid h-3.5 w-3.5 place-items-center">
+            <span className={cn("relative grid place-items-center", iconSize)}>
               <motion.span
                 animate={
                   isDone
@@ -121,7 +135,7 @@ export function ActionGroup({
                 initial={false}
                 transition={isDone ? fade : pop}
               >
-                <Icon aria-hidden={true} className="h-3.5 w-3.5" />
+                <Icon aria-hidden={true} className={iconSize} />
               </motion.span>
               <motion.span
                 animate={
@@ -135,7 +149,7 @@ export function ActionGroup({
               >
                 <Check
                   aria-hidden="true"
-                  className="h-3.5 w-3.5 text-success"
+                  className={cn(iconSize, "text-success")}
                 />
               </motion.span>
             </span>

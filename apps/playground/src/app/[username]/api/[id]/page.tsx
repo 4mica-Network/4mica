@@ -3,6 +3,7 @@ import { BookText, CalendarDays, Globe, Shapes, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CardShell } from "@/components/CardShell";
+import { CopyForAi } from "@/components/CopyForAi";
 import { CopyValue } from "@/components/CopyValue";
 import { buildApiIntegrationSteps } from "@/components/IntegrationSection/ApiIntegration";
 import { JsonLd } from "@/components/JsonLd";
@@ -23,6 +24,7 @@ import { SupportSection } from "@/components/SupportSection";
 import { TrustSection } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
+import { buildApiListingHandoff } from "@/lib/ai-handoff";
 import { buildApiListingDescriptor } from "@/lib/descriptor";
 import { links } from "@/services/links";
 import { getPayerState } from "@/services/payer";
@@ -55,6 +57,14 @@ export default async function ApiListingPage({
   const { listing, profile } = resolved;
   const payerState = await getPayerState(listing.network);
   const descriptor = buildApiListingDescriptor(listing, profile);
+
+  const pageUrl = `${links.website}${apiListingPath(profile.username, listing.ref)}`;
+  const handoff = buildApiListingHandoff(listing, {
+    username: profile.username,
+    pageUrl,
+    appUrl: links.app,
+    docsUrl: links.docs,
+  });
 
   const price = {
     amount: listing.priceAmount,
@@ -201,11 +211,16 @@ export default async function ApiListingPage({
 
       <CardShell
         actions={
-          <ProfileActions
-            label={messages.flow.actions}
-            title={listing.name}
-            url={`${links.website}${apiListingPath(profile.username, listing.ref)}`}
-          />
+          <div className="flex items-stretch gap-2">
+            {handoff && (
+              <CopyForAi markdown={handoff.markdown} prompt={handoff.prompt} />
+            )}
+            <ProfileActions
+              label={messages.flow.actions}
+              title={listing.name}
+              url={pageUrl}
+            />
+          </div>
         }
       >
         <StepFlow

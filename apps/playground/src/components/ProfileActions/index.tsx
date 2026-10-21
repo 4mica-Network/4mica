@@ -30,7 +30,9 @@ export function ProfileActions({
 
   return (
     <ActionGroup
+      iconOnly
       label={label}
+      size="md"
       actions={[
         {
           id: "copy",

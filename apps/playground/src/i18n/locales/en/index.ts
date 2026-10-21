@@ -219,6 +219,13 @@ export const en = {
     actions: "Page actions",
   },
 
+  ai: {
+    trigger: "Copy for AI",
+    markdown: "Copy as markdown",
+    prompt: "Copy prompt",
+    copied: "Copied",
+  },
+
   facts: {
     network: "Network",
     asset: "Asset",
