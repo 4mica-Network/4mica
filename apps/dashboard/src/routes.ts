@@ -53,7 +53,7 @@ export interface SettingsRouteMeta {
 
 export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "profile", component: ProfileSettings },
-  { path: "account", component: AccountSettings },
+  { path: "general", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
   { path: "notifications", component: NotificationSettings },
