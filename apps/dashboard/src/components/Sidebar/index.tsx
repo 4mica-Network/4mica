@@ -346,27 +346,29 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </nav>
 
       <div className="p-3">
-        {!inSettings && !collapsed && <SidebarBanners />}
-        <div className="flex flex-col gap-0.5">
-          <ActionRow
-            icon={Eye}
-            label={t("sidebar.viewPublicProfile")}
-            onClick={viewProfile}
-            collapsed={collapsed}
-          />
-          <ActionRow
-            icon={copied ? Check : Copy}
-            label={copyLabel}
-            tooltip={copyLabel}
-            onClick={copyProfile}
-            collapsed={collapsed}
-          />
-          {FOOTER_ITEMS.filter(
-            (item) => !(inSettings && item.to === "/settings"),
-          ).map((item) => (
-            <NavRow key={item.to} item={item} collapsed={collapsed} />
-          ))}
-        </div>
+        {!inSettings && (
+          <>
+            {!collapsed && <SidebarBanners />}
+            <div className="flex flex-col gap-0.5">
+              <ActionRow
+                icon={Eye}
+                label={t("sidebar.viewPublicProfile")}
+                onClick={viewProfile}
+                collapsed={collapsed}
+              />
+              <ActionRow
+                icon={copied ? Check : Copy}
+                label={copyLabel}
+                tooltip={copyLabel}
+                onClick={copyProfile}
+                collapsed={collapsed}
+              />
+              {FOOTER_ITEMS.map((item) => (
+                <NavRow key={item.to} item={item} collapsed={collapsed} />
+              ))}
+            </div>
+          </>
+        )}
         <div className="mt-1 flex justify-end px-2.5">
           <Label
             collapsed={collapsed}
