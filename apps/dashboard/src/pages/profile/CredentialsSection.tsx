@@ -1,4 +1,5 @@
 import { isPhoneNumber } from "@4mica/rules";
+import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { sendEmailVerification, updateAccount } from "@stores/user/actions";
 import {
@@ -88,13 +89,33 @@ export function CredentialsSection({ user }: { user: User }) {
           description={t("settings.account.emailHint")}
           htmlFor="account-email"
           action={
-            <VerifiedBadge
-              verified={user.emailVerified}
-              labels={{
-                yes: t("settings.verified"),
-                no: t("settings.unverified"),
-              }}
-            />
+            user.emailVerified || !user.email ? (
+              <VerifiedBadge
+                verified={user.emailVerified}
+                labels={{
+                  yes: t("settings.verified"),
+                  no: t("settings.unverified"),
+                }}
+              />
+            ) : (
+              <Button
+                type="button"
+                intent="invert"
+                size="sm"
+                className="btn-no-lift w-28 shrink-0"
+                disabled={sendingVerification}
+                aria-label={t("settings.profile.verifyEmail")}
+                onClick={() => dispatch(sendEmailVerification())}
+              >
+                <span className="flex w-full items-center justify-center text-xs">
+                  {sendingVerification ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    t("settings.profile.verifyEmail")
+                  )}
+                </span>
+              </Button>
+            )
           }
         >
           <TextInput

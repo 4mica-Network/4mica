@@ -1,11 +1,7 @@
 import { isHexColor, isSingleLine } from "@4mica/rules";
 import { Button, Spinner } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import {
-  confirmEmailVerification,
-  sendEmailVerification,
-  updateProfile,
-} from "@stores/user/actions";
+import { confirmEmailVerification, updateProfile } from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
@@ -20,7 +16,6 @@ import { hasErrors } from "@utils/validation";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { VerifiedBadge } from "@/components/badges";
 import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
 import { SettingsSection, SurfaceCard } from "@/components/layout";
@@ -253,44 +248,6 @@ export function ProfileSettings() {
             </div>
           </SurfaceCard>
         ) : null}
-
-        <SurfaceCard className="flex items-center justify-between gap-4">
-          <div>
-            <span className="font-medium text-ink-strong text-sm">
-              {t("settings.profile.accountStatus")}
-            </span>
-            <p className="mt-0.5 text-ink-muted text-xs">
-              {t("settings.profile.accountStatusHint")}
-            </p>
-          </div>
-          {user.emailVerified ? (
-            <VerifiedBadge
-              verified={user.emailVerified}
-              labels={{
-                yes: t("settings.verified"),
-                no: t("settings.unverified"),
-              }}
-            />
-          ) : (
-            <Button
-              type="button"
-              intent="invert"
-              size="sm"
-              className="btn-no-lift w-32 shrink-0"
-              disabled={sendingVerification}
-              aria-label={t("settings.profile.verifyEmail")}
-              onClick={() => dispatch(sendEmailVerification())}
-            >
-              <span className="flex w-full items-center justify-center text-sm">
-                {sendingVerification ? (
-                  <Spinner size="sm" />
-                ) : (
-                  t("settings.profile.verifyEmail")
-                )}
-              </span>
-            </Button>
-          )}
-        </SurfaceCard>
 
         <EditableCard
           isDirty={identity.isDirty}
