@@ -277,7 +277,7 @@ async fn spawn_facilitator(
 fn success_response() -> Value {
     json!({
         "success": true,
-        "txHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "transaction": "0x1111111111111111111111111111111111111111111111111111111111111111",
         "network": "eip155:1337",
     })
 }
@@ -302,9 +302,9 @@ fn echoing_request(mut response: Value, request: &Value) -> Value {
 fn rejection(code: &str) -> Value {
     json!({
         "success": false,
-        "error": "no",
-        "errorCode": code,
-        "retryable": false,
+        "errorMessage": "no",
+        "errorReason": code,
+        "extra": { "retryable": false },
     })
 }
 
@@ -888,7 +888,7 @@ async fn request_falls_back_to_self_funding_without_a_facilitator() -> anyhow::R
 #[tokio::test]
 async fn a_throttled_facilitator_falls_back_to_self_funding() -> anyhow::Result<()> {
     let (client, _signer, log, facilitator_log) =
-        client_with_facilitator(rejection("RATE_LIMITED")).await?;
+        client_with_facilitator(rejection("rate_limited")).await?;
 
     let _ = client
         .withdraw
@@ -909,7 +909,7 @@ async fn a_throttled_facilitator_falls_back_to_self_funding() -> anyhow::Result<
 #[tokio::test]
 async fn a_rejection_naming_the_request_is_returned_rather_than_retried() -> anyhow::Result<()> {
     let (client, _signer, log, _facilitator_log) =
-        client_with_facilitator(rejection("SIMULATION_REVERTED")).await?;
+        client_with_facilitator(rejection("simulation_reverted")).await?;
 
     let err = client
         .withdraw
@@ -932,7 +932,7 @@ async fn a_rejection_naming_the_request_is_returned_rather_than_retried() -> any
 #[tokio::test]
 async fn cancel_falls_back_the_same_way() -> anyhow::Result<()> {
     let (client, _signer, log, _facilitator_log) =
-        client_with_facilitator(rejection("RELAYER_BALANCE_TOO_LOW")).await?;
+        client_with_facilitator(rejection("relayer_underfunded")).await?;
 
     let _ = client.withdraw.cancel(Asset::Erc20(TOKEN)).send().await;
 
@@ -952,7 +952,7 @@ async fn a_facilitator_that_reports_success_without_a_tx_hash_is_not_believed() 
         .gasless()
         .send()
         .await
-        .expect_err("success without a txHash is not a success");
+        .expect_err("success without a transaction is not a success");
 
     assert!(matches!(
         err,

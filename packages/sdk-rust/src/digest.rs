@@ -188,7 +188,7 @@ pub fn eip712_digest_for_permit2_transfer(
 ///
 /// `domain_separator` is the token's own. `nonce` must be the owner's *current* nonce, which is
 /// what makes a permit single-use — a client without an Ethereum RPC gets it from the
-/// facilitator's `PERMIT2_ALLOWANCE_REQUIRED` response rather than reading the token.
+/// facilitator's `permit2_allowance_required` response rather than reading the token.
 pub fn eip712_digest_for_permit(
     domain_separator: B256,
     owner: Address,

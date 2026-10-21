@@ -283,7 +283,7 @@ impl From<SponsorshipError> for DepositError {
 }
 
 impl DepositError {
-    /// Maps a facilitator `errorCode` onto a typed variant where one exists.
+    /// Maps a facilitator reason onto a typed variant where one exists.
     ///
     /// Unrecognised codes fall through to [`Self::Facilitator`] carrying the raw code rather than
     /// being flattened into a string, so a client can still branch on a code this SDK predates.
@@ -293,16 +293,15 @@ impl DepositError {
         retryable: bool,
         eip2612_nonce: Option<U256>,
     ) -> Self {
-        let code = code.unwrap_or_else(|| "UNKNOWN".into());
+        let code = code.unwrap_or_else(|| "unknown".into());
         let message = message.unwrap_or_else(|| "facilitator gave no reason".into());
 
         match code.as_str() {
-            "PERMIT2_ALLOWANCE_REQUIRED" => Self::Permit2AllowanceRequired {
+            "permit2_allowance_required" => Self::Permit2AllowanceRequired {
                 message,
                 eip2612_nonce,
             },
-            "NO_RELAYER_CONFIGURED" | "NO_RELAYER" => Self::FacilitatorNotConfigured,
-            "UNSUPPORTED_ASSET" => Self::InvalidParams(message),
+            "sponsorship_unavailable" => Self::FacilitatorNotConfigured,
             _ => Self::Facilitator {
                 code,
                 message,
@@ -326,7 +325,7 @@ impl DepositError {
         matches!(
             self,
             DepositError::Facilitator { code, .. }
-                if code == "SIMULATION_REVERTED" || code == "UNSUPPORTED_TRANSFER_METHOD"
+                if code == "simulation_reverted" || code == "unsupported_transfer_method"
         ) || matches!(
             self,
             DepositError::Client(ClientError::MissingTokenDomainSeparator { .. })
