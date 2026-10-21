@@ -39,7 +39,7 @@ export default function DevelopersPage() {
               <i className="ri-arrow-right-line text-md" />
             </a>
             <a
-              href={links.social.githubCore}
+              href={links.social.githubRepo}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-1.5 rounded-md border border-overlay/15 bg-overlay/5 px-5 py-2.5 font-semibold text-ink-strong text-md transition-colors hover:bg-overlay/10"
