@@ -288,36 +288,53 @@ class SettlementReceipt:
     with ``success: false`` — read the body, not the status."""
 
     success: bool
-    tx_hash: Optional[str]
-    network_id: Optional[str]
+    transaction: Optional[str]
+    """The settlement transaction; ``None`` for an issued guarantee, which
+    broadcasts nothing."""
+    network: Optional[str]
+    payer: Optional[str]
     receipt: Optional[GuaranteeReceipt]
-    """The operator's guarantee receipt, when the facilitator relays one —
-    verify it with :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`.
-    Read from ``receipt`` or, as facilitators have named it, ``certificate``;
-    anything not shaped ``{receipt, signature}`` stays only in ``raw``."""
-    error: Optional[str]
+    """The operator's guarantee receipt, read from ``extra.receipt`` — verify
+    it with :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`.
+    Anything not shaped ``{receipt, signature}`` stays only in ``raw``."""
+    error_reason: Optional[str]
+    """A machine-readable reason, such as
+    ``invalid_4mica_credit_checkpoint_required``."""
+    error_message: Optional[str]
+    retryable: bool
+    """Whether repeating the identical settlement later may succeed. Absent
+    means not retryable."""
+    details: Optional[Dict[str, Any]]
+    """What the payer needs to act on ``error_reason``, such as core's
+    checkpoint details."""
     raw: Dict[str, Any]
 
     @classmethod
     def from_raw(cls, raw: Any) -> "SettlementReceipt":
         if not isinstance(raw, dict):
             raw = {}
+        extra = raw.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
         receipt = None
-        for key in ("receipt", "certificate"):
-            candidate = raw.get(key)
-            if (
-                isinstance(candidate, dict)
-                and candidate.get("receipt") is not None
-                and candidate.get("signature") is not None
-            ):
-                receipt = GuaranteeReceipt.from_rpc(candidate)
-                break
+        candidate = extra.get("receipt")
+        if (
+            isinstance(candidate, dict)
+            and candidate.get("receipt") is not None
+            and candidate.get("signature") is not None
+        ):
+            receipt = GuaranteeReceipt.from_rpc(candidate)
+        details = extra.get("details")
         return cls(
             success=bool(raw.get("success")),
-            tx_hash=_pick(raw, "txHash", "tx_hash"),
-            network_id=_pick(raw, "networkId", "network_id", "network"),
+            transaction=raw.get("transaction") or None,
+            network=raw.get("network"),
+            payer=raw.get("payer"),
             receipt=receipt,
-            error=_pick(raw, "error", "errorReason", "invalidReason"),
+            error_reason=raw.get("errorReason"),
+            error_message=raw.get("errorMessage"),
+            retryable=bool(extra.get("retryable")),
+            details=details if isinstance(details, dict) else None,
             raw=raw,
         )
 

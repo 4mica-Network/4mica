@@ -65,6 +65,14 @@ repository into the `4mica` monorepo (`packages/sdk-python`); the PyPI name
 - **x402**: scheme is exactly `4mica-credit`; `req_id` is a random 32-byte
   value; `/settle` sends `{x402Version, paymentPayload (object),
   paymentRequirements}` — the `paymentHeader` field is gone.
+- **Facilitator responses follow x402** (needs a facilitator with #113).
+  `FacilitatorRejectedError.code` is the facilitator's snake_case reason
+  (`invalid_signature`, `rate_limited`, `permit2_allowance_required`, …)
+  instead of a SCREAMING_CASE code, and `retryable` and the EIP-2612 nonce are
+  read from `extra`. `SettlementReceipt` reads the guarantee receipt from
+  `extra.receipt`, renames `tx_hash` to `transaction` and `network_id` to
+  `network`, splits `error` into `error_reason` and `error_message`, and adds
+  `payer`, `retryable` and `details`.
 - Admin API-key management methods were removed (the routes no longer exist).
 - The public-RPC fallback (`resolve_public_rpc_url`) was removed; the Ethereum
   endpoint comes from config or from core's public parameters.

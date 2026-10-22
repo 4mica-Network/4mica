@@ -52,14 +52,18 @@ def settlement(handler, gateway=None, **rpc_responses) -> SettlementClient:
 
 
 def success(extra=None):
-    body = {"success": True, "txHash": TX_HASH}
+    body = {"success": True, "transaction": TX_HASH}
     body.update(extra or {})
     return httpx.Response(200, json=body)
 
 
-def rejection(code, extra=None):
-    body = {"success": False, "errorCode": code, "error": code.lower()}
-    body.update(extra or {})
+def rejection(code, extra=None, retryable=False):
+    body = {
+        "success": False,
+        "errorReason": code,
+        "errorMessage": code.replace("_", " "),
+        "extra": {"retryable": retryable, **(extra or {})},
+    }
     return httpx.Response(200, json=body)
 
 
@@ -91,8 +95,8 @@ async def test_sponsored_permit2_pay_pins_uint256_cycle_nonce():
         bodies.append(body)
         if "eip2612Permit" not in body:
             return rejection(
-                "PERMIT2_ALLOWANCE_REQUIRED",
-                {"permit2Allowance": {"eip2612Nonce": "3"}},
+                "permit2_allowance_required",
+                {"details": {"eip2612Nonce": "3"}},
             )
         return success()
 
@@ -114,8 +118,8 @@ async def test_auto_pay_falls_back_to_self_funded_when_unsponsorable():
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         if body["assetTransferMethod"] == "eip3009":
-            return rejection("SIMULATION_REVERTED")
-        return rejection("PERMIT2_ALLOWANCE_REQUIRED")
+            return rejection("simulation_reverted")
+        return rejection("permit2_allowance_required")
 
     client = settlement(handler, gateway=gateway, pay_action=action())
     receipt = await client.pay(CYCLE_ID).send()
@@ -131,7 +135,7 @@ async def test_auto_pay_does_not_retry_an_insufficient_balance():
     gateway = FakeGateway(allowance=5000)
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return rejection("INSUFFICIENT_BALANCE")
+        return rejection("insufficient_funds")
 
     client = settlement(handler, gateway=gateway, pay_action=action())
     with pytest.raises(FacilitatorRejectedError):
@@ -184,7 +188,7 @@ async def test_claim_for_another_creditor_travels_in_the_request():
 async def test_claim_falls_back_when_the_facilitator_declines():
     gateway = FakeGateway()
     client = settlement(
-        lambda request: rejection("RATE_LIMITED"),
+        lambda request: rejection("rate_limited"),
         gateway=gateway,
         claim_action=action(
             function_name="claimNetCreditFor", action="claim_net_credit"
@@ -200,7 +204,7 @@ async def test_claim_falls_back_when_the_facilitator_declines():
 async def test_claim_does_not_fall_back_on_an_unfunded_cycle():
     gateway = FakeGateway()
     client = settlement(
-        lambda request: rejection("ACTION_UNAVAILABLE"), gateway=gateway
+        lambda request: rejection("clearing_action_unavailable"), gateway=gateway
     )
 
     with pytest.raises(FacilitatorRejectedError):

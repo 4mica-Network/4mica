@@ -192,9 +192,10 @@ async def test_settle_sends_payload_object_not_header():
             200,
             json={
                 "success": True,
-                "txHash": None,
-                "networkId": "eip155:84532",
-                "certificate": {"receipt": "0x00", "signature": "0x11"},
+                "payer": "0x00000000000000000000000000000000000000aa",
+                "transaction": "",
+                "network": "eip155:84532",
+                "extra": {"receipt": {"receipt": "0x00", "signature": "0x11"}},
             },
         )
 
@@ -215,23 +216,52 @@ async def test_settle_sends_payload_object_not_header():
     assert seen["body"]["paymentRequirements"] == requirements.to_payload()
     assert settled.settlement.success
     assert settled.settlement.receipt.signature == "0x11"
+    assert settled.settlement.transaction is None
+    assert settled.settlement.network == "eip155:84532"
 
 
 @pytest.mark.parametrize(
     "body",
     [
         {"success": True},
-        {"success": True, "certificate": {"claims": "0x00", "signature": "0x11"}},
+        {"success": True, "receipt": {"receipt": "0x00", "signature": "0x11"}},
+        {
+            "success": True,
+            "extra": {"receipt": {"claims": "0x00", "signature": "0x11"}},
+        },
     ],
 )
 def test_a_settlement_without_a_receipt_keeps_it_raw(body):
-    """A facilitator that relays no receipt, or one still shaped like a BLS
-    certificate, leaves ``receipt`` empty rather than misreading it."""
+    """A facilitator that relays no receipt under ``extra``, or one still
+    shaped like a BLS certificate, leaves ``receipt`` empty rather than
+    misreading it."""
     from fourmica_sdk.x402.model import SettlementReceipt
 
     settlement = SettlementReceipt.from_raw(body)
     assert settlement.receipt is None
     assert settlement.raw == body
+
+
+def test_a_refused_settlement_carries_reason_and_details():
+    from fourmica_sdk.x402.model import SettlementReceipt
+
+    details = {"uncheckpointed": 64, "max_uncheckpointed": 64}
+    settlement = SettlementReceipt.from_raw(
+        {
+            "success": False,
+            "errorReason": "invalid_4mica_credit_checkpoint_required",
+            "errorMessage": "checkpoint required",
+            "transaction": "",
+            "network": "eip155:84532",
+            "extra": {"retryable": False, "details": details},
+        }
+    )
+    assert not settlement.success
+    assert settlement.error_reason == "invalid_4mica_credit_checkpoint_required"
+    assert settlement.error_message == "checkpoint required"
+    assert settlement.retryable is False
+    assert settlement.details == details
+    assert settlement.transaction is None
 
 
 async def test_settle_rejects_version_mismatch():
