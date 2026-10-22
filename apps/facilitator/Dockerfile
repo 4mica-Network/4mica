@@ -5,20 +5,26 @@ FROM rust:1-bookworm AS builder
 
 WORKDIR /build
 
+# The facilitator is a member of the repository's Cargo workspace, so the
+# build context is the repository root:
+#   docker build -f apps/facilitator/Dockerfile .
+
 # Compile dependencies against a stub main.rs first. This layer is only
-# invalidated when Cargo.toml or Cargo.lock change, so ordinary source edits
-# reuse the cached dependency build.
+# invalidated when a manifest, the lockfile or the SDK changes, so ordinary
+# source edits reuse the cached dependency build.
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src \
-    && echo 'fn main() {}' > src/main.rs \
-    && cargo build --release --locked \
-    && rm -rf src
+COPY packages/sdk-rust ./packages/sdk-rust
+COPY apps/facilitator/Cargo.toml ./apps/facilitator/
+RUN mkdir apps/facilitator/src \
+    && echo 'fn main() {}' > apps/facilitator/src/main.rs \
+    && cargo build --release --locked -p facilitator-4mica \
+    && rm -rf apps/facilitator/src
 
 # Real sources. cargo compares mtimes, so the stub must be replaced by
 # something strictly newer or the binary is not rebuilt.
-COPY src ./src
-RUN touch src/main.rs \
-    && cargo build --release --locked
+COPY apps/facilitator/src ./apps/facilitator/src
+RUN touch apps/facilitator/src/main.rs \
+    && cargo build --release --locked -p facilitator-4mica
 
 # ---------- runtime ----------
 FROM debian:bookworm-slim AS runtime

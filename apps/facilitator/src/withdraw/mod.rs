@@ -326,6 +326,7 @@ pub async fn submit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::{ErrorCode, Refusal};
     use alloy::primitives::{address, b256};
 
     fn request(nonce: B256) -> WithdrawIntent {
@@ -361,14 +362,14 @@ mod tests {
     #[test]
     fn the_window_rejects_an_expired_authorization() {
         let err = check_window(U256::ZERO, U256::from(100u64), 100).expect_err("expired");
-        assert_eq!(err.code(), "EXPIRED");
+        assert_eq!(err.code(), ErrorCode::AuthorizationExpired);
     }
 
     #[test]
     fn the_window_rejects_an_authorization_that_is_not_yet_valid() {
         let err =
             check_window(U256::from(200u64), U256::from(300u64), 100).expect_err("not yet valid");
-        assert_eq!(err.code(), "NOT_YET_VALID");
+        assert_eq!(err.code(), ErrorCode::AuthorizationNotYetValid);
     }
 
     #[test]

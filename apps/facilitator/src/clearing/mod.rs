@@ -596,6 +596,7 @@ pub fn parse_cycle_id(value: &str) -> Result<&str, ClaimError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::{ErrorCode, Refusal};
     use alloy::primitives::{U256, address};
     use alloy::transports::RpcError;
 
@@ -605,7 +606,7 @@ mod tests {
         let err = classify_call_error(alloy::contract::Error::TransportError(RpcError::ErrorResp(
             serde_json::from_value(payload).expect("error payload"),
         )));
-        assert_eq!(err.code(), "SIMULATION_REVERTED");
+        assert_eq!(err.code(), ErrorCode::SimulationReverted);
     }
 
     fn terms(cycle_id: B256) -> ClaimTerms {
@@ -637,7 +638,7 @@ mod tests {
     #[test]
     fn a_malformed_creditor_is_rejected() {
         let err = parse_creditor("not-an-address").expect_err("invalid address");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     #[test]
@@ -656,7 +657,7 @@ mod tests {
     fn a_cycle_id_that_could_escape_its_path_segment_is_rejected() {
         for hostile in ["", "a/b", "..", "eth:1?admin", "eth:1#x", "eth 1"] {
             let err = parse_cycle_id(hostile).expect_err(hostile);
-            assert_eq!(err.code(), "INVALID_REQUEST", "{hostile}");
+            assert_eq!(err.code(), ErrorCode::InvalidPayload, "{hostile}");
         }
     }
 
@@ -742,7 +743,7 @@ mod tests {
             Some(eip2612_permit()),
         )
         .expect_err("expected rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     /// The payload shape and the discriminator must agree, or the caller is confused about what it
@@ -756,14 +757,14 @@ mod tests {
             None,
         )
         .expect_err("expected mismatch rejection");
-        assert_eq!(err.code(), "INVALID_REQUEST");
+        assert_eq!(err.code(), ErrorCode::InvalidPayload);
     }
 
     #[test]
     fn parse_requires_exactly_one_authorization() {
         let none = PayAuthorization::parse(None, None, None, None)
             .expect_err("expected missing rejection");
-        assert_eq!(none.code(), "INVALID_REQUEST");
+        assert_eq!(none.code(), ErrorCode::InvalidPayload);
 
         let both = PayAuthorization::parse(
             None,
@@ -772,7 +773,7 @@ mod tests {
             None,
         )
         .expect_err("expected both-authorizations rejection");
-        assert_eq!(both.code(), "INVALID_REQUEST");
+        assert_eq!(both.code(), ErrorCode::InvalidPayload);
     }
 
     #[test]
@@ -784,7 +785,7 @@ mod tests {
             None,
         )
         .expect_err("expected unknown-method rejection");
-        assert_eq!(err.code(), "UNSUPPORTED_TRANSFER_METHOD");
+        assert_eq!(err.code(), ErrorCode::UnsupportedTransferMethod);
     }
 
     /// The debtor is always the signer, whichever scheme travels.

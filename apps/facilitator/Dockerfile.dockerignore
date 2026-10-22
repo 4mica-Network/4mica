@@ -1,0 +1,8 @@
+# The build context is the repository root, so only what the image build reads is let in.
+*
+!Cargo.toml
+!Cargo.lock
+!packages/sdk-rust
+!apps/facilitator/Cargo.toml
+!apps/facilitator/src
+**/target

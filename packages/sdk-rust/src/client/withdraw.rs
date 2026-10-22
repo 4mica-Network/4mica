@@ -569,7 +569,7 @@ async fn verify<S>(ctx: &ClientCtx<S>, request: WithdrawRequest) -> Result<(), S
     }
     Err(response
         .failure
-        .into_sponsorship_error(response.invalid_reason))
+        .into_sponsorship_error(response.invalid_reason, response.invalid_message))
 }
 
 /// Whether an error means "nobody sponsored this", as opposed to "this request is bad" or "we do
@@ -595,13 +595,12 @@ fn sponsorship_unavailable(err: &WithdrawError) -> bool {
 fn names_the_request(code: &str) -> bool {
     matches!(
         code,
-        "INVALID_REQUEST"
-            | "MALFORMED_SIGNATURE"
-            | "SIGNATURE_MISMATCH"
-            | "EXPIRED"
-            | "NOT_YET_VALID"
-            | "NONCE_ALREADY_USED"
-            | "SIMULATION_REVERTED"
+        "invalid_payload"
+            | "invalid_signature"
+            | "authorization_expired"
+            | "authorization_not_yet_valid"
+            | "nonce_already_used"
+            | "simulation_reverted"
     )
 }
 
@@ -627,11 +626,12 @@ enum WithdrawRequest {
 #[serde(rename_all = "camelCase")]
 struct WithdrawResponse {
     success: bool,
-    tx_hash: Option<String>,
+    transaction: Option<String>,
     network: Option<String>,
     user: Option<String>,
     asset: Option<String>,
-    error: Option<String>,
+    error_reason: Option<String>,
+    error_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -646,16 +646,18 @@ impl WithdrawResponse {
         asset: Address,
     ) -> Result<WithdrawReceipt, SponsorshipError> {
         if !self.success {
-            return Err(self.failure.into_sponsorship_error(self.error));
+            return Err(self
+                .failure
+                .into_sponsorship_error(self.error_reason, self.error_message));
         }
 
         let tx_hash = self
-            .tx_hash
+            .transaction
             .as_deref()
             .and_then(|raw| raw.parse::<B256>().ok())
             .ok_or_else(|| {
                 SponsorshipError::OutcomeUnknown(
-                    "facilitator reported success without a txHash".into(),
+                    "facilitator reported success without a transaction".into(),
                 )
             })?;
 
@@ -684,6 +686,7 @@ impl WithdrawResponse {
 struct WithdrawVerifyResponse {
     is_valid: bool,
     invalid_reason: Option<String>,
+    invalid_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -709,26 +712,24 @@ mod tests {
 
     #[test]
     fn throttling_falls_back_to_self_funding() {
-        assert!(sponsorship_unavailable(&rejected("RATE_LIMITED")));
-        assert!(sponsorship_unavailable(&rejected(
-            "RELAYER_BALANCE_TOO_LOW"
-        )));
+        assert!(sponsorship_unavailable(&rejected("rate_limited")));
+        assert!(sponsorship_unavailable(&rejected("relayer_underfunded")));
     }
 
     /// The user's own transaction would revert for the same reason, so falling back would cost them
     /// gas to learn what the facilitator already told them for free.
     #[test]
     fn a_rejection_naming_the_request_does_not_fall_back() {
-        assert!(!sponsorship_unavailable(&rejected("SIMULATION_REVERTED")));
-        assert!(!sponsorship_unavailable(&rejected("SIGNATURE_MISMATCH")));
-        assert!(!sponsorship_unavailable(&rejected("EXPIRED")));
+        assert!(!sponsorship_unavailable(&rejected("simulation_reverted")));
+        assert!(!sponsorship_unavailable(&rejected("invalid_signature")));
+        assert!(!sponsorship_unavailable(&rejected("authorization_expired")));
     }
 
     /// A code this SDK predates is treated as "the facilitator would not pay", which costs the user
     /// one transaction at worst and keeps a new facilitator rejection from stranding them.
     #[test]
     fn an_unknown_code_falls_back_to_self_funding() {
-        assert!(sponsorship_unavailable(&rejected("SOMETHING_NEW")));
+        assert!(sponsorship_unavailable(&rejected("something_new")));
     }
 
     /// Every step has something to lose from a second transaction it did not need: a request would

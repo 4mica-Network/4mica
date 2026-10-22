@@ -310,7 +310,7 @@ async fn spawn_facilitator(
     .await
 }
 
-/// Rejects the first `/deposit` with `PERMIT2_ALLOWANCE_REQUIRED`, then accepts the retry. Mirrors
+/// Rejects the first `/deposit` with `permit2_allowance_required`, then accepts the retry. Mirrors
 /// a real facilitator seeing the allowance appear once the sponsored permit lands.
 async fn spawn_allowance_then_success_facilitator(
     eip2612_nonce: Option<&str>,
@@ -336,10 +336,12 @@ async fn spawn_allowance_then_success_facilitator(
                     }
                     json!({
                         "success": false,
-                        "error": "approve permit2 first",
-                        "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
-                        "retryable": false,
-                        "permit2Allowance": allowance,
+                        "errorMessage": "approve permit2 first",
+                        "errorReason": "permit2_allowance_required",
+                        "extra": {
+                            "retryable": false,
+                            "details": allowance,
+                        },
                     })
                 } else {
                     echoing_payer(success_response(), &body)
@@ -356,7 +358,7 @@ async fn spawn_allowance_then_success_facilitator(
 fn success_response() -> Value {
     json!({
         "success": true,
-        "txHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+        "transaction": "0x1111111111111111111111111111111111111111111111111111111111111111",
         "network": "eip155:1337",
         "asset": TOKEN.to_string(),
         "amount": "1000000",
@@ -1096,9 +1098,9 @@ async fn facilitator_permit2_deposit_sends_the_permit2_shape() -> anyhow::Result
 async fn facilitator_maps_a_known_error_code_to_a_typed_variant() -> anyhow::Result<()> {
     let (client, _signer, _chain, _log) = test_client_with_facilitator(json!({
         "success": false,
-        "error": "0xabc has approved 0 but 1000 is required",
-        "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
-        "retryable": false,
+        "errorMessage": "0xabc has approved 0 but 1000 is required",
+        "errorReason": "permit2_allowance_required",
+        "extra": { "retryable": false },
     }))
     .await?;
 
@@ -1123,9 +1125,9 @@ async fn facilitator_maps_a_known_error_code_to_a_typed_variant() -> anyhow::Res
 async fn facilitator_passes_through_an_unknown_error_code() -> anyhow::Result<()> {
     let (client, _signer, _chain, _log) = test_client_with_facilitator(json!({
         "success": false,
-        "error": "the relayer is on fire",
-        "errorCode": "SOMETHING_ADDED_LATER",
-        "retryable": true,
+        "errorMessage": "the relayer is on fire",
+        "errorReason": "something_added_later",
+        "extra": { "retryable": true },
     }))
     .await?;
 
@@ -1143,7 +1145,7 @@ async fn facilitator_passes_through_an_unknown_error_code() -> anyhow::Result<()
             message,
             retryable,
         } => {
-            assert_eq!(code, "SOMETHING_ADDED_LATER");
+            assert_eq!(code, "something_added_later");
             assert!(message.contains("on fire"));
             assert!(retryable, "retryability must survive an unrecognised code");
         }
@@ -1164,7 +1166,7 @@ async fn facilitator_success_without_a_tx_hash_is_an_error() -> anyhow::Result<(
         .eip3009()
         .send()
         .await
-        .expect_err("expected a missing txHash to be rejected");
+        .expect_err("expected a missing transaction to be rejected");
     assert!(
         matches!(err, DepositError::OutcomeUnknown(_)),
         "got {err:?}"
@@ -1455,20 +1457,22 @@ async fn spawn_no_gasless_route_facilitator(
                 let response = if body["assetTransferMethod"] == "eip3009" {
                     json!({
                         "success": false,
-                        "error": "deposit would revert",
-                        "errorCode": "SIMULATION_REVERTED",
-                        "retryable": false,
+                        "errorMessage": "deposit would revert",
+                        "errorReason": "simulation_reverted",
+                        "extra": { "retryable": false },
                     })
                 } else {
                     json!({
                         "success": false,
-                        "error": "approve permit2 first",
-                        "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
-                        "retryable": false,
-                        "permit2Allowance": {
-                            "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
-                            "allowance": "0",
-                            "required": "1000000",
+                        "errorMessage": "approve permit2 first",
+                        "errorReason": "permit2_allowance_required",
+                        "extra": {
+                            "retryable": false,
+                            "details": {
+                                "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+                                "allowance": "0",
+                                "required": "1000000",
+                            },
                         },
                     })
                 };

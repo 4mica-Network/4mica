@@ -160,4 +160,5 @@ packages/db/src/generated/
 .taste-skill
 
 # Rust
-/target
+target/
+**/*.rs.bk

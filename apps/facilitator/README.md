@@ -10,8 +10,8 @@
 </p>
 
 A facilitator for the x402 protocol that runs the 4mica credit flow. Resource servers call it to
-validate payment payloads against their `paymentRequirements` and settle by returning the BLS
-certificate to the recipient.
+validate payment payloads against their `paymentRequirements` and settle by returning the
+operator's signed guarantee receipt to the recipient.
 
 
 **Contents**
@@ -25,8 +25,8 @@ certificate to the recipient.
 ### Quick integration (resource servers)
 
 - Configure the 4mica facilitator (for example `https://x402.4mica.xyz/`). Your `402 Payment Required` responses should advertise `scheme = "4mica-credit"`, a supported `network`, and set `payTo` / `asset` (an address from core's `GET /core/tokens` for that network) / `amount` (`maxAmountRequired` under x402 v1). To gate the payment on a validation outcome, also advertise `paymentRequirements.extra.validation = { validator, subject, deadline?, params? }`.
-- Clients sign a payment guarantee claim straight from your `paymentRequirements` — no round-trip to you or the facilitator first — producing the x402 `paymentPayload` that they send on the retried request for the protected resource. You never construct this payload yourself; you only need to validate and consume it.
-- When a request arrives with a payment payload, send it together with the original `paymentRequirements` to the facilitator's `/verify` and `/settle` endpoints. Use `/verify` as an optional preflight check before doing work, and `/settle` once you are ready to accept credit: it issues the BLS guarantee certificate via 4mica core, which binds it to the open settlement cycle for that asset. That is the whole integration — there are no endpoints for you to implement.
+- Clients sign a payment straight from your `paymentRequirements` — no round-trip to you or the facilitator first — producing the x402 `paymentPayload` that they send on the retried request for the protected resource. You never construct this payload yourself; you only need to validate and consume it.
+- When a request arrives with a payment payload, send it together with the original `paymentRequirements` to the facilitator's `/verify` and `/settle` endpoints. Use `/verify` as an optional preflight check before doing work, and `/settle` once you are ready to accept credit: 4mica core issues the guarantee in the open settlement cycle for that asset, and the facilitator returns the operator's signed receipt. When core refuses, pass the `/settle` response back to the payer: its `errorReason` and `extra.details` say what to do. That is the whole integration — there are no endpoints for you to implement.
 
 ### Quick integration (clients)
 
@@ -127,9 +127,9 @@ examples/python_client/requirements.txt`). A TypeScript version lives in `exampl
 
 `paymentPayload` is a JSON envelope, sent base64-encoded in the `PAYMENT-SIGNATURE` header. The
 requirements entry the payer accepted travels under `accepted`, an optional `resource` block may
-accompany it, and the claims inside are `"version": "v1"` — the x402 protocol version is decoupled
-from the guarantee claims version. Validation gating travels as `extra.validation` on the
-requirements and as the nested `validation` object inside the signed claims. The facilitator
+accompany it, and the signed payment inside is `"version": "v1"` — the x402 protocol version is
+decoupled from the payment payload version. Validation gating travels as `extra.validation` on the
+requirements and as the nested `validation` object inside the signed payment. The facilitator
 derives the expected chain id from the CAIP-2 payment network.
 
 ```json
@@ -150,36 +150,38 @@ derives the expected chain id from the CAIP-2 payment network.
     }
   },
   "payload": {
-    "claims": {
+    "payload": {
       "version": "v1",
       "user_address": "<0x-prefixed checksum string>",
       "recipient_address": "<0x-prefixed checksum string>",
+      "cycle_id": "<0x-prefixed 32-byte settlement cycle id>",
       "req_id": "<0x-prefixed 32-byte value>",
       "amount": "<0x-prefixed u256 value>",
       "asset_address": "<0x-prefixed checksum string>",
       "timestamp": 1716500000,
+      "salt": "<0x-prefixed 32-byte value>",
       "validation": {
         "validator": "<0x-prefixed checksum string>",
         "subject": "<subject identifier>",
         "deadline": 1716503600
       }
     },
-    "signature": "<0x-prefixed wallet signature>",
-    "scheme": "eip712"
+    "signature": "<0x-prefixed EIP-712 wallet signature>"
   },
   "resource": { "url": "/your/resource" }
 }
 ```
 
-`req_id` is a random 32-byte value the client mints locally — uniqueness is all core asks, so no
-server round-trip is needed before signing. When the requirements carry `extra.validation`, the
-claims additionally embed the same requirement as a nested `validation` object
+`cycle_id` is the asset's active settlement cycle, which the SDK reads from core. `req_id` and
+`salt` are random 32-byte values the client mints locally — uniqueness is all core asks of
+`req_id`. When the requirements carry `extra.validation`, the signed payment additionally embeds the
+same requirement as a nested `validation` object
 (`{ "validator", "subject", "deadline"?, "params"? }`), and the facilitator cross-checks both
 sides.
 
 ### Payment payload schema (v1, legacy)
 
-x402 v1 changes only the envelope, not the claims: it is flat, names `scheme` and `network`
+x402 v1 changes only the envelope, not the signed payment: it is flat, names `scheme` and `network`
 directly, and is sent base64-encoded in the `X-PAYMENT` header:
 
 ```json
@@ -188,17 +190,18 @@ directly, and is sent base64-encoded in the `X-PAYMENT` header:
   "scheme": "4mica-credit",
   "network": "eip155:84532",
   "payload": {
-    "claims": {
+    "payload": {
       "version": "v1",
       "user_address": "<0x-prefixed checksum string>",
       "recipient_address": "<0x-prefixed checksum string>",
+      "cycle_id": "<0x-prefixed 32-byte settlement cycle id>",
       "req_id": "<0x-prefixed 32-byte value>",
       "amount": "<0x-prefixed u256 value>",
       "asset_address": "<0x-prefixed checksum string>",
-      "timestamp": 1716500000
+      "timestamp": 1716500000,
+      "salt": "<0x-prefixed 32-byte value>"
     },
-    "signature": "<0x-prefixed wallet signature>",
-    "scheme": "eip712"
+    "signature": "<0x-prefixed EIP-712 wallet signature>"
   }
 }
 ```
@@ -206,16 +209,15 @@ directly, and is sent base64-encoded in the `X-PAYMENT` header:
 The facilitator enforces that:
 
 - `scheme` / `network` match both `/supported` and the resource server's requirements.
-- `payTo` equals the `recipient_address` present inside the claim.
-- `asset` must match the signed `amount` claim's asset exactly.
+- `payTo` equals the signed `recipient_address`.
+- `asset` equals the signed `asset_address`.
 - For V1, `maxAmountRequired` must match the signed `amount` exactly.
 - For V2, `amount` must match the signed `amount` exactly.
-- When `paymentRequirements.extra.validation` is present, the signed claims must carry the same
+- When `paymentRequirements.extra.validation` is present, the signed payment must carry the same
   `validation` requirement (`validator`, `subject`, optional `deadline` and `params`) — the
   facilitator cross-checks both sides.
-- By default, the facilitator verifies certificates against the active guarantee domain advertised
-  by core. If `X402_GUARANTEE_DOMAIN` is set (legacy `FOUR_MICA_GUARANTEE_DOMAIN` /
-  `4MICA_GUARANTEE_DOMAIN` are also honored), that value overrides the core-provided domain.
+- On `/settle`, the receipt core returns must be signed by core's `guarantee_signer` under the
+  GuaranteeRegistry's EIP-712 domain, and must describe exactly the payment the payer signed.
 
 ### HTTP API
 
@@ -240,22 +242,85 @@ The facilitator enforces that:
   cached for 15s, so polling this endpoint does not amplify into RPC load.
 - `POST /verify`
   - Request: `{ "x402Version": 1|2, "paymentPayload": { ... }, "paymentRequirements": { ... } }`.
-  - Response: `{ "isValid": true|false, "invalidReason"?, "certificate": null }`.
+  - Response: `{ "isValid": true, "payer" }` or `{ "isValid": false, "invalidReason",
+    "invalidMessage", "extra": { "retryable" } }`. See [Errors](#errors).
 - `POST /settle`
   - Request: same shape as `/verify`.
-  - Response: for 4mica, `{ "success": true, "networkId": "<network>", "certificate": { "claims", "signature" } }`.
-    When delegating to the `exact` facilitator the structure mirrors upstream x402 responses and may
-    include `txHash`.
+  - Response: for 4mica, `{ "success": true, "payer", "transaction": "", "network",
+    "extra": { "receipt": { "receipt", "signature" } } }`. There is no transaction: the guarantee
+    is the settlement. On failure, `{ "success": false, "errorReason", "errorMessage",
+    "transaction": "", "network", "extra": { "retryable", "details"? } }`. Hand a refused
+    guarantee back to the payer: `invalid_4mica_credit_checkpoint_required`, for example, means
+    the payer must submit a checkpoint to core before more payments are accepted, and
+    `invalid_4mica_credit_cycle_mismatch` means it must re-sign for the active cycle. When
+    delegating to the `exact` facilitator the response is upstream x402's.
     If `X402_DEBIT_URL` is set, debit requests are proxied to the configured x402-rs
     facilitator, allowing clients to follow the x402 debit flow unchanged.
 - `POST /deposit` and `POST /deposit/verify` – gasless deposits; see below. Available only when a
-  relayer is configured, otherwise every request returns `errorCode: "NO_RELAYER"`.
+  relayer is configured, otherwise every request is refused with `sponsorship_unavailable`.
 - `POST /withdraw` and `POST /withdraw/verify` – gasless withdrawals; see below. Same availability
   rule as `/deposit`.
 - `POST /clearing/claim` and `POST /clearing/claim/verify` – sponsored net-credit claims; see
   below. Same availability rule as `/deposit`.
 - `POST /clearing/pay` and `POST /clearing/pay/verify` – sponsored net-debit payments; see below.
   Same availability rule as `/deposit`.
+
+### Errors
+
+Every endpoint reports a failure the way x402 does: a machine-readable reason, a human message,
+and 4mica's additions under `extra`.
+
+```jsonc
+// verify endpoints
+{ "isValid": false, "invalidReason": "…", "invalidMessage": "…", "extra": { "retryable": false } }
+// /settle and the sponsored actions
+{ "success": false, "errorReason": "…", "errorMessage": "…", "extra": { "retryable": false, "details": { … } } }
+```
+
+Branch on the reason, not on the message. `extra.retryable` is true only when repeating the identical
+request later may succeed (throttling, an unreachable chain or core). `extra.details` appears when
+the message alone is not enough to act on. A failure after broadcasting carries its `transaction`.
+
+Reasons x402 defines:
+
+| Reason | Meaning |
+| --- | --- |
+| `invalid_payload` | The payment or request is malformed, or core refused it without a more specific reason |
+| `invalid_payment_requirements` | The resource server's requirements are malformed |
+| `invalid_x402_version` / `unsupported_scheme` / `invalid_network` | Not something this facilitator serves |
+| `insufficient_funds` | The payer lacks the collateral or tokens for this payment |
+| `settlement_pending` | Broadcast, but the outcome is unknown: check `transaction` on-chain, do **not** retry |
+| `invalid_transaction_state` | Mined and reverted, so gas was spent |
+| `unexpected_verify_error` / `unexpected_settle_error` | Something failed on our side |
+
+Reasons for the `4mica-credit` scheme, prefixed `invalid_4mica_credit_` as x402 schemes do:
+
+| Reason | Meaning |
+| --- | --- |
+| `…_recipient_mismatch` / `…_asset_mismatch` / `…_amount_mismatch` | The payment differs from the requirements |
+| `…_validation_mismatch` | The signed validation requirement differs from the advertised one |
+| `…_validator_not_allowed` | The validator is not one core accepts |
+| `…_checkpoint_required` | The payer must submit a checkpoint to core first |
+| `…_cycle_mismatch` | The payment names a cycle that is no longer active; re-sign for the active one |
+| `…_timestamp_not_past_cutoff` / `…_future_timestamp` / `…_stale_timestamp` | Re-sign with a fresh timestamp |
+| `…_payer_not_registered` / `…_payer_suspended` | Core does not accept payments from this payer |
+| `…_duplicate_request` | The request id was already used for a different payment |
+
+Reasons for the sponsored endpoints:
+
+| Reason | Meaning |
+| --- | --- |
+| `sponsorship_unavailable` | No relayer for this facilitator or the requested network |
+| `unsupported_transfer_method` | `assetTransferMethod` is neither `eip3009` nor `permit2` |
+| `permit2_allowance_required` | Payer must approve Permit2 first; see [Gasless deposits](#gasless-deposits) |
+| `authorization_expired` / `authorization_not_yet_valid` | Outside the authorization's validity window |
+| `invalid_signature` | The signature is malformed or does not recover to the declared signer |
+| `nonce_already_used` | Authorization already redeemed |
+| `simulation_reverted` | The transaction would revert; the message carries the decoded contract error |
+| `gas_ceiling_exceeded` | Estimated gas above the sponsored ceiling |
+| `clearing_action_unavailable` / `clearing_action_mismatch` | Core could not supply the cycle's terms |
+| `chain_unavailable` / `broadcast_failed` | The chain could not be reached; nothing was submitted |
+| `rate_limited` / `duplicate_in_flight` / `relayer_underfunded` | Throttled; retry later |
 
 ### Sponsored net-credit claims
 
@@ -271,10 +336,9 @@ facilitator's relayer submit `claimNetCreditFor` for them:
 }
 ```
 
-`/clearing/claim` answers with `{ "success": true, "txHash", "network", "creditor", "cycleId",
-"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/claim/verify`
-answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
-error codes reuse `/withdraw`'s strings wherever the meaning is the same.
+`/clearing/claim` answers with `{ "success": true, "transaction", "network", "creditor", "cycleId",
+"amount" }`; `/clearing/claim/verify` answers with `{ "isValid": true }` and spends no gas. Both
+report failures as described in [Errors](#errors).
 
 The request carries no signature and needs none: the ClearingHouse pays the address the cycle's
 committed Merkle leaf names, for the amount that leaf fixes, so a submitter can neither redirect
@@ -324,12 +388,10 @@ The scheme travels under the same `assetTransferMethod` tag as `/deposit`, and e
 }
 ```
 
-`/clearing/pay` answers with `{ "success": true, "txHash", "network", "debtor", "cycleId",
-"amount" }` or `{ "success": false, "error", "errorCode", "retryable" }`; `/clearing/pay/verify`
-answers with `{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The
-error codes reuse `/deposit`'s and `/clearing/claim`'s strings wherever the meaning is the same —
-including `PERMIT2_ALLOWANCE_REQUIRED` with the same `permit2Allowance` detail (and `eip2612Nonce`
-escape hatch) as `/deposit`.
+`/clearing/pay` answers with `{ "success": true, "transaction", "network", "debtor", "cycleId",
+"amount" }`; `/clearing/pay/verify` answers with `{ "isValid": true }` and spends no gas. Both
+report failures as described in [Errors](#errors), including `permit2_allowance_required` with the
+same details (and `eip2612Nonce` escape hatch) as `/deposit`.
 
 The signature is what makes this safe to relay: it binds the receiver/spender (the ClearingHouse),
 the exact amount, and — through the nonce — the cycle it settles, so a submitter can change none
@@ -370,11 +432,9 @@ One endpoint covers all three steps, selected by `action`:
 { "action": "finalize", "user": "0x…", "asset": "0x…" }
 ```
 
-Both endpoints answer with `{ "success": true, "txHash", "network", "user", "asset", "amount"? }`,
-or `{ "success": false, "error", "errorCode", "retryable" }`. `/withdraw/verify` answers with
-`{ "isValid", "invalidReason"?, "errorCode"?, "retryable"? }` and spends no gas. The error codes are
-the same strings `/deposit` uses wherever the meaning is the same, so client handling of
-`RATE_LIMITED` or `SIGNATURE_MISMATCH` does not depend on which endpoint produced it.
+`/withdraw` answers with `{ "success": true, "transaction", "network", "user", "asset",
+"amount"? }`; `/withdraw/verify` answers with `{ "isValid": true }` and spends no gas. Both report
+failures as described in [Errors](#errors).
 
 Unlike a deposit, this works for **native ETH** too — Core4Mica verifies the signature itself rather
 than relying on what the asset implements.
@@ -423,18 +483,22 @@ Two asset transfer methods, named as in x402's `scheme_exact_evm`. Send **exactl
 ```
 
 Permit2 alone is not gasless: it needs a one-time on-chain `approve(PERMIT2, …)`, and
-`/deposit/verify` reports `PERMIT2_ALLOWANCE_REQUIRED` when the payer has not made it — mirroring
+`/deposit/verify` reports `permit2_allowance_required` when the payer has not made it — mirroring
 x402's precondition of the same name. That response carries everything needed to fix it:
 
 ```jsonc
 {
   "isValid": false,
-  "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
-  "permit2Allowance": {
-    "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
-    "allowance": "0",
-    "required": "1000",
-    "eip2612Nonce": "7"        // omitted when the token has no EIP-2612 surface
+  "invalidReason": "permit2_allowance_required",
+  "invalidMessage": "0x… has approved 0 of 0x… to Permit2 but 1000 is required; …",
+  "extra": {
+    "retryable": false,
+    "details": {
+      "spender": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+      "allowance": "0",
+      "required": "1000",
+      "eip2612Nonce": "7"      // omitted when the token has no EIP-2612 surface
+    }
   }
 }
 ```
@@ -489,39 +553,18 @@ destination. A deposit has no free destination — Core4Mica pulls into itself a
 
 `POST /deposit/verify` is a preflight that spends no gas: it checks expiry, recovers the signature,
 confirms the nonce is unused and the balance sufficient, then simulates the deposit and rejects it
-if the estimated gas exceeds `X402_DEPOSIT_MAX_GAS`. It returns
-`{ "isValid": true }` or `{ "isValid": false, "invalidReason", "errorCode", "retryable" }`.
+if the estimated gas exceeds `X402_DEPOSIT_MAX_GAS`. It returns `{ "isValid": true }`, or a
+failure as described in [Errors](#errors).
 
 `POST /deposit` re-runs every check — the two are separate requests and state can change between
 them — then broadcasts and waits for the receipt:
 
 ```json
-{ "success": true, "txHash": "0x…", "network": "eip155:84532",
+{ "success": true, "transaction": "0x…", "network": "eip155:84532",
   "from": "0x…", "asset": "0x…", "amount": "1000000" }
 ```
 
-On failure it returns `{ "success": false, "error", "errorCode", "retryable" }`. Branch on
-`errorCode`, not on the message. `retryable` is true only for transient conditions (throttling,
-chain errors); a bad signature or an expired authorization will never become valid.
-
-| `errorCode` | Meaning |
-| --- | --- |
-| `NO_RELAYER_CONFIGURED` | Gas sponsorship is not enabled on this facilitator |
-| `NO_RELAYER` | No relayer configured for the requested network |
-| `INVALID_REQUEST` | Malformed address, amount, or signature `v` |
-| `UNSUPPORTED_TRANSFER_METHOD` | `assetTransferMethod` is neither `eip3009` nor `permit2` |
-| `PERMIT2_ALLOWANCE_REQUIRED` | Payer must submit a one-time `approve(PERMIT2, …)` first |
-| `EXPIRED` / `NOT_YET_VALID` | Outside the authorization's validity window |
-| `SIGNATURE_MISMATCH` | Signature does not recover to the declared `from` |
-| `MALFORMED_SIGNATURE` | Signature is structurally invalid (bad `v`, unrecoverable) |
-| `NONCE_ALREADY_USED` | Authorization already redeemed |
-| `INSUFFICIENT_BALANCE` | Payer does not hold `amount` |
-| `GAS_CEILING_EXCEEDED` | Estimated gas above `X402_DEPOSIT_MAX_GAS` |
-| `SIMULATION_REVERTED` | Deposit would revert; carries the decoded Core4Mica error |
-| `RECEIPT_UNAVAILABLE` | Broadcast, outcome unknown — poll `txHash`, do **not** retry |
-| `REVERTED_ON_CHAIN` | Mined and reverted, so gas was spent |
-| `RATE_LIMITED` / `ADDRESS_RATE_LIMITED` / `TOO_MANY_IN_FLIGHT` / `DUPLICATE_IN_FLIGHT` | Throttled |
-| `RELAYER_BALANCE_TOO_LOW` | Relayer at or below its configured floor |
+Failures are reported as described in [Errors](#errors).
 
 #### Trust model
 
@@ -550,12 +593,12 @@ ultimately settled on-chain.
 
 #### 1. Payment signing and guarantee issuance
 
-The payer signs a payment guarantee claim straight from the `paymentRequirements` in the
-`402 Payment Required` response — there is no round-trip to the resource server or the facilitator
-before signing. The claims carry a random client-minted 32-byte `req_id`; uniqueness is all core
-asks. When the resource server calls `/settle`, the facilitator submits the signed guarantee to
-4mica core, which issues the BLS certificate and binds it to the open settlement cycle for that
-asset.
+The payer signs a payment straight from the `paymentRequirements` in the `402 Payment Required`
+response, scoped to the asset's active settlement cycle — there is no round-trip to the resource
+server or the facilitator before signing. The payment carries a random client-minted 32-byte
+`req_id`; uniqueness is all core asks. When the resource server calls `/settle`, the facilitator
+submits the signed payment to 4mica core, which issues the guarantee in that cycle and returns the
+operator's signed receipt.
 
 ```mermaid
 sequenceDiagram
@@ -567,7 +610,7 @@ sequenceDiagram
     P->>R: GET /api/resource
     R-->>P: 402 Payment Required<br/>paymentRequirements {<br/>  scheme: "4mica-credit",<br/>  asset, amount, payTo,<br/>  extra.validation? }
 
-    Note over P: Build and sign claims<br/>{ reqId (random 32 bytes),<br/>  amount, timestamp,<br/>  userAddress, payTo, asset,<br/>  validation? }<br/>EIP-712 ECDSA sign
+    Note over P: Build and sign payment<br/>{ cycleId, reqId (random 32 bytes),<br/>  amount, timestamp,<br/>  userAddress, payTo, asset,<br/>  validation? }<br/>EIP-712 ECDSA sign
 
     P->>R: GET /api/resource<br/>PAYMENT-SIGNATURE: base64(paymentPayload)
     R->>F: POST /verify<br/>{ paymentPayload, paymentRequirements }
@@ -576,9 +619,9 @@ sequenceDiagram
     Note over R: Process request...
 
     R->>F: POST /settle<br/>{ paymentPayload, paymentRequirements }
-    F->>C: POST core/guarantees<br/>{ claims, signature, scheme }
-    C-->>F: BLS certificate<br/>(bound to the open cycle)
-    F-->>R: { success, certificate: { claims, signature } }
+    F->>C: POST core/guarantees<br/>{ payload, signature }
+    C-->>F: guarantee receipt<br/>(signed by the operator)
+    F-->>R: { success, receipt: { receipt, signature } }
     R-->>P: 200 + response body
 ```
 
@@ -628,8 +671,8 @@ The facilitator can transparently replace the EIP-3009/x402 debit flow. The key 
 ### Changes resource servers must make
 
 1. **Point at the credit facilitator** – set `X402_FACILITATOR_URL=https://x402.4mica.xyz`
-   (or the TypeScript `CC_FACILITATOR_URL`). This host validates guarantee envelopes and returns BLS
-   certificates instead of ERC-3009 receipts.
+   (or the TypeScript `CC_FACILITATOR_URL`). This host validates signed payments and returns the
+   operator's guarantee receipts instead of ERC-3009 transfer receipts.
 2. **Emit credit-flavoured `paymentRequirements`** – switch the identifying strings and, if the
    payment should be gated on a validation outcome, advertise it under `extra.validation`:
 
@@ -652,13 +695,14 @@ The facilitator can transparently replace the EIP-3009/x402 debit flow. The key 
    ```
 
    The facilitator enforces that `scheme`, `network`, `payTo`, `asset` — and, when present,
-   `extra.validation` — match the signed claims exactly, so keep them synchronized.
+   `extra.validation` — match the signed payment exactly, so keep them synchronized.
 
-3. **Expect credit certificates during settlement** – `/verify` still performs structural checks and
-   `/settle` now returns `{ success, networkId: "eip155:84532", certificate: { claims, signature } }`.
-   Core binds each issued certificate to the open settlement cycle for its asset; when the cycle
-   commits, your net credit becomes claimable on-chain. Persist the certificate if you want an
-   audit trail of what the cycle netted.
+3. **Expect guarantee receipts during settlement** – `/verify` still performs structural checks and
+   `/settle` now returns `{ success, network: "eip155:84532", extra: { receipt: { receipt, signature } } }`.
+   Core issues each guarantee in the open settlement cycle for its asset; when the cycle commits,
+   your net credit becomes claimable on-chain. Persist the receipt if you want an audit trail of
+   what the cycle netted. When `/settle` fails, return the response to the payer: most refusals
+   (a checkpoint due, a stale cycle, missing collateral) are the payer's to fix.
 
 ### Changes clients (payers) must make
 
@@ -672,43 +716,39 @@ Payers sign guarantees instead of EIP-3009 transfers. Use the official SDK `sdk-
 
    or add the same entry manually to `Cargo.toml`.
 
-2. **Configure the client** – create a `Client` with the payer's signing key. The SDK pulls the
-   remaining parameters (domain separator, operator key, etc.) from the configured core RPC URL.
+2. **Configure the client** – create a `Client` with the payer's signing key. The SDK signs in to
+   core and pulls the remaining parameters (signing domains, the operator's signer, etc.) from the
+   configured core RPC URL.
 
    ```rust
    use alloy::signers::local::PrivateKeySigner;
-   use sdk_4mica::{Client, ConfigBuilder};
+   use sdk_4mica::ClientBuilder;
 
    let signer: PrivateKeySigner = std::env::var("PAYER_KEY")?.parse()?;
-   let config = ConfigBuilder::default().signer(signer).build()?;
-   let client = Client::new(config).await?;
+   let client = ClientBuilder::default().signer(signer).connect().await?;
    ```
 
 3. **Post collateral** – before requesting credit, ensure the payer has collateral using
-   `client.user.deposit(...)` (or `approve_erc20` + `deposit` for tokens). Refer to the SDK README
-   for concrete examples.
-4. **Sign guarantee claims** – hand the decoded `payment-required` challenge and the `accepts`
-   entry you chose to `X402Flow::sign_payment_v2` (`sign_payment` for a v1 body). The flow derives
-   the claims (`userAddress`, `payTo`,
-   `asset`, `amount`, a timestamp, the `validation` requirement when the requirements carry one),
-   mints a random 32-byte `req_id`, and signs — no server round-trip first.
+   `client.deposit.of(asset, amount).send()`. Refer to the SDK README for concrete examples.
+4. **Sign the payment** – hand the decoded `payment-required` challenge and the `accepts` entry you
+   chose to `X402Flow::sign_payment_v2` (`sign_payment` for a v1 body). The flow builds the payment
+   (`payTo`, `asset`, `amount`, the active cycle, a timestamp, the `validation` requirement when the
+   requirements carry one), mints a random 32-byte `req_id`, and signs as the payer.
 
    ```rust
    use sdk_4mica::X402Flow;
 
    let flow = X402Flow::new(client)?;
-   let payment = flow
-       .sign_payment_v2(payment_required, accepted, user_address)
-       .await?;
+   let payment = flow.sign_payment_v2(payment_required, accepted).await?;
    ```
 
 5. **Send the payment payload** – `payment.header` is the finished
-   `{ x402Version: 2, accepted, payload: { claims, signature, scheme: "eip712" }, resource }`
+   `{ x402Version: 2, accepted, payload: { payload, signature }, resource }`
    envelope, base64-encoded and ready for the `PAYMENT-SIGNATURE` header of the retried HTTP
    request (a v1 signature goes in `X-PAYMENT`; see `examples/rust_client/main.rs` or
    `examples/python_client/client.py`).
-6. **Settle through the cycle** – recipients call `/settle` to obtain the BLS certificate, which
-   core binds to the open settlement cycle for the asset. There is no per-payment on-chain
+6. **Settle through the cycle** – recipients call `/settle` to obtain the guarantee receipt, which
+   core issues in the open settlement cycle for the asset. There is no per-payment on-chain
    repayment: when the cycle closes, core nets every guarantee down to one net-debit or net-credit
    per participant and commits a Merkle root on-chain. If you end the cycle a net debtor, pay via
    the ClearingHouse's `payNetDebit` (or gaslessly through the facilitator's `/clearing/pay`);
@@ -742,7 +782,7 @@ export X402_AUTH_WALLET_PRIVATE_KEY=0x...
 export X402_AUTH_URL=https://base.sepolia.api.4mica.xyz/
 export X402_AUTH_REFRESH_MARGIN_SECS=60
 
-# Gasless deposits (optional). Without a relayer key, /deposit returns NO_RELAYER and the rest of
+# Gasless deposits (optional). Without a relayer key, /deposit returns sponsorship_unavailable and the rest of
 # the facilitator is unaffected. Keep this key separate from the auth wallet above: that one is an
 # identity and needs no balance, this one pays gas and must be funded.
 export X402_RELAYER_PRIVATE_KEY=0x...
@@ -768,10 +808,6 @@ export X402_WITHDRAW_GLOBAL_LIMIT=60
 export X402_WITHDRAW_WINDOW_SECS=60
 export X402_WITHDRAW_MAX_GAS=600000
 export X402_WITHDRAW_MIN_RELAYER_BALANCE_WEI=100000000000000000
-
-# Optional: pin the expected domain separator (32-byte hex, 0x-prefixed)
-export X402_GUARANTEE_DOMAIN=0x...
-# legacy: FOUR_MICA_GUARANTEE_DOMAIN / 4MICA_GUARANTEE_DOMAIN
 
 # Optional: proxy x402 debit flows to an existing x402-rs facilitator
 export X402_DEBIT_URL=https://x402.example.com/
@@ -825,8 +861,8 @@ keeping custody and settlement under your own infrastructure.
 
 - **Startup** – the process loads configuration from the environment, then calls
   `X402_CORE_API_URL/core/public-params` (or the first `coreApiUrl` listed inside `X402_NETWORKS`) to
-  fetch the operator's BLS public key, active guarantee domain, accepted guarantee versions, and
-  related metadata. Those values are kept in memory and reused for later requests.
+  fetch the operator's guarantee signer, the GuaranteeRegistry address, the accepted payment payload
+  versions, and related metadata. Those values are kept in memory and reused for later requests.
 - **Gasless deposit (`POST /deposit`)** – the only path where the facilitator acts on-chain. It
   verifies the payer's EIP-3009 authorization, then signs and broadcasts
   `depositStablecoinWithAuthorization` with its relayer key, paying the gas. Collateral is credited
@@ -836,13 +872,14 @@ keeping custody and settlement under your own infrastructure.
   `requestWithdrawalWithAuthorization`, `cancelWithdrawalWithAuthorization` or
   `finalizeWithdrawalFor`. Collateral is only ever released to the signer.
 - **Verification (`POST /verify`)** – recipients send the `paymentPayload` plus the
-  `paymentRequirements` they issued to the client. The facilitator validates the claims against the
-  requirements and mirrors the upstream x402 error semantics. No 4mica network call is made in this
+  `paymentRequirements` they issued to the client. The facilitator validates the signed payment
+  against the requirements and mirrors the upstream x402 error semantics. No 4mica network call is made in this
   path.
 - **Settlement (`POST /settle`)** – recipients replay the same payload once they are ready to accept
-  credit. The facilitator re-runs validation, submits the signed guarantee to
-  `core/guarantees`, receives the BLS certificate, verifies it against the cached operator public
-  key (and optional domain), and returns the certificate to the caller.
+  credit. The facilitator re-runs validation, submits the signed payment to `core/guarantees`,
+  checks the receipt core returns is signed by the operator's guarantee signer and matches the
+  payment, and returns it to the caller. A refusal comes back with a reason the payer can act on
+  and core's details.
 
 If EVM settlement variables are present the facilitator also instantiates the upstream `exact`
 facilitator from `x402-rs`, exposing those `(scheme, network)` pairs on `/supported`.

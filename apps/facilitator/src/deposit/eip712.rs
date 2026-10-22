@@ -213,6 +213,7 @@ pub(crate) fn require_signer_from_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error_code::{ErrorCode, Refusal};
     use alloy::primitives::{address, b256};
     use alloy::signers::SignerSync;
     use alloy::signers::local::PrivateKeySigner;
@@ -394,6 +395,6 @@ mod tests {
             authorization.v,
         )
         .expect_err("expected v rejection");
-        assert_eq!(err.code(), "MALFORMED_SIGNATURE");
+        assert_eq!(err.code(), ErrorCode::InvalidSignature);
     }
 }

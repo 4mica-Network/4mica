@@ -91,54 +91,64 @@ impl Facilitator {
     }
 }
 
-/// Failure detail shared by every facilitator response, whatever it was asked to do.
-#[derive(Debug, Deserialize)]
+/// What the facilitator adds to a failure, under `extra`. Flattened into every response, whatever
+/// it was asked to do; the reason and message travel beside it under the names that response uses.
+#[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct FacilitatorFailure {
-    permit2_allowance: Option<Permit2AllowanceResponse>,
-    error_code: Option<String>,
+    #[serde(default)]
+    extra: FailureExtra,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FailureExtra {
     retryable: Option<bool>,
+    details: Option<FailureDetails>,
+}
+
+/// The one detail this SDK reads: the EIP-2612 nonce attached to `permit2_allowance_required`,
+/// which a client with no chain access cannot compute.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FailureDetails {
+    eip2612_nonce: Option<String>,
 }
 
 impl FacilitatorFailure {
-    /// The EIP-2612 nonce attached to a `PERMIT2_ALLOWANCE_REQUIRED` rejection, for callers that
+    /// The EIP-2612 nonce attached to a `permit2_allowance_required` rejection, for callers that
     /// unpack the allowance detail themselves rather than through [`Self::into_error`].
     pub(super) fn eip2612_nonce(&self) -> Option<U256> {
-        self.permit2_allowance
+        self.extra
+            .details
             .as_ref()
-            .and_then(|allowance| allowance.eip2612_nonce.as_ref())
+            .and_then(|details| details.eip2612_nonce.as_ref())
             .and_then(|raw| raw.parse().ok())
     }
 
+    // Absent `retryable` means "not retryable": a facilitator that omits it is not promising anything.
+    fn retryable(&self) -> bool {
+        self.extra.retryable.unwrap_or(false)
+    }
+
     /// The generic rejection, for sponsored actions with no scheme-specific detail to unpack.
-    pub(super) fn into_sponsorship_error(self, message: Option<String>) -> SponsorshipError {
+    pub(super) fn into_sponsorship_error(
+        self,
+        reason: Option<String>,
+        message: Option<String>,
+    ) -> SponsorshipError {
         SponsorshipError::Rejected {
-            code: self.error_code.unwrap_or_else(|| "UNKNOWN".into()),
+            code: reason.unwrap_or_else(|| "unknown".into()),
             message: message.unwrap_or_else(|| "facilitator gave no reason".into()),
-            // Absent means "not retryable": a facilitator that omits it is not promising anything.
-            retryable: self.retryable.unwrap_or(false),
+            retryable: self.retryable(),
         }
     }
 
-    pub(super) fn into_error(self, message: Option<String>) -> DepositError {
-        let eip2612_nonce = self
-            .permit2_allowance
-            .and_then(|allowance| allowance.eip2612_nonce)
-            .and_then(|raw| raw.parse().ok());
-        DepositError::from_facilitator(
-            self.error_code,
-            message,
-            // Absent means "not retryable": a facilitator that omits it is not promising anything.
-            self.retryable.unwrap_or(false),
-            eip2612_nonce,
-        )
+    pub(super) fn into_error(
+        self,
+        reason: Option<String>,
+        message: Option<String>,
+    ) -> DepositError {
+        DepositError::from_facilitator(reason, message, self.retryable(), self.eip2612_nonce())
     }
-}
-
-/// Detail attached to `PERMIT2_ALLOWANCE_REQUIRED`, carrying the one value a client with no chain
-/// access cannot compute: the owner's current EIP-2612 nonce.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Permit2AllowanceResponse {
-    eip2612_nonce: Option<String>,
 }
