@@ -110,6 +110,16 @@ impl ClaimError {
                 Self::RelayerBalanceTooLow { .. } | Self::Chain(_) | Self::ActionUnavailable(_)
             )
     }
+
+    /// The transaction this request already broadcast, when it failed after broadcasting.
+    pub fn broadcast_tx_hash(&self) -> Option<B256> {
+        match self {
+            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
+                Some(*tx_hash)
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Debit-payment sponsorship failures. A payment differs from a claim in carrying the debtor's
@@ -272,13 +282,18 @@ impl PayError {
                 Self::RelayerBalanceTooLow { .. } | Self::Chain(_) | Self::ActionUnavailable(_)
             )
     }
+
+    /// The transaction this request already broadcast, when it failed after broadcasting.
+    pub fn broadcast_tx_hash(&self) -> Option<B256> {
+        match self {
+            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
+                Some(*tx_hash)
+            }
+            _ => None,
+        }
+    }
 }
 
-/// Splits an alloy contract error into "the claim would revert" and "the node is unreachable".
-///
-/// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
-/// revert. Reverts decode against the ClearingHouse error ABI, so a caller sees `AlreadyClaimed`
-/// rather than a bare selector.
 impl Refusal for ClaimError {
     fn code(&self) -> ErrorCode {
         match self {
@@ -305,12 +320,7 @@ impl Refusal for ClaimError {
     }
 
     fn transaction(&self) -> Option<B256> {
-        match self {
-            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
-                Some(*tx_hash)
-            }
-            _ => None,
-        }
+        self.broadcast_tx_hash()
     }
 }
 
@@ -354,15 +364,15 @@ impl Refusal for PayError {
     }
 
     fn transaction(&self) -> Option<B256> {
-        match self {
-            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
-                Some(*tx_hash)
-            }
-            _ => None,
-        }
+        self.broadcast_tx_hash()
     }
 }
 
+/// Splits an alloy contract error into "the claim would revert" and "the node is unreachable".
+///
+/// Collapsing both into one variant would report an RPC outage as a permanent, non-retryable
+/// revert. Reverts decode against the ClearingHouse error ABI, so a caller sees `AlreadyClaimed`
+/// rather than a bare selector.
 pub(super) fn classify_call_error(err: alloy::contract::Error) -> ClaimError {
     match split_call_error(err, "claim simulation") {
         CallFailure::Reverted(reason) => ClaimError::SimulationReverted(reason),

@@ -1955,6 +1955,7 @@ impl ExactService for MockExact {
         Ok(SettleResponse::from_exact(
             true,
             None,
+            Some("0xpayer".into()),
             Some("0xdeadbeef".into()),
             "base".into(),
         ))
@@ -2042,6 +2043,7 @@ async fn settle_routes_to_exact_service() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], true);
     assert_eq!(payload["transaction"], "0xdeadbeef");
+    assert_eq!(payload["payer"], "0xpayer");
     assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(exact.settle_calls(), 1);
 }

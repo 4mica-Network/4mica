@@ -662,6 +662,7 @@ impl SettleResponse {
     pub fn from_exact(
         success: bool,
         error_reason: Option<String>,
+        payer: Option<String>,
         transaction: Option<String>,
         network: String,
     ) -> Self {
@@ -669,7 +670,7 @@ impl SettleResponse {
             success,
             error_reason,
             error_message: None,
-            payer: None,
+            payer,
             transaction: transaction.unwrap_or_default(),
             network,
             extra: None,

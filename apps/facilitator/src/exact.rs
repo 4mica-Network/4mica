@@ -194,17 +194,19 @@ impl LocalExactService {
     ) -> Result<SettleResponse, ValidationError> {
         let response: x402_rs::proto::v1::SettleResponse = serde_json::from_value(response.0)
             .map_err(|err| ValidationError::Exact(err.to_string()))?;
-        let (success, error, tx_hash, network) = match response {
+        let (success, error, payer, tx_hash, network) = match response {
             x402_rs::proto::v1::SettleResponse::Success {
+                payer,
                 transaction,
                 network,
-                ..
-            } => (true, None, Some(transaction), network),
+            } => (true, None, Some(payer), Some(transaction), network),
             x402_rs::proto::v1::SettleResponse::Error { reason, network } => {
-                (false, Some(reason), None, network)
+                (false, Some(reason), None, None, network)
             }
         };
-        Ok(SettleResponse::from_exact(success, error, tx_hash, network))
+        Ok(SettleResponse::from_exact(
+            success, error, payer, tx_hash, network,
+        ))
     }
 }
 

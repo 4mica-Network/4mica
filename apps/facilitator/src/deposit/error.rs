@@ -179,6 +179,16 @@ impl DepositError {
     pub fn is_retryable(&self) -> bool {
         self.is_throttling() || matches!(self, Self::RelayerBalanceTooLow { .. } | Self::Chain(_))
     }
+
+    /// The transaction this request already broadcast, when it failed after broadcasting.
+    pub fn broadcast_tx_hash(&self) -> Option<B256> {
+        match self {
+            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
+                Some(*tx_hash)
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Refusal for DepositError {
@@ -219,12 +229,7 @@ impl Refusal for DepositError {
     }
 
     fn transaction(&self) -> Option<B256> {
-        match self {
-            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
-                Some(*tx_hash)
-            }
-            _ => None,
-        }
+        self.broadcast_tx_hash()
     }
 }
 

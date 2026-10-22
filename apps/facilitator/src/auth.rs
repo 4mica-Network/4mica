@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex as AsyncMutex;
 
+use crate::error_body::parse_error_message;
+
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("invalid auth URL: {0}")]
@@ -273,26 +275,6 @@ fn build_siwe_message(template: &SiweTemplate, address: &str, nonce: &str) -> St
     )
 }
 
-fn parse_error_message(bytes: &[u8]) -> String {
-    if bytes.is_empty() {
-        return "unknown error".to_string();
-    }
-
-    if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
-        if let Some(msg) = value.get("error").and_then(|v| v.as_str()) {
-            return msg.to_string();
-        }
-        if let Some(msg) = value.get("message").and_then(|v| v.as_str()) {
-            return msg.to_string();
-        }
-    }
-
-    match std::str::from_utf8(bytes) {
-        Ok(text) if !text.trim().is_empty() => text.trim().to_string(),
-        _ => "unknown error".to_string(),
-    }
-}
-
 #[derive(Debug, Serialize)]
 struct AuthNonceRequest {
     address: String,
@@ -330,24 +312,6 @@ impl From<AuthTokenResponse> for AuthTokens {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn parse_error_message_prefers_error() {
-        let message =
-            parse_error_message(json!({ "error": "invalid nonce" }).to_string().as_bytes());
-        assert_eq!(message, "invalid nonce");
-    }
-
-    #[test]
-    fn parse_error_message_uses_message_fallback() {
-        let message = parse_error_message(
-            json!({ "message": "signature invalid" })
-                .to_string()
-                .as_bytes(),
-        );
-        assert_eq!(message, "signature invalid");
-    }
 
     #[test]
     fn build_siwe_message_includes_critical_fields() {

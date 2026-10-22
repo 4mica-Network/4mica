@@ -16,7 +16,7 @@ use reqwest::Url;
 use rpc::{ClearingSettlementAction, ClearingSettlementActionResponse};
 
 use crate::auth::AuthSession;
-use crate::issuer::parse_error_message;
+use crate::error_body::parse_error_message;
 
 use super::{ClaimError, PayError};
 
