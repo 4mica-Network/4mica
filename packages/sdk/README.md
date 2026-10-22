@@ -278,7 +278,8 @@ await client.settlement.claim(cycleId).gasless().send(); // claims sign nothing
 client.deposit.isGaslessAvailable(); // false when no facilitator is configured
 ```
 
-Facilitator rejections carry their `errorCode` verbatim on `FacilitatorRejectedError`; a request
+Facilitator rejections carry their snake_case reason (such as `rate_limited`) verbatim as
+`FacilitatorRejectedError.code`, with `retryable` from the facilitator's `extra`; a request
 that provably never arrived is a `SponsorshipTransportError`, and anything that may have been
 acted on is an `OutcomeUnknownError` — do not blindly retry those. A missing one-time Permit2
 approval surfaces as `Permit2AllowanceRequiredError`.
@@ -373,9 +374,9 @@ Rejections come back as **HTTP 200 with `success: false`**, so check the receipt
 ```ts
 const settled = await flow.settlePayment(payment, requirements, facilitatorUrl);
 if (!settled.settlement.success) {
-  console.error('settlement rejected:', settled.settlement.error);
+  console.error('settlement rejected:', settled.settlement.errorReason, settled.settlement.errorMessage);
 } else {
-  console.log('tx:', settled.settlement.txHash, 'receipt:', settled.settlement.receipt);
+  console.log('receipt:', settled.settlement.receipt);
 }
 ```
 
