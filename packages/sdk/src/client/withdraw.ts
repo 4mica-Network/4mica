@@ -453,13 +453,13 @@ async function submit(
 ): Promise<WithdrawReceipt> {
   const response = await ctx.facilitator.post("withdraw", request);
   if (!response.success) {
-    throw rejectionError(response, response.error);
+    throw rejectionError(response, response.errorReason, response.errorMessage);
   }
 
-  const txHash = response.txHash;
+  const txHash = response.transaction;
   if (typeof txHash !== "string" || !txHash.startsWith("0x")) {
     throw new OutcomeUnknownError(
-      "facilitator reported success without a txHash",
+      "facilitator reported success without a transaction",
     );
   }
 
@@ -482,5 +482,9 @@ async function verifyRequest(
   if (response.isValid) {
     return;
   }
-  throw rejectionError(response, response.invalidReason);
+  throw rejectionError(
+    response,
+    response.invalidReason,
+    response.invalidMessage,
+  );
 }

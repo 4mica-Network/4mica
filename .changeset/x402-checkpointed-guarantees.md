@@ -16,6 +16,10 @@ Built on `@4mica/sdk`'s checkpointed guarantees (core 2.0.0-alpha.4).
 - The settle response's BLS certificate is replaced by core's guarantee
   receipt: `FourMicaSettleResponse.certificate` (`CertificateResponse`,
   `{ claims, signature }`) becomes `receipt` (`GuaranteeReceiptResponse`,
-  `{ receipt, signature }`), read from the facilitator's `receipt` or
-  `certificate` key. Verify it with `@4mica/sdk`'s
-  `client.payment.verifyGuarantee`.
+  `{ receipt, signature }`), lifted from the facilitator's `extra.receipt`.
+  Verify it with `@4mica/sdk`'s `client.payment.verifyGuarantee`.
+- `FourMicaFacilitatorClient.settle` delegates to `@x402/core`'s client, which
+  parses the facilitator's x402-shaped response as is, and throws x402's
+  `SettleError` (carrying `errorReason` and `errorMessage`) on a refusal. The
+  `txHash`, `networkId` and `error` aliases on `FourMicaSettleResponse` are
+  gone; read `transaction`, `network` and `errorReason`.

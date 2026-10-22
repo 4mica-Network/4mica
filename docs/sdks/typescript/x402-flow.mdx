@@ -102,11 +102,17 @@ async function settle(
     facilitatorUrl,
   );
   if (!settled.settlement.success) {
-    console.error("settlement rejected:", settled.settlement.error);
+    // errorReason is a code such as invalid_4mica_credit_checkpoint_required;
+    // retryable and details say whether and how the payer can act on it.
+    console.error(
+      "settlement rejected:",
+      settled.settlement.errorReason,
+      settled.settlement.errorMessage,
+    );
     return;
   }
-  console.log("tx:", settled.settlement.txHash);
-  // settled.settlement.receipt is the operator's GuaranteeReceipt, when relayed
+  // settled.settlement.receipt is the operator's GuaranteeReceipt, read from
+  // the facilitator's extra.receipt
 }
 ```
 

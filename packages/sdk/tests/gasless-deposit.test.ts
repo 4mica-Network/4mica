@@ -26,15 +26,19 @@ const AMOUNT = 1_000_000n;
 const TX_HASH = `0x${"ab".repeat(32)}`;
 
 const success = (extra: Record<string, unknown> = {}) => ({
-  json: { success: true, txHash: TX_HASH, ...extra },
+  json: { success: true, transaction: TX_HASH, ...extra },
 });
 
-const rejection = (code: string, extra: Record<string, unknown> = {}) => ({
+const rejection = (
+  code: string,
+  details?: Record<string, unknown>,
+  message = code.replaceAll("_", " "),
+) => ({
   json: {
     success: false,
-    errorCode: code,
-    error: code.toLowerCase(),
-    ...extra,
+    errorReason: code,
+    errorMessage: message,
+    extra: { retryable: false, ...(details ? { details } : {}) },
   },
 });
 
@@ -49,8 +53,8 @@ const mined = async () => ({ transactionHash: "0xtx", status: "success" });
 /** EIP-3009 is refused outright and Permit2 lacks an allowance the token cannot sign for. */
 const noGaslessRoute: FacilitatorHandler = (_path, body) =>
   body.assetTransferMethod === "eip3009"
-    ? rejection("SIMULATION_REVERTED")
-    : rejection("PERMIT2_ALLOWANCE_REQUIRED");
+    ? rejection("simulation_reverted")
+    : rejection("permit2_allowance_required");
 
 describe("gasless deposits", () => {
   it("eip3009 send posts the wire shape", async () => {
@@ -91,7 +95,7 @@ describe("gasless deposits", () => {
     const client = depositClient((_path, body) => {
       methods.push(String(body.assetTransferMethod));
       if (body.assetTransferMethod === "eip3009") {
-        return rejection("SIMULATION_REVERTED");
+        return rejection("simulation_reverted");
       }
       return success();
     });
@@ -107,9 +111,7 @@ describe("gasless deposits", () => {
     const client = depositClient((_path, body) => {
       bodies.push(body);
       if (!("eip2612Permit" in body)) {
-        return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
-          permit2Allowance: { eip2612Nonce: "7" },
-        });
+        return rejection("permit2_allowance_required", { eip2612Nonce: "7" });
       }
       return success();
     });
@@ -137,7 +139,7 @@ describe("gasless deposits", () => {
   });
 
   it("surfaces an unsponsorable allowance", async () => {
-    const client = depositClient(() => rejection("PERMIT2_ALLOWANCE_REQUIRED"));
+    const client = depositClient(() => rejection("permit2_allowance_required"));
     const failure = await client
       .of(TOKEN_ADDRESS, AMOUNT)
       .permit2()
@@ -155,7 +157,7 @@ describe("gasless deposits", () => {
         return { transactionHash: "0xtx", status: "success" };
       }) as never,
     };
-    const client = depositClient(() => rejection("UNREACHED"), gateway);
+    const client = depositClient(() => rejection("unreached"), gateway);
 
     const receipt = await client.of(null, AMOUNT).send();
 
@@ -164,14 +166,14 @@ describe("gasless deposits", () => {
   });
 
   it("does not retry a rejection that names the deposit", async () => {
-    const client = depositClient(() => rejection("EXPIRED"));
+    const client = depositClient(() => rejection("authorization_expired"));
     const failure = await client
       .of(TOKEN_ADDRESS, AMOUNT)
       .gasless()
       .send()
       .catch((err) => err);
     expect(failure).toBeInstanceOf(FacilitatorRejectedError);
-    expect(failure.code).toBe("EXPIRED");
+    expect(failure.code).toBe("authorization_expired");
   });
 
   it("treats a mismatched echo as an unknown outcome", async () => {
@@ -189,7 +191,7 @@ describe("gasless deposits", () => {
     ).rejects.toThrow(/echoed amount/);
   });
 
-  it("treats success without a txHash as an unknown outcome", async () => {
+  it("treats success without a transaction as an unknown outcome", async () => {
     const client = depositClient(() => ({ json: { success: true } }));
     await expect(
       client.of(TOKEN_ADDRESS, AMOUNT).eip3009().send(),
@@ -203,8 +205,9 @@ describe("gasless deposits", () => {
       return {
         json: {
           isValid: false,
-          invalidReason: "expired",
-          errorCode: "EXPIRED",
+          invalidReason: "authorization_expired",
+          invalidMessage: "expired",
+          extra: { retryable: false },
         },
       };
     });
@@ -295,10 +298,11 @@ describe("gasless deposits", () => {
       (_path, body) => {
         bodies.push(body);
         if (!("eip2612Permit" in body)) {
-          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
-            error: "approve permit2 first",
-            permit2Allowance: { eip2612Nonce: "7" },
-          });
+          return rejection(
+            "permit2_allowance_required",
+            { eip2612Nonce: "7" },
+            "approve permit2 first",
+          );
         }
         return success();
       },

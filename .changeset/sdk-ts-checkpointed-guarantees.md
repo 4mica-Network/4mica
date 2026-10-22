@@ -45,6 +45,15 @@ SDKs.
   `{ payload: { version: "v1", ... }, signature }`; `X402SignedPayment` gains
   `request` and loses `signature`; `SettlementReceipt.certificate` became
   `receipt`.
+- Breaking (facilitator): responses follow x402 (needs a facilitator with
+  #113). `FacilitatorRejectedError.code` is the facilitator's snake_case
+  reason (`invalid_signature`, `rate_limited`, `permit2_allowance_required`,
+  …) instead of a SCREAMING_CASE code, and `retryable` and the EIP-2612 nonce
+  are read from `extra`; the exported `NAMES_THE_*` sets and
+  `rejectionError(payload, reason, message)` follow. `SettlementReceipt`
+  reads the receipt from `extra.receipt`, renames `txHash` to `transaction`
+  and `networkId` to `network`, splits `error` into `errorReason` and
+  `errorMessage`, and adds `payer`, `retryable` and `details`.
 - Breaking (server): the paywall's guarantee is `{ receipt, signature, raw }`
   instead of `{ claims, signature, raw }`, and `paymentFromHeader` reads the
   new envelope. When reporting a payment, send `guarantee.receipt` as

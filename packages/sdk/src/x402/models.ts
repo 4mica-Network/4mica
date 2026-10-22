@@ -387,58 +387,76 @@ export interface X402SignedPayment {
  */
 export class SettlementReceipt {
   success: boolean;
-  txHash?: string;
-  networkId?: string;
   /**
-   * The operator's guarantee receipt, when the facilitator relays one —
-   * verify it with `client.payment.verifyGuarantee`. Read from `receipt` or,
-   * as facilitators have named it, `certificate`; anything not shaped
+   * The settlement transaction; absent for an issued guarantee, which
+   * broadcasts nothing.
+   */
+  transaction?: string;
+  network?: string;
+  payer?: string;
+  /**
+   * The operator's guarantee receipt, read from `extra.receipt` — verify it
+   * with `client.payment.verifyGuarantee`. Anything not shaped
    * `{receipt, signature}` stays only in `raw`.
    */
   receipt?: GuaranteeReceipt;
-  error?: string;
+  /** A machine-readable reason, such as `invalid_4mica_credit_checkpoint_required`. */
+  errorReason?: string;
+  errorMessage?: string;
+  /** Whether repeating the identical settlement later may succeed. */
+  retryable: boolean;
+  /** What the payer needs to act on `errorReason`, such as core's checkpoint details. */
+  details?: Record<string, unknown>;
   raw: Record<string, unknown>;
 
   constructor(init: {
     success: boolean;
-    txHash?: string;
-    networkId?: string;
+    transaction?: string;
+    network?: string;
+    payer?: string;
     receipt?: GuaranteeReceipt;
-    error?: string;
+    errorReason?: string;
+    errorMessage?: string;
+    retryable?: boolean;
+    details?: Record<string, unknown>;
     raw: Record<string, unknown>;
   }) {
     this.success = init.success;
-    this.txHash = init.txHash;
-    this.networkId = init.networkId;
+    this.transaction = init.transaction;
+    this.network = init.network;
+    this.payer = init.payer;
     this.receipt = init.receipt;
-    this.error = init.error;
+    this.errorReason = init.errorReason;
+    this.errorMessage = init.errorMessage;
+    this.retryable = init.retryable ?? false;
+    this.details = init.details;
     this.raw = init.raw;
   }
 
   static fromRaw(raw: unknown): SettlementReceipt {
     const record: Record<string, unknown> = isRecord(raw) ? raw : {};
-    let receipt: GuaranteeReceipt | undefined;
-    for (const key of ["receipt", "certificate"]) {
-      const candidate = record[key];
-      if (
-        isRecord(candidate) &&
-        candidate.receipt !== undefined &&
-        candidate.signature !== undefined
-      ) {
-        receipt = GuaranteeReceipt.fromRpc(candidate);
-        break;
-      }
-    }
-    const pick = (...keys: string[]): string | undefined => {
-      const value = getAny(record, ...keys);
-      return value === undefined || value === null ? undefined : String(value);
-    };
+    const extra = isRecord(record.extra) ? record.extra : {};
+    const candidate = extra.receipt;
+    const receipt =
+      isRecord(candidate) &&
+      candidate.receipt !== undefined &&
+      candidate.signature !== undefined
+        ? GuaranteeReceipt.fromRpc(candidate)
+        : undefined;
+    const text = (value: unknown): string | undefined =>
+      value === undefined || value === null || value === ""
+        ? undefined
+        : String(value);
     return new SettlementReceipt({
       success: Boolean(record.success),
-      txHash: pick("txHash", "tx_hash"),
-      networkId: pick("networkId", "network_id", "network"),
+      transaction: text(record.transaction),
+      network: text(record.network),
+      payer: text(record.payer),
       receipt,
-      error: pick("error", "errorReason", "invalidReason"),
+      errorReason: text(record.errorReason),
+      errorMessage: text(record.errorMessage),
+      retryable: Boolean(extra.retryable),
+      details: isRecord(extra.details) ? extra.details : undefined,
       raw: record,
     });
   }

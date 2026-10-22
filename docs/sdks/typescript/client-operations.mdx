@@ -130,8 +130,9 @@ await client.settlement.pay(cycleId).gasless().send();
   Native ETH has no gasless deposit route — no authorization scheme covers it —
   and native-asset debits cannot be pulled by signature. Both self-fund.
   `client.deposit.isGaslessAvailable()` reports whether a facilitator is
-  configured at all. A rejection carrying its `errorCode` surfaces as
-  `FacilitatorRejectedError`; an `OutcomeUnknownError` means the facilitator
+  configured at all. A rejection surfaces as `FacilitatorRejectedError`
+  carrying the facilitator's snake_case reason (such as `rate_limited`) as
+  `code`; an `OutcomeUnknownError` means the facilitator
   may already have submitted — do not blindly retry it.
 </Note>
 

@@ -244,9 +244,10 @@ describe("X402Flow", () => {
       return new Response(
         JSON.stringify({
           success: true,
-          txHash: "0xabc",
-          networkId: "testnet",
-          certificate: { receipt: "0x01", signature: "0x02" },
+          payer: "0x00000000000000000000000000000000000000aa",
+          transaction: "",
+          network: "testnet",
+          extra: { receipt: { receipt: "0x01", signature: "0x02" } },
         }),
         { status: 200 },
       );
@@ -267,8 +268,39 @@ describe("X402Flow", () => {
     ).toBe(PAY_TO);
 
     expect(settled.settlement.success).toBe(true);
-    expect(settled.settlement.txHash).toBe("0xabc");
+    expect(settled.settlement.transaction).toBeUndefined();
+    expect(settled.settlement.network).toBe("testnet");
     expect(settled.settlement.receipt?.receipt).toBe("0x01");
+  });
+
+  it("reads a refused settlement's reason, message and details", async () => {
+    const requirements = v1Requirements();
+    const details = { uncheckpointed: 64, max_uncheckpointed: 64 };
+    const fetch: FetchFn = async () =>
+      new Response(
+        JSON.stringify({
+          success: false,
+          errorReason: "invalid_4mica_credit_checkpoint_required",
+          errorMessage: "checkpoint required",
+          transaction: "",
+          network: "testnet",
+          extra: { retryable: false, details },
+        }),
+        { status: 200 },
+      );
+    const flow = new X402Flow(new StubSigner(), fetch);
+    const { settlement } = await flow.settlePayment(
+      await flow.signPayment(requirements),
+      requirements,
+      "http://facilitator.test",
+    );
+    expect(settlement.success).toBe(false);
+    expect(settlement.errorReason).toBe(
+      "invalid_4mica_credit_checkpoint_required",
+    );
+    expect(settlement.errorMessage).toBe("checkpoint required");
+    expect(settlement.retryable).toBe(false);
+    expect(settlement.details).toEqual(details);
   });
 
   it("reports a rejected settlement as success: false, not an exception", async () => {
@@ -286,7 +318,7 @@ describe("X402Flow", () => {
       "http://facilitator.test",
     );
     expect(settled.settlement.success).toBe(false);
-    expect(settled.settlement.error).toBe("insufficient_funds");
+    expect(settled.settlement.errorReason).toBe("insufficient_funds");
   });
 
   it("refuses to settle when the requirements version disagrees with the payment", async () => {
@@ -353,13 +385,14 @@ describe("X402Flow", () => {
     expect(signer.built).toHaveLength(0);
   });
 
-  it("does not read a BLS-shaped certificate as a receipt", async () => {
+  it("reads the receipt only from extra, and only when receipt-shaped", async () => {
     const requirements = v1Requirements();
     const fetch: FetchFn = async () =>
       new Response(
         JSON.stringify({
           success: true,
-          certificate: { claims: "0x01", signature: "0x02" },
+          receipt: { receipt: "0x01", signature: "0x02" },
+          extra: { receipt: { claims: "0x01", signature: "0x02" } },
         }),
         { status: 200 },
       );
@@ -370,7 +403,7 @@ describe("X402Flow", () => {
       "http://facilitator.test",
     );
     expect(settled.settlement.receipt).toBeUndefined();
-    expect(settled.settlement.raw.certificate).toBeDefined();
+    expect(settled.settlement.raw.extra).toBeDefined();
   });
 
   it("signs for the live cycle through a connected Client", async () => {
