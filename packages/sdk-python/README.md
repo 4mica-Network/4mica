@@ -1,10 +1,12 @@
 # 4Mica Python SDK (`sdk-4mica`)
 
 Python client for the 4Mica credit layer: sign and issue payment guarantees,
-verify BLS certificates, settle clearing cycles, and manage collateral.
+verify the operator's guarantee receipts, checkpoint what a payer owes,
+settle clearing cycles, and manage collateral.
 
-This is the 2.0 line, built for the **settlement-cycle** protocol. The 1.x tab
-model no longer exists on the server — see [Migrating from 1.x](#migrating-from-1x).
+This is the 2.0 line, built for the **settlement-cycle** protocol with
+checkpointed guarantees, and targets core 2.0.0-alpha.4. The 1.x tab model no
+longer exists on the server — see [Migrating from 1.x](#migrating-from-1x).
 
 ```bash
 pip install --pre sdk-4mica          # 2.0 is in pre-release
@@ -34,8 +36,10 @@ async def main():
 asyncio.run(main())
 ```
 
-`Client.connect` fetches core's public parameters (operator BLS key, contract
-address, guarantee domains), which is why construction is async and fallible.
+`Client.connect` fetches core's public parameters (the Treasury, ClearingHouse
+and GuaranteeRegistry addresses and the operator's receipt-signing address),
+which is why construction is async and fallible. A core that cannot read the
+payment payload version this SDK signs is refused at connect.
 An Ethereum RPC endpoint is only needed for paths that read chain state or
 send transactions; signing-only clients never touch the chain.
 
@@ -64,36 +68,96 @@ pin narrows how, and a terminal does it.
 
 ### Payment guarantees
 
-The payer signs a request; the recipient redeems it for a BLS certificate and
-verifies it locally:
+The payer signs a payment; the recipient redeems it for the operator's
+guarantee receipt and verifies it locally:
 
 ```python
-from fourmica_sdk import PaymentGuaranteeRequestClaims
-import time, secrets
-
 # payer side
-claims = PaymentGuaranteeRequestClaims.new(
-    user_address=payer.signer_address,
-    recipient_address="0xRecipient...",
-    req_id=int.from_bytes(secrets.token_bytes(32), "big"),
-    amount=1_000_000,
-    timestamp=int(time.time()),
-    erc20_token="0xToken...",  # omit for native ETH
+payload = await payer.payment.new_payment(
+    "0xRecipient...",
+    1_000_000,
+    "0xToken...",  # omit the asset for native ETH
 )
-signature = await payer.payment.sign_request(claims)
+request = await payer.payment.sign_request(payload)
 
 # recipient side
-cert = await recipient.payment.issue_guarantee(claims, signature)
-verified = recipient.payment.verify_guarantee(cert)
-print("guaranteed", verified.amount, "in cycle", verified.cycle_id)
+receipt = await recipient.payment.issue_guarantee(request)
+guarantee = recipient.payment.verify_guarantee(receipt)
+print("guaranteed", guarantee.amount, "in cycle", hex(guarantee.cycle_id))
 ```
 
-`cycle_id` is assigned by core: every guarantee binds to the settlement cycle
-open for its asset at issuance.
+`new_payment` scopes the payment to the asset's **active settlement cycle**,
+which it reads from core and reuses until the cycle's period ends or core
+refuses a payment signed against it. It stamps the payment by core's clock as
+core last reported it, not this machine's, and draws a random `req_id` and a
+random `salt`.
+
+The payer signs an EIP-712 `PaymentAuthorization` under the ClearingHouse
+domain (`4micaClearingHouse`). The recipient is bound into it through a salted
+commitment, so the on-chain default path can verify the authorization without
+learning who was paid. The operator signs the receipt under the
+GuaranteeRegistry domain (`4micaGuaranteeRegistry`); `verify_guarantee` checks
+that signature offline against the operator address core published. A
+service that never builds a `Client` can run the same check with
+`fourmica_sdk.verify_guarantee_receipt`.
 
 A guarantee can be gated on an external validator by attaching a
-`ValidationRequirement` (`claims.with_validation(...)`) — core then holds it
-until the named validator approves the subject.
+`ValidationRequirement` (`payload.with_validation(...)`) before signing. The
+requirement is part of the commitment the payer signs, and core holds the
+guarantee until the named validator approves the subject.
+
+#### Refusals
+
+Core's coded refusals arrive as typed errors carrying the details needed to
+act on them. All are `CoreRefusalError`s, which are both `PaymentError`s and
+`RpcError`s; an uncoded refusal stays a plain `RpcError`.
+
+| Error | Core code | What to do |
+|---|---|---|
+| `CheckpointRequiredError` | `CHECKPOINT_REQUIRED` | Checkpoint (below), then retry |
+| `CycleMismatchError` | `CYCLE_MISMATCH` | Build and sign again; the stale cycle is already forgotten |
+| `FutureTimestampError` | `FUTURE_TIMESTAMP` | Build and sign again; core's clock is already recorded |
+| `StaleTimestampError` | `STALE_TIMESTAMP` | Build and sign again |
+| `TimestampNotPastCutoffError` | `TIMESTAMP_NOT_PAST_CUTOFF` | Build and sign again; the next payment is stamped past the cutoff |
+
+### Checkpoints
+
+A payer may hold only so many guarantees that no checkpoint covers yet. At the
+bound, core refuses the next one with `CHECKPOINT_REQUIRED` and the payer
+signs a **checkpoint**: a running total of everything it has authorized in the
+cycle, up to a timestamp cutoff.
+
+```python
+from fourmica_sdk import CheckpointRequiredError
+
+try:
+    receipt = await recipient.payment.issue_guarantee(request)
+except CheckpointRequiredError as exc:
+    await payer.payment.checkpoint_cycle(
+        exc.details.asset_address, exc.details.cycle_id
+    )
+```
+
+`payment.checkpoint_active_cycle(asset)` signs and submits a checkpoint for
+the asset's active cycle, and returns `None` when there is nothing to cover.
+`payment.checkpoint_cycle(asset, cycle_id)` checkpoints a named cycle instead.
+Submitting a checkpoint that was already accepted succeeds and covers nothing,
+so retrying is safe.
+
+A payment can land while a checkpoint is in flight, and core then refuses the
+checkpoint as stale. Both methods read the batch and sign once more; if core
+refuses again, they raise `CheckpointMismatchError`.
+
+The checkpoint total is what the payer can be charged on-chain if they
+default, so it is built only from what the payer signed. Every payment in
+core's batch, and the checkpoint it extends, must carry the payer's own
+signature, be in this cycle and asset, be newer than the previous checkpoint,
+and appear once. Otherwise nothing is signed and the call raises
+`UntrustedCheckpointBatchError`.
+
+A payment must be stamped strictly after the payer's latest checkpoint cutoff,
+so a payment built right after a checkpoint may wait out the rest of the
+current second.
 
 ### Settlement cycles
 
@@ -117,8 +181,8 @@ action = await client.settlement.pay(cycle_id).action()
 
 `cycle_id` is core's text id (`"{asset}:{period_start}"`, returned as
 `cycle_id_text` in clearing responses). Core resolves this path by text id
-only; the 0x-prefixed on-chain id carried in guarantee claims is not accepted
-here.
+only; the 0x-prefixed on-chain id carried in payments and receipts is not
+accepted here.
 
 ### Collateral
 
@@ -161,16 +225,17 @@ await (
 ```
 
 Read the receipt's `route` to see which one actually ran. Rejections that
-name the request itself (`SIGNATURE_MISMATCH`, `INSUFFICIENT_BALANCE`, …)
+name the request itself (`invalid_signature`, `insufficient_funds`, …)
 are surfaced, not retried — your own transaction would fail the same way —
 and an `OutcomeUnknownError` means the facilitator may already have
 submitted: check the chain before resending.
 
 ## x402
 
-The SDK implements the `4mica-credit` x402 scheme, versions 1 and 2. There is
-no tab step: a signed claim carries a random `req_id` and the facilitator's
-`/settle` turns it into a BLS certificate.
+The SDK implements the `4mica-credit` x402 scheme, versions 1 and 2. A
+payment is built with `new_payment` (so it is scoped to the live cycle and
+stamped by core's clock) and the facilitator's `/settle` redeems it for the
+operator's guarantee receipt.
 
 ```python
 from fourmica_sdk import X402Flow, PaymentRequirementsV1
@@ -178,13 +243,13 @@ from fourmica_sdk import X402Flow, PaymentRequirementsV1
 flow = X402Flow.from_client(client)
 requirements = PaymentRequirementsV1.from_raw(reqs_from_402_response)
 
-payment = await flow.sign_payment(requirements, client.signer_address)
+payment = await flow.sign_payment(requirements)
 # retry the request with the header:  {"X-PAYMENT": payment.header}
 # (v2 uses sign_payment_v2 and the PAYMENT-SIGNATURE header)
 
 # or settle directly against a facilitator:
 settled = await flow.settle_payment(payment, requirements, "https://x402.4mica.xyz")
-print(settled.settlement.success, settled.settlement.certificate)
+print(settled.settlement.success, settled.settlement.receipt)
 ```
 
 ## Errors
@@ -192,8 +257,11 @@ print(settled.settlement.success, settled.settlement.certificate)
 Everything derives from `FourMicaError`. Contract reverts decode to typed
 exceptions (`InsufficientAvailableError`, `GracePeriodNotElapsedError`, …);
 missing allowances surface as `Erc20AllowanceRequiredError` *before* gas is
-spent; facilitator rejections carry their `errorCode` verbatim on
-`FacilitatorRejectedError`, so callers can branch on codes this SDK predates.
+spent; facilitator rejections carry their reason (such as
+`simulation_reverted`) verbatim as `FacilitatorRejectedError.code`, so callers
+can branch on codes this SDK predates.
+Core's own coded refusals carry `code` and `details` on `RpcError`, and the
+payment ones arrive typed (see [Refusals](#refusals)).
 
 ## Development
 
@@ -209,11 +277,20 @@ ruff check . && pytest -q
 Contract ABIs under `fourmica_sdk/contract/abi/` are copies of the monorepo's
 `contracts/abi/*.json`, vendored from the `4mica-core` repo's forge artifacts
 by `scripts/refresh-abis.sh` at the repo root (which refreshes every SDK at
-once; `scripts/refresh_abis.sh` here just forwards to it). Wire-format
-parity with the Rust SDK and the contracts is pinned by two fixtures:
-`tests/fixtures/guarantee_vectors.json` (shared with the Rust and Solidity
-suites) and `tests/fixtures/digest_vectors.json` (regenerate with
-`cargo run --example digest_vectors` in `packages/sdk-rust`).
+once; `scripts/refresh_abis.sh` here just forwards to it). The Python SDK
+reads `treasury.json`. `contracts/abi/Core4Mica.json` is the pre-rename
+contract, frozen (the script no longer refreshes it) until the TypeScript SDK
+moves to the Treasury.
+
+Wire-format parity with core, the contracts and the Rust SDK is pinned by
+three fixtures in `tests/fixtures/`:
+
+- `checkpoint_vectors.json` and `guarantee_vectors.json` are copied from
+  4mica-core's `contracts/test/fixtures/`, which the ClearingHouse and
+  GuaranteeRegistry Solidity suites verify. Regenerate them in core with
+  `REGEN_CHECKPOINT_VECTORS=1` / `REGEN_GUARANTEE_VECTORS=1`.
+- `digest_vectors.json` is the Rust SDK's serialization and digests;
+  regenerate with `cargo run --example digest_vectors` in `packages/sdk-rust`.
 
 ## Migrating from 1.x
 
@@ -226,9 +303,10 @@ version. Headlines:
   `client.settlement`.
 - `Client.new(cfg)` → `await Client.connect(cfg)`; `client.user` /
   `client.recipient` → the capability sub-clients above.
-- Claims lost `tab_id` and `total_amount`, gained a server-assigned
-  `cycle_id`; request signing changed (the EIP-712 domain now names the
-  verifying contract), so 1.x signatures do not verify.
+- Claims and BLS certificates are gone. A payer builds a
+  `PaymentRequestPayload` with `payment.new_payment`, scoped to the active
+  cycle, and signs it under the ClearingHouse domain; the recipient gets back
+  an ECDSA `GuaranteeReceipt`. 1.x signatures do not verify.
 - x402: exact scheme `4mica-credit`, no `tabEndpoint`, and `/settle` takes the
   envelope object as `paymentPayload` instead of a `paymentHeader` string.
 

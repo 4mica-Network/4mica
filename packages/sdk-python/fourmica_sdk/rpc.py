@@ -14,17 +14,23 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 import httpx
 
 from .errors import RpcError
+from .guarantee import GuaranteeReceipt
 from .models import (
+    ActiveCycleResponse,
     AssetBalanceInfo,
-    BLSCert,
+    CheckpointAcceptedResponse,
+    CheckpointBatchResponse,
     ClearingParticipantProof,
     ClearingSettlementAction,
     ClearingSettlementActionResponse,
     CorePublicParameters,
+    PaymentRequest,
     RecipientPaymentInfo,
+    SignedCheckpoint,
     SupportedTokensResponse,
     UserSuspensionStatus,
 )
+from .utils import normalize_bytes32_hex
 
 ADMIN_API_KEY_HEADER = "x-api-key"
 AUTHORIZATION_HEADER = "authorization"
@@ -113,13 +119,22 @@ class RpcProxy:
         if response.is_success:
             return payload
 
+        # Core's error body is {"error": <message>, "code"?, "details"?};
+        # anything else is surfaced verbatim so a proxy failure reads sensibly.
         message = "unknown error"
+        code: Optional[str] = None
+        details: Any = None
         if isinstance(payload, dict):
             message = payload.get("error") or payload.get("message") or str(payload)
+            code = payload.get("code") if isinstance(payload.get("code"), str) else None
+            details = payload.get("details")
         elif isinstance(payload, str) and payload.strip():
             message = payload.strip()
         raise RpcError(
-            f"{response.status_code}: {message}", status_code=response.status_code
+            f"{response.status_code}: {message}",
+            status_code=response.status_code,
+            code=code,
+            details=details,
         )
 
     async def _get(
@@ -166,8 +181,34 @@ class RpcProxy:
             await self._get("/core/tokens", authed=False)
         )
 
-    async def issue_guarantee(self, body: Dict[str, Any]) -> BLSCert:
-        return BLSCert.from_rpc(await self._post("/core/guarantees", body))
+    async def issue_guarantee(self, request: PaymentRequest) -> GuaranteeReceipt:
+        return GuaranteeReceipt.from_rpc(
+            await self._post("/core/guarantees", request.to_payload())
+        )
+
+    async def get_active_cycle(self, asset_address: str) -> ActiveCycleResponse:
+        """The settlement cycle a payment for *asset_address* must be signed
+        for right now."""
+        raw = await self._get("/core/cycles/active", params={"asset": asset_address})
+        return ActiveCycleResponse.from_rpc(raw)
+
+    async def get_checkpoint_batch(
+        self, payer: str, asset_address: str, cycle_id: Optional[str] = None
+    ) -> CheckpointBatchResponse:
+        """The previous checkpoint and the authorizations *payer*'s next one
+        must cover, in the active cycle or the one *cycle_id* names. A closed
+        cycle still answers until settlement has read what it holds."""
+        params = {"asset": asset_address}
+        if cycle_id is not None:
+            params["cycle_id"] = normalize_bytes32_hex(cycle_id)
+        raw = await self._get(f"/core/payers/{payer}/checkpoint-batch", params=params)
+        return CheckpointBatchResponse.from_rpc(raw)
+
+    async def submit_checkpoint(
+        self, checkpoint: SignedCheckpoint
+    ) -> CheckpointAcceptedResponse:
+        raw = await self._post("/core/checkpoints", checkpoint.to_payload())
+        return CheckpointAcceptedResponse.from_rpc(raw)
 
     async def get_clearing_participant_proof(
         self, cycle_id: str, participant: str

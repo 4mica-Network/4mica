@@ -35,14 +35,18 @@ def deposit_client(handler, gateway=None) -> DepositClient:
 
 
 def success(extra=None):
-    body = {"success": True, "txHash": TX_HASH}
+    body = {"success": True, "transaction": TX_HASH}
     body.update(extra or {})
     return httpx.Response(200, json=body)
 
 
-def rejection(code, extra=None):
-    body = {"success": False, "errorCode": code, "error": code.lower()}
-    body.update(extra or {})
+def rejection(code, extra=None, retryable=False):
+    body = {
+        "success": False,
+        "errorReason": code,
+        "errorMessage": code.replace("_", " "),
+        "extra": {"retryable": retryable, **(extra or {})},
+    }
     return httpx.Response(200, json=body)
 
 
@@ -86,7 +90,7 @@ async def test_gasless_falls_from_eip3009_to_permit2_on_simulation_revert():
         body = json.loads(request.content)
         methods.append(body["assetTransferMethod"])
         if body["assetTransferMethod"] == "eip3009":
-            return rejection("SIMULATION_REVERTED")
+            return rejection("simulation_reverted")
         return success()
 
     receipt = await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).gasless().send()
@@ -103,8 +107,8 @@ async def test_sponsored_permit2_signs_the_missing_approval():
         bodies.append(body)
         if "eip2612Permit" not in body:
             return rejection(
-                "PERMIT2_ALLOWANCE_REQUIRED",
-                {"permit2Allowance": {"eip2612Nonce": "7"}},
+                "permit2_allowance_required",
+                {"details": {"eip2612Nonce": "7"}},
             )
         return success()
 
@@ -126,7 +130,7 @@ async def test_sponsored_permit2_signs_the_missing_approval():
 
 async def test_unsponsorable_allowance_is_surfaced():
     def handler(request: httpx.Request) -> httpx.Response:
-        return rejection("PERMIT2_ALLOWANCE_REQUIRED")
+        return rejection("permit2_allowance_required")
 
     with pytest.raises(Permit2AllowanceRequiredError) as excinfo:
         await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).permit2().send()
@@ -135,7 +139,7 @@ async def test_unsponsorable_allowance_is_surfaced():
 
 async def test_auto_route_self_funds_native():
     gateway = FakeGateway()
-    client = deposit_client(lambda request: rejection("UNREACHED"), gateway)
+    client = deposit_client(lambda request: rejection("unreached"), gateway)
 
     receipt = await client.of(None, AMOUNT).send()
 
@@ -145,11 +149,24 @@ async def test_auto_route_self_funds_native():
 
 async def test_a_rejection_that_names_the_deposit_is_not_retried():
     def handler(request: httpx.Request) -> httpx.Response:
-        return rejection("EXPIRED")
+        return rejection("authorization_expired")
 
     with pytest.raises(FacilitatorRejectedError) as excinfo:
         await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).gasless().send()
-    assert excinfo.value.code == "EXPIRED"
+    assert excinfo.value.code == "authorization_expired"
+    assert excinfo.value.retryable is False
+
+
+async def test_a_rejection_reports_retryable_from_extra():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return rejection("relayer_underfunded", retryable=True)
+
+    with pytest.raises(
+        FacilitatorRejectedError, match="relayer underfunded"
+    ) as excinfo:
+        await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).gasless().send()
+    assert excinfo.value.code == "relayer_underfunded"
+    assert excinfo.value.retryable is True
 
 
 async def test_a_mismatched_echo_is_an_unknown_outcome():
@@ -174,7 +191,7 @@ async def test_success_without_tx_hash_is_an_unknown_outcome():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"success": True})
 
-    with pytest.raises(OutcomeUnknownError, match="txHash"):
+    with pytest.raises(OutcomeUnknownError, match="without a transaction"):
         await deposit_client(handler).of(TOKEN_ADDRESS, AMOUNT).eip3009().send()
 
 
@@ -185,7 +202,12 @@ async def test_verify_reports_the_rejection_without_submitting():
         paths.append(request.url.path)
         return httpx.Response(
             200,
-            json={"isValid": False, "invalidReason": "expired", "errorCode": "EXPIRED"},
+            json={
+                "isValid": False,
+                "invalidReason": "authorization_expired",
+                "invalidMessage": "authorization expired",
+                "extra": {"retryable": False},
+            },
         )
 
     client = deposit_client(handler)

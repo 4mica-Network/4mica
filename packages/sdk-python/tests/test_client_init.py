@@ -1,19 +1,30 @@
 import pytest
-from stubs import CONTRACT_ADDRESS, TEST_PRIVATE_KEY
+from stubs import (
+    CLEARING_HOUSE_ADDRESS,
+    CONTRACT_ADDRESS,
+    GUARANTEE_REGISTRY_ADDRESS,
+    OPERATOR_ADDRESS,
+    TEST_PRIVATE_KEY,
+)
 
 import fourmica_sdk.client.ctx as ctx_module
 from fourmica_sdk.client.ctx import ClientCtx
 from fourmica_sdk.config import ConfigBuilder
 from fourmica_sdk.errors import ChainRpcUnavailableError, ClientInitializationError
+from fourmica_sdk.guarantee import (
+    clearing_house_domain_separator,
+    guarantee_registry_domain_separator,
+)
 
 PARAMS = {
-    "public_key": "0x" + "00" * 48,
+    "guarantee_signer": OPERATOR_ADDRESS,
     "contract_address": CONTRACT_ADDRESS,
-    "eip712_name": "4mica",
+    "guarantee_registry_address": GUARANTEE_REGISTRY_ADDRESS,
+    "clearing_house_address": CLEARING_HOUSE_ADDRESS,
+    "eip712_name": "4micaClearingHouse",
     "eip712_version": "1",
     "chain_id": 84532,
-    "supported_guarantee_versions": [1],
-    "guarantee_domains": [{"version": 1, "domain_separator": "0x" + "11" * 32}],
+    "supported_payment_payload_versions": [1],
 }
 
 
@@ -58,31 +69,65 @@ def use_params(monkeypatch, params_raw):
     return proxy
 
 
-async def test_connect_resolves_published_guarantee_domains(monkeypatch):
+async def test_connect_resolves_the_signing_domains_from_core(monkeypatch):
     use_params(monkeypatch, PARAMS)
     ctx = await ClientCtx.create(config())
-    assert ctx.guarantee_domain == b"\x11" * 32
-    assert ctx.guarantee_domain_for_version(1) == b"\x11" * 32
+    assert ctx.clearing_house_domain_separator == clearing_house_domain_separator(
+        84532, CLEARING_HOUSE_ADDRESS
+    )
+    assert ctx.guarantee_domain_separator == guarantee_registry_domain_separator(
+        84532, GUARANTEE_REGISTRY_ADDRESS
+    )
+    assert ctx.guarantee_signer == OPERATOR_ADDRESS
     assert ctx.contract_address == CONTRACT_ADDRESS
     assert ctx.chain_id == 84532
 
 
+async def test_connect_needs_no_ethereum_endpoint(monkeypatch):
+    """Everything resolved at connect comes from core, so constructing a
+    client costs no chain access at all."""
+    use_params(monkeypatch, PARAMS)
+    ctx = await ClientCtx.create(config())
+    assert ctx.ethereum_http_rpc_url is None
+    assert ctx._gateway is None
+
+
 async def test_connect_fails_fast_when_core_cannot_take_v1(monkeypatch):
-    use_params(monkeypatch, dict(PARAMS, supported_guarantee_versions=[2]))
-    with pytest.raises(ClientInitializationError, match="signs guarantee v1"):
+    use_params(monkeypatch, dict(PARAMS, supported_payment_payload_versions=[2]))
+    with pytest.raises(ClientInitializationError, match="signs payment payload v1"):
         await ClientCtx.create(config())
 
 
-async def test_connect_rejects_bad_operator_key(monkeypatch):
-    use_params(monkeypatch, dict(PARAMS, public_key="0x0102"))
-    with pytest.raises(ClientInitializationError, match="operator public key"):
+async def test_a_core_that_accepts_no_payload_version_is_refused(monkeypatch):
+    use_params(monkeypatch, dict(PARAMS, supported_payment_payload_versions=[]))
+    with pytest.raises(ClientInitializationError, match="core accepts \\[\\]"):
         await ClientCtx.create(config())
 
 
-async def test_missing_published_domains_without_eth_rpc_is_unavailable(monkeypatch):
-    use_params(monkeypatch, dict(PARAMS, guarantee_domains=[]))
-    with pytest.raises(ChainRpcUnavailableError):
+async def test_a_core_that_predates_payload_versions_is_accepted(monkeypatch):
+    params = dict(PARAMS)
+    del params["supported_payment_payload_versions"]
+    use_params(monkeypatch, params)
+    await ClientCtx.create(config())
+
+
+@pytest.mark.parametrize(
+    "field,label",
+    [
+        ("clearing_house_address", "clearing house address"),
+        ("guarantee_registry_address", "guarantee registry address"),
+        ("guarantee_signer", "guarantee signer"),
+    ],
+)
+async def test_a_core_missing_a_signing_address_is_refused(monkeypatch, field, label):
+    """Every payment is signed or verified against these, so a core that
+    omits one is refused at connect rather than at the first payment."""
+    params = dict(PARAMS)
+    del params[field]
+    proxy = use_params(monkeypatch, params)
+    with pytest.raises(ClientInitializationError, match=label):
         await ClientCtx.create(config())
+    assert proxy.closed
 
 
 async def test_gateway_needs_an_ethereum_endpoint(monkeypatch):

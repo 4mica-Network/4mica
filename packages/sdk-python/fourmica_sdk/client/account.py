@@ -53,17 +53,12 @@ class AccountClient:
             withdrawable_balance=await gateway.withdrawable_balance(
                 user, token_address
             ),
-            total_user_scaled_balance=await gateway.total_user_scaled_balance(
-                token_address
-            ),
-            protocol_scaled_balance=await gateway.protocol_scaled_balance(
-                token_address
-            ),
-            surplus_scaled_balance=await gateway.surplus_scaled_balance(token_address),
-            contract_scaled_a_token_balance=(
-                await gateway.contract_scaled_a_token_balance(token_address)
-            ),
-            stablecoin_a_token=await gateway.stablecoin_a_token(token_address),
+            user_shares=await gateway.user_shares(user, token_address),
+            total_user_shares=await gateway.total_user_shares(token_address),
+            protocol_shares=await gateway.protocol_shares(token_address),
+            pool_shares=await gateway.pool_shares(token_address),
+            pool_assets=await gateway.pool_assets(token_address),
+            strategy=await gateway.strategy(token_address),
         )
 
     async def asset_balance(

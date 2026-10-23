@@ -9,33 +9,6 @@
           "internalType": "address"
         },
         {
-          "name": "verificationKey",
-          "type": "tuple",
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
-        },
-        {
           "name": "stablecoins_",
           "type": "address[]",
           "internalType": "address[]"
@@ -84,61 +57,7 @@
     },
     {
       "type": "function",
-      "name": "GUARANTEE_VERIFICATION_KEY",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "x_a",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        },
-        {
-          "name": "x_b",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        },
-        {
-          "name": "y_a",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        },
-        {
-          "name": "y_b",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "INITIAL_GUARANTEE_VERSION",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64",
-          "internalType": "uint64"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
       "name": "MAX_YIELD_FEE_BPS",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "RECONCILIATION_DUST_TOLERANCE_SCALED",
       "inputs": [],
       "outputs": [
         {
@@ -164,19 +83,6 @@
     },
     {
       "type": "function",
-      "name": "aaveAddressesProvider",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "address",
-          "internalType": "contract IPoolAddressesProvider"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
       "name": "addStablecoinAsset",
       "inputs": [
         {
@@ -185,7 +91,7 @@
           "internalType": "address"
         },
         {
-          "name": "aToken",
+          "name": "strategy_",
           "type": "address",
           "internalType": "address"
         }
@@ -320,7 +226,7 @@
     },
     {
       "type": "function",
-      "name": "claimSurplusATokens",
+      "name": "claimSurplus",
       "inputs": [
         {
           "name": "asset",
@@ -331,11 +237,6 @@
           "name": "to",
           "type": "address",
           "internalType": "address"
-        },
-        {
-          "name": "scaledAmount",
-          "type": "uint256",
-          "internalType": "uint256"
         }
       ],
       "outputs": [],
@@ -386,85 +287,17 @@
     },
     {
       "type": "function",
-      "name": "configureAave",
-      "inputs": [
-        {
-          "name": "poolAddressesProvider",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "aTokens",
-          "type": "address[]",
-          "internalType": "address[]"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "configureGuaranteeVersion",
-      "inputs": [
-        {
-          "name": "version",
-          "type": "uint64",
-          "internalType": "uint64"
-        },
-        {
-          "name": "verificationKey",
-          "type": "tuple",
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
-        },
-        {
-          "name": "domainSeparator",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        },
-        {
-          "name": "decoder",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "internalType": "bool"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "contractScaledATokenBalance",
+      "name": "convertToAssets",
       "inputs": [
         {
           "name": "asset",
           "type": "address",
           "internalType": "address"
+        },
+        {
+          "name": "shares",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "outputs": [
@@ -478,30 +311,31 @@
     },
     {
       "type": "function",
-      "name": "creditCollateral",
+      "name": "convertToPoolShares",
       "inputs": [
-        {
-          "name": "creditor",
-          "type": "address",
-          "internalType": "address"
-        },
         {
           "name": "asset",
           "type": "address",
           "internalType": "address"
         },
         {
-          "name": "amount",
+          "name": "assets",
           "type": "uint256",
           "internalType": "uint256"
         }
       ],
-      "outputs": [],
-      "stateMutability": "payable"
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
     },
     {
       "type": "function",
-      "name": "creditFromEscrowScaled",
+      "name": "creditFromEscrow",
       "inputs": [
         {
           "name": "creditor",
@@ -531,6 +365,19 @@
     },
     {
       "type": "function",
+      "name": "depositFor",
+      "inputs": [
+        {
+          "name": "receiver",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
       "name": "depositStablecoin",
       "inputs": [
         {
@@ -542,6 +389,29 @@
           "name": "amount",
           "type": "uint256",
           "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "depositStablecoinFor",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "receiver",
+          "type": "address",
+          "internalType": "address"
         }
       ],
       "outputs": [],
@@ -668,7 +538,20 @@
         }
       ],
       "outputs": [],
-      "stateMutability": "nonpayable"
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "depositsEnabled",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool",
+          "internalType": "bool"
+        }
+      ],
+      "stateMutability": "view"
     },
     {
       "type": "function",
@@ -715,8 +598,37 @@
     },
     {
       "type": "function",
-      "name": "escrowScaledBalance",
+      "name": "escrowBalance",
       "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "escrowShares",
+      "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "internalType": "address"
+        },
         {
           "name": "asset",
           "type": "address",
@@ -779,62 +691,6 @@
           "name": "",
           "type": "address[]",
           "internalType": "address[]"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "getGuaranteeVersionConfig",
-      "inputs": [
-        {
-          "name": "version",
-          "type": "uint64",
-          "internalType": "uint64"
-        }
-      ],
-      "outputs": [
-        {
-          "name": "verificationKey",
-          "type": "tuple",
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
-        },
-        {
-          "name": "domainSeparator",
-          "type": "bytes32",
-          "internalType": "bytes32"
-        },
-        {
-          "name": "decoder",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "internalType": "bool"
         }
       ],
       "stateMutability": "view"
@@ -916,7 +772,7 @@
         {
           "name": "",
           "type": "tuple[]",
-          "internalType": "struct Core4Mica.UserAssetInfo[]",
+          "internalType": "struct Treasury.UserAssetInfo[]",
           "components": [
             {
               "name": "asset",
@@ -993,13 +849,19 @@
     },
     {
       "type": "function",
-      "name": "guaranteeDomainSeparator",
-      "inputs": [],
+      "name": "idleAssets",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
       "outputs": [
         {
           "name": "",
-          "type": "bytes32",
-          "internalType": "bytes32"
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "stateMutability": "view"
@@ -1013,6 +875,25 @@
           "name": "",
           "type": "bytes4",
           "internalType": "bytes4"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "isStablecoinAsset",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool",
+          "internalType": "bool"
         }
       ],
       "stateMutability": "view"
@@ -1052,6 +933,44 @@
     },
     {
       "type": "function",
+      "name": "poolAssets",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "poolShares",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "principalBalance",
       "inputs": [
         {
@@ -1076,7 +995,7 @@
     },
     {
       "type": "function",
-      "name": "protocolScaledBalance",
+      "name": "protocolShares",
       "inputs": [
         {
           "name": "asset",
@@ -1119,16 +1038,57 @@
     },
     {
       "type": "function",
-      "name": "reconciliationDustToleranceScaled",
-      "inputs": [],
-      "outputs": [
+      "name": "reassignEscrow",
+      "inputs": [
         {
-          "name": "",
+          "name": "from",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "to",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "recapitalizePool",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
           "type": "uint256",
           "internalType": "uint256"
         }
       ],
-      "stateMutability": "pure"
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "removeStablecoinAsset",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -1213,35 +1173,6 @@
     },
     {
       "type": "function",
-      "name": "seizeCollateral",
-      "inputs": [
-        {
-          "name": "debtor",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "asset",
-          "type": "address",
-          "internalType": "address"
-        },
-        {
-          "name": "amount",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "outputs": [
-        {
-          "name": "seized",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
       "name": "seizeUpTo",
       "inputs": [
         {
@@ -1284,34 +1215,12 @@
     },
     {
       "type": "function",
-      "name": "setGuaranteeVerificationKey",
+      "name": "setDepositsEnabled",
       "inputs": [
         {
-          "name": "verificationKey",
-          "type": "tuple",
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
+          "name": "enabled",
+          "type": "bool",
+          "internalType": "bool"
         }
       ],
       "outputs": [],
@@ -1323,6 +1232,47 @@
       "inputs": [
         {
           "name": "_minGracePeriod",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setStablecoinDepositsEnabled",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "internalType": "bool"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "setStrategy",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "newStrategy",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "maxLossBps",
           "type": "uint256",
           "internalType": "uint256"
         }
@@ -1358,7 +1308,26 @@
     },
     {
       "type": "function",
-      "name": "stablecoinAToken",
+      "name": "stablecoinDepositsEnabled",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool",
+          "internalType": "bool"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "strategy",
       "inputs": [
         {
           "name": "asset",
@@ -1377,7 +1346,7 @@
     },
     {
       "type": "function",
-      "name": "surplusScaledBalance",
+      "name": "strategyShares",
       "inputs": [
         {
           "name": "asset",
@@ -1396,7 +1365,119 @@
     },
     {
       "type": "function",
-      "name": "totalUserScaledBalance",
+      "name": "surplusIdleAssets",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "surplusStrategyShares",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "sweepableEscrow",
+      "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "owed",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "totalEscrowShares",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "totalEthEscrowBalance",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "totalUserEthBalance",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "totalUserShares",
       "inputs": [
         {
           "name": "asset",
@@ -1446,113 +1527,24 @@
     },
     {
       "type": "function",
-      "name": "verifyAndDecodeGuarantee",
+      "name": "userShares",
       "inputs": [
         {
-          "name": "guarantee",
-          "type": "bytes",
-          "internalType": "bytes"
+          "name": "user",
+          "type": "address",
+          "internalType": "address"
         },
         {
-          "name": "signature",
-          "type": "tuple",
-          "internalType": "struct BLS.G2Point",
-          "components": [
-            {
-              "name": "x_c0_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_c0_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_c1_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_c1_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_c0_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_c0_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_c1_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_c1_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
         }
       ],
       "outputs": [
         {
           "name": "",
-          "type": "tuple",
-          "internalType": "struct Guarantee",
-          "components": [
-            {
-              "name": "domain",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "cycleId",
-              "type": "uint256",
-              "internalType": "uint256"
-            },
-            {
-              "name": "reqId",
-              "type": "uint256",
-              "internalType": "uint256"
-            },
-            {
-              "name": "client",
-              "type": "address",
-              "internalType": "address"
-            },
-            {
-              "name": "recipient",
-              "type": "address",
-              "internalType": "address"
-            },
-            {
-              "name": "amount",
-              "type": "uint256",
-              "internalType": "uint256"
-            },
-            {
-              "name": "asset",
-              "type": "address",
-              "internalType": "address"
-            },
-            {
-              "name": "timestamp",
-              "type": "uint64",
-              "internalType": "uint64"
-            },
-            {
-              "name": "version",
-              "type": "uint64",
-              "internalType": "uint64"
-            }
-          ]
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ],
       "stateMutability": "view"
@@ -1672,25 +1664,6 @@
     },
     {
       "type": "event",
-      "name": "AaveConfigured",
-      "inputs": [
-        {
-          "name": "provider",
-          "type": "address",
-          "indexed": true,
-          "internalType": "address"
-        },
-        {
-          "name": "pool",
-          "type": "address",
-          "indexed": true,
-          "internalType": "address"
-        }
-      ],
-      "anonymous": false
-    },
-    {
-      "type": "event",
       "name": "AuthorityUpdated",
       "inputs": [
         {
@@ -1751,6 +1724,12 @@
       "name": "CollateralSeized",
       "inputs": [
         {
+          "name": "controller",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
           "name": "debtor",
           "type": "address",
           "indexed": true,
@@ -1769,7 +1748,7 @@
           "internalType": "uint256"
         },
         {
-          "name": "scaledToEscrow",
+          "name": "sharesToEscrow",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -1804,6 +1783,19 @@
     },
     {
       "type": "event",
+      "name": "DepositsEnabledUpdated",
+      "inputs": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "indexed": false,
+          "internalType": "bool"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "EIP712DomainChanged",
       "inputs": [],
       "anonymous": false
@@ -1812,6 +1804,12 @@
       "type": "event",
       "name": "EscrowCredited",
       "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
         {
           "name": "creditor",
           "type": "address",
@@ -1831,7 +1829,7 @@
           "internalType": "uint256"
         },
         {
-          "name": "scaledFromEscrow",
+          "name": "sharesFromEscrow",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -1844,13 +1842,13 @@
       "name": "EscrowDeposited",
       "inputs": [
         {
-          "name": "asset",
+          "name": "controller",
           "type": "address",
           "indexed": true,
           "internalType": "address"
         },
         {
-          "name": "from",
+          "name": "asset",
           "type": "address",
           "indexed": true,
           "internalType": "address"
@@ -1862,7 +1860,38 @@
           "internalType": "uint256"
         },
         {
-          "name": "scaledCredited",
+          "name": "sharesCredited",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "EscrowReassigned",
+      "inputs": [
+        {
+          "name": "from",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "to",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -1874,6 +1903,12 @@
       "type": "event",
       "name": "EscrowWithdrawn",
       "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
         {
           "name": "asset",
           "type": "address",
@@ -1893,69 +1928,10 @@
           "internalType": "uint256"
         },
         {
-          "name": "scaledBurned",
+          "name": "sharesBurned",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
-        }
-      ],
-      "anonymous": false
-    },
-    {
-      "type": "event",
-      "name": "GuaranteeVersionUpdated",
-      "inputs": [
-        {
-          "name": "version",
-          "type": "uint64",
-          "indexed": true,
-          "internalType": "uint64"
-        },
-        {
-          "name": "verificationKey",
-          "type": "tuple",
-          "indexed": false,
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
-        },
-        {
-          "name": "domainSeparator",
-          "type": "bytes32",
-          "indexed": false,
-          "internalType": "bytes32"
-        },
-        {
-          "name": "decoder",
-          "type": "address",
-          "indexed": false,
-          "internalType": "address"
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "indexed": false,
-          "internalType": "bool"
         }
       ],
       "anonymous": false
@@ -1982,6 +1958,31 @@
           "type": "address",
           "indexed": false,
           "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PoolRecapitalized",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "from",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
         }
       ],
       "anonymous": false
@@ -2032,7 +2033,63 @@
     },
     {
       "type": "event",
-      "name": "SurplusATokensClaimed",
+      "name": "StablecoinDepositsEnabledUpdated",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "indexed": false,
+          "internalType": "bool"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "StrategyUpdated",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "oldStrategy",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "newStrategy",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "assetsBefore",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "assetsAfter",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "SurplusClaimed",
       "inputs": [
         {
           "name": "asset",
@@ -2047,13 +2104,13 @@
           "internalType": "address"
         },
         {
-          "name": "scaledAmount",
+          "name": "strategyShares",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
         },
         {
-          "name": "nominalAmount",
+          "name": "idleAssets",
           "type": "uint256",
           "indexed": false,
           "internalType": "uint256"
@@ -2070,41 +2127,6 @@
           "type": "address",
           "indexed": false,
           "internalType": "address"
-        }
-      ],
-      "anonymous": false
-    },
-    {
-      "type": "event",
-      "name": "VerificationKeyUpdated",
-      "inputs": [
-        {
-          "name": "newVerificationKey",
-          "type": "tuple",
-          "indexed": false,
-          "internalType": "struct BLS.G1Point",
-          "components": [
-            {
-              "name": "x_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "x_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_a",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            },
-            {
-              "name": "y_b",
-              "type": "bytes32",
-              "internalType": "bytes32"
-            }
-          ]
         }
       ],
       "anonymous": false
@@ -2193,16 +2215,6 @@
     },
     {
       "type": "error",
-      "name": "AaveNotConfigured",
-      "inputs": []
-    },
-    {
-      "type": "error",
-      "name": "AaveProviderReconfigurationBlocked",
-      "inputs": []
-    },
-    {
-      "type": "error",
       "name": "AccessManagedInvalidAuthority",
       "inputs": [
         {
@@ -2284,6 +2296,27 @@
     },
     {
       "type": "error",
+      "name": "ControllerMustCallDirectly",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ControllerStillAuthorized",
+      "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "DepositsDisabled",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "DirectTransferNotAllowed",
       "inputs": []
     },
@@ -2294,8 +2327,13 @@
     },
     {
       "type": "error",
-      "name": "EscrowScaledUnderflow",
+      "name": "EscrowUnderflow",
       "inputs": [
+        {
+          "name": "controller",
+          "type": "address",
+          "internalType": "address"
+        },
         {
           "name": "asset",
           "type": "address",
@@ -2308,6 +2346,22 @@
         },
         {
           "name": "available",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "EthReconciliationLoss",
+      "inputs": [
+        {
+          "name": "tracked",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "observed",
           "type": "uint256",
           "internalType": "uint256"
         }
@@ -2351,7 +2405,7 @@
     },
     {
       "type": "error",
-      "name": "InvalidAToken",
+      "name": "InsufficientLiquidity",
       "inputs": [
         {
           "name": "asset",
@@ -2359,9 +2413,14 @@
           "internalType": "address"
         },
         {
-          "name": "aToken",
-          "type": "address",
-          "internalType": "address"
+          "name": "requested",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "available",
+          "type": "uint256",
+          "internalType": "uint256"
         }
       ]
     },
@@ -2378,11 +2437,6 @@
     },
     {
       "type": "error",
-      "name": "InvalidGuaranteeDomain",
-      "inputs": []
-    },
-    {
-      "type": "error",
       "name": "InvalidRecipient",
       "inputs": []
     },
@@ -2395,6 +2449,22 @@
       "type": "error",
       "name": "InvalidSignature",
       "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidStrategy",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "strategy",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
     },
     {
       "type": "error",
@@ -2414,12 +2484,12 @@
     },
     {
       "type": "error",
-      "name": "MissingGuaranteeDecoder",
+      "name": "NoSurplus",
       "inputs": [
         {
-          "name": "version",
-          "type": "uint64",
-          "internalType": "uint64"
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
         }
       ]
     },
@@ -2427,6 +2497,28 @@
       "type": "error",
       "name": "NoWithdrawalRequested",
       "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PoolEmpty",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "PoolInsolvent",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
     },
     {
       "type": "error",
@@ -2467,7 +2559,29 @@
     },
     {
       "type": "error",
-      "name": "StablecoinWithdrawShortfall",
+      "name": "StablecoinAssetInUse",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "StablecoinDepositsDisabled",
+      "inputs": [
+        {
+          "name": "asset",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "StrategyMigrationLoss",
       "inputs": [
         {
           "name": "asset",
@@ -2475,12 +2589,12 @@
           "internalType": "address"
         },
         {
-          "name": "requested",
+          "name": "assetsBefore",
           "type": "uint256",
           "internalType": "uint256"
         },
         {
-          "name": "actual",
+          "name": "assetsAfter",
           "type": "uint256",
           "internalType": "uint256"
         }
@@ -2496,11 +2610,6 @@
           "internalType": "string"
         }
       ]
-    },
-    {
-      "type": "error",
-      "name": "SurplusClaimExceedsAvailable",
-      "inputs": []
     },
     {
       "type": "error",
@@ -2525,18 +2634,7 @@
     },
     {
       "type": "error",
-      "name": "UnsupportedGuaranteeVersion",
-      "inputs": [
-        {
-          "name": "version",
-          "type": "uint64",
-          "internalType": "uint64"
-        }
-      ]
-    },
-    {
-      "type": "error",
-      "name": "UserScaledBalanceUnderflow",
+      "name": "UserShareUnderflow",
       "inputs": [
         {
           "name": "asset",

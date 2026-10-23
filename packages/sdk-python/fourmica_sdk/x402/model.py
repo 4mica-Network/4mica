@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..errors import X402Error
-from ..models import BLSCert, PaymentSignature
+from ..guarantee import GuaranteeReceipt
+from ..models import PaymentRequest
 from ..utils import ValidationError, normalize_bytes32_hex
 
 SCHEME_4MICA_CREDIT = "4mica-credit"
@@ -278,8 +279,7 @@ class X402SignedPayment:
     header: str
     envelope: Dict[str, Any]
     x402_version: int
-    payload: Dict[str, Any]
-    signature: PaymentSignature
+    payload: PaymentRequest
 
 
 @dataclass
@@ -288,29 +288,53 @@ class SettlementReceipt:
     with ``success: false`` — read the body, not the status."""
 
     success: bool
-    tx_hash: Optional[str]
-    network_id: Optional[str]
-    certificate: Optional[BLSCert]
-    error: Optional[str]
+    transaction: Optional[str]
+    """The settlement transaction; ``None`` for an issued guarantee, which
+    broadcasts nothing."""
+    network: Optional[str]
+    payer: Optional[str]
+    receipt: Optional[GuaranteeReceipt]
+    """The operator's guarantee receipt, read from ``extra.receipt`` — verify
+    it with :meth:`~fourmica_sdk.client.payment.PaymentClient.verify_guarantee`.
+    Anything not shaped ``{receipt, signature}`` stays only in ``raw``."""
+    error_reason: Optional[str]
+    """A machine-readable reason, such as
+    ``invalid_4mica_credit_checkpoint_required``."""
+    error_message: Optional[str]
+    retryable: bool
+    """Whether repeating the identical settlement later may succeed. Absent
+    means not retryable."""
+    details: Optional[Dict[str, Any]]
+    """What the payer needs to act on ``error_reason``, such as core's
+    checkpoint details."""
     raw: Dict[str, Any]
 
     @classmethod
     def from_raw(cls, raw: Any) -> "SettlementReceipt":
         if not isinstance(raw, dict):
             raw = {}
-        certificate_raw = raw.get("certificate")
-        certificate = None
-        if isinstance(certificate_raw, dict):
-            claims = _pick(certificate_raw, "claims")
-            signature = _pick(certificate_raw, "signature")
-            if claims is not None and signature is not None:
-                certificate = BLSCert(claims=str(claims), signature=str(signature))
+        extra = raw.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
+        receipt = None
+        candidate = extra.get("receipt")
+        if (
+            isinstance(candidate, dict)
+            and candidate.get("receipt") is not None
+            and candidate.get("signature") is not None
+        ):
+            receipt = GuaranteeReceipt.from_rpc(candidate)
+        details = extra.get("details")
         return cls(
             success=bool(raw.get("success")),
-            tx_hash=_pick(raw, "txHash", "tx_hash"),
-            network_id=_pick(raw, "networkId", "network_id", "network"),
-            certificate=certificate,
-            error=_pick(raw, "error", "errorReason", "invalidReason"),
+            transaction=raw.get("transaction") or None,
+            network=raw.get("network"),
+            payer=raw.get("payer"),
+            receipt=receipt,
+            error_reason=raw.get("errorReason"),
+            error_message=raw.get("errorMessage"),
+            retryable=bool(extra.get("retryable")),
+            details=details if isinstance(details, dict) else None,
             raw=raw,
         )
 

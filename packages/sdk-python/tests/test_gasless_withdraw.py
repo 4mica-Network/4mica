@@ -34,12 +34,18 @@ def withdraw_client(handler, gateway=None) -> WithdrawClient:
 
 
 def success():
-    return httpx.Response(200, json={"success": True, "txHash": TX_HASH})
+    return httpx.Response(200, json={"success": True, "transaction": TX_HASH})
 
 
 def rejection(code):
     return httpx.Response(
-        200, json={"success": False, "errorCode": code, "error": code.lower()}
+        200,
+        json={
+            "success": False,
+            "errorReason": code,
+            "errorMessage": code.replace("_", " "),
+            "extra": {"retryable": False},
+        },
     )
 
 
@@ -91,7 +97,7 @@ async def test_throttling_falls_back_to_self_funding():
     gateway = FakeGateway()
 
     receipt = (
-        await withdraw_client(lambda request: rejection("RATE_LIMITED"), gateway)
+        await withdraw_client(lambda request: rejection("rate_limited"), gateway)
         .request(None, AMOUNT)
         .send()
     )
@@ -105,7 +111,7 @@ async def test_a_rejection_naming_the_request_does_not_fall_back():
     back would cost them gas to learn what the facilitator already told them
     for free."""
     gateway = FakeGateway()
-    client = withdraw_client(lambda request: rejection("SIGNATURE_MISMATCH"), gateway)
+    client = withdraw_client(lambda request: rejection("invalid_signature"), gateway)
 
     with pytest.raises(FacilitatorRejectedError):
         await client.request(None, AMOUNT).send()
@@ -130,7 +136,7 @@ async def test_cancel_falls_back_on_unknown_codes():
     gateway = FakeGateway()
 
     receipt = (
-        await withdraw_client(lambda request: rejection("SOMETHING_NEW"), gateway)
+        await withdraw_client(lambda request: rejection("something_new"), gateway)
         .cancel(TOKEN_ADDRESS)
         .send()
     )

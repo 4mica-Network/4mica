@@ -384,11 +384,13 @@ async def _submit(
 ) -> WithdrawReceipt:
     response = await ctx.facilitator.post("withdraw", request)
     if not response.get("success"):
-        raise rejection_error(response, response.get("error"))
+        raise rejection_error(
+            response, response.get("errorReason"), response.get("errorMessage")
+        )
 
-    tx_hash = response.get("txHash")
+    tx_hash = response.get("transaction")
     if not isinstance(tx_hash, str) or not tx_hash.startswith("0x"):
-        raise OutcomeUnknownError("facilitator reported success without a txHash")
+        raise OutcomeUnknownError("facilitator reported success without a transaction")
 
     return WithdrawReceipt(
         tx_hash=tx_hash,
@@ -404,4 +406,6 @@ async def _verify(ctx: ClientCtx, request: Dict[str, Any]) -> None:
     response = await ctx.facilitator.post("withdraw/verify", request)
     if response.get("isValid"):
         return
-    raise rejection_error(response, response.get("invalidReason"))
+    raise rejection_error(
+        response, response.get("invalidReason"), response.get("invalidMessage")
+    )

@@ -133,7 +133,7 @@ async def _permit2_authorization(
 async def eip2612_permit(ctx: ClientCtx, token: str, nonce: int) -> Eip2612Permit:
     """Signs an EIP-2612 permit granting Permit2 an unlimited allowance for
     *token*. *nonce* must be the owner's current one, which arrives with the
-    facilitator's ``PERMIT2_ALLOWANCE_REQUIRED`` rejection."""
+    facilitator's ``permit2_allowance_required`` rejection."""
     deadline = _valid_before()
     domain_separator = await ctx.token_domain_separator(token)
     digest = digest_for_permit(
