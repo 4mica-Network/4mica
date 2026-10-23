@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const verifier: PaywallVerifier = {
   async issueGuarantee(payload) {
     console.log("[seller] verifying payment payload:", payload);
-    return { claims: "0xdemoClaims", signature: "0xdemoSignature" };
+    return { receipt: "0xdemoReceipt", signature: "0xdemoSignature" };
   },
 };
 

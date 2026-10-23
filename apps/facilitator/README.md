@@ -84,7 +84,8 @@ operator's signed guarantee receipt to the recipient.
     );
     const accepted = challenge.accepts.find((a) => a.scheme === "4mica-credit")!;
 
-    const payment = await flow.signPaymentV2(challenge, accepted, client.signerAddress);
+    // Scoped to the asset's active settlement cycle, which the client reads from core.
+    const payment = await flow.signPaymentV2(challenge, accepted);
     const headers = { "PAYMENT-SIGNATURE": payment.header }; // decode to paymentPayload for /verify
     await client.aclose();
   }
@@ -96,7 +97,7 @@ operator's signed guarantee receipt to the recipient.
   `X402Flow::sign_payment_v2(payment_required, accepted, user_address)` to obtain the same
   `payment.header` for the retry request.
 - x402 v1 (JSON body with `accepts`, `X-PAYMENT` retry header) is still served. Call the v1
-  sibling — `signPayment(requirements, userAddress)` / `sign_payment(requirements, user_address)` —
+  sibling — `signPayment(requirements)` / `sign_payment(requirements, user_address)` —
   with the v1 requirements entry instead.
 - With `@4mica/x402` and `@x402/fetch` none of this is hand-written:
   `wrapFetchWithPaymentFromConfig(fetch, { schemes: [{ network: "eip155:84532", client: await FourMicaEvmScheme.create(account) }] })`

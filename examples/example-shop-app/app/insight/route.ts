@@ -37,7 +37,7 @@ const paywalled = (shop: Shop) =>
           network: shop.network,
           assetAddress: shop.listing.assetAddress,
           amount: paid.amount,
-          guaranteeClaims: guarantee.claims,
+          guaranteeClaims: guarantee.receipt,
           guaranteeSignature: guarantee.signature,
           resource: request.url,
           description: "Market insight",

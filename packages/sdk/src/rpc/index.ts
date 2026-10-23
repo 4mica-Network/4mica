@@ -8,19 +8,26 @@
  */
 
 import { RpcError } from "@/errors";
+import { GuaranteeReceipt } from "@/guarantee";
 import { normalizeBaseUrl, requestJson } from "@/http";
 import {
+  ActiveCycleResponse,
   AssetBalanceInfo,
-  BLSCert,
+  CheckpointAcceptedResponse,
+  CheckpointBatchResponse,
   ClearingParticipantProof,
   type ClearingSettlementAction,
   ClearingSettlementActionResponse,
   CorePublicParameters,
+  PaymentRequest,
   RecipientPaymentInfo,
+  type SignedCheckpoint,
   SupportedTokensResponse,
   UserSuspensionStatus,
 } from "@/models";
 import type { BearerTokenProvider, FetchFn } from "@/rpc/models";
+import { isRecord } from "@/serde";
+import { normalizeBytes32Hex } from "@/utils";
 
 export type { BearerTokenProvider, FetchFn } from "@/rpc/models";
 
@@ -97,8 +104,17 @@ export class RpcProxy {
   private errorsFor(path: string) {
     return {
       decodeError: (message: string) => new RpcError(message),
+      // Core's error body is {"error": <message>, "code"?, "details"?}.
       httpError: (message: string, response: Response, body: unknown) =>
-        new RpcError(message, { status: response.status, body }),
+        new RpcError(message, {
+          status: response.status,
+          body,
+          code:
+            isRecord(body) && typeof body.code === "string"
+              ? body.code
+              : undefined,
+          details: isRecord(body) ? body.details : undefined,
+        }),
       wrapTransportError: (err: unknown) =>
         new RpcError(`request to ${path} failed: ${String(err)}`),
     };
@@ -183,12 +199,60 @@ export class RpcProxy {
     );
   }
 
-  async issueGuarantee(body: unknown): Promise<BLSCert> {
+  /**
+   * Redeem a payer-signed payment request for the operator's guarantee
+   * receipt. Takes the {@link PaymentRequest} or its wire form as a payer
+   * sent it — what a seller's paywall relays from the `X-PAYMENT` header.
+   */
+  async issueGuarantee(
+    request: PaymentRequest | Record<string, unknown>,
+  ): Promise<GuaranteeReceipt> {
+    const body =
+      request instanceof PaymentRequest ? request.toPayload() : request;
     const data = await this.post<Record<string, unknown>>(
       "/core/guarantees",
       body,
     );
-    return BLSCert.fromRpc(data);
+    return GuaranteeReceipt.fromRpc(data);
+  }
+
+  /** The settlement cycle a payment for `assetAddress` must be signed for now. */
+  async getActiveCycle(assetAddress: string): Promise<ActiveCycleResponse> {
+    const query = new URLSearchParams({ asset: assetAddress });
+    const data = await this.get<Record<string, unknown>>(
+      `/core/cycles/active?${query}`,
+    );
+    return ActiveCycleResponse.fromRpc(data);
+  }
+
+  /**
+   * The previous checkpoint and the authorizations `payer`'s next one must
+   * cover, in the active cycle or the one `cycleId` names. A closed cycle
+   * still answers until settlement has read what it holds.
+   */
+  async getCheckpointBatch(
+    payer: string,
+    assetAddress: string,
+    cycleId?: string,
+  ): Promise<CheckpointBatchResponse> {
+    const query = new URLSearchParams({ asset: assetAddress });
+    if (cycleId !== undefined) {
+      query.set("cycle_id", normalizeBytes32Hex(cycleId));
+    }
+    const data = await this.get<Record<string, unknown>>(
+      `/core/payers/${payer}/checkpoint-batch?${query}`,
+    );
+    return CheckpointBatchResponse.fromRpc(data);
+  }
+
+  async submitCheckpoint(
+    checkpoint: SignedCheckpoint,
+  ): Promise<CheckpointAcceptedResponse> {
+    const data = await this.post<Record<string, unknown>>(
+      "/core/checkpoints",
+      checkpoint.toPayload(),
+    );
+    return CheckpointAcceptedResponse.fromRpc(data);
   }
 
   /**

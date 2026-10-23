@@ -45,7 +45,7 @@ const init = async () => {
           network,
           assetAddress: asset,
           amount: paid.amount,
-          guaranteeClaims: guarantee.claims,
+          guaranteeClaims: guarantee.receipt,
           guaranteeSignature: guarantee.signature,
           resource: request.url,
         })

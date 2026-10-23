@@ -42,8 +42,8 @@ app.get(
 ```
 
 Without a valid `X-PAYMENT` header the middleware answers `402` with the payment requirements.
-Otherwise it verifies the payment, sets `X-PAYMENT-RESPONSE`, exposes the guarantee at
-`res.locals.paymentGuarantee` and calls `next()`.
+Otherwise it verifies the payment, sets `X-PAYMENT-RESPONSE`, exposes the guarantee receipt
+(`{ receipt, signature, raw }`) at `res.locals.paymentGuarantee` and calls `next()`.
 
 ## App API
 
@@ -85,7 +85,7 @@ app.get(
       network: "base-sepolia",
       assetAddress: listing!.assetAddress,
       amount: paid.amount,
-      guaranteeClaims: res.locals.paymentGuarantee.claims,
+      guaranteeClaims: res.locals.paymentGuarantee.receipt,
       guaranteeSignature: res.locals.paymentGuarantee.signature,
       resource: req.originalUrl,
     });

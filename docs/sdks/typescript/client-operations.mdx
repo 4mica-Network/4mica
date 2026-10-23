@@ -11,24 +11,19 @@ Settlement is **cycle-based**. Core nets each participant's obligations for a cl
 
 ## Deposits and withdrawals
 
-Deposit collateral, then sign a payment guarantee request:
+Deposit collateral, then sign a payment:
 
 ```ts
-import { PaymentGuaranteeRequestClaims } from "@4mica/sdk";
-
 // Deposit ETH collateral (in wei); null asset = native ETH
 await client.deposit.of(null, 1_000_000_000_000_000n).send(); // 0.001 ETH
 
-// Build and sign a payment guarantee request
-const claims = PaymentGuaranteeRequestClaims.new(
-  userAddress, // payer address
+// Build a payment for the asset's active settlement cycle, then sign it
+const payload = await client.payment.newPayment(
   recipientAddress,
-  reqId, // random uint256 nonce — uniqueness is all core asks of it
   "1000", // amount in the asset's base units
-  Math.floor(Date.now() / 1000), // timestamp (seconds)
-);
+); // asset omitted = native ETH
 
-const { signature, scheme } = await client.payment.signRequest(claims);
+const request = await client.payment.signRequest(payload);
 ```
 
 To deposit an ERC20 token, grant the allowance first:
@@ -54,30 +49,35 @@ await client.withdraw.finalize(tokenAddress).send(); // after it elapses
 
 ## Payment guarantees
 
-The payer signs a request; the recipient redeems it for a BLS certificate and verifies it:
+The payer signs a payment; the recipient redeems it for the operator's receipt and verifies it:
 
 ```ts
 // Payer side
-const { signature } = await client.payment.signRequest(claims);
+const payload = await client.payment.newPayment(recipientAddress, amount, asset);
+const request = await client.payment.signRequest(payload);
 
-// Recipient side (the signer must be the claims' recipient)
-const cert = await client.payment.issueGuarantee(claims, signature);
+// Recipient side
+const receipt = await client.payment.issueGuarantee(request);
 
-// Verify: BLS-check against the operator key, decode, and match the domain
-const verified = await client.payment.verifyGuarantee(cert);
+// Verify: check the operator's ECDSA signature offline and decode the guarantee
+const guarantee = await client.payment.verifyGuarantee(receipt);
+// guarantee.client, guarantee.recipient, guarantee.amount, guarantee.asset, …
 ```
 
 ### `client.payment` methods
 
-- `signRequest(claims, scheme?)` — sign a payment guarantee request as the payer.
-- `issueGuarantee(claims, signature)` — redeem a payer's signature for a BLS-signed certificate.
-- `verifyGuarantee(cert)` — BLS-verify a certificate, decode it, and validate its domain separator.
+- `newPayment(recipient, amount, asset?)` — a payment payload scoped to the asset's active settlement cycle.
+- `signRequest(payload)` — sign the payload as the payer, returning a `PaymentRequest`.
+- `issueGuarantee(request)` — redeem a signed request for the operator's `GuaranteeReceipt`.
+- `verifyGuarantee(receipt)` — check the receipt was signed by the operator signer core publishes, and return the `Guarantee` it attests.
 - `listReceived()` — payments guaranteed to the signer as a recipient.
-- `guaranteeDomain` / `guaranteeDomains` — the domain separator(s) certificates are issued under.
+- `checkpointActiveCycle(asset?)` / `checkpointCycle(asset, cycleId)` — sign and submit a checkpoint (see [Checkpoints](#checkpoints)).
 
 <Note>
-  Certificate verification requires the optional `@noble/curves` dependency for
-  BLS decoding.
+  Verification is offline. A service that never builds a `Client` can run the
+  same check with `verifyGuaranteeReceipt(receipt,
+  guaranteeRegistryDomain(chainId, guaranteeRegistryAddress), guaranteeSigner)`,
+  taking the three values from core's public parameters.
 </Note>
 
 ## Settling a cleared cycle
@@ -130,8 +130,9 @@ await client.settlement.pay(cycleId).gasless().send();
   Native ETH has no gasless deposit route — no authorization scheme covers it —
   and native-asset debits cannot be pulled by signature. Both self-fund.
   `client.deposit.isGaslessAvailable()` reports whether a facilitator is
-  configured at all. A rejection carrying its `errorCode` surfaces as
-  `FacilitatorRejectedError`; an `OutcomeUnknownError` means the facilitator
+  configured at all. A rejection surfaces as `FacilitatorRejectedError`
+  carrying the facilitator's snake_case reason (such as `rate_limited`) as
+  `code`; an `OutcomeUnknownError` means the facilitator
   may already have submitted — do not blindly retry it.
 </Note>
 
@@ -143,49 +144,37 @@ const balance = await client.account.assetBalance(tokenAddress); // core's view,
 const tokens = await client.tokens.supported(); // depositable assets
 ```
 
-## Building claims
+`client.account.stablecoinPosition(token)` reports a stablecoin pool position: the principal and yield split, plus the pool's share accounting — `userShares`, `totalUserShares`, `protocolShares`, `poolShares`, `poolAssets`, and the `strategy` backing the pool (the zero address while its assets sit idle).
 
-Build claims with the `PaymentGuaranteeRequestClaims.new` factory. It normalizes addresses and parses `uint256` values. The asset defaults to the zero address, which represents native ETH.
+## Building payments
+
+Build payments with `client.payment.newPayment`. A payment is scoped to the asset's active settlement cycle, which it reads from core, so it cannot be built offline. It is stamped by core's clock rather than this machine's, gets a random `uint256` `reqId`, and a random `salt` that blinds the recipient. The asset defaults to the zero address, which represents native ETH.
 
 ```ts
-import { PaymentGuaranteeRequestClaims, SigningScheme } from "@4mica/sdk";
-
-const claims = PaymentGuaranteeRequestClaims.new(
-  userAddress,
+const payload = await client.payment.newPayment(
   recipientAddress,
-  reqId, // number | bigint | string — a random uint256 nonce
   amount, // number | bigint | string
-  timestamp, // seconds
   erc20Token, // optional; omit for native ETH
 );
+// payload.cycleId, payload.reqId, payload.timestamp, payload.salt, …
 ```
 
-Signing uses `SigningScheme.EIP712` by default. Use `SigningScheme.EIP191` for wallets that do not support typed data:
+`signRequest` signs it as an EIP-712 `PaymentAuthorization` under the ClearingHouse domain, through the signer's `signTypedData`:
 
 ```ts
-const { signature, scheme } = await client.payment.signRequest(
-  claims,
-  SigningScheme.EIP191,
-);
+const request = await client.payment.signRequest(payload);
+// request.payload, request.signature
 ```
 
 ## Validated guarantees
 
-A payer can agree that a guarantee only becomes payable once an external validator approves it, by attaching a `ValidationRequirement`:
+A payer can agree that a guarantee only becomes payable once an external validator approves it, by attaching a `ValidationRequirement` to the payload before signing. The requirement is bound into the salted recipient commitment the payer signs:
 
 ```ts
-import {
-  PaymentGuaranteeRequestClaims,
-  ValidationRequirement,
-} from "@4mica/sdk";
+import { ValidationRequirement } from "@4mica/sdk";
 
-const claims = PaymentGuaranteeRequestClaims.new(
-  userAddress,
-  recipientAddress,
-  reqId,
-  amount,
-  timestamp,
-  erc20Token,
+const payload = (
+  await client.payment.newPayment(recipientAddress, amount, erc20Token)
 ).withValidation(
   new ValidationRequirement({
     validator: "validator-id", // must be on core's allowlist
@@ -195,11 +184,44 @@ const claims = PaymentGuaranteeRequestClaims.new(
   }),
 );
 
-const { signature } = await client.payment.signRequest(claims);
-const cert = await client.payment.issueGuarantee(claims, signature);
+const request = await client.payment.signRequest(payload);
+const receipt = await client.payment.issueGuarantee(request);
 ```
 
 In the x402 flow, the same requirement travels as `extra.validation` on the payment requirements and is attached automatically.
+
+## Checkpoints
+
+A checkpoint is the payer's signed running total of its payments in a cycle. Core caps how many guarantees a payer may hold past its latest checkpoint; past the cap, issuance is refused with a `CheckpointRequiredError`. Only the payer can sign its checkpoint, so run these on the payer's client.
+
+```ts
+import { CheckpointRequiredError } from "@4mica/sdk";
+
+// Cover everything outstanding in the asset's active cycle
+await client.payment.checkpointActiveCycle(erc20Token); // undefined when there is nothing to cover
+
+// Or cover the cycle a refusal names, then retry
+try {
+  await client.payment.issueGuarantee(request);
+} catch (err) {
+  if (err instanceof CheckpointRequiredError) {
+    await client.payment.checkpointCycle(
+      err.details.assetAddress,
+      err.details.cycleId,
+    );
+  }
+}
+```
+
+Both methods retry once when core answers `CheckpointMismatchError` because the batch moved while it was being signed. `cycleId` here is the on-chain `bytes32` id, not the text id settlement takes.
+
+<Note>
+  Core's batch is checked before it is signed: every payment must be one the
+  payer signed, in this cycle and asset, past the previous checkpoint, and
+  counted once. A batch that fails those checks throws
+  `UntrustedCheckpointBatchError` rather than being signed, since signing it
+  could inflate what the payer can be charged on default.
+</Note>
 
 ## Transaction receipt options
 

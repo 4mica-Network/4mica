@@ -44,17 +44,19 @@ function demoPaymentHeader(
     scheme: requirement.scheme,
     network: requirement.network,
     payload: {
-      claims: {
+      payload: {
         version: "v1",
         user_address: "0x2222222222222222222222222222222222222222",
         recipient_address: requirement.payTo,
+        // Demo only: a real payment carries core's active cycle id.
+        cycle_id: `0x${"0".repeat(64)}`,
         req_id: reqId,
         amount: `0x${BigInt(requirement.amount).toString(16)}`,
         asset_address: requirement.asset,
         timestamp: Math.floor(Date.now() / 1000),
+        salt: `0x${"0".repeat(64)}`,
       },
       signature: "0xdemoSignature",
-      scheme: "eip712",
     },
   };
   return Buffer.from(JSON.stringify(envelope)).toString("base64");

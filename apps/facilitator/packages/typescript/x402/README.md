@@ -148,7 +148,7 @@ The recommended middleware factory for most use cases. Automatically configures 
 
 To gate a payment on an external validator, advertise a nested `validation`
 object in `paymentRequirements.extra`. The payer signs the same requirement
-into their claims, and the guarantee only becomes payable once the validator
+into their payment, and the guarantee only becomes payable once the validator
 approves it:
 
 ```typescript
@@ -258,10 +258,11 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ### Paying on a self-hosted core
 
-`FourMicaEvmScheme.create` connects to every hosted network up front. Pass `coreUrls` to
-override a network's core API URL and `networks` to limit the connections to the ones you use;
-a resource server can also steer payers with `extra.rpcUrl` in its requirements, which wins over
-both.
+`FourMicaEvmScheme.create` connects to every hosted network up front. A payer always signs
+through a core, since every payment carries the asset's active settlement cycle, which only core
+knows. Pass `coreUrls` to override a network's core API URL and `networks` to limit the
+connections to the ones you use; a resource server can also steer payers with `extra.rpcUrl` in
+its requirements, which wins over both.
 
 ```typescript
 const scheme = await FourMicaEvmScheme.create(account, {
@@ -376,13 +377,14 @@ main();
 2. **Payment Flow** (tab-free):
    - Client makes initial request to protected resource
    - Server responds with `402 Payment Required` including payment requirements
-   - Client signs a payment guarantee straight from those requirements using
-     the 4mica SDK — a random 32-byte `reqId` is minted locally; there is no
-     server round-trip before signing
+   - Client signs a payment straight from those requirements using the 4mica
+     SDK, scoped to the asset's active settlement cycle (read from 4mica core)
+     and carrying a random 32-byte `reqId` minted locally; there is no round
+     trip to the server or the facilitator before signing
    - Client retries the request with the payment payload
-   - Server verifies and settles the payment via the 4mica facilitator, which
-     issues the BLS guarantee certificate and binds it to the open settlement
-     cycle
+   - Server verifies and settles the payment via the 4mica facilitator; core
+     issues the guarantee receipt (`FourMicaSettleResponse.receipt`, the
+     operator's ECDSA signature over the guarantee) for that cycle
    - Server returns the protected resource
 
 ## License

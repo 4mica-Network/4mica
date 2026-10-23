@@ -22,7 +22,6 @@ export default defineConfig({
   target: "es2022",
   external: [
     "viem",
-    "@noble/curves",
     "@quillai-network/wachai-validation-sdk",
     "@coinbase/cdp-sdk",
   ],

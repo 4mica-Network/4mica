@@ -86,7 +86,7 @@ export class ConfigBuilder {
     return this;
   }
 
-  /** Override the Core4Mica contract address. Normally unnecessary: core advertises the deployment. */
+  /** Override the Treasury contract address. Normally unnecessary: core advertises the deployment. */
   contractAddress(value: string): ConfigBuilder {
     this._contractAddress = value;
     return this;
