@@ -28,7 +28,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   }, [dispatch, isSignedIn, tokenReady, userId]);
 
   if (!tokenReady) {
-    return <FullScreenLoader messageKey="auth.loading" />;
+    return <FullScreenLoader />;
   }
 
   return <>{children}</>;

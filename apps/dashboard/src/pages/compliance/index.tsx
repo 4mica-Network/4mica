@@ -34,6 +34,7 @@ import {
   TextInput,
 } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { OwnersCard } from "./OwnersCard";
@@ -202,7 +203,7 @@ export function ComplianceSettings() {
       descriptionKey="page.settings.compliance.description"
     >
       {isLoading && !hasLoaded ? (
-        <p className="text-ink-muted text-sm">{t("settings.loading")}</p>
+        <PageSpinner />
       ) : (
         <>
           <ReviewCard />
