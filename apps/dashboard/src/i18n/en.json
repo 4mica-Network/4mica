@@ -66,8 +66,6 @@
   "settings.account.twoFactorOn": "On",
   "settings.account.twoFactorOff": "Off",
   "settings.account.twoFactorManage": "Manage",
-  "settings.business.entity": "Legal entity",
-  "settings.business.entityHint": "The company that receives payouts and appears on invoices.",
   "settings.business.kyb": "Verification status",
   "settings.business.kybHint": "Required before you can receive payouts.",
   "settings.business.typeHint": "Determines which compliance checks apply.",

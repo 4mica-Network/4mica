@@ -178,10 +178,7 @@ export function BusinessSettings() {
       titleKey="page.settings.business.title"
       descriptionKey="page.settings.business.description"
     >
-      <SettingsSection
-        title={t("settings.business.entity")}
-        description={t("settings.business.entityHint")}
-      >
+      <div className="flex flex-col gap-3">
         <Card className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
@@ -283,7 +280,7 @@ export function BusinessSettings() {
             />
           </SettingRow>
         </InstantCard>
-      </SettingsSection>
+      </div>
 
       <SettingsSection
         title={t("settings.business.registration")}
