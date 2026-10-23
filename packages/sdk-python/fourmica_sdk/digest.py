@@ -181,7 +181,7 @@ def digest_for_permit(
 ) -> bytes:
     """Signing hash for an EIP-2612 ``permit``. *nonce* must be the owner's
     current one — a client without chain access gets it from the facilitator's
-    ``PERMIT2_ALLOWANCE_REQUIRED`` response rather than reading the token."""
+    ``permit2_allowance_required`` response rather than reading the token."""
     struct_hash = keccak(
         abi_encode(
             ["bytes32", "address", "address", "uint256", "uint256", "uint256"],

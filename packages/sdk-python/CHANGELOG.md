@@ -89,7 +89,7 @@ repository into the `4mica` monorepo (`packages/sdk-python`); the PyPI name
   elsewhere, and `verify()` preflights. Auto `send()` prefers gasless and
   falls back to self-funding only when the rejection does not name the
   request; unknown outcomes are never retried. Facilitator rejections carry
-  their `errorCode` verbatim; `PERMIT2_ALLOWANCE_REQUIRED` surfaces as
+  their reason verbatim; `permit2_allowance_required` surfaces as
   `Permit2AllowanceRequiredError` with the EIP-2612 nonce when the approval
   can be sponsored. Configure with `facilitator_url` /
   `4MICA_FACILITATOR_URL`.

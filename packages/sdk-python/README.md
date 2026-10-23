@@ -225,7 +225,7 @@ await (
 ```
 
 Read the receipt's `route` to see which one actually ran. Rejections that
-name the request itself (`SIGNATURE_MISMATCH`, `INSUFFICIENT_BALANCE`, …)
+name the request itself (`invalid_signature`, `insufficient_funds`, …)
 are surfaced, not retried — your own transaction would fail the same way —
 and an `OutcomeUnknownError` means the facilitator may already have
 submitted: check the chain before resending.
@@ -257,8 +257,9 @@ print(settled.settlement.success, settled.settlement.receipt)
 Everything derives from `FourMicaError`. Contract reverts decode to typed
 exceptions (`InsufficientAvailableError`, `GracePeriodNotElapsedError`, …);
 missing allowances surface as `Erc20AllowanceRequiredError` *before* gas is
-spent; facilitator rejections carry their `errorCode` verbatim on
-`FacilitatorRejectedError`, so callers can branch on codes this SDK predates.
+spent; facilitator rejections carry their reason (such as
+`simulation_reverted`) verbatim as `FacilitatorRejectedError.code`, so callers
+can branch on codes this SDK predates.
 Core's own coded refusals carry `code` and `details` on `RpcError`, and the
 payment ones arrive typed (see [Refusals](#refusals)).
 
