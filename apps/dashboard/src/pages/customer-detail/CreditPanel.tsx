@@ -140,14 +140,13 @@ function GrantForm({
           type="button"
           intent="invert"
           size="sm"
-          className="btn-no-lift w-24"
-          disabled={isSaving || trimmedAmount === "" || Boolean(amountError)}
+          className="btn-no-lift w-24 text-sm"
+          loading={isSaving}
+          disabled={trimmedAmount === "" || Boolean(amountError)}
           onClick={submit}
           data-testid="customer-credit-save"
         >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : t("customer.credit.save")}
-          </span>
+          {t("customer.credit.save")}
         </Button>
       </div>
     </SectionInset>

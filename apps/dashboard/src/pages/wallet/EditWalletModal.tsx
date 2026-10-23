@@ -1,5 +1,5 @@
 import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -124,16 +124,13 @@ export function EditWalletModal({
           <Button
             intent="invert"
             size="sm"
-            className="btn-no-lift min-w-24"
+            className="btn-no-lift min-w-24 text-sm"
+            loading={isSaving}
             type="submit"
             form={formId}
-            disabled={isSaving}
-            aria-busy={isSaving}
             data-testid="edit-wallet-submit"
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isSaving ? <Spinner size="sm" /> : t("wallet.edit.save")}
-            </span>
+            {t("wallet.edit.save")}
           </Button>
         </div>
       }

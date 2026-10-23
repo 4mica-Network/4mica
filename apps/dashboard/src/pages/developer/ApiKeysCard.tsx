@@ -1,4 +1,4 @@
-import { Button, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
 import {
   createApiKey,
   deleteApiKey,
@@ -18,7 +18,7 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
@@ -30,7 +30,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
   const isRevoked = Boolean(apiKey.revokedAt);
 
   return (
-    <SurfaceCard className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium text-ink-strong text-sm">
@@ -80,7 +80,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
           </Button>
         </ConfirmAction>
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }
 
@@ -108,7 +108,7 @@ export function ApiKeysCard() {
       title={t("developer.keys.title")}
       description={t("developer.keys.description")}
     >
-      <SurfaceCard>
+      <Card>
         <form
           className="flex flex-col gap-3 sm:flex-row sm:items-start"
           onSubmit={(e) => {
@@ -132,14 +132,13 @@ export function ApiKeysCard() {
             size="sm"
             intent="invert"
             className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
-            disabled={!name.trim() || isCreating}
+            loading={isCreating}
+            disabled={!name.trim()}
           >
-            <span className="flex w-full items-center justify-center">
-              {isCreating ? <Spinner size="sm" /> : t("developer.keys.create")}
-            </span>
+            {t("developer.keys.create")}
           </Button>
         </form>
-      </SurfaceCard>
+      </Card>
 
       {apiKeys.length === 0 ? (
         <EmptyState

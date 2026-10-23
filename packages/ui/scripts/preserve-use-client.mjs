@@ -26,6 +26,7 @@ const IMPORTS_REACT =
 const IMPORTS_REACT_DOM =
   /(?:from\s*["']react-dom["'])|(?:require\(\s*["']react-dom["']\s*\))/;
 const HOOK_IDENTIFIER = /\buse[A-Z]\w*/;
+const HOOK_CALL = /\buse[A-Z]\w*\s*\(/;
 
 async function* jsFiles(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -40,6 +41,7 @@ async function* jsFiles(dir) {
 
 function needsDirective(code) {
   if (IMPORTS_REACT_DOM.test(code)) return true;
+  if (HOOK_CALL.test(code)) return true;
   // A React import plus any `use*` hook reference means client-only.
   return IMPORTS_REACT.test(code) && HOOK_IDENTIFIER.test(code);
 }

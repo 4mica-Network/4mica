@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import {
   compliancePendingKeys,
   submitCompliance,
@@ -13,7 +13,6 @@ import { ArrowUpRight, Check, Circle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { KybTag } from "@/components/badges";
-import { SurfaceCard } from "@/components/layout";
 
 const SECTION_FOR: Record<string, string> = {
   "profile.incorporation": "compliance-incorporation",
@@ -73,7 +72,7 @@ export function ReviewCard() {
   const showChecklist = kybStatus === "UNVERIFIED" || kybStatus === "REJECTED";
 
   return (
-    <SurfaceCard className="flex flex-col gap-4">
+    <Card className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <span className="font-medium text-ink-strong text-sm">
@@ -119,23 +118,18 @@ export function ReviewCard() {
               type="button"
               size="sm"
               intent="invert"
-              className="btn-no-lift min-w-36"
-              disabled={!canSubmit || isSubmitting}
+              className="btn-no-lift min-w-36 text-sm"
+              loading={isSubmitting}
+              disabled={!canSubmit}
               onClick={() => dispatch(submitCompliance())}
             >
-              <span className="flex w-full items-center justify-center text-sm">
-                {isSubmitting ? (
-                  <Spinner size="sm" />
-                ) : kybStatus === "REJECTED" ? (
-                  t("compliance.review.resubmit")
-                ) : (
-                  t("compliance.review.submit")
-                )}
-              </span>
+              {kybStatus === "REJECTED"
+                ? t("compliance.review.resubmit")
+                : t("compliance.review.submit")}
             </Button>
           </div>
         </div>
       )}
-    </SurfaceCard>
+    </Card>
   );
 }

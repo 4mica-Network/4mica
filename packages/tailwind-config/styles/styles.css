@@ -356,6 +356,15 @@
     color: rgb(var(--brand));
   }
 
+  .btn-danger {
+    background: rgb(var(--color-danger));
+    color: rgb(var(--surface-deep));
+  }
+
+  .btn-danger:hover {
+    background: rgb(var(--color-danger) / 0.9);
+  }
+
   .link-muted {
     color: rgb(var(--ink) / 0.8);
     transition: color 200ms ease;

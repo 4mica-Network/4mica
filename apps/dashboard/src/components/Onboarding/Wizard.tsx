@@ -1,4 +1,4 @@
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { useClerk } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { completeOnboarding, updateProfile } from "@stores/user/actions";
@@ -176,19 +176,12 @@ export function Wizard() {
             <Button
               intent="invert"
               size="sm"
-              className="btn-no-lift min-w-24"
-              disabled={!canContinue || Boolean(pending)}
+              className="btn-no-lift min-w-24 text-sm"
+              loading={Boolean(pending)}
+              disabled={!canContinue}
               onClick={submit}
             >
-              <span className="flex w-full items-center justify-center text-sm">
-                {pending ? (
-                  <Spinner size="sm" />
-                ) : isLastStep ? (
-                  t("onboarding.finish")
-                ) : (
-                  t("onboarding.continue")
-                )}
-              </span>
+              {isLastStep ? t("onboarding.finish") : t("onboarding.continue")}
             </Button>
           </div>
         </div>

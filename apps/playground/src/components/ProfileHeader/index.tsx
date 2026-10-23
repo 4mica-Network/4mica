@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/Avatar";
+import { Avatar } from "@4mica/ui";
 import { ProfileContact } from "@/components/ProfileContact";
 import { Prose } from "@/components/Prose";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -10,8 +10,10 @@ export function ProfileHeader({ profile }: { profile: PublicProfile }) {
       <Avatar
         src={profile.avatarUrl}
         name={profile.name}
-        username={profile.username}
+        fallback={profile.username}
+        alt={`${profile.name || profile.username}'s avatar`}
         size="xl"
+        className="profile-avatar"
       />
 
       <div className="flex flex-wrap items-center gap-2">

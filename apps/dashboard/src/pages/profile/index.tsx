@@ -1,5 +1,5 @@
 import { isHexColor, isSingleLine } from "@4mica/rules";
-import { Button, Spinner } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { confirmEmailVerification, updateProfile } from "@stores/user/actions";
 import {
@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
@@ -203,7 +203,7 @@ export function ProfileSettings() {
     >
       <section className="flex flex-col gap-3">
         {pendingVerification.token ? (
-          <SurfaceCard className="flex items-center justify-between gap-4">
+          <Card className="flex items-center justify-between gap-4">
             <div>
               <span className="font-medium text-ink-strong text-sm">
                 {t("page.settings.profile.verify.confirm.title")}
@@ -226,8 +226,8 @@ export function ProfileSettings() {
                 type="button"
                 intent="invert"
                 size="sm"
-                className="btn-no-lift w-32"
-                disabled={sendingVerification}
+                className="btn-no-lift w-32 text-sm"
+                loading={sendingVerification}
                 onClick={() => {
                   dispatch(
                     confirmEmailVerification(
@@ -237,16 +237,10 @@ export function ProfileSettings() {
                   pendingVerification.clear();
                 }}
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {sendingVerification ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    t("page.settings.profile.verify.confirm.action")
-                  )}
-                </span>
+                {t("page.settings.profile.verify.confirm.action")}
               </Button>
             </div>
-          </SurfaceCard>
+          </Card>
         ) : null}
 
         <EditableCard

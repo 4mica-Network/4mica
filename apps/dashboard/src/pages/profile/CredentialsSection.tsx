@@ -1,5 +1,5 @@
 import { isPhoneNumber, toE164 } from "@4mica/rules";
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { sendEmailVerification, updateAccount } from "@stores/user/actions";
 import {
@@ -110,18 +110,12 @@ export function CredentialsSection({ user }: { user: User }) {
                 type="button"
                 intent="invert"
                 size="sm"
-                className="btn-no-lift w-28 shrink-0"
-                disabled={sendingVerification}
+                className="btn-no-lift w-28 shrink-0 text-xs"
+                loading={sendingVerification}
                 aria-label={t("settings.profile.verifyEmail")}
                 onClick={() => dispatch(sendEmailVerification())}
               >
-                <span className="flex w-full items-center justify-center text-xs">
-                  {sendingVerification ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    t("settings.profile.verifyEmail")
-                  )}
-                </span>
+                {t("settings.profile.verifyEmail")}
               </Button>
             )
           }
@@ -163,12 +157,10 @@ export function CredentialsSection({ user }: { user: User }) {
                 type="button"
                 intent="invert"
                 size="sm"
-                className="btn-no-lift w-28 shrink-0"
+                className="btn-no-lift w-28 shrink-0 text-xs"
                 onClick={() => setVerifyingPhone(true)}
               >
-                <span className="flex w-full items-center justify-center text-xs">
-                  {t("settings.account.phoneVerify.action")}
-                </span>
+                {t("settings.account.phoneVerify.action")}
               </Button>
             ) : (
               <VerifiedBadge

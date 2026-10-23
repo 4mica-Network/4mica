@@ -1,6 +1,6 @@
+import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useCopyToClipboard } from "./useCopyToClipboard";
 
 describe("useCopyToClipboard", () => {
   const writeText = vi.fn();

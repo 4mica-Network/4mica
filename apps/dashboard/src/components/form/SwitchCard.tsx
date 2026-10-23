@@ -1,6 +1,6 @@
-import { Switch } from "@4mica/ui";
+import { Card, Switch } from "@4mica/ui";
 import { useId } from "react";
-import { SavingIndicator, SurfaceCard } from "@/components/layout";
+import { SavingIndicator } from "@/components/layout";
 
 export function SwitchCard({
   id,
@@ -23,7 +23,7 @@ export function SwitchCard({
 }) {
   const descriptionId = useId();
   return (
-    <SurfaceCard className="flex items-center justify-between gap-4">
+    <Card className="flex items-center justify-between gap-4">
       <div className="min-w-0 flex-1">
         <span className="font-medium text-ink-strong text-sm">{title}</span>
         {description && (
@@ -46,6 +46,6 @@ export function SwitchCard({
           disabled={disabled}
         />
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }

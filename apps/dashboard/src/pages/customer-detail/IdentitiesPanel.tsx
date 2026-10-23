@@ -311,14 +311,11 @@ function AddIdentityCard({
             type="submit"
             intent="invert"
             size="sm"
-            className="btn-no-lift w-24"
-            disabled={isSaving}
-            aria-busy={isSaving}
+            className="btn-no-lift w-24 text-sm"
+            loading={isSaving}
             data-testid="customer-identity-save"
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
-            </span>
+            {t("customer.identity.save")}
           </Button>
         </div>
       </Form>

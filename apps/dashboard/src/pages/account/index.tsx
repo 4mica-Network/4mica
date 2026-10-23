@@ -1,4 +1,4 @@
-import { Button } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateAccount } from "@stores/user/actions";
@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { VerifiedBadge } from "@/components/badges";
 import { InstantCard } from "@/components/EditableCard";
 import { FieldRow, Select, SettingRow, SwitchCard } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 
 const THEMES = [
@@ -150,7 +150,7 @@ export function AccountSettings() {
           isSaving={savingPrivacy}
           onToggle={(v) => set("privacyMode", v)}
         />
-        <SurfaceCard className="flex items-center justify-between gap-4">
+        <Card className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.account.twoFactor")}
@@ -177,7 +177,7 @@ export function AccountSettings() {
               {t("settings.account.twoFactorManage")}
             </Button>
           </div>
-        </SurfaceCard>
+        </Card>
       </SettingsSection>
     </SettingsPage>
   );

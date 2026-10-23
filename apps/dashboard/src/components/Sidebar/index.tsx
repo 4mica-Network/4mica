@@ -1,4 +1,5 @@
-import { cn, Dropdown, Tooltip } from "@4mica/ui";
+import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
+import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
@@ -17,7 +18,6 @@ import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
@@ -86,20 +86,14 @@ function AvatarCircle() {
   const { t } = useTranslation();
   const { user } = useUser();
 
-  if (user?.imageUrl) {
-    return (
-      <img
-        src={user.imageUrl}
-        alt=""
-        className="h-8 w-8 shrink-0 rounded-full object-cover"
-      />
-    );
-  }
-
   return (
-    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/15 font-semibold text-sm text-white">
-      {t("monogram")}
-    </span>
+    <Avatar
+      src={user?.imageUrl}
+      name={t("monogram")}
+      alt=""
+      size="xs"
+      className="border-0 bg-overlay/15 text-white"
+    />
   );
 }
 
