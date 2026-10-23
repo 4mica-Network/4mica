@@ -1,4 +1,4 @@
-import { Button, EmptyState, Pagination, Spinner } from "@4mica/ui";
+import { Button, EmptyState, Pagination } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   batchDeleteWallets,
@@ -21,6 +21,7 @@ import type { Wallet as WalletType } from "@stores/wallet/type";
 import { ArrowUpRight, Plus, TriangleAlert, WalletMinimal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { CreateWalletModal } from "./CreateWalletModal";
@@ -103,9 +104,7 @@ export function Wallet() {
         )}
 
         {showSpinner ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner size="lg" className="text-ink-subtle" />
-          </div>
+          <PageSpinner />
         ) : showError ? (
           <EmptyState
             className="flex-1"

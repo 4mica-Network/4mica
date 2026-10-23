@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { fetchAgents } from "@stores/agent/actions";
 import { selectAgents, selectHasLoadedAgents } from "@stores/agent/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/layout";
+import { PageSpinner } from "@/components/PageSpinner";
 import { FaqEditor } from "@/components/Resource/FaqEditor";
 import { PolicyForm } from "@/components/Resource/PolicyForm";
 import { ReportsPanel } from "@/components/Resource/ReportsPanel";
@@ -55,11 +56,7 @@ export function AgentDetail() {
   }, [dispatch, id]);
 
   if (!hasLoaded && !agent) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (!agent) {

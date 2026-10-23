@@ -8,7 +8,7 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (!isLoaded) {
-    return <FullScreenLoader messageKey="auth.loading" />;
+    return <FullScreenLoader />;
   }
 
   if (!isSignedIn) {

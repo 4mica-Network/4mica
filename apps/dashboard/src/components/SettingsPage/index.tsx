@@ -2,6 +2,7 @@ import { useAppSelector } from "@stores/hooks";
 import { selectIsUserLoading } from "@stores/user/selector";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
 export function SettingsPage({
@@ -27,11 +28,7 @@ export function SettingsPage({
             <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
           </div>
 
-          {isLoading ? (
-            <p className="text-ink-muted text-sm">{t("settings.loading")}</p>
-          ) : (
-            children
-          )}
+          {isLoading ? <PageSpinner /> : children}
         </div>
       </div>
     </div>

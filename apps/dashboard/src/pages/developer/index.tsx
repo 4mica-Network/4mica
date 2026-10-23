@@ -5,14 +5,13 @@ import {
 } from "@stores/developer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
-import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { RevealedSecretBanner } from "@/components/RevealedSecret";
 import { SettingsPage } from "@/components/SettingsPage";
 import { ApiKeysCard } from "./ApiKeysCard";
 import { WebhooksCard } from "./WebhooksCard";
 
 export function DeveloperSettings() {
-  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectIsDeveloperLoading);
   const hasLoaded = useAppSelector(selectHasLoadedDeveloper);
@@ -27,7 +26,7 @@ export function DeveloperSettings() {
       descriptionKey="page.settings.developer.description"
     >
       {isLoading && !hasLoaded ? (
-        <p className="text-ink-muted text-sm">{t("settings.loading")}</p>
+        <PageSpinner />
       ) : (
         <>
           <RevealedSecretBanner />
