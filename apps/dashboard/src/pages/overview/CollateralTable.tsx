@@ -1,12 +1,11 @@
 import { shortenAddress } from "@4mica/rules";
-import { cn, Tooltip } from "@4mica/ui";
+import { cn, Segmented, Tooltip } from "@4mica/ui";
 import type { WalletBalance } from "@stores/balance/type";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ROLE_LABEL_KEYS } from "@/pages/wallet/constants";
 import { type AssetTotal, collateralRows, formatBalance } from "./metrics";
 import { Panel } from "./Panel";
-import { Segmented } from "./Segmented";
 
 const SHARE_TINTS = [
   "bg-ink-strong",
@@ -47,7 +46,7 @@ export function CollateralTable({
               label: entry.symbol,
             }))}
             onChange={setAssetAddress}
-            testId="overview-collateral-asset"
+            data-testid="overview-collateral-asset"
           />
         ) : undefined
       }

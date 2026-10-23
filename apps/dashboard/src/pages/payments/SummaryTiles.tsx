@@ -1,5 +1,5 @@
 import { trimAmount } from "@4mica/rules";
-import { Tooltip } from "@4mica/ui";
+import { Card, Tooltip } from "@4mica/ui";
 import type { PaymentSummary, PaymentTotals } from "@stores/payment/type";
 import { useTranslation } from "react-i18next";
 
@@ -45,10 +45,7 @@ function Tile({
   const { t } = useTranslation();
 
   return (
-    <div
-      className="flex flex-col gap-2 rounded-lg border border-overlay/10 bg-surface px-4 py-3.5"
-      data-testid={testId}
-    >
+    <Card className="flex flex-col gap-2 px-4 py-3.5" data-testid={testId}>
       <span className="text-ink-subtle text-xs uppercase tracking-wide">
         {title}
       </span>
@@ -72,7 +69,7 @@ function Tile({
           </Tooltip>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 

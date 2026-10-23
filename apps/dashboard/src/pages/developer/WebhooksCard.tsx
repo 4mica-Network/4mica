@@ -1,4 +1,4 @@
-import { Button, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
 import {
   createWebhook,
   deleteWebhook,
@@ -20,7 +20,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { ComboBox, FieldRow, TextInput } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function WebhookRow({ webhook }: { webhook: Webhook }) {
@@ -40,7 +40,7 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
   const enabled = webhook.status === "ENABLED";
 
   return (
-    <SurfaceCard className="flex flex-col gap-3">
+    <Card className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="truncate font-medium text-ink-strong text-sm">
@@ -155,7 +155,7 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
           </ConfirmAction>
         </div>
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }
 
@@ -213,7 +213,7 @@ export function WebhooksCard() {
       title={t("developer.webhooks.title")}
       description={t("developer.webhooks.description")}
     >
-      <SurfaceCard>
+      <Card>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -273,19 +273,14 @@ export function WebhooksCard() {
               size="sm"
               intent="invert"
               className="btn-no-lift min-w-28 shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
-              disabled={!canSubmit || isCreating}
+              loading={isCreating}
+              disabled={!canSubmit}
             >
-              <span className="flex w-full items-center justify-center">
-                {isCreating ? (
-                  <Spinner size="sm" />
-                ) : (
-                  t("developer.webhooks.create")
-                )}
-              </span>
+              {t("developer.webhooks.create")}
             </Button>
           </div>
         </form>
-      </SurfaceCard>
+      </Card>
 
       {webhooks.length === 0 ? (
         <EmptyState

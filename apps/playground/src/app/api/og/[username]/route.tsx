@@ -1,8 +1,8 @@
+import { initials } from "@4mica/ui";
 import { ImageResponse } from "next/og";
 import { parseUsername } from "@/schema/params";
 import { getPublicProfile } from "@/services/profile";
 import { SITE_NAME } from "@/services/seo";
-import { initials } from "@/utils/initials";
 
 export const revalidate = 3600;
 

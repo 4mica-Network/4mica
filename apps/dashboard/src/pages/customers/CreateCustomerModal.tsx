@@ -1,4 +1,4 @@
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createCustomer } from "@stores/customer/actions";
 import {
@@ -173,16 +173,14 @@ export function CreateCustomerModal({
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
+                loading={isSaving}
                 type="submit"
                 form={formId}
                 disabled={!canSubmit}
-                aria-busy={isSaving}
                 data-testid="create-customer-submit"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {isSaving ? <Spinner size="sm" /> : t("customer.create.save")}
-                </span>
+                {t("customer.create.save")}
               </Button>
             ) : (
               <Button

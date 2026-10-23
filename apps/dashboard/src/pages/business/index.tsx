@@ -1,4 +1,5 @@
 import { isPhoneNumber, isWebUrl } from "@4mica/rules";
+import { Card } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateBusiness } from "@stores/user/actions";
 import {
@@ -20,7 +21,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
 import { useDraft } from "@/hooks/useDraft";
@@ -181,7 +182,7 @@ export function BusinessSettings() {
         title={t("settings.business.entity")}
         description={t("settings.business.entityHint")}
       >
-        <SurfaceCard className="flex items-center justify-between gap-4">
+        <Card className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.business.kyb")}
@@ -194,7 +195,7 @@ export function BusinessSettings() {
             status={business?.kybStatus ?? "UNVERIFIED"}
             label={t(`settings.kyb.${business?.kybStatus ?? "UNVERIFIED"}`)}
           />
-        </SurfaceCard>
+        </Card>
 
         <EditableCard
           isDirty={entity.isDirty}

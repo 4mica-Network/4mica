@@ -1,11 +1,10 @@
-import { Button, cn } from "@4mica/ui";
+import { Button, Card, cn } from "@4mica/ui";
+import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { dismissRevealedSecret } from "@stores/developer/actions";
 import { selectRevealedSecret } from "@stores/developer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Check, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { SurfaceCard } from "@/components/layout";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 
 export function SecretRevealCard({
   title,
@@ -25,7 +24,7 @@ export function SecretRevealCard({
   const copy = () => copyText(plaintext);
 
   return (
-    <SurfaceCard
+    <Card
       className={cn("border-warning/40 bg-warning/5", className)}
       data-testid={testId}
     >
@@ -65,7 +64,7 @@ export function SecretRevealCard({
           </Button>
         </div>
       </div>
-    </SurfaceCard>
+    </Card>
   );
 }
 

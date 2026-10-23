@@ -1,6 +1,5 @@
-/** Up to two initials for the avatar fallback. Falls back to the handle. */
-export const initials = (name: string, username: string): string => {
-  const source = name.trim() || username;
+export const initials = (name: string, fallback = ""): string => {
+  const source = name.trim() || fallback;
   const parts = source.split(/\s+/).filter(Boolean);
 
   if (parts.length === 0) {

@@ -1,4 +1,4 @@
-import { Button, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
 import {
   compliancePendingKeys,
   createOwner,
@@ -26,7 +26,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, SettingRow, TextInput } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { type FieldError, type OwnerDraft, ownerErrors } from "./validation";
 
@@ -251,12 +251,11 @@ function OwnerForm({
           type="submit"
           size="sm"
           intent="invert"
-          className="btn-no-lift min-w-20"
-          disabled={Object.keys(errors).length > 0 || isSaving}
+          className="btn-no-lift min-w-20 text-sm"
+          loading={isSaving}
+          disabled={Object.keys(errors).length > 0}
         >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : submitLabel}
-          </span>
+          {submitLabel}
         </Button>
       </div>
     </form>
@@ -282,7 +281,7 @@ function OwnerRow({
 
   if (editing) {
     return (
-      <SurfaceCard>
+      <Card>
         <OwnerForm
           id={`owner-${owner.id}`}
           initial={toDraft(owner)}
@@ -291,12 +290,12 @@ function OwnerRow({
           onSubmit={(data) => dispatch(updateOwner({ id: owner.id, data }))}
           onCancel={() => setEditing(false)}
         />
-      </SurfaceCard>
+      </Card>
     );
   }
 
   return (
-    <SurfaceCard className="flex items-start justify-between gap-4">
+    <Card className="flex items-start justify-between gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-medium text-ink-strong text-sm">
@@ -364,7 +363,7 @@ function OwnerRow({
           </ConfirmAction>
         </div>
       )}
-    </SurfaceCard>
+    </Card>
   );
 }
 
@@ -401,7 +400,7 @@ export function OwnersCard() {
       }
     >
       {adding && (
-        <SurfaceCard>
+        <Card>
           <OwnerForm
             id="owner-new"
             initial={BLANK}
@@ -410,7 +409,7 @@ export function OwnersCard() {
             onSubmit={(input) => dispatch(createOwner(input))}
             onCancel={() => setAdding(false)}
           />
-        </SurfaceCard>
+        </Card>
       )}
 
       {owners.length === 0 && !adding ? (

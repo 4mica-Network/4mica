@@ -1,9 +1,8 @@
-import { Tag } from "@4mica/ui";
+import { Avatar, Tag } from "@4mica/ui";
 import { BookText, CalendarDays, Globe, UserRound, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Avatar } from "@/components/Avatar";
 import { CardShell } from "@/components/CardShell";
 import { CopyValue } from "@/components/CopyValue";
 import {
@@ -244,10 +243,12 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
             <header className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
                 <Avatar
+                  alt={`${agent.name || agent.ref}'s avatar`}
+                  className="profile-avatar"
+                  fallback={agent.ref}
                   name={agent.name}
                   size="md"
                   src={agent.avatarUrl}
-                  username={agent.ref}
                 />
                 <div className="flex min-w-0 flex-col gap-1">
                   <h1 className="font-semibold text-ink-strong text-lg leading-tight">

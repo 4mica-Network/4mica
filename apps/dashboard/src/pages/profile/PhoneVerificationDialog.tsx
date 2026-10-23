@@ -1,5 +1,5 @@
 import { toE164 } from "@4mica/rules";
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { useUser } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -162,20 +162,13 @@ export function PhoneVerificationDialog({
             form={formId}
             intent="invert"
             size="sm"
-            className="btn-no-lift min-w-28"
-            disabled={
-              working || (step === "code" && code.length !== CODE_LENGTH)
-            }
+            className="btn-no-lift min-w-28 text-sm"
+            loading={working}
+            disabled={step === "code" && code.length !== CODE_LENGTH}
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {working ? (
-                <Spinner size="sm" />
-              ) : step === "send" ? (
-                t("settings.account.phoneVerify.send")
-              ) : (
-                t("settings.account.phoneVerify.verify")
-              )}
-            </span>
+            {step === "send"
+              ? t("settings.account.phoneVerify.send")
+              : t("settings.account.phoneVerify.verify")}
           </Button>
         </div>
       }
