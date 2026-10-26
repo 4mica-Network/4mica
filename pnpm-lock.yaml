@@ -744,6 +744,9 @@ importers:
       '@types/node':
         specifier: catalog:node26
         version: 26.3.0
+      '@x402/fetch':
+        specifier: 'catalog:'
+        version: 2.28.0
       express:
         specifier: 'catalog:'
         version: 5.2.1

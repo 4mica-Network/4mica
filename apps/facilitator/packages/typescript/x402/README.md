@@ -402,6 +402,15 @@ core's clock after a cycle or timestamp refusal, and waits out a checkpoint
 cutoff. Anything else, or a recovery that fails, reaches the caller as the
 `402`.
 
+## Development
+
+```bash
+pnpm test
+```
+
+The end-to-end tests in `e2e/` need a local core and facilitator;
+`../../e2e/stack.sh test ts` brings them up and runs the tests.
+
 ## License
 
 MIT

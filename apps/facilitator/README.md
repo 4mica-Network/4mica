@@ -855,6 +855,15 @@ cargo test
 Integration-style tests use a mock verifier to exercise `/verify`, `/settle`, and the discovery
 endpoints without contacting 4mica.
 
+The x402 packages (`packages/typescript/x402`, `packages/python/x402`) have end-to-end tests that
+pay through a real seller and buyer against a local core and this facilitator.
+`packages/e2e/stack.sh` brings that stack up (core with a low uncheckpointed-payment limit, the
+facilitator, funded payers) and runs them:
+
+```bash
+packages/e2e/stack.sh test        # or: test ts | test py
+```
+
 Point your x402 resource server at this facilitator to outsource 4mica guarantee verification while
 keeping custody and settlement under your own infrastructure.
 

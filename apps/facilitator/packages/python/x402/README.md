@@ -88,3 +88,6 @@ Install dev tools:
 ```bash
 pip install -e .[dev]
 ```
+
+The end-to-end tests in `e2e/` need a local core and facilitator;
+`../../e2e/stack.sh test py` brings them up and runs the tests.
