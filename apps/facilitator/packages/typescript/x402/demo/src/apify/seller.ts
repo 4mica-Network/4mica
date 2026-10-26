@@ -151,8 +151,11 @@ export class DemoSeller {
   }
 
   /** Issues the cap guarantee in core, binding it to the open settlement cycle. Throws on failure. */
-  settle(payload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> {
-    return this.server.settlePayment(payload, requirements)
+  async settle(
+    payload: PaymentPayload,
+    requirements: PaymentRequirements
+  ): Promise<SettleResponse> {
+    return settledOrThrow(await this.server.settlePayment(payload, requirements))
   }
 
   /** What a run that produced `results` results costs against the cap. */
@@ -181,9 +184,16 @@ export class DemoSeller {
       accepted: requirements,
       payload: signed.payload,
     }
-    const settlement = await this.facilitator.settle(payload, requirements)
+    const settlement = settledOrThrow(await this.facilitator.settle(payload, requirements))
     return { amount: billing.refund, from: this.address, to: buyer, settlement }
   }
+}
+
+/** `settlement` if it succeeded; a refusal comes back with `success: false`, not thrown. */
+function settledOrThrow(settlement: SettleResponse): SettleResponse {
+  if (settlement.success) return settlement
+  const reason = settlement.errorReason ?? 'unknown reason'
+  throw new Error(settlement.errorMessage ? `${reason}: ${settlement.errorMessage}` : reason)
 }
 
 /**

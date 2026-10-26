@@ -387,6 +387,21 @@ main();
      operator's ECDSA signature over the guarantee) for that cycle
    - Server returns the protected resource
 
+## Refusals
+
+When the facilitator refuses a settlement, the server answers `402` with the
+facilitator's response, base64 JSON in the `PAYMENT-RESPONSE` header: the
+reason in `errorReason`, a message in `errorMessage`, and `retryable` and
+`details` under `extra`. The reasons are listed in the
+[facilitator's README](../../../README.md#errors).
+
+`FourMicaEvmScheme` fixes the refusals a payer can fix and has x402 retry the
+request once with a new payment: it checkpoints when core asks for one
+(`invalid_4mica_credit_checkpoint_required`), relearns the active cycle and
+core's clock after a cycle or timestamp refusal, and waits out a checkpoint
+cutoff. Anything else, or a recovery that fails, reaches the caller as the
+`402`.
+
 ## License
 
 MIT

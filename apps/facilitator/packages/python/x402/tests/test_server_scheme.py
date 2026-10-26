@@ -32,6 +32,7 @@ def test_parse_price_money_default_conversion():
     parsed = scheme.parse_price("$0.10", "eip155:11155111")
     assert parsed.amount == "100000"  # 0.10 USDC with 6 decimals
     assert parsed.asset == "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+    assert parsed.extra == {}
 
 
 def test_parse_price_unsupported_network():
@@ -41,8 +42,8 @@ def test_parse_price_unsupported_network():
 
 
 def test_enhance_payment_requirements_leaves_requirements_untouched():
-    """The tab step is gone from the protocol, so there is nothing to inject —
-    a client signs its claim straight from the requirements."""
+    """A payer reads everything beyond the requirements from core, so there
+    is nothing to inject."""
     scheme = FourMicaEvmScheme()
     req = PaymentRequirements(
         scheme="4mica-credit",

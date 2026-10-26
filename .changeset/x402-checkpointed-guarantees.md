@@ -19,7 +19,7 @@ Built on `@4mica/sdk`'s checkpointed guarantees (core 2.0.0-alpha.4).
   `{ receipt, signature }`), lifted from the facilitator's `extra.receipt`.
   Verify it with `@4mica/sdk`'s `client.payment.verifyGuarantee`.
 - `FourMicaFacilitatorClient.settle` delegates to `@x402/core`'s client, which
-  parses the facilitator's x402-shaped response as is, and throws x402's
-  `SettleError` (carrying `errorReason` and `errorMessage`) on a refusal. The
-  `txHash`, `networkId` and `error` aliases on `FourMicaSettleResponse` are
-  gone; read `transaction`, `network` and `errorReason`.
+  parses the facilitator's x402-shaped response as is, and returns a refusal
+  with `success: false` instead of throwing. The `txHash`, `networkId` and
+  `error` aliases on `FourMicaSettleResponse` are gone; read `transaction`,
+  `network` and `errorReason`.

@@ -1,10 +1,5 @@
 import { type FacilitatorConfig, HTTPFacilitatorClient } from '@x402/core/server'
-import {
-  type PaymentPayload,
-  type PaymentRequirements,
-  SettleError,
-  type SettleResponse,
-} from '@x402/core/types'
+import type { PaymentPayload, PaymentRequirements, SettleResponse } from '@x402/core/types'
 
 const DEFAULT_FACILITATOR_URL = 'https://x402.4mica.xyz'
 
@@ -33,18 +28,16 @@ export class FourMicaFacilitatorClient extends HTTPFacilitatorClient {
   }
 
   /**
-   * Settles through the facilitator, throwing x402's `SettleError` on a refusal
-   * (which the facilitator reports as HTTP 200 with `success: false`) rather
-   * than returning it.
+   * Settles through the facilitator. A refusal comes back as is, with
+   * `success: false`: x402 relays a returned refusal to the payer whole, `extra`
+   * included, but drops `extra` from a thrown `SettleError`.
    */
   async settle(
     paymentPayload: PaymentPayload,
     paymentRequirements: PaymentRequirements
   ): Promise<FourMicaSettleResponse> {
     const settled = await super.settle(paymentPayload, paymentRequirements)
-    if (!settled.success) {
-      throw new SettleError(200, settled)
-    }
+    if (!settled.success) return settled
     return { ...settled, receipt: readGuaranteeReceipt(settled.extra?.receipt) }
   }
 }
