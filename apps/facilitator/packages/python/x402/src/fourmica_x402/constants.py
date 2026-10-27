@@ -7,9 +7,9 @@ from typing import Dict, List, TypedDict
 SUPPORTED_NETWORKS: List[str] = ["eip155:11155111", "eip155:84532", "eip155:8453"]
 
 DEFAULT_RPC_URLS: Dict[str, str] = {
-    "eip155:11155111": "https://ethereum.sepolia.api.4mica.xyz",
-    "eip155:84532": "https://base.sepolia.api.4mica.xyz",
-    "eip155:8453": "https://base.api.4mica.xyz",
+    "eip155:11155111": "https://ethereum.sepolia.api.4mica.io",
+    "eip155:84532": "https://base.sepolia.api.4mica.io",
+    "eip155:8453": "https://base.api.4mica.io",
 }
 
 

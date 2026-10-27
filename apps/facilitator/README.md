@@ -24,7 +24,7 @@ operator's signed guarantee receipt to the recipient.
 
 ### Quick integration (resource servers)
 
-- Configure the 4mica facilitator (for example `https://x402.4mica.xyz/`). Your `402 Payment Required` responses should advertise `scheme = "4mica-credit"`, a supported `network`, and set `payTo` / `asset` (an address from core's `GET /core/tokens` for that network) / `amount` (`maxAmountRequired` under x402 v1). To gate the payment on a validation outcome, also advertise `paymentRequirements.extra.validation = { validator, subject, deadline?, params? }`.
+- Configure the 4mica facilitator (for example `https://testnet.payment.4mica.io/`). Your `402 Payment Required` responses should advertise `scheme = "4mica-credit"`, a supported `network`, and set `payTo` / `asset` (an address from core's `GET /core/tokens` for that network) / `amount` (`maxAmountRequired` under x402 v1). To gate the payment on a validation outcome, also advertise `paymentRequirements.extra.validation = { validator, subject, deadline?, params? }`.
 - Clients sign a payment straight from your `paymentRequirements` — no round-trip to you or the facilitator first — producing the x402 `paymentPayload` that they send on the retried request for the protected resource. You never construct this payload yourself; you only need to validate and consume it.
 - When a request arrives with a payment payload, send it together with the original `paymentRequirements` to the facilitator's `/verify` and `/settle` endpoints. Use `/verify` as an optional preflight check before doing work, and `/settle` once you are ready to accept credit: 4mica core issues the guarantee in the open settlement cycle for that asset, and the facilitator returns the operator's signed receipt. When core refuses, pass the `/settle` response back to the payer: its `errorReason` and `extra.details` say what to do. That is the whole integration — there are no endpoints for you to implement.
 
@@ -47,7 +47,7 @@ operator's signed guarantee receipt to the recipient.
       cfg = (
           ConfigBuilder()
           .wallet_private_key(payer_key)
-          .rpc_url("https://base.sepolia.api.4mica.xyz/")
+          .rpc_url("https://base.sepolia.api.4mica.io/")
           .build()
       )
       client = await Client.connect(cfg)
@@ -108,7 +108,7 @@ operator's signed guarantee receipt to the recipient.
 You can pair the client with `examples/server/mock_paid_api.py`, a FastAPI server that simulates a
 paywalled endpoint. Start it with `python examples/server/mock_paid_api.py` (set `PORT` to override
 the default `9000`). The mock resource will call the facilitator's `/verify` endpoint (defaulting to
-`https://x402.4mica.xyz/`; override with `FACILITATOR_URL`) whenever it receives a payment payload
+`https://testnet.payment.4mica.io/`; override with `FACILITATOR_URL`) whenever it receives a payment payload
 (the mock speaks x402 v1, so it reads the `X-PAYMENT` header).
 
 The bundled Rust example shows how to sign a payment
@@ -671,7 +671,7 @@ The facilitator can transparently replace the EIP-3009/x402 debit flow. The key 
 
 ### Changes resource servers must make
 
-1. **Point at the credit facilitator** – set `X402_FACILITATOR_URL=https://x402.4mica.xyz`
+1. **Point at the credit facilitator** – set `X402_FACILITATOR_URL=https://testnet.payment.4mica.io`
    (or the TypeScript `CC_FACILITATOR_URL`). This host validates signed payments and returns the
    operator's guarantee receipts instead of ERC-3009 transfer receipts.
 2. **Emit credit-flavoured `paymentRequirements`** – switch the identifying strings and, if the
@@ -769,18 +769,18 @@ export X402_SCHEME=4mica-credit
 # List of supported networks (JSON). Each entry must include
 # `{ "network", "coreApiUrl", "authWalletPrivateKey" }` where `network` is a
 # CAIP-2 identifier (e.g., `eip155:84532`).
-export X402_NETWORKS='[{"network":"eip155:84532","coreApiUrl":"https://base.sepolia.api.4mica.xyz/","authWalletPrivateKey":"0x..."}]'
+export X402_NETWORKS='[{"network":"eip155:84532","coreApiUrl":"https://base.sepolia.api.4mica.io/","authWalletPrivateKey":"0x..."}]'
 # Legacy single-network fallback if X402_NETWORKS is unset
 export X402_NETWORK=eip155:84532
 
 # 4mica public API – used to fetch operator parameters. REQUIRED: there is no
 # default, so an unconfigured facilitator refuses to start rather than pointing
 # itself at a live core API.
-export X402_CORE_API_URL=https://base.sepolia.api.4mica.xyz/
+export X402_CORE_API_URL=https://base.sepolia.api.4mica.io/
 # SIWE key used to authenticate against the core API. REQUIRED, per network.
 export X402_AUTH_WALLET_PRIVATE_KEY=0x...
 # Optional: defaults to the network's own coreApiUrl, and 60s respectively.
-export X402_AUTH_URL=https://base.sepolia.api.4mica.xyz/
+export X402_AUTH_URL=https://base.sepolia.api.4mica.io/
 export X402_AUTH_REFRESH_MARGIN_SECS=60
 
 # Gasless deposits (optional). Without a relayer key, /deposit returns sponsorship_unavailable and the rest of

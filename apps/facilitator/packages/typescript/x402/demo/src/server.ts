@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
     message: 'x402 Demo Server',
     network: NETWORK,
     core: CORE_URL ?? 'hosted',
-    facilitator: FACILITATOR_URL ?? 'https://x402.4mica.xyz',
+    facilitator: FACILITATOR_URL ?? 'https://testnet.payment.4mica.io',
     endpoints: {
       free: ['/', '/health'],
       protected: [

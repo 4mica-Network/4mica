@@ -316,8 +316,8 @@ mod tests {
     #[test]
     fn build_siwe_message_includes_critical_fields() {
         let template = SiweTemplate {
-            domain: "api.4mica.xyz".into(),
-            uri: "https://api.4mica.xyz".into(),
+            domain: "base.sepolia.api.4mica.io".into(),
+            uri: "https://base.sepolia.api.4mica.io".into(),
             chain_id: 11155111,
             statement: "Sign this message".into(),
             expiration: "2030-01-01T00:00:00Z".into(),
@@ -325,9 +325,9 @@ mod tests {
         };
         let message = build_siwe_message(&template, "0xabc", "nonce-1");
 
-        assert!(message.contains("api.4mica.xyz wants you to sign in"));
+        assert!(message.contains("base.sepolia.api.4mica.io wants you to sign in"));
         assert!(message.contains("0xabc"));
-        assert!(message.contains("URI: https://api.4mica.xyz"));
+        assert!(message.contains("URI: https://base.sepolia.api.4mica.io"));
         assert!(message.contains("Chain ID: 11155111"));
         assert!(message.contains("Nonce: nonce-1"));
         assert!(message.contains("Expiration Time: 2030-01-01T00:00:00Z"));

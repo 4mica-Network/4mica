@@ -37,7 +37,7 @@ dev = ["pytest>=8.4.0", "pytest-asyncio>=1.0.0", "ruff>=0.6.0"]
 [project.urls]
 Homepage = "https://4mica.io"
 Repository = "https://github.com/4mica-Network/4mica"
-Documentation = "https://docs.4mica.xyz"
+Documentation = "https://docs.4mica.io"
 
 [tool.hatch.build.targets.wheel]
 packages = ["fourmica_sdk"]

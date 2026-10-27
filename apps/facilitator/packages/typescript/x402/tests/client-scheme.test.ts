@@ -120,9 +120,9 @@ describe('FourMicaEvmScheme', () => {
     await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
     expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
-      'https://ethereum.sepolia.api.4mica.xyz/',
-      'https://base.sepolia.api.4mica.xyz/',
-      'https://base.api.4mica.xyz/',
+      'https://ethereum.sepolia.api.4mica.io/',
+      'https://base.sepolia.api.4mica.io/',
+      'https://base.api.4mica.io/',
     ])
   })
 
@@ -256,7 +256,7 @@ describe('FourMicaEvmScheme always signs through core', () => {
     await scheme.createPaymentPayload(2, { ...BASE, extra: STALE_DOMAIN } as never)
 
     expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
-      'https://base.sepolia.api.4mica.xyz/',
+      'https://base.sepolia.api.4mica.io/',
     ])
   })
 

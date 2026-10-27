@@ -33,9 +33,9 @@ SDK methods over hand-built payloads or signatures.
 - A 4Mica signing key for the payer, with collateral deposited in 4mica core for the asset.
 - A recipient address for resource servers.
 - A supported CAIP-2 network string: `eip155:8453` (Base) or `eip155:84532` (Base Sepolia).
-- A facilitator URL: hosted at `https://x402.4mica.xyz/`, or self-run.
-- The core API for the network: `https://base.api.4mica.xyz/` (Base) or
-  `https://base.sepolia.api.4mica.xyz/` (Base Sepolia). `GET /core/tokens` lists the accepted assets;
+- A facilitator URL: hosted at `https://testnet.payment.4mica.io/`, or self-run.
+- The core API for the network: `https://base.api.4mica.io/` (Base) or
+  `https://base.sepolia.api.4mica.io/` (Base Sepolia). `GET /core/tokens` lists the accepted assets;
   `GET /core/public-params` carries the EIP-712 guarantee domain.
 
 ## Client (Payer) Flow
@@ -59,7 +59,7 @@ SDK methods over hand-built payloads or signatures.
 9. With `@4mica/x402/server/express`, steps 1 to 7 are `paymentMiddlewareFromConfig({ "GET /path": { accepts: { scheme: "4mica-credit", price: "$0.10", network, payTo } } })`. The middleware resolves `price` to the stablecoin core lists for the network.
 
 ## Facilitator Operations
-1. Use the hosted facilitator (`https://x402.4mica.xyz/`) or run your own instance.
+1. Use the hosted facilitator (`https://testnet.payment.4mica.io/`) or run your own instance.
 2. Configure `X402_NETWORKS` (per-network `coreApiUrl` and auth key) and, for sponsored deposits, withdrawals and clearing, the relayer keys.
 3. Expose `GET /supported`, `GET /health`, `POST /verify`, `POST /settle`, and when a relayer is configured `POST /deposit`, `/withdraw`, `/clearing/pay`, `/clearing/claim` (each with a `/verify` twin).
 4. Enforce scheme, network, asset, amount, `payTo` and `extra.validation` checks before settlement.

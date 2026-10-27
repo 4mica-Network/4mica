@@ -30,7 +30,7 @@ cp .env.example .env
 | `PRIVATE_KEY` | client, deposit, balance | Buyer wallet key, `0x`-prefixed. |
 | `SELLER_PRIVATE_KEY` | actor-server, mcp-server, balance | Seller wallet key, `0x`-prefixed. It receives the caps and pays the refunds, so it needs collateral too. |
 | `API_URL` | client | Server base URL. `http://localhost:3000` by default. |
-| `FACILITATOR_URL` | servers, deposit | Facilitator the servers verify and settle through, and that sponsors the deposit's gas. `https://x402.4mica.xyz` by default; set it empty for the deposit to go self-funded. |
+| `FACILITATOR_URL` | servers, deposit | Facilitator the servers verify and settle through, and that sponsors the deposit's gas. `https://testnet.payment.4mica.io` by default; set it empty for the deposit to go self-funded. |
 | `DEPOSIT_AMOUNT` | deposit | USDC to deposit. `2` by default. |
 | `WALLET` | balance, deposit | `seller` to act as the seller wallet; the buyer wallet otherwise. |
 | `PORT` | server | Listen port. `3000` by default. |
@@ -254,7 +254,7 @@ test USDC from step 1 rather than a mock.
 
 ## Notes
 
-- Verify and settle go to the hosted facilitator at `https://x402.4mica.xyz`.
+- Verify and settle go to the hosted facilitator at `https://testnet.payment.4mica.io`.
 - Settlement is per cycle, not per payment: the recipient's net credit becomes claimable on-chain
   when the cycle commits.
 - A refund only nets against its cap if both land in the same cycle. A run that crosses the cycle

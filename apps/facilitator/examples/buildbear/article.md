@@ -97,7 +97,7 @@ OPENAI_API_KEY=sk-...
 # Network configuration (Polygon Amoy = eip155:80002)
 USDC_ADDRESS=0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582
 X402_NETWORK=eip155:80002
-FACILITATOR_URL=https://x402.4mica.xyz
+FACILITATOR_URL=https://testnet.payment.4mica.io
 SERVER_URL=http://localhost:8402
 
 # Price in base units (USDC has 6 decimals)
@@ -234,7 +234,7 @@ async def get_image(request: Request) -> JSONResponse:
   )
 ```
 
-The facilitator at https://x402.4mica.xyz handles cryptographic verification and settlement, so you don't need to implement the complex signature verification yourself. Note the `/verify` and `/settle` calls use `paymentPayload` (decoded from the header) plus the original `paymentRequirements`.
+The facilitator at https://testnet.payment.4mica.io handles cryptographic verification and settlement, so you don't need to implement the complex signature verification yourself. Note the `/verify` and `/settle` calls use `paymentPayload` (decoded from the header) plus the original `paymentRequirements`.
 
 ## Building the AI Agent (Payer)
 

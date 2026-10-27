@@ -39,7 +39,7 @@ describe('FourMicaEvmScheme default assets', () => {
 
     expect(parsed).toEqual({ amount: '1500000', asset: USDC, extra: {} })
     expect(load).toHaveBeenCalledTimes(1)
-    expect(load).toHaveBeenCalledWith('https://base.sepolia.api.4mica.xyz/')
+    expect(load).toHaveBeenCalledWith('https://base.sepolia.api.4mica.io/')
   })
 
   it('asks core once per network', async () => {
@@ -53,8 +53,8 @@ describe('FourMicaEvmScheme default assets', () => {
     await scheme.parsePrice('$1.00', 'eip155:8453')
 
     expect(load.mock.calls.map(([url]) => url)).toEqual([
-      'https://base.sepolia.api.4mica.xyz/',
-      'https://base.api.4mica.xyz/',
+      'https://base.sepolia.api.4mica.io/',
+      'https://base.api.4mica.io/',
     ])
   })
 

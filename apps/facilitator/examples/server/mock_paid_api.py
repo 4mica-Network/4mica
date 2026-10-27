@@ -45,7 +45,7 @@ DEFAULT_MAX_AMOUNT = "100"
 DEFAULT_ASSET = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
 DEFAULT_DESCRIPTION = "Demo paid API - 4mica tab verification required"
 DEFAULT_RESOURCE = "mock-paid-endpoint"
-DEFAULT_FACILITATOR_URL = "https://x402.4mica.xyz/"
+DEFAULT_FACILITATOR_URL = "https://testnet.payment.4mica.io/"
 
 _ENV_FILE_CACHE: Optional[Dict[str, str]] = None
 _TAB_STATE: Dict[str, Dict[str, Any]] = {}

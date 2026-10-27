@@ -570,12 +570,12 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     docsNoCustody: "https://docs.4mica.io/core-concepts/no-custodial-risk",
     docsSecurity: "https://docs.4mica.io/core-concepts/security",
     status: "https://status.4mica.io",
-    facilitator: "https://x402.4mica.xyz",
-    facilitatorSettle: "https://x402.4mica.xyz/settle",
+    facilitator: "https://testnet.payment.4mica.io",
+    facilitatorSettle: "https://testnet.payment.4mica.io/settle",
     api: {
-      base: "https://base.api.4mica.xyz/",
-      baseSepolia: "https://base.sepolia.api.4mica.xyz/",
-      ethereumSepolia: "https://ethereum.sepolia.api.4mica.xyz/",
+      base: "https://base.api.4mica.io/",
+      baseSepolia: "https://base.sepolia.api.4mica.io/",
+      ethereumSepolia: "https://ethereum.sepolia.api.4mica.io/",
     },
     explorer: {
       ethereumSepolia: "https://sepolia.etherscan.io",

@@ -1,7 +1,7 @@
 import { type FacilitatorConfig, HTTPFacilitatorClient } from '@x402/core/server'
 import type { PaymentPayload, PaymentRequirements, SettleResponse } from '@x402/core/types'
 
-const DEFAULT_FACILITATOR_URL = 'https://x402.4mica.xyz'
+const DEFAULT_FACILITATOR_URL = 'https://testnet.payment.4mica.io'
 
 /**
  * The operator's guarantee receipt a 4mica `/settle` returns: the receipt
