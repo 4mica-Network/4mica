@@ -1,4 +1,3 @@
-import { SettleError } from '@x402/core/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FourMicaFacilitatorClient } from '../src/server/facilitator.js'
@@ -76,7 +75,7 @@ describe('FourMicaFacilitatorClient', () => {
     expect((await settle()).receipt).toBeUndefined()
   })
 
-  it('throws a SettleError carrying the reason and message of a refusal', async () => {
+  it('returns a refusal whole, extra included', async () => {
     respondWith({
       success: false,
       errorReason: 'invalid_4mica_credit_checkpoint_required',
@@ -86,11 +85,13 @@ describe('FourMicaFacilitatorClient', () => {
       extra: { retryable: false, details: { uncheckpointed: 64 } },
     })
 
-    const error = await settle().catch((err: unknown) => err)
+    const result = await settle()
 
-    expect(error).toBeInstanceOf(SettleError)
-    expect((error as SettleError).errorReason).toBe('invalid_4mica_credit_checkpoint_required')
-    expect((error as SettleError).errorMessage).toBe('checkpoint required')
+    expect(result.success).toBe(false)
+    expect(result.errorReason).toBe('invalid_4mica_credit_checkpoint_required')
+    expect(result.errorMessage).toBe('checkpoint required')
+    expect(result.extra).toEqual({ retryable: false, details: { uncheckpointed: 64 } })
+    expect(result.receipt).toBeUndefined()
   })
 
   it('throws on a non-200 response', async () => {

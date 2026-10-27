@@ -7,9 +7,8 @@ import os
 import ssl
 import threading
 from concurrent.futures import Future
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, NamedTuple, Optional
 
-from eth_account import Account
 from fourmica_sdk import (
     Client as FourMicaClient,
 )
@@ -26,10 +25,15 @@ from fourmica_sdk import (
     PaymentRequirementsV2 as SDKPaymentRequirementsV2,
 )
 from x402.interfaces import SchemeNetworkClient, SchemeNetworkClientV1
-from x402.schemas import PaymentRequirements
+from x402.schemas import (
+    PaymentRequirements,
+    PaymentResponseContext,
+    RecoveredResponseResult,
+)
 from x402.schemas.v1 import PaymentRequirementsV1
 
 from .constants import DEFAULT_RPC_URLS, SUPPORTED_NETWORKS
+from .recovery import RecoveringPayer, recover_refused_payment
 
 
 class _AsyncRunner:
@@ -133,17 +137,31 @@ def _patch_web3_ssl_context() -> None:
     provider._fourmica_ssl_patched = True  # type: ignore[attr-defined]
 
 
+class _Payer(NamedTuple):
+    """A connected core: the flow that signs for it and the client behind it."""
+
+    flow: X402Flow
+    payment: RecoveringPayer
+
+
 class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
     """Client-side scheme for 4mica credit payments (v1 and v2)."""
 
     scheme = "4mica-credit"
 
-    def __init__(self, private_key: str) -> None:
+    def __init__(self, private_key: str, core_urls: Optional[Mapping[str, str]] = None) -> None:
+        """*core_urls* maps a network to the core API URL to pay on, overriding
+        the hosted deployment; set an entry to pay on a self-hosted core."""
         self._private_key = private_key
-        self._user_address = Account.from_key(private_key).address
-        self._flows: Dict[str, X402Flow] = {}
+        self._core_urls = dict(core_urls or {})
+        self._payers: Dict[str, _Payer] = {}
+        # When the facilitator refuses a payment for something the payer can
+        # fix (a checkpoint core wants, a stale cycle or clock, a checkpoint
+        # cutoff), fix it and have x402 retry the request once with a freshly
+        # signed payment. Sync, so both x402Client and x402ClientSync run it.
+        self.scheme_hooks = {"on_payment_response": self._on_payment_response}
 
-    async def _create_flow(self, rpc_url: str) -> X402Flow:
+    async def _connect(self, rpc_url: str) -> _Payer:
         _ensure_ssl_certs()
         _patch_web3_ssl_context()
         cfg = (
@@ -154,17 +172,40 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
             .build()
         )
         client = await FourMicaClient.connect(cfg)
-        return X402Flow.from_client(client)
+        return _Payer(flow=X402Flow.from_client(client), payment=client.payment)
 
-    async def _get_flow_async(self, rpc_url: str) -> X402Flow:
-        if rpc_url in self._flows:
-            return self._flows[rpc_url]
-        flow = await self._create_flow(rpc_url)
-        self._flows[rpc_url] = flow
-        return flow
+    async def _get_payer_async(self, rpc_url: str) -> _Payer:
+        if rpc_url in self._payers:
+            return self._payers[rpc_url]
+        payer = await self._connect(rpc_url)
+        self._payers[rpc_url] = payer
+        return payer
 
     def _get_flow(self, rpc_url: str) -> X402Flow:
-        return _run_async(self._get_flow_async(rpc_url))
+        return _run_async(self._get_payer_async(rpc_url)).flow
+
+    def _on_payment_response(
+        self, ctx: PaymentResponseContext
+    ) -> Optional[RecoveredResponseResult]:
+        refusal = ctx.settle_response
+        if refusal is None or refusal.success:
+            return None
+        payer = self._payers.get(self._rpc_url_for(ctx.requirements) or "")
+        if payer is None:
+            return None
+        try:
+            recovered = _run_async(
+                recover_refused_payment(
+                    payer.payment,
+                    str(ctx.requirements.asset),
+                    refusal.error_reason,
+                    refusal.extra,
+                )
+            )
+        except Exception:
+            # The caller still gets the refusal, which names what to fix.
+            return None
+        return RecoveredResponseResult() if recovered else None
 
     def create_payment_payload(self, requirements: Any) -> dict[str, Any]:
         if hasattr(requirements, "max_amount_required"):
@@ -172,14 +213,7 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
         return self._create_payment_payload_v2(requirements)
 
     def _create_payment_payload_v2(self, requirements: PaymentRequirements) -> dict[str, Any]:
-        network = str(requirements.network)
-        rpc_url = requirements.extra.get("rpcUrl") if requirements.extra else None
-        if not rpc_url:
-            rpc_url = DEFAULT_RPC_URLS.get(network)
-        if not rpc_url:
-            raise ValueError(f"No RPC URL configured for network {network}")
-
-        flow = self._get_flow(rpc_url)
+        flow = self._get_flow(self._require_rpc_url(requirements))
         accepted = SDKPaymentRequirementsV2.from_raw(
             requirements.model_dump(by_alias=True, exclude_none=True)
         )
@@ -201,29 +235,42 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
             accepts=[accepted],
         )
 
-        signed = _run_async(flow.sign_payment_v2(payment_required, accepted, self._user_address))
-        return signed.payload
+        signed = _run_async(flow.sign_payment_v2(payment_required, accepted))
+        return signed.payload.to_payload()
 
     def _create_payment_payload_v1(self, requirements: PaymentRequirementsV1) -> dict[str, Any]:
-        network = str(requirements.network)
-        rpc_url = requirements.extra.get("rpcUrl") if requirements.extra else None
-        if not rpc_url:
-            rpc_url = DEFAULT_RPC_URLS.get(network)
-        if not rpc_url:
-            raise ValueError(f"No RPC URL configured for network {network}")
-
-        flow = self._get_flow(rpc_url)
+        flow = self._get_flow(self._require_rpc_url(requirements))
         req_v1 = SDKPaymentRequirementsV1.from_raw(
             requirements.model_dump(by_alias=True, exclude_none=True)
         )
-        signed = _run_async(flow.sign_payment(req_v1, self._user_address))
-        return signed.payload
+        signed = _run_async(flow.sign_payment(req_v1))
+        return signed.payload.to_payload()
+
+    def _core_url(self, network: str) -> Optional[str]:
+        return self._core_urls.get(network) or DEFAULT_RPC_URLS.get(network)
+
+    def _rpc_url_for(self, requirements: Any) -> Optional[str]:
+        """The core that signs *requirements*: the one the seller names in
+        ``extra.rpcUrl``, then the payer's own override, then the hosted
+        deployment for the network."""
+        rpc_url = requirements.extra.get("rpcUrl") if requirements.extra else None
+        return rpc_url or self._core_url(str(requirements.network))
+
+    def _require_rpc_url(self, requirements: Any) -> str:
+        rpc_url = self._rpc_url_for(requirements)
+        if not rpc_url:
+            raise ValueError(f"No RPC URL configured for network {requirements.network}")
+        return rpc_url
 
 
-def create_default_client_scheme(private_key: str) -> FourMicaEvmScheme:
-    scheme = FourMicaEvmScheme(private_key)
-    for network in SUPPORTED_NETWORKS:
-        rpc_url = DEFAULT_RPC_URLS.get(network)
+def create_default_client_scheme(
+    private_key: str, core_urls: Optional[Mapping[str, str]] = None
+) -> FourMicaEvmScheme:
+    """A scheme connected up front to every hosted network and to each network
+    in *core_urls*."""
+    scheme = FourMicaEvmScheme(private_key, core_urls)
+    for network in dict.fromkeys([*SUPPORTED_NETWORKS, *(core_urls or {})]):
+        rpc_url = scheme._core_url(network)
         if rpc_url:
             scheme._get_flow(rpc_url)
     return scheme

@@ -61,8 +61,9 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         supported_kind,
         extensions: list[str],
     ) -> PaymentRequirements:
-        # Nothing to add since the tab step was removed from the protocol: a
-        # client signs its claim straight from the requirements.
+        # Nothing to add: a 4mica-credit payer needs nothing beyond payTo,
+        # asset, amount and the optional extra.validation and extra.rpcUrl, and
+        # takes everything else from core.
         del supported_kind, extensions
         return requirements
 
@@ -85,10 +86,10 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         return AssetAmount(
             amount=token_amount,
             asset=asset_info["address"],
-            extra={
-                "name": asset_info["name"],
-                "version": asset_info["version"],
-            },
+            # No EIP-3009 domain hints: a 4mica-credit payer signs against
+            # core's ClearingHouse domain, never the token's, and reads it from
+            # core.
+            extra={},
         )
 
     def _convert_to_token_amount(self, decimal_amount: str, decimals: int) -> str:

@@ -41,6 +41,7 @@
     "build": "tsc -p tsconfig.build.json",
     "check:exports": "attw --pack . --profile esm-only && publint --strict",
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "lint": "biome check .",
     "lint:write": "biome check --write --diagnostic-level=error .",
     "fmt": "biome format .",
@@ -54,7 +55,7 @@
   },
   "dependencies": {
     "@x402/core": "catalog:",
-    "@x402/extensions": "catalog:",
+    "@x402/express": "catalog:",
     "@4mica/sdk": "workspace:^",
     "viem": "catalog:"
   },
@@ -63,13 +64,14 @@
     "@biomejs/biome": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:node26",
+    "@x402/fetch": "catalog:",
     "express": "catalog:",
     "publint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@x402/paywall": "^2.2.0",
+    "@x402/paywall": "^2.28.0",
     "express": "^4.0.0 || ^5.0.0"
   },
   "peerDependenciesMeta": {
