@@ -17,8 +17,8 @@ system has the shape it does.
 
 ```text
 ┌─ 4mica-core (Rust, :3000) ──────────────────────────────────────────────┐
-│  The ledger and the authority. Holds collateral accounting, issues BLS  │
-│  guarantee certificates, runs settlement cycles. Talks to the chain.    │
+│  The ledger and the authority. Holds collateral accounting, issues      │
+│  signed guarantee receipts, runs settlement cycles. Talks to the chain. │
 └────────────────────────────────────────────────────────────────────────┘
         ▲ /core/guarantees, /core/public-params, /core/tokens
         │
@@ -51,10 +51,10 @@ price*; nothing in it moves value.
 
 ### The one paragraph that explains the protocol
 
-> A payer signs a payment guarantee claim straight from the recipient's
-> `paymentRequirements`; the recipient hands the signed payload to the
-> facilitator, which verifies it and settles by issuing a BLS certificate
-> through 4mica core. There is no tab, no token allowance and no per-payment
+> A payer signs a payment straight from the recipient's `paymentRequirements`,
+> scoped to the asset's active settlement cycle; the recipient hands the signed
+> payload to the facilitator, which verifies it and settles by having 4mica core
+> issue the guarantee and return the operator's signed receipt. There is no tab, no token allowance and no per-payment
 > on-chain transaction: the payer's collateral backs the guarantee, and
 > guarantees net into one settlement per cycle.
 
@@ -64,12 +64,12 @@ One paid request on the wire:
 buyer  GET /quote                       → 402  + `payment-required` header
                                                (base64 JSON: scheme, network,
                                                 payTo, asset, amount)
-buyer  signs EIP-712 claims, random reqId
+buyer  signs an EIP-712 payment, random reqId
 buyer  GET /quote  PAYMENT-SIGNATURE    → seller POSTs facilitator /verify
                                           seller does the work only if valid
                                           seller POSTs facilitator /settle
                                         → 200  + `X-PAYMENT-RESPONSE`
-                                               (the BLS certificate)
+                                               (the guarantee receipt)
 ```
 
 **A published listing is a stored `paymentRequirements`.** That is why the
@@ -93,21 +93,17 @@ curl -L https://foundry.paradigm.xyz | bash && foundryup
 
 ### The core checkout must match the facilitator
 
-`apps/facilitator/Cargo.toml` pins `rpc-4mica`, `sdk-4mica` and `crypto-4mica`
-at `=2.0.0-alpha.3`. A core on an older tag speaks the **tab-based** protocol
-that 2.0 removed, and the mismatch surfaces at `/settle` as an error that reads
-like an auth failure. Pin it explicitly:
+The root `Cargo.toml` pins `rpc-4mica` and `crypto-4mica` at `=2.0.0-alpha.4`
+for both the Rust SDK and the facilitator, and this guide follows core
+`v2.0.0-alpha.5`'s dev stack. A core speaking a different protocol fails at
+`/settle`, so pin it explicitly:
 
 ```bash
 git clone git@github.com:4mica-Network/4mica-core.git ../4mica-core
-cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.3
+cd ../4mica-core && git fetch --tags origin && git checkout v2.0.0-alpha.5
 ```
 
 Put it beside this repo, or point `FOURMICA_CORE_DIR` at it.
-
-`packages/sdk-rust` already builds against the `2.0.0-alpha.4` crates (core
-`v2.0.0-alpha.4`). This stack stays on `v2.0.0-alpha.3` until the facilitator
-moves to them.
 
 ---
 
@@ -117,31 +113,26 @@ moves to them.
 scripts/dev-stack.sh up
 ```
 
-That does five things, in order:
+That does four things, in order:
 
-1. **`make dev-up` in 4mica-core.** Postgres, anvil (`--hardfork prague`), the
-   `Core4MicaFullStack` forge deploy, migrations, then `core-service`. Core's
-   own script owns this because it is careful in ways worth not re-deriving:
-   it reads the chain id back off anvil rather than assuming, derives the
-   on-chain verification key from the BLS signing key so remuneration
-   verifies, and pre-checks core's solvency invariant
+1. **`make dev-up` in 4mica-core.** Postgres, anvil on chain 84532 (see §8), the
+   `Core4MicaFullStack` forge deploy, migrations, the facilitator's wallet role,
+   then `core-service`. Core's own script owns this because it is careful in
+   ways worth not re-deriving: it reads the chain id back off anvil rather than
+   assuming, and pre-checks core's solvency invariant
    (`cycle + resolution_cutoff + commit_delay + finality_window + seizure_margin
    < withdrawalGracePeriod`) — which core otherwise refuses to boot over, with
-   an error that names five variables and no fix.
+   an error that names five variables and no fix. Issuing a guarantee needs the
+   `guarantee:issue` scope, which core grants to anvil account #11; without it
+   every `/settle` returns 401.
 
-2. **Grants the facilitator its role.** Issuing a guarantee needs the
-   `guarantee:issue` scope; `DEFAULT_SCOPES` is only `payment:read`. Roles live
-   in core's `WalletRole` table and there is no admin endpoint, so the row goes
-   in with SQL. Skip this and every `/settle` returns 401.
+2. **Starts the facilitator** on `:8080`, pointed at the local core, as anvil
+   account #11. The same key is its relayer, so the gasless `POST /deposit`
+   route works; core's stack funds that account.
 
-3. **Starts the facilitator** on `:8080`, pointed at the local core, with a
-   relayer key so the gasless `POST /deposit` route works. The auth key and the
-   relayer key are deliberately different accounts: the first is an identity
-   and needs no balance, the second pays gas.
+3. **Starts 4Mica's postgres** on `:5433`, migrates and seeds it.
 
-4. **Starts 4Mica's postgres** on `:5433`, migrates and seeds it.
-
-5. **Writes `.dev/stack.env`** with the values core actually deployed, read
+4. **Writes `.dev/stack.env`** with the values core actually deployed, read
    back from core's generated `.env` and `GET /core/tokens` rather than
    restated — the contract address changes on every redeploy.
 
@@ -158,7 +149,7 @@ pnpm --filter @4mica/playground dev  # :3100
 ```bash
 curl localhost:3000/core/health
 curl localhost:3000/core/tokens        # the assets core accepts
-curl localhost:8080/supported          # must list ("4mica-credit", "eip155:31337")
+curl localhost:8080/supported          # must list ("4mica-credit", "eip155:84532")
 scripts/dev-stack.sh status
 ```
 
@@ -177,8 +168,7 @@ advertise an address that has been proved this way, which is why the listing
 form asks you to *pick* a wallet rather than type an address.
 
 Give it the role **Recipient** or **Both**, and put it on the chain your stack
-is running (`eip155:31337` locally — see the note in §8 if the network picker
-does not offer it).
+is running: Base Sepolia, `eip155:84532`, locally (see §8).
 
 ### b. Create the API
 
@@ -246,8 +236,8 @@ or use the facilitator's gasless route, `POST /deposit`. Then:
 pnpm --filter @4mica/example-buyer start
 ```
 
-You should see `402` → `200`, a body, and an `X-PAYMENT-RESPONSE` carrying real
-claims and a BLS signature.
+You should see `402` → `200`, a body, and an `X-PAYMENT-RESPONSE` carrying the
+operator's guarantee receipt.
 
 The facilitator log shows `/verify` then `/settle`, in that order. Always that
 order: verify gates the work, settle takes the credit.
@@ -320,13 +310,17 @@ another, and 4Mica settles per chain.
 
 ## 8. Things that will bite you
 
-**A bare anvil chain is `eip155:31337`, which is not a `PaymentNetwork`.** The
-enum in `packages/db` has `BASE`, `BASE_SEPOLIA` and `ETHEREUM_SEPOLIA` only —
-deliberately, so a typo cannot reach a payment snippet. The dashboard's wallet
-picker therefore offers those three, and a wallet on 31337 cannot be linked.
+**The local chain borrows Base Sepolia's id.** Core's dev stack runs a bare
+anvil on chain 84532, so wallets, listings and payments use `BASE_SEPOLIA` as
+they would on the testnet. Only the id is borrowed: the tokens are mocks core
+deploys, and nothing touches the real chain. Point clients at the local URLs
+explicitly — anything that maps `eip155:84532` to an endpoint, such as the Rust
+SDK's `.network("base-sepolia")`, reaches the real testnet instead.
 
-**Fork Base Sepolia instead.** The forked chain keeps its own id, 84532, which
-*is* `BASE_SEPOLIA`, so the whole product works unchanged:
+**Fork Base Sepolia for its real tokens.** The seeded listings price in Base
+Sepolia's USDC, which only a fork has; on the bare chain, list your API with a
+token from `/core/tokens`. A forked chain has the same id but keeps the chain's
+state:
 
 ```bash
 cd ../4mica-core
@@ -340,13 +334,6 @@ Core reads the chain id back off the fork rather than assuming, so everything
 downstream follows. A forked deploy registers the chain's existing tokens
 rather than deploying mocks, which is why the token address is named
 explicitly. Then run `scripts/dev-stack.sh` from `role` onwards.
-
-The alternative — adding a `LOCAL` member to the enum — is possible but it
-would put a "Local" option in the production network picker, so it is not the
-default. If you do it, it is deliberately a type error in
-`apps/playground/src/lib/snippets/networks.ts`,
-`apps/dashboard/src/lib/networks.ts` and `apps/be/src/services/siwe.ts` — fix
-all three or it will not compile.
 
 **The agent network default is `ETHEREUM_SEPOLIA`.** Omitting `network` on
 create does not mean "whatever chain the wallet is on"; a `BASE_SEPOLIA` wallet

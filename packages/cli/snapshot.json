@@ -10,8 +10,10 @@
     "@coinbase/cdp-sdk": "^1.49.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/rate-limit": "^11.2.0",
-    "@fastify/swagger": "^9.8.1",
+    "@fastify/swagger": "^9.9.1",
     "@fastify/swagger-ui": "^6.1.1",
+    "@hookform/resolvers": "^5.2.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/curves": "^2.2.0",
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
@@ -42,13 +44,14 @@
     "@wagmi/connectors": "^8.0.15",
     "@wagmi/core": "^3.5.0",
     "@walletconnect/ethereum-provider": "2.23.4",
-    "@x402/core": "2.23.0",
-    "@x402/extensions": "2.23.0",
-    "@x402/fetch": "2.23.0",
+    "@x402/core": "2.28.0",
+    "@x402/express": "2.28.0",
+    "@x402/fetch": "2.28.0",
     "accounts": "^0.14.6",
     "ahooks": "^3.9.7",
     "autoprefixer": "^10.5.0",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
+    "bullmq": "^5.66.0",
     "changelogen": "^0.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -57,7 +60,7 @@
     "esbuild": "^0.28.0",
     "execa": "^9.6.1",
     "express": "^5.1.0",
-    "fastify": "^5.10.0",
+    "fastify": "^5.12.5",
     "fastify-plugin": "^5.1.0",
     "find-up": "^8.0.0",
     "gray-matter": "^4.0.3",
@@ -80,6 +83,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-email": "^6.9.2",
+    "react-hook-form": "^7.65.0",
     "react-i18next": "^17.0.9",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.1",
@@ -111,7 +115,8 @@
     "wagmi": "^3.6.16",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "yargs": "^18.0.0"
+    "yargs": "^18.0.0",
+    "zod": "^3.25.76"
   },
   "catalogs": {
     "node24": {
@@ -122,16 +127,14 @@
     },
     "typescript-latest": {
       "typescript": "^5.9.0"
+    },
+    "zod4": {
+      "zod": "^4.4.3"
     }
   },
   "fourMica": {
     "@4mica/cli": "0.3.0-alpha.0",
     "@4mica/sdk": "2.0.0-alpha.0",
-    "@4mica/sdk-bun": "2.0.0-alpha.0",
-    "@4mica/sdk-deno": "2.0.0-alpha.0",
-    "@4mica/sdk-express": "2.0.0-alpha.0",
-    "@4mica/sdk-hono": "2.0.0-alpha.0",
-    "@4mica/sdk-next": "2.0.0-alpha.0",
-    "@4mica/sdk-node": "2.0.0-alpha.0"
+    "@4mica/x402": "2.0.0-alpha.2"
   }
 }

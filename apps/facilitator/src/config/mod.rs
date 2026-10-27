@@ -17,9 +17,10 @@ mod sponsor;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
+use alloy::sol_types::Eip712Domain;
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
-use rpc::{CorePublicParameters, GUARANTEE_CLAIMS_VERSION};
+use rpc::{CorePublicParameters, PAYMENT_PAYLOAD_VERSION, guarantee_registry_domain};
 use sdk_4mica::Address;
 use serde::Deserialize;
 
@@ -38,11 +39,6 @@ const ENV_AUTH_URL: &str = "X402_AUTH_URL";
 const ENV_AUTH_REFRESH_MARGIN_SECS: &str = "X402_AUTH_REFRESH_MARGIN_SECS";
 const ENV_HOST: &str = "HOST";
 const ENV_PORT: &str = "PORT";
-const ENV_GUARANTEE_DOMAIN_VARIANTS: [&str; 3] = [
-    "X402_GUARANTEE_DOMAIN",
-    "FOUR_MICA_GUARANTEE_DOMAIN",
-    "4MICA_GUARANTEE_DOMAIN",
-];
 const DEFAULT_NETWORK_ID: &str = "eip155:11155111";
 const DEFAULT_AUTH_REFRESH_MARGIN_SECS: u64 = 60;
 
@@ -97,14 +93,10 @@ impl ServiceConfig {
 
 #[derive(Clone, Debug)]
 pub struct PublicParameters {
-    pub operator_public_key: [u8; 48],
-    pub guarantee_domain: Option<[u8; 32]>,
-    /// Core's own domain, before any `X402_GUARANTEE_DOMAIN` override is applied. Kept for
-    /// diagnostics and asserted in tests; [`Self::guarantee_domain`] is what verification uses.
-    // Scoped to this field rather than the struct: a blanket allow is how a stale field survives
-    // a migration unnoticed.
-    #[allow(dead_code)]
-    pub active_guarantee_domain: Option<[u8; 32]>,
+    /// The address whose signature every guarantee receipt must carry.
+    pub guarantee_signer: Address,
+    /// The GuaranteeRegistry's EIP-712 domain, which receipts are signed under.
+    pub guarantee_domain: Eip712Domain,
     /// Validator identities this operator whitelisted. A signed validation requirement may only
     /// name one of these. By convention a URL or CAIP-10 account id, not an address.
     pub validators: Vec<String>,
@@ -133,28 +125,14 @@ pub async fn load_public_params(api_base: &Url) -> Result<PublicParameters> {
 }
 
 fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicParameters> {
-    ensure_core_decodes_our_guarantee_version(&params.supported_guarantee_versions)?;
-    let active_guarantee_domain =
-        parse_optional_hex_array::<32>(&params.guarantee_domain_separator)
-            .context("invalid guarantee_domain_separator in core public params")?;
-    let operator_public_key = params.public_key.try_into().map_err(|bytes: Vec<u8>| {
-        anyhow::anyhow!("operator public key must be 48 bytes, got {}", bytes.len())
-    })?;
-
-    let configured_guarantee_domain = first_env_value(&ENV_GUARANTEE_DOMAIN_VARIANTS)
-        .map(|value| parse_hex_array::<32>(&value))
-        .transpose()?;
-    let guarantee_domain =
-        resolve_guarantee_domain(configured_guarantee_domain, active_guarantee_domain);
+    ensure_core_accepts_our_payload_version(&params.supported_payment_payload_versions)?;
+    let guarantee_signer = core_address(&params.guarantee_signer, "guarantee_signer")?;
+    let guarantee_registry = core_address(
+        &params.guarantee_registry_address,
+        "guarantee_registry_address",
+    )?;
     let validators = normalize_validators(&params.validators)?;
-
-    let contract_address =
-        Address::from_str(params.contract_address.trim()).with_context(|| {
-            format!(
-                "invalid contract_address in core public params: {}",
-                params.contract_address
-            )
-        })?;
+    let contract_address = core_address(&params.contract_address, "contract_address")?;
 
     // Optional: a facilitator that never sponsors gas has no use for it, and core may omit it.
     let ethereum_http_rpc_url = match params.ethereum_http_rpc_url.trim() {
@@ -165,13 +143,17 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
     };
 
     Ok(PublicParameters {
-        operator_public_key,
-        guarantee_domain,
-        active_guarantee_domain,
+        guarantee_signer,
+        guarantee_domain: guarantee_registry_domain(params.chain_id, guarantee_registry),
         validators,
         contract_address,
         ethereum_http_rpc_url,
     })
+}
+
+fn core_address(raw: &str, field: &str) -> Result<Address> {
+    Address::from_str(raw.trim())
+        .with_context(|| format!("invalid {field} in core public params: {raw}"))
 }
 
 fn normalize_validators(raw: &[String]) -> Result<Vec<String>> {
@@ -230,7 +212,7 @@ fn parse_network_list(
     let entries: Vec<NetworkEnvConfig> = serde_json::from_str(raw).with_context(|| {
         format!(
             "{ENV_NETWORKS} must be JSON like \
-        '[{{\"network\":\"eip155:11155111\",\"coreApiUrl\":\"https://api.4mica.xyz/\"}}]'"
+        '[{{\"network\":\"eip155:84532\",\"coreApiUrl\":\"https://base.sepolia.api.4mica.io/\"}}]'"
         )
     })?;
     if entries.is_empty() {
@@ -373,15 +355,6 @@ fn bind_addr_from_env() -> Result<SocketAddr> {
     Ok(addr)
 }
 
-fn first_env_value(names: &[&str]) -> Option<String> {
-    names.iter().find_map(|name| {
-        std::env::var(name)
-            .ok()
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty())
-    })
-}
-
 pub(super) fn normalize_url(input: &str) -> Result<Url> {
     let mut url = Url::parse(input).or_else(|_| Url::parse(&format!("{input}/")))?;
     if url.path().is_empty() {
@@ -428,35 +401,14 @@ async fn fetch_public_params(base: &Url) -> Result<CorePublicParameters> {
     Ok(response.json::<CorePublicParameters>().await?)
 }
 
-fn parse_hex_array<const N: usize>(value: &str) -> Result<[u8; N]> {
-    let trimmed = value.strip_prefix("0x").unwrap_or(value);
-    let decoded = hex::decode(trimmed)?;
-    if decoded.len() != N {
-        return Err(anyhow::anyhow!("expected {N} bytes, got {}", decoded.len()));
-    }
-    let mut bytes = [0u8; N];
-    bytes.copy_from_slice(&decoded);
-    Ok(bytes)
-}
-
-fn parse_optional_hex_array<const N: usize>(value: &str) -> Result<Option<[u8; N]>> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-    parse_hex_array::<N>(trimmed).map(Some)
-}
-
-/// Fails startup unless core can decode the guarantee version this build signs at.
+/// Fails startup unless core accepts the payment payload version this build decodes.
 ///
-/// The facilitator always requests guarantees at [`GUARANTEE_CLAIMS_VERSION`], so a core that
-/// cannot decode that version is unusable — better to refuse to start than to accept payments and
-/// have core reject every issuance. The set is only sorted to keep the error message stable; the
-/// facilitator has no use for the other versions core happens to accept, since it never signs at
-/// them. That is deliberately unrelated to the *x402* versions we serve — see
+/// The facilitator checks every payload against the requirements before forwarding it, so a core
+/// that cannot read that version would refuse every issuance. The set is only sorted to keep the
+/// error message stable. That is deliberately unrelated to the *x402* versions we serve — see
 /// [`crate::server::state::SUPPORTED_X402_VERSIONS`].
-fn ensure_core_decodes_our_guarantee_version(raw_versions: &[u64]) -> Result<()> {
-    if raw_versions.contains(&GUARANTEE_CLAIMS_VERSION) {
+fn ensure_core_accepts_our_payload_version(raw_versions: &[u64]) -> Result<()> {
+    if raw_versions.contains(&PAYMENT_PAYLOAD_VERSION) {
         return Ok(());
     }
 
@@ -464,40 +416,30 @@ fn ensure_core_decodes_our_guarantee_version(raw_versions: &[u64]) -> Result<()>
     supported.sort_unstable();
     supported.dedup();
     bail!(
-        "core supports guarantee versions {supported:?} but this facilitator issues \
-         v{GUARANTEE_CLAIMS_VERSION}; upgrade core or downgrade the facilitator"
+        "core accepts payment payload versions {supported:?} but this facilitator decodes \
+         v{PAYMENT_PAYLOAD_VERSION}; upgrade core or downgrade the facilitator"
     );
-}
-
-fn resolve_guarantee_domain(
-    configured_guarantee_domain: Option<[u8; 32]>,
-    active_guarantee_domain: Option<[u8; 32]>,
-) -> Option<[u8; 32]> {
-    configured_guarantee_domain.or(active_guarantee_domain)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use relayer::{ENV_RELAYER_PRIVATE_KEY, ENV_RELAYER_RPC_URL};
-    use rpc::{CorePublicParameters, GuaranteeVersionDomain};
+    use rpc::CorePublicParameters;
     use serial_test::serial;
     use std::env;
 
     fn sample_core_params() -> CorePublicParameters {
         CorePublicParameters {
-            public_key: vec![7u8; 48],
+            guarantee_signer: "0x0000000000000000000000000000000000000003".into(),
             contract_address: "0x0000000000000000000000000000000000000001".into(),
+            guarantee_registry_address: "0x0000000000000000000000000000000000000002".into(),
+            clearing_house_address: "0x0000000000000000000000000000000000000004".into(),
             ethereum_http_rpc_url: "https://rpc.example".into(),
             eip712_name: "4mica".into(),
             eip712_version: "1".into(),
             chain_id: 11155111,
-            supported_guarantee_versions: vec![GUARANTEE_CLAIMS_VERSION],
-            guarantee_domain_separator: format!("0x{}", "11".repeat(32)),
-            guarantee_domains: vec![GuaranteeVersionDomain {
-                version: GUARANTEE_CLAIMS_VERSION,
-                domain_separator: format!("0x{}", "11".repeat(32)),
-            }],
+            supported_payment_payload_versions: vec![PAYMENT_PAYLOAD_VERSION],
             core_domain_separator: format!("0x{}", "22".repeat(32)),
             validators: vec!["https://validator.example".into()],
         }
@@ -511,9 +453,6 @@ mod tests {
             env::remove_var(ENV_AUTH_WALLET_PRIVATE_KEY);
             env::remove_var(ENV_AUTH_URL);
             env::remove_var(ENV_AUTH_REFRESH_MARGIN_SECS);
-            env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[0]);
-            env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[1]);
-            env::remove_var(ENV_GUARANTEE_DOMAIN_VARIANTS[2]);
             env::remove_var(ENV_RELAYER_PRIVATE_KEY);
             env::remove_var(ENV_RELAYER_RPC_URL);
         }
@@ -740,15 +679,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_hex_array_rejects_wrong_length() {
-        let err = parse_hex_array::<4>("0x01").unwrap_err();
-        assert!(
-            err.to_string().contains("expected 4 bytes"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
     fn normalize_url_appends_trailing_slash() {
         let url = normalize_url("http://example.com").expect("normalize");
         assert_eq!(url.as_str(), "http://example.com/");
@@ -757,22 +687,22 @@ mod tests {
     /// Core accepting versions beyond ours is normal and must not fail startup — it only means
     /// core still serves older clients.
     #[test]
-    fn ensure_core_decodes_our_guarantee_version_accepts_a_wider_core() {
-        ensure_core_decodes_our_guarantee_version(&[
-            GUARANTEE_CLAIMS_VERSION,
-            GUARANTEE_CLAIMS_VERSION + 1,
+    fn ensure_core_accepts_our_payload_version_accepts_a_wider_core() {
+        ensure_core_accepts_our_payload_version(&[
+            PAYMENT_PAYLOAD_VERSION,
+            PAYMENT_PAYLOAD_VERSION + 1,
         ])
-        .expect("a core that decodes our version is usable");
+        .expect("a core that accepts our version is usable");
     }
 
-    /// The facilitator only ever asks core to issue at `GUARANTEE_CLAIMS_VERSION`; a core that
-    /// cannot decode it would reject every request, so startup must fail loudly instead.
+    /// A core that cannot read the payloads this build decodes would refuse every issuance, so
+    /// startup must fail loudly instead.
     #[test]
-    fn ensure_core_decodes_our_guarantee_version_rejects_a_core_without_our_version() {
-        let err = ensure_core_decodes_our_guarantee_version(&[GUARANTEE_CLAIMS_VERSION + 1])
+    fn ensure_core_accepts_our_payload_version_rejects_a_core_without_our_version() {
+        let err = ensure_core_accepts_our_payload_version(&[PAYMENT_PAYLOAD_VERSION + 1])
             .expect_err("expected version mismatch");
         assert!(
-            err.to_string().contains("this facilitator issues"),
+            err.to_string().contains("this facilitator decodes"),
             "unexpected error: {err}"
         );
     }
@@ -780,8 +710,8 @@ mod tests {
     /// The reported set is sorted and deduped so the operator-facing error is stable regardless of
     /// the order core happens to serialize it in.
     #[test]
-    fn ensure_core_decodes_our_guarantee_version_reports_a_sorted_deduped_set() {
-        let err = ensure_core_decodes_our_guarantee_version(&[9, 7, 9])
+    fn ensure_core_accepts_our_payload_version_reports_a_sorted_deduped_set() {
+        let err = ensure_core_accepts_our_payload_version(&[9, 7, 9])
             .expect_err("expected version mismatch");
         assert!(
             err.to_string().contains("[7, 9]"),
@@ -790,80 +720,52 @@ mod tests {
     }
 
     #[test]
-    fn resolve_guarantee_domain_prefers_env_override() {
-        let resolved = resolve_guarantee_domain(Some([1u8; 32]), Some([2u8; 32]));
-        assert_eq!(resolved, Some([1u8; 32]));
-    }
-
-    #[test]
-    fn resolve_guarantee_domain_falls_back_to_active_domain() {
-        let resolved = resolve_guarantee_domain(None, Some([2u8; 32]));
-        assert_eq!(resolved, Some([2u8; 32]));
-    }
-
-    #[test]
-    fn resolve_guarantee_domain_allows_no_domain() {
-        let resolved = resolve_guarantee_domain(None, None);
-        assert_eq!(resolved, None);
-    }
-
-    #[test]
     #[serial]
-    fn public_parameters_from_core_rejects_invalid_active_domain() {
+    fn public_parameters_from_core_rejects_a_core_without_our_payload_version() {
         clear_network_env();
         let mut params = sample_core_params();
-        params.guarantee_domain_separator = "0x1234".into();
+        params.supported_payment_payload_versions = vec![PAYMENT_PAYLOAD_VERSION + 1];
 
         let err = public_parameters_from_core(params).unwrap_err();
         assert!(
-            err.to_string()
-                .contains("invalid guarantee_domain_separator"),
+            err.to_string().contains("this facilitator decodes"),
             "unexpected error: {err}"
+        );
+    }
+
+    /// Receipts are checked against the signer and registry core names, so both must parse.
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_takes_the_receipt_signer_and_registry_domain() {
+        clear_network_env();
+        let params = sample_core_params();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert_eq!(
+            public_params.guarantee_signer,
+            Address::from_str("0x0000000000000000000000000000000000000003").unwrap()
+        );
+        assert_eq!(
+            public_params.guarantee_domain,
+            guarantee_registry_domain(
+                11155111,
+                Address::from_str("0x0000000000000000000000000000000000000002").unwrap()
+            )
         );
     }
 
     #[test]
     #[serial]
-    fn public_parameters_from_core_rejects_a_core_without_our_guarantee_version() {
+    fn public_parameters_from_core_rejects_a_malformed_guarantee_signer() {
         clear_network_env();
         let mut params = sample_core_params();
-        params.supported_guarantee_versions = vec![GUARANTEE_CLAIMS_VERSION + 1];
+        params.guarantee_signer = String::new();
 
         let err = public_parameters_from_core(params).unwrap_err();
         assert!(
-            err.to_string().contains("this facilitator issues"),
+            err.to_string().contains("invalid guarantee_signer"),
             "unexpected error: {err}"
         );
-    }
-
-    #[test]
-    #[serial]
-    fn public_parameters_from_core_prefers_env_domain_over_active_domain() {
-        clear_network_env();
-        unsafe {
-            env::set_var(
-                ENV_GUARANTEE_DOMAIN_VARIANTS[0],
-                format!("0x{}", "22".repeat(32)),
-            );
-        }
-        let params = sample_core_params();
-
-        let public_params = public_parameters_from_core(params).expect("public params");
-        assert_eq!(public_params.active_guarantee_domain, Some([0x11; 32]));
-        assert_eq!(public_params.guarantee_domain, Some([0x22; 32]));
-
-        clear_network_env();
-    }
-
-    #[test]
-    #[serial]
-    fn public_parameters_from_core_uses_active_domain_when_no_override_is_set() {
-        clear_network_env();
-        let params = sample_core_params();
-
-        let public_params = public_parameters_from_core(params).expect("public params");
-        assert_eq!(public_params.active_guarantee_domain, Some([0x11; 32]));
-        assert_eq!(public_params.guarantee_domain, Some([0x11; 32]));
     }
 
     #[test]

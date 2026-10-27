@@ -58,14 +58,15 @@ export async function runInitFlow(
             label: "Trading agent",
             hint: "buys/sells over x402",
           },
-          { value: "seller", label: "Paywalled API (seller)" },
+          { value: "seller", label: "Paid API (seller)" },
           { value: "buyer", label: "Buyer client" },
         ],
       }),
     );
 
   let agentRole: AgentRole = flags.agentRole ?? "seller";
-  let framework: Framework = flags.framework ?? "express";
+  // Express is the only framework the seller and buyer templates come in.
+  const framework: Framework = flags.framework ?? "express";
 
   if (type === "agent") {
     if (flags.agentRole === undefined) {
@@ -87,17 +88,6 @@ export async function runInitFlow(
         }),
       );
     }
-  } else if (flags.framework === undefined) {
-    framework = unwrap(
-      await select({
-        message: "Which framework?",
-        options: [
-          { value: "express", label: "Express" },
-          { value: "hono", label: "Hono" },
-          { value: "next", label: "Next.js" },
-        ],
-      }),
-    );
   }
 
   const defaultName =

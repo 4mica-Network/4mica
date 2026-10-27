@@ -1,8 +1,6 @@
 import {
   Client,
   ConfigBuilder,
-  CorePublicParameters,
-  PaymentSigner,
   RpcProxy,
   resolveNetworkRpcUrl,
   PaymentRequirementsV2 as SdkPaymentRequirementsV2,
@@ -16,12 +14,12 @@ import type {
   Network,
   PaymentPayload,
   PaymentRequirements,
+  SchemeClientHooks,
   SchemeNetworkClient,
 } from '@x402/core/types'
 import type { Account } from 'viem/accounts'
-import { chainIdOf, readDomainExtra } from '../domain.js'
 import { SUPPORTED_NETWORKS } from '../server/scheme.js'
-import type { FourMicaDomainExtra } from '../types.js'
+import { type RecoveringPayer, recoverRefusedPayment } from './recovery.js'
 
 export interface FourMicaEvmSchemeClientOptions {
   /**
@@ -30,10 +28,16 @@ export interface FourMicaEvmSchemeClientOptions {
    */
   coreUrls?: Partial<Record<Network, string>>
   /**
-   * Networks to connect to up front. Defaults to every hosted network plus the
+   * Networks to connect to up front. Defaults to `SUPPORTED_NETWORKS` plus the
    * keys of `coreUrls`. Any other network connects lazily on its first payment.
    */
   networks?: Network[]
+}
+
+/** A connected core: the flow that signs for it and the client behind it. */
+interface Payer {
+  flow: Pick<X402Flow, 'signPayment' | 'signPaymentV2'>
+  payment: RecoveringPayer
 }
 
 /** What `findDefaultAsset` reports for an asset core lists: `@x402/core`'s `DefaultAsset`. */
@@ -45,23 +49,41 @@ export interface FourMicaDefaultAsset {
 
 export class FourMicaEvmScheme implements SchemeNetworkClient {
   readonly scheme = '4mica-credit'
-  // rpcUrl -> x402Flow
-  private readonly x402Flows = new Map<string, X402Flow>()
+  /**
+   * When the facilitator refuses a payment for something the payer can fix
+   * (a checkpoint core wants, a stale cycle or clock, a checkpoint cutoff),
+   * fix it and have x402 retry the request once with a freshly signed payment.
+   * A recovery that fails leaves the refusal for the caller.
+   */
+  readonly schemeHooks: SchemeClientHooks = {
+    onPaymentResponse: async ({ requirements, settleResponse }) => {
+      if (!settleResponse || settleResponse.success) return
+      const payer = this.payers.get(this.rpcUrlFor(requirements) ?? '')
+      if (!payer) return
+      try {
+        if (await recoverRefusedPayment(payer.payment, requirements.asset, settleResponse)) {
+          return { recovered: true }
+        }
+      } catch {
+        // The caller still gets the refusal, which names what to fix.
+      }
+    },
+  }
+  // rpcUrl -> connected core
+  private readonly payers = new Map<string, Payer>()
   // rpcUrl -> the tokens that core accepts guarantees against
   private readonly tokensByRpcUrl = new Map<string, SupportedTokenInfo[]>()
-  // chainId|name|version|verifyingContract -> a flow that signs without core
-  private readonly domainFlows = new Map<string, X402Flow>()
 
   private constructor(
     private readonly signer: Account,
     private readonly coreUrls: Partial<Record<Network, string>>
   ) {}
 
-  private static async createX402Flow(signer: Account, rpcUrl: string): Promise<X402Flow> {
+  private static async connect(signer: Account, rpcUrl: string): Promise<Payer> {
     const cfg = new ConfigBuilder().rpcUrl(rpcUrl).signer(signer).build()
     const client = await Client.connect(cfg)
 
-    return X402Flow.fromClient(client)
+    return { flow: X402Flow.fromClient(client), payment: client.payment }
   }
 
   /** Core's token list. Private static so tests can stub the network call. */
@@ -82,7 +104,7 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
 
     for (const network of new Set(networks)) {
       const rpcUrl = scheme.coreUrl(network)
-      if (rpcUrl) await scheme.flowFor(rpcUrl)
+      if (rpcUrl) await scheme.payerFor(rpcUrl)
     }
 
     return scheme
@@ -106,12 +128,15 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
       throw new Error('Network is required in PaymentRequirements')
     }
 
-    const x402Flow = await this.flowForRequirements(paymentRequirements, network)
+    const rpcUrl = this.rpcUrlFor(paymentRequirements)
+    if (!rpcUrl) {
+      throw new Error(`No core API URL known for network ${network}`)
+    }
+    const x402Flow = (await this.payerFor(rpcUrl)).flow
 
     if (x402Version === 1) {
       const signed = await x402Flow.signPayment(
-        paymentRequirements as unknown as Record<string, unknown>,
-        this.signer.address
+        paymentRequirements as unknown as Record<string, unknown>
       )
       return {
         x402Version: 1,
@@ -139,7 +164,7 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
         }),
         accepts: [accepted],
       })
-      const signed = await x402Flow.signPaymentV2(paymentRequired, accepted, this.signer.address)
+      const signed = await x402Flow.signPaymentV2(paymentRequired, accepted)
 
       return {
         x402Version: 2,
@@ -155,65 +180,27 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
   }
 
   /**
-   * The flow that signs `paymentRequirements`. A requirement that carries
-   * core's EIP-712 domain in `extra` is signed locally, with no call to core.
-   * Otherwise the payer connects to core: the one a resource server names in
-   * `extra.rpcUrl`, then the payer's own overrides, then the hosted deployment.
+   * The core that signs `paymentRequirements`. Every payment carries core's
+   * active settlement cycle, so the payer always connects to a core: the one a
+   * resource server names in `extra.rpcUrl`, then the payer's own overrides,
+   * then the hosted deployment.
    */
-  private async flowForRequirements(
-    paymentRequirements: PaymentRequirements,
-    network: Network
-  ): Promise<X402Flow> {
-    const domain = readDomainExtra(paymentRequirements.extra)
-    if (domain) return this.flowForDomain(domain, network)
-
-    const rpcUrl =
-      (paymentRequirements.extra?.rpcUrl as string | undefined) ?? this.coreUrl(network)
-    if (!rpcUrl) {
-      throw new Error(`No core API URL known for network ${network}`)
-    }
-    return this.flowFor(rpcUrl)
+  private rpcUrlFor(paymentRequirements: PaymentRequirements): string | undefined {
+    return (
+      (paymentRequirements.extra?.rpcUrl as string | undefined) ||
+      this.coreUrl(paymentRequirements.network as Network)
+    )
   }
 
-  /** The flow for a core, connected and its token list loaded on first use. */
-  private async flowFor(rpcUrl: string): Promise<X402Flow> {
-    let x402Flow = this.x402Flows.get(rpcUrl)
-    if (!x402Flow) {
-      x402Flow = await FourMicaEvmScheme.createX402Flow(this.signer, rpcUrl)
-      this.x402Flows.set(rpcUrl, x402Flow)
+  /** A core, connected and its token list loaded on first use. */
+  private async payerFor(rpcUrl: string): Promise<Payer> {
+    let payer = this.payers.get(rpcUrl)
+    if (!payer) {
+      payer = await FourMicaEvmScheme.connect(this.signer, rpcUrl)
       const { tokens } = await FourMicaEvmScheme.loadSupportedTokens(rpcUrl)
+      this.payers.set(rpcUrl, payer)
       this.tokensByRpcUrl.set(rpcUrl, tokens)
     }
-    return x402Flow
-  }
-
-  /** A flow that signs under the domain the resource server advertised. */
-  private flowForDomain(domain: FourMicaDomainExtra, network: Network): X402Flow {
-    const chainId = chainIdOf(network)
-    if (chainId === undefined) {
-      throw new Error(`Cannot derive an EIP-712 chain id from network ${network}`)
-    }
-
-    const key = [chainId, domain.name, domain.version, domain.verifyingContract.toLowerCase()].join(
-      '|'
-    )
-    let flow = this.domainFlows.get(key)
-    if (!flow) {
-      // Only the four domain fields matter for signing; the operator's BLS key
-      // is for verifying certificates, which this path never does.
-      const params = new CorePublicParameters(
-        new Uint8Array(0),
-        domain.verifyingContract,
-        domain.name,
-        domain.version,
-        chainId
-      )
-      const signer = new PaymentSigner(this.signer)
-      flow = new X402Flow({
-        signPayment: (claims, scheme) => signer.signRequest(params, claims, scheme),
-      })
-      this.domainFlows.set(key, flow)
-    }
-    return flow
+    return payer
   }
 }

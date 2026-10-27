@@ -82,11 +82,16 @@ export interface StablecoinPosition {
   protocolYieldShare: bigint;
   userNetYield: bigint;
   withdrawableBalance: bigint;
-  totalUserScaledBalance: bigint;
-  protocolScaledBalance: bigint;
-  surplusScaledBalance: bigint;
-  contractScaledATokenBalance: bigint;
-  stablecoinAToken: string;
+  /** The signer's pool shares. */
+  userShares: bigint;
+  totalUserShares: bigint;
+  protocolShares: bigint;
+  /** Shares outstanding across users, the protocol and escrow. */
+  poolShares: bigint;
+  /** Underlying value backing the pool. */
+  poolAssets: bigint;
+  /** The ERC-4626 strategy backing the pool, or the zero address while its assets sit idle. */
+  strategy: string;
 }
 
 /** Outcome of a deposit, whichever route delivered it. */

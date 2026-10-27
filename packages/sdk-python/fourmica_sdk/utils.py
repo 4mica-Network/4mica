@@ -33,6 +33,16 @@ def normalize_address(raw: str) -> str:
     return to_checksum_address(raw)
 
 
+def parse_address(raw: str, field: str = "address") -> str:
+    """Checksums *raw* without demanding it already be checksummed — any
+    casing of 20 hex bytes is the same address, as alloy parses it. Signed
+    payloads carry addresses spelled however their author wrote them."""
+    value = str(raw).strip()
+    if not re.fullmatch(r"0[xX][0-9a-fA-F]{40}", value):
+        raise ValidationError(f"invalid {field} address: {raw}")
+    return to_checksum_address("0x" + value[2:].lower())
+
+
 def normalize_bytes32_hex(raw: str) -> str:
     if not isinstance(raw, str):
         raise ValidationError(f"invalid bytes32 value type: {type(raw)}")

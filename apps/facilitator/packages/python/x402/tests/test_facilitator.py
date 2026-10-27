@@ -26,22 +26,29 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def test_settle_async_normalizes_certificate_and_alias_fields():
+PAYMENT = {
+    "x402_version": 2,
+    "accepted": {"scheme": "4mica-credit"},
+    "payload": {"payload": {"version": "v1"}, "signature": "0x" + "33" * 65},
+}
+RECEIPT = {"receipt": "0x" + "11" * 32, "signature": "0x" + "22" * 65}
+
+
+def test_settle_async_reads_the_receipt_from_extra():
     base_url = "http://fac.test"
 
     def handler(request):
         body = json.loads(request.content.decode())
         assert body["x402Version"] == 2
+        assert body["paymentPayload"]["payload"]["payload"]["version"] == "v1"
         return httpx.Response(
             200,
             json={
                 "success": True,
-                "txHash": "0xdeadbeef",
-                "networkId": "eip155:11155111",
-                "certificate": {
-                    "claims": "0x" + "11" * 32,
-                    "signature": "0x" + "22" * 96,
-                },
+                "payer": "0x9999999999999999999999999999999999999999",
+                "transaction": "",
+                "network": "eip155:11155111",
+                "extra": {"receipt": RECEIPT},
             },
         )
 
@@ -52,88 +59,35 @@ def test_settle_async_normalizes_certificate_and_alias_fields():
     try:
         response = run(
             client.settle(
-                StubModel(
-                    x402_version=2,
-                    accepted={"scheme": "4mica-credit"},
-                    payload={"claims": {"version": "v2"}},
-                ),
+                StubModel(**PAYMENT),
                 StubModel(network="eip155:11155111", scheme="4mica-credit"),
             )
         )
         assert response.success is True
-        assert response.transaction == "0xdeadbeef"
+        assert response.transaction == ""
         assert response.network == "eip155:11155111"
-        assert response.error_reason is None
-    finally:
-        run(async_client.aclose())
-
-
-def test_settle_async_normalizes_alias_fields_without_certificate():
-    base_url = "http://fac.test"
-
-    def handler(request):
-        body = json.loads(request.content.decode())
-        assert body["x402Version"] == 2
-        assert body["paymentPayload"]["payload"]["claims"]["version"] == "v2"
-        return httpx.Response(
-            200,
-            json={
-                "success": True,
-                "transactionHash": "0xabc123",
-                "network": "eip155:80002",
-                "user_address": "0x9999999999999999999999999999999999999999",
-            },
-        )
-
-    transport = httpx.MockTransport(handler)
-    async_client = httpx.AsyncClient(transport=transport)
-    client = FourMicaFacilitatorClient(FacilitatorConfig(url=base_url, http_client=async_client))
-
-    try:
-        response = run(
-            client.settle(
-                StubModel(
-                    x402_version=2,
-                    accepted={"scheme": "4mica-credit"},
-                    payload={"claims": {"version": "v2"}},
-                ),
-                StubModel(network="eip155:80002", scheme="4mica-credit"),
-            )
-        )
-        assert response.success is True
-        assert response.transaction == "0xabc123"
-        assert response.network == "eip155:80002"
         assert response.payer == "0x9999999999999999999999999999999999999999"
         assert response.error_reason is None
+        assert response.extra == {"receipt": RECEIPT}
     finally:
         run(async_client.aclose())
 
 
-def test_settle_async_raises_on_facilitator_error_reason():
+def test_settle_async_raises_on_a_non_200():
     base_url = "http://fac.test"
 
     def handler(request):
-        return httpx.Response(
-            400,
-            json={
-                "success": False,
-                "error_reason": "unsupported x402Version 2",
-            },
-        )
+        return httpx.Response(422, text="unsupported x402Version 3")
 
     transport = httpx.MockTransport(handler)
     async_client = httpx.AsyncClient(transport=transport)
     client = FourMicaFacilitatorClient(FacilitatorConfig(url=base_url, http_client=async_client))
 
     try:
-        with pytest.raises(ValueError, match="unsupported x402Version 2"):
+        with pytest.raises(ValueError, match="unsupported x402Version 3"):
             run(
                 client.settle(
-                    StubModel(
-                        x402_version=2,
-                        accepted={"scheme": "4mica-credit"},
-                        payload={"claims": {"version": "v2"}},
-                    ),
+                    StubModel(**PAYMENT),
                     StubModel(network="eip155:11155111", scheme="4mica-credit"),
                 )
             )
@@ -141,20 +95,22 @@ def test_settle_async_raises_on_facilitator_error_reason():
         run(async_client.aclose())
 
 
-def test_settle_sync_normalizes_alias_fields():
+def test_settle_sync_surfaces_a_refusal():
+    """Refusals arrive as HTTP 200 with ``success: false``: the reason is a
+    code, and 4mica's ``retryable`` / ``details`` ride under ``extra``."""
     base_url = "http://fac.test"
+    details = {"uncheckpointed": 64, "max_uncheckpointed": 64}
 
     def handler(request):
         return httpx.Response(
             200,
             json={
-                "success": True,
-                "tx_hash": "0xfeedface",
-                "network_id": "eip155:11155111",
-                "certificate": {
-                    "claims": "0x" + "11" * 32,
-                    "signature": "0x" + "22" * 96,
-                },
+                "success": False,
+                "errorReason": "invalid_4mica_credit_checkpoint_required",
+                "errorMessage": "checkpoint required",
+                "transaction": "",
+                "network": "eip155:11155111",
+                "extra": {"retryable": False, "details": details},
             },
         )
 
@@ -163,16 +119,12 @@ def test_settle_sync_normalizes_alias_fields():
     client = FourMicaFacilitatorClientSync(FacilitatorConfig(url=base_url, http_client=sync_client))
 
     response = client.settle(
-        StubModel(
-            x402_version=2,
-            accepted={"scheme": "4mica-credit"},
-            payload={"claims": {"version": "v2"}},
-        ),
+        StubModel(**PAYMENT),
         StubModel(network="eip155:11155111", scheme="4mica-credit"),
     )
-    assert response.success is True
-    assert response.transaction == "0xfeedface"
-    assert response.network == "eip155:11155111"
-    assert response.error_reason is None
+    assert response.success is False
+    assert response.error_reason == "invalid_4mica_credit_checkpoint_required"
+    assert response.error_message == "checkpoint required"
+    assert response.extra == {"retryable": False, "details": details}
 
     sync_client.close()

@@ -13,7 +13,7 @@ import type {
 import { err } from "./ui/log.js";
 
 const BUILD_TYPES: BuildType[] = ["agent", "seller", "buyer"];
-const FRAMEWORKS: Framework[] = ["express", "hono", "next"];
+const FRAMEWORKS: Framework[] = ["express"];
 const AGENT_ROLES: AgentRole[] = ["seller", "buyer"];
 const PMS: PackageManager[] = ["pnpm", "npm", "yarn", "bun"];
 

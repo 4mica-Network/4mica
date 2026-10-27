@@ -29,13 +29,12 @@ from ..errors import (
 # reason, so falling back to self-funding just burns their gas on a revert.
 NAMES_THE_REQUEST = frozenset(
     {
-        "INVALID_REQUEST",
-        "MALFORMED_SIGNATURE",
-        "SIGNATURE_MISMATCH",
-        "EXPIRED",
-        "NOT_YET_VALID",
-        "NONCE_ALREADY_USED",
-        "SIMULATION_REVERTED",
+        "invalid_payload",
+        "invalid_signature",
+        "authorization_expired",
+        "authorization_not_yet_valid",
+        "nonce_already_used",
+        "simulation_reverted",
     }
 )
 
@@ -43,12 +42,12 @@ NAMES_THE_REQUEST = frozenset(
 # terms from the same core and submits to the same contract.
 NAMES_THE_CLAIM = frozenset(
     {
-        "INVALID_REQUEST",
-        "ACTION_UNAVAILABLE",
-        "ACTION_MISMATCH",
-        "SIMULATION_REVERTED",
-        "REVERTED_ON_CHAIN",
-        "RECEIPT_UNAVAILABLE",
+        "invalid_payload",
+        "clearing_action_unavailable",
+        "clearing_action_mismatch",
+        "simulation_reverted",
+        "invalid_transaction_state",
+        "settlement_pending",
     }
 )
 
@@ -57,12 +56,11 @@ NAMES_THE_CLAIM = frozenset(
 # balance fails the self-funded route just the same.
 NAMES_THE_PAYMENT = NAMES_THE_CLAIM | frozenset(
     {
-        "MALFORMED_SIGNATURE",
-        "SIGNATURE_MISMATCH",
-        "EXPIRED",
-        "NOT_YET_VALID",
-        "NONCE_ALREADY_USED",
-        "INSUFFICIENT_BALANCE",
+        "invalid_signature",
+        "authorization_expired",
+        "authorization_not_yet_valid",
+        "nonce_already_used",
+        "insufficient_funds",
     }
 )
 
@@ -126,13 +124,21 @@ def confirm_facilitator_echo(field: str, raw: Optional[str], expected: str) -> s
     raise OutcomeUnknownError(f"facilitator echoed {field} {raw}, expected {expected}")
 
 
+def _extra(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """What the facilitator adds to a failure, under ``extra``: ``retryable``
+    and ``details``. The reason and message travel beside it, under the names
+    the response uses."""
+    extra = payload.get("extra")
+    return extra if isinstance(extra, dict) else {}
+
+
 def eip2612_nonce(payload: Dict[str, Any]) -> Optional[int]:
-    """The EIP-2612 nonce attached to a ``PERMIT2_ALLOWANCE_REQUIRED``
+    """The EIP-2612 nonce attached to a ``permit2_allowance_required``
     rejection — the one value a client with no chain access cannot compute."""
-    allowance = payload.get("permit2Allowance")
-    if not isinstance(allowance, dict):
+    details = _extra(payload).get("details")
+    if not isinstance(details, dict):
         return None
-    raw = allowance.get("eip2612Nonce")
+    raw = details.get("eip2612Nonce")
     if raw is None:
         return None
     try:
@@ -142,20 +148,24 @@ def eip2612_nonce(payload: Dict[str, Any]) -> Optional[int]:
 
 
 def rejection_error(
-    payload: Dict[str, Any], message: Optional[str]
+    payload: Dict[str, Any], reason: Optional[str], message: Optional[str]
 ) -> SponsorshipError:
     """The typed rejection for a ``success: false`` / ``isValid: false`` body.
-    ``errorCode`` is carried verbatim so a caller can branch on a code this
-    SDK predates; absent ``retryable`` means "not retryable" — a facilitator
+    ``reason`` is ``errorReason`` on a submit and ``invalidReason`` on a
+    verify, ``message`` the matching ``errorMessage`` / ``invalidMessage``.
+    The reason is carried verbatim so a caller can branch on a code this SDK
+    predates; absent ``extra.retryable`` means "not retryable" — a facilitator
     that omits it is not promising anything."""
-    code = payload.get("errorCode") or "UNKNOWN"
-    text = message or payload.get("error") or "facilitator gave no reason"
-    if code == "PERMIT2_ALLOWANCE_REQUIRED":
+    code = reason or "unknown"
+    text = message or "facilitator gave no reason"
+    if code == "permit2_allowance_required":
         return Permit2AllowanceRequiredError(text, eip2612_nonce(payload))
-    if code in ("NO_RELAYER_CONFIGURED", "NO_RELAYER"):
+    if code == "sponsorship_unavailable":
         return FacilitatorNotConfiguredError()
     return FacilitatorRejectedError(
-        code=str(code), message=str(text), retryable=bool(payload.get("retryable"))
+        code=str(code),
+        message=str(text),
+        retryable=bool(_extra(payload).get("retryable")),
     )
 
 
@@ -186,6 +196,6 @@ def refuses_the_authorization(exc: FourMicaError) -> bool:
     if isinstance(exc, MissingTokenDomainSeparatorError):
         return True
     return isinstance(exc, FacilitatorRejectedError) and exc.code in (
-        "SIMULATION_REVERTED",
-        "UNSUPPORTED_TRANSFER_METHOD",
+        "simulation_reverted",
+        "unsupported_transfer_method",
     )

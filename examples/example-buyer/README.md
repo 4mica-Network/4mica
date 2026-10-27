@@ -1,8 +1,9 @@
 # example-buyer
 
-Buyer: pays for a seller's paywalled route over x402. It fetches the route,
-reads the `402` payment requirements, signs a payment guarantee with the SDK,
-and fetches again with the `X-PAYMENT` header.
+Buyer: pays for a seller's x402-priced route with `@x402/fetch` and
+`@4mica/x402`'s client scheme. The wrapped `fetch` answers the seller's `402` by
+signing a payment and retrying, and recovers from the refusals a payer can fix,
+such as core asking for a checkpoint.
 
 ## Setup
 
@@ -28,5 +29,3 @@ pnpm --filter @4mica/example-buyer deposit
 pnpm --filter @4mica/example-buyer start
 ```
 
-Point `RESOURCE_URL` at `http://localhost:3001/quote` for the Hono seller or
-`http://localhost:3002/api/quote` for the Next.js seller.

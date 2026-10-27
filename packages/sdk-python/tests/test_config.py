@@ -29,9 +29,9 @@ def test_bearer_token_replaces_siwe():
 
 def test_network_shorthand_and_caip2():
     cfg = ConfigBuilder().network("base").wallet_private_key(KEY).build()
-    assert cfg.rpc_url == "https://base.api.4mica.xyz/"
+    assert cfg.rpc_url == "https://base.api.4mica.io/"
     cfg = ConfigBuilder().network("eip155:8453").wallet_private_key(KEY).build()
-    assert cfg.rpc_url == "https://base.api.4mica.xyz/"
+    assert cfg.rpc_url == "https://base.api.4mica.io/"
     with pytest.raises(ConfigError, match="unknown network"):
         ConfigBuilder().network("solana")
 
@@ -62,4 +62,4 @@ def test_from_env_network_takes_precedence(monkeypatch):
     monkeypatch.setenv("4MICA_RPC_URL", "https://env.example/")
     monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", KEY)
     cfg = ConfigBuilder().from_env().build()
-    assert cfg.rpc_url == "https://base.sepolia.api.4mica.xyz/"
+    assert cfg.rpc_url == "https://base.sepolia.api.4mica.io/"

@@ -48,9 +48,6 @@ catalogs:
     '@modelcontextprotocol/sdk':
       specifier: ^1.30.0
       version: 1.30.0
-    '@noble/curves':
-      specifier: ^2.2.0
-      version: 2.2.0
     '@prisma/adapter-pg':
       specifier: 7.9.1
       version: 7.9.1
@@ -115,14 +112,14 @@ catalogs:
       specifier: ^4.1.8
       version: 4.1.8
     '@x402/core':
-      specifier: 2.23.0
-      version: 2.23.0
-    '@x402/extensions':
-      specifier: 2.23.0
-      version: 2.23.0
+      specifier: 2.28.0
+      version: 2.28.0
+    '@x402/express':
+      specifier: 2.28.0
+      version: 2.28.0
     '@x402/fetch':
-      specifier: 2.23.0
-      version: 2.23.0
+      specifier: 2.28.0
+      version: 2.28.0
     ahooks:
       specifier: ^3.9.7
       version: 3.9.7
@@ -171,9 +168,6 @@ catalogs:
     gray-matter:
       specifier: ^4.0.3
       version: 4.0.3
-    hono:
-      specifier: ^4.6.0
-      version: 4.12.27
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -724,13 +718,13 @@ importers:
         version: link:../../../../../packages/sdk
       '@x402/core':
         specifier: 'catalog:'
-        version: 2.23.0
-      '@x402/extensions':
+        version: 2.28.0
+      '@x402/express':
         specifier: 'catalog:'
-        version: 2.23.0(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 2.28.0(@x402/paywall@2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3))(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(express@5.2.1)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@x402/paywall':
-        specifier: ^2.2.0
-        version: 2.23.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)
+        specifier: ^2.28.0
+        version: 2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)
       viem:
         specifier: 'catalog:'
         version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
@@ -747,6 +741,9 @@ importers:
       '@types/node':
         specifier: catalog:node26
         version: 26.3.0
+      '@x402/fetch':
+        specifier: 'catalog:'
+        version: 2.28.0
       express:
         specifier: 'catalog:'
         version: 5.2.1
@@ -773,10 +770,10 @@ importers:
         version: 1.30.0(zod@3.25.76)
       '@x402/core':
         specifier: 'catalog:'
-        version: 2.23.0
+        version: 2.28.0
       '@x402/fetch':
         specifier: 'catalog:'
-        version: 2.23.0
+        version: 2.28.0
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
@@ -1026,12 +1023,21 @@ importers:
       '@4mica/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
-      '@4mica/sdk-node':
+      '@4mica/x402':
         specifier: workspace:*
-        version: link:../../packages/sdk-node
+        version: link:../../apps/facilitator/packages/typescript/x402
+      '@x402/core':
+        specifier: 'catalog:'
+        version: 2.28.0
+      '@x402/fetch':
+        specifier: 'catalog:'
+        version: 2.28.0
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
+      viem:
+        specifier: 'catalog:'
+        version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
     devDependencies:
       '@4mica/tsconfig':
         specifier: workspace:*
@@ -1051,12 +1057,9 @@ importers:
       '@4mica/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
-      '@4mica/sdk-express':
+      '@4mica/x402':
         specifier: workspace:*
-        version: link:../../packages/sdk-express
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
+        version: link:../../apps/facilitator/packages/typescript/x402
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
@@ -1080,152 +1083,23 @@ importers:
         specifier: catalog:typescript-latest
         version: 5.9.3
 
-  examples/example-seller-hono:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-hono':
-        specifier: workspace:*
-        version: link:../../packages/sdk-hono
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      '@hono/node-server':
-        specifier: ^1.13.0
-        version: 1.19.14(hono@4.12.27)
-      dotenv:
-        specifier: 'catalog:'
-        version: 17.4.2
-      hono:
-        specifier: 'catalog:'
-        version: 4.12.27
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      tsx:
-        specifier: 'catalog:'
-        version: 4.22.4
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-seller-next:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-next':
-        specifier: workspace:*
-        version: link:../../packages/sdk-next
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      next:
-        specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react:
-        specifier: 'catalog:'
-        version: 19.2.7
-      react-dom:
-        specifier: 'catalog:'
-        version: 19.2.7(react@19.2.7)
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.16
-      '@types/react-dom':
-        specifier: 'catalog:'
-        version: 19.2.3(@types/react@19.2.16)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
-  examples/example-shop-app:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../../packages/sdk
-      '@4mica/sdk-next':
-        specifier: workspace:*
-        version: link:../../packages/sdk-next
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
-      '@4mica/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      framer-motion:
-        specifier: 'catalog:'
-        version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      lucide-react:
-        specifier: 'catalog:'
-        version: 1.23.0(react@19.2.7)
-      next:
-        specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react:
-        specifier: 'catalog:'
-        version: 19.2.7
-      react-dom:
-        specifier: 'catalog:'
-        version: 19.2.7(react@19.2.7)
-      viem:
-        specifier: 'catalog:'
-        version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
-    devDependencies:
-      '@4mica/tailwind-config':
-        specifier: workspace:*
-        version: link:../../packages/tailwind-config
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@tailwindcss/postcss':
-        specifier: 'catalog:'
-        version: 4.3.0
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.16
-      '@types/react-dom':
-        specifier: 'catalog:'
-        version: 19.2.3(@types/react@19.2.16)
-      postcss:
-        specifier: 'catalog:'
-        version: 8.5.15
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.0
-      tailwindcss-animate:
-        specifier: 'catalog:'
-        version: 1.0.7(tailwindcss@4.3.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-
   examples/example-wallet-app:
     dependencies:
       '@4mica/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
-      '@4mica/sdk-node':
-        specifier: workspace:*
-        version: link:../../packages/sdk-node
       '@4mica/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@4mica/x402':
+        specifier: workspace:*
+        version: link:../../apps/facilitator/packages/typescript/x402
+      '@x402/core':
+        specifier: 'catalog:'
+        version: 2.28.0
+      '@x402/fetch':
+        specifier: 'catalog:'
+        version: 2.28.0
       framer-motion:
         specifier: 'catalog:'
         version: 12.40.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1433,9 +1307,6 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@noble/curves':
-        specifier: 'catalog:'
-        version: 2.2.0
       '@quillai-network/wachai-validation-sdk':
         specifier: 'catalog:'
         version: 0.1.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -1468,158 +1339,6 @@ importers:
       '@coinbase/cdp-sdk':
         specifier: 'catalog:'
         version: 1.51.2(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-
-  packages/sdk-deno:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@arethetypeswrong/cli':
-        specifier: 'catalog:'
-        version: 0.18.4
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      publint:
-        specifier: 'catalog:'
-        version: 0.3.21
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.23)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/sdk-express:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@arethetypeswrong/cli':
-        specifier: 'catalog:'
-        version: 0.18.4
-      '@types/express':
-        specifier: 'catalog:'
-        version: 5.0.6
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      express:
-        specifier: 'catalog:'
-        version: 5.2.1
-      publint:
-        specifier: 'catalog:'
-        version: 0.3.21
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.23)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/sdk-hono:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@arethetypeswrong/cli':
-        specifier: 'catalog:'
-        version: 0.18.4
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      hono:
-        specifier: 'catalog:'
-        version: 4.12.27
-      publint:
-        specifier: 'catalog:'
-        version: 0.3.21
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.23)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/sdk-next:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../sdk
-      next:
-        specifier: '>=14'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@arethetypeswrong/cli':
-        specifier: 'catalog:'
-        version: 0.18.4
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      publint:
-        specifier: 'catalog:'
-        version: 0.3.21
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.23)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/sdk-node:
-    dependencies:
-      '@4mica/sdk':
-        specifier: workspace:*
-        version: link:../sdk
-    devDependencies:
-      '@4mica/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@arethetypeswrong/cli':
-        specifier: 'catalog:'
-        version: 0.18.4
-      '@types/node':
-        specifier: catalog:node24
-        version: 24.12.4
-      publint:
-        specifier: 'catalog:'
-        version: 0.3.21
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(jiti@2.7.0)(postcss@8.5.23)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
-      typescript:
-        specifier: catalog:typescript-latest
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/seed:
     dependencies:
@@ -6620,17 +6339,26 @@ packages:
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
 
-  '@x402/core@2.23.0':
-    resolution: {integrity: sha512-EFeV0nXbTPPe5FXaD6y9vMgqc+k/ujLXCrUPrQXkmHjHyjC3Ir5tTL1e2FPSkx2+GUGzfpt1wVZb36639ygkWw==}
+  '@x402/core@2.28.0':
+    resolution: {integrity: sha512-Da/7zKxCKqpBoB4Msc9tFgkAv7tJTD8nG+DSSm+QdXAyJS4PQsmgVSKe17rDJTtlu0pwNbLcOje6MyQ6kaDkig==}
 
-  '@x402/extensions@2.23.0':
-    resolution: {integrity: sha512-K0hDWGNrQ5iU8CdDzM8RpYrMusfqs2rgZJbCfUnFXG61TjgFIYYyLExaP8jJ4y2ac0SGXYZC1MI+uJA6YP3TTw==}
+  '@x402/express@2.28.0':
+    resolution: {integrity: sha512-/94ZT89ce9Y92TgAxMuBQiS32BbvZOh0ZziMxTR8js2dbroEZ8po5guayy8zHOG79/x0p5GHJ/yoUUC4faMnvA==}
+    peerDependencies:
+      '@x402/paywall': ^2.28.0
+      express: ^4.0.0 || ^5.0.0
+    peerDependenciesMeta:
+      '@x402/paywall':
+        optional: true
 
-  '@x402/fetch@2.23.0':
-    resolution: {integrity: sha512-iyUfmnX6eAQa+GxyhC2M/vDP49EuoB/KHCXeOAFJgfL9lhtsyomLfYAMZlF+0xYHgpk/G96QZSp8iyhVlems/A==}
+  '@x402/extensions@2.28.0':
+    resolution: {integrity: sha512-M3SVxO8DJnx7gpok/ODQp803jr21s1XrCMholNw0hSgOVvSPRksfTZ+CUNfJwteNaHmaAxGjPelXWBhTCMD9oQ==}
 
-  '@x402/paywall@2.23.0':
-    resolution: {integrity: sha512-owpZ14OD+JeQvySAS2NLayLkMTNOp8WgLpiInm0zS/1MXTaThV+U//3bR8fI6EvRqeHMzy6hqlPUXB0qihJFYQ==}
+  '@x402/fetch@2.28.0':
+    resolution: {integrity: sha512-kF5IjZIz/izg2TD/Zav+SVj0jtC0zBDfE7WcKCnMZWIsZcLCyL2GgvwXCn7CCSsNjpQ/z3Rz4OqTCA4AaeKySQ==}
+
+  '@x402/paywall@2.28.0':
+    resolution: {integrity: sha512-Uysf92BSzOpXoi7JXQeStioOf+BM/M9fI+/Z260l5d9rmoXldK9hhuZ3u13tTuvBlhGQESusBjkxTo6bhgRxTQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -13091,7 +12819,7 @@ snapshots:
 
   '@metamask/sdk@0.33.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)':
     dependencies:
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.29.10
       '@metamask/onboarding': 1.0.1
       '@metamask/providers': 16.1.0
       '@metamask/sdk-analytics': 0.0.5
@@ -17285,23 +17013,36 @@ snapshots:
 
   '@walletconnect/window-metadata@1.0.0':
     dependencies:
-      '@walletconnect/window-getters': 1.0.0
+      '@walletconnect/window-getters': 1.0.1
 
   '@walletconnect/window-metadata@1.0.1':
     dependencies:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
 
-  '@x402/core@2.23.0':
+  '@x402/core@2.28.0':
     dependencies:
       zod: 3.25.76
 
-  '@x402/extensions@2.23.0(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)':
+  '@x402/express@2.28.0(@x402/paywall@2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3))(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(express@5.2.1)(typescript@5.9.3)(utf-8-validate@5.0.10)':
+    dependencies:
+      '@x402/core': 2.28.0
+      '@x402/extensions': 2.28.0(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)
+      express: 5.2.1
+    optionalDependencies:
+      '@x402/paywall': 2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)
+    transitivePeerDependencies:
+      - bufferutil
+      - ethers
+      - typescript
+      - utf-8-validate
+
+  '@x402/extensions@2.28.0(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@noble/curves': 1.9.7
       '@scure/base': 1.2.6
       '@signinwithethereum/siwe': 4.2.0(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(viem@2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
-      '@x402/core': 2.23.0
+      '@x402/core': 2.28.0
       ajv: 8.20.0
       jose: 5.10.0
       tweetnacl: 1.0.3
@@ -17313,11 +17054,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@x402/fetch@2.23.0':
+  '@x402/fetch@2.28.0':
     dependencies:
-      '@x402/core': 2.23.0
+      '@x402/core': 2.28.0
 
-  '@x402/paywall@2.23.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
+  '@x402/paywall@2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
     dependencies:
       '@algorandfoundation/algokit-utils': 10.0.0-alpha.46
       '@blockshake/defly-connect': 1.2.1(algosdk@3.7.0)(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -17337,7 +17078,7 @@ snapshots:
       '@wallet-standard/base': 1.1.1
       '@wallet-standard/features': 1.1.1
       '@walletconnect/sign-client': 2.23.10(bufferutil@4.1.0)(ioredis@5.11.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
-      '@x402/core': 2.23.0
+      '@x402/core': 2.28.0
       lute-connect: 1.7.0
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
@@ -18081,7 +17822,7 @@ snapshots:
 
   date-fns@2.30.0:
     dependencies:
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.29.10
 
   dayjs@1.11.13: {}
 

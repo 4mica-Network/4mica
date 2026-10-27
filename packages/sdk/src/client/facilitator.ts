@@ -11,32 +11,30 @@ import type { FetchFn } from "@/rpc";
 import { isRecord } from "@/serde";
 
 export const NAMES_THE_REQUEST: ReadonlySet<string> = new Set([
-  "INVALID_REQUEST",
-  "MALFORMED_SIGNATURE",
-  "SIGNATURE_MISMATCH",
-  "EXPIRED",
-  "NOT_YET_VALID",
-  "NONCE_ALREADY_USED",
-  "SIMULATION_REVERTED",
+  "invalid_payload",
+  "invalid_signature",
+  "authorization_expired",
+  "authorization_not_yet_valid",
+  "nonce_already_used",
+  "simulation_reverted",
 ]);
 
 export const NAMES_THE_CLAIM: ReadonlySet<string> = new Set([
-  "INVALID_REQUEST",
-  "ACTION_UNAVAILABLE",
-  "ACTION_MISMATCH",
-  "SIMULATION_REVERTED",
-  "REVERTED_ON_CHAIN",
-  "RECEIPT_UNAVAILABLE",
+  "invalid_payload",
+  "clearing_action_unavailable",
+  "clearing_action_mismatch",
+  "simulation_reverted",
+  "invalid_transaction_state",
+  "settlement_pending",
 ]);
 
 export const NAMES_THE_PAYMENT: ReadonlySet<string> = new Set([
   ...NAMES_THE_CLAIM,
-  "MALFORMED_SIGNATURE",
-  "SIGNATURE_MISMATCH",
-  "EXPIRED",
-  "NOT_YET_VALID",
-  "NONCE_ALREADY_USED",
-  "INSUFFICIENT_BALANCE",
+  "invalid_signature",
+  "authorization_expired",
+  "authorization_not_yet_valid",
+  "nonce_already_used",
+  "insufficient_funds",
 ]);
 
 const NEVER_ARRIVED_CODES = new Set([
@@ -151,14 +149,27 @@ export function confirmFacilitatorEcho(
   );
 }
 
+/**
+ * What the facilitator adds to a failure, under `extra`: `retryable` and
+ * `details`. The reason and message travel beside it, under the names the
+ * response uses.
+ */
+function extraOf(payload: Record<string, unknown>): Record<string, unknown> {
+  return isRecord(payload.extra) ? payload.extra : {};
+}
+
+/**
+ * The EIP-2612 nonce attached to a `permit2_allowance_required` rejection —
+ * the one value a client with no chain access cannot compute.
+ */
 export function eip2612NonceFrom(
   payload: Record<string, unknown>,
 ): bigint | undefined {
-  const allowance = payload.permit2Allowance;
-  if (!isRecord(allowance)) {
+  const details = extraOf(payload).details;
+  if (!isRecord(details)) {
     return undefined;
   }
-  const raw = allowance.eip2612Nonce;
+  const raw = details.eip2612Nonce;
   if (raw === null || raw === undefined) {
     return undefined;
   }
@@ -169,22 +180,31 @@ export function eip2612NonceFrom(
   }
 }
 
+/**
+ * The typed rejection for a `success: false` / `isValid: false` body.
+ * `reason` is `errorReason` on a submit and `invalidReason` on a verify,
+ * `message` the matching `errorMessage` / `invalidMessage`. The reason is
+ * carried verbatim so a caller can branch on a code this SDK predates; absent
+ * `extra.retryable` means "not retryable" — a facilitator that omits it is not
+ * promising anything.
+ */
 export function rejectionError(
   payload: Record<string, unknown>,
+  reason: unknown,
   message: unknown,
 ): SponsorshipError {
-  const code = payload.errorCode || "UNKNOWN";
-  const text = String(message || payload.error || "facilitator gave no reason");
-  if (code === "PERMIT2_ALLOWANCE_REQUIRED") {
+  const code = String(reason || "unknown");
+  const text = String(message || "facilitator gave no reason");
+  if (code === "permit2_allowance_required") {
     return new Permit2AllowanceRequiredError(text, eip2612NonceFrom(payload));
   }
-  if (code === "NO_RELAYER_CONFIGURED" || code === "NO_RELAYER") {
+  if (code === "sponsorship_unavailable") {
     return new FacilitatorNotConfiguredError();
   }
   return new FacilitatorRejectedError(
-    String(code),
+    code,
     text,
-    Boolean(payload.retryable),
+    Boolean(extraOf(payload).retryable),
   );
 }
 
@@ -210,7 +230,7 @@ export function refusesTheAuthorization(err: unknown): boolean {
   }
   return (
     err instanceof FacilitatorRejectedError &&
-    (err.code === "SIMULATION_REVERTED" ||
-      err.code === "UNSUPPORTED_TRANSFER_METHOD")
+    (err.code === "simulation_reverted" ||
+      err.code === "unsupported_transfer_method")
   );
 }

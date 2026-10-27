@@ -1,4 +1,4 @@
-// Regenerate src/abi/core4mica.ts and src/abi/clearinghouse.ts from the
+// Regenerate src/abi/treasury.ts and src/abi/clearinghouse.ts from the
 // monorepo's contracts/abi/*.json.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -13,10 +13,10 @@ const source = readFileSync(resolve(abiDir, "SOURCE"), "utf8").trim();
 
 const targets = [
   {
-    json: "Core4Mica.json",
-    out: "src/abi/core4mica.ts",
-    name: "core4micaAbi",
-    doc: "Core4Mica contract ABI.",
+    json: "Treasury.json",
+    out: "src/abi/treasury.ts",
+    name: "treasuryAbi",
+    doc: "Treasury contract ABI.",
   },
   {
     json: "ClearingHouse.json",

@@ -1,6 +1,5 @@
 export * from "@/auth";
 export * from "@/authorizations";
-export * from "@/bls";
 export * from "@/client";
 export * from "@/config";
 export * from "@/contract";
@@ -10,7 +9,7 @@ export * from "@/guarantee";
 export * from "@/models";
 export * from "@/networks";
 export * from "@/rpc";
-export { PaymentSigner } from "@/signing";
+export { PayerSigner } from "@/signing";
 export * from "@/utils";
 export * from "@/wallet";
 export * from "@/x402/index";

@@ -10,15 +10,15 @@ use tracing::{info, warn};
 
 use super::{
     model::{
-        ClaimRequest, ClaimResponse, ClaimVerifyResponse, DepositRequest, DepositResponse,
-        DepositVerifyResponse, PayRequest, PayResponse, PayVerifyResponse, SettleRequest,
-        SettleResponse, SupportedKind, SupportedResponse, VerifyRequest, VerifyResponse,
-        WithdrawRequest, WithdrawResponse, WithdrawVerifyResponse,
+        ClaimRequest, ClaimResponse, DepositRequest, DepositResponse, PayRequest, PayResponse,
+        SettleRequest, SettleResponse, SupportedKind, SupportedResponse, VerifyRequest,
+        VerifyResponse, WithdrawRequest, WithdrawResponse,
     },
     state::SharedState,
 };
 use crate::clearing::{self, ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{self, DepositError, DepositIntent};
+use crate::error_code::{ErrorCode, Refusal};
 use crate::withdraw::{self, WithdrawError, WithdrawIntent};
 
 pub(super) fn build_router(state: SharedState) -> Router {
@@ -47,13 +47,13 @@ async fn deposit_verify_handler(
     Json(request): Json<DepositRequest>,
 ) -> impl IntoResponse {
     match run_deposit_verify(&state, request).await {
-        Ok(()) => Json(DepositVerifyResponse::valid()),
+        Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
             // Counted like a submit rejection: this endpoint consumes a global rate-limit slot and
             // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
             state.deposit_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "deposit verification failed");
-            Json(DepositVerifyResponse::invalid(&err))
+            warn!(reason = %err, code = %err.code(), "deposit verification failed");
+            Json(VerifyResponse::invalid(&err))
         }
     }
 }
@@ -89,7 +89,7 @@ async fn deposit_handler(
         Ok(response) => {
             state.deposit_guard().record_sponsored();
             info!(
-                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 from = response.from.as_deref().unwrap_or_default(),
                 asset = response.asset.as_deref().unwrap_or_default(),
                 amount = response.amount.as_deref().unwrap_or_default(),
@@ -100,7 +100,7 @@ async fn deposit_handler(
         }
         Err(err) => {
             state.deposit_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "gasless deposit failed");
+            warn!(reason = %err, code = %err.code(), "gasless deposit failed");
             Json(DepositResponse::failure(&err))
         }
     }
@@ -135,11 +135,11 @@ async fn withdraw_verify_handler(
     Json(request): Json<WithdrawRequest>,
 ) -> impl IntoResponse {
     match run_withdraw_verify(&state, request).await {
-        Ok(()) => Json(WithdrawVerifyResponse::valid()),
+        Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
             state.withdraw_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "withdrawal verification failed");
-            Json(WithdrawVerifyResponse::invalid(&err))
+            warn!(reason = %err, code = %err.code(), "withdrawal verification failed");
+            Json(VerifyResponse::invalid(&err))
         }
     }
 }
@@ -173,7 +173,7 @@ async fn withdraw_handler(
             state.withdraw_guard().record_sponsored();
             info!(
                 action,
-                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 user = response.user.as_deref().unwrap_or_default(),
                 asset = response.asset.as_deref().unwrap_or_default(),
                 network = response.network.as_deref().unwrap_or_default(),
@@ -183,7 +183,7 @@ async fn withdraw_handler(
         }
         Err(err) => {
             state.withdraw_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "gasless withdrawal failed");
+            warn!(reason = %err, code = %err.code(), "gasless withdrawal failed");
             Json(WithdrawResponse::failure(&err))
         }
     }
@@ -210,11 +210,11 @@ async fn claim_verify_handler(
     Json(request): Json<ClaimRequest>,
 ) -> impl IntoResponse {
     match run_claim_verify(&state, request).await {
-        Ok(()) => Json(ClaimVerifyResponse::valid()),
+        Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
             state.claim_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "claim verification failed");
-            Json(ClaimVerifyResponse::invalid(&err))
+            warn!(reason = %err, code = %err.code(), "claim verification failed");
+            Json(VerifyResponse::invalid(&err))
         }
     }
 }
@@ -237,7 +237,7 @@ async fn claim_handler(
         Ok(response) => {
             state.claim_guard().record_sponsored();
             info!(
-                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 creditor = response.creditor.as_deref().unwrap_or_default(),
                 cycle_id = response.cycle_id.as_deref().unwrap_or_default(),
                 amount = response.amount.as_deref().unwrap_or_default(),
@@ -248,7 +248,7 @@ async fn claim_handler(
         }
         Err(err) => {
             state.claim_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "sponsored net-credit claim failed");
+            warn!(reason = %err, code = %err.code(), "sponsored net-credit claim failed");
             Json(ClaimResponse::failure(&err))
         }
     }
@@ -271,11 +271,11 @@ async fn pay_verify_handler(
     Json(request): Json<PayRequest>,
 ) -> impl IntoResponse {
     match run_pay_verify(&state, request).await {
-        Ok(()) => Json(PayVerifyResponse::valid()),
+        Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
             state.pay_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "payment verification failed");
-            Json(PayVerifyResponse::invalid(&err))
+            warn!(reason = %err, code = %err.code(), "payment verification failed");
+            Json(VerifyResponse::invalid(&err))
         }
     }
 }
@@ -306,7 +306,7 @@ async fn pay_handler(
         Ok(response) => {
             state.pay_guard().record_sponsored();
             info!(
-                tx_hash = response.tx_hash.as_deref().unwrap_or_default(),
+                tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 debtor = response.debtor.as_deref().unwrap_or_default(),
                 cycle_id = response.cycle_id.as_deref().unwrap_or_default(),
                 amount = response.amount.as_deref().unwrap_or_default(),
@@ -317,7 +317,7 @@ async fn pay_handler(
         }
         Err(err) => {
             state.pay_guard().record_rejected(err.is_throttling());
-            warn!(reason = %err, code = err.code(), "sponsored net-debit payment failed");
+            warn!(reason = %err, code = %err.code(), "sponsored net-debit payment failed");
             Json(PayResponse::failure(&err))
         }
     }
@@ -405,7 +405,7 @@ async fn supported_handler(State(state): State<SharedState>) -> impl IntoRespons
 async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
     let supported = state.supported().await;
     Json(HomeResponse {
-        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to mint certificates or forward debit settlements.",
+        message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to issue guarantees or forward debit settlements.",
         supported,
         health: "/health",
         docs: "See README.md for a full flow walkthrough.",
@@ -420,36 +420,20 @@ async fn verify_handler(
     State(state): State<SharedState>,
     Json(request): Json<VerifyRequest>,
 ) -> impl IntoResponse {
-    let x402_version = match request.resolved_x402_version() {
-        Ok(version) => version,
-        Err(err) => {
-            warn!(reason = %err, "verify request rejected");
-            return Json(VerifyResponse {
-                is_valid: false,
-                invalid_reason: Some(err.to_string()),
-                certificate: None,
-            });
-        }
+    let verified = match request
+        .resolved_x402_version()
+        .and_then(|version| state.validate_version(version).map(|()| version))
+    {
+        Ok(version) => state.verify(&request, version).await,
+        Err(err) => Err(err),
     };
 
-    if let Err(err) = state.validate_version(x402_version) {
-        warn!(reason = %err, "verify request rejected");
-        return Json(VerifyResponse {
-            is_valid: false,
-            invalid_reason: Some(err.to_string()),
-            certificate: None,
-        });
-    }
-
-    match state.verify(&request, x402_version).await {
+    match verified {
         Ok(response) => Json(response),
         Err(err) => {
-            warn!(reason = %err, "payment validation failed");
-            Json(VerifyResponse {
-                is_valid: false,
-                invalid_reason: Some(err.to_string()),
-                certificate: None,
-            })
+            let failure = err.failure(ErrorCode::UnexpectedVerifyError);
+            warn!(reason = %err, code = %failure.reason, "payment verification failed");
+            Json(VerifyResponse::invalid(failure))
         }
     }
 }
@@ -458,24 +442,26 @@ async fn settle_handler(
     State(state): State<SharedState>,
     Json(request): Json<SettleRequest>,
 ) -> impl IntoResponse {
-    let x402_version = match request.resolved_x402_version() {
-        Ok(version) => version,
-        Err(err) => {
-            warn!(reason = %err, "settle request rejected");
-            return Json(SettleResponse::invalid(err.to_string(), state.network()));
-        }
+    let settled = match request
+        .resolved_x402_version()
+        .and_then(|version| state.validate_version(version).map(|()| version))
+    {
+        Ok(version) => state.settle(&request, version).await,
+        Err(err) => Err(err),
     };
 
-    if let Err(err) = state.validate_version(x402_version) {
-        warn!(reason = %err, "settle request rejected");
-        return Json(SettleResponse::invalid(err.to_string(), state.network()));
-    }
-
-    match state.settle(&request, x402_version).await {
+    match settled {
         Ok(response) => {
-            if let Some(tx_hash) = response.tx_hash.as_deref() {
-                info!(tx_hash, "settlement forwarded to on-chain handler");
-            } else if response.certificate.is_some() {
+            if !response.transaction.is_empty() {
+                info!(
+                    tx_hash = response.transaction,
+                    "settlement forwarded to on-chain handler"
+                );
+            } else if response
+                .extra
+                .as_ref()
+                .is_some_and(|extra| extra.receipt.is_some())
+            {
                 info!("settlement completed with 4mica guarantee");
             } else {
                 info!("settlement acknowledged (deferred)");
@@ -483,8 +469,9 @@ async fn settle_handler(
             Json(response)
         }
         Err(err) => {
-            warn!(reason = %err, "settlement validation failed");
-            Json(SettleResponse::invalid(err.to_string(), state.network()))
+            let failure = err.failure(ErrorCode::UnexpectedSettleError);
+            warn!(reason = %err, code = %failure.reason, "settlement failed");
+            Json(SettleResponse::failed(failure, state.network()))
         }
     }
 }

@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "apps/facilitator/**"
+      - "packages/sdk-rust/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "packages/sdk/**"
       - "packages/sdk-python/**"
       - ".github/workflows/facilitator-ci.yml"

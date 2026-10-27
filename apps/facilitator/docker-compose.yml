@@ -9,7 +9,8 @@ services:
   facilitator:
     image: ${FACILITATOR_IMAGE:-ghcr.io/4mica-network/facilitator-4mica:latest}
     build:
-      context: .
+      context: ../..
+      dockerfile: apps/facilitator/Dockerfile
     container_name: facilitator-4mica
     restart: unless-stopped
 

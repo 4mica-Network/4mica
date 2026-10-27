@@ -715,7 +715,11 @@ async fn verify_pay<S>(
     if response.is_valid {
         return Ok(());
     }
-    Err(pay_rejection(response.failure, response.invalid_reason))
+    Err(pay_rejection(
+        response.failure,
+        response.invalid_reason,
+        response.invalid_message,
+    ))
 }
 
 async fn verify_claim<S>(
@@ -732,17 +736,21 @@ async fn verify_claim<S>(
     }
     Err(response
         .failure
-        .into_sponsorship_error(response.invalid_reason)
+        .into_sponsorship_error(response.invalid_reason, response.invalid_message)
         .into())
 }
 
 /// The one rejection with detail to unpack: the missing-allowance nonce is what lets the
 /// sponsored-Permit2 route sign the approval instead of surrendering.
-fn pay_rejection(failure: FacilitatorFailure, message: Option<String>) -> SettlementError {
+fn pay_rejection(
+    failure: FacilitatorFailure,
+    reason: Option<String>,
+    message: Option<String>,
+) -> SettlementError {
     let eip2612_nonce = failure.eip2612_nonce();
-    match failure.into_sponsorship_error(message) {
+    match failure.into_sponsorship_error(reason, message) {
         SponsorshipError::Rejected { code, message, .. }
-            if code == "PERMIT2_ALLOWANCE_REQUIRED" =>
+            if code == "permit2_allowance_required" =>
         {
             SettlementError::Permit2AllowanceRequired {
                 message,
@@ -895,12 +903,12 @@ fn sponsorship_unavailable(err: &SettlementError, names_the_request: fn(&str) ->
 fn names_the_claim(code: &str) -> bool {
     matches!(
         code,
-        "INVALID_REQUEST"
-            | "ACTION_UNAVAILABLE"
-            | "ACTION_MISMATCH"
-            | "SIMULATION_REVERTED"
-            | "REVERTED_ON_CHAIN"
-            | "RECEIPT_UNAVAILABLE"
+        "invalid_payload"
+            | "clearing_action_unavailable"
+            | "clearing_action_mismatch"
+            | "simulation_reverted"
+            | "invalid_transaction_state"
+            | "settlement_pending"
     )
 }
 
@@ -912,12 +920,11 @@ fn names_the_payment(code: &str) -> bool {
     names_the_claim(code)
         || matches!(
             code,
-            "MALFORMED_SIGNATURE"
-                | "SIGNATURE_MISMATCH"
-                | "EXPIRED"
-                | "NOT_YET_VALID"
-                | "NONCE_ALREADY_USED"
-                | "INSUFFICIENT_BALANCE"
+            "invalid_signature"
+                | "authorization_expired"
+                | "authorization_not_yet_valid"
+                | "nonce_already_used"
+                | "insufficient_funds"
         )
 }
 
@@ -948,7 +955,7 @@ fn refuses_the_authorization(err: &SettlementError) -> bool {
     matches!(
         err,
         SettlementError::Sponsorship(SponsorshipError::Rejected { code, .. })
-            if code == "SIMULATION_REVERTED" || code == "UNSUPPORTED_TRANSFER_METHOD"
+            if code == "simulation_reverted" || code == "unsupported_transfer_method"
     ) || matches!(
         err,
         SettlementError::Client(ClientError::MissingTokenDomainSeparator { .. })
@@ -996,6 +1003,7 @@ struct FacilitatorClaimRequest {
 struct ClearingVerifyResponse {
     is_valid: bool,
     invalid_reason: Option<String>,
+    invalid_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -1004,10 +1012,11 @@ struct ClearingVerifyResponse {
 #[serde(rename_all = "camelCase")]
 struct FacilitatorClaimResponse {
     success: bool,
-    tx_hash: Option<String>,
+    transaction: Option<String>,
     network: Option<String>,
     creditor: Option<String>,
-    error: Option<String>,
+    error_reason: Option<String>,
+    error_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -1018,16 +1027,18 @@ impl FacilitatorClaimResponse {
     /// else has, and the receipt is refused rather than made to describe it.
     fn into_receipt(self, creditor: Address) -> Result<ClaimReceipt, SponsorshipError> {
         if !self.success {
-            return Err(self.failure.into_sponsorship_error(self.error));
+            return Err(self
+                .failure
+                .into_sponsorship_error(self.error_reason, self.error_message));
         }
 
         let tx_hash = self
-            .tx_hash
+            .transaction
             .as_deref()
             .and_then(|raw| raw.parse::<B256>().ok())
             .ok_or_else(|| {
                 SponsorshipError::OutcomeUnknown(
-                    "facilitator reported success without a txHash".into(),
+                    "facilitator reported success without a transaction".into(),
                 )
             })?;
 
@@ -1078,10 +1089,11 @@ enum PayAuthorization {
 #[serde(rename_all = "camelCase")]
 struct FacilitatorPayResponse {
     success: bool,
-    tx_hash: Option<String>,
+    transaction: Option<String>,
     network: Option<String>,
     debtor: Option<String>,
-    error: Option<String>,
+    error_reason: Option<String>,
+    error_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -1096,16 +1108,20 @@ impl FacilitatorPayResponse {
         debtor: Address,
     ) -> Result<PayReceipt, SettlementError> {
         if !self.success {
-            return Err(pay_rejection(self.failure, self.error));
+            return Err(pay_rejection(
+                self.failure,
+                self.error_reason,
+                self.error_message,
+            ));
         }
 
         let tx_hash = self
-            .tx_hash
+            .transaction
             .as_deref()
             .and_then(|raw| raw.parse::<B256>().ok())
             .ok_or_else(|| {
                 SponsorshipError::OutcomeUnknown(
-                    "facilitator reported success without a txHash".into(),
+                    "facilitator reported success without a transaction".into(),
                 )
             })?;
 

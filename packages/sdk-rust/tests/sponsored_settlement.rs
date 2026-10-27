@@ -463,7 +463,7 @@ async fn a_self_claim_names_the_signer() -> anyhow::Result<()> {
 fn facilitator_success(creditor: Address) -> Value {
     json!({
         "success": true,
-        "txHash": format!("{:#x}", B256::repeat_byte(0xcc)),
+        "transaction": format!("{:#x}", B256::repeat_byte(0xcc)),
         "network": "eip155:1337",
         "creditor": format!("{creditor:#x}"),
         "cycleId": format!("{CYCLE_ID:#x}"),
@@ -474,9 +474,9 @@ fn facilitator_success(creditor: Address) -> Value {
 fn facilitator_refusal(code: &str) -> Value {
     json!({
         "success": false,
-        "error": "refused for the test",
-        "errorCode": code,
-        "retryable": false,
+        "errorMessage": "refused for the test",
+        "errorReason": code,
+        "extra": { "retryable": false },
     })
 }
 
@@ -541,7 +541,7 @@ async fn a_receipt_for_another_creditor_is_refused() -> anyhow::Result<()> {
 #[tokio::test]
 async fn a_refusal_naming_the_claim_does_not_fall_back() -> anyhow::Result<()> {
     let (client, _signer, chain_log, _facilitator_log) =
-        test_client_with_facilitator(facilitator_refusal("SIMULATION_REVERTED")).await?;
+        test_client_with_facilitator(facilitator_refusal("simulation_reverted")).await?;
 
     let err = client
         .settlement
@@ -555,7 +555,7 @@ async fn a_refusal_naming_the_claim_does_not_fall_back() -> anyhow::Result<()> {
         matches!(
             &err,
             SettlementError::Sponsorship(SponsorshipError::Rejected { code, .. })
-                if code == "SIMULATION_REVERTED"
+                if code == "simulation_reverted"
         ),
         "unexpected error: {err}"
     );
@@ -571,7 +571,7 @@ async fn a_refusal_naming_the_claim_does_not_fall_back() -> anyhow::Result<()> {
 #[tokio::test]
 async fn an_unwilling_facilitator_falls_back_to_self_funding() -> anyhow::Result<()> {
     let (client, _signer, chain_log, facilitator_log) =
-        test_client_with_facilitator(facilitator_refusal("RATE_LIMITED")).await?;
+        test_client_with_facilitator(facilitator_refusal("rate_limited")).await?;
 
     let receipt = client
         .settlement
@@ -625,7 +625,7 @@ async fn a_claim_with_a_mismatched_participant_never_reaches_the_chain() -> anyh
 fn facilitator_pay_success(debtor: Address) -> Value {
     json!({
         "success": true,
-        "txHash": format!("{:#x}", B256::repeat_byte(0xdd)),
+        "transaction": format!("{:#x}", B256::repeat_byte(0xdd)),
         "network": "eip155:1337",
         "debtor": format!("{debtor:#x}"),
         "cycleId": format!("{CYCLE_ID:#x}"),
@@ -946,7 +946,7 @@ async fn a_token_that_cannot_redeem_eip3009_is_paid_over_permit2() -> anyhow::Re
             if body["assetTransferMethod"] == "permit2" {
                 facilitator_pay_success(debtor)
             } else {
-                facilitator_refusal("SIMULATION_REVERTED")
+                facilitator_refusal("simulation_reverted")
             }
         },
         facilitator_log.clone(),
@@ -1009,17 +1009,17 @@ async fn a_token_that_cannot_redeem_eip3009_is_paid_over_permit2() -> anyhow::Re
     Ok(())
 }
 
-/// A `PERMIT2_ALLOWANCE_REQUIRED` rejection, carrying the owner's EIP-2612 nonce when the token
+/// A `permit2_allowance_required` rejection, carrying the owner's EIP-2612 nonce when the token
 /// has a permit surface.
 fn facilitator_allowance_refusal(eip2612_nonce: Option<&str>) -> Value {
     let mut refusal = json!({
         "success": false,
-        "error": "approve(PERMIT2) missing",
-        "errorCode": "PERMIT2_ALLOWANCE_REQUIRED",
-        "retryable": false,
+        "errorMessage": "approve(PERMIT2) missing",
+        "errorReason": "permit2_allowance_required",
+        "extra": { "retryable": false },
     });
     if let Some(nonce) = eip2612_nonce {
-        refusal["permit2Allowance"] = json!({ "eip2612Nonce": nonce });
+        refusal["extra"]["details"] = json!({ "eip2612Nonce": nonce });
     }
     refusal
 }
@@ -1061,7 +1061,7 @@ async fn a_missing_allowance_is_signed_for_and_retried() -> anyhow::Result<()> {
         "/clearing/pay",
         move |body| {
             if body["assetTransferMethod"] == "eip3009" {
-                facilitator_refusal("SIMULATION_REVERTED")
+                facilitator_refusal("simulation_reverted")
             } else if body.get("eip2612Permit").is_some() {
                 facilitator_pay_success(debtor)
             } else {
@@ -1130,7 +1130,7 @@ async fn an_unsponsorable_allowance_falls_back_to_a_self_funded_payment() -> any
         "/clearing/pay",
         move |body| {
             if body["assetTransferMethod"] == "eip3009" {
-                facilitator_refusal("SIMULATION_REVERTED")
+                facilitator_refusal("simulation_reverted")
             } else {
                 facilitator_allowance_refusal(None)
             }
@@ -1211,7 +1211,7 @@ async fn sponsored_permit2_gives_up_when_the_token_has_no_permit() -> anyhow::Re
 #[tokio::test]
 async fn a_fallback_without_an_erc20_allowance_is_refused_not_broadcast() -> anyhow::Result<()> {
     let (client, _signer, chain_log, facilitator_log) =
-        test_client_paying(TOKEN, facilitator_refusal("RATE_LIMITED")).await?;
+        test_client_paying(TOKEN, facilitator_refusal("rate_limited")).await?;
     chain_log.lock().unwrap().erc20_allowance = Some(U256::ZERO);
 
     let err = client
@@ -1326,7 +1326,7 @@ async fn a_missing_allowance_without_a_token_domain_falls_back_to_self_funding()
 #[tokio::test]
 async fn a_payment_refused_over_both_schemes_surfaces_without_fallback() -> anyhow::Result<()> {
     let (client, _signer, chain_log, facilitator_log) =
-        test_client_paying(TOKEN, facilitator_refusal("SIMULATION_REVERTED")).await?;
+        test_client_paying(TOKEN, facilitator_refusal("simulation_reverted")).await?;
 
     let err = client
         .settlement
@@ -1339,7 +1339,7 @@ async fn a_payment_refused_over_both_schemes_surfaces_without_fallback() -> anyh
         matches!(
             &err,
             SettlementError::Sponsorship(SponsorshipError::Rejected { code, .. })
-                if code == "SIMULATION_REVERTED"
+                if code == "simulation_reverted"
         ),
         "unexpected error: {err}"
     );
@@ -1360,7 +1360,7 @@ async fn a_payment_refused_over_both_schemes_surfaces_without_fallback() -> anyh
 #[tokio::test]
 async fn a_refusal_naming_the_payment_does_not_fall_back() -> anyhow::Result<()> {
     let (client, _signer, chain_log, _facilitator_log) =
-        test_client_paying(TOKEN, facilitator_refusal("SIGNATURE_MISMATCH")).await?;
+        test_client_paying(TOKEN, facilitator_refusal("invalid_signature")).await?;
 
     let err = client
         .settlement
@@ -1373,7 +1373,7 @@ async fn a_refusal_naming_the_payment_does_not_fall_back() -> anyhow::Result<()>
         matches!(
             &err,
             SettlementError::Sponsorship(SponsorshipError::Rejected { code, .. })
-                if code == "SIGNATURE_MISMATCH"
+                if code == "invalid_signature"
         ),
         "unexpected error: {err}"
     );
@@ -1389,7 +1389,7 @@ async fn a_refusal_naming_the_payment_does_not_fall_back() -> anyhow::Result<()>
 #[tokio::test]
 async fn an_unwilling_facilitator_falls_back_to_a_self_funded_payment() -> anyhow::Result<()> {
     let (client, signer, chain_log, facilitator_log) =
-        test_client_paying(TOKEN, facilitator_refusal("RATE_LIMITED")).await?;
+        test_client_paying(TOKEN, facilitator_refusal("rate_limited")).await?;
 
     let receipt = client.settlement.pay(CYCLE_ID.to_string()).send().await?;
 

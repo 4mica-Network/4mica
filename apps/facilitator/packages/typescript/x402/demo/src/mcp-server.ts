@@ -152,7 +152,7 @@ async function main() {
       tool: TOOL_NAME,
       network: env.network,
       core: env.coreUrl ?? 'hosted',
-      facilitator: env.facilitatorUrl ?? 'https://x402.4mica.xyz',
+      facilitator: env.facilitatorUrl ?? 'https://testnet.payment.4mica.io',
       seller: seller.address,
       cap: env.price,
       resultPrice: env.resultPrice,

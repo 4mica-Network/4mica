@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Callable, List
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
+import httpx
+from fourmica_sdk import SupportedTokensResponse, resolve_network_rpc_url
 from x402.interfaces import SchemeNetworkServer
 from x402.payment_flow import (
     AUTHORIZATION_PAYMENT_FLOW,
@@ -11,13 +13,22 @@ from x402.payment_flow import (
 )
 from x402.schemas import AssetAmount, Network, PaymentRequirements, Price
 
-from .constants import DEFAULT_ASSETS, UnsupportedNetworkError
+from .constants import UnsupportedNetworkError
 
 MoneyParser = Callable[[float, Network], AssetAmount | None]
 
 
 class FourMicaEvmScheme(SchemeNetworkServer):
-    """EVM server-side scheme for 4mica credit payments."""
+    """EVM server-side scheme for 4mica credit payments.
+
+    A money price (``"$0.10"``) resolves to the stablecoin core lists for the
+    network (``GET /core/tokens``), so the advertised asset is always one core
+    accepts a guarantee against. The token list is fetched once per network and
+    cached for the life of the instance; a failed lookup is not cached.
+
+    *core_urls* points a network at a self-hosted core instead of the hosted
+    deployment, and *stablecoin_symbol* names the token a money price is in.
+    """
 
     scheme = "4mica-credit"
     # No on-wire assetTransferMethod: a claim is a claim. The signed payment
@@ -26,8 +37,24 @@ class FourMicaEvmScheme(SchemeNetworkServer):
     default_asset_transfer_method = SDK_DEFAULT_ASSET_TRANSFER_METHOD
     payment_flows = {SDK_DEFAULT_ASSET_TRANSFER_METHOD: AUTHORIZATION_PAYMENT_FLOW}
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        core_urls: Optional[Mapping[str, str]] = None,
+        stablecoin_symbol: str = "USDC",
+    ) -> None:
         self._money_parsers: List[MoneyParser] = []
+        self._core_urls = dict(core_urls or {})
+        self._stablecoin_symbol = stablecoin_symbol
+        # network -> (address, decimals)
+        self._default_assets: Dict[str, Tuple[str, int]] = {}
+
+    @staticmethod
+    def _load_supported_tokens(core_url: str) -> SupportedTokensResponse:
+        """Core's token list. Synchronous because x402 parses prices
+        synchronously; static so tests can stub the network call."""
+        response = httpx.get(f"{core_url.rstrip('/')}/core/tokens", timeout=10)
+        response.raise_for_status()
+        return SupportedTokensResponse.from_rpc(response.json())
 
     def register_money_parser(self, parser: MoneyParser) -> "FourMicaEvmScheme":
         self._money_parsers.append(parser)
@@ -61,8 +88,9 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         supported_kind,
         extensions: list[str],
     ) -> PaymentRequirements:
-        # Nothing to add since the tab step was removed from the protocol: a
-        # client signs its claim straight from the requirements.
+        # Nothing to add: a 4mica-credit payer needs nothing beyond payTo,
+        # asset, amount and the optional extra.validation and extra.rpcUrl, and
+        # takes everything else from core.
         del supported_kind, extensions
         return requirements
 
@@ -78,18 +106,44 @@ class FourMicaEvmScheme(SchemeNetworkServer):
         raise ValueError(f"Invalid money type: {type(money)}")
 
     def _default_money_conversion(self, amount: float, network: Network) -> AssetAmount:
-        asset_info = DEFAULT_ASSETS.get(network)
-        if not asset_info:
-            raise UnsupportedNetworkError(f"No default asset configured for network {network}")
-        token_amount = self._convert_to_token_amount(str(amount), asset_info["decimals"])
+        address, decimals = self._default_asset(network)
         return AssetAmount(
-            amount=token_amount,
-            asset=asset_info["address"],
-            extra={
-                "name": asset_info["name"],
-                "version": asset_info["version"],
-            },
+            amount=self._convert_to_token_amount(str(amount), decimals),
+            asset=address,
+            # No EIP-3009 domain hints: a 4mica-credit payer signs against
+            # core's ClearingHouse domain, never the token's, and reads it from
+            # core.
+            extra={},
         )
+
+    def _default_asset(self, network: Network) -> Tuple[str, int]:
+        """The stablecoin core lists for *network*, fetched once and cached."""
+        cached = self._default_assets.get(network)
+        if cached is None:
+            cached = self._resolve_default_asset(network)
+            self._default_assets[network] = cached
+        return cached
+
+    def _resolve_default_asset(self, network: Network) -> Tuple[str, int]:
+        core_url = self._core_urls.get(network) or resolve_network_rpc_url(network)
+        if not core_url:
+            raise UnsupportedNetworkError(
+                f"No core API URL known for network {network}; pass one in core_urls"
+            )
+        tokens = self._load_supported_tokens(core_url).tokens
+        wanted = self._stablecoin_symbol.lower()
+        token = next((t for t in tokens if t.symbol.lower() == wanted), None)
+        if token is None:
+            listed = ", ".join(t.symbol for t in tokens) or "none"
+            raise UnsupportedNetworkError(
+                f"Core at {core_url} lists no {self._stablecoin_symbol} for network "
+                f"{network} (listed: {listed})"
+            )
+        if token.decimals is None:
+            raise UnsupportedNetworkError(
+                f"Core at {core_url} reports no decimals for {token.symbol} on network {network}"
+            )
+        return token.address, token.decimals
 
     def _convert_to_token_amount(self, decimal_amount: str, decimals: int) -> str:
         from decimal import Decimal, InvalidOperation

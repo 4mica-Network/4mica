@@ -606,7 +606,9 @@ async fn verify_deposit<S>(
     if response.is_valid {
         return Ok(());
     }
-    Err(response.failure.into_error(response.invalid_reason))
+    Err(response
+        .failure
+        .into_error(response.invalid_reason, response.invalid_message))
 }
 
 /// What a deposit was asked to do, to hold the facilitator's answer against.
@@ -666,12 +668,13 @@ impl DepositRequest {
 #[serde(rename_all = "camelCase")]
 struct DepositResponse {
     success: bool,
-    tx_hash: Option<String>,
+    transaction: Option<String>,
     network: Option<String>,
     from: Option<String>,
     asset: Option<String>,
     amount: Option<String>,
-    error: Option<String>,
+    error_reason: Option<String>,
+    error_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }
@@ -687,15 +690,19 @@ impl DepositResponse {
         deposited: Deposited,
     ) -> Result<DepositReceipt, DepositError> {
         if !self.success {
-            return Err(self.failure.into_error(self.error));
+            return Err(self
+                .failure
+                .into_error(self.error_reason, self.error_message));
         }
 
         let tx_hash = self
-            .tx_hash
+            .transaction
             .as_deref()
             .and_then(|raw| raw.parse::<B256>().ok())
             .ok_or_else(|| {
-                DepositError::OutcomeUnknown("facilitator reported success without a txHash".into())
+                DepositError::OutcomeUnknown(
+                    "facilitator reported success without a transaction".into(),
+                )
             })?;
 
         Ok(DepositReceipt {
@@ -729,6 +736,7 @@ impl DepositResponse {
 struct DepositVerifyResponse {
     is_valid: bool,
     invalid_reason: Option<String>,
+    invalid_message: Option<String>,
     #[serde(flatten)]
     failure: FacilitatorFailure,
 }

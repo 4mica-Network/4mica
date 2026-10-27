@@ -1,22 +1,22 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use alloy::primitives::B256;
 use async_trait::async_trait;
 use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
-use rpc::GUARANTEE_CLAIMS_VERSION;
-use sdk_4mica::{Address, BLSCert, PaymentGuaranteeClaims, U256};
+use rpc::{Guarantee, GuaranteeReceipt, PaymentRequest, PaymentRequestPayload};
+use sdk_4mica::{Address, U256};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
 use crate::exact::ExactService;
-use crate::issuer::GuaranteeIssuer;
+use crate::issuer::{GuaranteeIssuer, IssueError};
 use crate::limits::{SponsorGuard, SponsorLimits};
-use crate::verifier::CertificateValidator;
-use crypto::bls::KeyMaterial;
+use crate::verifier::ReceiptValidator;
 
 use super::handlers::build_router;
 use super::model::{
@@ -47,7 +47,6 @@ async fn verify_endpoint_accepts_valid_payload() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -74,7 +73,6 @@ async fn verify_accepts_payload_without_top_level_version() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -102,7 +100,6 @@ async fn verify_accepts_duplicate_payloads() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
 
     // Second verification with the same payload succeeds without calling downstream services.
     let response = router
@@ -113,7 +110,6 @@ async fn verify_accepts_duplicate_payloads() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -139,13 +135,12 @@ async fn verify_endpoint_accepts_v2_payload() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
 
 #[tokio::test]
-async fn settle_endpoint_returns_certificate() {
+async fn settle_endpoint_returns_receipt() {
     let verifier = Arc::new(MockVerifier::success());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
@@ -166,9 +161,14 @@ async fn settle_endpoint_returns_certificate() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.certificate.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -195,9 +195,14 @@ async fn settle_accepts_payload_without_top_level_version() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.certificate.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -224,9 +229,14 @@ async fn settle_endpoint_accepts_v2_payload() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.certificate.is_some());
-    assert!(payload.tx_hash.is_none());
-    assert_eq!(payload.network_id.as_deref(), Some("eip155:11155111"));
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
+    assert!(payload.transaction.is_empty());
+    assert_eq!(payload.network, "eip155:11155111");
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -244,11 +254,11 @@ async fn settle_endpoint_accepts_v2_payload_with_checksum_addresses() {
         payment_requirements: sample_requirements_v2("10"),
     };
     let mut request_json = serde_json::to_value(request_body).unwrap();
-    request_json["paymentPayload"]["payload"]["claims"]["user_address"] =
+    request_json["paymentPayload"]["payload"]["payload"]["user_address"] =
         json!("0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB");
-    request_json["paymentPayload"]["payload"]["claims"]["recipient_address"] =
+    request_json["paymentPayload"]["payload"]["payload"]["recipient_address"] =
         json!("0x1111111111111111111111111111111111111111");
-    request_json["paymentPayload"]["payload"]["claims"]["asset_address"] =
+    request_json["paymentPayload"]["payload"]["payload"]["asset_address"] =
         json!("0x2222222222222222222222222222222222222222");
 
     let response = router
@@ -260,7 +270,12 @@ async fn settle_endpoint_accepts_v2_payload_with_checksum_addresses() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.success);
-    assert!(payload.certificate.is_some());
+    assert!(
+        payload
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.receipt.is_some())
+    );
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -301,7 +316,7 @@ async fn supported_includes_exact_when_available() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        verifier as Arc<dyn CertificateValidator>,
+        verifier as Arc<dyn ReceiptValidator>,
         issuer as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
@@ -409,8 +424,9 @@ async fn verify_rejects_mismatched_versions() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("does not match paymentPayload x402Version"));
+    assert_eq!(payload.invalid_reason.as_deref(), Some("invalid_payload"));
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("does not match paymentPayload x402Version"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -440,8 +456,12 @@ async fn verify_rejects_mismatched_amount() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("claim amount"));
+    assert_eq!(
+        payload.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_amount_mismatch")
+    );
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("payment amount"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -468,8 +488,12 @@ async fn verify_rejects_v2_mismatched_amount() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.is_valid);
-    let reason = payload.invalid_reason.expect("reason");
-    assert!(reason.contains("claim amount"));
+    assert_eq!(
+        payload.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_amount_mismatch")
+    );
+    let message = payload.invalid_message.expect("message");
+    assert!(message.contains("payment amount"));
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -492,6 +516,10 @@ async fn verify_rejects_validation_the_requirements_did_not_ask_for() {
     .await;
 
     assert_rejected_because(&response, "requirements ask for no validation");
+    assert_eq!(
+        response.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_validation_mismatch")
+    );
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -513,7 +541,7 @@ async fn verify_rejects_missing_validation_the_requirements_asked_for() {
     )
     .await;
 
-    assert_rejected_because(&response, "claims carry none");
+    assert_rejected_because(&response, "payment carries none");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -534,7 +562,7 @@ async fn verify_rejects_mismatched_validator() {
     )
     .await;
 
-    assert_rejected_because(&response, "claim validator");
+    assert_rejected_because(&response, "payment validator");
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -559,6 +587,10 @@ async fn verify_rejects_a_validator_core_has_not_whitelisted() {
     .await;
 
     assert_rejected_because(&response, "not whitelisted by core");
+    assert_eq!(
+        response.invalid_reason.as_deref(),
+        Some("invalid_4mica_credit_validator_not_allowed")
+    );
     assert_eq!(issuer.issue_calls(), 0);
 }
 
@@ -757,13 +789,89 @@ async fn settle_propagates_issue_errors() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert!(payload["error"].as_str().unwrap().contains("issue failure"));
+    assert!(
+        payload["errorMessage"]
+            .as_str()
+            .unwrap()
+            .contains("issue failure")
+    );
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 1);
 }
 
+/// Core's refusal reaches the seller with its code and details intact, so the payer can act on
+/// it: checkpoint, re-sign for another cycle, or deposit.
 #[tokio::test]
-async fn settle_propagates_certificate_errors() {
+async fn settle_passes_on_cores_error_code() {
+    let verifier = Arc::new(MockVerifier::success());
+    let issuer = Arc::new(MockIssuer::refusing(
+        "CHECKPOINT_REQUIRED",
+        json!({ "uncheckpointed": 64, "max_uncheckpointed": 64 }),
+    ));
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let request_body = SettleRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2("10"),
+        payment_requirements: sample_requirements_v2("10"),
+    };
+
+    let response = router
+        .oneshot(post_json("/settle", &request_body))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["success"], false);
+    assert_eq!(
+        payload["errorReason"],
+        "invalid_4mica_credit_checkpoint_required"
+    );
+    assert_eq!(payload["extra"]["details"]["uncheckpointed"], 64);
+    assert!(payload["extra"]["receipt"].is_null());
+    assert_eq!(verifier.verify_calls(), 0);
+}
+
+/// A genuine receipt for some other payment must not be passed to the seller as this one's.
+#[tokio::test]
+async fn settle_rejects_a_receipt_for_another_payment() {
+    let mut other = sample_payload();
+    let PaymentRequestPayload::V1(inner) = &mut other;
+    inner.amount = U256::from(11);
+    let verifier = Arc::new(MockVerifier::with_guarantee(guarantee_for(&other)));
+    let issuer = Arc::new(MockIssuer::success());
+    let state = test_state(verifier.clone(), issuer.clone());
+    let router = build_router(state);
+
+    let request_body = SettleRequest {
+        x402_version: Some(2),
+        payment_payload: payment_payload_v2("10"),
+        payment_requirements: sample_requirements_v2("10"),
+    };
+
+    let response = router
+        .oneshot(post_json("/settle", &request_body))
+        .await
+        .unwrap();
+
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let payload: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(payload["success"], false);
+    assert!(
+        payload["errorMessage"]
+            .as_str()
+            .unwrap()
+            .contains("receipt amount"),
+        "{payload}"
+    );
+    assert!(payload["extra"]["receipt"].is_null());
+}
+
+#[tokio::test]
+async fn settle_propagates_receipt_errors() {
     let verifier = Arc::new(MockVerifier::failing());
     let issuer = Arc::new(MockIssuer::success());
     let state = test_state(verifier.clone(), issuer.clone());
@@ -784,7 +892,7 @@ async fn settle_propagates_certificate_errors() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["error"].as_str(), Some("verify failure"));
+    assert_eq!(payload["errorMessage"].as_str(), Some("verify failure"));
     assert_eq!(verifier.verify_calls(), 1);
     assert_eq!(issuer.issue_calls(), 1);
 }
@@ -812,12 +920,12 @@ async fn settle_rejects_mismatched_versions() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
     assert!(
-        payload["error"]
+        payload["errorMessage"]
             .as_str()
             .unwrap()
             .contains("does not match paymentPayload x402Version")
     );
-    assert!(payload["certificate"].is_null());
+    assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(verifier.verify_calls(), 0);
     assert_eq!(issuer.issue_calls(), 0);
 }
@@ -863,7 +971,7 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        verifier.clone() as Arc<dyn CertificateValidator>,
+        verifier.clone() as Arc<dyn ReceiptValidator>,
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
@@ -962,7 +1070,10 @@ async fn every_withdraw_action_reports_a_missing_relayer() {
             serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(payload["success"], false, "for {body}");
-        assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED", "for {body}");
+        assert_eq!(
+            payload["errorReason"], "sponsorship_unavailable",
+            "for {body}"
+        );
     }
 }
 
@@ -982,7 +1093,7 @@ async fn withdraw_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// An unrecognised `action` must be refused outright rather than silently defaulting to one.
@@ -1011,7 +1122,7 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         Vec::new(),
     );
@@ -1045,7 +1156,7 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_ne!(
-        payload["errorCode"], "RATE_LIMITED",
+        payload["errorReason"], "rate_limited",
         "deposits must not consume the withdrawal budget"
     );
 }
@@ -1096,7 +1207,7 @@ async fn deposit_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1116,7 +1227,7 @@ async fn deposit_verify_reports_a_missing_relayer() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// The global limit must engage before any relayer or chain work, so it protects a facilitator
@@ -1126,7 +1237,7 @@ async fn deposit_is_rate_limited_globally() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
@@ -1156,7 +1267,7 @@ async fn deposit_is_rate_limited_globally() {
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let payload: Value = serde_json::from_slice(&body).unwrap();
         codes.push(
-            payload["errorCode"]
+            payload["errorReason"]
                 .as_str()
                 .unwrap_or_default()
                 .to_string(),
@@ -1164,9 +1275,9 @@ async fn deposit_is_rate_limited_globally() {
     }
 
     // First two get as far as the relayer lookup; the third is turned away by the limiter.
-    assert_eq!(codes[0], "NO_RELAYER_CONFIGURED");
-    assert_eq!(codes[1], "NO_RELAYER_CONFIGURED");
-    assert_eq!(codes[2], "RATE_LIMITED");
+    assert_eq!(codes[0], "sponsorship_unavailable");
+    assert_eq!(codes[1], "sponsorship_unavailable");
+    assert_eq!(codes[2], "rate_limited");
 }
 
 /// Throttling is transient and a client should retry; a malformed request never becomes valid.
@@ -1175,7 +1286,7 @@ async fn deposit_marks_throttling_as_retryable() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
@@ -1207,8 +1318,8 @@ async fn deposit_marks_throttling_as_retryable() {
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(payload["errorCode"], "RATE_LIMITED");
-    assert_eq!(payload["retryable"], true);
+    assert_eq!(payload["errorReason"], "rate_limited");
+    assert_eq!(payload["extra"]["retryable"], true);
 }
 
 /// Existing monitoring checks `status == "ok"`, so the enriched payload must stay a superset of
@@ -1247,7 +1358,7 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
-        Arc::new(MockVerifier::success()) as Arc<dyn CertificateValidator>,
+        Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
         vec![TEST_VALIDATOR.into()],
     );
@@ -1304,14 +1415,14 @@ async fn permit2_allowance_error_carries_the_fix() {
 
     let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
         .expect("serialize failure");
-    assert_eq!(response["errorCode"], "PERMIT2_ALLOWANCE_REQUIRED");
+    assert_eq!(response["errorReason"], "permit2_allowance_required");
     assert_eq!(
-        response["permit2Allowance"]["spender"],
+        response["extra"]["details"]["spender"],
         "0x000000000022d473030f116ddee9f6b43ac78ba3"
     );
-    assert_eq!(response["permit2Allowance"]["allowance"], "0");
-    assert_eq!(response["permit2Allowance"]["required"], "1000");
-    assert_eq!(response["permit2Allowance"]["eip2612Nonce"], "7");
+    assert_eq!(response["extra"]["details"]["allowance"], "0");
+    assert_eq!(response["extra"]["details"]["required"], "1000");
+    assert_eq!(response["extra"]["details"]["eip2612Nonce"], "7");
 }
 
 /// A token without EIP-2612 cannot have its approval sponsored, and the absent nonce is how a
@@ -1332,9 +1443,9 @@ async fn permit2_allowance_error_omits_the_nonce_for_a_non_2612_token() {
 
     let response = serde_json::to_value(super::model::DepositResponse::failure(&err))
         .expect("serialize failure");
-    assert!(response["permit2Allowance"].is_object());
+    assert!(response["extra"]["details"].is_object());
     assert!(
-        response["permit2Allowance"].get("eip2612Nonce").is_none(),
+        response["extra"]["details"].get("eip2612Nonce").is_none(),
         "an absent nonce must be omitted, not null: {response}"
     );
 }
@@ -1348,8 +1459,8 @@ async fn other_errors_carry_no_permit2_detail() {
         &DepositError::RateLimited,
     ))
     .expect("serialize failure");
-    assert_eq!(response["errorCode"], "RATE_LIMITED");
-    assert!(response.get("permit2Allowance").is_none());
+    assert_eq!(response["errorReason"], "rate_limited");
+    assert!(response["extra"].get("details").is_none());
 }
 
 /// An unparseable `ReceiveAuthorization` must not reach a handler at all — serde rejects it.
@@ -1431,7 +1542,7 @@ async fn claim_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1450,7 +1561,7 @@ async fn claim_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 /// The request's own identifiers are checked before any relayer or core work, so a bad one gets a
@@ -1472,7 +1583,7 @@ async fn claim_rejects_a_malformed_creditor() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 #[tokio::test]
@@ -1492,7 +1603,7 @@ async fn claim_rejects_a_cycle_id_that_could_escape_its_url() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 // ── sponsored net-debit payments ────────────────────────────────────────────
@@ -1530,7 +1641,7 @@ async fn pay_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["errorReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1549,7 +1660,7 @@ async fn pay_verify_reports_a_missing_relayer() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["isValid"], false);
-    assert_eq!(payload["errorCode"], "NO_RELAYER_CONFIGURED");
+    assert_eq!(payload["invalidReason"], "sponsorship_unavailable");
 }
 
 #[tokio::test]
@@ -1569,7 +1680,7 @@ async fn pay_rejects_a_cycle_id_that_could_escape_its_url() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(payload["success"], false);
-    assert_eq!(payload["errorCode"], "INVALID_REQUEST");
+    assert_eq!(payload["errorReason"], "invalid_payload");
 }
 
 /// The debtor is `authorization.from` — a request with no authorization at all cannot name one, so
@@ -1593,7 +1704,7 @@ async fn pay_requires_an_authorization() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: PayResponse = serde_json::from_slice(&body).unwrap();
     assert!(!payload.success);
-    assert_eq!(payload.error_code.as_deref(), Some("INVALID_REQUEST"));
+    assert_eq!(payload.error_reason.as_deref(), Some("invalid_payload"));
 }
 
 /// POSTs a `/verify` request against a fresh router and decodes the response.
@@ -1613,7 +1724,7 @@ async fn post_verify(state: SharedState, request: &VerifyRequest) -> VerifyRespo
     serde_json::from_slice(&body).expect("decode VerifyResponse")
 }
 
-/// Asserts `/verify` rejected the request, and that the reason names the actual cause rather than
+/// Asserts `/verify` rejected the request, and that the message names the actual cause rather than
 /// some unrelated earlier check firing first.
 #[track_caller]
 fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
@@ -1621,13 +1732,17 @@ fn assert_rejected_because(response: &VerifyResponse, expected: &str) {
         !response.is_valid,
         "expected a rejection mentioning {expected:?}, but the request was accepted"
     );
-    let reason = response
-        .invalid_reason
-        .as_deref()
-        .expect("a rejection must carry a reason");
     assert!(
-        reason.contains(expected),
-        "expected reason to contain {expected:?}, got: {reason}"
+        response.invalid_reason.is_some(),
+        "a rejection must carry a reason"
+    );
+    let message = response
+        .invalid_message
+        .as_deref()
+        .expect("a rejection must carry a message");
+    assert!(
+        message.contains(expected),
+        "expected message to contain {expected:?}, got: {message}"
     );
 }
 
@@ -1655,10 +1770,7 @@ fn sample_requirements() -> PaymentRequirements {
         pay_to: format!("{:#x}", recipient_address()),
         max_timeout_seconds: None,
         asset: format!("{:#x}", asset_address()),
-        extra: Some(json!({
-            "tabId": "0x1",
-            "userAddress": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        })),
+        extra: Some(json!({ "rpcUrl": "https://core.example" })),
     }
 }
 
@@ -1679,7 +1791,7 @@ fn sample_requirements_v2(amount: &str) -> PaymentRequirements {
         pay_to: format!("{:#x}", recipient_address()),
         max_timeout_seconds: None,
         asset: format!("{:#x}", asset_address()),
-        extra: Some(json!({ "tabEndpoint": "https://core.example/tab" })),
+        extra: Some(json!({ "rpcUrl": "https://core.example" })),
     }
 }
 
@@ -1688,7 +1800,7 @@ fn sample_requirements_v2(amount: &str) -> PaymentRequirements {
 fn requirements_gated_on(validation: Value) -> PaymentRequirements {
     let mut reqs = sample_requirements_v2("10");
     reqs.extra = Some(json!({
-        "tabEndpoint": "https://core.example/tab",
+        "rpcUrl": "https://core.example",
         "validation": validation,
     }));
     reqs
@@ -1706,17 +1818,8 @@ fn payment_payload_v1_with_scheme(scheme: &str, network: &str, amount: &str) -> 
         "scheme": scheme,
         "network": network,
         "payload": {
-            "claims": {
-                "version": "v1",
-                "user_address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                "recipient_address": recipient,
-                "req_id": "0x0",
-                "amount": amount,
-                "asset_address": asset,
-                "timestamp": 1
-            },
-            "signature": "0x1111",
-            "scheme": "eip712"
+            "payload": payload_json(&recipient, &asset, amount),
+            "signature": "0x1111"
         }
     });
 
@@ -1732,7 +1835,7 @@ fn payment_payload_v2(amount: &str) -> X402PaymentPayload {
     payment_payload_v2_inner(amount, None)
 }
 
-/// x402 v2 envelope whose claims are gated on a validation requirement.
+/// x402 v2 envelope whose payment is gated on a validation requirement.
 fn payment_payload_v2_validated(amount: &str, validator: &str) -> X402PaymentPayload {
     payment_payload_v2_inner(
         amount,
@@ -1740,24 +1843,15 @@ fn payment_payload_v2_validated(amount: &str, validator: &str) -> X402PaymentPay
     )
 }
 
-/// The x402 version lives in the envelope; the claims inside are always at the current guarantee
-/// claims version, with validation an optional field rather than a separate claims variant.
+/// The x402 version lives in the envelope; the payment inside is always at the current payload
+/// version, with validation an optional field rather than a separate variant.
 fn payment_payload_v2_inner(amount: &str, validation: Option<Value>) -> X402PaymentPayload {
     let recipient = format!("{:#x}", recipient_address());
     let asset = format!("{:#x}", asset_address());
-    let user = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-    let mut claims = json!({
-        "version": "v1",
-        "user_address": user,
-        "recipient_address": recipient,
-        "req_id": "0x0",
-        "amount": amount,
-        "asset_address": asset,
-        "timestamp": 1
-    });
+    let mut payload = payload_json(&recipient, &asset, amount);
     if let Some(validation) = validation {
-        claims["validation"] = validation;
+        payload["validation"] = validation;
     }
 
     let value = json!({
@@ -1770,13 +1864,44 @@ fn payment_payload_v2_inner(amount: &str, validation: Option<Value>) -> X402Paym
             "asset": asset
         },
         "payload": {
-            "claims": claims,
-            "signature": "0x1111",
-            "scheme": "eip712"
+            "payload": payload,
+            "signature": "0x1111"
         }
     });
 
     serde_json::from_value(value).expect("failed to deserialize payment payload v2")
+}
+
+const PAYER: &str = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const CYCLE_ID: B256 = B256::repeat_byte(0x33);
+
+fn payload_json(recipient: &str, asset: &str, amount: &str) -> Value {
+    json!({
+        "version": "v1",
+        "user_address": PAYER,
+        "recipient_address": recipient,
+        "cycle_id": CYCLE_ID,
+        "req_id": "0x0",
+        "amount": amount,
+        "asset_address": asset,
+        "timestamp": 1,
+        "salt": B256::repeat_byte(0x44)
+    })
+}
+
+/// The payment the fixtures above sign for 10 units.
+fn sample_payload() -> PaymentRequestPayload {
+    serde_json::from_value(payload_json(
+        &format!("{:#x}", recipient_address()),
+        &format!("{:#x}", asset_address()),
+        "10",
+    ))
+    .expect("payload")
+}
+
+/// The guarantee core issues for `payload`.
+fn guarantee_for(payload: &PaymentRequestPayload) -> Guarantee {
+    Guarantee::from_payment(payload, U256::from_be_bytes(payload.cycle_id().0)).expect("guarantee")
 }
 
 fn post_json<T: Serialize>(uri: &str, payload: &T) -> Request<Body> {
@@ -1794,20 +1919,6 @@ fn recipient_address() -> Address {
 
 fn asset_address() -> Address {
     Address::from_slice(&[0x22; 20])
-}
-
-fn sample_claims() -> PaymentGuaranteeClaims {
-    PaymentGuaranteeClaims {
-        domain: [0u8; 32],
-        user_address: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
-        recipient_address: format!("{:#x}", recipient_address()),
-        cycle_id: U256::from(1),
-        req_id: U256::ZERO,
-        amount: U256::from(10),
-        asset_address: format!("{:#x}", asset_address()),
-        timestamp: 1,
-        version: GUARANTEE_CLAIMS_VERSION,
-    }
 }
 
 struct MockExact {
@@ -1836,11 +1947,7 @@ impl MockExact {
 impl ExactService for MockExact {
     async fn verify(&self, _: &VerifyRequest) -> Result<VerifyResponse, ValidationError> {
         self.verify_calls.fetch_add(1, Ordering::SeqCst);
-        Ok(VerifyResponse {
-            is_valid: true,
-            invalid_reason: None,
-            certificate: None,
-        })
+        Ok(VerifyResponse::valid(None))
     }
 
     async fn settle(&self, _: &SettleRequest) -> Result<SettleResponse, ValidationError> {
@@ -1848,6 +1955,7 @@ impl ExactService for MockExact {
         Ok(SettleResponse::from_exact(
             true,
             None,
+            Some("0xpayer".into()),
             Some("0xdeadbeef".into()),
             "base".into(),
         ))
@@ -1897,7 +2005,6 @@ async fn verify_routes_to_exact_service() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: VerifyResponse = serde_json::from_slice(&body).unwrap();
     assert!(payload.is_valid);
-    assert!(payload.certificate.is_none());
     assert_eq!(exact.verify_calls(), 1);
 }
 
@@ -1935,25 +2042,26 @@ async fn settle_routes_to_exact_service() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["success"], true);
-    assert_eq!(payload["txHash"], "0xdeadbeef");
-    assert!(payload["certificate"].is_null());
+    assert_eq!(payload["transaction"], "0xdeadbeef");
+    assert_eq!(payload["payer"], "0xpayer");
+    assert!(payload["extra"]["receipt"].is_null());
     assert_eq!(exact.settle_calls(), 1);
 }
 
 struct MockVerifier {
-    claims: PaymentGuaranteeClaims,
+    guarantee: Guarantee,
     fail: bool,
     verify_calls: AtomicUsize,
 }
 
 impl MockVerifier {
     fn success() -> Self {
-        Self::with_claims(sample_claims())
+        Self::with_guarantee(guarantee_for(&sample_payload()))
     }
 
-    fn with_claims(claims: PaymentGuaranteeClaims) -> Self {
+    fn with_guarantee(guarantee: Guarantee) -> Self {
         Self {
-            claims,
+            guarantee,
             fail: false,
             verify_calls: AtomicUsize::new(0),
         }
@@ -1961,9 +2069,8 @@ impl MockVerifier {
 
     fn failing() -> Self {
         Self {
-            claims: sample_claims(),
             fail: true,
-            verify_calls: AtomicUsize::new(0),
+            ..Self::success()
         }
     }
 
@@ -1972,42 +2079,50 @@ impl MockVerifier {
     }
 }
 
-impl CertificateValidator for MockVerifier {
-    fn verify_certificate(&self, _cert: &BLSCert) -> Result<PaymentGuaranteeClaims, String> {
+impl ReceiptValidator for MockVerifier {
+    fn verify_receipt(&self, _receipt: &GuaranteeReceipt) -> Result<Guarantee, String> {
         self.verify_calls.fetch_add(1, Ordering::SeqCst);
         if self.fail {
             Err("verify failure".into())
         } else {
-            Ok(self.claims.clone())
+            Ok(self.guarantee.clone())
         }
     }
 }
 
 struct MockIssuer {
-    certificate: BLSCert,
-    fail: bool,
+    refusal: Option<IssueError>,
     issue_calls: AtomicUsize,
-}
-
-fn dummy_cert() -> BLSCert {
-    let key =
-        KeyMaterial::from_bytes(crypto::bls::Zeroizing::new(vec![1u8; 32])).expect("secret key");
-    BLSCert::sign(&key, vec![0u8].into()).expect("sign cert")
 }
 
 impl MockIssuer {
     fn success() -> Self {
         Self {
-            certificate: dummy_cert(),
-            fail: false,
+            refusal: None,
             issue_calls: AtomicUsize::new(0),
         }
     }
 
     fn failing() -> Self {
         Self {
-            certificate: dummy_cert(),
-            fail: true,
+            refusal: Some(IssueError {
+                message: "issue failure".into(),
+                original_code: None,
+                details: None,
+                refused: false,
+            }),
+            issue_calls: AtomicUsize::new(0),
+        }
+    }
+
+    fn refusing(code: &str, details: Value) -> Self {
+        Self {
+            refusal: Some(IssueError {
+                message: format!("core refused the guarantee: {code}"),
+                original_code: Some(code.into()),
+                details: Some(details),
+                refused: true,
+            }),
             issue_calls: AtomicUsize::new(0),
         }
     }
@@ -2019,17 +2134,14 @@ impl MockIssuer {
 
 #[async_trait]
 impl GuaranteeIssuer for MockIssuer {
-    async fn issue(
-        &self,
-        _claims: rpc::PaymentGuaranteeRequestClaims,
-        _signature: String,
-        _scheme: sdk_4mica::SigningScheme,
-    ) -> Result<BLSCert, String> {
+    async fn issue(&self, _request: PaymentRequest) -> Result<GuaranteeReceipt, IssueError> {
         self.issue_calls.fetch_add(1, Ordering::SeqCst);
-        if self.fail {
-            Err("issue failure".into())
-        } else {
-            Ok(self.certificate.clone())
+        match &self.refusal {
+            Some(refusal) => Err(refusal.clone()),
+            None => Ok(GuaranteeReceipt {
+                receipt: "0x00".into(),
+                signature: "0x00".into(),
+            }),
         }
     }
 }

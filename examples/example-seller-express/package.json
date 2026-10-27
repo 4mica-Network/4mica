@@ -10,8 +10,7 @@
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",
-    "@4mica/sdk-express": "workspace:*",
-    "@4mica/sdk-node": "workspace:*",
+    "@4mica/x402": "workspace:*",
     "dotenv": "catalog:",
     "express": "catalog:"
   },

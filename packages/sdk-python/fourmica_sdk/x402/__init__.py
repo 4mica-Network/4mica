@@ -1,30 +1,26 @@
-"""The 402 → signed-claim → settle flow for the ``4mica-credit`` scheme.
+"""The 402 → signed-payment → settle flow for the ``4mica-credit`` scheme.
 
-There is no tab step any more: a claim carries a random 32-byte ``req_id``,
-core binds the guarantee to the open settlement cycle at issuance, and the
-facilitator's ``/settle`` turns the signed claim into a BLS certificate.
+A payment is scoped to the asset's live settlement cycle, carries a random
+32-byte ``req_id`` and a salted commitment to the recipient, and is signed
+under the ClearingHouse domain. The facilitator's ``/settle`` redeems it for
+the operator's guarantee receipt.
 """
 
 from __future__ import annotations
 
 import base64
+import dataclasses
 import json
-import secrets
-import time
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol, Union
 from urllib.parse import urljoin
 
 import httpx
 
+from ..client.model import Asset
 from ..errors import X402Error
-from ..models import (
-    PaymentGuaranteeRequestClaims,
-    PaymentSignature,
-    SigningScheme,
-    ValidationRequirement,
-)
-from ..utils import ValidationError, normalize_address, parse_u256, validate_url
+from ..models import PaymentRequest, PaymentRequestPayload, ValidationRequirement
+from ..utils import ValidationError, parse_address, parse_u256, validate_url
 from .model import (
     SCHEME_4MICA_CREDIT,
     PaymentRequirementsExtra,
@@ -60,11 +56,15 @@ Requirements = Union[PaymentRequirementsV1, PaymentRequirementsV2]
 
 
 class FlowSigner(Protocol):
-    async def sign_payment(
-        self,
-        claims: PaymentGuaranteeRequestClaims,
-        scheme: SigningScheme,
-    ) -> PaymentSignature: ...
+    """What the flow needs of a payer: a payload scoped to the live
+    settlement cycle, and a signature over it. :class:`~fourmica_sdk.Client`
+    is one."""
+
+    async def new_payment(
+        self, recipient: str, amount: int, asset: Asset
+    ) -> PaymentRequestPayload: ...
+
+    async def sign_payment(self, payload: PaymentRequestPayload) -> PaymentRequest: ...
 
 
 def _requirements_version(requirements: Requirements) -> int:
@@ -83,27 +83,24 @@ class X402Flow:
         return cls(client)
 
     async def sign_payment(
-        self, payment_requirements: PaymentRequirementsV1, user_address: str
+        self, payment_requirements: PaymentRequirementsV1
     ) -> X402SignedPayment:
         """Build a signed payment envelope for x402 version 1. The base64
         ``header`` goes in ``X-PAYMENT``."""
         self._validate_scheme(payment_requirements.scheme)
-        claims = self._build_claims(payment_requirements, user_address)
-        signature = await self._sign(claims)
-        payment_payload = _payment_payload(claims, signature)
+        request = await self._sign(await self._build_payment(payment_requirements))
         envelope = {
             "x402Version": 1,
             "scheme": payment_requirements.scheme,
             "network": payment_requirements.network,
-            "payload": payment_payload,
+            "payload": request.to_payload(),
         }
-        return _finish(1, envelope, payment_payload, signature)
+        return _finish(1, envelope, request)
 
     async def sign_payment_v2(
         self,
         payment_required: X402PaymentRequired,
         accepted: PaymentRequirementsV2,
-        user_address: str,
     ) -> X402SignedPayment:
         """Build a signed payment envelope for x402 version 2. The base64
         ``header`` goes in ``PAYMENT-SIGNATURE``."""
@@ -111,19 +108,17 @@ class X402Flow:
         if payment_required.x402_version != 2:
             raise X402Error("expected x402 version 2")
 
-        claims = self._build_claims(accepted, user_address)
-        signature = await self._sign(claims)
-        payment_payload = _payment_payload(claims, signature)
+        request = await self._sign(await self._build_payment(accepted))
         envelope: Dict[str, Any] = {
             "x402Version": 2,
             "accepted": accepted.to_payload(),
-            "payload": payment_payload,
+            "payload": request.to_payload(),
             "resource": payment_required.resource.to_payload(),
         }
         # Spec v2 §5.1.2: return at least the info the server advertised.
         if payment_required.extensions is not None:
             envelope["extensions"] = payment_required.extensions
-        return _finish(2, envelope, payment_payload, signature)
+        return _finish(2, envelope, request)
 
     async def settle_payment(
         self,
@@ -156,53 +151,56 @@ class X402Flow:
             )
         except httpx.HTTPError as exc:
             raise X402Error(str(exc)) from exc
+        # Before parsing: a request the facilitator cannot read is answered in
+        # plain text, and its status says more than a JSON parse error would.
+        if not response.is_success:
+            raise X402Error(
+                f"settlement failed with status {response.status_code}: {response.text}"
+            )
         try:
             settlement = response.json()
         except Exception as exc:
             raise X402Error(f"settlement response invalid JSON: {exc}") from exc
-        if not response.is_success:
-            raise X402Error(
-                f"settlement failed with status {response.status_code}: {settlement}"
-            )
         return X402SettledPayment(
             payment=payment, settlement=SettlementReceipt.from_raw(settlement)
         )
 
-    async def _sign(self, claims: PaymentGuaranteeRequestClaims) -> PaymentSignature:
+    async def _sign(self, payload: PaymentRequestPayload) -> PaymentRequest:
         try:
-            return await self.signer.sign_payment(claims, SigningScheme.EIP712)
+            return await self.signer.sign_payment(payload)
         except X402Error:
             raise
         except Exception as exc:
             raise X402Error(f"failed to sign payment: {exc}") from exc
 
-    def _build_claims(
-        self, requirements: Requirements, user_address: str
-    ) -> PaymentGuaranteeRequestClaims:
+    async def _build_payment(self, requirements: Requirements) -> PaymentRequestPayload:
+        """The payment these requirements ask for, scoped to the live
+        settlement cycle."""
         try:
+            recipient = parse_address(requirements.pay_to, "payTo")
             amount = parse_u256(requirements.amount)
+            asset = Asset(parse_address(requirements.asset, "asset"))
         except ValidationError as exc:
-            raise X402Error(f"invalid amount: {exc}") from exc
-        # A random req_id: uniqueness is all core asks of it now that requests
-        # no longer count up a tab.
-        req_id = int.from_bytes(secrets.token_bytes(32), "big")
-        try:
-            claims = PaymentGuaranteeRequestClaims.new(
-                user_address=normalize_address(user_address),
-                recipient_address=normalize_address(requirements.pay_to),
-                req_id=req_id,
-                amount=amount,
-                timestamp=int(time.time()),
-                erc20_token=requirements.asset,
-            )
-        except ValidationError as exc:
-            raise X402Error(str(exc)) from exc
-
+            raise X402Error(f"invalid payment requirements: {exc}") from exc
         extra = PaymentRequirementsExtra.from_raw(requirements.extra)
-        if extra.validation is None:
-            return claims
+
         try:
-            return claims.with_validation(
+            payload = await self.signer.new_payment(recipient, amount, asset)
+        except X402Error:
+            raise
+        except Exception as exc:
+            raise X402Error(f"failed to build payment: {exc}") from exc
+        # Echo the advertised spelling of the recipient rather than a
+        # re-encoded one, so a resource server that compares it as a string
+        # still matches. What the payer commits to is the address either way.
+        payload = dataclasses.replace(
+            payload, recipient_address=requirements.pay_to.strip()
+        )
+
+        if extra.validation is None:
+            return payload
+        try:
+            return payload.with_validation(
                 ValidationRequirement(
                     validator=extra.validation.validator,
                     subject=extra.validation.subject,
@@ -219,29 +217,15 @@ class X402Flow:
             raise X402Error(f"invalid scheme: {scheme}")
 
 
-def _payment_payload(
-    claims: PaymentGuaranteeRequestClaims, signature: PaymentSignature
-) -> Dict[str, Any]:
-    return {
-        "claims": claims.to_payload(),
-        "signature": signature.signature,
-        "scheme": signature.scheme.value,
-    }
-
-
 def _finish(
-    x402_version: int,
-    envelope: Dict[str, Any],
-    payment_payload: Dict[str, Any],
-    signature: PaymentSignature,
+    x402_version: int, envelope: Dict[str, Any], request: PaymentRequest
 ) -> X402SignedPayment:
     header = base64.b64encode(_json_dumps(envelope).encode()).decode()
     return X402SignedPayment(
         header=header,
         envelope=envelope,
         x402_version=x402_version,
-        payload=payment_payload,
-        signature=signature,
+        payload=request,
     )
 
 

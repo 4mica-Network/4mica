@@ -21,7 +21,7 @@ const CAP: PaymentRequirements = {
   amount: '1000000',
   payTo: SELLER,
   maxTimeoutSeconds: 18_000,
-  extra: { name: '4Mica', version: '1', verifyingContract: `0x${'1'.repeat(40)}` },
+  extra: { rpcUrl: 'http://localhost:3000/' },
 }
 
 const SETTLEMENT = { success: true, transaction: '', network: 'eip155:84532' as const }

@@ -43,8 +43,8 @@ describe("ConfigBuilder", () => {
       .walletPrivateKey("11".repeat(32))
       .build();
 
-    expect(byName.rpcUrl).toBe("https://base.api.4mica.xyz/");
-    expect(byCaip2.rpcUrl).toBe("https://base.api.4mica.xyz/");
+    expect(byName.rpcUrl).toBe("https://base.api.4mica.io/");
+    expect(byCaip2.rpcUrl).toBe("https://base.api.4mica.io/");
   });
 
   it("gives network env precedence over rpc url", () => {
@@ -54,7 +54,7 @@ describe("ConfigBuilder", () => {
 
     const cfg = new ConfigBuilder().fromEnv().build();
 
-    expect(cfg.rpcUrl).toBe("https://base.api.4mica.xyz/");
+    expect(cfg.rpcUrl).toBe("https://base.api.4mica.io/");
   });
 
   it("requires private key", () => {

@@ -45,7 +45,7 @@ export type PaymentOutcome =
 
 /**
  * The seller half of an Apify-shaped run endpoint: one real `4mica-credit` entry built
- * by the scheme server (asset from core's token list, EIP-712 domain in `extra`), two
+ * by the scheme server (asset from core's token list), two
  * shape-only entries in front of it, verify and settle through the facilitator, and a
  * refund of the unused cap after the run, paid as a guarantee back to the buyer.
  */
@@ -53,7 +53,7 @@ export class DemoSeller {
   private constructor(
     private readonly server: x402ResourceServer,
     private readonly facilitator: FourMicaFacilitatorClient,
-    /** Signs the refunds. It signs under the domain the cap advertises, so it never calls core. */
+    /** Signs the refunds, against the same core as the cap: a payment needs core's active cycle. */
     private readonly payer: FourMicaPayerScheme,
     /** The seller's wallet: `payTo` on the cap, `user` on the refund. */
     readonly address: string,
@@ -99,7 +99,7 @@ export class DemoSeller {
     const token = await tokenOf(requirements.asset, options.network, options.coreUrl)
 
     const payer = await FourMicaPayerScheme.create(options.signer, {
-      networks: [],
+      networks: [options.network],
       ...(coreUrls ? { coreUrls } : {}),
     })
 
@@ -151,8 +151,11 @@ export class DemoSeller {
   }
 
   /** Issues the cap guarantee in core, binding it to the open settlement cycle. Throws on failure. */
-  settle(payload: PaymentPayload, requirements: PaymentRequirements): Promise<SettleResponse> {
-    return this.server.settlePayment(payload, requirements)
+  async settle(
+    payload: PaymentPayload,
+    requirements: PaymentRequirements
+  ): Promise<SettleResponse> {
+    return settledOrThrow(await this.server.settlePayment(payload, requirements))
   }
 
   /** What a run that produced `results` results costs against the cap. */
@@ -181,9 +184,16 @@ export class DemoSeller {
       accepted: requirements,
       payload: signed.payload,
     }
-    const settlement = await this.facilitator.settle(payload, requirements)
+    const settlement = settledOrThrow(await this.facilitator.settle(payload, requirements))
     return { amount: billing.refund, from: this.address, to: buyer, settlement }
   }
+}
+
+/** `settlement` if it succeeded; a refusal comes back with `success: false`, not thrown. */
+function settledOrThrow(settlement: SettleResponse): SettleResponse {
+  if (settlement.success) return settlement
+  const reason = settlement.errorReason ?? 'unknown reason'
+  throw new Error(settlement.errorMessage ? `${reason}: ${settlement.errorMessage}` : reason)
 }
 
 /**

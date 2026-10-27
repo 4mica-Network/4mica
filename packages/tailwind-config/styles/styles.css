@@ -718,7 +718,8 @@
      in `mdx-components.tsx` because Shiki replaces the whole `<pre><code>`
      subtree and markdown images carry no dimensions to hand to a component.
      Ordered by ascending specificity so later rules never lose to earlier ones. */
-  .blog-content img {
+  .blog-content img,
+  .blog-content video {
     max-width: 100%;
     height: auto;
     margin: 1.5rem 0;

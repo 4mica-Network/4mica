@@ -123,7 +123,6 @@
               "sdks/typescript/configuration",
               "sdks/typescript/client-operations",
               "sdks/typescript/x402-flow",
-              "sdks/typescript/server-paywall",
               "sdks/typescript/errors"
             ]
           }

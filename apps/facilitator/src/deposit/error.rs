@@ -1,8 +1,8 @@
 //! Deposit failures, and how chain errors are turned into them.
 //!
-//! Every variant carries a stable [`code`](DepositError::code) so callers branch on an identifier
-//! rather than on prose, and [`is_retryable`](DepositError::is_retryable) says whether repeating
-//! the identical request could ever help.
+//! Every variant maps to an [`ErrorCode`] so callers branch on an identifier rather than on prose,
+//! and [`is_retryable`](DepositError::is_retryable) says whether repeating the identical request
+//! could ever help.
 //!
 //! The distinctions worth knowing are the ones a client acts on differently:
 //!
@@ -15,8 +15,10 @@
 
 use alloy::primitives::{Address, B256, U256};
 use sdk_4mica::contract::Core4Mica::Core4MicaErrors;
+use serde_json::{Value, json};
 use thiserror::Error;
 
+use crate::error_code::{ErrorCode, Refusal};
 use crate::limits::ThrottleError;
 use crate::relayer::NoRelayer;
 
@@ -107,6 +109,23 @@ pub struct Permit2AllowanceDetails {
     pub eip2612_nonce: Option<U256>,
 }
 
+impl Permit2AllowanceDetails {
+    /// `eip2612Nonce` is the one value a client with no chain access cannot derive. Present means
+    /// the approval can be sponsored: sign an EIP-2612 permit and retry. Absent means the payer
+    /// must submit `approve(PERMIT2, ...)` themselves.
+    pub fn to_json(&self) -> Value {
+        let mut details = json!({
+            "spender": format!("{:#x}", self.spender),
+            "allowance": self.allowance.to_string(),
+            "required": self.required.to_string(),
+        });
+        if let Some(nonce) = self.eip2612_nonce {
+            details["eip2612Nonce"] = Value::String(nonce.to_string());
+        }
+        details
+    }
+}
+
 impl From<NoRelayer> for DepositError {
     fn from(err: NoRelayer) -> Self {
         match err {
@@ -140,34 +159,6 @@ impl DepositError {
         }
     }
 
-    /// Stable, machine-readable code so clients can branch without string matching.
-    pub fn code(&self) -> &'static str {
-        match self {
-            Self::InvalidRequest(_) => "INVALID_REQUEST",
-            Self::MalformedSignature(_) => "MALFORMED_SIGNATURE",
-            Self::UnsupportedTransferMethod(_) => "UNSUPPORTED_TRANSFER_METHOD",
-            Self::NoRelayerConfigured => "NO_RELAYER_CONFIGURED",
-            Self::NoRelayer(_) => "NO_RELAYER",
-            Self::Expired { .. } => "EXPIRED",
-            Self::NotYetValid { .. } => "NOT_YET_VALID",
-            Self::SignatureMismatch { .. } => "SIGNATURE_MISMATCH",
-            Self::NonceAlreadyUsed => "NONCE_ALREADY_USED",
-            Self::InsufficientBalance { .. } => "INSUFFICIENT_BALANCE",
-            Self::SimulationReverted(_) => "SIMULATION_REVERTED",
-            Self::Chain(_) => "CHAIN_ERROR",
-            Self::Broadcast(_) => "BROADCAST_FAILED",
-            Self::ReceiptUnavailable { .. } => "RECEIPT_UNAVAILABLE",
-            Self::RevertedOnChain { .. } => "REVERTED_ON_CHAIN",
-            Self::RateLimited => "RATE_LIMITED",
-            Self::AddressRateLimited { .. } => "ADDRESS_RATE_LIMITED",
-            Self::TooManyInFlight => "TOO_MANY_IN_FLIGHT",
-            Self::DuplicateInFlight => "DUPLICATE_IN_FLIGHT",
-            Self::RelayerBalanceTooLow { .. } => "RELAYER_BALANCE_TOO_LOW",
-            Self::GasCeilingExceeded { .. } => "GAS_CEILING_EXCEEDED",
-            Self::Permit2AllowanceRequired(_) => "PERMIT2_ALLOWANCE_REQUIRED",
-        }
-    }
-
     /// Whether this rejection came from throttling rather than the request itself. The single
     /// source of truth for both [`Self::is_retryable`] and the abuse counters.
     pub fn is_throttling(&self) -> bool {
@@ -188,6 +179,58 @@ impl DepositError {
     pub fn is_retryable(&self) -> bool {
         self.is_throttling() || matches!(self, Self::RelayerBalanceTooLow { .. } | Self::Chain(_))
     }
+
+    /// The transaction this request already broadcast, when it failed after broadcasting.
+    pub fn broadcast_tx_hash(&self) -> Option<B256> {
+        match self {
+            Self::ReceiptUnavailable { tx_hash, .. } | Self::RevertedOnChain { tx_hash } => {
+                Some(*tx_hash)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Refusal for DepositError {
+    fn code(&self) -> ErrorCode {
+        match self {
+            Self::InvalidRequest(_) => ErrorCode::InvalidPayload,
+            Self::MalformedSignature(_) | Self::SignatureMismatch { .. } => {
+                ErrorCode::InvalidSignature
+            }
+            Self::UnsupportedTransferMethod(_) => ErrorCode::UnsupportedTransferMethod,
+            Self::NoRelayerConfigured | Self::NoRelayer(_) => ErrorCode::SponsorshipUnavailable,
+            Self::Expired { .. } => ErrorCode::AuthorizationExpired,
+            Self::NotYetValid { .. } => ErrorCode::AuthorizationNotYetValid,
+            Self::NonceAlreadyUsed => ErrorCode::NonceAlreadyUsed,
+            Self::InsufficientBalance { .. } => ErrorCode::InsufficientFunds,
+            Self::SimulationReverted(_) => ErrorCode::SimulationReverted,
+            Self::Chain(_) => ErrorCode::ChainUnavailable,
+            Self::Broadcast(_) => ErrorCode::BroadcastFailed,
+            Self::ReceiptUnavailable { .. } => ErrorCode::SettlementPending,
+            Self::RevertedOnChain { .. } => ErrorCode::InvalidTransactionState,
+            Self::RateLimited | Self::AddressRateLimited { .. } | Self::TooManyInFlight => {
+                ErrorCode::RateLimited
+            }
+            Self::DuplicateInFlight => ErrorCode::DuplicateInFlight,
+            Self::RelayerBalanceTooLow { .. } => ErrorCode::RelayerUnderfunded,
+            Self::GasCeilingExceeded { .. } => ErrorCode::GasCeilingExceeded,
+            Self::Permit2AllowanceRequired(_) => ErrorCode::Permit2AllowanceRequired,
+        }
+    }
+
+    fn retryable(&self) -> bool {
+        self.is_retryable()
+    }
+
+    fn details(&self) -> Option<Value> {
+        self.permit2_allowance_details()
+            .map(Permit2AllowanceDetails::to_json)
+    }
+
+    fn transaction(&self) -> Option<B256> {
+        self.broadcast_tx_hash()
+    }
 }
 
 /// Names the Core4Mica reverts a sponsored call can realistically hit. Anything else falls back to
@@ -196,10 +239,14 @@ fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
     use alloy::sol_types::SolInterface;
 
     match decoded {
-        Core4MicaErrors::AaveNotConfigured(_) => {
-            "AaveNotConfigured: the deployment has no Aave pool, so stablecoin deposits are \
-             unavailable"
-                .to_string()
+        Core4MicaErrors::DepositsDisabled(_) => {
+            "DepositsDisabled: the deployment is not accepting deposits".to_string()
+        }
+        Core4MicaErrors::StablecoinDepositsDisabled(err) => {
+            format!(
+                "StablecoinDepositsDisabled: deposits of {} are switched off",
+                err.asset
+            )
         }
         Core4MicaErrors::UnsupportedAsset(err) => {
             format!(
@@ -258,7 +305,7 @@ fn describe_core4mica_error(decoded: &Core4MicaErrors) -> String {
 /// node may still have answered — a call into a function the target does not implement (a token
 /// without EIP-3009 asked for `receiveWithAuthorization`) reverts with *empty* data, and reaches us
 /// as JSON-RPC error 3 with no `data` field. [`revert_without_data`] catches that case, so it is
-/// reported as `SIMULATION_REVERTED` — which lets an SDK fall back to another route — rather than
+/// reported as `simulation_reverted` — which lets an SDK fall back to another route — rather than
 /// as a retryable outage.
 pub(crate) fn classify_core4mica_revert(err: &alloy::contract::Error) -> Option<String> {
     let Some(data) = err.as_revert_data() else {
@@ -290,7 +337,7 @@ pub(crate) fn revert_without_data(err: &alloy::contract::Error) -> Option<String
 /// Splits an alloy contract error into "the deposit would revert" and "the node is unreachable".
 ///
 /// Reverts are decoded against the Core4Mica error ABI that `sdk-4mica` publishes, so clients see
-/// `AaveNotConfigured` rather than a bare `0x3a76e42a` selector.
+/// `DepositsDisabled` rather than a bare selector.
 pub(super) fn classify_call_error(err: alloy::contract::Error) -> DepositError {
     match classify_core4mica_revert(&err) {
         Some(reason) => DepositError::SimulationReverted(reason),

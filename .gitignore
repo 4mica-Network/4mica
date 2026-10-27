@@ -80,6 +80,9 @@ web_modules/
 **/.env.*
 !.env.example
 
+# Local stack state from scripts/dev-stack.sh and the x402 e2e stack
+.dev/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
@@ -160,4 +163,5 @@ packages/db/src/generated/
 .taste-skill
 
 # Rust
-/target
+target/
+**/*.rs.bk

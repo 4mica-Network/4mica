@@ -5,6 +5,11 @@ collateral at 4Mica and pays for any x402 route on credit: paste a paid URL,
 check its price, buy it. The private key stays in the server's route handlers
 (`app/api/*`); the page only calls them.
 
+Buying goes through `@x402/fetch` with `@4mica/x402`'s client scheme: the
+wrapped `fetch` answers the seller's `402` by signing a payment and retrying, and
+recovers from the refusals a payer can fix, such as core asking for a
+checkpoint. The SDK client in `lib/wallet.ts` serves the balance and deposits.
+
 ## Setup
 
 ```bash
@@ -15,7 +20,7 @@ cp .env.example .env
 | --- | --- |
 | `4MICA_WALLET_PRIVATE_KEY` | The paying wallet. Any funded anvil key locally. |
 | `4MICA_RPC_URL` | `http://127.0.0.1:3000` for a local core. |
-| `NEXT_PUBLIC_SHOP_URL` | The URL the page starts with, default `http://localhost:3010/insight`. |
+| `NEXT_PUBLIC_SHOP_URL` | The URL the page starts with, default `http://localhost:3000/quote` ([`example-seller-express`](../example-seller-express)). |
 
 ## Run
 

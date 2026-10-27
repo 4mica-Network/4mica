@@ -322,7 +322,9 @@ class AuthorizedPay:
         )
         if response.get("isValid"):
             return
-        raise rejection_error(response, response.get("invalidReason"))
+        raise rejection_error(
+            response, response.get("invalidReason"), response.get("invalidMessage")
+        )
 
     async def send(self) -> PayReceipt:
         """Pays the committed net debit with the attached authorization. The
@@ -459,11 +461,13 @@ async def _submit_pay(
 ) -> PayReceipt:
     response = await ctx.facilitator.post("clearing/pay", request)
     if not response.get("success"):
-        raise rejection_error(response, response.get("error"))
+        raise rejection_error(
+            response, response.get("errorReason"), response.get("errorMessage")
+        )
 
-    tx_hash = response.get("txHash")
+    tx_hash = response.get("transaction")
     if not isinstance(tx_hash, str) or not tx_hash.startswith("0x"):
-        raise OutcomeUnknownError("facilitator reported success without a txHash")
+        raise OutcomeUnknownError("facilitator reported success without a transaction")
 
     return PayReceipt(
         tx_hash=tx_hash,
@@ -595,7 +599,9 @@ class GaslessClaim:
         )
         if response.get("isValid"):
             return
-        raise rejection_error(response, response.get("invalidReason"))
+        raise rejection_error(
+            response, response.get("invalidReason"), response.get("invalidMessage")
+        )
 
     async def send(self) -> ClaimReceipt:
         """Claims the committed net credit gaslessly. Nothing is signed and
@@ -604,11 +610,15 @@ class GaslessClaim:
         what it pays."""
         response = await self._ctx.facilitator.post("clearing/claim", self._request())
         if not response.get("success"):
-            raise rejection_error(response, response.get("error"))
+            raise rejection_error(
+                response, response.get("errorReason"), response.get("errorMessage")
+            )
 
-        tx_hash = response.get("txHash")
+        tx_hash = response.get("transaction")
         if not isinstance(tx_hash, str) or not tx_hash.startswith("0x"):
-            raise OutcomeUnknownError("facilitator reported success without a txHash")
+            raise OutcomeUnknownError(
+                "facilitator reported success without a transaction"
+            )
 
         return ClaimReceipt(
             tx_hash=tx_hash,

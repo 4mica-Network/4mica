@@ -5,7 +5,7 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{Context, Result};
 use dotenvy::from_filename;
 use reqwest::StatusCode;
-use sdk_4mica::{ConfigBuilder, U256, X402Flow, x402::PaymentRequirements};
+use sdk_4mica::{ClientBuilder, U256, X402Flow, x402::PaymentRequirements};
 use serde::Deserialize;
 
 fn load_env_files() {
@@ -69,49 +69,32 @@ async fn main() -> Result<()> {
     load_env_files();
 
     let payer_key = env_var("PAYER_KEY")?;
-    let user_address = env_var("USER_ADDRESS")?;
     let resource_url = env_var("RESOURCE_URL")?;
     let asset_address = env_var("ASSET_ADDRESS")?;
 
     println!("--- x402 / 4mica flow ---");
     println!("1) Discover 402 + accepted requirements from the resource");
-    println!("2) Sign payment claims locally");
+    println!("2) Sign the payment locally");
     println!(
         "3) Retry the resource with X-PAYMENT using the header below (server will handle verify/settle)\n"
     );
 
     let signer: PrivateKeySigner = payer_key.parse().context("invalid payer private key")?;
-    let config = ConfigBuilder::default()
+    let core = ClientBuilder::default()
         .signer(signer)
-        .build()
-        .context("invalid SDK config")?;
-    let core = sdk_4mica::Client::new(config)
+        .connect()
         .await
         .context("failed to init 4mica core client")?;
 
-    // If you need to prime collateral on-chain, uncomment the block below:
-    // let one_unit = U256::from(1_000_000u64);
-    // println!("Approving allowance for the 4mica contract...");
-    // let approve_receipt = core
-    //     .user
-    //     .approve_erc20(asset_address.clone(), one_unit)
-    //     .await
-    //     .context("failed to approve asset")?;
-    // println!(
-    //     "Approval tx hash: 0x{}",
-    //     hex::encode(approve_receipt.transaction_hash)
-    // );
-    //
-    // println!("Depositing collateral...");
-    // let deposit_receipt = core
-    //     .user
-    //     .deposit(one_unit, Some(asset_address.clone()))
+    // If you need to prime collateral first, uncomment the block below:
+    // let token = asset_address.parse().context("invalid ASSET_ADDRESS")?;
+    // let deposit = core
+    //     .deposit
+    //     .of(sdk_4mica::Asset::Erc20(token), U256::from(1_000_000u64))
+    //     .send()
     //     .await
     //     .context("failed to deposit asset")?;
-    // println!(
-    //     "Deposit tx hash: 0x{}",
-    //     hex::encode(deposit_receipt.transaction_hash)
-    // );
+    // println!("Deposit tx hash: {}", deposit.tx_hash);
 
     // Request payment requirements from the resource server
     let payment_requirements = request_server_and_fetch_payment_requirements(&resource_url).await?;
@@ -121,22 +104,22 @@ async fn main() -> Result<()> {
     // Prepare the payment requirements and signature. The resource server will call
     // /verify and /settle; the client only needs to attach the X-PAYMENT header.
     let payment: sdk_4mica::x402::X402SignedPayment = flow
-        .sign_payment(payment_requirements, user_address)
+        .sign_payment(payment_requirements)
         .await
         .context("failed to prepare payment")?;
 
-    // Read through the version-agnostic accessors rather than matching on the claims variant, so
+    // Read through the version-agnostic accessors rather than matching on the payload variant, so
     // this keeps compiling when a new version is added.
-    let claims = &payment.payload.claims;
+    let signed = &payment.payload.payload;
     let (payment_asset, payment_req_id, actual_amount) =
-        (claims.asset_address(), claims.req_id(), claims.amount());
+        (signed.asset_address(), signed.req_id(), signed.amount());
     println!("Payment asset address: {payment_asset}");
     println!("Payment reqId: {:#x}", payment_req_id);
 
     // Sanity checks against the desired USDC flow.
     if !payment_asset.eq_ignore_ascii_case(&asset_address) {
         eprintln!(
-            "warning: claims.asset_address ({payment_asset}) does not match ASSET_ADDRESS ({asset_address})"
+            "warning: payment asset ({payment_asset}) does not match ASSET_ADDRESS ({asset_address})"
         );
     }
 
@@ -144,7 +127,7 @@ async fn main() -> Result<()> {
     let expected_amount = U256::from(100u64);
     if actual_amount != expected_amount {
         eprintln!(
-            "warning: claims.amount is {} (expected 100 base units)",
+            "warning: payment amount is {} (expected 100 base units)",
             actual_amount
         );
     }

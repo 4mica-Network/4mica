@@ -4,35 +4,25 @@ version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0"
-rpc-4mica = "=2.0.0-alpha.3"
-sdk-4mica = "=2.0.0-alpha.3"
-crypto-4mica = "=2.0.0-alpha.3"
-axum = { version = "0.8.9", features = ["macros", "json"] }
-base64 = "0.23"
+alloy = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+axum = { workspace = true, features = ["macros", "json"] }
 dotenvy = "0.15"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0.18"
-tokio = { version = "1.53.0", features = [
-  "macros",
-  "rt-multi-thread",
-  "signal",
-  "sync",
-] }
+hex = "0.4"
+reqwest = { workspace = true, features = ["json", "default-tls"] }
+rpc = { workspace = true }
+sdk-4mica = { path = "../../packages/sdk-rust" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync"] }
 tower-http = { version = "0.7.0", features = ["trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-reqwest = { version = "0.13.1", default-features = false, features = [
-  "json",
-  "default-tls",
-] }
-hex = "0.4"
-async-trait = "0.1.92"
 x402-rs = "0.12.5"
-alloy = "2.2.0"
 
 [dev-dependencies]
+serial_test = { workspace = true }
+tokio = { workspace = true, features = ["net", "time"] }
 tower = { version = "0.5.3", features = ["util"] }
-serial_test = "4.0.0"
-tokio = { version = "1.49.0", features = ["net", "time"] }

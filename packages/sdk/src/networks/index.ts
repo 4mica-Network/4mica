@@ -25,15 +25,15 @@ export type { NetworkInfo } from "@/networks/models";
 export const NETWORKS: Record<string, NetworkInfo> = {
   base: {
     caip2: "eip155:8453",
-    rpcUrl: "https://base.api.4mica.xyz/",
+    rpcUrl: "https://base.api.4mica.io/",
   },
   "base-sepolia": {
     caip2: "eip155:84532",
-    rpcUrl: "https://base.sepolia.api.4mica.xyz/",
+    rpcUrl: "https://base.sepolia.api.4mica.io/",
   },
   "ethereum-sepolia": {
     caip2: "eip155:11155111",
-    rpcUrl: "https://ethereum.sepolia.api.4mica.xyz/",
+    rpcUrl: "https://ethereum.sepolia.api.4mica.io/",
   },
 } as const;
 

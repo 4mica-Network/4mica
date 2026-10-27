@@ -11,13 +11,15 @@ npm install
 npm run start
 ```
 
-Demo mode uses a mock verifier and a locally-built payment header, so it runs
-with **zero credentials**.
+Demo mode uses a stand-in facilitator and a locally-built payment header, so it
+runs with **zero credentials**.
 
 ## Go live
 
-Copy `.env.example` → `.env`, fill in your `4MICA_*` credentials, and swap the
-mock verifier for `createClient()` from `@4mica/sdk-node`. Set `ANTHROPIC_API_KEY` to power the agent with Claude.
+Copy `.env.example` → `.env`, fill in your `4MICA_*` credentials, and replace the
+demo header with `@x402/fetch`'s `wrapFetchWithPaymentFromConfig` and the
+`FourMicaEvmScheme` from `@4mica/x402/client`: the wrapped `fetch` pays a `402`
+and retries for you. Set `ANTHROPIC_API_KEY` to power the agent with Claude.
 
 ## Manage agents & transactions
 

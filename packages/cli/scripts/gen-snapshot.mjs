@@ -57,16 +57,19 @@ function stripQuotes(v) {
 
 function collectFourMicaVersions() {
   const versions = {};
-  const packagesDir = join(repoRoot, "packages");
-  for (const entry of readdirSync(packagesDir)) {
-    const pkgPath = join(packagesDir, entry, "package.json");
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-      if (pkg.name?.startsWith("@4mica/") && pkg.version && !pkg.private) {
-        versions[pkg.name] = pkg.version;
+  // @4mica/x402 lives with the facilitator, not under packages/.
+  for (const dir of ["packages", "apps/facilitator/packages/typescript"]) {
+    const packagesDir = join(repoRoot, dir);
+    for (const entry of readdirSync(packagesDir)) {
+      const pkgPath = join(packagesDir, entry, "package.json");
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+        if (pkg.name?.startsWith("@4mica/") && pkg.version && !pkg.private) {
+          versions[pkg.name] = pkg.version;
+        }
+      } catch {
+        // not a package dir
       }
-    } catch {
-      // not a package dir
     }
   }
   return versions;

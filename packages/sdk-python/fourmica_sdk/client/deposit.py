@@ -423,11 +423,13 @@ async def _submit(
 ) -> DepositReceipt:
     response = await ctx.facilitator.post("deposit", request)
     if not response.get("success"):
-        raise rejection_error(response, response.get("error"))
+        raise rejection_error(
+            response, response.get("errorReason"), response.get("errorMessage")
+        )
 
-    tx_hash = response.get("txHash")
+    tx_hash = response.get("transaction")
     if not isinstance(tx_hash, str) or not tx_hash.startswith("0x"):
-        raise OutcomeUnknownError("facilitator reported success without a txHash")
+        raise OutcomeUnknownError("facilitator reported success without a transaction")
 
     # from/asset/amount are echoed for reconciliation; a facilitator that
     # omits them has not changed what the contract did, but one that echoes a
@@ -460,4 +462,6 @@ async def _verify(ctx: ClientCtx, request: Dict[str, Any]) -> None:
     response = await ctx.facilitator.post("deposit/verify", request)
     if response.get("isValid"):
         return
-    raise rejection_error(response, response.get("invalidReason"))
+    raise rejection_error(
+        response, response.get("invalidReason"), response.get("invalidMessage")
+    )

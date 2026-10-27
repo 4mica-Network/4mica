@@ -1,5 +1,5 @@
 import { InvalidParamsError } from "@/errors";
-import { parsePaymentHeader } from "@/server/envelope";
+import { parsePaymentHeader } from "@/x402/envelope";
 
 export interface ParsedPayment {
   reqId: string;
@@ -42,12 +42,12 @@ export function paymentFromHeader(
   header: string,
   decimals = 18,
 ): ParsedPayment {
-  const claims = (parsePaymentHeader(header).payload as { claims?: unknown })
-    .claims as Record<string, unknown> | undefined;
+  const payment = (parsePaymentHeader(header).payload as { payload?: unknown })
+    .payload as Record<string, unknown> | undefined;
 
-  const reqId = claims?.req_id ?? claims?.reqId;
-  const payerAddress = claims?.user_address ?? claims?.userAddress;
-  const amountRaw = asBigInt(claims?.amount);
+  const reqId = payment?.req_id ?? payment?.reqId;
+  const payerAddress = payment?.user_address ?? payment?.userAddress;
+  const amountRaw = asBigInt(payment?.amount);
 
   if (
     typeof reqId !== "string" ||

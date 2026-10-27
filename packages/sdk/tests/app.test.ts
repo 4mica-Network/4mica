@@ -11,7 +11,8 @@ import {
 } from "@/app";
 import { ConfigError, InvalidParamsError, X402Error } from "@/errors";
 import type { FetchFn } from "@/http";
-import { utf8ToBase64 } from "@/server/base64";
+import { PaymentRequestPayload } from "@/models";
+import { utf8ToBase64 } from "@/x402/base64";
 
 const API_KEY = "4mica_sk_test";
 
@@ -245,15 +246,33 @@ describe("fromAppNetwork", () => {
 });
 
 describe("paymentFromHeader", () => {
-  const header = (claims: Record<string, unknown>) =>
+  const header = (payment: Record<string, unknown>) =>
     utf8ToBase64(
       JSON.stringify({
         x402Version: 1,
         scheme: "4mica-credit",
         network: "eip155:84532",
-        payload: { claims, signature: "0xsig" },
+        payload: { payload: payment, signature: "0xsig" },
       }),
     );
+
+  it("reads a signed payment as the SDK writes it", () => {
+    const payload = PaymentRequestPayload.new({
+      userAddress: "0x3D8e1f5A7C9b2D4E6a8c0f2B4d6e8A1c3F5b7D09",
+      recipientAddress: "0x00000000000000000000000000000000000000Be",
+      cycleId: `0x${"11".repeat(32)}`,
+      reqId: 0xabcn,
+      amount: 1_500_000n,
+      timestamp: 1_700_000_000,
+    });
+
+    expect(paymentFromHeader(header(payload.toPayload()), 6)).toEqual({
+      reqId: "0xabc",
+      payerAddress: "0x3D8e1f5A7C9b2D4E6a8c0f2B4d6e8A1c3F5b7D09",
+      amountRaw: 1_500_000n,
+      amount: "1.5",
+    });
+  });
 
   it("reads the id, payer and amount from the payment envelope", () => {
     const parsed = paymentFromHeader(
@@ -273,7 +292,7 @@ describe("paymentFromHeader", () => {
     });
   });
 
-  it("accepts camelCase claim names and defaults to 18 decimals", () => {
+  it("accepts camelCase field names and defaults to 18 decimals", () => {
     const parsed = paymentFromHeader(
       header({
         reqId: "0xdef",

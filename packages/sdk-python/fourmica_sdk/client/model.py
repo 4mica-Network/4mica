@@ -94,11 +94,17 @@ class StablecoinPosition:
     protocol_yield_share: int
     user_net_yield: int
     withdrawable_balance: int
-    total_user_scaled_balance: int
-    protocol_scaled_balance: int
-    surplus_scaled_balance: int
-    contract_scaled_a_token_balance: int
-    stablecoin_a_token: str
+    user_shares: int
+    """The signer's pool shares."""
+    total_user_shares: int
+    protocol_shares: int
+    pool_shares: int
+    """Shares outstanding across users, the protocol and escrow."""
+    pool_assets: int
+    """Underlying value backing the pool."""
+    strategy: str
+    """The ERC-4626 strategy backing the pool, or the zero address while its
+    assets sit idle."""
 
 
 @dataclass
