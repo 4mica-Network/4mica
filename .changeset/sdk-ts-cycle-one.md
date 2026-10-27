@@ -1,10 +1,5 @@
 ---
 "@4mica/sdk": major
-"@4mica/sdk-node": major
-"@4mica/sdk-deno": major
-"@4mica/sdk-next": major
-"@4mica/sdk-express": major
-"@4mica/sdk-hono": major
 ---
 
 TypeScript SDK 2.0: settlement cycles and the tab-free protocol.

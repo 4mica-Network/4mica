@@ -54,10 +54,9 @@ SDKs.
   reads the receipt from `extra.receipt`, renames `txHash` to `transaction`
   and `networkId` to `network`, splits `error` into `errorReason` and
   `errorMessage`, and adds `payer`, `retryable` and `details`.
-- Breaking (server): the paywall's guarantee is `{ receipt, signature, raw }`
-  instead of `{ claims, signature, raw }`, and `paymentFromHeader` reads the
-  new envelope. When reporting a payment, send `guarantee.receipt` as
-  `guaranteeClaims` and `guarantee.signature` as `guaranteeSignature`.
+- Breaking (app): `paymentFromHeader` reads the new envelope. When reporting a
+  payment, send the receipt as `guaranteeClaims` and its signature as
+  `guaranteeSignature`.
 - Breaking (contracts): `core4micaAbi` is replaced by `treasuryAbi`.
   `StablecoinPosition` reports `userShares`, `totalUserShares`,
   `protocolShares`, `poolShares`, `poolAssets` and `strategy`;

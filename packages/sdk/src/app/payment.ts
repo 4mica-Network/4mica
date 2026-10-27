@@ -1,5 +1,5 @@
 import { InvalidParamsError } from "@/errors";
-import { parsePaymentHeader } from "@/server/envelope";
+import { parsePaymentHeader } from "@/x402/envelope";
 
 export interface ParsedPayment {
   reqId: string;

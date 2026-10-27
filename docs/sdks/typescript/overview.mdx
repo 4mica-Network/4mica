@@ -15,18 +15,12 @@ The client is made of capability sub-clients:
 - **`client.settlement`** — settle a cleared cycle from either side: the debtor pays, the creditor claims.
 - **`client.account`** / **`client.tokens`** — the signer's balances and supported-token metadata.
 - **X402 flow helper** (`X402Flow`) — turn a `402 Payment Required` response into a signed payment header.
-- **Server paywall** (`@4mica/sdk/server`) — an edge-safe primitive that gates a route behind an x402 payment.
+
+To charge for a route, use the [payment middleware](/seller/payment-middleware) in `@4mica/x402`.
 
 ## Runtime-neutral
 
-`@4mica/sdk` runs on Node, Bun, Deno, and edge runtimes. HTTP uses the global `fetch`, and the `@4mica/sdk/server` subpath is `Buffer`-free so it runs on the edge.
-
-<Note>
-  Prefer a runtime or framework adapter for idiomatic wiring: `@4mica/sdk-node`,
-  `@4mica/sdk-bun`, and `@4mica/sdk-deno` for env-driven client and paywall
-  factories, and `@4mica/sdk-next`, `@4mica/sdk-express`, and `@4mica/sdk-hono`
-  for thin x402 middleware.
-</Note>
+`@4mica/sdk` runs on Node, Bun, Deno, and edge runtimes. HTTP uses the global `fetch`, and payment headers are encoded without `Buffer`, so it runs on the edge.
 
 ## Install
 
@@ -114,7 +108,7 @@ try {
   <Card title="X402 flow" icon="arrows-rotate" href="/sdks/typescript/x402-flow">
     Turn a `402 Payment Required` response into a signed payment header.
   </Card>
-  <Card title="Server paywall" icon="shield" href="/sdks/typescript/server-paywall">
-    Gate any route behind an x402 payment with the edge-safe primitive.
+  <Card title="Payment middleware" icon="shield" href="/seller/payment-middleware">
+    Charge for a route with `@4mica/x402`'s Express middleware.
   </Card>
 </Columns>

@@ -42,7 +42,7 @@ The site currently includes:
 │   ├── web                 # Next.js website and docs app
 │   └── dashboard           # Vite + React dashboard (agents, transactions, whitelist)
 ├── packages
-│   ├── sdk                 # @4mica/sdk — universal x402 payment SDK (+ sdk-node/-express/-hono/-next/…)
+│   ├── sdk                 # @4mica/sdk — universal x402 payment SDK
 │   ├── cli                 # @4mica/cli — the `4mica` scaffolding CLI
 │   ├── ui                  # Shared React component library
 │   ├── tailwind-config     # Shared Tailwind v4 preset and tokens

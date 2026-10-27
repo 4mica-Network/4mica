@@ -17,51 +17,19 @@ Merkle root. This SDK provides:
   facilitator submit and pay the gas — deposits, withdrawals, and cycle settlement included
 - **X402 Flow Helper**: generate `X-PAYMENT` headers for 402-protected HTTP resources — tab-free,
   with a random per-payment `reqId`, scoped to the asset's active settlement cycle
-- **Server paywall** (`@4mica/sdk/server`): a runtime-neutral, edge-safe primitive for gating a
-  route behind an x402 payment
 - **App API** (`@4mica/sdk/app`): read the pricing, policy and FAQs you set in the dashboard for
   one API listing or agent, check a payer's rules, and record payments, using a secret key from
   that listing or agent. See [docs/app-api.md](docs/app-api.md)
 - **Golden-vector parity**: EIP-712 digests, guarantee receipts, and checkpoints are pinned by the
   same fixtures the Rust and Python SDKs test against
 
-## Universal: runtime-neutral core + thin adapters
+## Runtime-neutral
 
-`@4mica/sdk` is runtime-neutral (Node, Bun, Deno, edge). HTTP uses the global `fetch`, and the
-`@4mica/sdk/server` subpath is `Buffer`-free so it runs on edge runtimes.
+`@4mica/sdk` runs on Node, Bun, Deno, and edge runtimes. HTTP uses the global `fetch`, and payment
+headers are encoded without `Buffer`, so it runs on the edge.
 
-- **Runtime adapters** — env-driven client/paywall factories: `@4mica/sdk-node`, `@4mica/sdk-bun`, `@4mica/sdk-deno`
-- **Framework adapters** — thin x402 paywall middleware: `@4mica/sdk-next`, `@4mica/sdk-express`, `@4mica/sdk-hono` (Nuxt / SvelteKit / Remix coming soon)
-
-### Server paywall
-
-Gate any route behind a payment. When no valid `X-PAYMENT` header is present, the paywall returns a
-`402` with the x402 payment requirements; otherwise it verifies the payment and lets the request
-through, adding an `X-PAYMENT-RESPONSE` header.
-
-```ts
-import { createPaywall } from "@4mica/sdk/server";
-
-const paywall = createPaywall(client.rpc, {
-  payTo: "0x…",
-  asset: "0x0000000000000000000000000000000000000000",
-  network: "base-sepolia",
-  amount: "1000",
-});
-
-// Web-standard (Hono, Next route handlers, SvelteKit, Remix, Deno, Bun.serve):
-const result = await paywall.handle(request);
-if (result instanceof Response) return result; // 402
-// ...run your handler, then merge result.headers onto the response
-// result.guarantee is the operator's receipt: { receipt, signature, raw }
-
-// Or the low-level, framework-agnostic primitive:
-const decision = await paywall.protect({ method, url, header: (n) => headers.get(n) });
-```
-
-Prefer a framework adapter (`@4mica/sdk-express`, `@4mica/sdk-hono`, `@4mica/sdk-next`) for
-idiomatic middleware. The paywall only **verifies** payment; on-chain settlement (the
-cycle-clearing claim flow) remains an out-of-band recipient operation.
+To charge for a route, use `@4mica/x402`'s Express middleware. The SDK is the payer's side: it
+signs the payment a seller's middleware verifies.
 
 ## Installation
 

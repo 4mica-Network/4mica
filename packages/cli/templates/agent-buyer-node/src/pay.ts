@@ -7,9 +7,14 @@ type Requirement = {
   extra?: Record<string, unknown>;
 };
 
-type Required402 = { x402Version: number; accepts: Requirement[] };
+type Required402 = {
+  x402Version: number;
+  resource: Record<string, unknown>;
+  accepts: Requirement[];
+};
 
-function demoPaymentHeader(req: Requirement): string {
+function demoPaymentHeader(required: Required402): string {
+  const req = required.accepts[0];
   // Mint a random 32-byte req_id — uniqueness is all core asks of it.
   const reqIdBytes = new Uint8Array(32);
   crypto.getRandomValues(reqIdBytes);
@@ -17,9 +22,9 @@ function demoPaymentHeader(req: Requirement): string {
     b.toString(16).padStart(2, "0"),
   ).join("")}`;
   const envelope = {
-    x402Version: 1,
-    scheme: req.scheme,
-    network: req.network,
+    x402Version: 2,
+    accepted: req,
+    resource: required.resource,
     payload: {
       payload: {
         version: "v1",
@@ -51,9 +56,15 @@ export async function payAndFetch<T>(url: string): Promise<PaidResult<T>> {
     return { status: first.status, body: (await first.json()) as T, paid: 0 };
   }
 
-  const requirement = ((await first.json()) as Required402).accepts[0];
-  const header = demoPaymentHeader(requirement);
-  const paid = await fetch(url, { headers: { "X-PAYMENT": header } });
+  // x402 v2 carries the requirements in a base64 `PAYMENT-REQUIRED` header.
+  const required = JSON.parse(
+    Buffer.from(first.headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString(
+      "utf8",
+    ),
+  ) as Required402;
+  const requirement = required.accepts[0];
+  const header = demoPaymentHeader(required);
+  const paid = await fetch(url, { headers: { "PAYMENT-SIGNATURE": header } });
   return {
     status: paid.status,
     body: paid.ok ? ((await paid.json()) as T) : null,

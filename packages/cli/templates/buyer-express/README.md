@@ -11,13 +11,15 @@ npm install
 npm run start
 ```
 
-Demo mode uses a mock verifier and a locally-built payment header, so it runs
-with **zero credentials**. Start the matching seller first, then run this to pay for the gated route.
+Demo mode uses a stand-in facilitator and a locally-built payment header, so it
+runs with **zero credentials**. Start the matching seller first, then run this to pay for the gated route.
 
 ## Go live
 
-Copy `.env.example` → `.env`, fill in your `4MICA_*` credentials, and swap the
-mock verifier for `createClient()` from `@4mica/sdk-node`.
+Copy `.env.example` → `.env`, fill in your `4MICA_*` credentials, and replace the
+demo header with `@x402/fetch`'s `wrapFetchWithPaymentFromConfig` and the
+`FourMicaEvmScheme` from `@4mica/x402/client`: the wrapped `fetch` pays a `402`
+and retries for you.
 
 ## Manage agents & transactions
 

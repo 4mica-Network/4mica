@@ -1,12 +1,12 @@
 import { X402Error } from "@/errors";
-import { base64ToUtf8 } from "@/server/base64";
-import type { X402PaymentEnvelope } from "@/server/models";
+import { base64ToUtf8 } from "@/x402/base64";
+import type { X402PaymentEnvelope } from "@/x402/models";
 
 /**
  * Decode a base64 `X-PAYMENT` header into its x402 payment envelope.
  *
- * Runtime-neutral and edge-safe (no `Buffer`). Shared by the payer-side
- * {@link X402Flow} and the server-side paywall so both agree on the wire format.
+ * Runtime-neutral and edge-safe (no `Buffer`). The inverse of the `header`
+ * {@link X402Flow} signs, for a seller reading what the payer sent.
  *
  * @throws {@link X402Error} if the header is missing or not valid base64 JSON.
  */

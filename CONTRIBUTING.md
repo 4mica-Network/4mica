@@ -43,12 +43,6 @@ This is a pnpm + Turbo monorepo.
 │   └── dashboard            # Vite + React dashboard (manage agents, txns, whitelist)
 ├── packages
 │   ├── sdk                  # @4mica/sdk — universal x402 payment SDK
-│   ├── sdk-node             # Node adapter (createClient, reads 4MICA_* env)
-│   ├── sdk-express          # Express paywall middleware
-│   ├── sdk-hono             # Hono paywall middleware
-│   ├── sdk-next             # Next.js App Router paywall helper
-│   ├── sdk-bun / sdk-deno   # Runtime adapters
-│   ├── sdk-nuxt / -remix / -sveltekit  # Framework adapters (coming soon)
 │   ├── cli                  # @4mica/cli — the `4mica` scaffolding CLI
 │   ├── ui                   # @4mica/ui — shared React component library
 │   ├── tailwind-config      # Shared Tailwind v4 preset + tokens
@@ -86,7 +80,7 @@ pnpm --filter @4mica/sdk test
 ## Developing the SDK
 
 The `examples/` apps double as the SDK's local test harness — edit
-`packages/sdk` (or an adapter) and watch the change flow into a running example.
+`packages/sdk` and watch the change flow into a running example.
 `turbo`'s `...` selector runs a package **plus its dependencies**:
 
 ```bash
@@ -115,7 +109,7 @@ Or link it globally so you can use the real `4mica` command:
 ```bash
 cd packages/cli && pnpm link --global
 4mica                                       # interactive
-4mica init my-app --type seller --framework hono --yes --no-install
+4mica init my-app --type seller --framework express --yes --no-install
 # later: pnpm uninstall --global @4mica/cli
 ```
 
@@ -125,10 +119,9 @@ rewrite scaffolded dependencies) via a `prebuild` step.
 
 ### Testing a scaffolded project end-to-end
 
-A **standalone** scaffold rewrites deps to published semver (`^1.3.0`). Until the
-SDK adapters are published to npm, install those standalone projects only after a
-release — for local testing, scaffold **inside the repo** so `workspace:*` links
-the local packages:
+A **standalone** scaffold rewrites deps to published semver (`^1.3.0`), so
+install those standalone projects only after a release — for local testing,
+scaffold **inside the repo** so `workspace:*` links the local packages:
 
 ```bash
 # Seller (terminal 1)
@@ -183,16 +176,14 @@ and `pnpm test`, so both must pass to commit. For editor setup, see the
 
 ## Changesets & releases
 
-For any change to a published package (SDK, adapters, or the CLI), add a
+For any change to a published package (the SDK, `@4mica/x402`, or the CLI), add a
 changeset describing the change:
 
 ```bash
 pnpm changeset
 ```
 
-- The SDK packages (`@4mica/sdk`, `sdk-node`, `sdk-express`, `sdk-hono`,
-  `sdk-next`, …) version together as a **fixed** group.
-- `@4mica/cli` versions **independently**.
+- Each package versions **independently**.
 - `apps/dashboard` and other `private` packages are not published, so they don't
   need a changeset.
 

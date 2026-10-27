@@ -20,6 +20,7 @@ const SELLER_URL = resolveSellerUrl();
 
 type X402PaymentRequired = {
   x402Version: number;
+  resource: Record<string, unknown>;
   accepts: Array<{
     scheme: string;
     network: string;
@@ -30,9 +31,8 @@ type X402PaymentRequired = {
   }>;
 };
 
-function demoPaymentHeader(
-  requirement: X402PaymentRequired["accepts"][number],
-) {
+function demoPaymentHeader(required: X402PaymentRequired) {
+  const requirement = required.accepts[0];
   // Mint a random 32-byte req_id — uniqueness is all core asks of it.
   const reqIdBytes = new Uint8Array(32);
   crypto.getRandomValues(reqIdBytes);
@@ -40,9 +40,9 @@ function demoPaymentHeader(
     b.toString(16).padStart(2, "0"),
   ).join("")}`;
   const envelope = {
-    x402Version: 1,
-    scheme: requirement.scheme,
-    network: requirement.network,
+    x402Version: 2,
+    accepted: requirement,
+    resource: required.resource,
     payload: {
       payload: {
         version: "v1",
@@ -66,20 +66,26 @@ async function main() {
   const first = await fetch(SELLER_URL);
   console.log(`[buyer] GET ${SELLER_URL} → ${first.status}`);
   if (first.status !== 402) {
-    console.log("[buyer] unexpected: not paywalled?", await first.text());
+    console.log("[buyer] unexpected: no payment asked for", await first.text());
     return;
   }
-  const required = (await first.json()) as X402PaymentRequired;
-  const requirement = required.accepts[0];
-  console.log("[buyer] payment required:", requirement);
+  // x402 v2 carries the requirements in a base64 `PAYMENT-REQUIRED` header.
+  const required = JSON.parse(
+    Buffer.from(first.headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString(
+      "utf8",
+    ),
+  ) as X402PaymentRequired;
+  console.log("[buyer] payment required:", required.accepts[0]);
 
-  const header = demoPaymentHeader(requirement);
+  const header = demoPaymentHeader(required);
 
-  const paid = await fetch(SELLER_URL, { headers: { "X-PAYMENT": header } });
+  const paid = await fetch(SELLER_URL, {
+    headers: { "PAYMENT-SIGNATURE": header },
+  });
   console.log(`[buyer] GET ${SELLER_URL} (paid) → ${paid.status}`);
   console.log(
-    "[buyer] X-PAYMENT-RESPONSE:",
-    paid.headers.get("X-PAYMENT-RESPONSE"),
+    "[buyer] PAYMENT-RESPONSE:",
+    paid.headers.get("PAYMENT-RESPONSE"),
   );
   console.log("[buyer] body:", await paid.json());
 }

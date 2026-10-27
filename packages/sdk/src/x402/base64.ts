@@ -2,8 +2,8 @@
  * Edge-safe base64 helpers.
  *
  * Uses only Web-standard `atob`/`btoa` + `TextEncoder`/`TextDecoder`, which are
- * available on Node (>=16), Bun, Deno, browsers, and edge/worker runtimes — so
- * the server paywall path never depends on Node's `Buffer`.
+ * available on Node (>=16), Bun, Deno, browsers, and edge/worker runtimes, so
+ * encoding a payment header never depends on Node's `Buffer`.
  */
 
 export function base64ToBytes(b64: string): Uint8Array {

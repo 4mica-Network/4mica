@@ -12,13 +12,13 @@ import { X402Error } from "@/errors";
 import type { PaymentRequest, PaymentRequestPayload } from "@/models";
 import type { FetchFn } from "@/rpc";
 import { isRecord } from "@/serde";
-import { utf8ToBase64 } from "@/server/base64";
 import {
   normalizeAddress,
   parseU256,
   ValidationError,
   validateUrl,
 } from "@/utils";
+import { utf8ToBase64 } from "@/x402/base64";
 import {
   type PaymentRequirements,
   PaymentRequirementsV1,
@@ -34,6 +34,7 @@ import {
   type X402SignedPayment,
 } from "@/x402/models";
 
+export { parsePaymentHeader } from "@/x402/envelope";
 export * from "@/x402/models";
 
 /**

@@ -12,7 +12,7 @@ import {
 import { ConfigError, InvalidParamsError, X402Error } from "@/errors";
 import type { FetchFn } from "@/http";
 import { PaymentRequestPayload } from "@/models";
-import { utf8ToBase64 } from "@/server/base64";
+import { utf8ToBase64 } from "@/x402/base64";
 
 const API_KEY = "4mica_sk_test";
 

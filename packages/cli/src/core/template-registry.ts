@@ -4,8 +4,8 @@ import type { InitOptions, TemplateMeta } from "../types.js";
  * Resolve the concrete template directory + metadata for a scaffold request.
  *
  * - agent  → seller-agent (Express) or buyer-agent (Node), by trading role
- * - seller → paywalled API by framework (express | hono | next)
- * - buyer  → x402 client targeting a seller of the chosen framework
+ * - seller → an Express API that charges over x402
+ * - buyer  → x402 client targeting that seller
  */
 export function resolveTemplate(opts: InitOptions): TemplateMeta {
   if (opts.type === "agent") {
@@ -18,7 +18,7 @@ export function resolveTemplate(opts: InitOptions): TemplateMeta {
           tmpfile: "4mica-agent.url",
           runScript: "dev",
           description:
-            "Trading seller agent: sells information, paywalls the " +
+            "Trading seller agent: sells information, charges for the " +
             "premium result with dynamic per-request pricing",
         }
       : {
@@ -34,8 +34,6 @@ export function resolveTemplate(opts: InitOptions): TemplateMeta {
 
   const ports: Record<string, number> = {
     express: 3000,
-    hono: 3001,
-    next: 3002,
   };
 
   // seller and buyer of the same framework share a handshake file + port so a
@@ -48,7 +46,7 @@ export function resolveTemplate(opts: InitOptions): TemplateMeta {
       port: ports[opts.framework],
       tmpfile,
       runScript: "dev",
-      description: `Seller (recipient): gate a ${opts.framework} route behind a 4Mica x402 paywall`,
+      description: `Seller (recipient): charge for a ${opts.framework} route over x402`,
     };
   }
 

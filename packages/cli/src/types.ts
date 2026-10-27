@@ -1,7 +1,7 @@
 export type BuildType = "agent" | "seller" | "buyer";
 
 /** For agents this is the trading role; for seller/buyer it is the web framework. */
-export type Framework = "express" | "hono" | "next";
+export type Framework = "express";
 export type AgentRole = "seller" | "buyer";
 
 export type PackageManager = "pnpm" | "npm" | "yarn" | "bun";
