@@ -117,7 +117,7 @@ import { Client, ConfigBuilder } from '@4mica/sdk';
 
 async function main() {
   const cfg = new ConfigBuilder()
-    .network('base') // or "ethereum-sepolia" (default)
+    .network('base-sepolia') // the default; or "base"
     .walletPrivateKey('0x...')
     .build();
 

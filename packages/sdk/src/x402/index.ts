@@ -185,16 +185,18 @@ export class X402Flow {
       throw new X402Error(err instanceof Error ? err.message : String(err));
     }
     const text = await response.text();
+    // Before parsing: a request the facilitator cannot read is answered in
+    // plain text, and its status says more than a JSON parse error would.
+    if (!response.ok) {
+      throw new X402Error(
+        `settlement failed with status ${response.status}: ${text}`,
+      );
+    }
     let settlement: unknown;
     try {
       settlement = text ? JSON.parse(text) : {};
     } catch (err) {
       throw new X402Error(`settlement response invalid JSON: ${String(err)}`);
-    }
-    if (!response.ok) {
-      throw new X402Error(
-        `settlement failed with status ${response.status}: ${text}`,
-      );
     }
     return { payment, settlement: SettlementReceipt.fromRaw(settlement) };
   }

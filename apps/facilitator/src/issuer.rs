@@ -86,7 +86,11 @@ impl From<ApiClientError> for IssueError {
                 message,
                 original_code: code,
                 details,
-                refused: status.is_client_error() && status != StatusCode::TOO_MANY_REQUESTS,
+                // A 401 rejects this facilitator's own credentials, not the payer's request. Not
+                // 403: core answers a suspended payer with it.
+                refused: status.is_client_error()
+                    && status != StatusCode::TOO_MANY_REQUESTS
+                    && status != StatusCode::UNAUTHORIZED,
             },
             other => Self::unavailable(format!("could not reach core: {other}")),
         }
