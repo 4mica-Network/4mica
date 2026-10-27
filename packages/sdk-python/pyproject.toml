@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sdk-4mica"
-version = "2.0.0a1"
+version = "2.0.0"
 description = "4Mica Python SDK — payment guarantees and settlement-cycle clearing for the agentic economy"
 readme = "README.md"
 license = { file = "LICENSE" }

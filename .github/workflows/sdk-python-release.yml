@@ -2,10 +2,6 @@ name: Python SDK Release
 
 # Dispatch-only, like every release workflow in this repo. Publishes
 # packages/sdk-python to PyPI via trusted publishing (no token secret).
-#
-# Until the facilitator's Python x402 package (4mica-x402) is updated for SDK
-# 2.0, publish only PEP 440 pre-releases (2.0.0aN): its open `sdk-4mica>=1.2.4`
-# range would resolve a stable 2.0.0 and break against the removed tab API.
 on:
   workflow_dispatch:
 
