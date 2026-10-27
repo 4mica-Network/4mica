@@ -23,11 +23,16 @@ const AMOUNT = 1000n;
 const TX_HASH = `0x${"cd".repeat(32)}`;
 
 const success = (extra: Record<string, unknown> = {}) => ({
-  json: { success: true, txHash: TX_HASH, ...extra },
+  json: { success: true, transaction: TX_HASH, ...extra },
 });
 
 const rejection = (code: string) => ({
-  json: { success: false, errorCode: code, error: code.toLowerCase() },
+  json: {
+    success: false,
+    errorReason: code,
+    errorMessage: code.replaceAll("_", " "),
+    extra: { retryable: false },
+  },
 });
 
 const withdrawClient = (
@@ -102,7 +107,7 @@ describe("gasless withdrawals", () => {
       }) as never,
     };
     const client = withdrawClient(
-      () => rejection("NO_RELAYER_AVAILABLE"),
+      () => rejection("no_relayer_available"),
       gateway,
     );
 
@@ -113,13 +118,13 @@ describe("gasless withdrawals", () => {
   });
 
   it("does not retry a rejection that names the request", async () => {
-    const client = withdrawClient(() => rejection("NONCE_ALREADY_USED"));
+    const client = withdrawClient(() => rejection("nonce_already_used"));
     const failure = await client
       .request(TOKEN_ADDRESS, AMOUNT)
       .send()
       .catch((err) => err);
     expect(failure).toBeInstanceOf(FacilitatorRejectedError);
-    expect(failure.code).toBe("NONCE_ALREADY_USED");
+    expect(failure.code).toBe("nonce_already_used");
   });
 
   it("does not retry an unknown outcome", async () => {
@@ -206,8 +211,9 @@ describe("gasless withdrawals", () => {
     const client = withdrawClient(() => ({
       json: {
         isValid: false,
-        invalidReason: "grace period not elapsed",
-        errorCode: "SIMULATION_REVERTED",
+        invalidReason: "simulation_reverted",
+        invalidMessage: "grace period not elapsed",
+        extra: { retryable: false },
       },
     }));
     const failure = await client
@@ -216,7 +222,7 @@ describe("gasless withdrawals", () => {
       .verify()
       .catch((err) => err);
     expect(failure).toBeInstanceOf(FacilitatorRejectedError);
-    expect(failure.code).toBe("SIMULATION_REVERTED");
+    expect(failure.code).toBe("simulation_reverted");
     expect(failure.message).toMatch(/grace period not elapsed/);
   });
 });

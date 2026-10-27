@@ -6,14 +6,12 @@ This demo shows how to use `4mica-x402` to protect an API endpoint with 4mica pa
 
 1. **Install dependencies**
 
-From the `packages/python/x402` directory:
+From the `demo` directory (the local package paths in `requirements.txt` are
+relative to it), with Python 3.10 or later:
 
 ```bash
-python -m pip install -r demo/requirements.txt
+python -m pip install -r requirements.txt
 ```
-
-If the local x402 path in `demo/requirements.txt` does not match your machine,
-update the `-e /path/to/x402` line.
 
 2. **Configure environment variables**
 

@@ -2,173 +2,100 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FourMicaFacilitatorClient } from '../src/server/facilitator.js'
 
+const REQUIREMENTS = {
+  scheme: '4mica-credit',
+  network: 'eip155:84532',
+  asset: '0x2222222222222222222222222222222222222222',
+  amount: '10',
+  payTo: '0x1111111111111111111111111111111111111111',
+}
+const PAYLOAD = {
+  x402Version: 2,
+  accepted: REQUIREMENTS,
+  payload: { payload: { version: 'v1' }, signature: '0x1234' },
+}
+const RECEIPT = { receipt: `0x${'11'.repeat(32)}`, signature: `0x${'22'.repeat(65)}` }
+
+function respondWith(body: unknown, status = 200) {
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    })
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+function settle() {
+  return new FourMicaFacilitatorClient({ url: 'https://facilitator.example' }).settle(
+    PAYLOAD as never,
+    REQUIREMENTS as never
+  )
+}
+
 describe('FourMicaFacilitatorClient', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
-  it('normalizes 4mica settle responses and preserves certificate fields', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          txHash: '0xdeadbeef',
-          networkId: 'eip155:11155111',
-          certificate: {
-            claims: '0x' + '11'.repeat(32),
-            signature: '0x' + '22'.repeat(96),
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }
-      )
-    )
-
-    vi.stubGlobal('fetch', fetchMock)
-
-    const client = new FourMicaFacilitatorClient({ url: 'https://facilitator.example' })
-
-    const result = await client.settle(
-      {
-        x402Version: 2,
-        accepted: {
-          scheme: '4mica-credit',
-          network: 'eip155:11155111',
-          asset: '0x2222222222222222222222222222222222222222',
-          amount: '10',
-          payTo: '0x1111111111111111111111111111111111111111',
-        },
-        payload: {
-          claims: {
-            version: 'v2',
-          },
-          signature: '0x1234',
-          scheme: 'eip712',
-        },
-      } as never,
-      {
-        scheme: '4mica-credit',
-        network: 'eip155:11155111',
-        asset: '0x2222222222222222222222222222222222222222',
-        amount: '10',
-        payTo: '0x1111111111111111111111111111111111111111',
-      } as never
-    )
-
-    expect(result.success).toBe(true)
-    expect(result.transaction).toBe('0xdeadbeef')
-    expect(result.network).toBe('eip155:11155111')
-    expect(result.txHash).toBe('0xdeadbeef')
-    expect(result.networkId).toBe('eip155:11155111')
-    expect(result.certificate).toEqual({
-      claims: '0x' + '11'.repeat(32),
-      signature: '0x' + '22'.repeat(96),
+  it('lifts the guarantee receipt out of extra', async () => {
+    const fetchMock = respondWith({
+      success: true,
+      payer: '0x9999999999999999999999999999999999999999',
+      transaction: '',
+      network: 'eip155:84532',
+      extra: { receipt: RECEIPT },
     })
 
-    const request = fetchMock.mock.calls[0]?.[1]
-    expect(typeof request?.body).toBe('string')
-    expect(String(request?.body)).toContain('"x402Version":2')
-    expect(String(request?.body)).toContain('"version":"v2"')
-  })
-
-  it('normalizes alias fields when the facilitator omits txHash/networkId', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          transactionHash: '0xabc123',
-          network: 'eip155:80002',
-          user_address: '0x9999999999999999999999999999999999999999',
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }
-      )
-    )
-
-    vi.stubGlobal('fetch', fetchMock)
-
-    const client = new FourMicaFacilitatorClient({ url: 'https://facilitator.example' })
-    const result = await client.settle(
-      {
-        x402Version: 2,
-        accepted: {
-          scheme: '4mica-credit',
-          network: 'eip155:80002',
-          asset: '0x2222222222222222222222222222222222222222',
-          amount: '10',
-          payTo: '0x1111111111111111111111111111111111111111',
-        },
-        payload: {
-          claims: { version: 'v2' },
-          signature: '0x1234',
-          scheme: 'eip712',
-        },
-      } as never,
-      {
-        scheme: '4mica-credit',
-        network: 'eip155:80002',
-        asset: '0x2222222222222222222222222222222222222222',
-        amount: '10',
-        payTo: '0x1111111111111111111111111111111111111111',
-      } as never
-    )
+    const result = await settle()
 
     expect(result.success).toBe(true)
-    expect(result.transaction).toBe('0xabc123')
-    expect(result.txHash).toBe('0xabc123')
-    expect(result.network).toBe('eip155:80002')
-    expect(result.networkId).toBe('eip155:80002')
+    expect(result.transaction).toBe('')
+    expect(result.network).toBe('eip155:84532')
     expect(result.payer).toBe('0x9999999999999999999999999999999999999999')
+    expect(result.receipt).toEqual(RECEIPT)
+
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body)
+    expect(body).toContain('"x402Version":2')
+    expect(body).toContain('"version":"v1"')
   })
 
-  it('surfaces facilitator errors using normalized reasons', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: false,
-          error_reason: 'unsupported x402Version 2',
-        }),
-        {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }
-      )
-    )
+  it('leaves receipt empty when extra carries none, or a BLS-shaped one', async () => {
+    respondWith({ success: true, transaction: '', network: 'eip155:84532' })
+    expect((await settle()).receipt).toBeUndefined()
 
-    vi.stubGlobal('fetch', fetchMock)
+    respondWith({
+      success: true,
+      transaction: '',
+      network: 'eip155:84532',
+      extra: { receipt: { claims: '0xaa', signature: '0xbb' } },
+    })
+    expect((await settle()).receipt).toBeUndefined()
+  })
 
-    const client = new FourMicaFacilitatorClient({ url: 'https://facilitator.example' })
+  it('returns a refusal whole, extra included', async () => {
+    respondWith({
+      success: false,
+      errorReason: 'invalid_4mica_credit_checkpoint_required',
+      errorMessage: 'checkpoint required',
+      transaction: '',
+      network: 'eip155:84532',
+      extra: { retryable: false, details: { uncheckpointed: 64 } },
+    })
 
-    await expect(
-      client.settle(
-        {
-          x402Version: 2,
-          accepted: {
-            scheme: '4mica-credit',
-            network: 'eip155:11155111',
-            asset: '0x2222222222222222222222222222222222222222',
-            amount: '10',
-            payTo: '0x1111111111111111111111111111111111111111',
-          },
-          payload: {
-            claims: { version: 'v2' },
-            signature: '0x1234',
-            scheme: 'eip712',
-          },
-        } as never,
-        {
-          scheme: '4mica-credit',
-          network: 'eip155:11155111',
-          asset: '0x2222222222222222222222222222222222222222',
-          amount: '10',
-          payTo: '0x1111111111111111111111111111111111111111',
-        } as never
-      )
-    ).rejects.toThrow('unsupported x402Version 2')
+    const result = await settle()
+
+    expect(result.success).toBe(false)
+    expect(result.errorReason).toBe('invalid_4mica_credit_checkpoint_required')
+    expect(result.errorMessage).toBe('checkpoint required')
+    expect(result.extra).toEqual({ retryable: false, details: { uncheckpointed: 64 } })
+    expect(result.receipt).toBeUndefined()
+  })
+
+  it('throws on a non-200 response', async () => {
+    respondWith('unsupported x402Version 3', 422)
+    await expect(settle()).rejects.toThrow('unsupported x402Version 3')
   })
 })

@@ -25,15 +25,15 @@ class NetworkInfo:
 NETWORKS: dict[str, NetworkInfo] = {
     "base": NetworkInfo(
         caip2="eip155:8453",
-        rpc_url="https://base.api.4mica.xyz/",
+        rpc_url="https://base.api.4mica.io/",
     ),
     "base-sepolia": NetworkInfo(
         caip2="eip155:84532",
-        rpc_url="https://base.sepolia.api.4mica.xyz/",
+        rpc_url="https://base.sepolia.api.4mica.io/",
     ),
     "ethereum-sepolia": NetworkInfo(
         caip2="eip155:11155111",
-        rpc_url="https://ethereum.sepolia.api.4mica.xyz/",
+        rpc_url="https://ethereum.sepolia.api.4mica.io/",
     ),
 }
 

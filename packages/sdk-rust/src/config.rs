@@ -11,7 +11,7 @@ use crate::{
 };
 
 const DEFAULT_AUTH_REFRESH_MARGIN_SECS: u64 = 60;
-const DEFAULT_RPC_URL: &str = "https://base.sepolia.api.4mica.xyz/";
+const DEFAULT_RPC_URL: &str = "https://base.sepolia.api.4mica.io/";
 
 /// A network this SDK has a default core endpoint for. Parses from the shorthand (`"base"`) or
 /// the CAIP-2 id (`"eip155:8453"`).
@@ -33,9 +33,9 @@ impl Network {
 
     pub fn rpc_url(&self) -> &'static str {
         match self {
-            Self::Base => "https://base.api.4mica.xyz/",
-            Self::BaseSepolia => "https://base.sepolia.api.4mica.xyz/",
-            Self::EthereumSepolia => "https://ethereum.sepolia.api.4mica.xyz/",
+            Self::Base => "https://base.api.4mica.io/",
+            Self::BaseSepolia => "https://base.sepolia.api.4mica.io/",
+            Self::EthereumSepolia => "https://ethereum.sepolia.api.4mica.io/",
         }
     }
 }
@@ -322,7 +322,7 @@ mod tests {
     const VALID_PRIVATE_KEY: &str =
         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
     const VALID_ADDRESS: &str = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-    const VALID_RPC_URL: &str = "http://api.4mica.xyz/";
+    const VALID_RPC_URL: &str = "http://base.sepolia.api.4mica.io/";
     const VALID_ETH_RPC_URL: &str = "http://localhost:8545/";
 
     fn valid_signer() -> PrivateKeySigner {
@@ -413,7 +413,7 @@ mod tests {
 
         assert_eq!(
             builder.rpc_url,
-            Some("https://base.api.4mica.xyz/".to_string())
+            Some("https://base.api.4mica.io/".to_string())
         );
         assert_eq!("eip155:8453".parse::<Network>().unwrap(), Network::Base);
         assert_eq!("base".parse::<Network>().unwrap(), Network::Base);
@@ -599,6 +599,6 @@ mod tests {
             std::env::remove_var("4MICA_RPC_URL");
         }
 
-        assert_eq!(config.rpc_url.as_str(), "https://base.api.4mica.xyz/");
+        assert_eq!(config.rpc_url.as_str(), "https://base.api.4mica.io/");
     }
 }

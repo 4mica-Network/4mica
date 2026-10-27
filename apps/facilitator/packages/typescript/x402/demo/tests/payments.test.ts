@@ -34,7 +34,7 @@ const CREDIT_ENTRY: PaymentRequirements = {
   amount: '1000000',
   payTo: PAY_TO,
   maxTimeoutSeconds: UPTO_MAX_TIMEOUT_SECONDS,
-  extra: { name: '4Mica', version: '1', verifyingContract: `0x${'1'.repeat(40)}` },
+  extra: {},
 }
 
 const RESOURCE = {
@@ -52,7 +52,7 @@ function signedPayload(): PaymentPayload {
     x402Version: 2,
     resource: RESOURCE,
     accepted: CREDIT_ENTRY,
-    payload: { scheme: 'eip712', claims: { req_id: '1' }, signature: '0xsig' },
+    payload: { payload: { version: 'v1', req_id: '0x1' }, signature: '0xsig' },
   }
 }
 
@@ -126,20 +126,20 @@ describe('readPaymentPayload', () => {
 })
 
 describe('payerOf', () => {
-  it('reads the buyer from the signed claims, checksummed', () => {
+  it('reads the buyer from the signed request, checksummed', () => {
     const payload = signedPayload()
     payload.payload = {
       ...payload.payload,
-      claims: { req_id: '1', user_address: '0x5ef6a28a5686df09592b1a1e43fd0ba5ee3b6a88' },
+      payload: { req_id: '0x1', user_address: '0x5ef6a28a5686df09592b1a1e43fd0ba5ee3b6a88' },
     }
     expect(payerOf(payload)).toBe('0x5Ef6a28a5686Df09592B1A1E43FD0BA5Ee3B6a88')
   })
 
   it('accepts the camel-case spelling and rejects anything that is not an address', () => {
     const payload = signedPayload()
-    payload.payload = { ...payload.payload, claims: { userAddress: `0x${'a'.repeat(40)}` } }
+    payload.payload = { ...payload.payload, payload: { userAddress: `0x${'a'.repeat(40)}` } }
     expect(payerOf(payload)?.toLowerCase()).toBe(`0x${'a'.repeat(40)}`)
-    payload.payload = { ...payload.payload, claims: { user_address: 'not-an-address' } }
+    payload.payload = { ...payload.payload, payload: { user_address: 'not-an-address' } }
     expect(payerOf(payload)).toBeUndefined()
     expect(payerOf(signedPayload())).toBeUndefined()
   })
@@ -206,7 +206,7 @@ describe('HTTP shapes', () => {
     })
   })
 
-  it('puts the receipt in the payment-refund header without the certificate', () => {
+  it('puts the refund in the payment-refund header without the guarantee receipt', () => {
     const settlement = { success: true, transaction: '', network: NETWORK }
     const receipt = { amount: '900000', from: PAY_TO, to: '0xpayer', settlement }
     expect(REFUND_HEADER).toBe('payment-refund')

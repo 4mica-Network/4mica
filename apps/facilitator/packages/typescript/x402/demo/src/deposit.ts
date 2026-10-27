@@ -15,7 +15,7 @@ const NETWORK = process.env.NETWORK || 'eip155:84532'
 const CORE_URL = process.env.CORE_URL
 // The facilitator sponsors the deposit's gas: one signature, no ETH needed. Set
 // FACILITATOR_URL to an empty string to deposit self-funded from a wallet that holds gas.
-const FACILITATOR_URL = process.env.FACILITATOR_URL ?? 'https://x402.4mica.xyz'
+const FACILITATOR_URL = process.env.FACILITATOR_URL ?? 'https://testnet.payment.4mica.io'
 // In whole tokens (e.g. "2" = 2 USDC); converted with the decimals core reports.
 const DEPOSIT_AMOUNT = process.env.DEPOSIT_AMOUNT || '2'
 const SYMBOL = 'USDC'

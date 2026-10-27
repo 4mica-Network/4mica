@@ -18,15 +18,32 @@ export class FourMicaError extends Error {
 /** Thrown when the SDK configuration is invalid (e.g. missing required fields or bad URL). */
 export class ConfigError extends FourMicaError {}
 
-/** Thrown when a 4Mica core RPC call fails. Includes the HTTP status and raw response body. */
+/**
+ * Thrown when a 4Mica core RPC call fails. Includes the HTTP status and raw
+ * response body. `code` and `details` are what core attached to a coded
+ * refusal — stable across message wording changes, so branch on `code`
+ * rather than the text.
+ */
 export class RpcError extends FourMicaError {
   readonly status?: number;
   readonly body?: unknown;
+  readonly code?: string;
+  readonly details?: unknown;
 
-  constructor(message: string, options?: { status?: number; body?: unknown }) {
+  constructor(
+    message: string,
+    options?: {
+      status?: number;
+      body?: unknown;
+      code?: string;
+      details?: unknown;
+    },
+  ) {
     super(message);
     this.status = options?.status;
     this.body = options?.body;
+    this.code = options?.code;
+    this.details = options?.details;
   }
 }
 
@@ -112,41 +129,218 @@ export class PaymentError extends FourMicaError {}
 /** Thrown when payment signing fails. */
 export class SigningError extends PaymentError {}
 
-/** Thrown when the signer address does not equal `claims.userAddress`. */
+/** The payload's payer is not a valid address. */
+export class InvalidPayerAddressError extends PaymentError {
+  constructor() {
+    super("payer address is not a valid address");
+  }
+}
+
+/** The signer was asked to sign for a payer other than itself. */
 export class AddressMismatchError extends PaymentError {
   readonly signer: string;
-  readonly claimsUser: string;
+  readonly payer: string;
 
-  constructor(signer: string, claimsUser: string) {
-    super(
-      `address mismatch: signer ${signer} != claims.user_address ${claimsUser}`,
-    );
+  constructor(signer: string, payer: string) {
+    super(`signer ${signer} cannot sign for payer ${payer}`);
     this.signer = signer;
-    this.claimsUser = claimsUser;
+    this.payer = payer;
   }
 }
 
-/** Thrown when a BLS certificate cannot be decoded or verified structurally. */
-export class InvalidCertificateError extends PaymentError {}
+/**
+ * A guarantee receipt that does not decode: not hex, too short, an unknown
+ * layout, or a payload that is not its layout.
+ */
+export class MalformedReceiptError extends PaymentError {}
 
-/** Thrown when a certificate's BLS signature does not verify. */
-export class CertificateMismatchError extends PaymentError {}
+/** A guarantee receipt whose signature is not a readable ECDSA signature. */
+export class UnreadableReceiptSignatureError extends PaymentError {}
 
-/** Thrown when a certificate's domain separator is not the expected one. */
-export class GuaranteeDomainMismatchError extends PaymentError {}
+/** A guarantee receipt signed by someone other than the operator. */
+export class ReceiptSignerMismatchError extends PaymentError {
+  readonly expected: string;
+  readonly recovered: string;
 
-/** Thrown for a guarantee claims version this client has no domain for. */
-export class UnsupportedGuaranteeVersionError extends PaymentError {
-  readonly version: number;
-
-  constructor(version: number) {
-    super(`unsupported guarantee version: ${version}`);
-    this.version = version;
+  constructor(expected: string, recovered: string) {
+    super(
+      `guarantee receipt was signed by ${recovered}, not by the operator ${expected}`,
+    );
+    this.expected = expected;
+    this.recovered = recovered;
   }
 }
 
-/** Thrown when BLS material or guarantee claims bytes cannot be decoded. */
-export class VerificationError extends FourMicaError {}
+/**
+ * Core's checkpoint batch failed a check, so it was not signed: an operator
+ * that slipped in a payment the payer never made would inflate what the payer
+ * can be charged on default.
+ */
+export class UntrustedCheckpointBatchError extends PaymentError {
+  readonly reason: string;
+
+  constructor(reason: string) {
+    super(`refusing to sign a checkpoint over core's batch: ${reason}`);
+    this.reason = reason;
+  }
+}
+
+/**
+ * A coded refusal from core, carrying the decoded `details` the caller needs
+ * to act on. An {@link RpcError}, so handlers written against core's plain
+ * errors keep catching it.
+ */
+export class CoreRefusalError<D = unknown> extends RpcError {
+  declare readonly details: D;
+
+  constructor(
+    message: string,
+    details: D,
+    options?: { status?: number; body?: unknown; code?: string },
+  ) {
+    super(message, { ...options, details });
+  }
+}
+
+type RefusalOptions = { status?: number; body?: unknown; code?: string };
+
+/**
+ * `CHECKPOINT_REQUIRED`: the payer holds too many guarantees past its latest
+ * checkpoint. Submit one and retry.
+ */
+export class CheckpointRequiredError extends CoreRefusalError<{
+  payer: string;
+  uncheckpointed: number;
+  maxUncheckpointed: number;
+  cycleId: string;
+  cycleIdText: string;
+  assetAddress: string;
+}> {
+  constructor(
+    details: CheckpointRequiredError["details"],
+    options?: RefusalOptions,
+  ) {
+    super(
+      `payer ${details.payer} has ${details.uncheckpointed} uncheckpointed ` +
+        `guarantees (max ${details.maxUncheckpointed}); submit a checkpoint and retry`,
+      details,
+      options,
+    );
+  }
+}
+
+/**
+ * `CHECKPOINT_MISMATCH`: the checkpoint no longer matches what core holds.
+ * Re-read the batch and sign again.
+ */
+export class CheckpointMismatchError extends CoreRefusalError<{
+  cycleId: string;
+  cycleIdText: string;
+  assetAddress: string;
+  payer: string;
+}> {
+  readonly reason: string;
+
+  constructor(
+    details: CheckpointMismatchError["details"],
+    reason: string,
+    options?: RefusalOptions,
+  ) {
+    super(
+      `checkpoint for cycle ${details.cycleId} no longer matches what core holds: ${reason}`,
+      details,
+      options,
+    );
+    this.reason = reason;
+  }
+}
+
+/** `CYCLE_MISMATCH`: signed for a cycle other than the active one. */
+export class CycleMismatchError extends CoreRefusalError<{
+  signedCycleId: string;
+  activeCycleId: string;
+  activeCycleIdText: string;
+  activePeriodEnd: number;
+  serverTime: number;
+}> {
+  constructor(
+    details: CycleMismatchError["details"],
+    options?: RefusalOptions,
+  ) {
+    super(
+      `payment was signed for cycle ${details.signedCycleId} but the active ` +
+        `cycle is ${details.activeCycleId}`,
+      details,
+      options,
+    );
+  }
+}
+
+/** `FUTURE_TIMESTAMP`: stamped later than core's clock. */
+export class FutureTimestampError extends CoreRefusalError<{
+  timestamp: number;
+  serverTime: number;
+}> {
+  constructor(
+    details: FutureTimestampError["details"],
+    options?: RefusalOptions,
+  ) {
+    super(
+      `payment timestamp ${details.timestamp} is later than core's clock ${details.serverTime}`,
+      details,
+      options,
+    );
+  }
+}
+
+/** `STALE_TIMESTAMP`: stamped before the active cycle opened. */
+export class StaleTimestampError extends CoreRefusalError<{
+  cycleId: string;
+  cycleIdText: string;
+  timestamp: number;
+  periodStart: number;
+  periodEnd: number;
+  serverTime: number;
+}> {
+  constructor(
+    details: StaleTimestampError["details"],
+    options?: RefusalOptions,
+  ) {
+    super(
+      `payment timestamp ${details.timestamp} is before cycle ${details.cycleId} ` +
+        `opened at ${details.periodStart}`,
+      details,
+      options,
+    );
+  }
+}
+
+/**
+ * `TIMESTAMP_NOT_PAST_CUTOFF`: stamped at or before the payer's latest
+ * checkpoint cutoff.
+ */
+export class TimestampNotPastCutoffError extends CoreRefusalError<{
+  cycleId: string;
+  cycleIdText: string;
+  assetAddress: string;
+  payer: string;
+  timestamp: number;
+  timestampCutoff: number;
+  cumulativeGross: bigint;
+  serverTime: number;
+}> {
+  constructor(
+    details: TimestampNotPastCutoffError["details"],
+    options?: RefusalOptions,
+  ) {
+    super(
+      `payment timestamp ${details.timestamp} is not past the payer's ` +
+        `checkpoint cutoff ${details.timestampCutoff}`,
+      details,
+      options,
+    );
+  }
+}
 
 // --- on-chain -----------------------------------------------------------
 
@@ -200,16 +394,58 @@ export class UnsupportedAssetError extends ContractError {
   }
 }
 
-/** The stablecoin withdrawal delivered less than requested. */
-export class StablecoinWithdrawShortfallError extends ContractError {}
+/**
+ * The pool cannot pay this much out right now; its strategy holds the rest.
+ * Retry later, or withdraw `available` or less.
+ */
+export class InsufficientLiquidityError extends ContractError {
+  readonly asset: string;
+  readonly requested: bigint;
+  readonly available: bigint;
 
-/** Aave is not configured for this deployment. */
-export class AaveNotConfiguredError extends ContractError {}
+  constructor(asset: string, requested: bigint, available: bigint) {
+    super(
+      `insufficient liquidity in ${asset}: requested ${requested}, available ${available}`,
+    );
+    this.asset = asset;
+    this.requested = requested;
+    this.available = available;
+  }
+}
+
+/**
+ * The pool has shares outstanding but nothing backing them, so no deposit can
+ * be priced.
+ */
+export class PoolInsolventError extends ContractError {
+  readonly asset: string;
+
+  constructor(asset: string) {
+    super(`the ${asset} pool is insolvent`);
+    this.asset = asset;
+  }
+}
+
+/** The Treasury is not accepting deposits. */
+export class DepositsDisabledError extends ContractError {}
+
+/** The Treasury is not accepting deposits of this stablecoin. */
+export class StablecoinDepositsDisabledError extends ContractError {
+  readonly asset: string;
+
+  constructor(asset: string) {
+    super(`deposits of ${asset} are disabled`);
+    this.asset = asset;
+  }
+}
+
+/** The Treasury is paused. */
+export class PausedError extends ContractError {}
 
 /** The token delivered a different amount than expected (fee-on-transfer). */
 export class ValueMismatchError extends ContractError {}
 
-/** The deposit was too small to mint any scaled collateral. */
+/** The deposit was too small to mint any pool shares. */
 export class ZeroCollateralCreditError extends ContractError {}
 
 /** The signed authorization's `validBefore` has already passed. */
@@ -244,8 +480,8 @@ export class AuthorizationAlreadyUsedError extends ContractError {
   }
 }
 
-/** Escrow holds less scaled collateral than the operation needs. */
-export class EscrowScaledUnderflowError extends ContractError {}
+/** Escrow holds less than the operation needs. */
+export class EscrowUnderflowError extends ContractError {}
 
 // --- ClearingHouse ------------------------------------------------------
 

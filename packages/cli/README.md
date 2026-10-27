@@ -31,7 +31,7 @@ CI use:
 ```bash
 4mica init my-app \
   --type seller \        # agent | seller | buyer
-  --framework hono \     # express | hono | next   (seller/buyer)
+  --framework express \  # express                  (seller/buyer)
   --role seller \        # seller | buyer          (agent)
   --pm pnpm \            # pnpm | npm | yarn | bun
   --no-run \             # scaffold without starting the dev server
@@ -43,12 +43,14 @@ CI use:
 | Type | Frameworks | Based on |
 | --- | --- | --- |
 | Trading agent | seller (Express) · buyer (Node) | seller/buyer agents |
-| Paywalled API (seller) | Express · Hono · Next | x402 paywall |
-| Buyer client | Express · Hono · Next targets | x402 handshake |
+| Paid API (seller) | Express | `@4mica/x402` Express middleware |
+| Buyer client | targets the Express seller | x402 handshake |
 
-Every template runs in **demo mode** with a mock verifier. To go live, copy
-`.env.example` → `.env`, fill in your `4MICA_*` credentials, and swap the mock
-verifier for `createClient()` from `@4mica/sdk-node`.
+Every template runs in **demo mode**: sellers use a stand-in facilitator and
+buyers send a hand-built payment. To go live, a seller passes
+`new FourMicaFacilitatorClient()` from `@4mica/x402/server`, and a buyer fills
+in its `4MICA_*` credentials and pays through `@x402/fetch` with the
+`FourMicaEvmScheme` from `@4mica/x402/client`.
 
 ## Dashboard
 

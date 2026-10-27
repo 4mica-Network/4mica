@@ -8,7 +8,6 @@ const pkg = JSON.parse(
 export default defineConfig({
   entry: {
     index: "src/index.ts",
-    server: "src/server/index.ts",
     app: "src/app/index.ts",
   },
   outDir: "dist",
@@ -22,7 +21,6 @@ export default defineConfig({
   target: "es2022",
   external: [
     "viem",
-    "@noble/curves",
     "@quillai-network/wachai-validation-sdk",
     "@coinbase/cdp-sdk",
   ],

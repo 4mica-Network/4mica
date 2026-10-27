@@ -212,7 +212,7 @@ fn parse_network_list(
     let entries: Vec<NetworkEnvConfig> = serde_json::from_str(raw).with_context(|| {
         format!(
             "{ENV_NETWORKS} must be JSON like \
-        '[{{\"network\":\"eip155:11155111\",\"coreApiUrl\":\"https://api.4mica.xyz/\"}}]'"
+        '[{{\"network\":\"eip155:84532\",\"coreApiUrl\":\"https://base.sepolia.api.4mica.io/\"}}]'"
         )
     })?;
     if entries.is_empty() {

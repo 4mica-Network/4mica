@@ -8,13 +8,13 @@ import type {
   WalletClient,
 } from "viem";
 import type { clearingHouseAbi } from "@/abi/clearinghouse";
-import type { core4micaAbi } from "@/abi/core4mica";
+import type { treasuryAbi } from "@/abi/treasury";
 
 export type TPublicClient = ReturnType<typeof createPublicClient>;
 export type TWalletClient = WalletClient<HttpTransport, Chain, Account>;
 
 export type CoreContract = GetContractReturnType<
-  typeof core4micaAbi,
+  typeof treasuryAbi,
   {
     public: ReturnType<typeof createPublicClient>;
     wallet: TWalletClient;

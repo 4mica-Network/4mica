@@ -55,6 +55,9 @@ export const ReportPaymentSchema = v.object({
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(280))),
   ),
 
+  // The guarantee receipt core issued, under the names the API shipped with:
+  // `guaranteeClaims` is the receipt hex, `guaranteeSignature` the operator's
+  // 65-byte ECDSA signature over it.
   guaranteeClaims: v.optional(v.nullable(hexBlob)),
   guaranteeSignature: v.optional(v.nullable(hexBlob)),
   txHash: v.optional(v.nullable(hex32)),

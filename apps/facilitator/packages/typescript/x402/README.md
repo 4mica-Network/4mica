@@ -130,7 +130,7 @@ The recommended middleware factory for most use cases. Automatically configures 
     accepts: {
       scheme: "4mica-credit",
       price: "$0.10",
-      network: "eip155:84532", // or "eip155:8453" for Base mainnet
+      network: "eip155:84532", // Base Sepolia
       payTo: "0xRecipientAddress",
     },
     description: "What the user is paying for",
@@ -148,7 +148,7 @@ The recommended middleware factory for most use cases. Automatically configures 
 
 To gate a payment on an external validator, advertise a nested `validation`
 object in `paymentRequirements.extra`. The payer signs the same requirement
-into their claims, and the guarantee only becomes payable once the validator
+into their payment, and the guarantee only becomes payable once the validator
 approves it:
 
 ```typescript
@@ -164,9 +164,11 @@ const extra = {
 
 #### Supported Networks
 
-- `eip155:8453` - Base
 - `eip155:84532` - Base Sepolia
-- `eip155:11155111` - Ethereum Sepolia (x402 v1 only)
+
+Base Sepolia is the one network running the 2.0 protocol today, so it is the only one the
+middleware and `FourMicaEvmScheme.create` set up by default. Base mainnet joins when it is
+upgraded.
 
 A `price` such as `"$0.10"` resolves to the stablecoin 4mica core lists for the network
 (`GET /core/tokens`), so the advertised `asset` is always one core accepts. Pass
@@ -258,10 +260,11 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ### Paying on a self-hosted core
 
-`FourMicaEvmScheme.create` connects to every hosted network up front. Pass `coreUrls` to
-override a network's core API URL and `networks` to limit the connections to the ones you use;
-a resource server can also steer payers with `extra.rpcUrl` in its requirements, which wins over
-both.
+`FourMicaEvmScheme.create` connects to Base Sepolia up front. A payer always signs
+through a core, since every payment carries the asset's active settlement cycle, which only core
+knows. Pass `coreUrls` to override a network's core API URL and `networks` to limit the
+connections to the ones you use; a resource server can also steer payers with `extra.rpcUrl` in
+its requirements, which wins over both.
 
 ```typescript
 const scheme = await FourMicaEvmScheme.create(account, {
@@ -376,14 +379,39 @@ main();
 2. **Payment Flow** (tab-free):
    - Client makes initial request to protected resource
    - Server responds with `402 Payment Required` including payment requirements
-   - Client signs a payment guarantee straight from those requirements using
-     the 4mica SDK — a random 32-byte `reqId` is minted locally; there is no
-     server round-trip before signing
+   - Client signs a payment straight from those requirements using the 4mica
+     SDK, scoped to the asset's active settlement cycle (read from 4mica core)
+     and carrying a random 32-byte `reqId` minted locally; there is no round
+     trip to the server or the facilitator before signing
    - Client retries the request with the payment payload
-   - Server verifies and settles the payment via the 4mica facilitator, which
-     issues the BLS guarantee certificate and binds it to the open settlement
-     cycle
+   - Server verifies and settles the payment via the 4mica facilitator; core
+     issues the guarantee receipt (`FourMicaSettleResponse.receipt`, the
+     operator's ECDSA signature over the guarantee) for that cycle
    - Server returns the protected resource
+
+## Refusals
+
+When the facilitator refuses a settlement, the server answers `402` with the
+facilitator's response, base64 JSON in the `PAYMENT-RESPONSE` header: the
+reason in `errorReason`, a message in `errorMessage`, and `retryable` and
+`details` under `extra`. The reasons are listed in the
+[facilitator's README](../../../README.md#errors).
+
+`FourMicaEvmScheme` fixes the refusals a payer can fix and has x402 retry the
+request once with a new payment: it checkpoints when core asks for one
+(`invalid_4mica_credit_checkpoint_required`), relearns the active cycle and
+core's clock after a cycle or timestamp refusal, and waits out a checkpoint
+cutoff. Anything else, or a recovery that fails, reaches the caller as the
+`402`.
+
+## Development
+
+```bash
+pnpm test
+```
+
+The end-to-end tests in `e2e/` need a local core and facilitator;
+`../../e2e/stack.sh test ts` brings them up and runs the tests.
 
 ## License
 

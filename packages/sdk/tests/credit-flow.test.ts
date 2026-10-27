@@ -1,23 +1,9 @@
-import { bls12_381 } from "@noble/curves/bls12-381.js";
 import { describe, expect, it, vi } from "vitest";
 import type { ClientCtx } from "@/client/ctx";
-import { PaymentClient } from "@/client/payment";
 import { SettlementClient } from "@/client/settlement";
 import type { ContractGateway } from "@/contract";
-import {
-  CertificateMismatchError,
-  Erc20AllowanceRequiredError,
-  GuaranteeDomainMismatchError,
-  InvalidParamsError,
-} from "@/errors";
-import { encodeGuaranteeClaims } from "@/guarantee";
-import {
-  BLSCert,
-  CorePublicParameters,
-  PaymentGuaranteeRequestClaims,
-} from "@/models";
+import { Erc20AllowanceRequiredError, InvalidParamsError } from "@/errors";
 import type { RpcProxy } from "@/rpc";
-import { bytesFromHex } from "@/utils";
 
 const USER = "0x0000000000000000000000000000000000000011";
 const RECIPIENT = "0x0000000000000000000000000000000000000022";
@@ -26,36 +12,9 @@ const NATIVE = "0x0000000000000000000000000000000000000000";
 const CLEARING_HOUSE = "0x0000000000000000000000000000000000000009";
 const CYCLE_ID = `0x${"aa".repeat(32)}`;
 const PROOF = [`0x${"dd".repeat(32)}`];
-const DOMAIN = new Uint8Array(32).fill(0x11);
-
-const { secretKey, publicKey } = bls12_381.longSignatures.keygen();
-const OPERATOR_KEY = publicKey.toBytes(true);
-
-function blsSign(message: Uint8Array): string {
-  const signature = bls12_381.longSignatures.sign(
-    bls12_381.longSignatures.hash(message),
-    secretKey,
-  );
-  return `0x${Buffer.from(signature.toBytes(true)).toString("hex")}`;
-}
-
 function fakeCtx(overrides: Partial<Record<string, unknown>> = {}): ClientCtx {
-  const params = new CorePublicParameters(
-    OPERATOR_KEY,
-    "0x0000000000000000000000000000000000000000",
-    "4mica",
-    "1",
-    84532,
-  );
   return {
     signerAddress: RECIPIENT,
-    publicParams: params,
-    operatorPublicKey: OPERATOR_KEY,
-    guaranteeDomain: DOMAIN,
-    guaranteeDomains: new Map([[1, DOMAIN]]),
-    guaranteeDomainForVersion(version: number) {
-      return this.guaranteeDomains.get(version);
-    },
     rpc: {},
     facilitator: { isConfigured: () => false },
     gateway: async () => {
@@ -64,111 +23,6 @@ function fakeCtx(overrides: Partial<Record<string, unknown>> = {}): ClientCtx {
     ...overrides,
   } as unknown as ClientCtx;
 }
-
-const certFor = (claimsHex: string): BLSCert =>
-  new BLSCert(claimsHex, blsSign(bytesFromHex(claimsHex)));
-
-const encodedClaims = (domain: Uint8Array = DOMAIN): string =>
-  encodeGuaranteeClaims({
-    domain,
-    userAddress: USER,
-    recipientAddress: RECIPIENT,
-    cycleId: 1n,
-    reqId: 2n,
-    amount: 3n,
-    assetAddress: ASSET,
-    timestamp: 123,
-    version: 1,
-  });
-
-describe("PaymentClient", () => {
-  it("issues a guarantee with the tagged claims payload", async () => {
-    const issueGuarantee = vi
-      .fn()
-      .mockResolvedValue(new BLSCert("0xabc", "0xdef"));
-    const payment = new PaymentClient(
-      fakeCtx({ rpc: { issueGuarantee } as unknown as RpcProxy }),
-    );
-
-    const claims = PaymentGuaranteeRequestClaims.new(
-      USER,
-      RECIPIENT,
-      0x30,
-      0x20,
-      1234,
-      ASSET,
-    );
-    const cert = await payment.issueGuarantee(claims, "0xsig");
-
-    expect(issueGuarantee).toHaveBeenCalledWith({
-      claims: {
-        version: "v1",
-        user_address: USER,
-        recipient_address: RECIPIENT,
-        req_id: "0x30",
-        amount: "0x20",
-        asset_address: ASSET,
-        timestamp: 1234,
-      },
-      signature: "0xsig",
-      scheme: "eip712",
-    });
-    expect(cert.claims).toBe("0xabc");
-  });
-
-  it("refuses to issue a guarantee crediting someone else", async () => {
-    const payment = new PaymentClient(fakeCtx());
-    const claims = PaymentGuaranteeRequestClaims.new(
-      USER,
-      USER, // recipient != this signer
-      1,
-      1,
-      1,
-      ASSET,
-    );
-    await expect(payment.issueGuarantee(claims, "0xsig")).rejects.toThrow(
-      InvalidParamsError,
-    );
-  });
-
-  it("verifies an operator-signed certificate end to end", async () => {
-    const payment = new PaymentClient(fakeCtx());
-    const encoded = encodedClaims();
-    const decoded = await payment.verifyGuarantee(certFor(encoded));
-    expect(decoded.cycleId).toBe(1n);
-    expect(decoded.reqId).toBe(2n);
-    expect(decoded.userAddress.toLowerCase()).toBe(USER);
-  });
-
-  it("rejects a certificate whose BLS signature does not verify", async () => {
-    const payment = new PaymentClient(fakeCtx());
-    const encoded = encodedClaims();
-    const other = encodeGuaranteeClaims({
-      domain: DOMAIN,
-      userAddress: USER,
-      recipientAddress: RECIPIENT,
-      cycleId: 999n,
-      reqId: 2n,
-      amount: 3n,
-      assetAddress: ASSET,
-      timestamp: 123,
-      version: 1,
-    });
-    await expect(
-      payment.verifyGuarantee(
-        new BLSCert(encoded, blsSign(bytesFromHex(other))),
-      ),
-    ).rejects.toThrow(CertificateMismatchError);
-  });
-
-  it("rejects a certificate under the wrong domain", async () => {
-    const payment = new PaymentClient(fakeCtx());
-    const encoded = encodedClaims(new Uint8Array(32).fill(0x99));
-    await expect(payment.verifyGuarantee(certFor(encoded))).rejects.toThrow(
-      GuaranteeDomainMismatchError,
-    );
-  });
-});
 
 describe("SettlementClient", () => {
   const payAction = (overrides: Record<string, unknown> = {}) => ({

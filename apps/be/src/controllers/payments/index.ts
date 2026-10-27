@@ -1,5 +1,5 @@
 import { PAYMENT_NETWORKS } from "@4mica/rules";
-import { BLSCert } from "@4mica/sdk";
+import { GuaranteeReceipt } from "@4mica/sdk";
 import { requireApiKeyOwner } from "@auth/api-key";
 import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
@@ -103,10 +103,14 @@ const checkGuarantee = async (
     };
   }
 
-  const claims = await core.payment
-    .verifyGuarantee(new BLSCert(data.guaranteeClaims, data.guaranteeSignature))
+  // `guaranteeClaims` carries the receipt hex and `guaranteeSignature` the
+  // operator's ECDSA signature over it; the names predate the receipt format.
+  const guarantee = await core.payment
+    .verifyGuarantee(
+      new GuaranteeReceipt(data.guaranteeClaims, data.guaranteeSignature),
+    )
     .catch(() => null);
-  if (!claims) {
+  if (!guarantee) {
     return { kind: "mismatch", path: "guaranteeSignature" };
   }
 
@@ -116,7 +120,7 @@ const checkGuarantee = async (
       )?.decimals ?? 0)
     : PAYMENT_NETWORKS[data.network].currency.decimals;
 
-  const mismatch = guaranteeMismatch(claims, data, decimals);
+  const mismatch = guaranteeMismatch(guarantee, data, decimals);
   return mismatch ? { kind: "mismatch", path: mismatch } : { kind: "ok" };
 };
 
@@ -173,7 +177,7 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
       return invalidBody(reply, [
         {
           path: check.path,
-          message: "is required: pass the certificate 4mica core issued",
+          message: "is required: pass the guarantee receipt 4mica core issued",
         },
       ]);
     }

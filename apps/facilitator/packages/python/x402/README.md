@@ -28,7 +28,7 @@ routes = {
         "accepts": {
             "scheme": "4mica-credit",
             "price": "$0.01",
-            "network": "eip155:11155111",
+            "network": "eip155:84532",
             "payTo": "0xRecipient",
         }
     }
@@ -41,6 +41,19 @@ async def x402_mw(request, call_next):
     return await middleware(request, call_next)
 ```
 
+A `price` such as `"$0.01"` resolves to the USDC 4mica core lists for the network
+(`GET /core/tokens`), so the advertised asset is always one core accepts. To price in
+another listed token or against a self-hosted core, pass your own scheme per network:
+
+```python
+from fourmica_x402.server_scheme import FourMicaEvmScheme
+
+middleware = fastapi_payment_middleware_from_config(
+    routes,
+    schemes={"eip155:84532": FourMicaEvmScheme(stablecoin_symbol="USDT")},
+)
+```
+
 ## Quick Start (Client)
 
 ```python
@@ -49,12 +62,32 @@ from x402.http.clients import x402_requests
 from fourmica_x402.client_scheme import FourMicaEvmScheme
 
 client = x402ClientSync()
-client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+client.register("eip155:84532", FourMicaEvmScheme("0xYourPrivateKey"))
 
 session = x402_requests(client)
 resp = session.get("https://api.example.com/premium")
 print(resp.status_code, resp.text)
 ```
+
+To pay on a self-hosted core, name it per network:
+`FourMicaEvmScheme("0xYourPrivateKey", core_urls={"eip155:84532": "http://localhost:3000"})`.
+A seller that advertises `extra.rpcUrl` in its requirements still takes precedence.
+
+## Refusals
+
+When the facilitator refuses a settlement, the seller answers `402` with the
+facilitator's response, base64 JSON in the `PAYMENT-RESPONSE` header: the
+reason in `errorReason`, a message in `errorMessage`, and `retryable` and
+`details` under `extra`. The reasons are listed in the
+[facilitator's README](../../../README.md#errors). A successful settlement
+carries the guarantee receipt in `extra.receipt`.
+
+The client scheme fixes the refusals a payer can fix and has x402 retry the
+request once with a new payment: it checkpoints when core asks for one
+(`invalid_4mica_credit_checkpoint_required`), relearns the active cycle and
+core's clock after a cycle or timestamp refusal, and waits out a checkpoint
+cutoff. Anything else, or a recovery that fails, reaches the caller as the
+`402`.
 
 ## Development
 
@@ -68,3 +101,6 @@ Install dev tools:
 ```bash
 pip install -e .[dev]
 ```
+
+The end-to-end tests in `e2e/` need a local core and facilitator;
+`../../e2e/stack.sh test py` brings them up and runs the tests.

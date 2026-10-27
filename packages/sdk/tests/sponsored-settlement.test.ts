@@ -28,15 +28,19 @@ const NATIVE = "0x0000000000000000000000000000000000000000";
 const TX_HASH = `0x${"ef".repeat(32)}`;
 
 const success = (extra: Record<string, unknown> = {}) => ({
-  json: { success: true, txHash: TX_HASH, ...extra },
+  json: { success: true, transaction: TX_HASH, ...extra },
 });
 
-const rejection = (code: string, extra: Record<string, unknown> = {}) => ({
+const rejection = (
+  code: string,
+  details?: Record<string, unknown>,
+  message = code.replaceAll("_", " "),
+) => ({
   json: {
     success: false,
-    errorCode: code,
-    error: code.toLowerCase(),
-    ...extra,
+    errorReason: code,
+    errorMessage: message,
+    extra: { retryable: false, ...(details ? { details } : {}) },
   },
 });
 
@@ -119,7 +123,7 @@ describe("sponsored settlement — pay", () => {
       handler: (_path, body) => {
         methods.push(String(body.assetTransferMethod));
         if (body.assetTransferMethod === "eip3009") {
-          return rejection("SIMULATION_REVERTED");
+          return rejection("simulation_reverted");
         }
         return success();
       },
@@ -175,7 +179,7 @@ describe("sponsored settlement — pay", () => {
       })) as never,
     };
     const settlement = settlementClient({
-      handler: () => rejection("NO_RELAYER_AVAILABLE"),
+      handler: () => rejection("no_relayer_available"),
       gateway,
     });
 
@@ -185,14 +189,14 @@ describe("sponsored settlement — pay", () => {
 
   it("auto pay does not retry a rejection that names the payment", async () => {
     const settlement = settlementClient({
-      handler: () => rejection("INSUFFICIENT_BALANCE"),
+      handler: () => rejection("insufficient_funds"),
     });
     const failure = await settlement
       .pay(CYCLE_ID)
       .send()
       .catch((err) => err);
     expect(failure).toBeInstanceOf(FacilitatorRejectedError);
-    expect(failure.code).toBe("INSUFFICIENT_BALANCE");
+    expect(failure.code).toBe("insufficient_funds");
   });
 
   it("verify hits the verify route only", async () => {
@@ -218,9 +222,7 @@ describe("sponsored settlement — pay", () => {
       handler: (_path, body) => {
         bodies.push(body);
         if (!("eip2612Permit" in body)) {
-          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
-            permit2Allowance: { eip2612Nonce: "3" },
-          });
+          return rejection("permit2_allowance_required", { eip2612Nonce: "3" });
         }
         return success();
       },
@@ -263,8 +265,8 @@ describe("sponsored settlement — pay", () => {
       handler: (_path, body) => {
         methods.push(String(body.assetTransferMethod));
         return body.assetTransferMethod === "eip3009"
-          ? rejection("SIMULATION_REVERTED")
-          : rejection("PERMIT2_ALLOWANCE_REQUIRED");
+          ? rejection("simulation_reverted")
+          : rejection("permit2_allowance_required");
       },
       gateway: {
         erc20Allowance: erc20Allowance as never,
@@ -285,8 +287,8 @@ describe("sponsored settlement — pay", () => {
     const settlement = settlementClient({
       handler: (_path, body) =>
         body.assetTransferMethod === "eip3009"
-          ? rejection("SIMULATION_REVERTED")
-          : rejection("PERMIT2_ALLOWANCE_REQUIRED"),
+          ? rejection("simulation_reverted")
+          : rejection("permit2_allowance_required"),
       gateway: {
         erc20Allowance: (async () => 0n) as never,
         payNetDebit: payNetDebit as never,
@@ -310,9 +312,7 @@ describe("sponsored settlement — pay", () => {
     const settlement = settlementClient({
       handler: (_path, body) => {
         methods.push(String(body.assetTransferMethod));
-        return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
-          permit2Allowance: { eip2612Nonce: "3" },
-        });
+        return rejection("permit2_allowance_required", { eip2612Nonce: "3" });
       },
       gateway: {
         erc20Allowance: (async () => 1_000_000n) as never,
@@ -337,10 +337,11 @@ describe("sponsored settlement — pay", () => {
       handler: (_path, body) => {
         bodies.push(body);
         if (!("eip2612Permit" in body)) {
-          return rejection("PERMIT2_ALLOWANCE_REQUIRED", {
-            error: "approve permit2 first",
-            permit2Allowance: { eip2612Nonce: "3" },
-          });
+          return rejection(
+            "permit2_allowance_required",
+            { eip2612Nonce: "3" },
+            "approve permit2 first",
+          );
         }
         return success();
       },
@@ -400,7 +401,7 @@ describe("sponsored settlement — claim", () => {
       })) as never,
     };
     const settlement = settlementClient({
-      handler: () => rejection("NO_RELAYER_AVAILABLE"),
+      handler: () => rejection("no_relayer_available"),
       gateway,
     });
 
@@ -410,13 +411,13 @@ describe("sponsored settlement — claim", () => {
 
   it("auto claim does not retry a rejection that names the claim", async () => {
     const settlement = settlementClient({
-      handler: () => rejection("ACTION_UNAVAILABLE"),
+      handler: () => rejection("clearing_action_unavailable"),
     });
     const failure = await settlement
       .claim(CYCLE_ID)
       .send()
       .catch((err) => err);
     expect(failure).toBeInstanceOf(FacilitatorRejectedError);
-    expect(failure.code).toBe("ACTION_UNAVAILABLE");
+    expect(failure.code).toBe("clearing_action_unavailable");
   });
 });

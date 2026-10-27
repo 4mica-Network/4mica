@@ -68,9 +68,12 @@ describe("Facilitator transport classification", () => {
     let receiver: unknown = "unset";
     const fetchFn = async function (this: unknown) {
       receiver = this;
-      return new Response(JSON.stringify({ success: true, txHash: "0x1" }), {
-        status: 200,
-      });
+      return new Response(
+        JSON.stringify({ success: true, transaction: "0x1" }),
+        {
+          status: 200,
+        },
+      );
     } as unknown as FetchFn;
     const facilitator = new Facilitator("https://facilitator.example", fetchFn);
     await facilitator.post("deposit", {});

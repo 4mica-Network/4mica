@@ -47,7 +47,7 @@ arguments, reading `FOURMICA_API_KEY` and `FOURMICA_API_URL` from the environmen
 ### Read your listing or agent: `app.resource()`
 
 Returns what the key is tied to, with its pricing and payment wiring, the published policy and the
-FAQs. Use it to drive your paywall from the dashboard instead of hard-coding prices.
+FAQs. Use it to price your routes from the dashboard instead of hard-coding them.
 
 ```ts
 const { kind, listing, agent, policy, faqs } = await app.resource();
@@ -121,64 +121,83 @@ With a listing or agent key the payment is attributed automatically. You can sti
 ### Helpers
 
 - `paymentFromHeader(header, decimals = 18)` reads `reqId`, `payerAddress` and the amount from the
-  `X-PAYMENT` header the paywall just verified, and converts the amount to a display string.
+  payment header a seller's middleware just verified (`PAYMENT-SIGNATURE` in x402 v2), and
+  converts the amount to a display string.
   Pass `6` for USDC.
 - `toAppNetwork(network)` converts `"base"`, `"eip155:8453"` or `"BASE"` to the API's enum. The
   client calls it for you on `network` inputs.
 - `fromAppNetwork(network)` goes the other way: `"BASE_SEPOLIA"` from `resource()` becomes
-  `"base-sepolia"`, which the core client and the paywall take.
+  `"base-sepolia"`, which the core client takes. x402 middleware wants the CAIP-2 id:
+  `NETWORKS[fromAppNetwork(network)].caip2`.
 - `toDisplayAmount(raw, decimals)` formats base units as a decimal string.
 
-## 4. Putting it together with a paywall
+## 4. Putting it together with x402 middleware
+
+`@4mica/x402`'s Express middleware answers the `402` and verifies the payment; the app API decides
+whether to serve the payer and records what was paid. Settlement runs after the route answers, so
+the guarantee receipt arrives in the resource server's `onAfterSettle` hook. A route that answers
+with an error is not settled, so a refused payer is not charged.
 
 ```ts
-import { createPaywall, parsePaymentHeader } from "@4mica/sdk/server";
-import { createAppClient, paymentFromHeader } from "@4mica/sdk/app";
+import { NETWORKS } from "@4mica/sdk";
+import { createAppClient, fromAppNetwork, paymentFromHeader } from "@4mica/sdk/app";
+import { FourMicaFacilitatorClient, x402ResourceServer } from "@4mica/x402/server";
+import { paymentMiddleware } from "@4mica/x402/server/express";
+import express from "express";
 
 const app = createAppClient({ apiKey: process.env.FOURMICA_API_KEY! });
 const { listing } = await app.resource();
+const network = NETWORKS[fromAppNetwork(listing!.network!)].caip2 as `${string}:${string}`;
 
-const paywall = createPaywall(client.rpc, {
-  payTo: listing!.payToAddress!,
-  asset: listing!.assetAddress ?? "0x0000000000000000000000000000000000000000",
-  network: "base-sepolia",
-  amount: "10000", // base units
-});
+const server = new x402ResourceServer(new FourMicaFacilitatorClient()).onAfterSettle(
+  async ({ paymentPayload, result }) => {
+    const paid = (paymentPayload.payload as { payload: Record<string, string> }).payload;
+    const receipt = result.extra?.receipt as { receipt: string; signature: string } | undefined;
+    void app.reportPayment({
+      reqId: paid.req_id,
+      payerAddress: paid.user_address,
+      recipientAddress: listing!.payToAddress!,
+      network,
+      assetAddress: listing!.assetAddress,
+      amount: paid.amount,
+      guaranteeClaims: receipt?.receipt,
+      guaranteeSignature: receipt?.signature,
+    });
+  },
+);
 
-export async function handle(request: Request): Promise<Response> {
-  const result = await paywall.handle(request);
-  if (result instanceof Response) return result; // 402
+const http = express();
 
-  const paid = paymentFromHeader(request.headers.get("x-payment")!, 6);
+http.use(
+  paymentMiddleware(
+    {
+      "GET /data": {
+        accepts: {
+          scheme: "4mica-credit",
+          price: { amount: listing!.priceAmount!, asset: listing!.assetAddress! },
+          network,
+          payTo: listing!.payToAddress!,
+        },
+      },
+    },
+    server,
+  ),
+);
 
-  const couponCode = new URL(request.url).searchParams.get("coupon");
+http.get("/data", async (req, res) => {
+  const paid = paymentFromHeader(req.get("payment-signature")!, 6);
   const decision = await app.resolveCustomer({
     payerAddress: paid.payerAddress,
-    network: "base-sepolia",
+    network,
     amount: paid.amount,
-    couponCode,
+    couponCode: typeof req.query.coupon === "string" ? req.query.coupon : null,
   });
   if (!decision.allowed) {
-    return Response.json({ error: decision.deniedReason }, { status: 403 });
+    res.status(403).json({ error: decision.deniedReason });
+    return;
   }
-
-  const response = Response.json({ ok: true });
-  result.headers.forEach((value, key) => response.headers.set(key, value));
-
-  void app.reportPayment({
-    reqId: paid.reqId,
-    payerAddress: paid.payerAddress,
-    recipientAddress: listing!.payToAddress!,
-    network: "base-sepolia",
-    assetAddress: listing!.assetAddress,
-    amount: paid.amount,
-    resource: request.url,
-    couponCode: decision.couponApplied !== "0" ? couponCode : null,
-    creditApplied: decision.creditApplied !== "0" ? decision.creditApplied : null,
-  });
-
-  return response;
-}
+  res.json({ ok: true });
+});
 ```
 
 ## 5. Errors

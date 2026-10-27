@@ -3,15 +3,18 @@
   "version": "0.0.1-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Buyer (payer): pay for a seller's paywalled route over x402",
+  "description": "Buyer (payer): pay for a seller's x402-priced route",
   "scripts": {
     "start": "tsx src/buyer.ts",
     "deposit": "tsx src/deposit.ts"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:*",
-    "@4mica/sdk-node": "workspace:*",
-    "dotenv": "catalog:"
+    "@4mica/x402": "workspace:*",
+    "@x402/core": "catalog:",
+    "@x402/fetch": "catalog:",
+    "dotenv": "catalog:",
+    "viem": "catalog:"
   },
   "devDependencies": {
     "@4mica/tsconfig": "workspace:*",

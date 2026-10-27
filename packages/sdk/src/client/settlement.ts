@@ -368,7 +368,11 @@ export class AuthorizedPay {
     if (response.isValid) {
       return;
     }
-    throw rejectionError(response, response.invalidReason);
+    throw rejectionError(
+      response,
+      response.invalidReason,
+      response.invalidMessage,
+    );
   }
 
   /**
@@ -537,13 +541,13 @@ async function submitPay(
 ): Promise<PayReceipt> {
   const response = await ctx.facilitator.post("clearing/pay", request);
   if (!response.success) {
-    throw rejectionError(response, response.error);
+    throw rejectionError(response, response.errorReason, response.errorMessage);
   }
 
-  const txHash = response.txHash;
+  const txHash = response.transaction;
   if (typeof txHash !== "string" || !txHash.startsWith("0x")) {
     throw new OutcomeUnknownError(
-      "facilitator reported success without a txHash",
+      "facilitator reported success without a transaction",
     );
   }
 
@@ -687,7 +691,11 @@ export class GaslessClaim {
     if (response.isValid) {
       return;
     }
-    throw rejectionError(response, response.invalidReason);
+    throw rejectionError(
+      response,
+      response.invalidReason,
+      response.invalidMessage,
+    );
   }
 
   /**
@@ -702,13 +710,17 @@ export class GaslessClaim {
       this.request(),
     );
     if (!response.success) {
-      throw rejectionError(response, response.error);
+      throw rejectionError(
+        response,
+        response.errorReason,
+        response.errorMessage,
+      );
     }
 
-    const txHash = response.txHash;
+    const txHash = response.transaction;
     if (typeof txHash !== "string" || !txHash.startsWith("0x")) {
       throw new OutcomeUnknownError(
-        "facilitator reported success without a txHash",
+        "facilitator reported success without a transaction",
       );
     }
 

@@ -29,7 +29,7 @@ if not logger.handlers:
 
 DEFAULT_USDC = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
 DEFAULT_NETWORK = "eip155:80002"  # Polygon Amoy
-DEFAULT_FACILITATOR_URL = "https://x402.4mica.xyz"
+DEFAULT_FACILITATOR_URL = "https://testnet.payment.4mica.io"
 DEFAULT_PRICE_USDC = "5000"  # 0.005 USDC with 6 decimals
 
 

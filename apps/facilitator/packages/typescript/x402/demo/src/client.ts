@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { FourMicaEvmScheme } from '@4mica/x402/client'
+import { decodePaymentResponseHeader } from '@x402/core/http'
 import { wrapFetchWithPaymentFromConfig } from '@x402/fetch'
 import { privateKeyToAccount } from 'viem/accounts'
 
@@ -44,13 +45,20 @@ async function main() {
 
   try {
     const response = await fetchWithPayment(endpoint)
-    const data = await response.json()
 
-    // A failed settle comes back as a 402 with an error body, not as a thrown error.
+    // A refused settlement comes back as a 402 whose PAYMENT-RESPONSE header
+    // carries the facilitator's reason, not as a thrown error.
     if (!response.ok) {
-      console.error(`Request failed with ${response.status}:`, JSON.stringify(data, null, 2))
+      const header = response.headers.get('PAYMENT-RESPONSE')
+      const settlement = header ? decodePaymentResponseHeader(header) : undefined
+      const reason = settlement
+        ? `${settlement.errorReason}: ${settlement.errorMessage}`
+        : await response.text()
+      console.error(`Request failed with ${response.status}:`, reason)
       process.exit(1)
     }
+
+    const data = await response.json()
 
     console.log('Request successful!')
     console.log('Response:', JSON.stringify(data, null, 2))

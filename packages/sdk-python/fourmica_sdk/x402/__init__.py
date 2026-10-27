@@ -151,14 +151,16 @@ class X402Flow:
             )
         except httpx.HTTPError as exc:
             raise X402Error(str(exc)) from exc
+        # Before parsing: a request the facilitator cannot read is answered in
+        # plain text, and its status says more than a JSON parse error would.
+        if not response.is_success:
+            raise X402Error(
+                f"settlement failed with status {response.status_code}: {response.text}"
+            )
         try:
             settlement = response.json()
         except Exception as exc:
             raise X402Error(f"settlement response invalid JSON: {exc}") from exc
-        if not response.is_success:
-            raise X402Error(
-                f"settlement failed with status {response.status_code}: {settlement}"
-            )
         return X402SettledPayment(
             payment=payment, settlement=SettlementReceipt.from_raw(settlement)
         )

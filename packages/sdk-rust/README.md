@@ -130,7 +130,7 @@ validators it whitelists, listed in `/core/public-params` as `validators`.
 The SDK requires a signer and can use sensible defaults for the rest:
 
 - `signer` (**required**): Any `alloy::signers::Signer` (typically `PrivateKeySigner` from a hex private key). On-chain methods require a signer that also implements `TxSigner<Signature>`.
-- `rpc_url` (optional): URL of the 4Mica RPC server. Defaults to `https://ethereum.sepolia.api.4mica.xyz/`; override for local development.
+- `rpc_url` (optional): URL of the 4Mica RPC server. Defaults to `https://ethereum.sepolia.api.4mica.io/`; override for local development.
 - `network` (optional): select a hosted network with the `Network` enum.
 - `credentials` (optional): how API calls authenticate — `Credentials::Siwe` (the default: sign in with the configured signer), `Credentials::Bearer(token)`, or `Credentials::None`.
 
@@ -138,9 +138,9 @@ Hosted networks:
 
 | `Network` variant  | CAIP-2            | Core API URL                              |
 | ------------------ | ----------------- | ----------------------------------------- |
-| `Base`             | `eip155:8453`     | `https://base.api.4mica.xyz/`             |
-| `BaseSepolia`      | `eip155:84532`    | `https://base.sepolia.api.4mica.xyz/`     |
-| `EthereumSepolia`  | `eip155:11155111` | `https://ethereum.sepolia.api.4mica.xyz/` |
+| `Base`             | `eip155:8453`     | `https://base.api.4mica.io/`             |
+| `BaseSepolia`      | `eip155:84532`    | `https://base.sepolia.api.4mica.io/`     |
+| `EthereumSepolia`  | `eip155:11155111` | `https://ethereum.sepolia.api.4mica.io/` |
 
 `Network` also parses from the shorthand (`"base"`) or CAIP-2 id, which is how the
 `4MICA_NETWORK` environment variable is read.
@@ -185,7 +185,7 @@ itself; pass it to `Client::connect(config)` later.
 
 - `4MICA_WALLET_PRIVATE_KEY` (required)
 - `4MICA_NETWORK` (optional; shorthand or CAIP-2 id; takes precedence over `4MICA_RPC_URL`)
-- `4MICA_RPC_URL` (optional; defaults to `https://ethereum.sepolia.api.4mica.xyz/`)
+- `4MICA_RPC_URL` (optional; defaults to `https://ethereum.sepolia.api.4mica.io/`)
 - `4MICA_ETHEREUM_HTTP_RPC_URL` (optional)
 - `4MICA_CONTRACT_ADDRESS` (optional)
 - `4MICA_FACILITATOR_URL` (optional)
@@ -1016,8 +1016,8 @@ This project is licensed under the Creative Commons Attribution-NonCommercial 4.
 
 ## Support
 
-- Website: [https://4mica.xyz](https://4mica.xyz)
-- Documentation: [https://docs.4mica.xyz](https://docs.4mica.xyz)
+- Website: [https://4mica.io](https://4mica.io)
+- Documentation: [https://docs.4mica.io](https://docs.4mica.io)
 - GitHub: [https://github.com/4mica-Network/4mica-core](https://github.com/4mica-Network/4mica-core)
 
 ---

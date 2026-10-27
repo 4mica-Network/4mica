@@ -15,7 +15,7 @@ from x402.http import (
     HTTPFacilitatorClientSync,
 )
 
-DEFAULT_FOURMICA_FACILITATOR_URL = "https://x402.4mica.xyz"
+DEFAULT_FOURMICA_FACILITATOR_URL = "https://testnet.payment.4mica.io"
 
 
 class FourMicaFacilitatorClient(HTTPFacilitatorClient):

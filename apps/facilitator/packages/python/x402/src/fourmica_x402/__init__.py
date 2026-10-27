@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 from .constants import (
-    DEFAULT_ASSETS,
     DEFAULT_RPC_URLS,
     SUPPORTED_NETWORKS,
     UnsupportedNetworkError,
-    get_default_asset,
 )
 
 __all__ = [
     "SUPPORTED_NETWORKS",
     "DEFAULT_RPC_URLS",
-    "DEFAULT_ASSETS",
     "UnsupportedNetworkError",
-    "get_default_asset",
 ]
 
 try:  # Optional: facilitator depends on x402

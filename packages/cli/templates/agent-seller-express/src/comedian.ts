@@ -1,8 +1,9 @@
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PaywallConfig, PaywallVerifier } from "@4mica/sdk/server";
-import { createPaywall } from "@4mica/sdk/server";
+import { x402ResourceServer } from "@4mica/x402/server";
+import { paymentMiddleware } from "@4mica/x402/server/express";
+import type { FacilitatorClient } from "@x402/core/server";
 import express from "express";
 import { brainMode, inventJoke, type Joke } from "./brain";
 
@@ -17,18 +18,34 @@ const CATEGORIES = [
 ];
 const BASE_PRICE = 100;
 
-const verifier: PaywallVerifier = {
-  async issueGuarantee() {
-    return { claims: "0xdemoClaims", signature: "0xdemoSignature" };
-  },
-};
+const NETWORK = "eip155:84532";
+// Base Sepolia USDC, one of the stablecoins 4mica core accepts there.
+const ASSET = "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f";
+const PAY_TO = "0x1111111111111111111111111111111111111111";
 
-const CONFIG_BASE: Omit<PaywallConfig, "amount"> = {
-  payTo: "0x1111111111111111111111111111111111111111",
-  asset: "0x0000000000000000000000000000000000000000",
-  network: "base-sepolia",
-  description:
-    "A premium punchline, brought to you by an agent that needs paying",
+// Demo mode: stands in for the 4mica facilitator and accepts any payment. To go
+// live, pass `new FourMicaFacilitatorClient()` from @4mica/x402/server instead.
+const demoFacilitator: FacilitatorClient = {
+  async getSupported() {
+    return {
+      kinds: [{ x402Version: 2, scheme: "4mica-credit", network: NETWORK }],
+      extensions: [],
+      signers: {},
+    };
+  },
+  async verify() {
+    return { isValid: true };
+  },
+  async settle(_paymentPayload, requirements) {
+    return {
+      success: true,
+      transaction: "",
+      network: requirements.network,
+      extra: {
+        receipt: { receipt: "0xdemoReceipt", signature: "0xdemoSignature" },
+      },
+    };
+  },
 };
 
 type Listing = { theme: string; category: string; joke: Joke; price: number };
@@ -37,7 +54,6 @@ const demand: Record<string, number> = {};
 const rating: Record<string, { sum: number; n: number }> = {};
 let nextId = 1;
 let revenue = 0;
-let baseUrl = "";
 
 function priceFor(category: string): number {
   const d = demand[category] ?? 0;
@@ -50,6 +66,32 @@ function priceFor(category: string): number {
 
 const app = express();
 app.use(express.json());
+
+app.use(
+  paymentMiddleware(
+    {
+      "GET /punchline": {
+        accepts: {
+          scheme: "4mica-credit",
+          // Each punchline costs what its setup quoted.
+          price: ({ adapter }) => {
+            const jokeId = new URL(adapter.getUrl()).searchParams.get("jokeId");
+            const listing = inventory.get(jokeId ?? "");
+            return {
+              amount: String(listing?.price ?? BASE_PRICE),
+              asset: ASSET,
+            };
+          },
+          network: NETWORK,
+          payTo: PAY_TO,
+        },
+        description:
+          "A premium punchline, brought to you by an agent that needs paying",
+      },
+    },
+    new x402ResourceServer(demoFacilitator),
+  ),
+);
 
 app.get("/setup", async (req, res) => {
   const theme = String(req.query.theme ?? "everyday life");
@@ -76,30 +118,12 @@ app.get("/punchline", async (req, res) => {
     return;
   }
 
-  const config: PaywallConfig = {
-    ...CONFIG_BASE,
-    amount: String(listing.price),
-  };
-  const paywall = createPaywall(verifier, config);
-  const decision = await paywall.protect({
-    method: req.method,
-    url: `${baseUrl}${req.originalUrl}`,
-    header: (name) => req.get(name) ?? null,
-  });
-
-  if (!decision.ok) {
-    res.status(decision.status).set(decision.headers).json(decision.body);
-    return;
-  }
-
   demand[listing.category] = (demand[listing.category] ?? 0) + 1;
   revenue += listing.price;
   console.log(
     `[comedian] 💰 sold ${listing.category} punchline for ${listing.price} credits (revenue: ${revenue}) — next ${listing.category} will cost ${priceFor(listing.category)}`,
   );
-  res
-    .set(decision.responseHeaders)
-    .json({ punchline: listing.joke.punchline, category: listing.category });
+  res.json({ punchline: listing.joke.punchline, category: listing.category });
 });
 
 app.post("/rating", (req, res) => {
@@ -120,12 +144,12 @@ app.post("/rating", (req, res) => {
 function listen(port: number, attemptsLeft = 20) {
   const server = app.listen(port);
   server.once("listening", () => {
-    baseUrl = `http://localhost:${port}`;
+    const baseUrl = `http://localhost:${port}`;
     writeFileSync(PORT_FILE, baseUrl);
     console.log(`[comedian] 🎭 open for business on ${baseUrl}`);
     console.log(`[comedian]    brain: ${brainMode}`);
     console.log(
-      `[comedian]    GET /setup?theme=&category= is free — punchlines are paywalled via x402`,
+      `[comedian]    GET /setup?theme=&category= is free — punchlines are paid for over x402`,
     );
   });
   server.once("error", (err: NodeJS.ErrnoException) => {

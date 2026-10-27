@@ -1,5 +1,4 @@
-import { GUARANTEE_CLAIMS_V1_TYPE, SupportedTokensResponse } from '@4mica/sdk'
-import { type Hex, verifyTypedData } from 'viem'
+import { SupportedTokensResponse } from '@4mica/sdk'
 import { privateKeyToAccount } from 'viem/accounts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,14 +6,19 @@ import { FourMicaEvmScheme } from '../src/client/scheme.js'
 
 const USDC = '0x2222222222222222222222222222222222222222'
 
-/** `createX402Flow` is private static; widen the class so the spy is typed. */
-function spyOnCreateX402Flow() {
+/** `connect` is private static; widen the class so the spy is typed. */
+function spyOnConnect() {
   return vi.spyOn(
     FourMicaEvmScheme as unknown as {
-      createX402Flow: (...args: unknown[]) => Promise<unknown>
+      connect: (...args: unknown[]) => Promise<unknown>
     },
-    'createX402Flow'
+    'connect'
   )
+}
+
+/** A connected core whose flow is `flow` and whose payment client is `payment`. */
+function payer(flow: object, payment: object = {}) {
+  return { flow, payment }
 }
 
 /** `loadSupportedTokens` is private static too; every connected core answers with USDC. */
@@ -41,20 +45,18 @@ describe('FourMicaEvmScheme', () => {
   })
 
   it('passes V2 resource metadata through to the SDK flow', async () => {
-    const signPaymentV2 = vi.fn().mockResolvedValue({
-      payload: {
-        claims: {
-          version: 'v2',
-          validation_request_hash: '0x' + '11'.repeat(32),
-          validation_subject_hash: '0x' + '22'.repeat(32),
-        },
-      },
-    })
+    const wire = {
+      payload: { version: 'v1', cycle_id: `0x${'33'.repeat(32)}` },
+      signature: `0x${'44'.repeat(65)}`,
+    }
+    const signPaymentV2 = vi.fn().mockResolvedValue({ payload: wire })
 
-    spyOnCreateX402Flow().mockResolvedValue({
-      signPayment: vi.fn(),
-      signPaymentV2,
-    } as never)
+    spyOnConnect().mockResolvedValue(
+      payer({
+        signPayment: vi.fn(),
+        signPaymentV2,
+      })
+    )
 
     const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
@@ -82,8 +84,10 @@ describe('FourMicaEvmScheme', () => {
 
     const result = await scheme.createPaymentPayload(2, requirements as never)
 
-    expect(result.x402Version).toBe(2)
+    expect(result).toEqual({ x402Version: 2, payload: wire })
     expect(signPaymentV2).toHaveBeenCalledTimes(1)
+    // The payer is the flow's own signer; no user address is passed in.
+    expect(signPaymentV2.mock.calls[0]).toHaveLength(2)
 
     const paymentRequired = signPaymentV2.mock.calls[0]?.[0]
     expect(paymentRequired.resource).toEqual({
@@ -110,24 +114,24 @@ describe('FourMicaEvmScheme', () => {
     })
   })
 
-  it('connects to every hosted network up front by default', async () => {
-    const createX402Flow = spyOnCreateX402Flow().mockResolvedValue({} as never)
+  it('connects to Base Sepolia up front by default', async () => {
+    const connect = spyOnConnect().mockResolvedValue(payer({}))
 
     await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
-    expect(createX402Flow.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
-      'https://ethereum.sepolia.api.4mica.xyz/',
-      'https://base.sepolia.api.4mica.xyz/',
-      'https://base.api.4mica.xyz/',
+    expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
+      'https://base.sepolia.api.4mica.io/',
     ])
   })
 
   it('connects only to the given networks and pays through a core URL override', async () => {
     const signPaymentV2 = vi.fn().mockResolvedValue({ payload: {} })
-    const createX402Flow = spyOnCreateX402Flow().mockResolvedValue({
-      signPayment: vi.fn(),
-      signPaymentV2,
-    } as never)
+    const connect = spyOnConnect().mockResolvedValue(
+      payer({
+        signPayment: vi.fn(),
+        signPaymentV2,
+      })
+    )
 
     const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
       coreUrls: { 'eip155:31337': 'http://localhost:3000/' },
@@ -141,13 +145,13 @@ describe('FourMicaEvmScheme', () => {
       payTo: '0x1111111111111111111111111111111111111111',
     } as never)
 
-    expect(createX402Flow).toHaveBeenCalledTimes(1)
-    expect(createX402Flow.mock.calls[0]?.[1]).toBe('http://localhost:3000/')
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(connect.mock.calls[0]?.[1]).toBe('http://localhost:3000/')
     expect(signPaymentV2).toHaveBeenCalledTimes(1)
   })
 
   it('reports the assets core lists as default assets, so spend controls allow them', async () => {
-    spyOnCreateX402Flow().mockResolvedValue({} as never)
+    spyOnConnect().mockResolvedValue(payer({}))
 
     const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
       coreUrls: { 'eip155:31337': 'http://localhost:3000/' },
@@ -167,10 +171,12 @@ describe('FourMicaEvmScheme', () => {
   })
 
   it('rejects unsupported x402 versions', async () => {
-    spyOnCreateX402Flow().mockResolvedValue({
-      signPayment: vi.fn(),
-      signPaymentV2: vi.fn(),
-    } as never)
+    spyOnConnect().mockResolvedValue(
+      payer({
+        signPayment: vi.fn(),
+        signPaymentV2: vi.fn(),
+      })
+    )
 
     const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
@@ -186,10 +192,87 @@ describe('FourMicaEvmScheme', () => {
   })
 })
 
-describe('FourMicaEvmScheme signing from an advertised domain', () => {
-  const CONTRACT: Hex = '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2'
-  const DOMAIN = { name: '4Mica-base-sepolia', version: '1', verifyingContract: CONTRACT }
+describe('FourMicaEvmScheme always signs through core', () => {
   const BASE = {
+    scheme: '4mica-credit',
+    network: 'eip155:84532',
+    asset: USDC,
+    amount: '1000',
+    payTo: '0x1111111111111111111111111111111111111111',
+    maxTimeoutSeconds: 300,
+  }
+  // What a seller on @4mica/x402 2.0.0-alpha.2 still advertises. A payment
+  // needs core's active cycle id, so a domain in extra cannot replace core.
+  const STALE_DOMAIN = {
+    name: '4Mica-base-sepolia',
+    version: '1',
+    verifyingContract: '0x41fD0745b0C96D49576b66688d1BF0BB1CbF85b2',
+  }
+
+  beforeEach(() => {
+    spyOnLoadSupportedTokens()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('connects to the core the seller names even when extra carries an EIP-712 domain', async () => {
+    const signPayment = vi.fn().mockResolvedValue({ payload: { payload: {}, signature: '0x' } })
+    const connect = spyOnConnect().mockResolvedValue(
+      payer({
+        signPayment,
+        signPaymentV2: vi.fn(),
+      })
+    )
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
+    })
+
+    await scheme.createPaymentPayload(1, {
+      ...BASE,
+      extra: { ...STALE_DOMAIN, rpcUrl: 'https://seller.core.example/' },
+    } as never)
+
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(connect.mock.calls[0]?.[1]).toBe('https://seller.core.example/')
+    expect(signPayment).toHaveBeenCalledTimes(1)
+    expect(signPayment.mock.calls[0]).toHaveLength(1)
+  })
+
+  it('falls back to the hosted core for the network', async () => {
+    const connect = spyOnConnect().mockResolvedValue(
+      payer({
+        signPayment: vi.fn(),
+        signPaymentV2: vi.fn().mockResolvedValue({ payload: {} }),
+      })
+    )
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
+    })
+
+    await scheme.createPaymentPayload(2, { ...BASE, extra: STALE_DOMAIN } as never)
+
+    expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
+      'https://base.sepolia.api.4mica.io/',
+    ])
+  })
+
+  it('refuses a network with no known core', async () => {
+    const connect = spyOnConnect()
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: [],
+    })
+
+    await expect(
+      scheme.createPaymentPayload(2, { ...BASE, network: 'eip155:1' } as never)
+    ).rejects.toThrow('No core API URL known for network eip155:1')
+    expect(connect).not.toHaveBeenCalled()
+  })
+})
+
+describe('FourMicaEvmScheme recovers refused payments', () => {
+  const REQUIREMENTS = {
     scheme: '4mica-credit',
     network: 'eip155:84532',
     asset: USDC,
@@ -206,60 +289,65 @@ describe('FourMicaEvmScheme signing from an advertised domain', () => {
     vi.restoreAllMocks()
   })
 
-  // The same path mcpc takes: everything needed to sign is in the 402.
-  it('signs locally when the requirements carry the domain, never connecting to core', async () => {
-    const createX402Flow = spyOnCreateX402Flow()
-    const account = privateKeyToAccount(`0x${'11'.repeat(32)}`)
-    const scheme = await FourMicaEvmScheme.create(account, { networks: [] })
+  async function connectedScheme(payment: object) {
+    spyOnConnect().mockResolvedValue(
+      payer({ signPayment: vi.fn(), signPaymentV2: vi.fn() }, payment)
+    )
+    return FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+      networks: ['eip155:84532'],
+    })
+  }
 
-    const result = await scheme.createPaymentPayload(2, {
-      ...BASE,
-      extra: { ...DOMAIN, rpcUrl: 'https://never.contacted.example' },
+  function respond(scheme: FourMicaEvmScheme, settleResponse: Record<string, unknown>) {
+    return scheme.schemeHooks.onPaymentResponse?.({
+      paymentPayload: { x402Version: 2, accepted: REQUIREMENTS, payload: {} },
+      requirements: REQUIREMENTS,
+      settleResponse,
     } as never)
+  }
 
-    expect(createX402Flow).not.toHaveBeenCalled()
-    const payload = result.payload as {
-      claims: Record<string, string | number>
-      signature: Hex
-      scheme: string
-    }
-    expect(payload.scheme).toBe('eip712')
-    expect(payload.claims).toMatchObject({
-      version: 'v1',
-      user_address: account.address.toLowerCase(),
-      recipient_address: BASE.payTo,
-      amount: '0x3e8',
-      asset_address: USDC,
+  it('checkpoints and asks x402 to retry when core wants a checkpoint', async () => {
+    const checkpointActiveCycle = vi.fn().mockResolvedValue(undefined)
+    const scheme = await connectedScheme({ checkpointActiveCycle })
+
+    const result = await respond(scheme, {
+      success: false,
+      errorReason: 'invalid_4mica_credit_checkpoint_required',
+      transaction: '',
+      network: 'eip155:84532',
     })
 
-    const { claims } = payload
-    await expect(
-      verifyTypedData({
-        address: account.address,
-        domain: { ...DOMAIN, chainId: 84532 },
-        types: { SolGuaranteeRequestClaimsV1: GUARANTEE_CLAIMS_V1_TYPE },
-        primaryType: 'SolGuaranteeRequestClaimsV1',
-        message: {
-          user: claims.user_address as Hex,
-          recipient: claims.recipient_address as Hex,
-          reqId: BigInt(claims.req_id),
-          amount: BigInt(claims.amount),
-          asset: claims.asset_address as Hex,
-          timestamp: BigInt(claims.timestamp),
-        },
-        signature: payload.signature,
-      })
-    ).resolves.toBe(true)
+    expect(result).toEqual({ recovered: true })
+    expect(checkpointActiveCycle).toHaveBeenCalledWith(USDC)
   })
 
-  it('rejects a partial domain instead of guessing the rest', async () => {
-    spyOnCreateX402Flow()
-    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
-      networks: [],
+  it('leaves a successful settlement and an unrecoverable refusal alone', async () => {
+    const scheme = await connectedScheme({})
+
+    expect(
+      await respond(scheme, { success: true, transaction: '', network: 'eip155:84532' })
+    ).toBeUndefined()
+    expect(
+      await respond(scheme, {
+        success: false,
+        errorReason: 'insufficient_funds',
+        transaction: '',
+        network: 'eip155:84532',
+      })
+    ).toBeUndefined()
+  })
+
+  it('leaves the refusal for the caller when the checkpoint fails', async () => {
+    const checkpointActiveCycle = vi.fn().mockRejectedValue(new Error('core unreachable'))
+    const scheme = await connectedScheme({ checkpointActiveCycle })
+
+    const result = await respond(scheme, {
+      success: false,
+      errorReason: 'invalid_4mica_credit_checkpoint_required',
+      transaction: '',
+      network: 'eip155:84532',
     })
 
-    await expect(
-      scheme.createPaymentPayload(2, { ...BASE, extra: { name: DOMAIN.name } } as never)
-    ).rejects.toThrow(/partial EIP-712 domain in extra \(missing version, verifyingContract\)/)
+    expect(result).toBeUndefined()
   })
 })
