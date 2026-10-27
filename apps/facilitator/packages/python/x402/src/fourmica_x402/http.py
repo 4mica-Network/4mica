@@ -7,7 +7,7 @@ register the ``4mica-credit`` scheme and hand off to x402's own middleware.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 from x402.http import PaywallConfig, PaywallProvider, RoutesConfig
 from x402.http.middleware import fastapi as fastapi_mw
@@ -18,16 +18,19 @@ from .facilitator import FourMicaFacilitatorClient, FourMicaFacilitatorClientSyn
 from .server_scheme import FourMicaEvmScheme
 
 
-def _register_4mica_scheme(server: x402ResourceServer) -> None:
-    scheme = FourMicaEvmScheme()
-    for network in SUPPORTED_NETWORKS:
+def _register_4mica_scheme(
+    server: x402ResourceServer | x402ResourceServerSync,
+    schemes: Mapping[str, Any] | None,
+) -> None:
+    """Register the caller's schemes, then the default 4mica scheme for each
+    supported network the caller left alone, such as a `FourMicaEvmScheme`
+    pointed at a self-hosted core or priced in USDT."""
+    for network, scheme in (schemes or {}).items():
         server.register(network, scheme)
-
-
-def _register_4mica_scheme_sync(server: x402ResourceServerSync) -> None:
-    scheme = FourMicaEvmScheme()
+    default = FourMicaEvmScheme()
     for network in SUPPORTED_NETWORKS:
-        server.register(network, scheme)
+        if not server.has_registered_scheme(network, default.scheme):
+            server.register(network, default)
 
 
 # =========================================================================
@@ -41,6 +44,7 @@ def fastapi_payment_middleware_from_config(
     paywall_config: PaywallConfig | None = None,
     paywall_provider: PaywallProvider | None = None,
     sync_facilitator_on_start: bool = True,
+    schemes: Mapping[str, Any] | None = None,
 ):
     facilitators: list[Any] = []
     if facilitator_client is not None:
@@ -52,7 +56,7 @@ def fastapi_payment_middleware_from_config(
         facilitators.append(FourMicaFacilitatorClient())
 
     server = x402ResourceServer(facilitators)
-    _register_4mica_scheme(server)
+    _register_4mica_scheme(server, schemes)
 
     return fastapi_mw.payment_middleware(
         routes,
@@ -75,6 +79,7 @@ def flask_payment_middleware_from_config(
     paywall_config: PaywallConfig | None = None,
     paywall_provider: PaywallProvider | None = None,
     sync_facilitator_on_start: bool = True,
+    schemes: Mapping[str, Any] | None = None,
 ):
     from x402.http.middleware import flask as flask_mw
 
@@ -88,7 +93,7 @@ def flask_payment_middleware_from_config(
         facilitators.append(FourMicaFacilitatorClientSync())
 
     server = x402ResourceServerSync(facilitators)
-    _register_4mica_scheme_sync(server)
+    _register_4mica_scheme(server, schemes)
 
     return flask_mw.payment_middleware(
         app,

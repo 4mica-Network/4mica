@@ -27,11 +27,24 @@ def test_parse_price_accepts_a_validated_asset_amount():
     assert parsed is price
 
 
-def test_parse_price_money_default_conversion():
+def test_parse_price_money_default_conversion(monkeypatch):
+    """A money price resolves to the stablecoin core lists for the network."""
+    from fourmica_sdk import SupportedTokensResponse
+
+    tokens = SupportedTokensResponse.from_rpc(
+        {
+            "chain_id": 84532,
+            "tokens": [
+                {"symbol": "USDT", "address": "0xusdt", "decimals": 6},
+                {"symbol": "USDC", "address": "0xusdc", "decimals": 6},
+            ],
+        }
+    )
+    monkeypatch.setattr(FourMicaEvmScheme, "_load_supported_tokens", staticmethod(lambda _: tokens))
     scheme = FourMicaEvmScheme()
-    parsed = scheme.parse_price("$0.10", "eip155:11155111")
+    parsed = scheme.parse_price("$0.10", "eip155:84532")
     assert parsed.amount == "100000"  # 0.10 USDC with 6 decimals
-    assert parsed.asset == "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+    assert parsed.asset == "0xusdc"
     assert parsed.extra == {}
 
 

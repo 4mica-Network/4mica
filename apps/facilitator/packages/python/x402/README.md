@@ -41,6 +41,19 @@ async def x402_mw(request, call_next):
     return await middleware(request, call_next)
 ```
 
+A `price` such as `"$0.01"` resolves to the USDC 4mica core lists for the network
+(`GET /core/tokens`), so the advertised asset is always one core accepts. To price in
+another listed token or against a self-hosted core, pass your own scheme per network:
+
+```python
+from fourmica_x402.server_scheme import FourMicaEvmScheme
+
+middleware = fastapi_payment_middleware_from_config(
+    routes,
+    schemes={"eip155:84532": FourMicaEvmScheme(stablecoin_symbol="USDT")},
+)
+```
+
 ## Quick Start (Client)
 
 ```python
