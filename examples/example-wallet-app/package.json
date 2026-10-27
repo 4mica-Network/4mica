@@ -1,6 +1,6 @@
 {
   "name": "@4mica/example-wallet-app",
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "Buyer with a UI: a Next.js wallet that deposits collateral and pays for x402 routes with 4Mica credit",
