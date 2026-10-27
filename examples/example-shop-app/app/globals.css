@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "@4mica/tailwind-config/styles.css";
+@config "../tailwind.config.ts";
+
+body {
+  background: rgb(var(--surface-deep));
+  color: rgb(var(--ink-body));
+}

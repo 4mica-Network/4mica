@@ -20,7 +20,7 @@ cp .env.example .env
 | --- | --- |
 | `4MICA_WALLET_PRIVATE_KEY` | The paying wallet. Any funded anvil key locally. |
 | `4MICA_RPC_URL` | `http://127.0.0.1:3000` for a local core. |
-| `NEXT_PUBLIC_SHOP_URL` | The URL the page starts with, default `http://localhost:3000/quote` ([`example-seller-express`](../example-seller-express)). |
+| `NEXT_PUBLIC_SHOP_URL` | The URL the page starts with, default `http://localhost:3010/insight` ([`example-shop-app`](../example-shop-app)); `http://localhost:3000/quote` for [`example-seller-express`](../example-seller-express). |
 
 ## Run
 
