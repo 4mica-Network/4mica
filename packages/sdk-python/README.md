@@ -9,8 +9,8 @@ checkpointed guarantees, and targets core 2.0.0-alpha.4. The 1.x tab model no
 longer exists on the server — see [Migrating from 1.x](#migrating-from-1x).
 
 ```bash
-pip install --pre sdk-4mica          # 2.0 is in pre-release
-pip install --pre "sdk-4mica[cdp]"   # with the Coinbase CDP wallet backend
+pip install sdk-4mica
+pip install "sdk-4mica[cdp]"   # with the Coinbase CDP wallet backend
 ```
 
 Requires Python 3.10+.
