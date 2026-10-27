@@ -1,7 +1,6 @@
 ---
 "@4mica/sdk": major
 "@4mica/sdk-node": major
-"@4mica/sdk-bun": major
 "@4mica/sdk-deno": major
 "@4mica/sdk-next": major
 "@4mica/sdk-express": major

@@ -6,7 +6,6 @@
     [
       "@4mica/sdk",
       "@4mica/sdk-node",
-      "@4mica/sdk-bun",
       "@4mica/sdk-deno",
       "@4mica/sdk-next",
       "@4mica/sdk-express",
@@ -17,5 +16,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@4mica/sdk-nuxt", "@4mica/sdk-sveltekit", "@4mica/sdk-remix"]
+  "ignore": []
 }
