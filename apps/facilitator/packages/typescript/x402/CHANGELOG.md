@@ -1,5 +1,94 @@
 # @4mica/x402
 
+## 2.0.0
+
+### Major Changes
+
+- bcc328f: Base Sepolia is the only default network for now, since it is the one running
+  the 2.0 protocol. `FourMicaEvmScheme.create` connects only to it up front (other
+  networks still connect lazily on a first payment), and the Express middleware
+  registers the 4mica scheme only for it, so a seller on another network registers
+  the scheme explicitly. Before, `create` also connected to Base mainnet and
+  Ethereum Sepolia and failed when either was unreachable.
+- bcc328f: Built on `@4mica/sdk`'s checkpointed guarantees (core 2.0.0-alpha.4).
+
+  - Client: every payment carries the asset's active settlement cycle, which only
+    core knows, so `FourMicaEvmScheme` always signs through a core: the seller's
+    `extra.rpcUrl`, then `coreUrls`, then the hosted deployment. The path that
+    signed locally from an EIP-712 domain in `extra` is removed. The x402
+    `payload` is now `{ payload: { version: "v1", ... }, signature }`.
+  - Server: requirements no longer carry `extra.name`, `extra.version` and
+    `extra.verifyingContract`; a payer reads core's ClearingHouse domain from the
+    core it signs against. `enhancePaymentRequirements` returns the requirements
+    unchanged and makes no call to core. The `FourMicaDomainExtra` type is gone.
+  - The settle response's BLS certificate is replaced by core's guarantee
+    receipt: `FourMicaSettleResponse.certificate` (`CertificateResponse`,
+    `{ claims, signature }`) becomes `receipt` (`GuaranteeReceiptResponse`,
+    `{ receipt, signature }`), lifted from the facilitator's `extra.receipt`.
+    Verify it with `@4mica/sdk`'s `client.payment.verifyGuarantee`.
+  - `FourMicaFacilitatorClient.settle` delegates to `@x402/core`'s client, which
+    parses the facilitator's x402-shaped response as is, and returns a refusal
+    with `success: false` instead of throwing. The `txHash`, `networkId` and
+    `error` aliases on `FourMicaSettleResponse` are gone; read `transaction`,
+    `network` and `errorReason`.
+
+- bcc328f: Facilitator refusals reach the payer, and the client recovers from the ones it
+  can fix.
+
+  - Express: the middlewares wrap `@x402/express` instead of a copy of it. A
+    refused settlement now answers `402` with the facilitator's response in
+    `PAYMENT-RESPONSE` (`errorReason`, `errorMessage`, `extra.retryable`,
+    `extra.details`) rather than a `{ error, details }` body, and routes are
+    matched on the decoded path as well, so an encoded path separator no longer
+    skips payment. `ExpressAdapter` and `setSettlementOverrides` are re-exported
+    from `@x402/express`.
+  - Client: `FourMicaEvmScheme` checkpoints when core asks for one, relearns the
+    active cycle and core's clock after a cycle or timestamp refusal, and waits
+    out a checkpoint cutoff, then has x402 retry the request once.
+  - Built on `@x402/core` and `@x402/express` 2.28.
+
+- 70d83f9: First release on `@4mica/sdk` 2.0 and the tab-free protocol.
+
+  - The tab handshake is gone: clients sign their claim straight from the payment
+    requirements with a random 32-byte `reqId`. `FourMicaFacilitatorClient.openTab`,
+    the `OpenTab*` types, the Express middlewares' `tabConfig` parameter and the
+    server scheme's `advertisedTabEndpoint` are removed. The flat ERC-8004 policy
+    types are replaced by `FourMicaRequirementsExtra` with a nested `validation`.
+  - Server: a `Money` price (`"$0.10"`) resolves to the stablecoin 4mica core lists
+    for the network (`GET /core/tokens`) instead of a hardcoded USDC table, so the
+    advertised `asset` is always one core accepts. `new FourMicaEvmScheme({
+coreUrls?, stablecoinSymbol? })` points a network at a self-hosted core or
+    picks another listed token. The EIP-3009 `name` / `version` hints in `extra`
+    are gone: a 4mica-credit payer signs against core's guarantee domain.
+  - Client: `FourMicaEvmScheme.create(account, { coreUrls?, networks? })`
+    overrides a network's core and limits the up-front connections. The scheme
+    implements `findDefaultAsset` from core's token list, so `@x402/fetch` spend
+    controls accept the advertised asset and apply their USD cap to it.
+  - Express: the middlewares no longer overwrite a scheme server the caller
+    registered for a hosted network, so a self-hosted core on a hosted chain id
+    works.
+  - Supported networks: Base (`eip155:8453`) and Base Sepolia (`eip155:84532`)
+    for x402 v1 and v2; Ethereum Sepolia for v1 only.
+
+### Minor Changes
+
+- 9136814: The server scheme advertises core's EIP-712 domain on every requirement, as
+  `extra.name`, `extra.version` and `extra.verifyingContract` (`eip712_name`,
+  `eip712_version` and `contract_address` from `GET /core/public-params`, fetched
+  once per network). The client signs from those fields when they are present
+  instead of connecting to core, taking the chain id from `network`, so a payer
+  needs no core URL for a seller that advertises them. Requirements without them
+  are signed as before.
+
+### Patch Changes
+
+- Updated dependencies [bcc328f]
+- Updated dependencies [bcc328f]
+- Updated dependencies [34eada6]
+- Updated dependencies [8998b02]
+- Updated dependencies [6b0974a]
+  - @4mica/sdk@2.0.0
+
 ## 2.0.0-alpha.2
 
 ### Major Changes
