@@ -2906,7 +2906,7 @@ dependencies = [
 
 [[package]]
 name = "facilitator-4mica"
-version = "1.0.0"
+version = "2.0.0"
 dependencies = [
  "alloy",
  "anyhow",
