@@ -248,7 +248,9 @@ payment = await flow.sign_payment(requirements)
 # (v2 uses sign_payment_v2 and the PAYMENT-SIGNATURE header)
 
 # or settle directly against a facilitator:
-settled = await flow.settle_payment(payment, requirements, "https://testnet.payment.4mica.io")
+settled = await flow.settle_payment(
+    payment, requirements, "https://testnet.payment.4mica.io"
+)
 print(settled.settlement.success, settled.settlement.receipt)
 ```
 
