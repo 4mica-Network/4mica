@@ -114,15 +114,13 @@ describe('FourMicaEvmScheme', () => {
     })
   })
 
-  it('connects to every hosted network up front by default', async () => {
+  it('connects to Base Sepolia up front by default', async () => {
     const connect = spyOnConnect().mockResolvedValue(payer({}))
 
     await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
     expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
-      'https://ethereum.sepolia.api.4mica.io/',
       'https://base.sepolia.api.4mica.io/',
-      'https://base.api.4mica.io/',
     ])
   })
 

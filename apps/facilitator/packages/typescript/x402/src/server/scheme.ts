@@ -10,7 +10,9 @@ import type {
   SchemeNetworkServer,
 } from '@x402/core/types'
 
-export const SUPPORTED_NETWORKS: Network[] = ['eip155:11155111', 'eip155:84532', 'eip155:8453']
+// Base Sepolia only for now: it is the one network running the 2.0 protocol.
+// Another network still works when its scheme is registered explicitly.
+export const SUPPORTED_NETWORKS: Network[] = ['eip155:84532']
 
 /** The token a `Money` price resolves to, as core lists it for the network. */
 export interface DefaultAsset {

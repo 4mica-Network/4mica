@@ -130,7 +130,7 @@ The recommended middleware factory for most use cases. Automatically configures 
     accepts: {
       scheme: "4mica-credit",
       price: "$0.10",
-      network: "eip155:84532", // or "eip155:8453" for Base mainnet
+      network: "eip155:84532", // Base Sepolia
       payTo: "0xRecipientAddress",
     },
     description: "What the user is paying for",
@@ -164,9 +164,11 @@ const extra = {
 
 #### Supported Networks
 
-- `eip155:8453` - Base
 - `eip155:84532` - Base Sepolia
-- `eip155:11155111` - Ethereum Sepolia (x402 v1 only)
+
+Base Sepolia is the one network running the 2.0 protocol today, so it is the only one the
+middleware and `FourMicaEvmScheme.create` set up by default. Base mainnet joins when it is
+upgraded.
 
 A `price` such as `"$0.10"` resolves to the stablecoin 4mica core lists for the network
 (`GET /core/tokens`), so the advertised `asset` is always one core accepts. Pass
@@ -258,7 +260,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ### Paying on a self-hosted core
 
-`FourMicaEvmScheme.create` connects to every hosted network up front. A payer always signs
+`FourMicaEvmScheme.create` connects to Base Sepolia up front. A payer always signs
 through a core, since every payment carries the asset's active settlement cycle, which only core
 knows. Pass `coreUrls` to override a network's core API URL and `networks` to limit the
 connections to the ones you use; a resource server can also steer payers with `extra.rpcUrl` in

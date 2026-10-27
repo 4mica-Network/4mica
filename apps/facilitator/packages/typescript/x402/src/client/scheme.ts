@@ -28,7 +28,7 @@ export interface FourMicaEvmSchemeClientOptions {
    */
   coreUrls?: Partial<Record<Network, string>>
   /**
-   * Networks to connect to up front. Defaults to every hosted network plus the
+   * Networks to connect to up front. Defaults to `SUPPORTED_NETWORKS` plus the
    * keys of `coreUrls`. Any other network connects lazily on its first payment.
    */
   networks?: Network[]

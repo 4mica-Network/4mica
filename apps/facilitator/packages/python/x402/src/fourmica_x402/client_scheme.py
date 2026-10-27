@@ -266,8 +266,8 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
 def create_default_client_scheme(
     private_key: str, core_urls: Optional[Mapping[str, str]] = None
 ) -> FourMicaEvmScheme:
-    """A scheme connected up front to every hosted network and to each network
-    in *core_urls*."""
+    """A scheme connected up front to each network in ``SUPPORTED_NETWORKS``
+    and in *core_urls*."""
     scheme = FourMicaEvmScheme(private_key, core_urls)
     for network in dict.fromkeys([*SUPPORTED_NETWORKS, *(core_urls or {})]):
         rpc_url = scheme._core_url(network)

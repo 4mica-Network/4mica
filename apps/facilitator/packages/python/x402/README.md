@@ -28,7 +28,7 @@ routes = {
         "accepts": {
             "scheme": "4mica-credit",
             "price": "$0.01",
-            "network": "eip155:11155111",
+            "network": "eip155:84532",
             "payTo": "0xRecipient",
         }
     }
@@ -49,7 +49,7 @@ from x402.http.clients import x402_requests
 from fourmica_x402.client_scheme import FourMicaEvmScheme
 
 client = x402ClientSync()
-client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+client.register("eip155:84532", FourMicaEvmScheme("0xYourPrivateKey"))
 
 session = x402_requests(client)
 resp = session.get("https://api.example.com/premium")
