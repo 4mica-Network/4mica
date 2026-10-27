@@ -19,7 +19,7 @@ Add the SDK to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sdk-4mica = "2.0.0-alpha.4"
+sdk-4mica = "2.0"
 ```
 
 `new_payment` and `X402Flow` generate the request id and blinding salt for you, so nothing extra
