@@ -28,10 +28,6 @@ const unauthorized = (reply: FastifyReply) =>
     message: "A valid API key is required. Send it as `Authorization: Bearer`.",
   });
 
-/**
- * Enough of a presented key to tell keys apart in a log — the same prefix the
- * dashboard shows — and never enough to use one.
- */
 const loggablePrefix = (token: string): string => token.slice(0, 13);
 
 const rejected = (

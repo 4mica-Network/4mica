@@ -52,10 +52,8 @@ export const CreateAgentSchema = v.object({
   status: v.optional(AgentStatusInputSchema, "PENDING"),
   visibility: v.optional(PublicVisibilitySchema, "PRIVATE"),
   network: v.optional(PaymentNetworkSchema, "ETHEREUM_SEPOLIA"),
-
   payerWalletId: v.optional(v.nullable(walletId)),
   creditLimit: v.optional(decimalAmount, "0"),
-
   walletId: v.optional(v.nullable(walletId)),
   assetAddress: v.optional(v.nullable(address)),
   priceAmount: v.optional(v.nullable(positiveDecimalAmount)),
@@ -75,10 +73,8 @@ export const UpdateAgentSchema = v.partial(
     status: AgentStatusInputSchema,
     visibility: PublicVisibilitySchema,
     network: PaymentNetworkSchema,
-
     payerWalletId: v.nullable(walletId),
     creditLimit: decimalAmount,
-
     walletId: v.nullable(walletId),
     assetAddress: v.nullable(address),
     priceAmount: v.nullable(positiveDecimalAmount),

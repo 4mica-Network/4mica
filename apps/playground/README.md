@@ -37,8 +37,9 @@ runs without a session, and `authenticated` reuses the saved one.
 ```bash
 pnpm --filter @4mica/playground test:e2e     # or test:e2e:ui
 pnpm --filter @4mica/dashboard test:e2e
-pnpm --filter @4mica/ui test:e2e            # every Storybook story and docs page
-pnpm test:e2e                                # all three, through turbo
+pnpm --filter @4mica/ui test:e2e            # every Storybook story, plus component behaviour
+pnpm --filter @4mica/web test:e2e           # static export on 6 browser/device projects
+pnpm test:e2e                                # all four, through turbo
 ```
 
 The config starts what it needs (`next dev` here; `apps/be` plus Vite for the
