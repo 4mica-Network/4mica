@@ -14,7 +14,7 @@ import {
   type LucideIcon,
   UserCog,
 } from "lucide-react";
-import { type ReactNode, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
@@ -281,6 +281,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     window.open(profileUrl, "_blank", "noopener,noreferrer");
   };
 
+  const [settled, setSettled] = useState(!collapsed);
+
+  useEffect(() => {
+    if (collapsed) {
+      setSettled(false);
+    }
+  }, [collapsed]);
+
   const copyLabel = copied
     ? t("sidebar.copied")
     : t("sidebar.copyPublicProfile");
@@ -290,6 +298,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       initial={false}
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
+      onAnimationComplete={() => setSettled(!collapsed)}
       className="flex h-screen shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
@@ -342,7 +351,15 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       <div className="p-3">
         {!inSettings && (
           <>
-            {!collapsed && <SidebarBanners />}
+            {!collapsed && settled && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <SidebarBanners />
+              </motion.div>
+            )}
             <div className="flex flex-col gap-0.5">
               <ActionRow
                 icon={Eye}
