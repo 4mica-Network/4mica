@@ -22,7 +22,7 @@ import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
 const EXPANDED_WIDTH = 256;
-const COLLAPSED_WIDTH = 60;
+export const COLLAPSED_WIDTH = 60;
 const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
 
 const rowClass = (active: boolean) =>

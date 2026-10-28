@@ -14,6 +14,8 @@
   "sidebar.preferences": "Preferences",
   "sidebar.signOut": "Sign out",
   "sidebar.version": "v{{version}}",
+  "shell.unsupported.title": "Open 4Mica on a larger screen",
+  "shell.unsupported.body": "The dashboard isn't available on small screens yet. Please switch to a tablet or desktop to continue.",
   "banner.learnMore": "Learn more",
   "banner.dismiss": "Dismiss",
   "store.banner.failedTitle": "Something went wrong",
