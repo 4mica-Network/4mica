@@ -14,7 +14,7 @@ import {
 } from "@stores/wallet/selector";
 import type { Wallet } from "@stores/wallet/type";
 import { useEffect, useId } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import {
   FieldRow,
@@ -59,7 +59,8 @@ export function EditWalletModal({
     },
   });
 
-  const { handleSubmit, reset, setError } = form;
+  const { handleSubmit, reset, setError, control } = form;
+  const label = useWatch({ control, name: "label" });
   const formId = useId();
 
   useEffect(() => {
@@ -128,6 +129,7 @@ export function EditWalletModal({
             loading={isSaving}
             type="submit"
             form={formId}
+            disabled={!label?.trim()}
             data-testid="edit-wallet-submit"
           >
             {t("wallet.edit.save")}

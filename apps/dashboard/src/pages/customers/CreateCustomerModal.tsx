@@ -131,7 +131,8 @@ export function CreateCustomerModal({
   );
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canSubmit = Boolean(name?.trim()) && !isSaving;
+  const hasName = Boolean(name?.trim());
+  const canSubmit = hasName && !isSaving;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (isLastStep) {
@@ -189,6 +190,7 @@ export function CreateCustomerModal({
                 className="btn-no-lift min-w-32"
                 type="submit"
                 form={formId}
+                disabled={!hasName}
                 data-testid="create-customer-next"
               >
                 {t("customer.create.next")}

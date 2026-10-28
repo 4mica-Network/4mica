@@ -47,8 +47,8 @@ export function CustomerToolbar({
       title: t(option.titleKey),
     }));
 
-  if (selectedIds.length > 0) {
-    return (
+  const selectionBar =
+    selectedIds.length > 0 ? (
       <ListToolbar.SelectionBar
         ns="customer"
         testIdPrefix="customer"
@@ -62,8 +62,7 @@ export function CustomerToolbar({
         }
         onBatchDelete={onBatchDelete}
       />
-    );
-  }
+    ) : undefined;
 
   return (
     <ListToolbar className="@5xl:flex-col @5xl:items-stretch">
@@ -74,7 +73,7 @@ export function CustomerToolbar({
         data-testid="customer-search"
       />
 
-      <ListToolbar.Filters>
+      <ListToolbar.Filters overlay={selectionBar}>
         <ListToolbar.Filter<CustomerType | "">
           label={t("list.filter.type")}
           value={filters.type}

@@ -30,8 +30,8 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
     selectIsAgentPending(agentPendingKeys.batchDelete),
   );
 
-  if (selectedIds.length > 0) {
-    return (
+  const selectionBar =
+    selectedIds.length > 0 ? (
       <ListToolbar.SelectionBar
         ns="agent"
         testIdPrefix="agent"
@@ -45,8 +45,7 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
         }
         onBatchDelete={onBatchDelete}
       />
-    );
-  }
+    ) : undefined;
 
   return (
     <ListToolbar>
@@ -57,7 +56,7 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
         data-testid="agent-search"
       />
 
-      <ListToolbar.Filters>
+      <ListToolbar.Filters overlay={selectionBar}>
         <ListToolbar.Filter<PublicVisibility | "">
           label={t("list.filter.visibility")}
           value={filters.visibility}
