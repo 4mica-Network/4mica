@@ -182,7 +182,7 @@ describe("route inventory", () => {
         (key) =>
           !PUBLIC.has(key) &&
           !/^[A-Z]+ \/(me|v1)(\/|$)/.test(key) &&
-          !/^[A-Z]+ \/(banners|webhook-events)(\/|$)/.test(key),
+          !/^[A-Z]+ \/(banners|config|webhook-events)(\/|$)/.test(key),
       ),
     ).toEqual([]);
   });

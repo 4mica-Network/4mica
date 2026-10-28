@@ -24,6 +24,7 @@ import {
 import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useBusinessTypeOptions } from "@/hooks/useBusinessTypeOptions";
+import { useConfigOptions, useCountryOptions } from "@/hooks/useConfigOptions";
 import { useDraft } from "@/hooks/useDraft";
 
 type FieldKind = "required" | "url" | "email" | "phone" | "country";
@@ -48,13 +49,11 @@ const FIELD_RULES: Record<string, { max: number; kind?: FieldKind }> = {
   statementDescriptor: { max: 22 },
 };
 
-const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"].map(
-  (code) => ({ title: code, value: code }),
-);
-
 export function BusinessSettings() {
   const { t } = useTranslation();
   const businessTypes = useBusinessTypeOptions();
+  const currencies = useConfigOptions("currencies");
+  const countries = useCountryOptions();
   const dispatch = useAppDispatch();
   const business = useAppSelector(selectBusiness);
   const issues = useAppSelector(selectValidationIssues);
@@ -486,15 +485,13 @@ export function BusinessSettings() {
             description={t("settings.business.countryHint")}
             htmlFor="business-country"
           >
-            <TextInput
+            <Select
               id="business-country"
-              autoComplete="country"
               value={address.draft.country}
               error={fieldErrors.country ?? issues.country}
-              maxLength={2}
-              placeholder="US"
-              format="uppercase"
-              onChange={(v) => address.set("country", v.slice(0, 2))}
+              options={countries}
+              hasSearch
+              onChange={(v) => address.set("country", v)}
             />
           </FieldRow>
         </EditableCard>
@@ -514,7 +511,7 @@ export function BusinessSettings() {
             <Select
               id="business-currency"
               value={business?.payoutCurrency ?? "USD"}
-              options={CURRENCIES}
+              options={currencies}
               hasSearch
               onChange={(v) =>
                 dispatch(

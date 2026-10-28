@@ -22,11 +22,15 @@ import {
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";
 import { Pencil, Trash2, Users } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, SettingRow, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import {
+  useCountryOptions,
+  useTranslatedConfigOptions,
+} from "@/hooks/useConfigOptions";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { type FieldError, type OwnerDraft, ownerErrors } from "./validation";
 
@@ -87,14 +91,8 @@ function OwnerForm({
   const [draft, setDraft] = useState(initial);
   const errors = ownerErrors(draft);
 
-  const roles = useMemo(
-    () =>
-      Object.values(OWNER_ROLE).map((role) => ({
-        title: t(`compliance.role.${role}`),
-        value: role,
-      })),
-    [t],
-  );
+  const roles = useTranslatedConfigOptions("ownerRoles", "compliance.role");
+  const countries = useCountryOptions();
 
   const set = <K extends keyof OwnerDraft>(key: K, value: OwnerDraft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -177,14 +175,13 @@ function OwnerForm({
         description={t("compliance.people.nationalityHint")}
         htmlFor={`${id}-nationality`}
       >
-        <TextInput
+        <Select
           id={`${id}-nationality`}
           value={draft.nationality}
           error={draft.nationality === "" ? undefined : message("nationality")}
-          maxLength={2}
-          placeholder="GB"
-          format="uppercase"
-          onChange={(v) => set("nationality", v.slice(0, 2))}
+          options={countries}
+          hasSearch
+          onChange={(v) => set("nationality", v)}
         />
       </FieldRow>
 
@@ -193,7 +190,7 @@ function OwnerForm({
         description={t("compliance.people.residenceHint")}
         htmlFor={`${id}-residence`}
       >
-        <TextInput
+        <Select
           id={`${id}-residence`}
           value={draft.countryOfResidence}
           error={
@@ -201,10 +198,9 @@ function OwnerForm({
               ? undefined
               : message("countryOfResidence")
           }
-          maxLength={2}
-          placeholder="GB"
-          format="uppercase"
-          onChange={(v) => set("countryOfResidence", v.slice(0, 2))}
+          options={countries}
+          hasSearch
+          onChange={(v) => set("countryOfResidence", v)}
         />
       </FieldRow>
 

@@ -29,6 +29,18 @@ const renderPage = (compliance: Partial<ComplianceState> = {}) => {
   const state = {
     compliance: { ...INITIAL_STATE, hasLoaded: true, ...compliance },
     user: { business: null },
+    config: {
+      config: {
+        countries: [
+          { code: "DE", name: "Germany" },
+          { code: "GB", name: "United Kingdom" },
+        ],
+        monthlyVolumes: ["UNDER_10K"],
+        customerBases: ["BOTH"],
+        fundsSources: ["LOANS"],
+        ownerRoles: ["OWNER", "DIRECTOR"],
+      },
+    },
   };
 
   const store = {
@@ -114,8 +126,12 @@ describe("compliance page", () => {
     );
     await userEvent.type(screen.getByLabelText("Ownership"), "40");
     await userEvent.type(screen.getByLabelText("Date of birth"), "1971-12-26");
-    await userEvent.type(screen.getByLabelText("Nationality"), "gb");
-    await userEvent.type(screen.getByLabelText("Country of residence"), "gb");
+    for (const label of ["Nationality", "Country of residence"]) {
+      await userEvent.click(screen.getByLabelText(label));
+      await userEvent.click(
+        await screen.findByRole("option", { name: "United Kingdom (GB)" }),
+      );
+    }
 
     const submit = screen
       .getAllByRole("button", { name: "Add a person" })

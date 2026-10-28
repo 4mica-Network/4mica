@@ -1059,3 +1059,60 @@ export const complianceResponseSchema = {
     missing: { type: "array", items: str },
   },
 } as const;
+
+const strList = { type: "array", items: str } as const;
+
+export const configResponseSchema = {
+  type: "object",
+  required: [
+    "version",
+    "countries",
+    "timezones",
+    "currencies",
+    "languages",
+    "themes",
+    "homes",
+    "notificationPlacements",
+    "businessTypes",
+    "monthlyVolumes",
+    "customerBases",
+    "fundsSources",
+    "ownerRoles",
+    "networks",
+  ],
+  properties: {
+    version: str,
+    countries: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["code", "name"],
+        properties: { code: str, name: str },
+      },
+    },
+    timezones: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["city", "timezone", "pop", "gmtOffset"],
+        properties: {
+          city: str,
+          timezone: str,
+          pop: { type: "number" },
+          gmtOffset: str,
+        },
+      },
+    },
+    currencies: strList,
+    languages: strList,
+    themes: strList,
+    homes: strList,
+    notificationPlacements: strList,
+    businessTypes: strList,
+    monthlyVolumes: strList,
+    customerBases: strList,
+    fundsSources: strList,
+    ownerRoles: strList,
+    networks: strList,
+  },
+} as const;

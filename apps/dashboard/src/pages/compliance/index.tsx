@@ -10,14 +10,11 @@ import {
   selectIsComplianceLoading,
   selectIsComplianceLocked,
 } from "@stores/compliance/selector";
-import {
-  type ComplianceUpdate,
-  CUSTOMER_BASE,
-  type CustomerBase,
-  FUNDS_SOURCE,
-  type FundsSource,
-  MONTHLY_VOLUME,
-  type MonthlyVolume,
+import type {
+  ComplianceUpdate,
+  CustomerBase,
+  FundsSource,
+  MonthlyVolume,
 } from "@stores/compliance/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import type { RootState } from "@stores/index";
@@ -36,6 +33,10 @@ import {
 import { SettingsSection } from "@/components/layout";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsPage } from "@/components/SettingsPage";
+import {
+  useCountryOptions,
+  useTranslatedConfigOptions,
+} from "@/hooks/useConfigOptions";
 import { useDraft } from "@/hooks/useDraft";
 import { OwnersCard } from "./OwnersCard";
 import { ReviewCard } from "./ReviewCard";
@@ -59,6 +60,19 @@ const isSaving = (section: string) => (state: RootState) =>
 export function ComplianceSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const countries = useCountryOptions();
+  const volumes = useTranslatedConfigOptions(
+    "monthlyVolumes",
+    "compliance.volume",
+  );
+  const customerBases = useTranslatedConfigOptions(
+    "customerBases",
+    "compliance.customerBase",
+  );
+  const fundsSources = useTranslatedConfigOptions(
+    "fundsSources",
+    "compliance.fundsSource",
+  );
   const profile = useAppSelector(selectComplianceProfile);
   const issues = useAppSelector(selectComplianceIssues);
   const locked = useAppSelector(selectIsComplianceLocked);
@@ -179,19 +193,6 @@ export function ComplianceSettings() {
       updateCompliance(blankFieldsToNull(changes) as ComplianceUpdate, section),
     );
 
-  const volumes = Object.values(MONTHLY_VOLUME).map((value) => ({
-    title: t(`compliance.volume.${value}`),
-    value,
-  }));
-  const customerBases = Object.values(CUSTOMER_BASE).map((value) => ({
-    title: t(`compliance.customerBase.${value}`),
-    value,
-  }));
-  const fundsSources = Object.values(FUNDS_SOURCE).map((value) => ({
-    title: t(`compliance.fundsSource.${value}`),
-    value,
-  }));
-
   const attestationNote = (signedAt: string | null) =>
     signedAt
       ? t("compliance.attest.signedOn", { date: formatDate(signedAt) })
@@ -240,20 +241,17 @@ export function ComplianceSettings() {
                 description={t("compliance.incorporation.countryHint")}
                 htmlFor="compliance-incorporation-country"
               >
-                <TextInput
+                <Select
                   id="compliance-incorporation-country"
                   value={incorporation.draft.incorporationCountry}
                   error={text(
                     incorporationErrors.incorporationCountry,
                     "incorporationCountry",
                   )}
-                  maxLength={2}
-                  placeholder="GB"
-                  format="uppercase"
+                  options={countries}
+                  hasSearch
                   disabled={locked}
-                  onChange={(v) =>
-                    incorporation.set("incorporationCountry", v.slice(0, 2))
-                  }
+                  onChange={(v) => incorporation.set("incorporationCountry", v)}
                 />
               </FieldRow>
               <FieldRow

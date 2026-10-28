@@ -36,6 +36,8 @@
     "@prisma/client": "catalog:",
     "axios": "catalog:",
     "bullmq": "catalog:",
+    "city-timezones": "catalog:",
+    "dayjs": "catalog:",
     "dotenv": "catalog:",
     "fastify": "catalog:",
     "valibot": "catalog:",

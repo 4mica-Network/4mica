@@ -4,6 +4,7 @@ import apiListingSaga from "./apiListing/saga";
 import balanceSaga from "./balance/saga";
 import bannerSaga from "./banner/saga";
 import complianceSaga from "./compliance/saga";
+import configSaga from "./config/saga";
 import customerSaga from "./customer/saga";
 import developerSaga from "./developer/saga";
 import paymentSaga from "./payment/saga";
@@ -26,5 +27,6 @@ export default function* rootSaga() {
     ...customerSaga,
     ...resourceKeySaga,
     ...complianceSaga,
+    ...configSaga,
   ]);
 }

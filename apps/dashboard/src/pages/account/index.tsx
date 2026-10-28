@@ -9,43 +9,41 @@ import { InstantCard } from "@/components/EditableCard";
 import { FieldRow, Select, SettingRow, SwitchCard } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
+import { useConfigOptions, useTimezoneOptions } from "@/hooks/useConfigOptions";
 
-const THEMES = [
-  { title: "Dark", value: "dark" },
-  { title: "Light", value: "light" },
-  { title: "System", value: "system" },
-];
+const THEME_LABELS: Record<string, string> = {
+  dark: "Dark",
+  light: "Light",
+  system: "System",
+};
 
-const LANGUAGES = [
-  { title: "English", value: "en" },
-  { title: "Deutsch", value: "de" },
-  { title: "Français", value: "fr" },
-  { title: "Español", value: "es" },
-];
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  de: "Deutsch",
+  fr: "Français",
+  es: "Español",
+};
 
-const HOMES = [
-  { title: "Overview", value: "overview" },
-  { title: "Balances", value: "balances" },
-  { title: "Transactions", value: "transactions" },
-  { title: "Payments", value: "payments" },
-  { title: "Agents", value: "agents" },
-];
+const HOME_LABELS: Record<string, string> = {
+  overview: "Overview",
+  balances: "Balances",
+  transactions: "Transactions",
+  payments: "Payments",
+  agents: "Agents",
+};
 
-const TIMEZONES = [
-  "UTC",
-  "Europe/London",
-  "Europe/Berlin",
-  "America/New_York",
-  "America/Los_Angeles",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Australia/Sydney",
-].map((zone) => ({ title: zone, value: zone }));
+const themeLabel = (value: string) => THEME_LABELS[value] ?? value;
+const languageLabel = (value: string) => LANGUAGE_LABELS[value] ?? value;
+const homeLabel = (value: string) => HOME_LABELS[value] ?? value;
 
 export function AccountSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
+  const languages = useConfigOptions("languages", languageLabel);
+  const themes = useConfigOptions("themes", themeLabel);
+  const homes = useConfigOptions("homes", homeLabel);
+  const timezones = useTimezoneOptions();
   const savingGeneral = useAppSelector(selectIsSectionSaving("general"));
   const savingHome = useAppSelector(selectIsSectionSaving("defaultHome"));
   const savingPrivacy = useAppSelector(selectIsSectionSaving("privacyMode"));
@@ -76,7 +74,7 @@ export function AccountSettings() {
             <Select
               id="account-language"
               value={user.language}
-              options={LANGUAGES}
+              options={languages}
               onChange={(v) => set("language", v, "general")}
             />
           </FieldRow>
@@ -89,7 +87,7 @@ export function AccountSettings() {
             <Select
               id="account-timezone"
               value={user.timeZone}
-              options={TIMEZONES}
+              options={timezones}
               hasSearch
               onChange={(v) => set("timeZone", v, "general")}
             />
@@ -103,7 +101,7 @@ export function AccountSettings() {
             <Select
               id="account-app-theme"
               value={user.appTheme}
-              options={THEMES}
+              options={themes}
               onChange={(v) => set("appTheme", v, "general")}
             />
           </FieldRow>
@@ -116,7 +114,7 @@ export function AccountSettings() {
             <Select
               id="account-theme"
               value={user.theme}
-              options={THEMES}
+              options={themes}
               onChange={(v) => set("theme", v, "general")}
             />
           </FieldRow>
@@ -131,7 +129,7 @@ export function AccountSettings() {
             <Select
               id="account-home"
               value={user.defaultHome}
-              options={HOMES}
+              options={homes}
               onChange={(v) => set("defaultHome", v)}
             />
           </SettingRow>

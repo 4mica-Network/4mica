@@ -43,6 +43,8 @@ const isTimeZone = (value: string): boolean => {
 
 export const LANGUAGES = ["en", "de", "fr", "es"] as const;
 
+export const THEMES = ["dark", "light", "system"] as const;
+
 export const DEFAULT_HOMES = [
   "overview",
   "balances",
@@ -113,8 +115,8 @@ export const UpdateAccountSchema = v.partial(
   v.object({
     email: email(255),
     phoneNumber: v.nullable(phoneNumber),
-    theme: v.picklist(["dark", "light", "system"]),
-    appTheme: v.picklist(["dark", "light", "system"]),
+    theme: v.picklist(THEMES),
+    appTheme: v.picklist(THEMES),
     language: v.picklist(LANGUAGES, "is not a supported language"),
     timeZone: v.pipe(
       v.string(),

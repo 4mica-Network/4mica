@@ -4,6 +4,7 @@ import { apiListingRoutes } from "./api-listings";
 import { balanceRoutes } from "./balances";
 import { bannerRoutes } from "./banners";
 import { complianceRoutes } from "./compliance";
+import { configRoutes } from "./config";
 import { customerRoutes } from "./customers";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
@@ -36,6 +37,7 @@ export const routes: RouteRegistration[] = [
   { plugin: trustRoutes },
   { plugin: resourceKeyRoutes },
   { plugin: complianceRoutes },
+  { plugin: configRoutes },
 ];
 
 export {
