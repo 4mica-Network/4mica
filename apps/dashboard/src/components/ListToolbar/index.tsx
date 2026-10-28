@@ -19,13 +19,15 @@ function Root({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-center",
-        className,
-      )}
-    >
-      {children}
+    <div className="@container">
+      <div
+        className={cn(
+          "flex @5xl:flex-row flex-col @5xl:items-start gap-3",
+          className,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -58,7 +60,7 @@ function Search({
   );
 
   return (
-    <div className="min-w-0 sm:w-80">
+    <div className="@5xl:w-72 w-full min-w-0 @5xl:shrink-0">
       <InputField
         type="search"
         value={term}
@@ -76,7 +78,11 @@ function Search({
 }
 
 function Filters({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap gap-3">{children}</div>;
+  return (
+    <div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
+      {children}
+    </div>
+  );
 }
 
 function Filter<T extends string>({
@@ -84,7 +90,7 @@ function Filter<T extends string>({
   value,
   options,
   onChange,
-  className = "sm:w-44",
+  className,
   "data-testid": testId,
 }: {
   label: string;
@@ -95,7 +101,7 @@ function Filter<T extends string>({
   "data-testid"?: string;
 }) {
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("min-w-0", className)}>
       <Select
         aria-label={label}
         value={value}

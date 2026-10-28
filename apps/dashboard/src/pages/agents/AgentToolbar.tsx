@@ -60,7 +60,6 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
       <ListToolbar.Filters>
         <ListToolbar.Filter<PublicVisibility | "">
           label={t("list.filter.visibility")}
-          className="sm:w-40"
           value={filters.visibility}
           options={[
             { value: "", title: t("agent.toolbar.allVisibilities") },

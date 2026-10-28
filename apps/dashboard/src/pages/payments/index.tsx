@@ -91,7 +91,6 @@ export function Payments() {
           <ListToolbar.Filters>
             <ListToolbar.Filter<PaymentDirection | "">
               label={t("list.filter.direction")}
-              className="sm:w-40"
               value={filters.direction}
               options={[
                 { value: "", title: t("payment.toolbar.allDirections") },
@@ -106,7 +105,6 @@ export function Payments() {
 
             <ListToolbar.Filter<PaymentStatus | "">
               label={t("list.filter.status")}
-              className="sm:w-40"
               value={filters.status}
               options={[
                 { value: "", title: t("payment.toolbar.allStatuses") },
@@ -131,7 +129,6 @@ export function Payments() {
 
             <ListToolbar.Filter<string>
               label={t("payment.toolbar.wallet")}
-              className="sm:w-52"
               value={filters.wallet}
               options={[
                 { value: "", title: t("payment.toolbar.allWallets") },

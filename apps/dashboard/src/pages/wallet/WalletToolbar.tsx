@@ -63,7 +63,6 @@ export function WalletToolbar({
       <ListToolbar.Filters>
         <ListToolbar.Filter<WalletStatus | "">
           label={t("list.filter.status")}
-          className="sm:w-40"
           value={filters.status}
           options={[
             { value: "", title: t("wallet.toolbar.allStatuses") },
