@@ -29,7 +29,7 @@
       "!packages/cli/templates",
       "!apps/**/coverage",
       "!apps/**/cypress",
-      "!apps/**/test-results",
+      "!**/test-results",
       "!apps/**/dev-dist",
       "!apps/web/out",
       "!packages/db/src/generated",

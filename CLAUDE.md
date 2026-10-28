@@ -88,7 +88,7 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 
 - **Data-driven content**: solutions/FAQs/team are typed TS data (e.g. `apps/web/i18n/locales/en/solutions.ts` with `getSolution(slug)`); dynamic routes use `generateStaticParams()`. SEO metadata is built from factories in `apps/web/seo/`.
 
-- **Tests**: Vitest (jsdom, v8 coverage), co-located `*.test.ts(x)`, global setup in `vitest.setup.ts`.
+- **Tests**: Vitest (jsdom, v8 coverage), co-located `*.test.ts(x)`, global setup in `vitest.setup.ts`. Browser tests for `apps/dashboard` and `apps/playground` are Playwright, kept in each app's `playwright/` folder with the config at `playwright.config.ts`, run with `test:e2e` (never part of `test`, which the pre-commit hook runs). Both apps are Google-only Clerk apps, so the `setup` project signs in with `@clerk/testing` and needs `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL` and a seed run with `SEED_CLERK_USER_ID` — see the "End-to-end tests" section of `apps/playground/README.md`. `packages/ui` has the same layout: its suite starts Storybook, reads `index.json` and renders every story and docs entry. The Playwright agent skill is checked in at `.agents/skills/playwright-cli/`.
 
 ## Deployment
 

@@ -41,6 +41,17 @@ export const Invert: Story = {
 export const Danger: Story = {
   args: { intent: "danger", children: "Delete" },
 };
+export const Disabled: Story = {
+  args: { intent: "primary", disabled: true },
+};
+export const Block: Story = {
+  args: { intent: "primary", block: true, children: "Continue" },
+  render: (args) => (
+    <div className="w-80">
+      <Button {...args} />
+    </div>
+  ),
+};
 export const Loading: Story = {
   args: { intent: "invert", loading: true, children: "Save changes" },
 };

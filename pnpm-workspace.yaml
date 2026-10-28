@@ -31,6 +31,7 @@ catalog:
   # @clerk/clerk-react ^5.61.9, the exact versions above. 7.x would pull
   # @clerk/backend ^3 and fork a second major alongside @4mica/be.
   '@clerk/nextjs': ^6.39.6
+  '@clerk/testing': ^2.2.52
   '@coinbase/cdp-sdk': ^1.49.2
   '@fastify/cors': ^11.3.0
   '@fastify/rate-limit': ^11.2.0
@@ -39,6 +40,7 @@ catalog:
   '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': ^1.30.0
   '@noble/curves': ^2.2.0
+  '@playwright/test': ^1.64.1
   '@prisma/adapter-pg': 7.9.1
   '@prisma/client': 7.9.1
   '@quillai-network/wachai-validation-sdk': ^0.1.0

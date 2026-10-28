@@ -27,6 +27,40 @@ pnpm --filter @4mica/playground dev          # http://localhost:3100
 
 Then open <http://localhost:3100/4mica-workspace>.
 
+## End-to-end tests
+
+Both this app and `apps/dashboard` carry a Playwright suite in `playwright/`
+(config at `playwright.config.ts`). Each has three projects: `setup` signs in
+through Clerk and saves the session to `playwright/.clerk/user.json`, `public`
+runs without a session, and `authenticated` reuses the saved one.
+
+```bash
+pnpm --filter @4mica/playground test:e2e     # or test:e2e:ui
+pnpm --filter @4mica/dashboard test:e2e
+pnpm --filter @4mica/ui test:e2e            # every Storybook story and docs page
+pnpm test:e2e                                # all three, through turbo
+```
+
+The config starts what it needs (`next dev` here; `apps/be` plus Vite for the
+dashboard) and reuses servers that are already listening. Postgres must be up
+and seeded. The Playwright agent skill lives in
+`.agents/skills/playwright-cli/`; refresh it with
+`pnpm --filter @4mica/dashboard exec playwright cli install --skills` from the
+repo root.
+
+Both apps sign in with Google only, so the `setup` project uses
+`@clerk/testing`'s backend sign-in token instead of the UI. That needs, once:
+
+1. A user on the Clerk **development** instance, e.g.
+   `e2e+clerk_test@example.com`. No password: the token bypasses OAuth.
+2. `SEED_CLERK_USER_ID=<that user's id>` in `apps/be/.env`, then
+   `pnpm db:seed` again. The seeded `@4mica-workspace` profile, its agents and
+   listings now belong to the test user, and its onboarding is already marked
+   complete — a fresh Clerk user would otherwise meet the dashboard's blocking
+   onboarding modal with no data behind it.
+3. `E2E_CLERK_USER_EMAIL=<that email>` in this app's `.env` and in
+   `apps/dashboard/.env`; the dashboard also needs `CLERK_SECRET_KEY`.
+
 ## Things that will bite you
 
 ### `User.private` defaults to `true`

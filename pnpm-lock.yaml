@@ -27,6 +27,9 @@ catalogs:
     '@clerk/nextjs':
       specifier: ^6.39.6
       version: 6.39.6
+    '@clerk/testing':
+      specifier: ^2.2.52
+      version: 2.2.52
     '@coinbase/cdp-sdk':
       specifier: ^1.49.2
       version: 1.51.2
@@ -48,6 +51,9 @@ catalogs:
     '@modelcontextprotocol/sdk':
       specifier: ^1.30.0
       version: 1.30.0
+    '@playwright/test':
+      specifier: ^1.64.1
+      version: 1.64.1
     '@prisma/adapter-pg':
       specifier: 7.9.1
       version: 7.9.1
@@ -576,6 +582,12 @@ importers:
       '@4mica/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@clerk/testing':
+        specifier: 'catalog:'
+        version: 2.2.52(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.2(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -669,7 +681,7 @@ importers:
         version: link:../../packages/tsconfig
       '@react-email/ui':
         specifier: 'catalog:'
-        version: 6.9.2(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 6.9.2(@playwright/test@1.64.1)(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@types/node':
         specifier: catalog:node24
         version: 24.12.4
@@ -822,7 +834,7 @@ importers:
         version: link:../../packages/url
       '@clerk/nextjs':
         specifier: 'catalog:'
-        version: 6.39.6(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 6.39.6(next@16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@prisma/adapter-pg':
         specifier: 'catalog:'
         version: 7.9.1
@@ -837,7 +849,7 @@ importers:
         version: 1.23.0(react@19.2.7)
       next:
         specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -863,6 +875,12 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(winston@3.19.0)
     devDependencies:
+      '@clerk/testing':
+        specifier: 'catalog:'
+        version: 2.2.52(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.3.0
@@ -952,7 +970,7 @@ importers:
         version: 4.0.3
       next:
         specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -1105,7 +1123,7 @@ importers:
         version: 1.23.0(react@19.2.7)
       next:
         specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -1169,7 +1187,7 @@ importers:
         version: 1.23.0(react@19.2.7)
       next:
         specifier: 'catalog:'
-        version: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
         specifier: 'catalog:'
         version: 19.2.7
@@ -1470,6 +1488,9 @@ importers:
       '@chromatic-com/storybook':
         specifier: 3.2.7
         version: 3.2.7(react@19.2.7)(storybook@8.6.14(bufferutil@4.1.0)(prettier@3.9.6)(utf-8-validate@5.0.10))
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.64.1
       '@storybook/addon-essentials':
         specifier: 8.6.14
         version: 8.6.14(@types/react@19.2.16)(storybook@8.6.14(bufferutil@4.1.0)(prettier@3.9.6)(utf-8-validate@5.0.10))
@@ -1824,6 +1845,10 @@ packages:
     resolution: {integrity: sha512-5foMmTHEQFt4mDv7AN0RDwUHZhGcg/JYe5hnl9SU/LFS8ZHY29Z2HDtIBmzKgjRfOJTMKj1AM81LgK2UFsGm9Q==}
     engines: {node: '>=18.17.0'}
 
+  '@clerk/backend@3.26.4':
+    resolution: {integrity: sha512-zvXqCfOKhgkY7LonpE1p8tLO+XOciHKTJ9K3e3KykxuiSPwnxKeKVltJMO8xu4LPhF/joFRY/B1cPQM06/f6AQ==}
+    engines: {node: '>=20.9.0'}
+
   '@clerk/clerk-react@5.61.9':
     resolution: {integrity: sha512-PRIodE1QVem/eV3wrjicJJiJ2pkGiZfI6t1vekE/+04cIHciXyvUezQ/468gGPl31xd7BiCNO3uKNM14TXEKZQ==}
     engines: {node: '>=18.17.0'}
@@ -1849,6 +1874,30 @@ packages:
       react:
         optional: true
       react-dom:
+        optional: true
+
+  '@clerk/shared@4.43.0':
+    resolution: {integrity: sha512-EtFANpM+o5pt4zeTh1ww+oYk8qg53Plofl5jA67gi1HYVxsiVvkKmfPU0BFAf54vOcTyzvpZxRvffEGTI0hsiw==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
+  '@clerk/testing@2.2.52':
+    resolution: {integrity: sha512-WCcreX3ol2I7TBf68jXFU8zI0MYgqsZsT4/h+IJE4spebmTLStBy229KwgbOn3Y4JppyEUuxuuWOA9HTpA2bGQ==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      '@playwright/test': ^1
+      cypress: ^13 || ^14 || ^15
+    peerDependenciesMeta:
+      '@playwright/test':
+        optional: true
+      cypress:
         optional: true
 
   '@clerk/types@4.101.26':
@@ -3889,6 +3938,11 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -7304,6 +7358,10 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
+  dotenv@17.2.2:
+    resolution: {integrity: sha512-Sf2LSQP+bOlhKWWyhFsn0UsfdK/kCWRv1iuA2gXAwt3dyNabr6QSj00I2V10pidqz69soatm9ZwZvpQMTIOd5Q==}
+    engines: {node: '>=12'}
+
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
@@ -9371,6 +9429,16 @@ packages:
 
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
+
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.1:
+    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
@@ -11753,6 +11821,15 @@ snapshots:
       - react
       - react-dom
 
+  '@clerk/backend@3.26.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@clerk/shared': 4.43.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      standardwebhooks: 1.0.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - react
+      - react-dom
+
   '@clerk/clerk-react@5.61.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@clerk/shared': 3.47.8(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -11760,13 +11837,13 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
       tslib: 2.8.1
 
-  '@clerk/nextjs@6.39.6(next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@clerk/nextjs@6.39.6(next@16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@clerk/backend': 2.33.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@clerk/clerk-react': 5.61.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@clerk/shared': 3.47.8(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@clerk/types': 4.101.26(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      next: 16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      next: 16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       server-only: 0.0.1
@@ -11783,6 +11860,27 @@ snapshots:
     optionalDependencies:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
+
+  '@clerk/shared@4.43.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@tanstack/query-core': 5.102.3
+      dequal: 2.0.3
+      glob-to-regexp: 0.4.1
+      js-cookie: 3.0.8
+    optionalDependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+
+  '@clerk/testing@2.2.52(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@clerk/backend': 3.26.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@clerk/shared': 4.43.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      dotenv: 17.2.2
+    optionalDependencies:
+      '@playwright/test': 1.64.1
+    transitivePeerDependencies:
+      - react
+      - react-dom
 
   '@clerk/types@4.101.26(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -13307,6 +13405,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@playwright/test@1.64.1':
+    dependencies:
+      playwright: 1.64.1
+
   '@polka/url@1.0.0-next.29': {}
 
   '@prisma/adapter-pg@7.9.1':
@@ -13517,10 +13619,10 @@ snapshots:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@react-email/ui@6.9.2(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@react-email/ui@6.9.2(@playwright/test@1.64.1)(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       esbuild: 0.28.1
-      next: 16.3.0(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      next: 16.3.0(@playwright/test@1.64.1)(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
     transitivePeerDependencies:
       - '@babel/core'
       - '@opentelemetry/api'
@@ -18008,6 +18110,8 @@ snapshots:
 
   dotenv@16.6.1: {}
 
+  dotenv@17.2.2: {}
+
   dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
@@ -20119,7 +20223,7 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next@16.2.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@16.2.7(@playwright/test@1.64.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 16.2.7
       '@swc/helpers': 0.5.15
@@ -20138,12 +20242,13 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.2.7
       '@next/swc-win32-arm64-msvc': 16.2.7
       '@next/swc-win32-x64-msvc': 16.2.7
+      '@playwright/test': 1.64.1
       sharp: 0.34.5
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
 
-  next@16.3.0(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@16.3.0(@playwright/test@1.64.1)(@types/node@24.12.4)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 16.3.0
       '@swc/helpers': 0.5.15
@@ -20162,6 +20267,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.3.0
       '@next/swc-win32-arm64-msvc': 16.3.0
       '@next/swc-win32-x64-msvc': 16.3.0
+      '@playwright/test': 1.64.1
       sharp: 0.35.3(@types/node@24.12.4)
     transitivePeerDependencies:
       - '@babel/core'
@@ -20703,6 +20809,12 @@ snapshots:
       confbox: 0.2.4
       exsolve: 1.0.8
       pathe: 2.0.3
+
+  playwright-core@1.64.1: {}
+
+  playwright@1.64.1:
+    dependencies:
+      playwright-core: 1.64.1
 
   pngjs@5.0.0: {}
 

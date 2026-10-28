@@ -15,7 +15,9 @@
     "lib",
     "utils",
     "stories",
-    ".storybook/**/*"
+    ".storybook/**/*",
+    "playwright.config.ts",
+    "playwright/**/*.ts"
   ],
   "exclude": ["dist", "storybook-static", "node_modules"]
 }
