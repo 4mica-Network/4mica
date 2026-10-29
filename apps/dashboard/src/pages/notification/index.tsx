@@ -7,18 +7,22 @@ import { InstantCard } from "@/components/EditableCard";
 import { Select, SettingRow, SwitchCard } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
+import { useConfigOptions } from "@/hooks/useConfigOptions";
 
-const PLACEMENTS = [
-  { title: "Top left", value: "topLeft" },
-  { title: "Top right", value: "topRight" },
-  { title: "Bottom left", value: "bottomLeft" },
-  { title: "Bottom right", value: "bottomRight" },
-];
+const PLACEMENT_LABELS: Record<string, string> = {
+  topLeft: "Top left",
+  topRight: "Top right",
+  bottomLeft: "Bottom left",
+  bottomRight: "Bottom right",
+};
+
+const placementLabel = (value: string) => PLACEMENT_LABELS[value] ?? value;
 
 export function NotificationSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
+  const placements = useConfigOptions("notificationPlacements", placementLabel);
 
   const savingInApp = useAppSelector(
     selectIsSectionSaving("allowNotification"),
@@ -56,10 +60,7 @@ export function NotificationSettings() {
       titleKey="page.settings.notifications.title"
       descriptionKey="page.settings.notifications.description"
     >
-      <SettingsSection
-        title={t("settings.notifications.channels")}
-        description={t("settings.notifications.channelsHint")}
-      >
+      <section className="flex flex-col gap-3">
         <SwitchCard
           id="notif-enabled"
           title={t("settings.notifications.inApp")}
@@ -85,7 +86,7 @@ export function NotificationSettings() {
             <Select
               id="notif-placement"
               value={user.notificationPlacement}
-              options={PLACEMENTS}
+              options={placements}
               disabled={!user.allowNotification}
               onChange={(v) =>
                 set("notificationPlacement", v as NotificationPlacement)
@@ -93,7 +94,7 @@ export function NotificationSettings() {
             />
           </SettingRow>
         </InstantCard>
-      </SettingsSection>
+      </section>
 
       <SettingsSection
         title={t("settings.notifications.emails")}

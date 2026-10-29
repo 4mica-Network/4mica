@@ -1,28 +1,6 @@
-import { cn, Spinner } from "@4mica/ui";
+import { Card, cn, Spinner } from "@4mica/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-
-export function SurfaceCard({
-  className,
-  children,
-  "data-testid": testId,
-}: {
-  className?: string;
-  children: ReactNode;
-  "data-testid"?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-overlay/10 bg-surface px-6 py-5",
-        className,
-      )}
-      data-testid={testId}
-    >
-      {children}
-    </div>
-  );
-}
 
 export function SavingIndicator() {
   const { t } = useTranslation();
@@ -58,18 +36,20 @@ function SectionHeader({
 }
 
 export function SettingsSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col">
+    <section id={id} className="flex scroll-mt-6 flex-col">
       <SectionHeader title={title} description={description} action={action} />
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </section>
@@ -113,14 +93,14 @@ export function SectionCard({
   title: string;
   description?: string;
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   "data-testid"?: string;
 }) {
   return (
-    <SurfaceCard className="flex flex-col gap-5" data-testid={testId}>
+    <Card className="flex flex-col gap-5" data-testid={testId}>
       <SectionHeader title={title} description={description} action={action} />
       {children}
-    </SurfaceCard>
+    </Card>
   );
 }
 

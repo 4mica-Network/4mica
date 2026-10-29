@@ -99,7 +99,6 @@ describe("isProfileRenderable", () => {
   const base = {
     username: "mo4mica",
     private: false,
-    hidden: false,
     banned: false,
     deletedAt: null as Date | null,
   };
@@ -119,7 +118,7 @@ describe("isProfileRenderable", () => {
   });
 
   it("requires every flag to be clear", () => {
-    const flags = ["private", "hidden", "banned"] as const;
+    const flags = ["private", "banned"] as const;
 
     for (const flag of flags) {
       expect(isProfileRenderable({ ...base, [flag]: true })).toBe(false);
@@ -128,14 +127,13 @@ describe("isProfileRenderable", () => {
     expect(isProfileRenderable({ ...base, deletedAt: new Date() })).toBe(false);
   });
 
-  it("covers every combination of the four gate flags", () => {
-    for (let mask = 0; mask < 16; mask++) {
+  it("covers every combination of the three gate flags", () => {
+    for (let mask = 0; mask < 8; mask++) {
       const row = {
         ...base,
         private: Boolean(mask & 1),
-        hidden: Boolean(mask & 2),
-        banned: Boolean(mask & 4),
-        deletedAt: mask & 8 ? new Date() : null,
+        banned: Boolean(mask & 2),
+        deletedAt: mask & 4 ? new Date() : null,
       };
 
       // Only the all-clear combination may render.
@@ -150,23 +148,23 @@ describe("toPublicProfile", () => {
     username: "mo4mica",
     name: "Mo",
     bio: "Builder",
-    description: null,
     avatarUrl: null,
     verified: true,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     private: false,
-    hidden: false,
     banned: false,
     deletedAt: null as Date | null,
     allowSEOIndexing: true,
     allowEmailVisibility: true,
     allowPhoneNumberVisibility: true,
     email: "mo@4mica.io",
+    emailVerified: true,
     phoneNumber: "+15550100",
     allowCustomBrandColor: true,
     primaryBrandColor: "#7bcbff",
     secondaryBrandColor: "#48c9b0",
     disableBranding: false,
+    theme: "light",
   };
 
   it("honours the contact visibility flags", () => {
@@ -183,11 +181,46 @@ describe("toPublicProfile", () => {
     expect(hidden.phoneNumber).toBeNull();
   });
 
+  it("shows the email only when it is visible and verified", () => {
+    expect(toPublicProfile(row, { isOwner: false }).email).toBe("mo@4mica.io");
+
+    const unverified = toPublicProfile(
+      { ...row, emailVerified: false },
+      { isOwner: false },
+    );
+
+    expect(unverified.email).toBeNull();
+  });
+
+  it("passes the bio through", () => {
+    expect(toPublicProfile(row, { isOwner: false }).bio).toBe("Builder");
+  });
+
+  it("carries the owner's public theme, defaulting unknown values to dark", () => {
+    expect(toPublicProfile(row, { isOwner: false }).theme).toBe("light");
+    expect(
+      toPublicProfile({ ...row, theme: "system" }, { isOwner: false }).theme,
+    ).toBe("system");
+    expect(
+      toPublicProfile({ ...row, theme: "sepia" }, { isOwner: false }).theme,
+    ).toBe("dark");
+  });
+
+  it("drops 4Mica branding when the owner disables it", () => {
+    expect(toPublicProfile(row, { isOwner: false }).showBranding).toBe(true);
+
+    const unbranded = toPublicProfile(
+      { ...row, disableBranding: true },
+      { isOwner: false },
+    );
+
+    expect(unbranded.showBranding).toBe(false);
+  });
+
   it("never emits a gate flag or an internal id", () => {
     const dto = toPublicProfile(row, { isOwner: false });
     const leaked = [
       "private",
-      "hidden",
       "banned",
       "deletedAt",
       "clerkUserId",

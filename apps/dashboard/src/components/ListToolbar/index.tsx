@@ -1,11 +1,4 @@
-import {
-  Button,
-  cn,
-  InputField,
-  type Option,
-  Select,
-  Spinner,
-} from "@4mica/ui";
+import { cn, InputField, type Option, Select, Spinner } from "@4mica/ui";
 import { useDebounceEffect } from "ahooks";
 import { Search as SearchIcon, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -19,13 +12,15 @@ function Root({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-center",
-        className,
-      )}
-    >
-      {children}
+    <div className="@container">
+      <div
+        className={cn(
+          "flex @5xl:flex-row flex-col @5xl:items-start gap-3",
+          className,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -58,7 +53,7 @@ function Search({
   );
 
   return (
-    <div className="min-w-0 sm:w-80">
+    <div className="@5xl:w-72 w-full min-w-0 @5xl:shrink-0">
       <InputField
         type="search"
         value={term}
@@ -75,8 +70,27 @@ function Search({
   );
 }
 
-function Filters({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap gap-3">{children}</div>;
+function Filters({
+  children,
+  overlay,
+}: {
+  children: ReactNode;
+  overlay?: ReactNode;
+}) {
+  return (
+    <div className="relative min-w-0 flex-1">
+      <div
+        className={cn(
+          "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3",
+          overlay && "invisible",
+        )}
+        inert={Boolean(overlay)}
+      >
+        {children}
+      </div>
+      {overlay && <div className="absolute inset-x-0 top-0">{overlay}</div>}
+    </div>
+  );
 }
 
 function Filter<T extends string>({
@@ -84,7 +98,7 @@ function Filter<T extends string>({
   value,
   options,
   onChange,
-  className = "sm:w-44",
+  className,
   "data-testid": testId,
 }: {
   label: string;
@@ -95,7 +109,7 @@ function Filter<T extends string>({
   "data-testid"?: string;
 }) {
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("min-w-0", className)}>
       <Select
         aria-label={label}
         value={value}
@@ -128,14 +142,11 @@ function SelectionBar({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-lg border border-brand/40 bg-overlay/5 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+      className="flex h-10.5 items-center justify-between gap-3 rounded-lg border border-overlay/10 bg-overlay/5 py-1.5 pr-1.5 pl-4"
       data-testid={`${testIdPrefix}-selection-bar`}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span
-          aria-live="polite"
-          className="font-medium text-ink-strong text-sm"
-        >
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <span aria-live="polite" className="text-ink-body text-sm">
           {t(`${ns}.toolbar.selected`, { count })}
         </span>
         <button
@@ -149,24 +160,21 @@ function SelectionBar({
         </button>
       </div>
 
-      <Button
-        intent="ghost"
-        size="sm"
-        className="btn-no-lift shrink-0 self-start text-danger sm:self-auto"
+      <button
+        type="button"
+        className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-ink-muted text-xs transition-colors hover:bg-danger/10 hover:text-danger disabled:pointer-events-none disabled:opacity-50"
         disabled={isDeleting}
         aria-busy={isDeleting}
         onClick={onBatchDelete}
         data-testid={`${testIdPrefix}-batch-delete`}
       >
-        <span className="flex items-center gap-2 text-sm">
-          {isDeleting ? (
-            <Spinner size="sm" />
-          ) : (
-            <Trash2 aria-hidden="true" className="h-4 w-4" />
-          )}
-          {t(`${ns}.toolbar.deleteSelected`)}
-        </span>
-      </Button>
+        {isDeleting ? (
+          <Spinner size="sm" />
+        ) : (
+          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+        )}
+        {t(`${ns}.toolbar.deleteSelected`)}
+      </button>
     </div>
   );
 }

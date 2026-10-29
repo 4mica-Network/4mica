@@ -319,14 +319,13 @@ export function PolicyPanel({ customer }: { customer: Customer }) {
           type="button"
           intent="invert"
           size="sm"
-          className="btn-no-lift w-20"
-          disabled={!draft.isDirty || isSaving || isInvalid}
+          className="btn-no-lift w-20 text-sm"
+          loading={isSaving}
+          disabled={!draft.isDirty || isInvalid}
           onClick={save}
           data-testid="customer-policy-save"
         >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : t("settings.update")}
-          </span>
+          {t("settings.update")}
         </Button>
       </SectionFooter>
     </SectionCard>

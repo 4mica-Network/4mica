@@ -14,11 +14,12 @@ const meta = {
   argTypes: {
     intent: {
       control: "select",
-      options: ["primary", "outline", "soft", "ghost", "invert"],
+      options: ["primary", "outline", "soft", "ghost", "invert", "danger"],
     },
     size: { control: "select", options: ["sm", "md", "lg"] },
     iconPosition: { control: "inline-radio", options: ["left", "right"] },
     block: { control: "boolean" },
+    loading: { control: "boolean" },
   },
 } satisfies Meta<typeof Button>;
 
@@ -35,6 +36,24 @@ export const Soft: Story = {
 export const Ghost: Story = { args: { intent: "ghost", children: "Cancel" } };
 export const Invert: Story = {
   args: { intent: "invert", children: "Try for free" },
+};
+
+export const Danger: Story = {
+  args: { intent: "danger", children: "Delete" },
+};
+export const Disabled: Story = {
+  args: { intent: "primary", disabled: true },
+};
+export const Block: Story = {
+  args: { intent: "primary", block: true, children: "Continue" },
+  render: (args) => (
+    <div className="w-80">
+      <Button {...args} />
+    </div>
+  ),
+};
+export const Loading: Story = {
+  args: { intent: "invert", loading: true, children: "Save changes" },
 };
 
 export const WithLeadingIcon: Story = {

@@ -120,7 +120,6 @@ describe("loadUser", () => {
       name: IDENTITY.name,
       email: IDENTITY.email,
     });
-    // Nothing to fill if a concurrent request created the row first.
     expect(upsert.mock.calls[0][0].update).not.toHaveProperty("name");
   });
 
@@ -135,7 +134,6 @@ describe("loadUser", () => {
     expect(upsert).toHaveBeenCalledTimes(2);
     expect(createArg(1).username).toMatch(HANDLE_PATTERN);
     expect(createArg(1).username).not.toBe(createArg(0).username);
-    // The email was never the problem, so it is still on the retry.
     expect(createArg(1).email).toBe(IDENTITY.email);
   });
 

@@ -33,6 +33,11 @@ import {
   FormTextInput,
 } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import {
+  fromAssetFormValue,
+  PriceField,
+  toAssetFormValue,
+} from "@/components/PriceField";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { HTTP_METHOD_OPTIONS, VISIBILITY_OPTIONS } from "../apis/constants";
 import {
@@ -55,7 +60,6 @@ const DETAILS_FIELDS = [
 const PAYMENT_FIELDS = [
   "walletId",
   "priceAmount",
-  "priceCurrency",
   "assetAddress",
   "method",
   "url",
@@ -67,9 +71,14 @@ const VISIBILITY_FIELDS = [
 ] as const satisfies readonly EditableField[];
 
 const toFormValue = (listing: ApiListing, field: EditableField) =>
-  listing[field] ?? "";
+  field === "assetAddress"
+    ? toAssetFormValue(listing.assetAddress)
+    : (listing[field] ?? "");
 
 const toPatchValue = (field: EditableField, value: unknown) => {
+  if (field === "assetAddress") {
+    return fromAssetFormValue(value as string | undefined);
+  }
   if (field === "method" || field === "visibility") {
     return value;
   }
@@ -203,6 +212,22 @@ function WalletField() {
   );
 }
 
+function ListingPriceField() {
+  const { t } = useTranslation();
+  const wallets = useAppSelector(selectSellerWallets);
+  const walletId = useWatch({ name: "walletId" }) as string | undefined;
+  const chosenWallet = wallets.find((wallet) => wallet.id === walletId);
+
+  return (
+    <PriceField
+      network={chosenWallet?.network ?? null}
+      idPrefix="app"
+      title={t("apiListing.create.fields.price.title")}
+      placeholder="0.01"
+    />
+  );
+}
+
 export function DetailsForm({ listing }: { listing: ApiListing }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -270,37 +295,7 @@ export function DetailsForm({ listing }: { listing: ApiListing }) {
         <div className="flex flex-col divide-y divide-overlay/10">
           <WalletField />
 
-          <FieldRow
-            htmlFor="app-price"
-            title={t("apiListing.create.fields.price.title")}
-          >
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <FormTextInput
-                  name="priceAmount"
-                  inputMode="decimal"
-                  placeholder="0.01"
-                />
-              </div>
-              <div className="w-28">
-                <FormTextInput
-                  id="app-currency"
-                  name="priceCurrency"
-                  aria-label={t("form.currency")}
-                  format="uppercase"
-                  maxLength={16}
-                  placeholder="USD"
-                />
-              </div>
-            </div>
-          </FieldRow>
-
-          <FieldRow
-            htmlFor="app-asset"
-            title={t("apiListing.create.fields.asset.title")}
-          >
-            <FormTextInput name="assetAddress" placeholder="0x…" />
-          </FieldRow>
+          <ListingPriceField />
 
           <FieldRow
             htmlFor="app-method"

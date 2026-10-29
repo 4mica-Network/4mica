@@ -24,6 +24,7 @@
     "start": "turbo start",
     "lint": "biome check .",
     "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
     "lint:write": "biome check --write --diagnostic-level=error .",
     "lint:linter": "biome lint --write --diagnostic-level=error .",
     "typecheck": "turbo typecheck",

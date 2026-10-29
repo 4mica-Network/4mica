@@ -1,13 +1,9 @@
-import { useTranslation } from "react-i18next";
+import { Spinner } from "@4mica/ui";
 
-export function FullScreenLoader({ messageKey }: { messageKey: string }) {
-  const { t } = useTranslation();
-
+export function FullScreenLoader() {
   return (
     <div className="grid min-h-screen place-items-center bg-surface-deep">
-      <p className="text-ink-muted text-sm" role="status">
-        {t(messageKey)}
-      </p>
+      <Spinner size="lg" className="text-ink-subtle" />
     </div>
   );
 }

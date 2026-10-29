@@ -1,10 +1,7 @@
-import { Tag } from "@4mica/ui";
+import { Avatar, EmptyState, Stars, Tag } from "@4mica/ui";
 import { BadgeCheck, MessageSquare } from "lucide-react";
-import { Avatar } from "@/components/Avatar";
-import { EmptyState } from "@/components/EmptyState";
-import { Stars } from "@/components/Stars";
 import { messages, t } from "@/i18n";
-import type { PublicReview } from "@/schema/trust";
+import { type PublicReview, RATING_MAX } from "@/schema/trust";
 import { formatDate } from "@/utils/formatDate";
 
 export interface ReviewListProps {
@@ -18,7 +15,9 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
       <EmptyState
         description={messages.trust.noReviewsBody}
         icon={<MessageSquare className="h-4 w-4" />}
+        size="sm"
         title={messages.trust.noReviews}
+        variant="dashed"
       />
     );
   }
@@ -32,10 +31,12 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
         >
           <div className="flex items-center gap-2.5">
             <Avatar
+              alt={`${review.authorName || (review.authorUsername ?? review.authorId)}'s avatar`}
+              className="profile-avatar"
+              fallback={review.authorUsername ?? review.authorId}
               name={review.authorName}
               size="sm"
               src={review.authorAvatarUrl}
-              username={review.authorUsername ?? review.authorId}
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -55,7 +56,7 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
                 {formatDate(review.createdAt)}
               </span>
             </div>
-            <Stars value={review.rating} />
+            <Stars max={RATING_MAX} value={review.rating} />
           </div>
 
           {review.title && (

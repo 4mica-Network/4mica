@@ -1,7 +1,6 @@
 import { Tag } from "@4mica/ui";
 import { ListRow } from "@/components/ListRow";
 import { VisibilityTag } from "@/components/VisibilityTag";
-import { VisibilityToggle } from "@/components/VisibilityToggle";
 import type { PublicApiListing } from "@/types";
 import { apiListingPath } from "@/utils/profileUrl";
 
@@ -40,15 +39,6 @@ export function ApiListingRow({
           ))}
           {isOwner && <VisibilityTag visibility={listing.visibility} />}
         </>
-      }
-      action={
-        isOwner && (
-          <VisibilityToggle
-            current={listing.visibility}
-            id={listing.id}
-            kind="api"
-          />
-        )
       }
     />
   );

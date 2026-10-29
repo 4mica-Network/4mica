@@ -1,4 +1,4 @@
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createAgent } from "@stores/agent/actions";
 import {
@@ -19,6 +19,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -66,9 +67,8 @@ export function CreateAgentModal({
       payerWalletId: "",
       creditLimit: "",
       walletId: "",
-      assetAddress: "",
+      assetAddress: NATIVE_ASSET,
       priceAmount: "",
-      priceCurrency: "USD",
       priceLabel: "",
       endpointUrl: "",
       x402Endpoint: "",
@@ -124,9 +124,8 @@ export function CreateAgentModal({
         creditLimit: data.creditLimit?.trim() || "0",
 
         walletId: blankToNull(data.walletId),
-        assetAddress: blankToNull(data.assetAddress),
+        assetAddress: fromAssetFormValue(data.assetAddress),
         priceAmount: blankToNull(data.priceAmount),
-        priceCurrency: blankToNull(data.priceCurrency),
         priceLabel: blankToNull(data.priceLabel),
         endpointUrl: blankToNull(data.endpointUrl),
         x402Endpoint: blankToNull(data.x402Endpoint),
@@ -151,7 +150,8 @@ export function CreateAgentModal({
   );
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canSubmit = Boolean(name?.trim()) && !isSaving;
+  const hasName = Boolean(name?.trim());
+  const canSubmit = hasName && !isSaving;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (isLastStep) {
@@ -199,29 +199,26 @@ export function CreateAgentModal({
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
+                loading={isSaving}
                 type="submit"
                 form={formId}
                 disabled={!canSubmit}
-                aria-busy={isSaving}
                 data-testid="create-agent-submit"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {isSaving ? <Spinner size="sm" /> : t("agent.create.finish")}
-                </span>
+                {t("agent.create.finish")}
               </Button>
             ) : (
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
                 type="submit"
                 form={formId}
+                disabled={!hasName}
                 data-testid="create-agent-continue"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {t("agent.create.continue")}
-                </span>
+                {t("agent.create.continue")}
               </Button>
             )}
           </div>

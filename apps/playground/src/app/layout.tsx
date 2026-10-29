@@ -1,9 +1,10 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import ThemeProvider, { themeInitScript } from "@/context/ThemeProvider";
+import ThemeProvider from "@/context/ThemeProvider";
 import { publicEnv } from "@/env";
 import fontVariables from "@/fonts";
+import { themeInitScript } from "@/lib/theme";
 import { SITE_NAME } from "@/services/seo";
 import "@/style/globals.css";
 

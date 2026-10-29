@@ -310,14 +310,109 @@ describe("api listing routes", () => {
         payload: {
           name: "Listing",
           priceAmount: "0.000000000000000001",
-          priceCurrency: "usd",
         },
       });
 
       expect(res.statusCode).toBe(201);
       const written = apiListing.create.mock.calls[0][0].data;
       expect(written.priceAmount).toBe("0.000000000000000001");
-      expect(written.priceCurrency).toBe("USD");
+
+      await instance.close();
+    });
+
+    it("names the currency after the token, whatever the request says", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/api-listings",
+        headers: AUTH,
+        payload: {
+          name: "Listing",
+          walletId: WALLET_ID,
+          assetAddress: USDC,
+          priceAmount: "0.01",
+          priceCurrency: "ETH",
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const written = apiListing.create.mock.calls[0][0].data;
+      expect(written.assetAddress).toBe(USDC.toLowerCase());
+      expect(written.priceCurrency).toBe("USDC");
+
+      await instance.close();
+    });
+
+    it("prices in the network's native coin when no token is chosen", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "POST",
+        url: "/me/api-listings",
+        headers: AUTH,
+        payload: { name: "Listing", walletId: WALLET_ID, priceAmount: "0.01" },
+      });
+
+      const written = apiListing.create.mock.calls[0][0].data;
+      expect(written.assetAddress).toBeNull();
+      expect(written.priceCurrency).toBe("ETH");
+
+      await instance.close();
+    });
+
+    it("refuses a token the wallet's network does not accept", async () => {
+      wallet.findFirst.mockResolvedValue(storedWallet({ network: "BASE" }));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/api-listings",
+        headers: AUTH,
+        payload: { name: "Listing", walletId: WALLET_ID, assetAddress: USDC },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0]).toEqual({
+        path: "assetAddress",
+        message: "is not a token 4Mica accepts on Base",
+      });
+      expect(apiListing.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("re-derives the currency when the token changes", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/api-listings/${LISTING_ID}`,
+        headers: AUTH,
+        payload: { assetAddress: USDC },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const written = apiListing.updateMany.mock.calls[0][0].data;
+      expect(written.assetAddress).toBe(USDC.toLowerCase());
+      expect(written.priceCurrency).toBe("USDC");
+
+      await instance.close();
+    });
+
+    it("leaves the currency alone on an unrelated edit", async () => {
+      const instance = await app();
+
+      await instance.inject({
+        method: "PATCH",
+        url: `/me/api-listings/${LISTING_ID}`,
+        headers: AUTH,
+        payload: { name: "Renamed" },
+      });
+
+      const written = apiListing.updateMany.mock.calls[0][0].data;
+      expect(written).not.toHaveProperty("priceCurrency");
+      expect(written).not.toHaveProperty("assetAddress");
 
       await instance.close();
     });
@@ -361,7 +456,7 @@ describe("api listing routes", () => {
         method: "POST",
         url: "/me/api-listings",
         headers: AUTH,
-        payload: { name: "Listing", assetAddress: USDC },
+        payload: { name: "Listing", walletId: WALLET_ID, assetAddress: USDC },
       });
 
       expect(res.statusCode).toBe(201);

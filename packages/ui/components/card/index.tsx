@@ -15,7 +15,7 @@ export const Card = ({ className, children, onClick, ...rest }: CardProps) => {
         onClick={onClick}
         {...(rest as HTMLAttributes<HTMLButtonElement>)}
         className={cn(
-          "flex w-full flex-col gap-2.5 rounded-lg rounded-b-none border-overlay/10 border-b px-6 py-5 text-left",
+          "w-full rounded-lg border border-overlay/10 bg-surface px-6 py-5 text-left",
           "cursor-pointer transition-colors hover:bg-overlay/5",
           className,
         )}
@@ -29,7 +29,7 @@ export const Card = ({ className, children, onClick, ...rest }: CardProps) => {
     <div
       {...rest}
       className={cn(
-        "flex flex-col gap-2.5 rounded-lg rounded-b-none border-overlay/10 border-b px-6 py-5",
+        "rounded-lg border border-overlay/10 bg-surface px-6 py-5",
         className,
       )}
     >

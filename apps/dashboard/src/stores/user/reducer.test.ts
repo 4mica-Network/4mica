@@ -13,7 +13,7 @@ import {
 import reducer, { INITIAL_STATE } from "./reducer";
 import type { Business, User, UserState } from "./type";
 
-const user = { private: true, hidden: false, name: "Ada" } as User;
+const user = { private: true, name: "Ada" } as User;
 
 const seeded: UserState = { ...INITIAL_STATE, user };
 
@@ -92,7 +92,7 @@ describe("user reducer optimistic updates", () => {
       seeded,
       updateProfile({ private: false }, "visibility"),
     );
-    state = reducer(state, updateProfile({ hidden: true }, "visibility"));
+    state = reducer(state, updateProfile({ private: false }, "visibility"));
 
     expect(state.rollback).toEqual({ private: true });
 

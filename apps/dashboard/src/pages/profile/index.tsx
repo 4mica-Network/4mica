@@ -1,11 +1,7 @@
 import { isHexColor, isSingleLine } from "@4mica/rules";
-import { Button, Spinner } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import {
-  confirmEmailVerification,
-  sendEmailVerification,
-  updateProfile,
-} from "@stores/user/actions";
+import { confirmEmailVerification, updateProfile } from "@stores/user/actions";
 import {
   selectIsSectionSaving,
   selectUser,
@@ -20,14 +16,14 @@ import { hasErrors } from "@utils/validation";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { VerifiedBadge } from "@/components/badges";
 import { EditableCard } from "@/components/EditableCard";
 import { FieldRow, SwitchCard, TextArea, TextInput } from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { CredentialsSection } from "./CredentialsSection";
 
 const TEXT_MAX_LENGTH = 2000;
 
@@ -88,7 +84,6 @@ export function ProfileSettings() {
   const savingIdentity = useAppSelector(selectIsSectionSaving("identity"));
   const savingColors = useAppSelector(selectIsSectionSaving("colors"));
   const savingPrivate = useAppSelector(selectIsSectionSaving("private"));
-  const savingHidden = useAppSelector(selectIsSectionSaving("hidden"));
   const savingSeo = useAppSelector(selectIsSectionSaving("allowSEOIndexing"));
   const savingEmailVis = useAppSelector(
     selectIsSectionSaving("allowEmailVisibility"),
@@ -111,7 +106,6 @@ export function ProfileSettings() {
       name: user?.name ?? "",
       username: user?.username ?? "",
       bio: user?.bio ?? "",
-      description: user?.description ?? "",
     }),
     [user],
   );
@@ -168,10 +162,6 @@ export function ProfileSettings() {
       identity.draft.bio.trim().length > TEXT_MAX_LENGTH
         ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
         : undefined,
-    description:
-      identity.draft.description.trim().length > TEXT_MAX_LENGTH
-        ? t("validation.tooLong", { max: TEXT_MAX_LENGTH })
-        : undefined,
   };
   const isUsernamePending =
     candidate !== savedUsername && usernameStatus === "checking";
@@ -211,12 +201,9 @@ export function ProfileSettings() {
       titleKey="page.settings.profile.title"
       descriptionKey="page.settings.profile.description"
     >
-      <SettingsSection
-        title={t("settings.profile.identity")}
-        description={t("settings.profile.identityHint")}
-      >
+      <section className="flex flex-col gap-3">
         {pendingVerification.token ? (
-          <SurfaceCard className="flex items-center justify-between gap-4">
+          <Card className="flex items-center justify-between gap-4">
             <div>
               <span className="font-medium text-ink-strong text-sm">
                 {t("page.settings.profile.verify.confirm.title")}
@@ -239,8 +226,8 @@ export function ProfileSettings() {
                 type="button"
                 intent="invert"
                 size="sm"
-                className="btn-no-lift w-32"
-                disabled={sendingVerification}
+                className="btn-no-lift w-32 text-sm"
+                loading={sendingVerification}
                 onClick={() => {
                   dispatch(
                     confirmEmailVerification(
@@ -250,55 +237,11 @@ export function ProfileSettings() {
                   pendingVerification.clear();
                 }}
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {sendingVerification ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    t("page.settings.profile.verify.confirm.action")
-                  )}
-                </span>
+                {t("page.settings.profile.verify.confirm.action")}
               </Button>
             </div>
-          </SurfaceCard>
+          </Card>
         ) : null}
-
-        <SurfaceCard className="flex items-center justify-between gap-4">
-          <div>
-            <span className="font-medium text-ink-strong text-sm">
-              {t("settings.profile.accountStatus")}
-            </span>
-            <p className="mt-0.5 text-ink-muted text-xs">
-              {t("settings.profile.accountStatusHint")}
-            </p>
-          </div>
-          {user.emailVerified ? (
-            <VerifiedBadge
-              verified={user.emailVerified}
-              labels={{
-                yes: t("settings.verified"),
-                no: t("settings.unverified"),
-              }}
-            />
-          ) : (
-            <Button
-              type="button"
-              intent="invert"
-              size="sm"
-              className="btn-no-lift w-32 shrink-0"
-              disabled={sendingVerification}
-              aria-label={t("settings.profile.verifyEmail")}
-              onClick={() => dispatch(sendEmailVerification())}
-            >
-              <span className="flex w-full items-center justify-center text-sm">
-                {sendingVerification ? (
-                  <Spinner size="sm" />
-                ) : (
-                  t("settings.profile.verifyEmail")
-                )}
-              </span>
-            </Button>
-          )}
-        </SurfaceCard>
 
         <EditableCard
           isDirty={identity.isDirty}
@@ -351,22 +294,10 @@ export function ProfileSettings() {
               onChange={(v) => identity.set("bio", v)}
             />
           </FieldRow>
-
-          <FieldRow
-            title={t("settings.profile.description")}
-            description={t("settings.profile.descriptionHint")}
-            htmlFor="profile-description"
-          >
-            <TextArea
-              id="profile-description"
-              value={identity.draft.description}
-              error={identityErrors.description ?? issues.description}
-              maxLength={TEXT_MAX_LENGTH}
-              onChange={(v) => identity.set("description", v)}
-            />
-          </FieldRow>
         </EditableCard>
-      </SettingsSection>
+      </section>
+
+      <CredentialsSection user={user} />
 
       <SettingsSection
         title={t("settings.profile.visibility")}
@@ -381,14 +312,6 @@ export function ProfileSettings() {
           onToggle={(v) => toggle("private", v)}
         />
         <SwitchCard
-          id="profile-hidden"
-          title={t("settings.profile.hidden")}
-          description={t("settings.profile.hiddenHint")}
-          checked={user.hidden}
-          isSaving={savingHidden}
-          onToggle={(v) => toggle("hidden", v)}
-        />
-        <SwitchCard
           id="profile-seo"
           title={t("settings.profile.seo")}
           description={t("settings.profile.seoHint")}
@@ -396,14 +319,16 @@ export function ProfileSettings() {
           isSaving={savingSeo}
           onToggle={(v) => toggle("allowSEOIndexing", v)}
         />
-        <SwitchCard
-          id="profile-email-visibility"
-          title={t("settings.profile.emailVisibility")}
-          description={t("settings.profile.emailVisibilityHint")}
-          checked={user.allowEmailVisibility}
-          isSaving={savingEmailVis}
-          onToggle={(v) => toggle("allowEmailVisibility", v)}
-        />
+        {user.emailVerified && (
+          <SwitchCard
+            id="profile-email-visibility"
+            title={t("settings.profile.emailVisibility")}
+            description={t("settings.profile.emailVisibilityHint")}
+            checked={user.allowEmailVisibility}
+            isSaving={savingEmailVis}
+            onToggle={(v) => toggle("allowEmailVisibility", v)}
+          />
+        )}
         <SwitchCard
           id="profile-phone-visibility"
           title={t("settings.profile.phoneVisibility")}

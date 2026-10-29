@@ -8,6 +8,16 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["index.ts", "components", "lib", "stories", ".storybook/**/*"],
+  "include": [
+    "index.ts",
+    "components",
+    "hooks",
+    "lib",
+    "utils",
+    "stories",
+    ".storybook/**/*",
+    "playwright.config.ts",
+    "playwright/**/*.ts"
+  ],
   "exclude": ["dist", "storybook-static", "node_modules"]
 }

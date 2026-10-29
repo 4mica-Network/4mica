@@ -105,6 +105,20 @@ export const sendEmailVerificationFailed = (
   meta,
 });
 
+export const syncPhoneVerification = (section = "phoneVerification") => ({
+  type: actionTypes.SYNC_PHONE_VERIFICATION_REQUESTED,
+  meta: { section },
+});
+
+export const syncPhoneVerificationFailed = (
+  message: string,
+  meta: UpdateMeta,
+) => ({
+  type: actionTypes.SYNC_PHONE_VERIFICATION_FAILED,
+  payload: { message },
+  meta,
+});
+
 export const confirmEmailVerification = (
   token: string,
   section = "emailVerification",

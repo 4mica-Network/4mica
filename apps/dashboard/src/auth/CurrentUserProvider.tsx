@@ -1,5 +1,6 @@
 import { setAuthTokenProvider } from "@api/client";
 import { useAuth } from "@clerk/clerk-react";
+import { fetchConfig } from "@stores/config/actions";
 import { useAppDispatch } from "@stores/hooks";
 import { fetchUser } from "@stores/user/actions";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -27,8 +28,24 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     }
   }, [dispatch, isSignedIn, tokenReady, userId]);
 
+  useEffect(() => {
+    if (!tokenReady || !isSignedIn) {
+      return;
+    }
+    dispatch(fetchConfig());
+    const revalidate = () => {
+      if (document.visibilityState === "visible") {
+        dispatch(fetchConfig());
+      }
+    };
+    document.addEventListener("visibilitychange", revalidate);
+    return () => {
+      document.removeEventListener("visibilitychange", revalidate);
+    };
+  }, [dispatch, isSignedIn, tokenReady]);
+
   if (!tokenReady) {
-    return <FullScreenLoader messageKey="auth.loading" />;
+    return <FullScreenLoader />;
   }
 
   return <>{children}</>;

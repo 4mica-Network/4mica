@@ -283,7 +283,7 @@ export const Select = ({
                       aria-selected={opt.value === selected?.value}
                       title={opt.title}
                       className={cn(
-                        "block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none",
+                        "block w-full cursor-pointer truncate rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none",
                         opt.value === selected?.value && "bg-overlay/5",
                       )}
                       onClick={() => handleChange(opt)}

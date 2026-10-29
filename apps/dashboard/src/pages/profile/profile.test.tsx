@@ -1,6 +1,6 @@
 import { INITIAL_STATE } from "@stores/user/reducer";
 import type { User } from "@stores/user/type";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
@@ -19,14 +19,13 @@ const actionTypes = (await import("@stores/user/actionTypes")).default;
 const BASE_USER = {
   name: "Ada Lovelace",
   username: "ada",
+  email: "ada@example.com",
   bio: "",
-  description: "",
   primaryBrandColor: "",
   secondaryBrandColor: "",
   verified: false,
   emailVerified: false,
   private: true,
-  hidden: false,
   allowSEOIndexing: false,
   allowEmailVisibility: true,
   allowPhoneNumberVisibility: true,
@@ -70,7 +69,10 @@ const renderPage = (
   return dispatched;
 };
 
-describe("profile account status", () => {
+const statusCard = () =>
+  within(screen.getByText("Contact details").closest("section") as HTMLElement);
+
+describe("profile email verification", () => {
   beforeEach(() => {
     notifySuccess.mockReset();
     notifyError.mockReset();
@@ -80,7 +82,8 @@ describe("profile account status", () => {
     const dispatched = renderPage({ emailVerified: false });
 
     const button = screen.getByRole("button", { name: "Verify email" });
-    expect(screen.queryByText("Unverified")).not.toBeInTheDocument();
+    const onlyThePhoneBadge = statusCard().getAllByText("Unverified");
+    expect(onlyThePhoneBadge).toHaveLength(1);
 
     await userEvent.click(button);
 
@@ -92,7 +95,7 @@ describe("profile account status", () => {
   it("shows the badge, and no button, once verified", () => {
     renderPage({ emailVerified: true });
 
-    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(statusCard().getByText("Verified")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Verify email" }),
     ).not.toBeInTheDocument();
@@ -167,6 +170,76 @@ describe("profile account status", () => {
 
     expect(
       screen.queryByRole("button", { name: "Confirm email" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("profile visibility", () => {
+  it("hides the email toggle until the address is verified", () => {
+    renderPage({ emailVerified: false });
+
+    expect(
+      screen.queryByText("Show email on public profile"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers the email toggle once the address is verified", () => {
+    renderPage({ emailVerified: true });
+
+    expect(
+      screen.getByText("Show email on public profile"),
+    ).toBeInTheDocument();
+  });
+
+  it("no longer offers a discovery toggle or a description field", () => {
+    renderPage({ emailVerified: true });
+
+    expect(screen.queryByText("Hide from discovery")).not.toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
+  });
+});
+
+describe("profile credentials", () => {
+  it("edits the sign-in email and phone number here", () => {
+    renderPage({ email: "ada@4mica.io", phoneNumber: "+15550100" });
+
+    expect(screen.getByText("Contact details")).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i, { selector: "input" })).toHaveValue(
+      "ada@4mica.io",
+    );
+    expect(screen.getByLabelText(/phone/i, { selector: "input" })).toHaveValue(
+      "+15550100",
+    );
+  });
+});
+
+describe("profile phone verification", () => {
+  it("offers to verify a saved international number", () => {
+    renderPage({ phoneNumber: "+15550100123", phoneNumberVerified: false });
+
+    expect(
+      screen.getByRole("button", { name: "Verify phone" }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for a country code before it can verify", () => {
+    renderPage({ phoneNumber: "555 010 0123", phoneNumberVerified: false });
+
+    expect(
+      screen.queryByRole("button", { name: "Verify phone" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Add the country code, like +1 or +44, to verify this number.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the badge once the number is verified", () => {
+    renderPage({ phoneNumber: "+15550100123", phoneNumberVerified: true });
+
+    expect(
+      screen.queryByRole("button", { name: "Verify phone" }),
     ).not.toBeInTheDocument();
   });
 });

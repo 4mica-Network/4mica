@@ -121,3 +121,8 @@ export const Interactive: Story = {
   args: { isOpen: false },
   render: (args) => <ControlledModal {...args} />,
 };
+
+export const BlockingInteractive: Story = {
+  args: { ...Blocking.args, isOpen: true },
+  render: (args) => <ControlledModal {...args} />,
+};

@@ -1,4 +1,4 @@
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { useClerk } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { completeOnboarding, updateProfile } from "@stores/user/actions";
@@ -14,6 +14,7 @@ import {
   isBusinessValid,
   isNameValid,
   isUsernameValid,
+  NAME_MIN_LENGTH,
 } from "@utils/user-rules";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,6 +43,7 @@ export function Wizard() {
   const error = useAppSelector((state) => state.user.error);
 
   const [step, setStep] = useState(0);
+  const [failedStep, setFailedStep] = useState<number | null>(null);
 
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -81,7 +83,24 @@ export function Wizard() {
 
   const savedUsername = user.username ?? "";
 
-  const canContinue = (() => {
+  const showErrors = failedStep === step;
+
+  const isFilled = (() => {
+    switch (STEPS[step]) {
+      case "name":
+        return name.trim().length > 0;
+      case "username":
+        return (
+          username.trim().length > 0 && usernameCheck.status !== "checking"
+        );
+      case "business":
+        return businessDraft.legalName.trim().length > 0;
+      default:
+        return false;
+    }
+  })();
+
+  const isValid = (() => {
     switch (STEPS[step]) {
       case "name":
         return isNameValid(name);
@@ -95,7 +114,11 @@ export function Wizard() {
   })();
 
   const submit = () => {
-    if (!canContinue || pending) {
+    if (!isFilled || pending) {
+      return;
+    }
+    if (!isValid) {
+      setFailedStep(step);
       return;
     }
 
@@ -176,19 +199,12 @@ export function Wizard() {
             <Button
               intent="invert"
               size="sm"
-              className="btn-no-lift min-w-24"
-              disabled={!canContinue || Boolean(pending)}
+              className="btn-no-lift min-w-24 text-sm"
+              loading={Boolean(pending)}
+              disabled={!isFilled}
               onClick={submit}
             >
-              <span className="flex w-full items-center justify-center text-sm">
-                {pending ? (
-                  <Spinner size="sm" />
-                ) : isLastStep ? (
-                  t("onboarding.finish")
-                ) : (
-                  t("onboarding.continue")
-                )}
-              </span>
+              {isLastStep ? t("onboarding.finish") : t("onboarding.continue")}
             </Button>
           </div>
         </div>
@@ -198,7 +214,16 @@ export function Wizard() {
         <StepIndicator current={step} total={STEPS.length} />
 
         {STEPS[step] === "name" && (
-          <NameStep value={name} onChange={setName} error={issues.name} />
+          <NameStep
+            value={name}
+            onChange={setName}
+            error={
+              issues.name ??
+              (showErrors && !isNameValid(name)
+                ? t("validation.minLength", { min: NAME_MIN_LENGTH })
+                : undefined)
+            }
+          />
         )}
 
         {STEPS[step] === "username" && (

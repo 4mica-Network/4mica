@@ -1,4 +1,5 @@
-import { cn, Dropdown, Tooltip } from "@4mica/ui";
+import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
+import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
@@ -13,16 +14,15 @@ import {
   type LucideIcon,
   UserCog,
 } from "lucide-react";
-import { type ReactNode, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 
 const EXPANDED_WIDTH = 256;
-const COLLAPSED_WIDTH = 60;
+export const COLLAPSED_WIDTH = 60;
 const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
 
 const rowClass = (active: boolean) =>
@@ -86,20 +86,14 @@ function AvatarCircle() {
   const { t } = useTranslation();
   const { user } = useUser();
 
-  if (user?.imageUrl) {
-    return (
-      <img
-        src={user.imageUrl}
-        alt=""
-        className="h-8 w-8 shrink-0 rounded-full object-cover"
-      />
-    );
-  }
-
   return (
-    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/15 font-semibold text-sm text-white">
-      {t("monogram")}
-    </span>
+    <Avatar
+      src={user?.imageUrl}
+      name={t("monogram")}
+      alt=""
+      size="xs"
+      className="border-0 bg-overlay/15 text-ink-strong"
+    />
   );
 }
 
@@ -183,7 +177,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         aria-controls={open ? menuId : undefined}
         aria-label={collapsed ? displayName : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-colors hover:bg-overlay/5"
+        className={cn(
+          "flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-[background-color,padding] duration-200 hover:bg-overlay/5",
+          collapsed ? "pl-0" : "pl-1.5",
+        )}
       >
         <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
           <AvatarCircle />
@@ -247,7 +244,12 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
 function StaticBrand({ collapsed }: { collapsed: boolean }) {
   const displayName = useDisplayName();
   return (
-    <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
+    <div
+      className={cn(
+        "flex h-11 w-full items-center overflow-hidden rounded-lg transition-[padding] duration-200",
+        collapsed ? "pl-0" : "pl-1.5",
+      )}
+    >
       <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
         <AvatarCircle />
       </span>
@@ -287,6 +289,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     window.open(profileUrl, "_blank", "noopener,noreferrer");
   };
 
+  const [settled, setSettled] = useState(!collapsed);
+
+  useEffect(() => {
+    if (collapsed) {
+      setSettled(false);
+    }
+  }, [collapsed]);
+
   const copyLabel = copied
     ? t("sidebar.copied")
     : t("sidebar.copyPublicProfile");
@@ -296,6 +306,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       initial={false}
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
+      onAnimationComplete={() => setSettled(!collapsed)}
       className="flex h-screen shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
@@ -346,27 +357,37 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       </nav>
 
       <div className="p-3">
-        {!inSettings && !collapsed && <SidebarBanners />}
-        <div className="flex flex-col gap-0.5">
-          <ActionRow
-            icon={Eye}
-            label={t("sidebar.viewPublicProfile")}
-            onClick={viewProfile}
-            collapsed={collapsed}
-          />
-          <ActionRow
-            icon={copied ? Check : Copy}
-            label={copyLabel}
-            tooltip={copyLabel}
-            onClick={copyProfile}
-            collapsed={collapsed}
-          />
-          {FOOTER_ITEMS.filter(
-            (item) => !(inSettings && item.to === "/settings"),
-          ).map((item) => (
-            <NavRow key={item.to} item={item} collapsed={collapsed} />
-          ))}
-        </div>
+        {!inSettings && (
+          <>
+            {!collapsed && settled && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <SidebarBanners />
+              </motion.div>
+            )}
+            <div className="flex flex-col gap-0.5">
+              <ActionRow
+                icon={Eye}
+                label={t("sidebar.viewPublicProfile")}
+                onClick={viewProfile}
+                collapsed={collapsed}
+              />
+              <ActionRow
+                icon={copied ? Check : Copy}
+                label={copyLabel}
+                tooltip={copyLabel}
+                onClick={copyProfile}
+                collapsed={collapsed}
+              />
+              {FOOTER_ITEMS.map((item) => (
+                <NavRow key={item.to} item={item} collapsed={collapsed} />
+              ))}
+            </div>
+          </>
+        )}
         <div className="mt-1 flex justify-end px-2.5">
           <Label
             collapsed={collapsed}

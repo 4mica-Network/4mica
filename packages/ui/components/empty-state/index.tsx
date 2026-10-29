@@ -12,6 +12,8 @@ const emptyState = cva(
         // Borderless, for use inside a container that already draws its own
         // border — two nested frames read as a rendering bug.
         plain: "",
+        dashed:
+          "items-start rounded-lg border border-overlay/10 border-dashed text-left",
       },
       size: {
         sm: "px-4 py-6",
@@ -68,13 +70,18 @@ export function EmptyState({
     ? `${props["data-testid"]}-empty-state`
     : "empty-state";
 
+  const dashed = variant === "dashed";
+
   return (
     <div
       className={cn(emptyState({ variant, size }), className)}
       data-testid={prefix}
     >
       {icon && (
-        <div className="mb-3 text-ink-muted" data-testid={`${prefix}-icon`}>
+        <div
+          className={cn("text-ink-muted", dashed ? "mb-2" : "mb-3")}
+          data-testid={`${prefix}-icon`}
+        >
           {icon}
         </div>
       )}
@@ -96,7 +103,10 @@ export function EmptyState({
       )}
 
       {action ? (
-        <div className="mt-6" data-testid={`${prefix}-action`}>
+        <div
+          className={dashed ? "mt-3" : "mt-6"}
+          data-testid={`${prefix}-action`}
+        >
           {isCallbackAction(action) ? (
             <Button
               size="sm"

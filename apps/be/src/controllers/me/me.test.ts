@@ -71,10 +71,8 @@ const FULL_USER = {
   emailVerified: true,
   phoneNumber: null,
   phoneNumberVerified: false,
-  description: null,
   bio: null,
   private: true,
-  hidden: false,
   verified: false,
   locked: false,
   banned: false,
@@ -246,6 +244,8 @@ describe("account routes", () => {
       { language: "xx" },
       { timeZone: "Mars/Olympus" },
       { defaultHome: "../admin" },
+      { defaultHome: "balances" },
+      { defaultHome: "transactions" },
     ]) {
       const res = await app.inject({
         method: "PATCH",
@@ -272,6 +272,42 @@ describe("account routes", () => {
     });
 
     expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("PATCH /me/account forgets the phone verification when the number changes", async () => {
+    findUnique.mockResolvedValue({ ...FULL_USER, phoneNumber: "+15550100123" });
+    const app = await initApp([{ plugin: meRoutes }]);
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { phoneNumber: "+15550100999" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(update.mock.calls[0][0].data).toEqual({
+      phoneNumber: "+15550100999",
+      phoneNumberVerified: false,
+    });
+
+    await app.close();
+  });
+
+  it("PATCH /me/account keeps the verification when the same number is reformatted", async () => {
+    findUnique.mockResolvedValue({ ...FULL_USER, phoneNumber: "+15550100123" });
+    const app = await initApp([{ plugin: meRoutes }]);
+    await app.inject({
+      method: "PATCH",
+      url: "/me/account",
+      headers: AUTH,
+      payload: { phoneNumber: "+1 (555) 010-0123" },
+    });
+
+    expect(update.mock.calls[0][0].data).toEqual({
+      phoneNumber: "+1 (555) 010-0123",
+    });
+
     await app.close();
   });
 
@@ -715,11 +751,16 @@ describe("account routes", () => {
         method: "PATCH",
         url: "/me/profile",
         headers: AUTH,
-        payload: { verified: true, banned: false, locked: false, hidden: true },
+        payload: {
+          verified: true,
+          banned: false,
+          locked: false,
+          private: false,
+        },
       });
 
       const data = update.mock.calls[0][0].data;
-      expect(data).toEqual({ hidden: true });
+      expect(data).toEqual({ private: false });
       for (const field of ["verified", "banned", "locked"]) {
         expect(data).not.toHaveProperty(field);
       }

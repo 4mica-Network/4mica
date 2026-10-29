@@ -4,7 +4,7 @@ import { FullScreenLoader } from "@/auth/FullScreenLoader";
 export function SsoCallbackPage() {
   return (
     <>
-      <FullScreenLoader messageKey="auth.callback.loading" />
+      <FullScreenLoader />
       <AuthenticateWithRedirectCallback
         signInUrl="/sign-in"
         signInFallbackRedirectUrl="/"

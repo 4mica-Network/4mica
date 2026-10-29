@@ -133,6 +133,10 @@ export const initApp = async (
         tags: [
           { name: "system", description: "Health and diagnostics" },
           { name: "account", description: "Authenticated user account" },
+          {
+            name: "compliance",
+            description: "KYB details, beneficial owners and review",
+          },
           { name: "verification", description: "Email verification" },
           { name: "developer", description: "API keys and webhooks" },
           {
@@ -159,6 +163,10 @@ export const initApp = async (
           {
             name: "customers",
             description: "Counterparties that spend through this account",
+          },
+          {
+            name: "support",
+            description: "Help requests the account has opened with 4Mica",
           },
         ],
         components: {

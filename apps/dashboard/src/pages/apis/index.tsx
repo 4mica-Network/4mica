@@ -1,4 +1,4 @@
-import { Button, EmptyState, Pagination, Spinner } from "@4mica/ui";
+import { Button, EmptyState, Pagination } from "@4mica/ui";
 import {
   batchDeleteApiListings,
   deleteApiListing,
@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { ArrowUpRight, Blocks, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { ApiListingRow } from "./ApiListingRow";
@@ -103,9 +104,7 @@ export function Apis() {
         )}
 
         {showSpinner ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner size="lg" className="text-ink-subtle" />
-          </div>
+          <PageSpinner />
         ) : showError ? (
           <EmptyState
             className="flex-1"

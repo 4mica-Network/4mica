@@ -1,4 +1,4 @@
-import { cn } from "@4mica/ui";
+import { cn, Segmented } from "@4mica/ui";
 import type { PaymentStats } from "@stores/payment/type";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { useId, useState } from "react";
@@ -14,7 +14,6 @@ import {
   smoothPath,
 } from "./metrics";
 import { Panel } from "./Panel";
-import { Segmented } from "./Segmented";
 
 const WIDTH = 600;
 const HEIGHT = 200;
@@ -100,7 +99,7 @@ export function CashFlowChart({
             label: t("overview.flow.rangeOption", { count: months }),
           }))}
           onChange={onRangeChange}
-          testId="overview-range"
+          data-testid="overview-range"
         />
       }
     >

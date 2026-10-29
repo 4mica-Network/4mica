@@ -63,13 +63,30 @@ describe("CreateCustomerModal", () => {
     expect(document.getElementById("create-customer-address")).toBeNull();
   });
 
-  it("refuses to advance without a name", async () => {
+  it("keeps Next disabled until a name is given", () => {
     open();
+    expect(screen.getByTestId("create-customer-next")).toBeDisabled();
+
+    setField("create-customer-name", "   ");
+    expect(screen.getByTestId("create-customer-next")).toBeDisabled();
+
+    setField("create-customer-name", "Acme Procurement");
+    expect(screen.getByTestId("create-customer-next")).toBeEnabled();
+  });
+
+  it("shows the field error and stays put when Next finds a problem", async () => {
+    open();
+    setField("create-customer-name", "Acme Procurement");
+    setField("create-customer-email", "not-an-email");
     next();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("create-customer-next")).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText("customer.errors.emailInvalid"),
+    ).toBeInTheDocument();
+    expect(document.getElementById("create-customer-email")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
     expect(document.getElementById("create-customer-address")).toBeNull();
   });
 
@@ -112,7 +129,10 @@ describe("CreateCustomerModal", () => {
     setField("create-customer-address", PAYER);
     submit();
 
-    await waitFor(() => expect(lastCreate()).toBeUndefined());
+    expect(
+      await screen.findByText("customer.errors.networkRequired"),
+    ).toBeInTheDocument();
+    expect(lastCreate()).toBeUndefined();
   });
 
   it("carries the limits through to the create call", async () => {
