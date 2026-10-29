@@ -92,6 +92,7 @@ export function Overview() {
                   className="flex-1"
                 >
                   <EmptyState
+                    variant="plain"
                     className="flex-1"
                     icon={<TriangleAlert className="h-5 w-5" />}
                     title={t("balance.errorState.title")}
@@ -110,6 +111,7 @@ export function Overview() {
                   className="flex-1"
                 >
                   <EmptyState
+                    variant="plain"
                     className="flex-1"
                     icon={<Landmark className="h-5 w-5" />}
                     title={t("balance.empty.title")}
