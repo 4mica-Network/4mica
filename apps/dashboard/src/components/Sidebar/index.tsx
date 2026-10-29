@@ -177,7 +177,10 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         aria-controls={open ? menuId : undefined}
         aria-label={collapsed ? displayName : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-colors hover:bg-overlay/5"
+        className={cn(
+          "flex h-11 w-full items-center overflow-hidden rounded-lg text-left transition-[background-color,padding] duration-200 hover:bg-overlay/5",
+          collapsed ? "pl-0" : "pl-1.5",
+        )}
       >
         <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
           <AvatarCircle />
@@ -241,7 +244,12 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
 function StaticBrand({ collapsed }: { collapsed: boolean }) {
   const displayName = useDisplayName();
   return (
-    <div className="flex h-11 w-full items-center overflow-hidden rounded-lg">
+    <div
+      className={cn(
+        "flex h-11 w-full items-center overflow-hidden rounded-lg transition-[padding] duration-200",
+        collapsed ? "pl-0" : "pl-1.5",
+      )}
+    >
       <span className="mr-1 grid h-11 w-9 shrink-0 place-items-center">
         <AvatarCircle />
       </span>
