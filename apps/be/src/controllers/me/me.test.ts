@@ -244,6 +244,8 @@ describe("account routes", () => {
       { language: "xx" },
       { timeZone: "Mars/Olympus" },
       { defaultHome: "../admin" },
+      { defaultHome: "balances" },
+      { defaultHome: "transactions" },
     ]) {
       const res = await app.inject({
         method: "PATCH",

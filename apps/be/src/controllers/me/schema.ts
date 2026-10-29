@@ -47,10 +47,11 @@ export const THEMES = ["dark", "light", "system"] as const;
 
 export const DEFAULT_HOMES = [
   "overview",
-  "balances",
-  "transactions",
   "payments",
+  "wallet",
+  "customers",
   "agents",
+  "apis",
 ] as const;
 
 const requiredUsername = v.pipe(

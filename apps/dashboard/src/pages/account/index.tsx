@@ -26,10 +26,11 @@ const LANGUAGE_LABELS: Record<string, string> = {
 
 const HOME_LABELS: Record<string, string> = {
   overview: "Overview",
-  balances: "Balances",
-  transactions: "Transactions",
   payments: "Payments",
+  wallet: "Wallet",
+  customers: "Customers",
   agents: "Agents",
+  apis: "APIs",
 };
 
 const themeLabel = (value: string) => THEME_LABELS[value] ?? value;
