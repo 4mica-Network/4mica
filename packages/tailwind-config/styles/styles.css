@@ -6,24 +6,24 @@
    * flipping these values re-skins the whole app.
    */
   :root {
-    --background: 210 40% 99%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 9%;
     --primary: 202 90% 42%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
     --accent: 202 90% 94%;
     --accent-foreground: 202 90% 30%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
     --ring: 202 90% 50%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -32,12 +32,12 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Ink — dark slate text on light surfaces */
-    --ink-strong: 15 23 42;
-    --ink: 15 23 42;
-    --ink-body: 51 65 85;
-    --ink-muted: 100 116 139;
-    --ink-subtle: 148 163 184;
+    /* Ink — neutral near-black text; every step clears WCAG AA on both light surfaces */
+    --ink-strong: 23 23 23;
+    --ink: 23 23 23;
+    --ink-body: 38 38 38;
+    --ink-muted: 82 82 82;
+    --ink-subtle: 107 107 107;
 
     /* Brand — deepened so accents stay legible on white */
     --brand: 3 105 161;
@@ -50,10 +50,10 @@
     /* Surfaces — light */
     --surface: 255 255 255;
     --surface-solid: 255 255 255;
-    --surface-deep: 247 248 250;
+    --surface-deep: 246 246 246;
 
-    /* Contrast overlay for hairlines/glass — dark slate over light surfaces */
-    --overlay: 15 23 42;
+    /* Contrast overlay for hairlines/glass — neutral black over light surfaces */
+    --overlay: 0 0 0;
 
     --font-display: var(--font-intervar);
     --font-sans: var(--font-intervar);
@@ -62,9 +62,9 @@
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
       "Courier New", monospace;
     /* Semantic colors */
-    --color-success: 22 163 74;
-    --color-warning: 217 119 6;
-    --color-danger: 220 38 38;
+    --color-success: 21 115 55;
+    --color-warning: 161 72 10;
+    --color-danger: 190 28 28;
   }
 
   .dark {
