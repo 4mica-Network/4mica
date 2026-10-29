@@ -11,6 +11,7 @@ import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { paymentRoutes } from "./payments";
 import { resourceKeyRoutes } from "./resource-keys";
+import { supportRoutes } from "./support";
 import { trustRoutes } from "./trust";
 import { unsubscribeRoutes } from "./unsubscribe";
 import { verificationRoutes } from "./verification";
@@ -38,6 +39,7 @@ export const routes: RouteRegistration[] = [
   { plugin: resourceKeyRoutes },
   { plugin: complianceRoutes },
   { plugin: configRoutes },
+  { plugin: supportRoutes },
 ];
 
 export {
@@ -52,6 +54,7 @@ export {
   meRoutes,
   paymentRoutes,
   resourceKeyRoutes,
+  supportRoutes,
   trustRoutes,
   unsubscribeRoutes,
   verificationRoutes,

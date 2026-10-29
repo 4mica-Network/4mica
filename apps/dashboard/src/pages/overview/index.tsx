@@ -74,7 +74,7 @@ export function Overview() {
           data-testid="overview-empty"
         />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4">
           <KpiStrip
             summary={summary}
             assets={assets}
@@ -83,7 +83,7 @@ export function Overview() {
 
           <CashFlowChart stats={stats} range={range} onRangeChange={setRange} />
 
-          <div className="grid gap-4 lg:grid-cols-5">
+          <div className="grid flex-1 gap-4 lg:grid-cols-5">
             <div className="flex min-w-0 lg:col-span-3">
               {balances.error && !balances.isLoading ? (
                 <Panel

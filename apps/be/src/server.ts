@@ -164,6 +164,10 @@ export const initApp = async (
             name: "customers",
             description: "Counterparties that spend through this account",
           },
+          {
+            name: "support",
+            description: "Help requests the account has opened with 4Mica",
+          },
         ],
         components: {
           securitySchemes: {

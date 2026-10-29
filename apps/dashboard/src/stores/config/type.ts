@@ -25,6 +25,8 @@ export interface AppConfig {
   fundsSources: string[];
   ownerRoles: string[];
   networks: string[];
+  supportCategories: string[];
+  supportPriorities: string[];
 }
 
 export interface ConfigState {

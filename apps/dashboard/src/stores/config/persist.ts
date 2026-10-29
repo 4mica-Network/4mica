@@ -1,6 +1,6 @@
 import type { AppConfig } from "./type";
 
-export const CONFIG_STORAGE_KEY = "4mica.config.v1";
+export const CONFIG_STORAGE_KEY = "4mica.config.v2";
 
 export interface CachedConfig {
   config: AppConfig;

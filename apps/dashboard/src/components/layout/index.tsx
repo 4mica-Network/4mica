@@ -93,7 +93,7 @@ export function SectionCard({
   title: string;
   description?: string;
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   "data-testid"?: string;
 }) {
   return (

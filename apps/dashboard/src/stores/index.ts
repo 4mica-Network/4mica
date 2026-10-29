@@ -11,6 +11,7 @@ import developerReducer from "./developer/reducer";
 import paymentReducer from "./payment/reducer";
 import resourceKeyReducer from "./resourceKey/reducer";
 import rootSaga from "./rootSaga";
+import supportReducer from "./support/reducer";
 import trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
 import walletReducer from "./wallet/reducer";
@@ -29,6 +30,7 @@ const rootReducer = combineReducers({
   resourceKey: resourceKeyReducer,
   compliance: complianceReducer,
   config: configReducer,
+  support: supportReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

@@ -1062,6 +1062,102 @@ export const complianceResponseSchema = {
 
 const strList = { type: "array", items: str } as const;
 
+const supportCategoryEnum = {
+  type: "string",
+  enum: [
+    "ACCOUNT",
+    "BILLING",
+    "PAYMENTS",
+    "WALLETS",
+    "AGENTS",
+    "API_LISTINGS",
+    "INTEGRATION",
+    "COMPLIANCE",
+    "BUG",
+    "FEATURE_REQUEST",
+    "OTHER",
+  ],
+} as const;
+
+const supportRequestProperties = {
+  id: str,
+  number: int,
+  subject: str,
+  category: supportCategoryEnum,
+  priority: { type: "string", enum: ["LOW", "NORMAL", "HIGH", "URGENT"] },
+  status: {
+    type: "string",
+    enum: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"],
+  },
+  description: str,
+  reference: nullStr,
+  firstRespondedAt: nullDate,
+  resolvedAt: nullDate,
+  lastActivityAt: date,
+  createdAt: date,
+  updatedAt: date,
+} as const;
+
+const supportRequestRequired = [
+  "id",
+  "number",
+  "subject",
+  "category",
+  "priority",
+  "status",
+  "description",
+  "lastActivityAt",
+  "createdAt",
+] as const;
+
+export const supportMessageResponseSchema = {
+  type: "object",
+  required: ["id", "author", "body", "createdAt"],
+  properties: {
+    id: str,
+    author: { type: "string", enum: ["CUSTOMER", "SUPPORT"] },
+    body: str,
+    createdAt: date,
+  },
+} as const;
+
+export const supportRequestResponseSchema = {
+  type: "object",
+  required: supportRequestRequired,
+  properties: supportRequestProperties,
+} as const;
+
+export const supportRequestDetailResponseSchema = {
+  type: "object",
+  required: [...supportRequestRequired, "messages"],
+  properties: {
+    ...supportRequestProperties,
+    messages: { type: "array", items: supportMessageResponseSchema },
+  },
+} as const;
+
+export const supportRequestListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: supportRequestResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+export const supportStatsResponseSchema = {
+  type: "object",
+  required: ["active", "awaitingYou", "resolved", "medianFirstResponseMinutes"],
+  properties: {
+    active: int,
+    awaitingYou: int,
+    resolved: int,
+    medianFirstResponseMinutes: { type: "number", nullable: true },
+  },
+} as const;
+
 export const configResponseSchema = {
   type: "object",
   required: [
@@ -1079,6 +1175,8 @@ export const configResponseSchema = {
     "fundsSources",
     "ownerRoles",
     "networks",
+    "supportCategories",
+    "supportPriorities",
   ],
   properties: {
     version: str,
@@ -1114,5 +1212,7 @@ export const configResponseSchema = {
     fundsSources: strList,
     ownerRoles: strList,
     networks: strList,
+    supportCategories: strList,
+    supportPriorities: strList,
   },
 } as const;

@@ -9,6 +9,7 @@ import customerSaga from "./customer/saga";
 import developerSaga from "./developer/saga";
 import paymentSaga from "./payment/saga";
 import resourceKeySaga from "./resourceKey/saga";
+import supportSaga from "./support/saga";
 import trustSaga from "./trust/saga";
 import userSaga from "./user/saga";
 import walletSaga from "./wallet/saga";
@@ -28,5 +29,6 @@ export default function* rootSaga() {
     ...resourceKeySaga,
     ...complianceSaga,
     ...configSaga,
+    ...supportSaga,
   ]);
 }

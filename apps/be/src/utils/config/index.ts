@@ -13,6 +13,10 @@ import {
   NOTIFICATION_PLACEMENTS,
   THEMES,
 } from "@controllers/me/schema";
+import {
+  SUPPORT_CATEGORIES,
+  SUPPORT_PRIORITIES,
+} from "@controllers/support/schema";
 import { buildCountries } from "./countries";
 import { buildCityTimezones } from "./timezones";
 
@@ -42,6 +46,8 @@ const buildLists = () => ({
   fundsSources: FUNDS_SOURCES,
   ownerRoles: OWNER_ROLES,
   networks: PAYMENT_NETWORK_IDS,
+  supportCategories: SUPPORT_CATEGORIES,
+  supportPriorities: SUPPORT_PRIORITIES,
 });
 
 export type AppConfig = ReturnType<typeof buildLists> & { version: string };

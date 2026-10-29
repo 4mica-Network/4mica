@@ -41,6 +41,8 @@ const config = (over: Partial<AppConfig> = {}): AppConfig => ({
   fundsSources: ["LOANS"],
   ownerRoles: ["OWNER"],
   networks: ["BASE"],
+  supportCategories: ["PAYMENTS", "OTHER"],
+  supportPriorities: ["LOW", "NORMAL"],
   ...over,
 });
 

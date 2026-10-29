@@ -224,6 +224,7 @@ model User {
   emailVerificationTokens        EmailVerificationToken[]
   onboardingQueue                OnboardingEmailQueue?
   wallets                        Wallet[]
+  supportRequests                SupportRequest[]
   walletNonces                   WalletNonce[]
   reportedPayments               Payment[]
   customers                      Customer[]
@@ -935,4 +936,78 @@ model FaqItem {
   @@index([listingId, sortOrder])
   @@index([agentId, sortOrder])
   @@map("faq_items")
+}
+
+enum SupportCategory {
+  ACCOUNT
+  BILLING
+  PAYMENTS
+  WALLETS
+  AGENTS
+  API_LISTINGS
+  INTEGRATION
+  COMPLIANCE
+  BUG
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportAuthor {
+  CUSTOMER
+  SUPPORT
+}
+
+model SupportRequest {
+  id          String          @id @default(uuid(7))
+  number      Int             @unique @default(autoincrement())
+  ownerId     String          @map("owner_id")
+  subject     String          @db.VarChar(160)
+  category    SupportCategory
+  priority    SupportPriority @default(NORMAL)
+  status      SupportStatus   @default(OPEN)
+  description String          @db.VarChar(5000)
+  reference   String?         @db.VarChar(255)
+
+  firstRespondedAt DateTime? @map("first_responded_at")
+  resolvedAt       DateTime? @map("resolved_at")
+  lastActivityAt   DateTime  @default(now()) @map("last_activity_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner    User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([ownerId, lastActivityAt(sort: Desc)])
+  @@index([ownerId, status])
+  @@map("support_requests")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid(7))
+  requestId String        @map("request_id")
+  author    SupportAuthor
+  body      String        @db.VarChar(5000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("support_messages")
 }
