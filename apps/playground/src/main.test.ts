@@ -164,6 +164,7 @@ describe("toPublicProfile", () => {
     primaryBrandColor: "#7bcbff",
     secondaryBrandColor: "#48c9b0",
     disableBranding: false,
+    theme: "light",
   };
 
   it("honours the contact visibility flags", () => {
@@ -193,6 +194,16 @@ describe("toPublicProfile", () => {
 
   it("passes the bio through", () => {
     expect(toPublicProfile(row, { isOwner: false }).bio).toBe("Builder");
+  });
+
+  it("carries the owner's public theme, defaulting unknown values to dark", () => {
+    expect(toPublicProfile(row, { isOwner: false }).theme).toBe("light");
+    expect(
+      toPublicProfile({ ...row, theme: "system" }, { isOwner: false }).theme,
+    ).toBe("system");
+    expect(
+      toPublicProfile({ ...row, theme: "sepia" }, { isOwner: false }).theme,
+    ).toBe("dark");
   });
 
   it("drops 4Mica branding when the owner disables it", () => {

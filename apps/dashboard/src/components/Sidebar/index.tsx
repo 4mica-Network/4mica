@@ -92,7 +92,7 @@ function AvatarCircle() {
       name={t("monogram")}
       alt=""
       size="xs"
-      className="border-0 bg-overlay/15 text-white"
+      className="border-0 bg-overlay/15 text-ink-strong"
     />
   );
 }

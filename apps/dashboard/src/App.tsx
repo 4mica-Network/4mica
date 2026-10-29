@@ -2,11 +2,14 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { SettingsLayout } from "@/components/SettingsLayout";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { SignInPage } from "@/pages/sign-in";
 import { SsoCallbackPage } from "@/pages/sso-callback";
 import { APP_PAGES, SETTINGS_PAGES } from "@/routes";
 
 export function App() {
+  useAppTheme();
+
   return (
     <Routes>
       <Route path="/sign-in" element={<SignInPage />} />

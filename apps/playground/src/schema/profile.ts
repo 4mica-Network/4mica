@@ -14,6 +14,7 @@ const PublicProfileSchema = v.object({
   secondaryBrandColor: v.nullable(v.string()),
   allowSEOIndexing: v.boolean(),
   showBranding: v.boolean(),
+  theme: v.picklist(["dark", "light", "system"]),
   isOwner: v.boolean(),
   isPublished: v.boolean(),
 });

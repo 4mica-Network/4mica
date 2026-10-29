@@ -27,6 +27,7 @@ export const PROFILE_SELECT = {
   primaryBrandColor: true,
   secondaryBrandColor: true,
   disableBranding: true,
+  theme: true,
 } as const;
 
 export interface ProfileResult {

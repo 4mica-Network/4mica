@@ -1,4 +1,5 @@
 import { isProfileRenderable } from "@4mica/rules";
+import { toThemePreference } from "@/lib/theme";
 import type { PublicProfile } from "@/schema/profile";
 import { safeBrandColor } from "@/utils/brandColor";
 
@@ -26,6 +27,7 @@ export interface ProfileRow extends ProfileGateRow {
   primaryBrandColor: string;
   secondaryBrandColor: string;
   disableBranding: boolean;
+  theme: string;
 }
 
 export { isProfileRenderable };
@@ -56,6 +58,7 @@ export const toPublicProfile = (
 
   allowSEOIndexing: row.allowSEOIndexing,
   showBranding: !row.disableBranding,
+  theme: toThemePreference(row.theme),
 
   isOwner,
   isPublished: isProfileRenderable(row),
