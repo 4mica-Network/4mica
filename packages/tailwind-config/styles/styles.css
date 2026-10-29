@@ -7,23 +7,23 @@
    */
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --foreground: 225 13% 6%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 225 13% 6%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+    --popover-foreground: 225 13% 6%;
     --primary: 202 90% 42%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 225 13% 6%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 224 7% 35%;
     --accent: 202 90% 94%;
     --accent-foreground: 202 90% 30%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
+    --border: 220 10% 90%;
+    --input: 220 10% 90%;
     --ring: 202 90% 50%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -32,12 +32,12 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Ink — neutral near-black text; every step clears WCAG AA on both light surfaces */
-    --ink-strong: 23 23 23;
-    --ink: 23 23 23;
-    --ink-body: 38 38 38;
-    --ink-muted: 82 82 82;
-    --ink-subtle: 107 107 107;
+    /* Ink — cool near-black, one hue; every step clears WCAG AA on both light surfaces */
+    --ink-strong: 14 15 18;
+    --ink: 14 15 18;
+    --ink-body: 38 40 46;
+    --ink-muted: 84 87 96;
+    --ink-subtle: 107 111 121;
 
     /* Brand — deepened so accents stay legible on white */
     --brand: 3 105 161;
@@ -45,15 +45,15 @@
     --brand-teal: 13 148 136;
     --brand-deep: 30 64 175;
     --brand-soft: 20 184 166;
-    --brand-violet: 79 70 229;
+    --brand-violet: 14 116 144;
 
     /* Surfaces — light */
     --surface: 255 255 255;
     --surface-solid: 255 255 255;
-    --surface-deep: 246 246 246;
+    --surface-deep: 245 246 248;
 
-    /* Contrast overlay for hairlines/glass — neutral black over light surfaces */
-    --overlay: 0 0 0;
+    /* Contrast overlay — the ink's hue, so fills and edges stay in one family */
+    --overlay: 14 18 28;
 
     --font-display: var(--font-intervar);
     --font-sans: var(--font-intervar);
