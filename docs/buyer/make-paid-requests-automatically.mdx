@@ -3,35 +3,80 @@ title: "Make Paid Requests Automatically"
 description: "Use client wrappers to turn HTTP 402 responses into automatic paid retries."
 ---
 
-The best experience is simple for the agent and controlled for the operator. Your code calls a protected resource normally, the wrapper handles the paid retry, and your policy decides whether the payment should be signed.
+The best experience is simple for the agent and controlled for the operator. Your code calls a protected resource normally, `client.fetch` handles the paid retry, and spend limits decide whether the payment is signed.
 
-Automatic payment does not mean unlimited payment. Treat the wrapper as the transport layer and your policy as the guardrail.
+Automatic payment does not mean unlimited payment. Treat `client.fetch` as the transport layer and your limits and policy as the guardrail.
 
-## What the wrapper handles
+## What `client.fetch` handles
 
-The wrapper handles the payment mechanics around a normal HTTP request.
+`client.fetch` has the same signature as the global `fetch` and handles the payment mechanics around a normal HTTP request.
 
 <Steps>
   <Step title="Read payment requirements">
-    The wrapper receives the seller's payment requirements from the protected route.
+    On an HTTP 402, it reads the seller's 4Mica payment options from the response.
   </Step>
-  <Step title="Create a unique request">
-    It generates a request ID that has not been used for another guarantee.
+  <Step title="Check spend limits">
+    It picks the first option the session's spend limits allow. If none passes, it throws `SpendLimitError` and signs nothing.
   </Step>
   <Step title="Sign the guarantee">
-    It signs a payment guarantee with your configured account.
+    It signs a payment guarantee with a fresh request ID, using the session's wallet.
   </Step>
   <Step title="Retry the request">
-    It sends the request again with the payment header attached.
+    It sends the request again with the payment header attached. It retries once; a second 402 comes back to you as is.
   </Step>
   <Step title="Return the response">
     Your agent receives the paid response like a normal HTTP result.
   </Step>
 </Steps>
 
+Any response other than a 402 is returned untouched, and so is a 402 that offers no 4Mica payment on a network the session has open. The session's network is always open; another network opens once you use it through the `{ network }` option of another call, such as `client.balance({ network })`.
+
+## Pay with `client.fetch`
+
+```ts
+import { FourMica, SpendLimitError } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  network: "base-sepolia",
+  spend: {
+    perPayment: "0.25 USDC",
+    total: "10 USDC",
+    payTo: ["0xSellerAddress"],
+  },
+});
+
+try {
+  const response = await client.fetch("https://api.example.com/research");
+  console.log(client.paymentFor(response)); // what was paid, or undefined
+} catch (err) {
+  if (!(err instanceof SpendLimitError)) throw err;
+  console.warn(`refused by ${err.limit} for ${err.url}`); // nothing was signed
+}
+```
+
+After the first paid retry succeeds, check the corresponding wallet activity in [4mica dashboard](https://app.4mica.io).
+
+## Spend limits
+
+Set limits once, in `FourMica.connect({ spend })`. Amounts are written like deposits, as a decimal string with the asset.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `perPayment` | `"1 USDC"` | Most one payment may cost, per asset. A string, or an array for several assets: `["1 USDC", "0.0005 ETH"]`. |
+| `total` | No limit | Most the whole session may pay, per asset. Same format as `perPayment`. |
+| `payTo` | Any address | Only pay these seller addresses. |
+
+- **A payment is only allowed in an asset that has a `perPayment` entry.** A seller cannot get round the cap by asking for a different token. With the default, the session pays only USDC.
+- **`total` counts every payment the session makes**, reserved before signing so concurrent requests cannot overshoot it. A payment whose signing or retry throws, or whose retry comes back 402, is released again. The count lives in the session; a new `connect` starts from zero.
+- **Violations throw `SpendLimitError`** before anything is signed. `err.limit` names the limit (`"perPayment"`, `"total"`, `"assets"` or `"payTo"`) and `err.url` the resource.
+- **A limit in an asset the network does not list does not apply there**, so one `spend` setting can cover several networks.
+
+`client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment.
+
 ## What your policy should handle
 
-Your policy handles judgment. It decides whether the seller, route, amount, network, asset, and task context are allowed before the wrapper signs.
+Spend limits are coarse. Your policy handles judgment: whether the seller, route, amount, network, asset, and task context are allowed before the agent makes the request.
 
 | Policy area | Decision |
 | --- | --- |
@@ -41,7 +86,9 @@ Your policy handles judgment. It decides whether the seller, route, amount, netw
 | Blocking | Categories, routes, or sellers the agent should never pay. |
 | Audit | Reason codes, logging, and alerting for every paid request. |
 
-## TypeScript fetch wrapper
+## Using `@x402/fetch`
+
+If your client is already built on `@x402/fetch`, register the 4Mica scheme with it instead of switching to `client.fetch`.
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
@@ -61,8 +108,6 @@ const response = await fetchWithPayment("https://api.example.com/research");
 <Note>
 `@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
 </Note>
-
-After the first paid retry succeeds, check the corresponding wallet activity in [4mica dashboard](https://app.4mica.io).
 
 ## Signing rules
 

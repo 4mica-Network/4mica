@@ -27,17 +27,17 @@ You should control:
   <Step title="Create a dedicated wallet">
     Use a wallet for the agent or application, not your main wallet. Keep automated signing separate from personal funds.
   </Step>
-  <Step title="Deposit collateral">
-    Deposit ETH or a supported <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> into 4Mica on the network your target sellers accept.
+  <Step title="Connect a session">
+    Open a `FourMica` session for the wallet on the network your target sellers accept.
   </Step>
-  <Step title="Register the client scheme">
-    Configure the 4Mica client for each network the agent may use.
+  <Step title="Deposit collateral">
+    Deposit ETH or a supported <Tooltip headline="ERC-20" tip="Ethereum's standard interface for fungible tokens. It defines common functions for balances, transfers, approvals, and allowances so wallets and applications can interact with tokens consistently.">ERC-20</Tooltip> into 4Mica with `client.deposit`, on that same network.
   </Step>
   <Step title="Define spending policy">
-    Set limits for amount, seller, route, network, task, time window, and approval requirements.
+    Set the session's `spend` limits for amount per payment, total per session, and allowed payees. Keep task, route, time-window, and approval rules in your agent's own policy.
   </Step>
   <Step title="Make paid requests">
-    Use a wrapped HTTP client so the agent can handle paid resources while Your policy decides which payments to sign.
+    Call `client.fetch` so the agent can handle paid resources while your limits decide which payments to sign.
   </Step>
   <Step title="Audit the task">
     Record each payment with the seller, route, amount, reason, guarantee ID, request ID, and task result.
@@ -49,24 +49,22 @@ When you are ready to create the wallet and policy, continue in the [dashboard](
 ## Make a Paid Request
 
 ```ts
-import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { FourMicaEvmScheme } from "@4mica/x402/client";
-import { privateKeyToAccount } from "viem/accounts";
+import { FourMica } from "@4mica/sdk";
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-const scheme = await FourMicaEvmScheme.create(account);
-
-const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
-  schemes: [{ network: "eip155:84532", client: scheme }],
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  network: "base-sepolia",
+  spend: { perPayment: "0.50 USDC", total: "20 USDC" },
 });
 
-const response = await fetchWithPayment("https://api.example.com/data");
+await client.deposit("5 USDC"); // once; resolves when the collateral is spendable
+
+const response = await client.fetch("https://api.example.com/data");
 const data = await response.json();
+const payment = client.paymentFor(response); // undefined if nothing was paid
 ```
 
-<Note>
-`@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
-</Note>
+`client.fetch` pays a 4Mica `402` within the `spend` limits and retries once; any other response comes back untouched. A payment that breaks a limit throws `SpendLimitError` before anything is signed. Without `spend`, each payment is capped at `1 USDC` and only USDC is paid. [Make paid requests automatically](/buyer/make-paid-requests-automatically) covers how the limits apply, and the `@x402/fetch` integration for agents that already use it.
 
 <Warning>
 Start on Base Sepolia (`eip155:84532`) with small amounts. Move to production only after limits, logs, and withdrawal checks are routine.
