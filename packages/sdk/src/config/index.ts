@@ -1,7 +1,8 @@
 import { type Account, privateKeyToAccount } from "viem/accounts";
+import { defaultEnv, readEnv } from "@/config/env";
 import type { Config } from "@/config/models";
 import { ConfigError } from "@/errors";
-import { resolveNetworkRpcUrl } from "@/networks";
+import { DEFAULT_NETWORK, NETWORKS, resolveNetwork } from "@/networks";
 import {
   normalizeAddress,
   normalizePrivateKey,
@@ -11,7 +12,7 @@ import {
 
 export type { Config } from "@/config/models";
 
-export const DEFAULT_RPC_URL = "https://base.sepolia.api.4mica.io/";
+export const DEFAULT_RPC_URL = NETWORKS[DEFAULT_NETWORK].rpcUrl;
 
 /**
  * Fluent builder for {@link Config}; hand the result to `Client.connect`.
@@ -37,16 +38,18 @@ export class ConfigBuilder {
   private _authUrl?: string;
   private _authRefreshMarginSecs?: number;
   private _facilitatorUrl?: string;
+  private _networkFacilitatorUrl?: string;
 
   /** Set the 4Mica core RPC URL directly. Use {@link network} to select a hosted network by name instead. Defaults to Base Sepolia, `https://base.sepolia.api.4mica.io/`. */
   rpcUrl(value: string): ConfigBuilder {
     this._rpcUrl = value;
+    this._networkFacilitatorUrl = undefined;
     return this;
   }
 
   /**
    * Select a hosted 4Mica network by shorthand or CAIP-2 identifier.
-   * Resolves to the corresponding core API URL.
+   * Resolves to the corresponding core API URL and hosted facilitator.
    * Mutually exclusive with {@link rpcUrl} — last call wins.
    *
    * Supported values: `"base"` / `"eip155:8453"`, `"base-sepolia"` / `"eip155:84532"`,
@@ -55,13 +58,14 @@ export class ConfigBuilder {
    * @throws {@link ConfigError} if the network is not recognised.
    */
   network(value: string): ConfigBuilder {
-    const url = resolveNetworkRpcUrl(value);
-    if (!url) {
+    const network = resolveNetwork(value);
+    if (!network) {
       throw new ConfigError(
         `unknown network "${value}". Use a known shorthand (e.g. "base") or CAIP-2 id, or call rpcUrl() directly.`,
       );
     }
-    this._rpcUrl = url;
+    this._rpcUrl = network.info.rpcUrl;
+    this._networkFacilitatorUrl = network.info.facilitatorUrl;
     return this;
   }
 
@@ -136,16 +140,16 @@ export class ConfigBuilder {
   /**
    * Load configuration from environment variables.
    *
-   * Recognised variables:
-   * - `4MICA_NETWORK` — shorthand or CAIP-2 id (e.g. `base`); takes precedence over `4MICA_RPC_URL`
-   * - `4MICA_RPC_URL`
-   * - `4MICA_WALLET_PRIVATE_KEY`
-   * - `4MICA_ETHEREUM_HTTP_RPC_URL`
-   * - `4MICA_CONTRACT_ADDRESS`
-   * - `4MICA_FACILITATOR_URL`
-   * - `4MICA_BEARER_TOKEN`
-   * - `4MICA_AUTH_URL`
-   * - `4MICA_AUTH_REFRESH_MARGIN_SECS`
+   * Recognised variables (the older `4MICA_` prefix also works):
+   * - `FOURMICA_NETWORK` — shorthand or CAIP-2 id (e.g. `base`); takes precedence over `FOURMICA_RPC_URL`
+   * - `FOURMICA_RPC_URL`
+   * - `FOURMICA_WALLET_PRIVATE_KEY`
+   * - `FOURMICA_ETHEREUM_HTTP_RPC_URL`
+   * - `FOURMICA_CONTRACT_ADDRESS`
+   * - `FOURMICA_FACILITATOR_URL`
+   * - `FOURMICA_BEARER_TOKEN`
+   * - `FOURMICA_AUTH_URL`
+   * - `FOURMICA_AUTH_REFRESH_MARGIN_SECS`
    *
    * @param source - Environment source to read from. Defaults to `process.env`
    *   when available (Node/Bun) and an empty object otherwise. Runtime adapters
@@ -153,31 +157,29 @@ export class ConfigBuilder {
    *   the core stays free of any hard `process` reference.
    */
   fromEnv(source?: Record<string, string | undefined>): ConfigBuilder {
-    const env =
-      source ??
-      (globalThis as { process?: { env?: Record<string, string | undefined> } })
-        .process?.env ??
-      {};
-    if (env["4MICA_NETWORK"]) this.network(env["4MICA_NETWORK"]);
-    else if (env["4MICA_RPC_URL"]) this._rpcUrl = env["4MICA_RPC_URL"];
-    if (env["4MICA_WALLET_PRIVATE_KEY"])
-      this._walletPrivateKey = env["4MICA_WALLET_PRIVATE_KEY"];
-    if (env["4MICA_ETHEREUM_HTTP_RPC_URL"])
-      this._ethereumHttpRpcUrl = env["4MICA_ETHEREUM_HTTP_RPC_URL"];
-    if (env["4MICA_CONTRACT_ADDRESS"])
-      this._contractAddress = env["4MICA_CONTRACT_ADDRESS"];
-    if (env["4MICA_FACILITATOR_URL"])
-      this._facilitatorUrl = env["4MICA_FACILITATOR_URL"];
-    if (env["4MICA_BEARER_TOKEN"])
-      this._bearerToken = env["4MICA_BEARER_TOKEN"];
-    if (env["4MICA_AUTH_URL"]) {
-      this._authUrl = env["4MICA_AUTH_URL"];
+    const env = source ?? defaultEnv();
+    const network = readEnv(env, "NETWORK");
+    const rpcUrl = readEnv(env, "RPC_URL");
+    if (network) this.network(network);
+    else if (rpcUrl) this.rpcUrl(rpcUrl);
+    const walletPrivateKey = readEnv(env, "WALLET_PRIVATE_KEY");
+    if (walletPrivateKey) this._walletPrivateKey = walletPrivateKey;
+    const ethereumHttpRpcUrl = readEnv(env, "ETHEREUM_HTTP_RPC_URL");
+    if (ethereumHttpRpcUrl) this._ethereumHttpRpcUrl = ethereumHttpRpcUrl;
+    const contractAddress = readEnv(env, "CONTRACT_ADDRESS");
+    if (contractAddress) this._contractAddress = contractAddress;
+    const facilitatorUrl = readEnv(env, "FACILITATOR_URL");
+    if (facilitatorUrl) this._facilitatorUrl = facilitatorUrl;
+    const bearerToken = readEnv(env, "BEARER_TOKEN");
+    if (bearerToken) this._bearerToken = bearerToken;
+    const authUrl = readEnv(env, "AUTH_URL");
+    if (authUrl) {
+      this._authUrl = authUrl;
       this._authEnabled = true;
     }
-    if (env["4MICA_AUTH_REFRESH_MARGIN_SECS"]) {
-      this._authRefreshMarginSecs = Number(
-        env["4MICA_AUTH_REFRESH_MARGIN_SECS"],
-      );
+    const refreshMargin = readEnv(env, "AUTH_REFRESH_MARGIN_SECS");
+    if (refreshMargin) {
+      this._authRefreshMarginSecs = Number(refreshMargin);
       this._authEnabled = true;
     }
     return this;
@@ -212,8 +214,10 @@ export class ConfigBuilder {
       const contractAddress = this._contractAddress
         ? normalizeAddress(this._contractAddress)
         : undefined;
-      const facilitatorUrl = this._facilitatorUrl
-        ? validateUrl(this._facilitatorUrl)
+      const facilitatorSource =
+        this._facilitatorUrl ?? this._networkFacilitatorUrl;
+      const facilitatorUrl = facilitatorSource
+        ? validateUrl(facilitatorSource)
         : undefined;
       const refreshMargin = this._authRefreshMarginSecs ?? 60;
       if (!Number.isFinite(refreshMargin) || refreshMargin < 0) {

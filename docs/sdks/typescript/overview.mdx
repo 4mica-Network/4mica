@@ -5,18 +5,12 @@ description: "Install and use @4mica/sdk, the runtime-neutral SDK for the 4Mica 
 
 # TypeScript SDK
 
-`@4mica/sdk` is the official TypeScript SDK for the 4Mica payment network. Use it to deposit collateral, sign payment guarantees, verify and settle them, run the x402 HTTP flow, and gate your own routes behind a payment.
+`@4mica/sdk` is the official TypeScript SDK for the 4Mica payment network. Use it to deposit collateral, pay for HTTP 402-protected resources, withdraw, sign and settle guarantees, and gate your own routes behind a payment.
 
-The client is made of capability sub-clients:
+It has two layers:
 
-- **`client.deposit`** — deposit collateral in ETH or ERC20 tokens.
-- **`client.withdraw`** — request, cancel, and finalize withdrawals.
-- **`client.payment`** — sign, issue, and verify payment guarantees.
-- **`client.settlement`** — settle a cleared cycle from either side: the debtor pays, the creditor claims.
-- **`client.account`** / **`client.tokens`** — the signer's balances and supported-token metadata.
-- **X402 flow helper** (`X402Flow`) — turn a `402 Payment Required` response into a signed payment header.
-
-To charge for a route, use the [payment middleware](/seller/payment-middleware) in `@4mica/x402`.
+- **`FourMica`** — connect once, then deposit, pay, and withdraw with amounts written as `"5 USDC"`. Start here.
+- **`Client`** — the exact-control layer: intent builders for every deposit, withdrawal, guarantee, and settlement route, with amounts in base units. Reach it from a session with `await client.lowLevel()`.
 
 ## Runtime-neutral
 
@@ -46,9 +40,55 @@ bun add @4mica/sdk
 
 </CodeGroup>
 
+## Your first session
+
+Connect, deposit, and make a paid request. Start on Base Sepolia with a test wallet.
+
+```ts
+import { FourMica } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  network: "base-sepolia",
+});
+
+await client.deposit("5 USDC");
+const response = await client.fetch("https://api.example.com/data");
+```
+
+`FourMica.connect` reaches the core service for its public parameters and checks that it supports the guarantee version this SDK signs. `await using` closes the session when `client` goes out of scope, even if a call throws.
+
+<Note>
+  `await using` needs TypeScript 5.2 or later. Plain JavaScript needs a runtime
+  with native `await using` (Node 24 or later); otherwise call
+  `await client.close()` in a `finally` block. If TypeScript reports that
+  `Symbol.asyncDispose` is missing, add `"esnext.disposable"` to `lib` in
+  `tsconfig.json`.
+</Note>
+
+| Call | What it does |
+| --- | --- |
+| `client.deposit("5 USDC", options?)` | Deposits collateral, gasless where the network's facilitator can sponsor it. Resolves once core counts it. |
+| `client.balance()` / `client.balance("USDC")` | Collateral per asset: `total`, `locked`, and `available` as decimal strings, plus `raw` bigints. |
+| `client.fetch(input, init?)` | The global `fetch` signature. Pays a 4Mica 402 within the session's spend limits and retries once. |
+| `client.paymentFor(response)` | What `fetch` paid for a response, or `undefined`. |
+| `client.withdraw("2 USDC")` | Requests a withdrawal. The grace period starts now. |
+| `client.withdrawals()` | Pending withdrawal requests, each with `readyAt`. |
+| `client.finalizeWithdrawal("USDC")` | Pays out a requested withdrawal once its grace period has ended. |
+| `client.cancelWithdrawal("USDC")` | Cancels a requested withdrawal. |
+| `await client.lowLevel(network?)` | The underlying `Client`, for anything the facade does not cover. |
+| `client.close()` | Closes the session. `await using` calls it for you. |
+| `client.address` / `client.network` | The signer address, and the session's network. |
+
+`deposit`, `balance`, and the withdrawal calls take an optional `{ network }` to use another network; the session connects it on first use.
+
+### Amounts
+
+Amounts are decimal strings with their asset: `"5 USDC"` or `{ amount: "5", asset: "USDC" }`. The asset is a symbol core lists (any case), `"ETH"` for the native asset, or a token address. Numbers and bigints are rejected on purpose, since `5` could mean 5 USDC or 5 base units. An amount with more decimals than the token has throws `AmountPrecisionError`; the SDK never rounds.
+
 ## Networks
 
-The default network is Base Sepolia. Select another with `.network()` or the `4MICA_NETWORK` environment variable.
+The default network is Base Sepolia (`DEFAULT_NETWORK`). Select another with the `network` option of `FourMica.connect` or the `FOURMICA_NETWORK` environment variable. Base still runs the previous protocol version, so 2.0 clients cannot pay there yet; see [supported networks](/getting-started/supported-networks).
 
 | Shorthand          | CAIP-2            | Core API URL                              |
 | ------------------ | ----------------- | ----------------------------------------- |
@@ -61,35 +101,23 @@ Read network details from the exported `NETWORKS` constant:
 ```ts
 import { NETWORKS } from "@4mica/sdk";
 
-console.log(NETWORKS.base.caip2); // "eip155:8453"
-console.log(NETWORKS.base.rpcUrl); // "https://base.api.4mica.io/"
+console.log(NETWORKS["base-sepolia"].caip2); // "eip155:84532"
+console.log(NETWORKS["base-sepolia"].facilitatorUrl); // "https://testnet.payment.4mica.io/"
 ```
 
-## Your first client
+## Exact control with `Client`
 
-Build a config, create a `Client`, and always close it when you are done. Start on Base Sepolia (`eip155:84532`) with a test wallet.
+`await client.lowLevel()` returns the session's `Client`, which the session closes for you. Its capability sub-clients take amounts in base units:
 
-```ts
-import { Client, ConfigBuilder } from "@4mica/sdk";
+- **`deposit`** — deposit collateral in ETH or ERC20 tokens, choosing the route.
+- **`withdraw`** — request, cancel, and finalize withdrawals.
+- **`payment`** — sign, issue, and verify payment guarantees.
+- **`settlement`** — settle a cleared cycle from either side: the debtor pays, the creditor claims.
+- **`account`** / **`tokens`** — the signer's balances and supported-token metadata.
 
-const cfg = new ConfigBuilder()
-  .network("base-sepolia") // the default
-  .walletPrivateKey(process.env.PRIVATE_KEY as `0x${string}`)
-  .build();
+Alongside it, `X402Flow` turns a `402 Payment Required` response into a signed payment header, and `@4mica/sdk/server` is an edge-safe paywall that gates a route behind an x402 payment.
 
-const client = await Client.connect(cfg);
-try {
-  // use client.deposit, client.payment, client.settlement, …
-} finally {
-  await client.aclose();
-}
-```
-
-`Client.connect` reaches the core service for its public parameters, validates that it accepts the payment payload version this SDK signs, and resolves the ClearingHouse, GuaranteeRegistry, and operator signer addresses that payments are signed and receipts verified against. The Ethereum RPC is only contacted lazily, on first on-chain use. From the client you reach the entry points:
-
-- `client.deposit` / `client.withdraw` — payer-side collateral operations.
-- `client.payment` — signing payments, issuing guarantees, and verifying receipts; `client.settlement` — settling cleared cycles.
-- `X402Flow` — the helper for `402`-protected HTTP resources.
+To build a `Client` yourself, use `ConfigBuilder` and `Client.connect`; see [Configuration](/sdks/typescript/configuration#advanced-exact-control).
 
 <Warning>
   Keep private keys in environment variables instead of committing them to your
@@ -100,10 +128,10 @@ try {
 
 <Columns cols={2}>
   <Card title="Configuration" icon="gear" href="/sdks/typescript/configuration">
-    Initialize a client with `ConfigBuilder`, environment variables, or a custom signer.
+    `FourMica.connect` options, environment variables, custom signers, and `ConfigBuilder`.
   </Card>
   <Card title="Client operations" icon="wallet" href="/sdks/typescript/client-operations">
-    Deposit collateral, sign payments, issue guarantees, and settle cleared cycles.
+    Deposit collateral, sign payments, issue guarantees, and settle cleared cycles with `Client`.
   </Card>
   <Card title="X402 flow" icon="arrows-rotate" href="/sdks/typescript/x402-flow">
     Turn a `402 Payment Required` response into a signed payment header.
