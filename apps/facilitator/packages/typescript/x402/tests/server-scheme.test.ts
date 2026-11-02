@@ -1,4 +1,4 @@
-import { SupportedTokensResponse } from '@4mica/sdk'
+import { type SupportedTokenInfo, SupportedTokensResponse } from '@4mica/sdk'
 import type { Network, PaymentRequirements } from '@x402/core/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,8 +7,7 @@ import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../src/server/scheme.js'
 const USDC = '0x2222222222222222222222222222222222222222'
 const OTHER = '0x3333333333333333333333333333333333333333'
 
-const coreTokens = (...tokens: { symbol: string; address: string; decimals?: number }[]) =>
-  new SupportedTokensResponse(84532, tokens)
+const coreTokens = (...tokens: SupportedTokenInfo[]) => new SupportedTokensResponse(84532, tokens)
 
 /** `loadSupportedTokens` is private static; widen the class so the spy is typed. */
 function spyOnLoadSupportedTokens() {
@@ -104,15 +103,23 @@ describe('FourMicaEvmScheme default assets', () => {
     )
 
     await expect(new FourMicaEvmScheme().parsePrice('$1.00', 'eip155:84532')).rejects.toThrow(
-      /lists no USDC for network eip155:84532 \(listed: WETH\)/
+      `USDC is not accepted on eip155:84532; accepted: WETH (${OTHER})`
     )
   })
 
-  it('rejects a stablecoin core lists without decimals', async () => {
-    spyOnLoadSupportedTokens().mockResolvedValue(coreTokens({ symbol: 'USDC', address: USDC }))
+  it('rejects when two tokens core lists report the stablecoin symbol', async () => {
+    spyOnLoadSupportedTokens().mockResolvedValue(
+      coreTokens(
+        { symbol: 'USDC', address: USDC, decimals: 6 },
+        { symbol: 'usdc', address: OTHER, decimals: 6 }
+      )
+    )
 
-    await expect(new FourMicaEvmScheme().parsePrice('$1.00', 'eip155:84532')).rejects.toThrow(
-      /reports no decimals for USDC/
+    await expect(new FourMicaEvmScheme().parsePrice('$1.00', 'eip155:84532')).rejects.toMatchObject(
+      {
+        name: 'AmbiguousTokenError',
+        message: expect.stringContaining('USDC matches more than one accepted token'),
+      }
     )
   })
 
@@ -137,6 +144,72 @@ describe('FourMicaEvmScheme default assets', () => {
     for (const network of SUPPORTED_NETWORKS) {
       await expect(scheme.parsePrice('$1.00', network)).resolves.toMatchObject({ asset: USDC })
     }
+  })
+})
+
+describe('FourMicaEvmScheme Money prices', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  async function parse(price: string | number) {
+    spyOnLoadSupportedTokens().mockResolvedValue(
+      coreTokens({ symbol: 'USDC', address: USDC, decimals: 6 })
+    )
+    return new FourMicaEvmScheme().parsePrice(price, 'eip155:84532')
+  }
+
+  it.each([
+    ['$0.10', '100000'],
+    [' $1.50 ', '1500000'],
+    ['2', '2000000'],
+    ['$0.000001', '1'],
+    ['$0.0000010', '1'],
+    [0.1, '100000'],
+    [2, '2000000'],
+    [1e-6, '1'],
+  ])('converts %j to %s base units', async (price, amount) => {
+    await expect(parse(price)).resolves.toEqual({ amount, asset: USDC, extra: {} })
+  })
+
+  it('rejects a price with more decimal places than the token has', async () => {
+    await expect(parse('$0.0000015')).rejects.toMatchObject({
+      name: 'AmountPrecisionError',
+    })
+  })
+
+  it('rejects a price too small for the token instead of producing garbage', async () => {
+    await expect(parse('$0.0000001')).rejects.toMatchObject({ name: 'AmountPrecisionError' })
+    await expect(parse(1e-7)).rejects.toMatchObject({ name: 'AmountPrecisionError' })
+  })
+
+  it.each([
+    '1.5abc',
+    '$1,000.00',
+    '1e-7',
+    '-1',
+    '$',
+    '',
+    '.5',
+    '$$1',
+  ])('rejects the malformed price %j', async (price) => {
+    await expect(parse(price)).rejects.toMatchObject({ name: 'InvalidParamsError' })
+  })
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.1])('rejects the number %s', async (price) => {
+    await expect(parse(price)).rejects.toThrow(/Invalid money amount/)
+  })
+
+  it('hands custom money parsers the parsed number', async () => {
+    const custom = vi.fn().mockResolvedValue({ amount: '7', asset: OTHER, extra: {} })
+    const scheme = new FourMicaEvmScheme().registerMoneyParser(custom)
+
+    await expect(scheme.parsePrice('$0.0000001', 'eip155:84532')).resolves.toEqual({
+      amount: '7',
+      asset: OTHER,
+      extra: {},
+    })
+    expect(custom).toHaveBeenCalledWith(1e-7, 'eip155:84532')
   })
 })
 
