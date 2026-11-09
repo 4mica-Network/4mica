@@ -48,23 +48,19 @@ to Core, and Core verifies the signature and available collateral before
 returning a BLS certificate — one round trip, no chain write.
 
 ```typescript
-import { FourMicaEvmScheme } from "@4mica/x402/server";
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
 
 app.use(
-  paymentMiddlewareFromConfig(
-    {
-      "GET /data": {
-        accepts: {
-          scheme: "4mica-credit",
-          price: "$0.01",
-          network: "eip155:84532",
-          payTo: "0xYourAddress",
-        },
+  paymentMiddlewareFromConfig({
+    "GET /data": {
+      accepts: {
+        scheme: "4mica-credit",
+        price: "$0.01",
+        network: "eip155:84532",
+        payTo: "0xYourAddress",
       },
     },
-    { advertisedEndpoint: "https://api.example.com/x402" },
-  ),
+  }),
 );
 ```
 

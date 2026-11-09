@@ -1,0 +1,198 @@
+---
+title: "4Mica v2 is live on mainnet: tabs are gone, cycles are in"
+description: 4Mica v2 replaces per-pair tabs with daily settlement cycles. Pay any amount per request with no gas and no wait, settle net every 24 hours, and run deposits, withdrawals and settlement gaslessly.
+date: 2026-11-09
+author: Mairon Mahzoun
+authorAvatar: /assets/mairon.jpg
+authorRole: CTO & Co-Founder
+category: Announcement
+tags: [mainnet, cycles, settlement, gasless]
+keywords:
+  [
+    4Mica mainnet,
+    x402 settlement cycles,
+    gasless x402,
+    net settlement on Base,
+    variable cost API payments,
+    agent payments mainnet,
+  ]
+draft: true
+---
+
+{/* draft: true keeps this page out of the production build. Before flipping it: 1. @4mica/x402 lists only eip155:84532 in SUPPORTED_NETWORKS (TS src/server/scheme.ts, Python constants.py); add eip155:8453 and release, or the "Base mainnet" claims below are ahead of the SDK; 2. set `date` to launch day; 3. add a hero.svg under public/blog/mainnet-v2-cycles/ and the thumbnail/thumbnailAlt fields; 4. confirm the production cycle length is still SETTLEMENT_CYCLE_SECS=86400. */}
+
+4Mica v2 is live on Base mainnet. The largest change is one you will mostly
+notice by its absence: tabs are gone. In their place is the settlement cycle,
+a 24-hour window in which every payment between every participant nets down to
+one position each.
+
+That one change gives three things. Any request can carry any amount, with no
+gas and no wait. Every participant settles net, once a day, on Base and on
+each chain that follows. And everything that touches the chain, from deposits
+to the daily settlement, can run without the user holding ETH.
+
+## Why we retired tabs
+
+In v1, a buyer could not pay a seller until the two had a tab. The client
+asked the seller's tab endpoint to open one, and every guarantee after that was
+drawn against it. When the tab expired, the buyer paid it off on-chain, or the
+seller remunerated itself from the buyer's collateral.
+
+Tabs worked, but they priced the wrong thing:
+
+- **A handshake before the first payment.** One more round trip, and one
+  more thing to fail, before an agent could buy anything.
+- **State per pair.** An agent that used fifty APIs had fifty tabs, each
+  with its own expiry and its own balance.
+- **Settlement per pair.** Fifty tabs meant fifty settlements, even when the
+  agent was also being paid by some of the same counterparties.
+- **Infrastructure for sellers.** Every seller had to advertise and serve a
+  tab endpoint just to start taking payments.
+
+Tabs model a bar tab, but agents spend the way a clearing house works: many
+small obligations in every direction, settled as one difference.
+
+## What a cycle is
+
+A cycle is a fixed window of time. While it is open, core accepts payable
+guarantees from anyone to anyone. When it closes, the set is fixed, and core
+computes each participant's net position across everyone they dealt with. Only
+that net amount moves on-chain.
+
+Forty outgoing guarantees and twenty-seven incoming ones become a single net
+debit of thirteen, so one movement replaces sixty-seven. Nothing is lost in the
+netting: every guarantee behind a net position stays on record and is signed
+by the operator, so a settled figure can always be expanded back into the
+charges that produced it.
+
+A payment no longer needs anything opened first. The payer signs a guarantee
+straight from the seller's 402, with a random request id, scoped to the
+asset's active cycle. The SDK reads which cycle that is. There is nothing else
+to set up.
+
+## Pay what the request costs, with no gas and no wait
+
+**Variable cost.** Every request carries a guarantee for its own amount. A
+route can charge a flat `"$0.01"`, a price that depends on the request, or a
+cap that the seller settles down to what the work actually cost, as in the
+[metered billing demo](/blog/answering-x402-three-problems). Since nothing
+settles per request, a fraction of a cent costs the same to process as a
+thousand dollars.
+
+**Zero gas.** A payment is an EIP-712 signature and a check by core against the
+buyer's collateral. Nothing is written to the chain per request, so there is no
+per-request gas to pay.
+
+**Zero delay, anywhere.** The seller serves the request as soon as core has
+locked the amount against the buyer's collateral. There is no block to wait
+for and no confirmation count to choose. A request from Singapore and a request
+from São Paulo clear in the same time, because neither waits on a chain.
+
+On the buyer's side this is the `fetch` you already have:
+
+```typescript
+import { FourMicaEvmScheme } from "@4mica/x402/client";
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { privateKeyToAccount } from "viem/accounts";
+
+const account = privateKeyToAccount("0xYourPrivateKey");
+const scheme = await FourMicaEvmScheme.create(account);
+
+const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:84532", client: scheme }],
+});
+
+const response = await fetchWithPayment("https://api.example.com/data");
+```
+
+And on the seller's side, one middleware with no tab endpoint behind it:
+
+```typescript
+import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
+
+app.use(
+  paymentMiddlewareFromConfig({
+    "GET /data": {
+      accepts: {
+        scheme: "4mica-credit",
+        price: "$0.01",
+        network: "eip155:84532",
+        payTo: "0xYourAddress",
+      },
+    },
+  }),
+);
+```
+
+## 24-hour settlement, on Base and any other chain
+
+Cycles close every 24 hours. Core then commits each participant's net position
+to the ClearingHouse as a Merkle root. Net debtors pay their position, net
+creditors claim theirs, and a debtor who does not pay within the window is
+covered from the collateral it locked when it signed. The seller was never
+exposed: the amount was locked before the work started.
+
+Settlement scales with how many participants there are, not with how many
+requests they made. An agent that made a million requests across a hundred
+APIs in a day settles once that day, and so does each API.
+
+Cycles are defined per asset and per chain, so the same 24-hour clock runs
+wherever 4Mica does. Base is the first mainnet. Each chain added after it gets
+the same cycle, the same netting and the same SDK calls, with only the network
+id changed.
+
+While it waits for settlement, collateral sits in Aave and earns yield.
+
+## Gasless, end to end
+
+Paying per request was already gas-free. In v2, the rest is too. Configure a
+facilitator and the SDK signs an authorization while the facilitator submits
+the transaction and pays the gas:
+
+- **Deposits** sign an EIP-3009 authorization, or a Permit2 approval with
+  the approval itself sponsored for tokens that lack EIP-3009.
+- **Withdrawals** sign a request the Treasury verifies itself, so they work
+  for ETH as well.
+- **Paying a net debit** signs an authorization pinned to the cycle.
+- **Claiming a net credit** signs nothing at all, because the payout goes to
+  the address the committed position names.
+
+```typescript
+await client.deposit.of(usdc, 1_000_000_000n).send(); // 1,000 USDC, gasless
+
+await client.settlement.pay(cycleId).gasless().send(); // net debtor
+await client.settlement.claim(cycleId).gasless().send(); // net creditor
+```
+
+An agent can run end to end holding nothing but stablecoins.
+
+## Before and after
+
+|                               | Tabs (v1)                       | Cycles (v2)                           |
+| ----------------------------- | ------------------------------- | ------------------------------------- |
+| Before the first payment      | Open a tab with the seller      | Nothing                               |
+| Per request                   | Guarantee against the tab       | Signature only, no gas, no wait       |
+| Settlement                    | Per buyer and seller pair       | Net, per participant, every 24 hours  |
+| Gas                           | Payer holds ETH                 | Sponsored through the facilitator     |
+| What a seller runs            | Middleware plus a tab endpoint  | Middleware                            |
+
+## What changes for you
+
+- **Upgrade to the 2.x packages**: `@4mica/x402` and `@4mica/sdk` for
+  TypeScript, `4mica-x402` and `sdk-4mica` for Python.
+- **Delete your tab configuration.** `openTab`, `extra.tabEndpoint`,
+  `tabConfig` and `POST /tabs` are gone. A seller on
+  `paymentMiddlewareFromConfig` and a buyer on `wrapFetchWithPaymentFromConfig`
+  change nothing else.
+- **Networks.** Base mainnet (`eip155:8453`) is production. Base Sepolia
+  (`eip155:84532`) is the network to build against. Ethereum Sepolia is
+  retired.
+
+The [changelog](https://docs.4mica.io/updates/changelogs) lists every renamed
+call, and the [docs](https://docs.4mica.io) cover the cycle model in full.
+
+## Start building
+
+Build against Base Sepolia today, then point the same code at Base mainnet
+when you are ready. If you run an x402 facilitator or sell API volume and want
+to talk through an integration, [get in touch](mailto:support@4mica.io).

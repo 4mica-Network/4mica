@@ -132,7 +132,7 @@ export const en = {
       {
         question: "Is 4Mica live on mainnet?",
         answer:
-          "Yes. Base (eip155:8453) is the production network. Base Sepolia (eip155:84532) is the development network and Ethereum Sepolia (eip155:11155111) is there for cross-network compatibility testing. We recommend building against Base Sepolia first and moving to mainnet once your flows are tested.",
+          "Yes. Base (eip155:8453) is the production network. Base Sepolia (eip155:84532) is the development network. We recommend building against Base Sepolia first and moving to mainnet once your flows are tested.",
       },
       {
         question: "How can facilitators integrate 4Mica?",
@@ -199,8 +199,9 @@ export const en = {
         layer: 2,
         caption:
           "Collateral is deposited once and keeps earning yield underneath.",
-        code: `await client.user.approveErc20(usdc.address, AMOUNT);
-await client.user.deposit(AMOUNT, usdc.address);`,
+        code: `// Gasless: sign an EIP-3009 authorization,
+// the facilitator submits it and pays the gas
+await client.deposit.of(usdc, 1_000_000_000n).send(); // 1,000 USDC`,
       },
       {
         num: "02",
@@ -210,26 +211,24 @@ await client.user.deposit(AMOUNT, usdc.address);`,
         layer: 0,
         caption:
           "Each request pays over x402 with a signed guarantee. Nothing touches the chain.",
-        code: `const payment = await signGuarantee({
-  cycleId:   "0xabc",  
-  reqId:     "0x0",
-  amount:    "0x64",
-  recipient: "0x72e1…ResourceHub",
-});
+        code: `// Scoped to the active cycle, with a random reqId
+const flow = X402Flow.fromClient(client);
+const payment = await flow.signPaymentV2(paymentRequired, accepted);
 
-// GET /resource
-// X-PAYMENT: <base64(payment)>
-// HTTP 200 OK`,
+await fetch("https://api.example.com/data", {
+  headers: { "PAYMENT-SIGNATURE": payment.header },
+});
+// HTTP 200 OK. No gas, no chain write.`,
       },
       {
         num: "03",
         badge: "Netting",
         title: "Netting across the cycle",
-        desc: "Every 7 days the cycle closes. Bilateral flows collapse into one net position per participant.",
+        desc: "Every 24 hours the cycle closes. Bilateral flows collapse into one net position per participant.",
         layer: 1,
         caption:
           "4Mica nets the cycle: 55 guarantees become one position per participant.",
-        code: `// Cycle closes every 7 days, netting begins
+        code: `// Cycle closes every 24 hours, netting begins
 // Bilateral edges this cycle:
 Alice → Bob:  800 USDC  (40 guarantees)
 Bob → Alice:  300 USDC  (15 guarantees)
@@ -245,19 +244,12 @@ Bob → Alice:  300 USDC  (15 guarantees)
         layer: 3,
         caption:
           "One net payment settles on-chain. Collateral covers any default.",
-        code: `// Debtor pays net position to ClearingHouse
-await clearingHouse.payNetDebit(
-  cycleId,
-  netDebit,       // 500 USDC (not 800)
-  merkleProof,
-);
+        code: `// Debtor pays its net position: 500 USDC, not 800.
+// Core supplies the amount and the Merkle proof.
+await client.settlement.pay(cycleId).gasless().send();
 
-// Creditor claims once debtor has paid
-await clearingHouse.claimNetCredit(
-  cycleId,
-  netCredit,
-  merkleProof,
-);
+// Creditor claims its net credit. Claims sign nothing.
+await client.settlement.claim(cycleId).gasless().send();
 
 // 55 off-chain payments → 1 on-chain settlement`,
       },
@@ -427,9 +419,9 @@ await clearingHouse.claimNetCredit(
         desc: "Contracts and SDKs are public on GitHub.",
       },
       {
-        icon: "ri-test-tube-line",
-        label: "Testnet live",
-        desc: "Deposit, spend, and earn on Sepolia today.",
+        icon: "ri-rocket-line",
+        label: "Mainnet live",
+        desc: "Deposit, spend, and earn on Base today.",
       },
     ],
     scenarioLines: {
@@ -564,7 +556,7 @@ await clearingHouse.claimNetCredit(
       },
     },
     benefits: [
-      "Users spend now and settle after 7 days",
+      "Users spend now and settle every 24 hours",
       "No prefunding or prepaid balances for customers",
       "Every charge is backed by on-chain collateral",
       "BLS-signed guarantees prevent replay and double-spending",
@@ -834,7 +826,7 @@ await clearingHouse.claimNetCredit(
     supportedOn: "Multi-chain. Live on",
     supportedNetworks: {
       base: "Base Mainnet",
-      testnets: "Base/Ethereum Sepolia testnets",
+      testnets: "Base Sepolia testnet",
     },
   },
   pricing: {

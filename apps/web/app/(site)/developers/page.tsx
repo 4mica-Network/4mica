@@ -59,7 +59,7 @@ export default function DevelopersPage() {
             </a>
             ,{" "}
             <a
-              href={links.api.ethereumSepolia}
+              href={links.api.baseSepolia}
               className="font-semibold text-ink-body transition-colors hover:text-ink-strong"
             >
               {content.supportedNetworks.testnets}
