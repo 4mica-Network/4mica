@@ -8,7 +8,11 @@ from x402.schemas import (
 )
 from x402.schemas.v1 import PaymentRequirementsV1
 
-from fourmica_x402.client_scheme import FourMicaEvmScheme, _Payer
+from fourmica_x402.client_scheme import (
+    FourMicaEvmScheme,
+    _Payer,
+    create_default_client_scheme,
+)
 
 pytest.importorskip("x402")
 pytest.importorskip("fourmica_sdk")
@@ -221,3 +225,39 @@ def test_leaves_the_refusal_for_the_caller_when_the_checkpoint_fails():
     ctx.settle_response = _refusal("invalid_4mica_credit_checkpoint_required")
 
     assert scheme.scheme_hooks["on_payment_response"](ctx) is None
+
+
+MAINNET_CORE = "https://base.api.4mica.io"
+SEPOLIA_CORE = "https://base.sepolia.api.4mica.io"
+
+
+def _connect_failing_on(monkeypatch, failing_url):
+    connected = []
+
+    async def connect(self, rpc_url):
+        if rpc_url.rstrip("/") == failing_url:
+            raise RuntimeError("core unreachable")
+        connected.append(rpc_url)
+        return _Payer(flow=StubFlow(), payment=StubPayment())
+
+    monkeypatch.setattr(FourMicaEvmScheme, "_connect", connect)
+    return connected
+
+
+def test_default_scheme_skips_a_default_network_whose_core_is_down(monkeypatch, caplog):
+    connected = _connect_failing_on(monkeypatch, MAINNET_CORE)
+
+    with caplog.at_level("WARNING"):
+        create_default_client_scheme("0x" + "11" * 32)
+
+    assert [url.rstrip("/") for url in connected] == [SEPOLIA_CORE]
+    assert "eip155:8453" in caplog.text
+
+
+def test_default_scheme_fails_when_a_core_the_caller_named_is_down(monkeypatch):
+    _connect_failing_on(monkeypatch, "http://localhost:3000")
+
+    with pytest.raises(RuntimeError, match="core unreachable"):
+        create_default_client_scheme(
+            "0x" + "11" * 32, core_urls={"eip155:31337": "http://localhost:3000"}
+        )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import ssl
 import threading
@@ -34,6 +35,8 @@ from x402.schemas.v1 import PaymentRequirementsV1
 
 from .constants import DEFAULT_RPC_URLS, SUPPORTED_NETWORKS
 from .recovery import RecoveringPayer, recover_refused_payment
+
+logger = logging.getLogger(__name__)
 
 
 class _AsyncRunner:
@@ -267,12 +270,28 @@ def create_default_client_scheme(
     private_key: str, core_urls: Optional[Mapping[str, str]] = None
 ) -> FourMicaEvmScheme:
     """A scheme connected up front to each network in ``SUPPORTED_NETWORKS``
-    and in *core_urls*."""
+    and in *core_urls*.
+
+    A network in *core_urls* must connect. A default network whose core can't
+    be reached is skipped with a warning, so one hosted core being down doesn't
+    stop payments on the others."""
     scheme = FourMicaEvmScheme(private_key, core_urls)
-    for network in dict.fromkeys([*SUPPORTED_NETWORKS, *(core_urls or {})]):
+    required = set(core_urls or {})
+    for network in dict.fromkeys([*SUPPORTED_NETWORKS, *required]):
         rpc_url = scheme._core_url(network)
-        if rpc_url:
+        if not rpc_url:
+            continue
+        try:
             scheme._get_flow(rpc_url)
+        except Exception as error:  # noqa: BLE001 - any connection failure
+            if network in required:
+                raise
+            logger.warning(
+                "could not connect to 4mica core for %s (%s); it connects on first use: %s",
+                network,
+                rpc_url,
+                error,
+            )
     return scheme
 
 

@@ -54,6 +54,24 @@ middleware = fastapi_payment_middleware_from_config(
 )
 ```
 
+## Networks
+
+| Network      | CAIP-2         | Hosted facilitator                 |
+| ------------ | -------------- | ---------------------------------- |
+| Base mainnet | `eip155:8453`  | `https://payment.4mica.io`         |
+| Base Sepolia | `eip155:84532` | `https://testnet.payment.4mica.io` |
+
+The middleware registers the 4mica scheme for both and routes each network to its
+own hosted facilitator (`FACILITATOR_URLS`). An app whose routes are all on one
+network doesn't depend on the other network's facilitator: an unreachable hosted
+facilitator logs a warning, and x402 only fails startup when a route's own network
+has no facilitator. Passing your own `FourMicaFacilitatorClient` replaces both; give
+it `networks` to limit which networks it serves.
+
+`create_default_client_scheme` connects to both cores up front. A default network
+whose core can't be reached is skipped with a warning and connects on first use; a
+network you pass in `core_urls` must connect.
+
 ## Quick Start (Client)
 
 ```python
