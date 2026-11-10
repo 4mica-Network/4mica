@@ -1240,10 +1240,17 @@ await client.settlement.claim(cycleId).gasless().send();
           done: false,
         },
         {
-          quarter: "Q3 2026",
+          quarter: "Q4 2026",
           title: "Mainnet launch",
           description:
-            "Full mainnet launch with multi-chain support, cross-chain credit, and off-ramping to fiat",
+            "4Mica v2 live on Base mainnet, with net settlement and gasless payments",
+          done: true,
+        },
+        {
+          quarter: "2027",
+          title: "Multi-chain expansion",
+          description:
+            "Multi-chain support, cross-chain credit, and off-ramping to fiat",
           done: false,
         },
       ],
