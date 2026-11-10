@@ -245,6 +245,9 @@ The facilitator enforces that:
   - Request: `{ "x402Version": 1|2, "paymentPayload": { ... }, "paymentRequirements": { ... } }`.
   - Response: `{ "isValid": true, "payer" }` or `{ "isValid": false, "invalidReason",
     "invalidMessage", "extra": { "retryable" } }`. See [Errors](#errors).
+  - For 4mica, checks the payment against the requirements and that it is signed by its `payer`
+    under the ClearingHouse domain core publishes. It does not call core, so collateral and
+    cycle state are only checked at `/settle`.
 - `POST /settle`
   - Request: same shape as `/verify`.
   - Response: for 4mica, `{ "success": true, "payer", "transaction": "", "network",
