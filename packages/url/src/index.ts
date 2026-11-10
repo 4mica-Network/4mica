@@ -575,14 +575,11 @@ const buildLinks = ({ base, appBase, root }: Bases) => {
     api: {
       base: "https://base.api.4mica.io/",
       baseSepolia: "https://base.sepolia.api.4mica.io/",
-      ethereumSepolia: "https://ethereum.sepolia.api.4mica.io/",
     },
     explorer: {
-      ethereumSepolia: "https://sepolia.etherscan.io",
       baseSepolia: "https://sepolia.basescan.org",
     },
     rpc: {
-      ethereumSepolia: "https://rpc.sepolia.org",
       baseSepolia: "https://sepolia.base.org",
     },
     email: {
