@@ -1,83 +1,143 @@
 ---
-title: "4Mica v2 is live: agents can finally pay without API keys"
-description: Almost nobody pays for APIs over x402 today, because API keys seem to work fine. They don't once an agent is the customer. 4Mica v2 solves the issues of x402 and improve the experience of an agent that wants to pay for any API per request, with no signup, no gas and no wait.
+title: "4Mica v2 is live on Base"
+description: 4Mica v2 launches on Base with collateral-backed x402 payments, usage-based pricing and net settlement, without API keys or an on-chain transaction for every request.
 date: 2026-11-09
 author: Mairon Mahzoun
 authorAvatar: /assets/mairon.jpg
 authorRole: CTO & Co-Founder
 category: Announcement
 tags: [mainnet, payment, agent experience, gasless]
+thumbnail: /blog/mainnet-v2-cycles/hero.svg
+thumbnailAlt: Impasto painting of a rising sun swirling over a deep blue sea
 keywords:
   [
     4Mica mainnet,
-    x402 settlement cycles,
-    gasless x402,
+    collateral-backed x402,
+    usage-based API pricing,
     net settlement on Base,
-    variable cost API payments,
-    agent payments mainnet,
+    x402 upto,
+    agent payments,
   ]
 draft: true
 ---
 
-{/* draft: true keeps this page out of the production build. Before flipping it: 1. @4mica/x402 lists only eip155:84532 in SUPPORTED_NETWORKS (TS src/server/scheme.ts, Python constants.py); add eip155:8453 and release, or the "Base mainnet" claims below are ahead of the SDK; 2. set `date` to launch day; 3. add a hero.svg under public/blog/mainnet-v2-cycles/ and the thumbnail/thumbnailAlt fields; 4. confirm the production cycle length is still SETTLEMENT_CYCLE_SECS=86400. */}
+{/* Internal launch checklist. MDX comments do not render, but delete this block before publishing. Before setting draft: false: 1. @4mica/x402 lists only eip155:84532 in SUPPORTED_NETWORKS (TS src/server/scheme.ts, Python constants.py). Add eip155:8453, release, and test that exact version end to end on mainnet. 2. Update docs/getting-started/supported-networks.mdx and the September changelog, which still say Base runs the previous protocol. 3. Confirm the production cycle length (SETTLEMENT_CYCLE_SECS=86400) and payment windows; the "current configuration" wording below depends on it. 4. Confirm whether the provider still needs its own collateral to sign refunds (demo README, "Cap, then refund"); the "How 4Mica secures the payment" section says it does. 5. Set `date` to launch day. */}
 
-4Mica v2 is live on Base mainnet. It fixes the three things that keep APIs
-off x402 today.
+4Mica v2 is live on Base mainnet. Making the agentic payments closer to the default payment method for AI agents.
 
-- **Charge what the job actually cost.** x402 needs a price before the work
-  starts. Most of what agents buy, from model calls to scrapes to multi-step
-  runs, has no price until it finishes, so providers can't sell it over x402.
-- **No gas and no wait, on every request.** A payment is a cryptographic guarantee
-  against collateral the agent has already deposited. Nothing touches the
-  chain, so a request costs no gas and is served immediately, globally.
-- **One settlement a day, without holding ETH.** Every participant settles
-  its net position once every 24 hours, on Base and on each chain that
-  follows. Deposits, withdrawals and the daily settlement all run gaslessly,
-  so an agent needs nothing but stablecoins.
+Most of what agents buy has a variable cost. A model call depends on the tokens
+it generates, a scrape on the pages it processes, and an agent run on the tools
+it ends up using. A provider needs to know it will be paid before it does the
+work, even when it doesn't yet know the final price.
 
-## How 4Mica works (differently)
+4Mica v2 makes that possible with collateral-backed payments and net
+settlement:
 
-Take one job: an agent asks a scraping API to crawl a site. The provider can't
-know the price until the crawl is done. Say it ends up costing $0.37, and the
-agent is willing to spend up to $1.00.
+- **Authorize a maximum, charge for actual usage.** The agent sets a spending
+  cap, and the provider starts work knowing the payment is secured.
+- **No on-chain settlement per request.** Payments are guaranteed off-chain,
+  so a provider serves the request without waiting for a blockchain
+  confirmation.
+- **One collateral position, netted across providers.** Instead of funding a
+  balance at every API, the agent pays every 4Mica provider from one deposit,
+  and only net obligations reach the chain.
 
-**With x402 today, the provider has two bad options.** With `exact`, it quotes
-a price before the work and the agent pays it up front. Quote $1.00 and the
-agent overpays by $0.63. Quote $0.37 and the provider can't, because it doesn't
-know the price yet. With `upto`, the agent signs an allowance of up to $1.00,
-but nothing holds that dollar while the crawl runs. The same balance can back
-any number of other signatures, and the provider only finds out whether it
-gets paid after it has done the work.
+## Why 4Mica? Why not just x402?
 
-**With 4Mica, the agent authorizes a cap and pays for what was used.** The
-agent authorize the cap of $1.00, which is locked until job is done. The
-provider runs the crawl, charges $0.37, and agent can use the $0.63 for the next task.
-The provider is covered before it starts work, and the agent pays
-for exactly what it used.
+Take one job. An agent asks a scraping API to crawl a site. The agent is
+willing to spend up to $1.00, and the crawl ends up costing $0.37.
 
-**A payment is a guarantee, not a transfer.** What the agent hands over with
-the request is a cryptographic guarantee: a signed promise to pay. The provider can verify it on
-its own, without trusting the agent or calling a chain. If the agent never
-pays, the locked collateral does. Since nothing moves on-chain at this point,
-the request costs no gas and gets an answer in the time a signature check
-takes.
+x402 has two schemes for this today. With `exact`, the provider quotes a price
+before the work, so it either guesses $1.00 and the agent overpays, or it
+can't sell the job at all. With `upto`, the agent authorizes up to $1.00 and
+the provider charges the actual $0.37 afterwards. That handles the pricing,
+but nothing reserves the agent's funds while the crawl runs: the same balance
+can back other authorizations, and the provider finds out whether it gets paid
+only when it settles. Each job also settles on-chain on its own.
 
-**The money moves once a day, in one batch.** Guarantees collect over a 24-hour
-cycle. When the cycle closes, 4Mica nets everything each participant owes and
-is owed, across every counterparty, and commits the result on-chain.
+That last point is also why x402 can only go as fast as the chain under it.
+With `exact` and `upto`, every payment is an on-chain transaction: it waits
+for a block, someone pays gas on it, and the chain's throughput caps how many
+payments can clear at once. When the chain is busy, payments queue behind
+everything else on it, and a gas spike raises the cost of every one. That
+works for a person buying one thing. It doesn't keep up with agents, where a
+single run can make hundreds of paid calls and
+[per-request settlement doesn't scale on any chain](/blog/ai-agents-break-every-payment-rail).
 
-## What it takes to integrate
+4Mica takes the chain out of the request path. 4Mica checks a payment against
+the agent's collateral; no block has to confirm it. So a payment clears
+in milliseconds on every chain 4Mica runs on, however congested that chain
+is. The chain only ever sees each cycle's net positions.
 
-An agent deposits once and keeps the `fetch` it already has. Every 402 it meets
-from a 4Mica provider is then paid automatically, with no account to create and
-no key to store:
+x402's `batch-settlement` scheme closes the reservation gap with an escrow,
+but that escrow is a channel between one payer and one provider. An agent that
+uses fifty providers funds fifty channels.
+
+The question 4Mica answers is this: how can a provider start work safely when
+the final charge is unknown, without the agent locking money up at every
+provider it uses, and without every payment waiting on a chain?
+
+## How 4Mica secures the payment
+
+The same crawl, on 4Mica:
+
+1. **Authorize.** The agent authorize a $1.00 cap and sends it
+   with the request.
+2. **Work.** The provider verifies the receipt on its own, without trusting
+   the agent or calling a chain, and runs the crawl. It never waits for a
+   transaction to confirm.
+3. **Reconcile.** The crawl costs $0.37. The provider authorize the unused $0.63
+   back to the agent.
+4. **Settle.** At the end of the cycle, the $0.37 joins everything else the
+   agent owes and is owed, and only the net amount moves on-chain.
+
+A payment here is a guarantee, not a transfer. The receipt is 4Mica's
+signed statement that the agent's collateral backs the payment. A signature
+from the agent alone would prove nothing about whether the money is there. If
+the agent never pays, the reserved collateral does.
+
+## Why net settlement changes the economics
+
+Every guarantee in a cycle, between any agent and any provider, nets into one
+position per participant. Forty outgoing guarantees and twenty-seven incoming
+ones become a single net debit of thirteen, so one on-chain movement replaces
+sixty-seven. An agent that made a million requests across a hundred APIs
+settles one position for the cycle, and so does each API.
+
+That is what one shared collateral position buys. The agent doesn't fund a
+balance or a channel per provider. It deposits once, pays any provider that
+accepts 4Mica, and its obligations to all of them reduce to one figure. Every
+guarantee behind that figure stays on record, signed by 4Mica, so it can
+always be broken back down into the charges that produced it.
+
+In the current mainnet configuration, a cycle runs for 24 hours. After it
+closes, 4Mica waits for any guarantees gated on an external validator to
+resolve, then commits each participant's net position on-chain. Net debtors
+pay within a payment window, net creditors claim, and any debtor that doesn't
+pay is covered from its reserved collateral.
+
+For the agent, the whole lifecycle is gasless. Deposits, withdrawals and
+the cycle's net payment can all be submitted by a facilitator that pays the
+gas, so an agent needs only stablecoins. Sponsored gas isn't unique to 4Mica,
+since x402 facilitators sponsor it too. What 4Mica changes is how many
+transactions there are to sponsor: one per participant per cycle, not one per
+request.
+
+## Start building
+
+"No API keys" means no provider-specific key or billing account. The agent
+still needs a wallet to sign with: one key, used at every provider.
+
+On the agent's side, wrap the `fetch` you already have. It pays any endpoint
+that advertises the `4mica-credit` scheme in its 402. Endpoints that only offer
+`exact` still need a client for that scheme.
 
 ```typescript
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { privateKeyToAccount } from "viem/accounts";
 
-const account = privateKeyToAccount("0xYourPrivateKey");
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 const scheme = await FourMicaEvmScheme.create(account);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
@@ -87,8 +147,7 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 const response = await fetchWithPayment("https://api.example.com/data");
 ```
 
-A provider adds one middleware and sets a price per route. There is no billing
-system, no customer database and no key management to build:
+On the provider's side, add one middleware and set a price per route:
 
 ```typescript
 import { paymentMiddlewareFromConfig } from "@4mica/x402/server/express";
@@ -107,45 +166,35 @@ app.use(
 );
 ```
 
-A flat price is the simplest place to start. The
-[metered billing demo](/blog/answering-x402-three-problems) runs the
-cap-and-refund flow from the crawl example end to end.
+This route charges a flat price, which is the simplest place to start. **To
+charge for actual usage**, follow the
+[metered billing demo](https://github.com/4mica-Network/4mica/tree/dev/apps/facilitator/packages/typescript/x402/demo).
+It runs the cap-and-refund flow from the crawl example end to end, and the
+[write-up](/blog/answering-x402-three-problems) walks through it.
 
-## One settlement a day, on Base and every chain after it
+Build against Base Sepolia (`eip155:84532`) first, then switch the network to
+Base mainnet (`eip155:8453`).
 
-Because the money moves once a day, settlement does not grow with the number of
-the number of requests. An agent that made a million
-requests across a hundred APIs settles once that day, and so does each API.
+- Paying for APIs from an agent: the
+  [buyer quick start](https://docs.4mica.io/buyer/quick-start).
+- Charging for an API: the
+  [seller quick start](https://docs.4mica.io/seller/quick-start).
+- Running an x402 facilitator and want to offer `4mica-credit` to your sellers:
+  [get in touch](mailto:support@4mica.io).
 
-The provider never waits on that settlement to get paid safely. The amount was
-locked before the work started, and if an agent doesn't pay its net position
-in time, its locked collateral covers it.
+## What's new for v1 users
 
-Base is the first mainnet. Each chain added after it gets the same
-cycle, the same netting and the same SDK calls, with only the network id
-changed.
+If you integrated 4Mica v1, three things change:
 
-## What changes for you
-
-- **New to 4Mica:** install `@4mica/x402` and `@4mica/sdk` for TypeScript,
-  or `4mica-x402` and `sdk-4mica` for Python, and start from the code above.
-- **Already on 4Mica v1:** upgrade to the 2.x packages and delete your tab
-  configuration. In v1, a buyer had to open a tab with each seller before
-  paying. v2 needs nothing opened first, so `openTab`, `extra.tabEndpoint`,
-  `tabConfig` and `POST /tabs` are gone. A seller on
-  `paymentMiddlewareFromConfig` and a buyer on `wrapFetchWithPaymentFromConfig`
-  change nothing else.
+- **Upgrade to the 2.x packages:** `@4mica/x402` and `@4mica/sdk` for
+  TypeScript, `4mica-x402` and `sdk-4mica` for Python.
+- **Delete your tab configuration.** In v1, a buyer opened a tab with each
+  seller before paying. v2 needs nothing opened first, so `openTab`,
+  `extra.tabEndpoint`, `tabConfig` and `POST /tabs` are gone. A seller on
+  `paymentMiddlewareFromConfig` and a buyer on
+  `wrapFetchWithPaymentFromConfig` change nothing else.
 - **Networks:** Base mainnet (`eip155:8453`) is production and Base Sepolia
-  (`eip155:84532`) is the network to build against. Ethereum Sepolia is
-  retired.
+  (`eip155:84532`) is for development. Ethereum Sepolia is retired.
 
 The [changelog](https://docs.4mica.io/updates/changelogs) lists every renamed
-call, and the [docs](https://docs.4mica.io) cover the full model.
-
-## Start building
-
-If you sell work whose price you only know at the end, such as model calls,
-crawls or agent runs, this is the release that lets you sell it per request.
-Build against Base Sepolia today and point the same code at Base mainnet when
-you are ready. If you run an x402 facilitator or sell API volume and want to
-talk through an integration, [get in touch](mailto:support@4mica.io).
+call.
