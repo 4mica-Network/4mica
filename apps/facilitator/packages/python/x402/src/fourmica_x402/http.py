@@ -14,7 +14,12 @@ from x402.http.middleware import fastapi as fastapi_mw
 from x402.server import x402ResourceServer, x402ResourceServerSync
 
 from .constants import SUPPORTED_NETWORKS
-from .facilitator import FourMicaFacilitatorClient, FourMicaFacilitatorClientSync
+from .facilitator import (
+    FourMicaFacilitatorClient,
+    FourMicaFacilitatorClientSync,
+    hosted_facilitator_clients,
+    hosted_facilitator_clients_sync,
+)
 from .server_scheme import FourMicaEvmScheme
 
 
@@ -53,7 +58,7 @@ def fastapi_payment_middleware_from_config(
         )
 
     if not any(isinstance(f, FourMicaFacilitatorClient) for f in facilitators):
-        facilitators.append(FourMicaFacilitatorClient())
+        facilitators.extend(hosted_facilitator_clients(SUPPORTED_NETWORKS))
 
     server = x402ResourceServer(facilitators)
     _register_4mica_scheme(server, schemes)
@@ -90,7 +95,7 @@ def flask_payment_middleware_from_config(
         )
 
     if not any(isinstance(f, FourMicaFacilitatorClientSync) for f in facilitators):
-        facilitators.append(FourMicaFacilitatorClientSync())
+        facilitators.extend(hosted_facilitator_clients_sync(SUPPORTED_NETWORKS))
 
     server = x402ResourceServerSync(facilitators)
     _register_4mica_scheme(server, schemes)

@@ -5,7 +5,7 @@ from fourmica_x402.constants import (
 
 
 def test_supported_networks_match_expected():
-    assert SUPPORTED_NETWORKS == ["eip155:84532"]
+    assert SUPPORTED_NETWORKS == ["eip155:84532", "eip155:8453"]
 
 
 def test_default_rpc_urls_match_expected():

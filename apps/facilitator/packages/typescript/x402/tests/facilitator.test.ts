@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FourMicaFacilitatorClient } from '../src/server/facilitator.js'
+import {
+  FACILITATOR_URLS,
+  FourMicaFacilitatorClient,
+  hostedFacilitatorClients,
+} from '../src/server/facilitator.js'
 
 const REQUIREMENTS = {
   scheme: '4mica-credit',
@@ -97,5 +101,40 @@ describe('FourMicaFacilitatorClient', () => {
   it('throws on a non-200 response', async () => {
     respondWith('unsupported x402Version 3', 422)
     await expect(settle()).rejects.toThrow('unsupported x402Version 3')
+  })
+
+  it('narrows /supported to the networks it was given', async () => {
+    const kind = (network: string) => ({ x402Version: 2, scheme: '4mica-credit', network })
+    respondWith({
+      kinds: [kind('eip155:84532'), kind('eip155:8453')],
+      extensions: [],
+      signers: {},
+    })
+
+    const client = new FourMicaFacilitatorClient({
+      url: 'https://facilitator.example',
+      networks: ['eip155:8453'],
+    })
+
+    expect((await client.getSupported()).kinds).toEqual([kind('eip155:8453')])
+  })
+})
+
+describe('hostedFacilitatorClients', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('routes Base Sepolia to the testnet facilitator and Base mainnet to the mainnet one', () => {
+    expect(FACILITATOR_URLS).toEqual({
+      'eip155:84532': 'https://testnet.payment.4mica.io',
+      'eip155:8453': 'https://payment.4mica.io',
+    })
+    const clients = hostedFacilitatorClients(['eip155:84532', 'eip155:8453', 'eip155:1'])
+
+    expect(clients.map((client) => client.url)).toEqual([
+      'https://testnet.payment.4mica.io',
+      'https://payment.4mica.io',
+    ])
   })
 })

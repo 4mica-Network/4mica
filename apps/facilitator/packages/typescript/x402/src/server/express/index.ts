@@ -8,7 +8,7 @@ import {
 } from '@x402/core/server'
 import type { Network, SchemeNetworkServer } from '@x402/core/types'
 import { paymentMiddlewareFromHTTPServer as x402PaymentMiddlewareFromHTTPServer } from '@x402/express'
-import { FourMicaFacilitatorClient } from '../facilitator.js'
+import { FourMicaFacilitatorClient, hostedFacilitatorClients } from '../facilitator.js'
 import { FourMicaEvmScheme, SUPPORTED_NETWORKS } from '../scheme.js'
 
 /**
@@ -152,7 +152,7 @@ export function paymentMiddlewareFromConfig(
     : []
 
   if (!facilitators.some((c) => c instanceof FourMicaFacilitatorClient)) {
-    facilitators.push(new FourMicaFacilitatorClient())
+    facilitators.push(...hostedFacilitatorClients(SUPPORTED_NETWORKS))
   }
 
   const ResourceServer = new x402ResourceServer(facilitators)

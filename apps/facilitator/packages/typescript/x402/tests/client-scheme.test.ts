@@ -114,14 +114,39 @@ describe('FourMicaEvmScheme', () => {
     })
   })
 
-  it('connects to Base Sepolia up front by default', async () => {
+  it('connects to Base Sepolia and Base mainnet up front by default', async () => {
     const connect = spyOnConnect().mockResolvedValue(payer({}))
 
     await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
 
     expect(connect.mock.calls.map(([, rpcUrl]) => rpcUrl)).toEqual([
       'https://base.sepolia.api.4mica.io/',
+      'https://base.api.4mica.io/',
     ])
+  })
+
+  it('skips a default network whose core is down instead of failing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    spyOnConnect().mockImplementation(async (_signer, rpcUrl) => {
+      if (rpcUrl === 'https://base.api.4mica.io/') throw new Error('core unreachable')
+      return payer({})
+    })
+
+    const scheme = await FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`))
+
+    expect(scheme.findDefaultAsset(USDC, 'eip155:84532')).toBeDefined()
+    expect(scheme.findDefaultAsset(USDC, 'eip155:8453')).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('eip155:8453'))
+  })
+
+  it('fails when a network the caller asked for cannot connect', async () => {
+    spyOnConnect().mockRejectedValue(new Error('core unreachable'))
+
+    await expect(
+      FourMicaEvmScheme.create(privateKeyToAccount(`0x${'11'.repeat(32)}`), {
+        networks: ['eip155:8453'],
+      })
+    ).rejects.toThrow('core unreachable')
   })
 
   it('connects only to the given networks and pays through a core URL override', async () => {

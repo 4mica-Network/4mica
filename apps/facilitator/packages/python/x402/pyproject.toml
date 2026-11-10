@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "4mica-x402"
-version = "2.0.0"
+version = "2.1.0"
 description = "Python integration for x402 Payment Protocol with 4mica credit flow"
 readme = "README.md"
 requires-python = ">=3.10"
