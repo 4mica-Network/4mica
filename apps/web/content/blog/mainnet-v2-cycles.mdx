@@ -1,7 +1,7 @@
 ---
 title: "4Mica v2 is live on Base"
 description: 4Mica v2 launches on Base, supporting usage-based pricing and netting, allowing agents to pay without API keys or an on-chain transaction for every request.
-date: 2026-11-09
+date: 2026-11-10
 author: Mairon Mahzoun
 authorAvatar: /assets/mairon.jpg
 authorRole: CTO & Co-Founder
@@ -18,7 +18,7 @@ keywords:
     x402 upto,
     agent payments,
   ]
-draft: true
+draft: false
 ---
 
 4Mica v2 is live on Base mainnet, bringing agentic payments closer to being
@@ -173,7 +173,8 @@ It runs the cap-and-refund flow from the crawl example end to end, and the
 [write-up](/blog/answering-x402-three-problems) walks through it.
 
 Build against Base Sepolia (`eip155:84532`) first, then switch the network to
-Base mainnet (`eip155:8453`).
+Base mainnet (`eip155:8453`). Base mainnet needs `@4mica/x402` or `4mica-x402`
+2.1.0 or later.
 
 - Paying for APIs from an agent: the
   [buyer quick start](https://docs.4mica.io/buyer/quick-start).
@@ -186,8 +187,9 @@ Base mainnet (`eip155:8453`).
 
 If you integrated 4Mica v1, three things change:
 
-- **Upgrade to the 2.x packages:** `@4mica/x402` and `@4mica/sdk` for
-  TypeScript, `4mica-x402` and `sdk-4mica` for Python.
+- **Upgrade the packages:** `@4mica/x402` 2.1.0 and `@4mica/sdk` 2.x for
+  TypeScript, `4mica-x402` 2.1.0 and `sdk-4mica` 2.x for Python. The x402
+  packages need 2.1.0 or later for Base mainnet.
 - **Delete your tab configuration.** In v1, a buyer opened a tab with each
   seller before paying. v2 needs nothing opened first, so `openTab`,
   `extra.tabEndpoint`, `tabConfig` and `POST /tabs` are gone. A seller on
