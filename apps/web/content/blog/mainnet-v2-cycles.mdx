@@ -1,6 +1,6 @@
 ---
 title: "4Mica v2 is live on Base"
-description: 4Mica v2 launches on Base with collateral-backed x402 payments, usage-based pricing and net settlement, without API keys or an on-chain transaction for every request.
+description: 4Mica v2 launches on Base, supporting usage-based pricing and netting, allowing agents to pay without API keys or an on-chain transaction for every request.
 date: 2026-11-09
 author: Mairon Mahzoun
 authorAvatar: /assets/mairon.jpg
@@ -21,9 +21,8 @@ keywords:
 draft: true
 ---
 
-{/* Internal launch checklist. MDX comments do not render, but delete this block before publishing. Before setting draft: false: 1. @4mica/x402 lists only eip155:84532 in SUPPORTED_NETWORKS (TS src/server/scheme.ts, Python constants.py). Add eip155:8453, release, and test that exact version end to end on mainnet. 2. Update docs/getting-started/supported-networks.mdx and the September changelog, which still say Base runs the previous protocol. 3. Confirm the production cycle length (SETTLEMENT_CYCLE_SECS=86400) and payment windows; the "current configuration" wording below depends on it. 4. Confirm whether the provider still needs its own collateral to sign refunds (demo README, "Cap, then refund"); the "How 4Mica secures the payment" section says it does. 5. Set `date` to launch day. */}
-
-4Mica v2 is live on Base mainnet. Making the agentic payments closer to the default payment method for AI agents.
+4Mica v2 is live on Base mainnet, bringing agentic payments closer to being
+the default payment method for AI agents.
 
 Most of what agents buy has a variable cost. A model call depends on the tokens
 it generates, a scrape on the pages it processes, and an agent run on the tools
@@ -81,12 +80,13 @@ provider it uses, and without every payment waiting on a chain?
 
 The same crawl, on 4Mica:
 
-1. **Authorize.** The agent authorize a $1.00 cap and sends it
+1. **Authorize.** The agent authorizes a $1.00 cap. 4Mica reserves $1.00 of
+   the agent's collateral and issues a signed receipt, which the agent sends
    with the request.
 2. **Work.** The provider verifies the receipt on its own, without trusting
    the agent or calling a chain, and runs the crawl. It never waits for a
    transaction to confirm.
-3. **Reconcile.** The crawl costs $0.37. The provider authorize the unused $0.63
+3. **Reconcile.** The crawl costs $0.37. The provider authorizes the unused $0.63
    back to the agent.
 4. **Settle.** At the end of the cycle, the $0.37 joins everything else the
    agent owes and is owed, and only the net amount moves on-chain.
