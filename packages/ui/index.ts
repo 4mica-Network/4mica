@@ -1,3 +1,4 @@
+export { Avatar, type AvatarProps } from "./components/avatar";
 export {
   Banner,
   type BannerData,
@@ -11,6 +12,7 @@ export {
   type ComboBoxOption,
   type ComboBoxProps,
 } from "./components/combo-box";
+export { CopyButton, type CopyButtonProps } from "./components/copy-button";
 export {
   Dropdown,
   type DropdownProps,
@@ -40,6 +42,11 @@ export {
   PopupConfirm,
   type PopupConfirmProps,
 } from "./components/popup-confirm";
+export {
+  Segmented,
+  type SegmentedProps,
+  type SegmentOption,
+} from "./components/segmented";
 export { type Option, Select, type SelectProps } from "./components/select";
 export {
   Spinner,
@@ -51,6 +58,7 @@ export {
   AutoStackHeight,
   type AutoStackHeightProps,
 } from "./components/stack/AutoStackHeight";
+export { Stars, type StarsProps } from "./components/stars";
 export {
   Switch,
   type SwitchColors,
@@ -85,3 +93,4 @@ export {
 export { cn } from "./lib/cn";
 export { type ComponentSize, getIconSize } from "./utils/getIconSize";
 export { hexToRGBA } from "./utils/hexToRGB";
+export { initials } from "./utils/initials";

@@ -53,7 +53,7 @@ export const buildProfileLlmsTxt = (
   const sections: string[] = [
     `# ${title} on 4Mica`,
     "",
-    `> ${singleLine(profile.bio || profile.description || `Paid APIs and agents published by @${profile.username}.`)}`,
+    `> ${singleLine(profile.bio || `Paid APIs and agents published by @${profile.username}.`)}`,
     "",
     "Every resource below is paid for with x402 using the 4mica-credit scheme:",
     "call it without a payment header, read the payment requirements from the",

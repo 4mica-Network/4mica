@@ -133,8 +133,8 @@
     }
   },
   "fourMica": {
-    "@4mica/cli": "0.3.0-alpha.0",
-    "@4mica/sdk": "2.0.0-alpha.0",
-    "@4mica/x402": "2.0.0-alpha.2"
+    "@4mica/cli": "0.3.0",
+    "@4mica/sdk": "2.0.0",
+    "@4mica/x402": "2.0.0"
   }
 }

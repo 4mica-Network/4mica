@@ -147,9 +147,9 @@ export default function Footer() {
             >
               {messages.footer.resources.restrictedBusinesses}
             </Link>
-            <Link href="/sitemap.xml" className={footerLinkClass}>
+            <a href="/sitemap.xml" className={footerLinkClass}>
               {messages.footer.resources.sitemap}
-            </Link>
+            </a>
             <Link href={routes.privacy} className={footerLinkClass}>
               {messages.footer.resources.privacy}
             </Link>

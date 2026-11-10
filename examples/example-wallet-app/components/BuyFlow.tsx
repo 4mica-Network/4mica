@@ -46,7 +46,7 @@ const slide = {
 export function BuyFlow({ onPurchased }: { onPurchased: () => void }) {
   const [step, setStep] = useState(0);
   const [url, setUrl] = useState(
-    process.env.NEXT_PUBLIC_SHOP_URL ?? "http://localhost:3000/quote",
+    process.env.NEXT_PUBLIC_SHOP_URL ?? "http://localhost:3010/insight",
   );
   const [offer, setOffer] = useState<Offer | null>(null);
   const [status, setStatus] = useState<Status | null>(null);

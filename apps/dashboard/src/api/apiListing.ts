@@ -40,7 +40,6 @@ export interface ApiListingInput {
   walletId?: string | null;
   assetAddress?: string | null;
   priceAmount?: string | null;
-  priceCurrency?: string | null;
   x402Endpoint?: string | null;
 }
 

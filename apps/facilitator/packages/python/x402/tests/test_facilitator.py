@@ -2,11 +2,15 @@ import asyncio
 import json
 
 import pytest
-from x402.http import FacilitatorConfig
+from x402.http import FacilitatorConfig, HTTPFacilitatorClient, HTTPFacilitatorClientSync
+from x402.schemas import SupportedKind, SupportedResponse
 
 from fourmica_x402.facilitator import (
+    FACILITATOR_URLS,
     FourMicaFacilitatorClient,
     FourMicaFacilitatorClientSync,
+    hosted_facilitator_clients,
+    hosted_facilitator_clients_sync,
 )
 
 httpx = pytest.importorskip("httpx")
@@ -128,3 +132,62 @@ def test_settle_sync_surfaces_a_refusal():
     assert response.extra == {"retryable": False, "details": details}
 
     sync_client.close()
+
+
+def _kind(network):
+    return SupportedKind(x402_version=2, scheme="4mica-credit", network=network)
+
+
+@pytest.mark.parametrize(
+    ("client_cls", "base_cls"),
+    [
+        (FourMicaFacilitatorClient, HTTPFacilitatorClient),
+        (FourMicaFacilitatorClientSync, HTTPFacilitatorClientSync),
+    ],
+)
+def test_narrows_supported_to_its_networks(monkeypatch, client_cls, base_cls):
+    monkeypatch.setattr(
+        base_cls,
+        "get_supported",
+        lambda self: SupportedResponse(kinds=[_kind("eip155:84532"), _kind("eip155:8453")]),
+    )
+
+    narrowed = client_cls(FacilitatorConfig(url="http://fac.test"), ["eip155:8453"])
+    unnarrowed = client_cls(FacilitatorConfig(url="http://fac.test"))
+
+    assert [k.network for k in narrowed.get_supported().kinds] == ["eip155:8453"]
+    assert len(unnarrowed.get_supported().kinds) == 2
+
+
+def test_a_narrowed_client_reports_nothing_when_its_facilitator_is_down(monkeypatch, caplog):
+    def unreachable(self):
+        raise httpx.ConnectError("facilitator unreachable")
+
+    monkeypatch.setattr(HTTPFacilitatorClientSync, "get_supported", unreachable)
+    narrowed = FourMicaFacilitatorClientSync(
+        FacilitatorConfig(url="http://fac.test"), ["eip155:8453"]
+    )
+    unnarrowed = FourMicaFacilitatorClientSync(FacilitatorConfig(url="http://fac.test"))
+
+    with caplog.at_level("WARNING"):
+        assert narrowed.get_supported().kinds == []
+    assert "eip155:8453" in caplog.text
+    with pytest.raises(httpx.ConnectError):
+        unnarrowed.get_supported()
+
+
+def test_hosted_clients_route_each_network_to_its_facilitator():
+    assert FACILITATOR_URLS == {
+        "eip155:84532": "https://testnet.payment.4mica.io",
+        "eip155:8453": "https://payment.4mica.io",
+    }
+    networks = ["eip155:84532", "eip155:8453", "eip155:1"]
+
+    for clients in (
+        hosted_facilitator_clients(networks),
+        hosted_facilitator_clients_sync(networks),
+    ):
+        assert [client._url for client in clients] == [
+            "https://testnet.payment.4mica.io",
+            "https://payment.4mica.io",
+        ]

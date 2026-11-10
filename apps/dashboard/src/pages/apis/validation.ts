@@ -1,13 +1,6 @@
 import { isSingleLine } from "@4mica/rules";
 import { PUBLIC_VISIBILITY } from "@stores/shared/type";
-import {
-  addressOrBlank,
-  currencyOrBlank,
-  httpsUrl,
-  orBlank,
-  positiveAmount,
-  slugOrBlank,
-} from "@utils/zod";
+import { httpsUrl, orBlank, positiveAmount, slugOrBlank } from "@utils/zod";
 import { z } from "zod";
 
 export const NAME_MAX_LENGTH = 120;
@@ -44,9 +37,8 @@ export const apiListingDetailsSchema = z.object({
 
 export const apiListingPaymentSchema = z.object({
   walletId: orBlank(z.string()),
-  assetAddress: addressOrBlank(`${NS}.assetInvalid`),
+  assetAddress: z.string(),
   priceAmount: orBlank(positiveAmount(NS)),
-  priceCurrency: currencyOrBlank("apiListing.errors.currencyInvalid"),
   priceLabel: orBlank(
     z
       .string()
@@ -82,7 +74,7 @@ export type ApiListingValues = z.infer<typeof createApiListingSchema>;
 
 export const CREATE_STEP_FIELDS = [
   ["name", "slug", "summary", "description"],
-  ["walletId", "assetAddress", "priceAmount", "priceCurrency", "priceLabel"],
+  ["walletId", "assetAddress", "priceAmount", "priceLabel"],
   [
     "method",
     "url",

@@ -1,7 +1,7 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CardHeader, SurfaceCard } from "@/components/layout";
+import { CardHeader } from "@/components/layout";
 
 export function EditableCard({
   title,
@@ -33,7 +33,7 @@ export function EditableCard({
   };
 
   return (
-    <SurfaceCard>
+    <Card>
       <form onSubmit={handleSubmit}>
         {title && (
           <div className="mb-4">
@@ -57,16 +57,15 @@ export function EditableCard({
             type="submit"
             size="sm"
             intent="invert"
-            className="btn-no-lift w-20"
-            disabled={!isDirty || isSaving || isInvalid}
+            className="btn-no-lift w-20 text-sm"
+            loading={isSaving}
+            disabled={!isDirty || isInvalid}
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isSaving ? <Spinner size="sm" /> : t("settings.update")}
-            </span>
+            {t("settings.update")}
           </Button>
         </div>
       </form>
-    </SurfaceCard>
+    </Card>
   );
 }
 
@@ -82,7 +81,7 @@ export function InstantCard({
   children: ReactNode;
 }) {
   return (
-    <SurfaceCard>
+    <Card>
       {title && (
         <div className="mb-4">
           <CardHeader
@@ -93,6 +92,6 @@ export function InstantCard({
         </div>
       )}
       {children}
-    </SurfaceCard>
+    </Card>
   );
 }

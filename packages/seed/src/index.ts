@@ -9,35 +9,17 @@ loadEnv({ quiet: true });
 
 const { disconnect, prisma } = await import("@4mica/db");
 
-/**
- * The public-profile fixture. `private` defaults to true on User, so without an
- * explicit opt-in here every profile page in @4mica/playground renders a 404.
- */
 const PROFILE = {
-  clerkUserId: "user_seed_4mica_workspace",
+  clerkUserId: process.env.SEED_CLERK_USER_ID ?? "user_seed_4mica_workspace",
   username: "4mica-workspace",
   name: "4Mica Workspace",
   email: "workspace@4mica.io",
   bio: "Credit-layer infrastructure for the agentic economy.",
-  description:
-    "We run settlement agents and publish the APIs that let autonomous agents transact on credit. Everything on this profile is live in sandbox mode.",
   avatarUrl: null,
 } as const;
 
-/** Canonical USDC on Base Sepolia. */
 const USDC_BASE_SEPOLIA = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
 
-/**
- * One agent, fully populated.
- *
- * ACTIVE + PUBLIC and on a network, because anything less renders a degraded
- * page: a non-ACTIVE agent shows the "cannot sign payments yet" warning, and a
- * non-PUBLIC one is absent from the profile index.
- *
- * Addresses are lower-case on purpose — a mixed-case address is only valid if
- * its EIP-55 checksum is right, and a hand-written one would fail validation in
- * any tool the reader pastes it into.
- */
 const AGENTS = [
   {
     slug: "atlas-research",
@@ -55,7 +37,7 @@ const AGENTS = [
     payToAddress: "0x3d8e1f5a7c9b2d4e6a8c0f2b4d6e8a1c3f5b7d09",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.002",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     priceLabel: "$0.002 per research run",
     endpointUrl: "https://agents.4mica.io/atlas/brief",
     x402Endpoint: "https://agents.4mica.io/atlas/x402",
@@ -96,16 +78,6 @@ const WALLETS = [
   },
 ] as const;
 
-/**
- * One API listing, fully populated.
- *
- * Priced in USDC rather than the native asset so the fixture exercises the
- * ERC-20 branch — the harder of the two paths to get right.
- *
- * The payment fields are what make the playground's integration snippets real:
- * without `network` and `payToAddress` a listing renders the "not accepting
- * payments yet" note instead of code.
- */
 const API_LISTINGS = [
   {
     slug: "credit-limits",
@@ -124,7 +96,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.01",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
   {
@@ -144,7 +116,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.05",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
   {
@@ -163,7 +135,7 @@ const API_LISTINGS = [
     payToAddress: "0x4f2c8b6d1e9a3f5c7b0d2e4a6c8f1b3d5e7a9c02",
     assetAddress: USDC_BASE_SEPOLIA,
     priceAmount: "0.01",
-    priceCurrency: "USD",
+    priceCurrency: "USDC",
     x402Endpoint: "https://api.4mica.io/v1/credit/x402",
   },
 ] as const;
@@ -428,12 +400,10 @@ const seed = async (): Promise<void> => {
     email: PROFILE.email,
     emailVerified: true,
     bio: PROFILE.bio,
-    description: PROFILE.description,
     avatarUrl: PROFILE.avatarUrl,
     // The public-profile opt-in. Leave any of these at their defaults and the
     // playground correctly refuses to render the page.
     private: false,
-    hidden: false,
     verified: true,
     allowSEOIndexing: true,
     allowEmailVisibility: true,
@@ -449,13 +419,6 @@ const seed = async (): Promise<void> => {
     select: { id: true },
   });
 
-  /**
-   * Convergence runs BEFORE the upserts, not after.
-   *
-   * The agent upsert is keyed on `walletAddress`, so changing an address in the
-   * fixture is a create — which then collides with the stale row still holding
-   * that `@@unique([ownerId, slug])`. Clearing first frees both keys.
-   */
   await prisma.agent.deleteMany({
     where: {
       ownerId: owner.id,

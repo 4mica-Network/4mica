@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { fetchApiListings } from "@stores/apiListing/actions";
 import {
   selectApiListings,
@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { SettingsSection } from "@/components/layout";
+import { PageSpinner } from "@/components/PageSpinner";
 import { FaqEditor } from "@/components/Resource/FaqEditor";
 import { PolicyForm } from "@/components/Resource/PolicyForm";
 import { ReportsPanel } from "@/components/Resource/ReportsPanel";
@@ -59,11 +60,7 @@ export function ApiDetail() {
   }, [dispatch, id]);
 
   if (!hasLoaded && !listing) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (!listing) {

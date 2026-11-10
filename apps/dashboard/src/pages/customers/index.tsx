@@ -1,4 +1,4 @@
-import { Button, EmptyState, Pagination, Spinner } from "@4mica/ui";
+import { Button, EmptyState, Pagination } from "@4mica/ui";
 import {
   batchDeleteCustomers,
   fetchCustomers,
@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Plus, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { CreateCustomerModal } from "./CreateCustomerModal";
 import { CustomerRow } from "./CustomerRow";
@@ -92,9 +93,7 @@ export function Customers() {
         )}
 
         {showSpinner ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner size="lg" className="text-ink-subtle" />
-          </div>
+          <PageSpinner />
         ) : showError ? (
           <EmptyState
             className="flex-1"

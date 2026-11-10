@@ -1,4 +1,4 @@
-import { cn } from "@4mica/ui";
+import { Card, cn } from "@4mica/ui";
 import type { PaymentSummary } from "@stores/payment/type";
 import {
   ArrowDownLeft,
@@ -33,8 +33,8 @@ function Kpi({
   testId: string;
 }) {
   return (
-    <div
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-overlay/10 bg-surface px-5 py-4"
+    <Card
+      className="flex min-w-0 flex-col gap-3 rounded-xl px-5 py-4"
       data-testid={testId}
     >
       <div className="flex items-center justify-between gap-2">
@@ -50,7 +50,7 @@ function Kpi({
       </div>
       <div className="min-w-0">{children}</div>
       <div className="text-ink-muted text-xs">{footer}</div>
-    </div>
+    </Card>
   );
 }
 

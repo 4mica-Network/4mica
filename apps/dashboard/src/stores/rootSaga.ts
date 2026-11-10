@@ -3,10 +3,13 @@ import agentSaga from "./agent/saga";
 import apiListingSaga from "./apiListing/saga";
 import balanceSaga from "./balance/saga";
 import bannerSaga from "./banner/saga";
+import complianceSaga from "./compliance/saga";
+import configSaga from "./config/saga";
 import customerSaga from "./customer/saga";
 import developerSaga from "./developer/saga";
 import paymentSaga from "./payment/saga";
 import resourceKeySaga from "./resourceKey/saga";
+import supportSaga from "./support/saga";
 import trustSaga from "./trust/saga";
 import userSaga from "./user/saga";
 import walletSaga from "./wallet/saga";
@@ -24,5 +27,8 @@ export default function* rootSaga() {
     ...balanceSaga,
     ...customerSaga,
     ...resourceKeySaga,
+    ...complianceSaga,
+    ...configSaga,
+    ...supportSaga,
   ]);
 }

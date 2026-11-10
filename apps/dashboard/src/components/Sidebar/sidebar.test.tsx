@@ -84,3 +84,25 @@ describe("sidebar identity", () => {
     expect(screen.getByText("New user")).toBeInTheDocument();
   });
 });
+
+describe("sidebar footer", () => {
+  beforeEach(() => {
+    useUser.mockReturnValue({ user: null });
+  });
+
+  it("offers the profile shortcuts and help in the app", () => {
+    renderAt("/", { name: "Ada", username: "ada" } as User);
+
+    expect(screen.getByText("View public profile")).toBeInTheDocument();
+    expect(screen.getByText("Copy public profile")).toBeInTheDocument();
+    expect(screen.getByText("Help")).toBeInTheDocument();
+  });
+
+  it("leaves them out of settings", () => {
+    renderAt("/settings/profile", { name: "Ada", username: "ada" } as User);
+
+    expect(screen.queryByText("View public profile")).toBeNull();
+    expect(screen.queryByText("Copy public profile")).toBeNull();
+    expect(screen.queryByText("Help")).toBeNull();
+  });
+});

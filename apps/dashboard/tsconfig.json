@@ -32,6 +32,8 @@
     // Without it in the program, `types: ["node"]` leaves those matchers
     // untyped and every component test fails to compile.
     "vitest.setup.ts",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "playwright.config.ts",
+    "playwright/**/*.ts"
   ]
 }

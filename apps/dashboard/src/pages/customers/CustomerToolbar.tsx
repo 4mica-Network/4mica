@@ -47,8 +47,8 @@ export function CustomerToolbar({
       title: t(option.titleKey),
     }));
 
-  if (selectedIds.length > 0) {
-    return (
+  const selectionBar =
+    selectedIds.length > 0 ? (
       <ListToolbar.SelectionBar
         ns="customer"
         testIdPrefix="customer"
@@ -62,11 +62,10 @@ export function CustomerToolbar({
         }
         onBatchDelete={onBatchDelete}
       />
-    );
-  }
+    ) : undefined;
 
   return (
-    <ListToolbar className="sm:flex-col sm:items-start">
+    <ListToolbar className="@5xl:flex-col @5xl:items-stretch">
       <ListToolbar.Search
         value={filters.q}
         placeholder={t("customer.toolbar.searchPlaceholder")}
@@ -74,10 +73,9 @@ export function CustomerToolbar({
         data-testid="customer-search"
       />
 
-      <ListToolbar.Filters>
+      <ListToolbar.Filters overlay={selectionBar}>
         <ListToolbar.Filter<CustomerType | "">
           label={t("list.filter.type")}
-          className="sm:w-40"
           value={filters.type}
           options={[
             { value: "", title: t("customer.toolbar.allTypes") },
@@ -89,7 +87,6 @@ export function CustomerToolbar({
 
         <ListToolbar.Filter<CustomerStatus | "">
           label={t("list.filter.status")}
-          className="sm:w-36"
           value={filters.status}
           options={[
             { value: "", title: t("customer.toolbar.allStatuses") },
@@ -112,7 +109,6 @@ export function CustomerToolbar({
 
         <ListToolbar.Filter<CustomerSort>
           label={t("list.sort")}
-          className="sm:w-52"
           value={filters.sort}
           options={translated(SORT_OPTIONS)}
           onChange={(sort) =>

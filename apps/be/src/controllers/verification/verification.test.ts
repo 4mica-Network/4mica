@@ -480,4 +480,99 @@ describe("verification routes", () => {
       expect(res.json().error).toBe("email_taken");
     });
   });
+  describe("POST /me/phone/verification/sync", () => {
+    const clerkUserWith = (
+      phoneNumbers: { phoneNumber: string; status: string }[],
+    ) => ({
+      fullName: "Ada Lovelace",
+      imageUrl: null,
+      primaryEmailAddress: null,
+      emailAddresses: [],
+      phoneNumbers: phoneNumbers.map(({ phoneNumber, status }) => ({
+        phoneNumber,
+        verification: { status },
+      })),
+    });
+
+    const sync = async () => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/phone/verification/sync",
+        headers: AUTH,
+      });
+      await instance.close();
+      return res;
+    };
+
+    it("needs a number with a country code first", async () => {
+      findUnique.mockResolvedValue({ ...PROFILE, phoneNumber: "555 010 0123" });
+
+      const res = await sync();
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("no_phone");
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("marks the number verified once Clerk has verified it", async () => {
+      findUnique.mockResolvedValue({
+        ...PROFILE,
+        phoneNumber: "+1 (555) 010-0123",
+      });
+      getUser.mockResolvedValue(
+        clerkUserWith([{ phoneNumber: "+15550100123", status: "verified" }]),
+      );
+      update.mockResolvedValue({
+        ...PROFILE,
+        phoneNumber: "+1 (555) 010-0123",
+        phoneNumberVerified: true,
+      });
+
+      const res = await sync();
+
+      expect(res.statusCode).toBe(200);
+      expect(getUser).toHaveBeenCalledWith("user_123");
+      expect(update.mock.calls[0][0]).toMatchObject({
+        where: { id: AUTH_USER.id },
+        data: { phoneNumberVerified: true },
+      });
+      expect(res.json().phoneNumberVerified).toBe(true);
+    });
+
+    it("takes nothing on trust while Clerk still has the code pending", async () => {
+      findUnique.mockResolvedValue({ ...PROFILE, phoneNumber: "+15550100123" });
+      getUser.mockResolvedValue(
+        clerkUserWith([{ phoneNumber: "+15550100123", status: "unverified" }]),
+      );
+
+      const res = await sync();
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("phone_not_verified");
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("does not count a different number Clerk has verified", async () => {
+      findUnique.mockResolvedValue({ ...PROFILE, phoneNumber: "+15550100123" });
+      getUser.mockResolvedValue(
+        clerkUserWith([{ phoneNumber: "+15550100999", status: "verified" }]),
+      );
+
+      const res = await sync();
+
+      expect(res.statusCode).toBe(409);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("reports Clerk being unreachable instead of guessing", async () => {
+      findUnique.mockResolvedValue({ ...PROFILE, phoneNumber: "+15550100123" });
+      getUser.mockRejectedValue(new Error("network down"));
+
+      const res = await sync();
+
+      expect(res.statusCode).toBe(502);
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
 });

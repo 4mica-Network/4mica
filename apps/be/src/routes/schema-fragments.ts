@@ -30,10 +30,8 @@ export const userResponseSchema = {
     phoneNumber: nullStr,
     phoneNumberVerified: bool,
     avatarUrl: nullStr,
-    description: nullStr,
     bio: nullStr,
     private: bool,
-    hidden: bool,
     verified: bool,
     locked: bool,
     banned: bool,
@@ -977,5 +975,244 @@ export const resourceContextResponseSchema = {
     agent: { ...agentResponseSchema, nullable: true },
     policy: policyResponseSchema.properties.policy,
     faqs: { type: "array", items: faqSchema },
+  },
+} as const;
+
+const nullEnum = (values: readonly string[]) => ({
+  type: "string",
+  nullable: true,
+  enum: [...values, null],
+});
+
+const nullIsoDate = { type: "string", format: "date", nullable: true } as const;
+
+export const beneficialOwnerResponseSchema = {
+  type: "object",
+  required: ["id", "fullName", "role"],
+  properties: {
+    id: str,
+    fullName: str,
+    role: {
+      type: "string",
+      enum: ["OWNER", "DIRECTOR", "CONTROLLER", "SIGNATORY"],
+    },
+    ownershipPercent: { type: "integer", nullable: true },
+    dateOfBirth: { type: "string", format: "date" },
+    nationality: str,
+    countryOfResidence: str,
+    email: nullStr,
+    isPep: bool,
+    createdAt: date,
+    updatedAt: date,
+  },
+} as const;
+
+export const complianceResponseSchema = {
+  type: "object",
+  required: ["kybStatus", "profile", "owners", "missing"],
+  properties: {
+    kybStatus: {
+      type: "string",
+      enum: ["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"],
+    },
+    profile: {
+      type: "object",
+      nullable: true,
+      properties: {
+        incorporationCountry: nullStr,
+        incorporatedOn: nullIsoDate,
+        monthlyVolume: nullEnum([
+          "UNDER_10K",
+          "FROM_10K_TO_100K",
+          "FROM_100K_TO_1M",
+          "OVER_1M",
+        ]),
+        customerBase: nullEnum(["BUSINESSES", "CONSUMERS", "BOTH"]),
+        customerRegions: { type: "array", items: str },
+        isRegulated: bool,
+        licenceType: nullStr,
+        licenceNumber: nullStr,
+        regulator: nullStr,
+        hasAmlPolicy: bool,
+        complianceOfficerName: nullStr,
+        complianceOfficerEmail: nullStr,
+        termsUrl: nullStr,
+        privacyUrl: nullStr,
+        refundPolicyUrl: nullStr,
+        fundsSource: nullEnum([
+          "BUSINESS_REVENUE",
+          "INVESTMENT",
+          "LOANS",
+          "PERSONAL_SAVINGS",
+          "OTHER",
+        ]),
+        fundsSourceDetail: nullStr,
+        sanctionsAttestedAt: nullDate,
+        prohibitedAttestedAt: nullDate,
+        accuracyAttestedAt: nullDate,
+        attestedBy: nullStr,
+        submittedAt: nullDate,
+        updatedAt: date,
+      },
+    },
+    owners: { type: "array", items: beneficialOwnerResponseSchema },
+    missing: { type: "array", items: str },
+  },
+} as const;
+
+const strList = { type: "array", items: str } as const;
+
+const supportCategoryEnum = {
+  type: "string",
+  enum: [
+    "ACCOUNT",
+    "BILLING",
+    "PAYMENTS",
+    "WALLETS",
+    "AGENTS",
+    "API_LISTINGS",
+    "INTEGRATION",
+    "COMPLIANCE",
+    "BUG",
+    "FEATURE_REQUEST",
+    "OTHER",
+  ],
+} as const;
+
+const supportRequestProperties = {
+  id: str,
+  number: int,
+  subject: str,
+  category: supportCategoryEnum,
+  priority: { type: "string", enum: ["LOW", "NORMAL", "HIGH", "URGENT"] },
+  status: {
+    type: "string",
+    enum: ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"],
+  },
+  description: str,
+  reference: nullStr,
+  firstRespondedAt: nullDate,
+  resolvedAt: nullDate,
+  lastActivityAt: date,
+  createdAt: date,
+  updatedAt: date,
+} as const;
+
+const supportRequestRequired = [
+  "id",
+  "number",
+  "subject",
+  "category",
+  "priority",
+  "status",
+  "description",
+  "lastActivityAt",
+  "createdAt",
+] as const;
+
+export const supportMessageResponseSchema = {
+  type: "object",
+  required: ["id", "author", "body", "createdAt"],
+  properties: {
+    id: str,
+    author: { type: "string", enum: ["CUSTOMER", "SUPPORT"] },
+    body: str,
+    createdAt: date,
+  },
+} as const;
+
+export const supportRequestResponseSchema = {
+  type: "object",
+  required: supportRequestRequired,
+  properties: supportRequestProperties,
+} as const;
+
+export const supportRequestDetailResponseSchema = {
+  type: "object",
+  required: [...supportRequestRequired, "messages"],
+  properties: {
+    ...supportRequestProperties,
+    messages: { type: "array", items: supportMessageResponseSchema },
+  },
+} as const;
+
+export const supportRequestListResponseSchema = {
+  type: "object",
+  required: ["items", "total", "page", "limit"],
+  properties: {
+    items: { type: "array", items: supportRequestResponseSchema },
+    total: int,
+    page: int,
+    limit: int,
+  },
+} as const;
+
+export const supportStatsResponseSchema = {
+  type: "object",
+  required: ["active", "awaitingYou", "resolved", "medianFirstResponseMinutes"],
+  properties: {
+    active: int,
+    awaitingYou: int,
+    resolved: int,
+    medianFirstResponseMinutes: { type: "number", nullable: true },
+  },
+} as const;
+
+export const configResponseSchema = {
+  type: "object",
+  required: [
+    "version",
+    "countries",
+    "timezones",
+    "currencies",
+    "languages",
+    "themes",
+    "homes",
+    "notificationPlacements",
+    "businessTypes",
+    "monthlyVolumes",
+    "customerBases",
+    "fundsSources",
+    "ownerRoles",
+    "networks",
+    "supportCategories",
+    "supportPriorities",
+  ],
+  properties: {
+    version: str,
+    countries: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["code", "name"],
+        properties: { code: str, name: str },
+      },
+    },
+    timezones: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["city", "timezone", "pop", "gmtOffset"],
+        properties: {
+          city: str,
+          timezone: str,
+          pop: { type: "number" },
+          gmtOffset: str,
+        },
+      },
+    },
+    currencies: strList,
+    languages: strList,
+    themes: strList,
+    homes: strList,
+    notificationPlacements: strList,
+    businessTypes: strList,
+    monthlyVolumes: strList,
+    customerBases: strList,
+    fundsSources: strList,
+    ownerRoles: strList,
+    networks: strList,
+    supportCategories: strList,
+    supportPriorities: strList,
   },
 } as const;

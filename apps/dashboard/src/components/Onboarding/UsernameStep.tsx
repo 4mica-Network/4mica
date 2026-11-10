@@ -65,6 +65,7 @@ export function UsernameStep({
   };
 
   const message = statusMessage();
+  const isProblem = message?.tone === "text-danger";
 
   const trailingIcon = () => {
     if (status === "checking") {
@@ -97,6 +98,7 @@ export function UsernameStep({
         description={t("onboarding.username.description", {
           url: links.profile(candidate || savedUsername),
         })}
+        required
       >
         <TextInput
           id="onboarding-username"
@@ -104,7 +106,7 @@ export function UsernameStep({
           value={value}
           onChange={onChange}
           placeholder={t("onboarding.username.placeholder")}
-          error={error}
+          error={error ?? (isProblem ? message?.text : undefined)}
           format="lowercase"
           maxLength={64}
           trailingIcon={trailingIcon()}
@@ -112,7 +114,7 @@ export function UsernameStep({
       </FieldRow>
 
       <p className={`text-xs ${message?.tone ?? ""}`} aria-live="polite">
-        {message?.text}
+        {isProblem ? null : message?.text}
       </p>
     </div>
   );

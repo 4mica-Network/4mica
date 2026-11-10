@@ -33,8 +33,8 @@ export function WalletToolbar({
     selectIsWalletPending(walletPendingKeys.batchDelete),
   );
 
-  if (selectedIds.length > 0) {
-    return (
+  const selectionBar =
+    selectedIds.length > 0 ? (
       <ListToolbar.SelectionBar
         ns="wallet"
         testIdPrefix="wallet"
@@ -48,8 +48,7 @@ export function WalletToolbar({
         }
         onBatchDelete={onBatchDelete}
       />
-    );
-  }
+    ) : undefined;
 
   return (
     <ListToolbar>
@@ -60,10 +59,9 @@ export function WalletToolbar({
         data-testid="wallet-search"
       />
 
-      <ListToolbar.Filters>
+      <ListToolbar.Filters overlay={selectionBar}>
         <ListToolbar.Filter<WalletStatus | "">
           label={t("list.filter.status")}
-          className="sm:w-40"
           value={filters.status}
           options={[
             { value: "", title: t("wallet.toolbar.allStatuses") },

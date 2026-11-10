@@ -734,4 +734,50 @@ describe("agent routes", () => {
 
     await instance.close();
   });
+  describe("the price asset", () => {
+    const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+    it("names the currency after the token on the agent's network", async () => {
+      agent.findMany.mockResolvedValue([]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/agents",
+        headers: AUTH,
+        payload: {
+          name: "Atlas",
+          network: "BASE_SEPOLIA",
+          assetAddress: USDC,
+          priceAmount: "0.01",
+          priceCurrency: "ETH",
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const written = agent.create.mock.calls[0][0].data;
+      expect(written.assetAddress).toBe(USDC.toLowerCase());
+      expect(written.priceCurrency).toBe("USDC");
+
+      await instance.close();
+    });
+
+    it("refuses a token from another network", async () => {
+      agent.findMany.mockResolvedValue([]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/agents",
+        headers: AUTH,
+        payload: { name: "Atlas", network: "BASE", assetAddress: USDC },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().issues[0].path).toBe("assetAddress");
+      expect(agent.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+  });
 });

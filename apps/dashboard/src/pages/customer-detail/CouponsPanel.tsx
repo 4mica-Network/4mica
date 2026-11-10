@@ -326,14 +326,13 @@ function AddCouponCard({
           type="button"
           intent="invert"
           size="sm"
-          className="btn-no-lift w-24"
-          disabled={isSaving || isInvalid}
+          className="btn-no-lift w-24 text-sm"
+          loading={isSaving}
+          disabled={isInvalid}
           onClick={submit}
           data-testid="customer-coupon-save"
         >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isSaving ? <Spinner size="sm" /> : t("customer.coupon.save")}
-          </span>
+          {t("customer.coupon.save")}
         </Button>
       </div>
     </SectionInset>

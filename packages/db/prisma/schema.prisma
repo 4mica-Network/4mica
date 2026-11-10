@@ -106,6 +106,34 @@ enum BusinessType {
   NON_PROFIT
 }
 
+enum MonthlyVolume {
+  UNDER_10K
+  FROM_10K_TO_100K
+  FROM_100K_TO_1M
+  OVER_1M
+}
+
+enum CustomerBase {
+  BUSINESSES
+  CONSUMERS
+  BOTH
+}
+
+enum FundsSource {
+  BUSINESS_REVENUE
+  INVESTMENT
+  LOANS
+  PERSONAL_SAVINGS
+  OTHER
+}
+
+enum OwnerRole {
+  OWNER
+  DIRECTOR
+  CONTROLLER
+  SIGNATORY
+}
+
 enum NotificationPlacement {
   topLeft
   topRight
@@ -147,10 +175,8 @@ model User {
   phoneNumber                    String?                   @unique @map("phone_number") @db.VarChar(20)
   phoneNumberVerified            Boolean                   @default(false) @map("phone_number_verified")
   avatarUrl                      String?                   @map("avatar_url")
-  description                    String?
   bio                            String?
   private                        Boolean                   @default(true)
-  hidden                         Boolean                   @default(false)
   verified                       Boolean                   @default(false)
   locked                         Boolean                   @default(false)
   banned                         Boolean                   @default(false)
@@ -186,6 +212,8 @@ model User {
   updatedAt                      DateTime                  @updatedAt @map("updated_at")
   deletedAt                      DateTime?                 @map("deleted_at")
   business                       Business?
+  complianceProfile              ComplianceProfile?
+  beneficialOwners               BeneficialOwner[]
   apiKeys                        ApiKey[]
   webhooks                       Webhook[]
   agents                         Agent[]
@@ -196,6 +224,7 @@ model User {
   emailVerificationTokens        EmailVerificationToken[]
   onboardingQueue                OnboardingEmailQueue?
   wallets                        Wallet[]
+  supportRequests                SupportRequest[]
   walletNonces                   WalletNonce[]
   reportedPayments               Payment[]
   customers                      Customer[]
@@ -633,6 +662,57 @@ model Business {
   @@map("businesses")
 }
 
+model ComplianceProfile {
+  id                     String         @id @default(uuid(7))
+  ownerId                String         @unique @map("owner_id")
+  incorporationCountry   String?        @map("incorporation_country") @db.VarChar(2)
+  incorporatedOn         DateTime?      @map("incorporated_on") @db.Date
+  monthlyVolume          MonthlyVolume? @map("monthly_volume")
+  customerBase           CustomerBase?  @map("customer_base")
+  customerRegions        String[]       @default([]) @map("customer_regions")
+  isRegulated            Boolean        @default(false) @map("is_regulated")
+  licenceType            String?        @map("licence_type") @db.VarChar(128)
+  licenceNumber          String?        @map("licence_number") @db.VarChar(64)
+  regulator              String?        @db.VarChar(128)
+  hasAmlPolicy           Boolean        @default(false) @map("has_aml_policy")
+  complianceOfficerName  String?        @map("compliance_officer_name") @db.VarChar(120)
+  complianceOfficerEmail String?        @map("compliance_officer_email") @db.VarChar(255)
+  termsUrl               String?        @map("terms_url") @db.VarChar(255)
+  privacyUrl             String?        @map("privacy_url") @db.VarChar(255)
+  refundPolicyUrl        String?        @map("refund_policy_url") @db.VarChar(255)
+  fundsSource            FundsSource?   @map("funds_source")
+  fundsSourceDetail      String?        @map("funds_source_detail")
+  sanctionsAttestedAt    DateTime?      @map("sanctions_attested_at")
+  prohibitedAttestedAt   DateTime?      @map("prohibited_attested_at")
+  accuracyAttestedAt     DateTime?      @map("accuracy_attested_at")
+  attestedBy             String?        @map("attested_by") @db.VarChar(120)
+  submittedAt            DateTime?      @map("submitted_at")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+  owner                  User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("compliance_profiles")
+}
+
+model BeneficialOwner {
+  id                 String    @id @default(uuid(7))
+  ownerId            String    @map("owner_id")
+  fullName           String    @map("full_name") @db.VarChar(120)
+  role               OwnerRole
+  ownershipPercent   Int?      @map("ownership_percent")
+  dateOfBirth        DateTime  @map("date_of_birth") @db.Date
+  nationality        String    @db.VarChar(2)
+  countryOfResidence String    @map("country_of_residence") @db.VarChar(2)
+  email              String?   @db.VarChar(255)
+  isPep              Boolean   @default(false) @map("is_pep")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@map("beneficial_owners")
+}
+
 enum BannerInteractionType {
   VIEWED
   CLICKED
@@ -856,4 +936,78 @@ model FaqItem {
   @@index([listingId, sortOrder])
   @@index([agentId, sortOrder])
   @@map("faq_items")
+}
+
+enum SupportCategory {
+  ACCOUNT
+  BILLING
+  PAYMENTS
+  WALLETS
+  AGENTS
+  API_LISTINGS
+  INTEGRATION
+  COMPLIANCE
+  BUG
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum SupportAuthor {
+  CUSTOMER
+  SUPPORT
+}
+
+model SupportRequest {
+  id          String          @id @default(uuid(7))
+  number      Int             @unique @default(autoincrement())
+  ownerId     String          @map("owner_id")
+  subject     String          @db.VarChar(160)
+  category    SupportCategory
+  priority    SupportPriority @default(NORMAL)
+  status      SupportStatus   @default(OPEN)
+  description String          @db.VarChar(5000)
+  reference   String?         @db.VarChar(255)
+
+  firstRespondedAt DateTime? @map("first_responded_at")
+  resolvedAt       DateTime? @map("resolved_at")
+  lastActivityAt   DateTime  @default(now()) @map("last_activity_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner    User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([ownerId, lastActivityAt(sort: Desc)])
+  @@index([ownerId, status])
+  @@map("support_requests")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid(7))
+  requestId String        @map("request_id")
+  author    SupportAuthor
+  body      String        @db.VarChar(5000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("support_messages")
 }

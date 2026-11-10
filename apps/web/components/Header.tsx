@@ -1,11 +1,12 @@
 "use client";
 
 import { Button } from "@4mica/ui";
-import { links, routes } from "@4mica/url";
+import { routes } from "@4mica/url";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { messages } from "@/i18n";
+import { links } from "@/lib/links";
 import DesktopNav from "./nav/DesktopNav";
 import MobileNav from "./nav/MobileNav";
 
@@ -101,7 +102,7 @@ export default function Header() {
             intent="invert"
             className="hidden h-9 whitespace-nowrap hover:transform-none md:inline-flex"
           >
-            <Link href={links.docs}>{messages.common.actions.tryForFree}</Link>
+            <a href={links.app}>{messages.common.actions.tryForFree}</a>
           </Button>
 
           <button
@@ -160,9 +161,9 @@ export default function Header() {
               block
               className="h-9 hover:transform-none"
             >
-              <Link href="/pricing" onClick={() => setIsMobileMenuOpen(false)}>
+              <a href={links.app} onClick={() => setIsMobileMenuOpen(false)}>
                 {messages.common.actions.tryForFree}
-              </Link>
+              </a>
             </Button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { Button, InputField, Spinner } from "@4mica/ui";
+import { Button, InputField } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import type { ResourceRef } from "@stores/shared/type";
 import {
@@ -121,8 +121,9 @@ function FaqRow({
             </Button>
             <Button
               className="btn-no-lift"
-              disabled={isPending || !question.trim() || !answer.trim()}
+              disabled={!question.trim() || !answer.trim()}
               intent="invert"
+              loading={isPending}
               onClick={() => {
                 setAttempted(true);
                 dispatch(
@@ -135,7 +136,7 @@ function FaqRow({
               size="sm"
               type="button"
             >
-              {isPending ? <Spinner size="sm" /> : t("settings.update")}
+              {t("settings.update")}
             </Button>
           </div>
         )}
@@ -294,20 +295,15 @@ export function FaqEditor({ resource }: { resource: ResourceRef }) {
         <div className="flex justify-end">
           <Button
             className="btn-no-lift"
-            disabled={isAdding || !question.trim() || !answer.trim()}
+            disabled={!question.trim() || !answer.trim()}
+            icon={<Plus aria-hidden="true" className="h-4 w-4" />}
             intent="invert"
+            loading={isAdding}
             onClick={add}
             size="sm"
             type="button"
           >
-            {isAdding ? (
-              <Spinner size="sm" />
-            ) : (
-              <>
-                <Plus aria-hidden="true" className="mr-1.5 h-4 w-4" />
-                {t("appDetail.faq.add")}
-              </>
-            )}
+            {t("appDetail.faq.add")}
           </Button>
         </div>
       </div>

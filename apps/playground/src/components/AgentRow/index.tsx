@@ -1,7 +1,6 @@
 import { Tag } from "@4mica/ui";
 import { ListRow } from "@/components/ListRow";
 import { VisibilityTag } from "@/components/VisibilityTag";
-import { VisibilityToggle } from "@/components/VisibilityToggle";
 import { messages } from "@/i18n";
 import type { PublicAgent } from "@/types";
 import { agentPath } from "@/utils/profileUrl";
@@ -37,15 +36,6 @@ export function AgentRow({ agent, username, isOwner }: AgentRowProps) {
           </Tag>
           {isOwner && <VisibilityTag visibility={agent.visibility} />}
         </>
-      }
-      action={
-        isOwner && (
-          <VisibilityToggle
-            current={agent.visibility}
-            id={agent.id}
-            kind="agent"
-          />
-        )
       }
     />
   );

@@ -1,6 +1,6 @@
 import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Tag, Link as UiLink } from "@4mica/ui";
-import { ArrowUpRight, Check, Wallet } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { messages, t } from "@/i18n";
 import type { PaymentNetwork } from "@/schema/params";
 import { links } from "@/services/links";
@@ -22,18 +22,25 @@ export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
 
   if (state.step === "ready") {
     return (
-      <div
-        className="flex flex-wrap items-center gap-2 rounded-lg border border-success/30 bg-success/5 px-4 py-3"
-        data-testid="pay-with-4mica-ready"
-      >
-        <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-success" />
-        <span className="text-ink-body text-sm">
-          {messages.payWith.readyTitle}
-        </span>
-        <Tag size="sm" variant="neutral" className="font-mono">
-          {shortenAddress(state.address)}
-        </Tag>
-        <UiLink className="text-sm" external href={links.app}>
+      <div className="flex flex-col gap-4" data-testid="pay-with-4mica-ready">
+        <p className="text-ink-body text-sm leading-relaxed">
+          {messages.payWith.lead}
+        </p>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-overlay/4 px-4 py-3">
+          <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-success" />
+          <span className="text-ink-body text-sm">
+            {messages.payWith.readyTitle}
+          </span>
+          <Tag size="sm" variant="neutral" className="font-mono">
+            {shortenAddress(state.address)}
+          </Tag>
+        </div>
+        <UiLink
+          className="self-start text-sm"
+          external
+          href={links.app}
+          icon={<ArrowUpRight aria-hidden="true" className="h-4 w-4" />}
+        >
           {messages.payWith.readyAction}
         </UiLink>
       </div>
@@ -96,48 +103,37 @@ export function PayWithFourMica({ state, network }: PayWithFourMicaProps) {
       : { href: `${links.app}/wallet`, label: messages.payWith.noWallet.cta };
 
   return (
-    <section
-      className="flex flex-col gap-4 rounded-lg border border-overlay/10 bg-surface p-4"
-      data-testid="pay-with-4mica"
-    >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-overlay/10">
-          <Wallet aria-hidden="true" className="h-4 w-4 text-ink-muted" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="font-semibold text-ink-strong text-sm">
-            {messages.payWith.heading}
-          </h2>
-          <p className="mt-0.5 text-ink-muted text-sm">
-            {messages.payWith.lead}
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5" data-testid="pay-with-4mica">
+      <p className="text-ink-body text-sm leading-relaxed">
+        {messages.payWith.lead}
+      </p>
 
-      <ol className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-4">
         {steps.map((step) => (
           <li className="flex items-start gap-3" key={step.index}>
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-overlay/20 text-ink-subtle text-xs">
+            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-overlay/6 text-2xs text-ink-muted tabular-nums">
               {step.index}
             </span>
-            <div className="min-w-0">
+            <div className="flex min-w-0 flex-col gap-0.5">
               <p className="font-medium text-ink-strong text-sm">
                 {step.title}
               </p>
-              <p className="text-ink-muted text-xs">{step.body}</p>
+              <p className="text-ink-muted text-sm leading-relaxed">
+                {step.body}
+              </p>
             </div>
           </li>
         ))}
       </ol>
 
       <UiLink
-        className="text-sm"
+        className="self-start text-sm"
         external
         href={cta.href}
         icon={<ArrowUpRight aria-hidden="true" className="h-4 w-4" />}
       >
         {cta.label}
       </UiLink>
-    </section>
+    </div>
   );
 }

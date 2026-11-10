@@ -3,12 +3,15 @@ import { agentRoutes } from "./agents";
 import { apiListingRoutes } from "./api-listings";
 import { balanceRoutes } from "./balances";
 import { bannerRoutes } from "./banners";
+import { complianceRoutes } from "./compliance";
+import { configRoutes } from "./config";
 import { customerRoutes } from "./customers";
 import { developerRoutes } from "./developer";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { paymentRoutes } from "./payments";
 import { resourceKeyRoutes } from "./resource-keys";
+import { supportRoutes } from "./support";
 import { trustRoutes } from "./trust";
 import { unsubscribeRoutes } from "./unsubscribe";
 import { verificationRoutes } from "./verification";
@@ -34,6 +37,9 @@ export const routes: RouteRegistration[] = [
   { plugin: customerRoutes },
   { plugin: trustRoutes },
   { plugin: resourceKeyRoutes },
+  { plugin: complianceRoutes },
+  { plugin: configRoutes },
+  { plugin: supportRoutes },
 ];
 
 export {
@@ -41,12 +47,14 @@ export {
   apiListingRoutes,
   balanceRoutes,
   bannerRoutes,
+  complianceRoutes,
   customerRoutes,
   developerRoutes,
   healthRoutes,
   meRoutes,
   paymentRoutes,
   resourceKeyRoutes,
+  supportRoutes,
   trustRoutes,
   unsubscribeRoutes,
   verificationRoutes,

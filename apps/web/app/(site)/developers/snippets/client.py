@@ -5,7 +5,7 @@ from fourmica_x402.client_scheme import FourMicaEvmScheme
 # 1. Create client
 client = x402ClientSync()
 # 2. Register the 4Mica scheme
-client.register("eip155:11155111", FourMicaEvmScheme("0xYourPrivateKey"))
+client.register("eip155:84532", FourMicaEvmScheme("0xYourPrivateKey"))
 # 3. Wrap requests. That's it.
 session = x402_requests(client)
 

@@ -10,7 +10,7 @@ const meta = {
   parameters: { layout: "centered" },
   args: { title: "No API keys yet" },
   argTypes: {
-    variant: { control: "inline-radio", options: ["card", "plain"] },
+    variant: { control: "inline-radio", options: ["card", "plain", "dashed"] },
     size: { control: "inline-radio", options: ["sm", "md"] },
     action: { table: { disable: true } },
     icon: { table: { disable: true } },
@@ -83,10 +83,19 @@ export const Compact: Story = {
   args: { variant: "plain", size: "sm", title: "No priced endpoints yet" },
 };
 
+export const Dashed: Story = {
+  args: {
+    variant: "dashed",
+    size: "sm",
+    title: "No reviews yet",
+    description: "Reviews from paying customers show up here.",
+  },
+};
+
 export const Variants: Story = {
   render: (args) => (
     <div className="flex w-[560px] flex-col gap-4">
-      {(["card", "plain"] as const).map((variant) =>
+      {(["card", "plain", "dashed"] as const).map((variant) =>
         (["md", "sm"] as const).map((size) => (
           <EmptyState
             {...args}

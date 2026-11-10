@@ -1,4 +1,4 @@
-import { cn } from "@4mica/ui";
+import { cn, Segmented } from "@4mica/ui";
 import type { RankedEntry } from "@stores/payment/type";
 import { LayoutGroup, motion } from "framer-motion";
 import { ArrowDownWideNarrow, Trophy } from "lucide-react";
@@ -7,7 +7,6 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { formatAmount, type RankKey, rankBy } from "./metrics";
 import { Panel } from "./Panel";
-import { Segmented } from "./Segmented";
 
 type Source = "listings" | "agents";
 
@@ -57,7 +56,7 @@ export function Leaderboard({
             { value: "agents", label: t("overview.leaders.agents") },
           ]}
           onChange={setSource}
-          testId="overview-leaders-source"
+          data-testid="overview-leaders-source"
         />
       }
     >

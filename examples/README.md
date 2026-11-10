@@ -1,18 +1,19 @@
 # 4Mica SDK examples
 
-One seller and two buyers. The seller reads its price, receiving wallet and
+Two sellers and two buyers. A seller reads its price, receiving wallet and
 network from your 4Mica listing with a secret key, prices a route over x402
-with [`@4mica/x402`](../apps/facilitator/packages/typescript/x402)'s Express
-middleware, checks the payer's rules, and reports the payment to your
-dashboard. The buyers pay for that route through `@x402/fetch` with
-`@4mica/x402`'s client scheme, which also recovers from the refusals a payer can
-fix.
+with [`@4mica/x402`](../apps/facilitator/packages/typescript/x402)'s resource
+server (through its Express middleware, or directly from a Next.js route
+handler), checks the payer's rules, and reports the payment to your dashboard.
+The buyers pay for that route through `@x402/fetch` with `@4mica/x402`'s
+client scheme, which also recovers from the refusals a payer can fix.
 
 | Example | Role | Framework | Port |
 | --- | --- | --- | --- |
 | [`example-seller-express`](./example-seller-express) | Seller | Express | 3000 |
+| [`example-shop-app`](./example-shop-app) | Seller, with a UI | Next.js | 3010 |
 | [`example-buyer`](./example-buyer) | Buyer | — | targets 3000 |
-| [`example-wallet-app`](./example-wallet-app) | Buyer, with a UI | Next.js | 3011 |
+| [`example-wallet-app`](./example-wallet-app) | Buyer, with a UI | Next.js | 3011, targets 3010 |
 
 ## What you need
 

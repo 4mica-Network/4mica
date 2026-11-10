@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import {
   fetchCustomerDetail,
   resetCustomerDetail,
@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AccessPanel } from "./AccessPanel";
 import { ActivityPanel } from "./ActivityPanel";
@@ -53,11 +54,7 @@ export function CustomerDetail() {
   }, [dispatch, id]);
 
   if (!hasLoaded && !customer) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (!customer) {

@@ -1,7 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/mdx-components.tsx"],
-  "project": ["src/**/*.{ts,tsx}"],
+  "entry": [
+    "src/mdx-components.tsx",
+    "playwright.config.ts",
+    "playwright/**/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "playwright.config.ts",
+    "playwright/**/*.ts"
+  ],
   "ignoreDependencies": ["@prisma/adapter-pg", "@prisma/client"],
   "ignoreBinaries": ["biome"],
   "ignoreExportsUsedInFile": true,

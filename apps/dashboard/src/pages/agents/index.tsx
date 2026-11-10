@@ -1,4 +1,4 @@
-import { Button, EmptyState, Pagination, Spinner } from "@4mica/ui";
+import { Button, EmptyState, Pagination } from "@4mica/ui";
 import {
   batchDeleteAgents,
   deleteAgent,
@@ -18,11 +18,11 @@ import {
 } from "@stores/agent/selector";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { ArrowUpRight, Bot, Plus, TriangleAlert } from "lucide-react";
+import { Bot, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { links } from "@/lib/links";
 import { AgentRow } from "./AgentRow";
 import { AgentToolbar } from "./AgentToolbar";
 import { CreateAgentModal } from "./CreateAgentModal";
@@ -103,9 +103,7 @@ export function Agents() {
         )}
 
         {showSpinner ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Spinner size="lg" className="text-ink-subtle" />
-          </div>
+          <PageSpinner />
         ) : showError ? (
           <EmptyState
             className="flex-1"
@@ -134,30 +132,19 @@ export function Agents() {
             }
             action={
               hasFilters ? undefined : (
-                <div className="flex flex-col items-center gap-3">
-                  <Button
-                    type="button"
-                    intent="invert"
-                    size="sm"
-                    className="btn-no-lift"
-                    onClick={() => setIsCreateOpen(true)}
-                    data-testid="agent-empty-create"
-                  >
-                    <span className="flex items-center gap-1.5 text-sm">
-                      <Plus className="h-4 w-4" />
-                      {t("agent.create.cta")}
-                    </span>
-                  </Button>
-                  <a
-                    href={links.docs}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
-                  >
-                    {t("agent.empty.learnMore")}
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                </div>
+                <Button
+                  type="button"
+                  intent="invert"
+                  size="sm"
+                  className="btn-no-lift"
+                  onClick={() => setIsCreateOpen(true)}
+                  data-testid="agent-empty-create"
+                >
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <Plus className="h-4 w-4" />
+                    {t("agent.create.cta")}
+                  </span>
+                </Button>
               )
             }
             data-testid="agent-empty"

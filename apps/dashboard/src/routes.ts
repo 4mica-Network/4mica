@@ -13,6 +13,7 @@ import { Customers } from "@/pages/customers";
 import { DeveloperSettings } from "@/pages/developer";
 import { Disputes } from "@/pages/disputes";
 import { Help } from "@/pages/help";
+import { HelpRequestDetail } from "@/pages/help-request";
 import { NotificationSettings } from "@/pages/notification";
 import { Overview } from "@/pages/overview";
 import { Payments } from "@/pages/payments";
@@ -44,6 +45,7 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "apis", component: Apis },
   { path: "apis/:id", component: ApiDetail },
   { path: "help", component: Help },
+  { path: "help/requests/:id", component: HelpRequestDetail },
 ];
 
 export interface SettingsRouteMeta {
@@ -53,7 +55,7 @@ export interface SettingsRouteMeta {
 
 export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "profile", component: ProfileSettings },
-  { path: "account", component: AccountSettings },
+  { path: "general", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
   { path: "notifications", component: NotificationSettings },

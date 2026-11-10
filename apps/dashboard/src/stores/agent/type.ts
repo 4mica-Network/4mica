@@ -15,11 +15,6 @@ export const AGENT_STATUS = {
 
 export type AgentStatus = (typeof AGENT_STATUS)[keyof typeof AGENT_STATUS];
 
-export const AGENT_STATUS_OPTIONS = [
-  AGENT_STATUS.PENDING,
-  AGENT_STATUS.ACTIVE,
-] as const;
-
 export interface Agent {
   id: string;
   slug: string | null;

@@ -38,6 +38,12 @@ export const sendEmailVerification = () =>
     method: HttpMethod.POST,
   });
 
+export const syncPhoneVerification = () =>
+  httpClient.request<User>({
+    url: "/me/phone/verification/sync",
+    method: HttpMethod.POST,
+  });
+
 export const confirmEmailVerification = (token: string) =>
   httpClient.request<User, { token: string }>({
     url: "/me/email/verification/confirm",

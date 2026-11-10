@@ -20,6 +20,7 @@ export function NameStep({
         title={t("onboarding.name.label")}
         htmlFor="onboarding-name"
         description={t("onboarding.name.description")}
+        required
       >
         <TextInput
           id="onboarding-name"

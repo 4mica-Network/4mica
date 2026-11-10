@@ -1,7 +1,6 @@
 import type { AuthIdentity, AuthUser } from "@4mica/auth";
-import { createClerkClient } from "@clerk/backend";
-import { config } from "@config/index";
 import { appLogger } from "@logger/index";
+import { clerk } from "@services/clerk";
 import {
   isUniqueViolation,
   uniqueViolationTargets,
@@ -52,11 +51,6 @@ const writeCache = (clerkUserId: string, user: AuthUser): void => {
     cache.delete(oldest);
   }
 };
-
-const clerk = createClerkClient({
-  secretKey: config.env.CLERK_SECRET_KEY,
-  publishableKey: config.env.CLERK_PUBLISHABLE_KEY,
-});
 
 const toAuthUser = (row: UserRow): AuthUser => ({
   id: row.id,

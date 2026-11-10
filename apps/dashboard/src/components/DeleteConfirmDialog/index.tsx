@@ -1,4 +1,4 @@
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -43,17 +43,14 @@ export function DeleteConfirmDialog({
             {t("confirm.cancel")}
           </Button>
           <Button
-            intent="primary"
+            intent="danger"
             size="sm"
-            className="btn-no-lift min-w-24 bg-danger text-surface-deep hover:bg-danger"
-            disabled={isPending}
-            aria-busy={isPending}
+            className="btn-no-lift min-w-24 text-sm"
+            loading={isPending}
             onClick={onConfirm}
             data-testid={`${testId}-confirm`}
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isPending ? <Spinner size="sm" /> : t(`${ns}.delete.confirm`)}
-            </span>
+            {t(`${ns}.delete.confirm`)}
           </Button>
         </div>
       }

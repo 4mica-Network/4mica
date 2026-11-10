@@ -1,5 +1,4 @@
-import { PAYMENT_NETWORKS } from "@4mica/rules";
-import { EmptyState, Spinner, Tag } from "@4mica/ui";
+import { EmptyState } from "@4mica/ui";
 import { fetchBalances } from "@stores/balance/actions";
 import { selectBalanceState } from "@stores/balance/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
@@ -11,15 +10,11 @@ import {
   selectPaymentStats,
   selectPaymentSummary,
 } from "@stores/payment/selector";
-import {
-  ArrowRight,
-  ArrowRightLeft,
-  Landmark,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowRightLeft, Landmark, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { CashFlowChart, type Range } from "./CashFlowChart";
 import { CollateralTable } from "./CollateralTable";
@@ -50,11 +45,7 @@ export function Overview() {
   }, [dispatch, range]);
 
   if (!summary || !stats || (balances.isLoading && !balances.hasLoaded)) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner size="lg" className="text-ink-subtle" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const assets = balances.hasLoaded ? totalsByAsset(balances.wallets) : null;
@@ -65,31 +56,13 @@ export function Overview() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
-              {t("page.overview.title")}
-            </h1>
-            {balances.network && (
-              <Tag size="sm" variant="neutral" data-testid="balance-network">
-                {PAYMENT_NETWORKS[balances.network].label}
-              </Tag>
-            )}
-          </div>
+          <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
+            {t("page.overview.title")}
+          </h1>
           <p className="mt-1 text-ink-muted text-sm">
             {t("page.overview.description")}
           </p>
         </div>
-
-        {!noPayments && (
-          <Link
-            to="/payments"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-overlay/10 px-3 py-1.5 text-ink-body text-sm transition-colors hover:border-overlay/20 hover:text-ink-strong"
-            data-testid="overview-view-payments"
-          >
-            {t("overview.viewAll")}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        )}
       </div>
 
       {noPayments && noWallets ? (
@@ -101,7 +74,7 @@ export function Overview() {
           data-testid="overview-empty"
         />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4">
           <KpiStrip
             summary={summary}
             assets={assets}
@@ -110,7 +83,7 @@ export function Overview() {
 
           <CashFlowChart stats={stats} range={range} onRangeChange={setRange} />
 
-          <div className="grid gap-4 lg:grid-cols-5">
+          <div className="grid flex-1 gap-4 lg:grid-cols-5">
             <div className="flex min-w-0 lg:col-span-3">
               {balances.error && !balances.isLoading ? (
                 <Panel
@@ -119,6 +92,7 @@ export function Overview() {
                   className="flex-1"
                 >
                   <EmptyState
+                    variant="plain"
                     className="flex-1"
                     icon={<TriangleAlert className="h-5 w-5" />}
                     title={t("balance.errorState.title")}
@@ -137,6 +111,7 @@ export function Overview() {
                   className="flex-1"
                 >
                   <EmptyState
+                    variant="plain"
                     className="flex-1"
                     icon={<Landmark className="h-5 w-5" />}
                     title={t("balance.empty.title")}

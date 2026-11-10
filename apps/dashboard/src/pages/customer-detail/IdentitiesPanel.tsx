@@ -205,7 +205,14 @@ function AddIdentityCard({
     defaultValues: { type: "WALLET", network: "", address: "", value: "" },
   });
   const { handleSubmit, setError, control } = form;
-  const type = useWatch({ control, name: "type" });
+  const [type, network, address, value] = useWatch({
+    control,
+    name: ["type", "network", "address", "value"],
+  });
+  const isFilled =
+    type === "WALLET"
+      ? Boolean(network && address?.trim())
+      : Boolean(value?.trim());
   useServerIssues(issues, setError);
 
   useOnSuccess(
@@ -311,14 +318,12 @@ function AddIdentityCard({
             type="submit"
             intent="invert"
             size="sm"
-            className="btn-no-lift w-24"
-            disabled={isSaving}
-            aria-busy={isSaving}
+            className="btn-no-lift w-24 text-sm"
+            loading={isSaving}
+            disabled={!isFilled}
             data-testid="customer-identity-save"
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isSaving ? <Spinner size="sm" /> : t("customer.identity.save")}
-            </span>
+            {t("customer.identity.save")}
           </Button>
         </div>
       </Form>

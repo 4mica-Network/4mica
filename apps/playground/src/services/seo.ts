@@ -92,7 +92,6 @@ export const buildProfileMetadata = (profile: PublicProfile): Metadata =>
     title: `${profile.name || profile.username} (@${profile.username}) · ${SITE_NAME}`,
     description:
       profile.bio ||
-      profile.description ||
       `${profile.name || profile.username} on 4Mica — agents and APIs for the agentic economy.`,
     path: `/${profile.username}`,
     username: profile.username,

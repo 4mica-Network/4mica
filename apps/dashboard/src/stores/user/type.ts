@@ -38,10 +38,8 @@ export interface User {
   phoneNumber: string | null;
   phoneNumberVerified: boolean;
   avatarUrl: string | null;
-  description: string | null;
   bio: string | null;
   private: boolean;
-  hidden: boolean;
   verified: boolean;
   locked: boolean;
   banned: boolean;

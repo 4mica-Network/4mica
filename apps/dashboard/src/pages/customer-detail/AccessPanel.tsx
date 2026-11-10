@@ -1,4 +1,4 @@
-import { Button, Spinner, Tag } from "@4mica/ui";
+import { Button, Tag } from "@4mica/ui";
 import { setCustomerStatus } from "@stores/customer/actions";
 import { selectIsCustomerStatusPending } from "@stores/customer/selector";
 import type { Customer, CustomerStatus } from "@stores/customer/type";
@@ -141,14 +141,13 @@ export function AccessPanel({ customer }: { customer: Customer }) {
           type="button"
           intent="invert"
           size="sm"
-          className="btn-no-lift w-20"
-          disabled={!draft.isDirty || isPending}
+          className="btn-no-lift w-20 text-sm"
+          loading={isPending}
+          disabled={!draft.isDirty}
           onClick={save}
           data-testid="customer-access-save"
         >
-          <span className="flex w-full items-center justify-center text-sm">
-            {isPending ? <Spinner size="sm" /> : t("settings.update")}
-          </span>
+          {t("settings.update")}
         </Button>
       </SectionFooter>
     </SectionCard>

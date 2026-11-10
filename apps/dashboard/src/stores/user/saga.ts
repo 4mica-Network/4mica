@@ -4,6 +4,7 @@ import {
   confirmEmailVerification as confirmEmailVerificationRequest,
   getMe,
   sendEmailVerification as sendEmailVerificationRequest,
+  syncPhoneVerification as syncPhoneVerificationRequest,
   type UsernameAvailability,
   updateAccount as updateAccountRequest,
   updateNotifications as updateNotificationsRequest,
@@ -22,6 +23,7 @@ import {
   fetchUserSucceeded,
   sendEmailVerificationFailed,
   sendEmailVerificationSucceeded,
+  syncPhoneVerificationFailed,
   type UpdateMeta,
   updateBusinessFailed,
   updateBusinessSucceeded,
@@ -200,6 +202,34 @@ export function* confirmEmailVerification(action: {
   }
 }
 
+export function* syncPhoneVerification(action: {
+  type: string;
+  meta: UpdateMeta;
+}): Generator {
+  try {
+    const user = yield call(syncPhoneVerificationRequest);
+    yield put(updateUserSucceeded(user as User, action.meta));
+
+    notifySuccess({
+      title: i18n.t("settings.account.phoneVerify.successTitle"),
+      content: i18n.t("settings.account.phoneVerify.successBody"),
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  } catch (error) {
+    const message = toMessage(
+      error,
+      i18n.t("settings.account.phoneVerify.syncFailed"),
+    );
+    yield put(syncPhoneVerificationFailed(message, action.meta));
+
+    notifyError({
+      title: i18n.t("settings.account.phoneVerify.failedTitle"),
+      content: message,
+      placement: (yield* placement()) as NotificationPlacement,
+    });
+  }
+}
+
 export function* checkUsername(action: {
   type: string;
   payload: string;
@@ -277,6 +307,10 @@ export default [
   takeLatest(
     actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
     confirmEmailVerification,
+  ),
+  takeLatest(
+    actionTypes.SYNC_PHONE_VERIFICATION_REQUESTED,
+    syncPhoneVerification,
   ),
   takeEvery(actionTypes.UPDATE_PROFILE_REQUESTED, updateUser),
   takeEvery(actionTypes.UPDATE_ACCOUNT_REQUESTED, updateUser),

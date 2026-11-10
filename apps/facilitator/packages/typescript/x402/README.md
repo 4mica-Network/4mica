@@ -164,11 +164,16 @@ const extra = {
 
 #### Supported Networks
 
-- `eip155:84532` - Base Sepolia
+| Network        | CAIP-2         | Hosted facilitator                 |
+| -------------- | -------------- | ---------------------------------- |
+| Base mainnet   | `eip155:8453`  | `https://payment.4mica.io`         |
+| Base Sepolia   | `eip155:84532` | `https://testnet.payment.4mica.io` |
 
-Base Sepolia is the one network running the 2.0 protocol today, so it is the only one the
-middleware and `FourMicaEvmScheme.create` set up by default. Base mainnet joins when it is
-upgraded.
+The middleware registers the 4mica scheme for both and routes each network to its own hosted
+facilitator (`FACILITATOR_URLS`), so a single app can sell on mainnet and testnet at once. An app
+whose routes are all on one network doesn't depend on the other network's facilitator: x402 only
+fails startup when a route's own network has no facilitator it can reach. Passing your own
+`FourMicaFacilitatorClient` replaces both; give it `networks` to limit which networks it serves.
 
 A `price` such as `"$0.10"` resolves to the stablecoin 4mica core lists for the network
 (`GET /core/tokens`), so the advertised `asset` is always one core accepts. Pass
@@ -260,7 +265,9 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 
 ### Paying on a self-hosted core
 
-`FourMicaEvmScheme.create` connects to Base Sepolia up front. A payer always signs
+`FourMicaEvmScheme.create` connects to Base Sepolia and Base mainnet up front. A default
+network whose core can't be reached is skipped with a warning, so a mainnet outage doesn't stop
+testnet payments; a network you name in `networks` or `coreUrls` must connect. A payer always signs
 through a core, since every payment carries the asset's active settlement cycle, which only core
 knows. Pass `coreUrls` to override a network's core API URL and `networks` to limit the
 connections to the ones you use; a resource server can also steer payers with `extra.rpcUrl` in

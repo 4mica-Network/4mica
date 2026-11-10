@@ -1,5 +1,5 @@
-import { cn } from "@4mica/ui";
-import { CopyButton } from "@/components/CopyButton";
+import { CopyButton, cn } from "@4mica/ui";
+import { messages } from "@/i18n";
 import { type CodeLang, highlight } from "@/lib/shiki";
 
 const LANG_LABEL: Record<CodeLang, string> = {
@@ -46,14 +46,21 @@ export async function CodeBlock({
         <span className="truncate text-2xs uppercase tracking-wider opacity-60">
           {label ?? LANG_LABEL[lang]}
         </span>
-        {/* The unhighlighted source, so a paste is runnable code. */}
-        <CopyButton value={code} />
+        <CopyButton
+          className="text-white/50 hover:bg-white/10 hover:text-white/90 data-[copied]:text-white"
+          labels={{
+            copy: messages.integration.copy,
+            copied: messages.integration.copied,
+          }}
+          resetAfterMs={1600}
+          value={code}
+        />
       </div>
 
       <div className="code-surface overflow-x-auto p-4">
         <div
           className={cn(
-            "shiki-code font-mono text-md leading-6",
+            "shiki-code font-mono text-[13px] leading-[1.375rem]",
             showLineNumbers && "shiki-numbered",
           )}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes the source at render time; `html` contains only its own token markup.

@@ -1,4 +1,4 @@
-import { Button, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
 import type { ApiKey } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -23,7 +23,7 @@ import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { SettingsSection } from "@/components/layout";
 import { SecretRevealCard } from "@/components/RevealedSecret";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
@@ -147,7 +147,7 @@ export function SecretKeysSection({ resource }: { resource: ResourceRef }) {
       title={t("appDetail.keys.title")}
       description={t("appDetail.keys.lead")}
     >
-      <SurfaceCard data-testid="secret-keys">
+      <Card data-testid="secret-keys">
         <div className="flex flex-col gap-4">
           {revealed && (
             <SecretRevealCard
@@ -202,23 +202,16 @@ export function SecretKeysSection({ resource }: { resource: ResourceRef }) {
               size="sm"
               intent="invert"
               className="btn-no-lift shrink-0 whitespace-nowrap border border-transparent py-2.5 text-sm leading-5"
-              disabled={!name.trim() || isCreating}
+              loading={isCreating}
+              disabled={!name.trim()}
               data-testid="secret-key-create"
+              icon={<Plus className="h-4 w-4" />}
             >
-              <span className="flex w-full items-center justify-center">
-                {isCreating ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <>
-                    <Plus className="mr-1.5 h-4 w-4" />
-                    {t("appDetail.keys.create")}
-                  </>
-                )}
-              </span>
+              {t("appDetail.keys.create")}
             </Button>
           </form>
         </div>
-      </SurfaceCard>
+      </Card>
     </SettingsSection>
   );
 }

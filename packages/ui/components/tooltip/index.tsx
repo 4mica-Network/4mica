@@ -18,6 +18,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/cn";
+import {
+  clampToViewport,
+  oppositeSide,
+  overflowsSide,
+  type Point,
+  sideOf,
+} from "../../lib/viewport";
 
 type Placement =
   | "top"
@@ -74,6 +81,66 @@ function isNativeElement(el: ReactElement): boolean {
   return typeof el.type === "string";
 }
 
+const BUBBLE_OFFSET = 10;
+
+const flippedPlacement: Record<Placement, Placement> = {
+  top: "bottom",
+  topRight: "bottomRight",
+  topLeft: "bottomLeft",
+  bottom: "top",
+  bottomRight: "topRight",
+  bottomLeft: "topLeft",
+  left: "right",
+  right: "left",
+  center: "center",
+};
+
+function bubblePosition(
+  placement: Placement,
+  rect: DOMRect,
+  tipRect: DOMRect,
+): Point {
+  const offset = BUBBLE_OFFSET;
+  switch (placement) {
+    case "top":
+      return {
+        top: rect.top - tipRect.height - offset,
+        left: rect.left + rect.width / 2 - tipRect.width / 2,
+      };
+    case "topRight":
+      return {
+        top: rect.top - tipRect.height - offset,
+        left: rect.right - tipRect.width,
+      };
+    case "topLeft":
+      return { top: rect.top - tipRect.height - offset, left: rect.left };
+    case "bottom":
+      return {
+        top: rect.bottom + offset,
+        left: rect.left + rect.width / 2 - tipRect.width / 2,
+      };
+    case "bottomRight":
+      return { top: rect.bottom + offset, left: rect.right - tipRect.width };
+    case "bottomLeft":
+      return { top: rect.bottom + offset, left: rect.left };
+    case "left":
+      return {
+        top: rect.top + rect.height / 2 - tipRect.height / 2,
+        left: rect.left - tipRect.width - offset,
+      };
+    case "right":
+      return {
+        top: rect.top + rect.height / 2 - tipRect.height / 2,
+        left: rect.right + offset,
+      };
+    case "center":
+      return {
+        top: rect.top + rect.height / 2 - tipRect.height / 2,
+        left: rect.left + rect.width / 2 - tipRect.width / 2,
+      };
+  }
+}
+
 function TipBubble({
   anchor,
   node,
@@ -103,50 +170,19 @@ function TipBubble({
     if (!anchor || !bubbleRef.current) return;
     const rect = anchor.getBoundingClientRect();
     const tipRect = bubbleRef.current.getBoundingClientRect();
-    const offset = 10;
 
-    let top = 0;
-    let left = 0;
+    let next = bubblePosition(placement, rect, tipRect);
+    const side = sideOf(placement);
 
-    switch (placement) {
-      case "top":
-        top = rect.top - tipRect.height - offset;
-        left = rect.left + rect.width / 2 - tipRect.width / 2;
-        break;
-      case "topRight":
-        top = rect.top - tipRect.height - offset;
-        left = rect.right - tipRect.width;
-        break;
-      case "topLeft":
-        top = rect.top - tipRect.height - offset;
-        left = rect.left;
-        break;
-      case "bottom":
-        top = rect.bottom + offset;
-        left = rect.left + rect.width / 2 - tipRect.width / 2;
-        break;
-      case "bottomRight":
-        top = rect.bottom + offset;
-        left = rect.right - tipRect.width;
-        break;
-      case "bottomLeft":
-        top = rect.bottom + offset;
-        left = rect.left;
-        break;
-      case "left":
-        top = rect.top + rect.height / 2 - tipRect.height / 2;
-        left = rect.left - tipRect.width - offset;
-        break;
-      case "right":
-        top = rect.top + rect.height / 2 - tipRect.height / 2;
-        left = rect.right + offset;
-        break;
-      case "center":
-        top = rect.top + rect.height / 2 - tipRect.height / 2;
-        left = rect.left + rect.width / 2 - tipRect.width / 2;
-        break;
+    if (side && overflowsSide(side, next, tipRect)) {
+      const flipped = flippedPlacement[placement];
+      const alternative = bubblePosition(flipped, rect, tipRect);
+      if (!overflowsSide(oppositeSide[side], alternative, tipRect)) {
+        next = alternative;
+      }
     }
-    setPos({ top, left });
+
+    setPos(clampToViewport(next, tipRect));
   }, [anchor, placement]);
 
   useEffect(() => {

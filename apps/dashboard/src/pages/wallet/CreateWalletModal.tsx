@@ -313,16 +313,14 @@ export function CreateWalletModal({
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
+                loading={isSaving}
                 type="submit"
                 form={formId}
                 disabled={!canSubmit}
-                aria-busy={isSaving}
                 data-testid="create-wallet-submit"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {isSaving ? <Spinner size="sm" /> : t("wallet.create.finish")}
-                </span>
+                {t("wallet.create.finish")}
               </Button>
             ) : (
               <Button

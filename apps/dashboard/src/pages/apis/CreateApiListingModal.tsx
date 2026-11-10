@@ -1,5 +1,5 @@
 import { slugify } from "@4mica/rules";
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createApiListing } from "@stores/apiListing/actions";
 import {
@@ -17,6 +17,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -58,9 +59,8 @@ export function CreateApiListingModal({
       summary: "",
       description: "",
       walletId: "",
-      assetAddress: "",
+      assetAddress: NATIVE_ASSET,
       priceAmount: "",
-      priceCurrency: "USD",
       priceLabel: "",
       url: "",
       method: "GET" as const,
@@ -124,9 +124,8 @@ export function CreateApiListingModal({
         tags: data.tags,
         visibility: data.visibility,
         walletId: blankToNull(data.walletId),
-        assetAddress: blankToNull(data.assetAddress),
+        assetAddress: fromAssetFormValue(data.assetAddress),
         priceAmount: blankToNull(data.priceAmount),
-        priceCurrency: blankToNull(data.priceCurrency),
         priceLabel: blankToNull(data.priceLabel),
       }),
     );
@@ -149,7 +148,8 @@ export function CreateApiListingModal({
   );
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canSubmit = Boolean(name?.trim()) && !isSaving;
+  const hasName = Boolean(name?.trim());
+  const canSubmit = hasName && !isSaving;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (isLastStep) {
@@ -197,33 +197,26 @@ export function CreateApiListingModal({
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
+                loading={isSaving}
                 type="submit"
                 form={formId}
                 disabled={!canSubmit}
-                aria-busy={isSaving}
                 data-testid="create-api-listing-submit"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {isSaving ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    t("apiListing.create.finish")
-                  )}
-                </span>
+                {t("apiListing.create.finish")}
               </Button>
             ) : (
               <Button
                 intent="invert"
                 size="sm"
-                className="btn-no-lift min-w-32"
+                className="btn-no-lift min-w-32 text-sm"
                 type="submit"
                 form={formId}
+                disabled={!hasName}
                 data-testid="create-api-listing-continue"
               >
-                <span className="flex w-full items-center justify-center text-sm">
-                  {t("apiListing.create.continue")}
-                </span>
+                {t("apiListing.create.continue")}
               </Button>
             )}
           </div>

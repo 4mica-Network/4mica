@@ -135,7 +135,7 @@ export const Banner = ({
             intent="ghost"
             size="sm"
             onClick={() => onDismiss(data)}
-            className="p-0 text-ink-muted hover:bg-transparent hover:text-ink-strong hover:underline hover:underline-offset-2"
+            className="p-0 font-normal text-ink-muted text-xs leading-normal hover:bg-transparent hover:text-ink-strong hover:underline hover:underline-offset-2"
             data-testid={`${prefix}-dismiss-button`}
           >
             {dismissLabel}

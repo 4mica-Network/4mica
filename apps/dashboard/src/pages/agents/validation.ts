@@ -1,8 +1,6 @@
 import { isSingleLine } from "@4mica/rules";
 import { PUBLIC_VISIBILITY } from "@stores/shared/type";
 import {
-  addressOrBlank,
-  currencyOrBlank,
   decimalAmount,
   httpsUrl,
   orBlank,
@@ -49,9 +47,8 @@ export const agentSchema = z.object({
   creditLimit: orBlank(decimalAmount(`${NS}.priceInvalid`)),
 
   walletId: orBlank(z.string()),
-  assetAddress: addressOrBlank(`${NS}.assetInvalid`),
+  assetAddress: z.string(),
   priceAmount: orBlank(positiveAmount(NS)),
-  priceCurrency: currencyOrBlank("agent.errors.currencyInvalid"),
   priceLabel: orBlank(
     z
       .string()
@@ -70,13 +67,6 @@ export type AgentValues = z.infer<typeof agentSchema>;
 export const CREATE_STEP_FIELDS = [
   ["name", "slug", "headline", "description"],
   ["network", "payerWalletId", "creditLimit"],
-  [
-    "walletId",
-    "assetAddress",
-    "priceAmount",
-    "priceCurrency",
-    "priceLabel",
-    "endpointUrl",
-  ],
+  ["walletId", "assetAddress", "priceAmount", "priceLabel", "endpointUrl"],
   ["docsUrl", "avatarUrl", "x402Endpoint", "status", "visibility"],
 ] as const satisfies readonly (readonly (keyof AgentValues)[])[];

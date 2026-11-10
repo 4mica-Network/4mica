@@ -1,127 +1,60 @@
-import { isPhoneNumber } from "@4mica/rules";
-import { Button } from "@4mica/ui";
+import { Button, Card } from "@4mica/ui";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { sendEmailVerification, updateAccount } from "@stores/user/actions";
-import {
-  selectIsSectionSaving,
-  selectUser,
-  selectValidationIssues,
-} from "@stores/user/selector";
-import { hasErrors, isEmail } from "@utils/validation";
-import { useMemo } from "react";
+import { updateAccount } from "@stores/user/actions";
+import { selectIsSectionSaving, selectUser } from "@stores/user/selector";
 import { useTranslation } from "react-i18next";
 import { VerifiedBadge } from "@/components/badges";
-import { EditableCard, InstantCard } from "@/components/EditableCard";
-import {
-  FieldRow,
-  Select,
-  SettingRow,
-  SwitchCard,
-  TextInput,
-} from "@/components/form";
-import { SettingsSection, SurfaceCard } from "@/components/layout";
+import { InstantCard } from "@/components/EditableCard";
+import { FieldRow, Select, SettingRow, SwitchCard } from "@/components/form";
+import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
-import { useDraft } from "@/hooks/useDraft";
+import { useConfigOptions, useTimezoneOptions } from "@/hooks/useConfigOptions";
 
-const THEMES = [
-  { title: "Dark", value: "dark" },
-  { title: "Light", value: "light" },
-  { title: "System", value: "system" },
-];
+const THEME_LABELS: Record<string, string> = {
+  dark: "Dark",
+  light: "Light",
+  system: "System",
+};
 
-const LANGUAGES = [
-  { title: "English", value: "en" },
-  { title: "Deutsch", value: "de" },
-  { title: "Français", value: "fr" },
-  { title: "Español", value: "es" },
-];
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  de: "Deutsch",
+  fr: "Français",
+  es: "Español",
+};
 
-const HOMES = [
-  { title: "Overview", value: "overview" },
-  { title: "Balances", value: "balances" },
-  { title: "Transactions", value: "transactions" },
-  { title: "Payments", value: "payments" },
-  { title: "Agents", value: "agents" },
-];
+const HOME_LABELS: Record<string, string> = {
+  overview: "Overview",
+  payments: "Payments",
+  wallet: "Wallet",
+  customers: "Customers",
+  agents: "Agents",
+  apis: "APIs",
+};
 
-const TIMEZONES = [
-  "UTC",
-  "Europe/London",
-  "Europe/Berlin",
-  "America/New_York",
-  "America/Los_Angeles",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Australia/Sydney",
-].map((zone) => ({ title: zone, value: zone }));
+const themeLabel = (value: string) => THEME_LABELS[value] ?? value;
+const languageLabel = (value: string) => LANGUAGE_LABELS[value] ?? value;
+const homeLabel = (value: string) => HOME_LABELS[value] ?? value;
 
 export function AccountSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
-  const issues = useAppSelector(selectValidationIssues);
-  const savingContact = useAppSelector(selectIsSectionSaving("contact"));
+  const languages = useConfigOptions("languages", languageLabel);
+  const themes = useConfigOptions("themes", themeLabel);
+  const homes = useConfigOptions("homes", homeLabel);
+  const timezones = useTimezoneOptions();
   const savingGeneral = useAppSelector(selectIsSectionSaving("general"));
   const savingHome = useAppSelector(selectIsSectionSaving("defaultHome"));
   const savingPrivacy = useAppSelector(selectIsSectionSaving("privacyMode"));
-  const sendingVerification = useAppSelector(
-    selectIsSectionSaving("emailVerification"),
-  );
   // Clerk enforces the second factor, so it is the only honest source for
   // whether one is set up. The dashboard reads it and hands off to Clerk.
   const { user: clerkUser } = useUser();
   const { openUserProfile } = useClerk();
 
-  const contactInitial = useMemo(
-    () => ({
-      email: user?.email ?? "",
-      phoneNumber: user?.phoneNumber ?? "",
-    }),
-    [user],
-  );
-
-  const contact = useDraft(contactInitial);
-
-  const emailValue = contact.draft.email.trim();
-  const phoneValue = contact.draft.phoneNumber.trim();
-  const contactErrors = {
-    email:
-      emailValue === ""
-        ? t("validation.required")
-        : emailValue.length > 255
-          ? t("validation.tooLong", { max: 255 })
-          : !isEmail(emailValue)
-            ? t("validation.email")
-            : undefined,
-    phoneNumber:
-      phoneValue === "" || isPhoneNumber(phoneValue)
-        ? undefined
-        : t("validation.phone"),
-  };
-
   const set = (key: string, value: string | boolean, section = key) =>
     dispatch(updateAccount({ [key]: value }, section));
-
-  const saveContact = () =>
-    dispatch(
-      updateAccount(
-        {
-          ...(contact.changes.email !== undefined
-            ? { email: contact.changes.email.trim().toLowerCase() }
-            : {}),
-          ...(contact.changes.phoneNumber !== undefined
-            ? {
-                phoneNumber:
-                  contact.changes.phoneNumber.trim() === ""
-                    ? null
-                    : contact.changes.phoneNumber.trim(),
-              }
-            : {}),
-        },
-        "contact",
-      ),
-    );
 
   if (!user) {
     return null;
@@ -132,91 +65,7 @@ export function AccountSettings() {
       titleKey="page.settings.account.title"
       descriptionKey="page.settings.account.description"
     >
-      <SettingsSection
-        title={t("settings.account.credentials")}
-        description={t("settings.account.credentialsHint")}
-      >
-        <EditableCard
-          isDirty={contact.isDirty}
-          isInvalid={hasErrors(contactErrors)}
-          isSaving={savingContact}
-          onSave={saveContact}
-          onReset={contact.reset}
-        >
-          <FieldRow
-            title={t("settings.account.email")}
-            description={t("settings.account.emailHint")}
-            htmlFor="account-email"
-            action={
-              <VerifiedBadge
-                verified={user.emailVerified}
-                labels={{
-                  yes: t("settings.verified"),
-                  no: t("settings.unverified"),
-                }}
-              />
-            }
-          >
-            <TextInput
-              id="account-email"
-              inputMode="email"
-              autoComplete="email"
-              type="email"
-              value={contact.draft.email}
-              error={contactErrors.email ?? issues.email}
-              maxLength={255}
-              onChange={(v) => contact.set("email", v)}
-            />
-            {user.pendingEmail ? (
-              <p className="mt-2 text-ink-muted text-xs">
-                {t("settings.account.emailPending", {
-                  email: user.pendingEmail,
-                })}{" "}
-                <button
-                  type="button"
-                  className="font-medium text-ink-strong underline disabled:opacity-50"
-                  disabled={sendingVerification}
-                  onClick={() => dispatch(sendEmailVerification())}
-                >
-                  {t("settings.account.emailPendingResend")}
-                </button>
-              </p>
-            ) : null}
-          </FieldRow>
-
-          <FieldRow
-            title={t("settings.account.phone")}
-            description={t("settings.account.phoneHint")}
-            htmlFor="account-phone"
-            action={
-              <VerifiedBadge
-                verified={user.phoneNumberVerified}
-                labels={{
-                  yes: t("settings.verified"),
-                  no: t("settings.unverified"),
-                }}
-              />
-            }
-          >
-            <TextInput
-              id="account-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              value={contact.draft.phoneNumber}
-              placeholder="+1 555 000 1234"
-              error={contactErrors.phoneNumber ?? issues.phoneNumber}
-              maxLength={20}
-              onChange={(v) => contact.set("phoneNumber", v)}
-            />
-          </FieldRow>
-        </EditableCard>
-      </SettingsSection>
-
-      <SettingsSection
-        title={t("settings.account.general")}
-        description={t("settings.account.generalHint")}
-      >
+      <section className="flex flex-col gap-3">
         <InstantCard isSaving={savingGeneral}>
           <FieldRow
             title={t("settings.account.language")}
@@ -226,7 +75,7 @@ export function AccountSettings() {
             <Select
               id="account-language"
               value={user.language}
-              options={LANGUAGES}
+              options={languages}
               onChange={(v) => set("language", v, "general")}
             />
           </FieldRow>
@@ -239,7 +88,7 @@ export function AccountSettings() {
             <Select
               id="account-timezone"
               value={user.timeZone}
-              options={TIMEZONES}
+              options={timezones}
               hasSearch
               onChange={(v) => set("timeZone", v, "general")}
             />
@@ -253,7 +102,7 @@ export function AccountSettings() {
             <Select
               id="account-app-theme"
               value={user.appTheme}
-              options={THEMES}
+              options={themes}
               onChange={(v) => set("appTheme", v, "general")}
             />
           </FieldRow>
@@ -266,7 +115,7 @@ export function AccountSettings() {
             <Select
               id="account-theme"
               value={user.theme}
-              options={THEMES}
+              options={themes}
               onChange={(v) => set("theme", v, "general")}
             />
           </FieldRow>
@@ -281,12 +130,12 @@ export function AccountSettings() {
             <Select
               id="account-home"
               value={user.defaultHome}
-              options={HOMES}
+              options={homes}
               onChange={(v) => set("defaultHome", v)}
             />
           </SettingRow>
         </InstantCard>
-      </SettingsSection>
+      </section>
 
       <SettingsSection
         title={t("settings.account.security")}
@@ -300,7 +149,7 @@ export function AccountSettings() {
           isSaving={savingPrivacy}
           onToggle={(v) => set("privacyMode", v)}
         />
-        <SurfaceCard className="flex items-center justify-between gap-4">
+        <Card className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium text-ink-strong text-sm">
               {t("settings.account.twoFactor")}
@@ -327,7 +176,7 @@ export function AccountSettings() {
               {t("settings.account.twoFactorManage")}
             </Button>
           </div>
-        </SurfaceCard>
+        </Card>
       </SettingsSection>
     </SettingsPage>
   );

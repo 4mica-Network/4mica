@@ -26,9 +26,7 @@ export function ConfirmAction({
       description={description ?? t("confirm.irreversible")}
       confirmLabel={confirmLabel ?? t("confirm.delete")}
       cancelLabel={t("confirm.cancel")}
-      confirmButtonProps={{
-        className: "bg-danger text-surface-deep hover:bg-danger",
-      }}
+      confirmButtonProps={{ intent: "danger" }}
       onConfirm={onConfirm}
       data-testid={testId}
     >

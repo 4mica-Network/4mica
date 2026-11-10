@@ -17,6 +17,7 @@ import {
   FormTextInput,
   TextInput,
 } from "@/components/form";
+import { PriceField } from "@/components/PriceField";
 import { links } from "@/lib/links";
 import {
   CATEGORY_SUGGESTIONS,
@@ -136,42 +137,13 @@ function PaymentStep({ wallets }: { wallets: Wallet[] }) {
         )}
       </FieldRow>
 
-      <FieldRow
+      <PriceField
+        network={chosenWallet?.network ?? null}
+        idPrefix="api-listing"
         title={t("apiListing.create.fields.price.title")}
         description={t("apiListing.create.fields.price.description")}
-        htmlFor="api-listing-price"
-      >
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <FormTextInput
-              name="priceAmount"
-              inputMode="decimal"
-              placeholder="0.01"
-            />
-          </div>
-          <div className="w-28">
-            <FormTextInput
-              id="api-listing-currency"
-              name="priceCurrency"
-              aria-label={t("form.currency")}
-              format="uppercase"
-              maxLength={16}
-              placeholder="USD"
-            />
-          </div>
-        </div>
-      </FieldRow>
-
-      <FieldRow
-        title={t("apiListing.create.fields.asset.title")}
-        description={t("apiListing.create.fields.asset.description")}
-        htmlFor="api-listing-asset"
-      >
-        <FormTextInput
-          name="assetAddress"
-          placeholder={t("apiListing.create.fields.asset.placeholder")}
-        />
-      </FieldRow>
+        placeholder="0.01"
+      />
 
       <FieldRow
         title={t("apiListing.create.fields.priceLabel.title")}

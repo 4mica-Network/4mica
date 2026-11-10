@@ -25,7 +25,7 @@ export function SupportSection({ profile, resourceName }: SupportSectionProps) {
       : profilePath(profile.username);
 
   return (
-    <section className="flex flex-col gap-1 border-overlay/10 border-t pt-6">
+    <section className="flex flex-col gap-1">
       <h2 className="font-medium text-ink-strong text-sm">
         {messages.support.heading}
       </h2>

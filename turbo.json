@@ -19,6 +19,16 @@
       "dependsOn": ["^build", "^test"],
       "outputs": []
     },
+    "test:e2e": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "passThroughEnv": [
+        "DATABASE_URL",
+        "CLERK_SECRET_KEY",
+        "CLERK_PUBLISHABLE_KEY",
+        "E2E_CLERK_USER_EMAIL"
+      ]
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },

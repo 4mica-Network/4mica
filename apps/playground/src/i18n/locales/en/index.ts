@@ -1,7 +1,7 @@
 export const en = {
   common: {
     brandName: "4Mica",
-    poweredBy: "Powered by 4Mica",
+    poweredBy: "Powered by",
     backToProfile: "Back to profile",
     viewDocs: "View docs",
     openApi: "Open API",
@@ -36,6 +36,19 @@ export const en = {
       "None of your agents are public yet. Publish one to show it here.",
     noApisOwner:
       "None of your APIs are public yet. Publish one to show it here.",
+    actions: "Profile actions",
+    copyLink: "Copy link",
+    share: "Share",
+    linkCopied: "Link copied",
+    shared: "Shared",
+    contact: "Contact",
+    email: "Email",
+    phone: "Phone",
+    copyEmail: "Copy email address",
+    copyPhone: "Copy phone number",
+    emailCopied: "Email copied",
+    phoneCopied: "Phone copied",
+    copyVerifiedEmail: "Copy verified email address",
   },
 
   agent: {
@@ -156,8 +169,6 @@ export const en = {
     installLead: "Add the client packages to your project.",
 
     // API listing
-    apiLead:
-      "Pay per call with credit-backed guarantees. No prepaid balance, no gas on the request path.",
     callTitle: "Call this API",
     callLead:
       "Wrap the fetch you already use. The client answers the 402, signs a guarantee, and retries — you get the response.",
@@ -194,6 +205,44 @@ export const en = {
       "The agent's wallet address is only shown to you, the owner.",
     inactiveAgent:
       "This agent cannot sign payments until it is active. The setup below still applies.",
+  },
+
+  flow: {
+    stepsLabel: "Steps",
+    done: "Done",
+    next: "Next: {{title}}",
+    overview: "Overview",
+    setup: "Set up payment",
+    integrate: "Integrate",
+    reviews: "Reviews",
+    support: "Support",
+    actions: "Page actions",
+  },
+
+  ai: {
+    trigger: "Copy for AI",
+    markdown: "Copy as markdown",
+    prompt: "Copy prompt",
+    copied: "Copied",
+  },
+
+  facts: {
+    network: "Network",
+    asset: "Asset",
+    operator: "Operator",
+    status: "Status",
+    hint: {
+      endpoint: "Where your requests go",
+      network: "Chain the payment settles on",
+      asset: "Token you pay in",
+      pricing: "The seller's note on pricing",
+      payTo: "Wallet that receives each payment",
+      docs: "The seller's own documentation",
+      category: "What kind of API this is",
+      published: "Listed on 4Mica since",
+      operator: "Account that runs this agent",
+      registered: "Registered on 4Mica since",
+    },
   },
 
   payWith: {
@@ -235,14 +284,10 @@ export const en = {
   },
 
   visibility: {
-    public: "Public",
     unlisted: "Unlisted",
     private: "Private",
     unlistedHint: "Reachable by direct link, hidden from your profile.",
     privateHint: "Only visible to you.",
-    errorUnauthorized: "Sign in again to change visibility.",
-    errorNotFound: "This item is no longer available.",
-    errorGeneric: "Could not change visibility. Try again.",
   },
 
   owner: {
@@ -255,13 +300,28 @@ export const en = {
     refreshFailed: "Could not refresh",
   },
 
+  notFound: {
+    code: "Error 404",
+    title: "This page does not exist.",
+    lead: "The link may be broken, or the page may have moved.",
+    handleTitle: "This profile does not exist… yet.",
+    handleLeadBefore: "The username",
+    handleLeadAfter: "is still available.",
+    claimNow: "Claim it now.",
+    claim: "Claim",
+    claimHint: "Create a free account and sell your APIs and agents on 4Mica.",
+    explore: "Explore",
+    docs: "Read the docs",
+    docsHint: "Add 4Mica payments to your APIs and agents.",
+    blog: "Read the blog",
+    blogHint: "Guides, product updates and news from the team.",
+    demo: "Request a demo",
+    demoHint: "See how 4Mica fits your product, with someone from our team.",
+    demoSubject: "Demo request",
+    home: "Or go back home",
+  },
+
   errors: {
-    notFoundTitle: "Nothing here",
-    notFoundLead: "That page does not exist.",
-    profileNotFoundTitle: "@{{username}} is available",
-    profileNotFoundLead:
-      "No one has claimed this handle yet. Create an account to take it.",
-    profileNotFoundAction: "Claim this handle",
     agentNotFound: "That agent is not available.",
     apiNotFound: "That API is not available.",
     genericTitle: "Something went wrong",

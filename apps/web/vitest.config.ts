@@ -19,6 +19,6 @@ export default defineConfig({
       exclude: ["dist/**", "dev-dist/**"],
     },
     include: ["**/*.{test,spec}.[jt]s?(x)"],
-    exclude: [...configDefaults.exclude],
+    exclude: [...configDefaults.exclude, "playwright/**"],
   },
 });

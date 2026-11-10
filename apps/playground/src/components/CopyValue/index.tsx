@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@4mica/ui";
+import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { messages } from "@/i18n";
 
 const RESET_MS = 1600;
@@ -16,32 +16,8 @@ export interface CopyValueProps {
 }
 
 export function CopyValue({ value, label, mono, className }: CopyValueProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard(RESET_MS);
   const reduceMotion = useReducedMotion();
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) {
-        clearTimeout(timer.current);
-      }
-    },
-    [],
-  );
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      return;
-    }
-
-    setCopied(true);
-    if (timer.current) {
-      clearTimeout(timer.current);
-    }
-    timer.current = setTimeout(() => setCopied(false), RESET_MS);
-  };
 
   return (
     <button
@@ -54,7 +30,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
         "group/copy relative -mx-1.5 inline-flex max-w-full items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-overlay/5",
         className,
       )}
-      onClick={copy}
+      onClick={() => copy(value)}
       type="button"
     >
       <span

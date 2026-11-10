@@ -1,5 +1,13 @@
 import type { FastifyPluginCallback } from "fastify";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const { authenticateRequest, getUser, findUnique, upsert, apiKeyFind } =
   vi.hoisted(() => ({
@@ -119,6 +127,10 @@ const loadApp = async (limits: Record<string, string>) => {
 const AUTH = { authorization: "Bearer good" };
 
 describe("rate limiting", () => {
+  beforeAll(async () => {
+    await (await loadApp({})).close();
+  }, 30_000);
+
   beforeEach(() => {
     for (const m of [authenticateRequest, getUser, findUnique, upsert]) {
       m.mockReset();

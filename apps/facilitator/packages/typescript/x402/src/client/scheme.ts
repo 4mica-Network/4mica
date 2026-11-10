@@ -30,6 +30,8 @@ export interface FourMicaEvmSchemeClientOptions {
   /**
    * Networks to connect to up front. Defaults to `SUPPORTED_NETWORKS` plus the
    * keys of `coreUrls`. Any other network connects lazily on its first payment.
+   * A network named here or in `coreUrls` must connect, or `create` throws; a
+   * default network that can't connect is skipped with a warning.
    */
   networks?: Network[]
 }
@@ -96,16 +98,27 @@ export class FourMicaEvmScheme implements SchemeNetworkClient {
     options: FourMicaEvmSchemeClientOptions = {}
   ): Promise<FourMicaEvmScheme> {
     const coreUrls = options.coreUrls ?? {}
-    const networks = options.networks ?? [
-      ...SUPPORTED_NETWORKS,
-      ...(Object.keys(coreUrls) as Network[]),
-    ]
+    const required = new Set(options.networks ?? (Object.keys(coreUrls) as Network[]))
+    const networks = new Set(options.networks ?? [...SUPPORTED_NETWORKS, ...required])
     const scheme = new FourMicaEvmScheme(signer, coreUrls)
 
-    for (const network of new Set(networks)) {
-      const rpcUrl = scheme.coreUrl(network)
-      if (rpcUrl) await scheme.payerFor(rpcUrl)
-    }
+    // One hosted core being down must not stop payments on the others, so a
+    // default network that fails to connect is skipped rather than fatal.
+    await Promise.all(
+      [...networks].map(async (network) => {
+        const rpcUrl = scheme.coreUrl(network)
+        if (!rpcUrl) return
+        try {
+          await scheme.payerFor(rpcUrl)
+        } catch (error) {
+          if (required.has(network)) throw error
+          console.warn(
+            `[4mica] could not connect to core for ${network} (${rpcUrl}); ` +
+              `payments on it are skipped until the scheme is recreated: ${error}`
+          )
+        }
+      })
+    )
 
     return scheme
   }

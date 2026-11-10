@@ -15,6 +15,12 @@ import {
   focusableWithin,
   LAYER_ATTRIBUTE,
 } from "../../lib/focusable";
+import {
+  clampToViewport,
+  oppositeSide,
+  sideOf,
+  spaceOnSide,
+} from "../../lib/viewport";
 
 export type Placement =
   | "top"
@@ -131,38 +137,23 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         const dropdownHeight =
           dropdownRect.height || dropdown.offsetHeight || dropdown.scrollHeight;
 
-        const availableTop = rect.top - DEFAULT_FLIP_EDGE_PADDING;
-        const availableBottom =
-          window.innerHeight - rect.bottom - DEFAULT_FLIP_EDGE_PADDING;
-        const availableLeft = rect.left - DEFAULT_FLIP_EDGE_PADDING;
-        const availableRight =
-          window.innerWidth - rect.right - DEFAULT_FLIP_EDGE_PADDING;
-
-        const requiredVerticalSpace = dropdownHeight + placementOffsetY;
-        const requiredHorizontalSpace =
-          (matchAnchorWidth ? rect.width : dropdownWidth) + placementOffsetX;
-
-        const isTopPlacement =
-          placement === "top" ||
-          placement === "topLeft" ||
-          placement === "topRight";
-        const isBottomPlacement =
-          placement === "bottom" ||
-          placement === "bottomLeft" ||
-          placement === "bottomRight";
-        const isLeftPlacement = placement === "left";
-        const isRightPlacement = placement === "right";
-
         let resolvedPlacement = placement;
+        const side = sideOf(placement);
 
-        if (flipOnOverflow) {
-          const shouldFlip =
-            (isTopPlacement && availableTop < requiredVerticalSpace) ||
-            (isBottomPlacement && availableBottom < requiredVerticalSpace) ||
-            (isLeftPlacement && availableLeft < requiredHorizontalSpace) ||
-            (isRightPlacement && availableRight < requiredHorizontalSpace);
+        if (flipOnOverflow && side) {
+          const required =
+            side === "top" || side === "bottom"
+              ? dropdownHeight + placementOffsetY
+              : (matchAnchorWidth ? rect.width : dropdownWidth) +
+                placementOffsetX;
+          const available = spaceOnSide(side, rect, DEFAULT_FLIP_EDGE_PADDING);
+          const opposite = spaceOnSide(
+            oppositeSide[side],
+            rect,
+            DEFAULT_FLIP_EDGE_PADDING,
+          );
 
-          if (shouldFlip) {
+          if (available < required && opposite > available) {
             resolvedPlacement = inversePlacementMap[placement];
           }
         }
@@ -206,7 +197,12 @@ export const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
             break;
         }
 
-        setPosition({ top, left });
+        setPosition(
+          clampToViewport(
+            { top, left },
+            { width: dropdownWidth, height: dropdownHeight },
+          ),
+        );
         setReady(true);
       }
 

@@ -1,5 +1,5 @@
 import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Button, Modal, Spinner } from "@4mica/ui";
+import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -14,7 +14,7 @@ import {
 } from "@stores/wallet/selector";
 import type { Wallet } from "@stores/wallet/type";
 import { useEffect, useId } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import {
   FieldRow,
@@ -59,7 +59,8 @@ export function EditWalletModal({
     },
   });
 
-  const { handleSubmit, reset, setError } = form;
+  const { handleSubmit, reset, setError, control } = form;
+  const label = useWatch({ control, name: "label" });
   const formId = useId();
 
   useEffect(() => {
@@ -124,16 +125,14 @@ export function EditWalletModal({
           <Button
             intent="invert"
             size="sm"
-            className="btn-no-lift min-w-24"
+            className="btn-no-lift min-w-24 text-sm"
+            loading={isSaving}
             type="submit"
             form={formId}
-            disabled={isSaving}
-            aria-busy={isSaving}
+            disabled={!label?.trim()}
             data-testid="edit-wallet-submit"
           >
-            <span className="flex w-full items-center justify-center text-sm">
-              {isSaving ? <Spinner size="sm" /> : t("wallet.edit.save")}
-            </span>
+            {t("wallet.edit.save")}
           </Button>
         </div>
       }

@@ -27,41 +27,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Stacked by default: bottom border only, square bottom corners. */
 export const Default: Story = {};
 
-/** Passing `onClick` swaps the `<div>` for a `<button>` with a hover state. */
 export const Clickable: Story = { args: { onClick: fn() } };
 
-/** Add `border rounded-lg` for a card that stands on its own. */
-export const Standalone: Story = {
-  args: { className: "rounded-lg border border-overlay/10" },
-};
-
-/** A run of cards reads as one surface — that is what the default style is for. */
-export const Stacked: Story = {
-  render: (args) => (
-    <div className="flex flex-col rounded-lg border border-overlay/10">
-      <Card {...args} onClick={fn()}>
-        <p className="font-medium text-ink-strong text-sm">Acme Robotics</p>
-        <p className="text-ink-muted text-sm">Credit line · $50,000</p>
-      </Card>
-      <Card {...args} onClick={fn()}>
-        <p className="font-medium text-ink-strong text-sm">Northwind Freight</p>
-        <p className="text-ink-muted text-sm">Credit line · $12,500</p>
-      </Card>
-      <Card {...args} onClick={fn()} className="border-b-0">
-        <p className="font-medium text-ink-strong text-sm">Globex Labs</p>
-        <p className="text-ink-muted text-sm">Credit line · $8,000</p>
-      </Card>
-    </div>
-  ),
-};
-
 export const WithRichContent: Story = {
-  args: { className: "rounded-lg border border-overlay/10" },
   render: (args) => (
-    <Card {...args}>
+    <Card {...args} className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
         <p className="font-medium text-ink-strong text-sm">INV-2048</p>
         <Tag variant="success" size="sm">

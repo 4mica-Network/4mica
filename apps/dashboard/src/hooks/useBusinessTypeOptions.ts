@@ -1,18 +1,16 @@
 import type { Option } from "@4mica/ui";
-import { BUSINESS_TYPE } from "@stores/user/type";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useTranslatedConfigOptions } from "./useConfigOptions";
 
 export const useBusinessTypeOptions = (): Option[] => {
   const { t } = useTranslation();
+  const types = useTranslatedConfigOptions(
+    "businessTypes",
+    "settings.business.types",
+  );
   return useMemo(
-    () => [
-      { title: t("settings.business.types.none"), value: "" },
-      ...Object.values(BUSINESS_TYPE).map((value) => ({
-        title: t(`settings.business.types.${value}`),
-        value,
-      })),
-    ],
-    [t],
+    () => [{ title: t("settings.business.types.none"), value: "" }, ...types],
+    [t, types],
   );
 };

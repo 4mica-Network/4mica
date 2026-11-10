@@ -11,6 +11,8 @@
     "lint": "biome check .",
     "test": "TEST=1 vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "knip": "knip",
@@ -40,6 +42,7 @@
     "tailwindcss-animate": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
@@ -51,6 +54,7 @@
     "cross-env": "catalog:",
     "jsdom": "catalog:",
     "postcss": "catalog:",
+    "serve": "catalog:",
     "tailwindcss": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

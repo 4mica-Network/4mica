@@ -165,3 +165,9 @@ packages/db/src/generated/
 # Rust
 target/
 **/*.rs.bk
+
+playwright-report/
+test-results/
+blob-report/
+**/playwright/.clerk/
+.playwright-cli/

@@ -1,4 +1,4 @@
-import { Button, EmptyState, InputField, Tag } from "@4mica/ui";
+import { Button, EmptyState, InputField, Stars, Tag } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { replyToReview, trustPendingKeys } from "@stores/trust/actions";
 import {
@@ -15,21 +15,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
-
-const Stars = ({ value }: { value: number }) => (
-  <span className="inline-flex items-center gap-0.5">
-    {[1, 2, 3, 4, 5].map((score) => (
-      <Star
-        className={
-          score <= value
-            ? "h-3.5 w-3.5 fill-warning text-warning"
-            : "h-3.5 w-3.5 fill-transparent text-ink-subtle/50"
-        }
-        key={score}
-      />
-    ))}
-  </span>
-);
 
 function ReviewRow({
   review,

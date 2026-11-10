@@ -1,6 +1,7 @@
 import { isReservedSegment } from "@4mica/url";
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+import { PATHNAME_HEADER } from "@/utils/pathnameHeader";
 
 /**
  * Runs on the Edge runtime.
@@ -21,6 +22,12 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_-]{2,64}$/;
 const rest = (segments: string[]): string =>
   segments.length > 1 ? `/${segments.slice(1).join("/")}` : "";
 
+const passThrough = (request: NextRequest) => {
+  const headers = new Headers(request.headers);
+  headers.set(PATHNAME_HEADER, request.nextUrl.pathname);
+  return NextResponse.next({ request: { headers } });
+};
+
 export default clerkMiddleware(async (_auth, request) => {
   // No auth.protect() anywhere: every route here is public. Clerk only
   // populates the session so a page can tell whether the viewer is the owner.
@@ -28,7 +35,7 @@ export default clerkMiddleware(async (_auth, request) => {
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   const [first] = segments;
@@ -36,7 +43,7 @@ export default clerkMiddleware(async (_auth, request) => {
   // Owned by apps/web or by this app's own literal routes. In production nginx
   // never sends these here; in dev they fall through to a 404.
   if (isReservedSegment(first)) {
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Compatibility with the dashboard's older /@handle links, and with anyone
@@ -50,7 +57,7 @@ export default clerkMiddleware(async (_auth, request) => {
       return NextResponse.redirect(url, 308);
     }
 
-    return NextResponse.next();
+    return passThrough(request);
   }
 
   // Handles are stored lowercase, so /MO and /mo must not be two URLs.
@@ -60,7 +67,7 @@ export default clerkMiddleware(async (_auth, request) => {
     return NextResponse.redirect(url, 308);
   }
 
-  return NextResponse.next();
+  return passThrough(request);
 });
 
 export const config = {

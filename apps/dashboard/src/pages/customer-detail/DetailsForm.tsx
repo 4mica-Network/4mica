@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerPendingKeys, updateCustomer } from "@stores/customer/actions";
 import {
@@ -148,14 +148,12 @@ export function DetailsForm({ customer }: { customer: Customer }) {
               type="submit"
               intent="invert"
               size="sm"
-              className="btn-no-lift w-20"
-              disabled={!isDirty || isSaving}
-              aria-busy={isSaving}
+              className="btn-no-lift w-20 text-sm"
+              loading={isSaving}
+              disabled={!isDirty}
               data-testid="customer-details-save"
             >
-              <span className="flex w-full items-center justify-center text-sm">
-                {isSaving ? <Spinner size="sm" /> : t("settings.update")}
-              </span>
+              {t("settings.update")}
             </Button>
           </SectionFooter>
         </div>

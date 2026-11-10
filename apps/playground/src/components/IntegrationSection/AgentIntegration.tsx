@@ -1,182 +1,178 @@
 import { Tag } from "@4mica/ui";
 import { CodeBlock } from "@/components/CodeBlock";
 import { CodeTabs } from "@/components/CodeTabs";
-import { Disclosure, DisclosureList } from "@/components/Disclosure";
-import { RevealLink } from "@/components/RevealLink";
+import type { FlowStep } from "@/components/StepFlow";
 import { messages } from "@/i18n";
 import {
   buildAgentBuyerSnippets,
   buildAgentSnippets,
 } from "@/lib/snippets/agent";
-import { links } from "@/services/links";
 import type { PublicAgent } from "@/types";
+import { StepLead } from "./StepLead";
 
-export interface AgentIntegrationProps {
-  agent: PublicAgent;
-  isOwner: boolean;
-}
-
-export function AgentIntegration({ agent, isOwner }: AgentIntegrationProps) {
+export function buildAgentBuyerSteps(
+  agent: PublicAgent,
+  isOwner: boolean,
+): FlowStep[] {
   const buyer = buildAgentBuyerSnippets(agent);
-  const runner = buildAgentSnippets(agent);
+  const inactive = agent.status !== "ACTIVE" && (
+    <Tag className="self-start" size="sm" variant="warning">
+      {messages.integration.inactiveAgent}
+    </Tag>
+  );
 
-  return (
-    <section className="flex flex-col gap-10">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
-              {messages.integration.agentBuyerHeading}
-            </h2>
-            {agent.status !== "ACTIVE" && (
-              <Tag size="sm" variant="warning">
-                {messages.integration.inactiveAgent}
-              </Tag>
-            )}
-          </div>
-          <p className="text-ink-muted text-sm">
-            {buyer
-              ? messages.integration.agentBuyerLead
-              : isOwner
+  if (!buyer) {
+    return [
+      {
+        id: "call",
+        title: messages.integration.agentCallTitle,
+        content: (
+          <>
+            {inactive}
+            <StepLead>
+              {isOwner
                 ? messages.integration.agentNotSellableOwner
                 : messages.integration.agentNotSellable}
-          </p>
-        </div>
+            </StepLead>
+          </>
+        ),
+      },
+    ];
+  }
 
-        {buyer && (
-          <DisclosureList>
-            <Disclosure
-              index={1}
-              lead={messages.integration.installLead}
-              title={messages.integration.installTitle}
-            >
-              <CodeBlock code={buyer.install} label="Terminal" lang="bash" />
-            </Disclosure>
+  return [
+    {
+      id: "install",
+      title: messages.integration.installTitle,
+      content: (
+        <>
+          {inactive}
+          <StepLead>{messages.integration.agentBuyerLead}</StepLead>
+          <StepLead>{messages.integration.installLead}</StepLead>
+          <CodeBlock code={buyer.install} label="Terminal" lang="bash" />
+        </>
+      ),
+    },
+    {
+      id: "call",
+      title: messages.integration.agentCallTitle,
+      content: (
+        <>
+          {inactive}
+          <StepLead>{messages.integration.agentCallLead}</StepLead>
+          <CodeTabs
+            tabs={[
+              {
+                id: "typescript",
+                label: "TypeScript",
+                content: (
+                  <CodeBlock
+                    code={buyer.typescript}
+                    lang="typescript"
+                    showLineNumbers
+                  />
+                ),
+              },
+              {
+                id: "python",
+                label: "Python",
+                content: (
+                  <CodeBlock
+                    code={buyer.python}
+                    lang="python"
+                    showLineNumbers
+                  />
+                ),
+              },
+              {
+                id: "curl",
+                label: "cURL",
+                content: (
+                  <CodeBlock
+                    code={buyer.curl}
+                    label="Wire format"
+                    lang="bash"
+                  />
+                ),
+              },
+            ]}
+          />
+        </>
+      ),
+    },
+    {
+      id: "receipt",
+      title: messages.integration.receiptTitle,
+      content: (
+        <>
+          <StepLead>{messages.integration.receiptLead}</StepLead>
+          <CodeBlock code={buyer.receipt} lang="typescript" showLineNumbers />
+        </>
+      ),
+    },
+  ];
+}
 
-            <Disclosure
-              index={2}
-              lead={messages.integration.agentCallLead}
-              title={messages.integration.agentCallTitle}
-            >
-              <CodeTabs
-                tabs={[
-                  {
-                    id: "typescript",
-                    label: "TypeScript",
-                    content: (
-                      <CodeBlock
-                        code={buyer.typescript}
-                        lang="typescript"
-                        showLineNumbers
-                      />
-                    ),
-                  },
-                  {
-                    id: "python",
-                    label: "Python",
-                    content: (
-                      <CodeBlock
-                        code={buyer.python}
-                        lang="python"
-                        showLineNumbers
-                      />
-                    ),
-                  },
-                  {
-                    id: "curl",
-                    label: "cURL",
-                    content: (
-                      <CodeBlock
-                        code={buyer.curl}
-                        label="Wire format"
-                        lang="bash"
-                      />
-                    ),
-                  },
-                ]}
-              />
-            </Disclosure>
+export function buildAgentRunSteps(
+  agent: PublicAgent,
+  isOwner: boolean,
+): FlowStep[] {
+  const runner = buildAgentSnippets(agent);
 
-            <Disclosure
-              index={3}
-              lead={messages.integration.receiptLead}
-              title={messages.integration.receiptTitle}
-            >
-              <CodeBlock
-                code={buyer.receipt}
-                lang="typescript"
-                showLineNumbers
-              />
-            </Disclosure>
-          </DisclosureList>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-semibold text-ink-strong text-lg tracking-tight">
-            {messages.integration.agentRunHeading}
-          </h2>
-          <p className="text-ink-muted text-sm">
-            {messages.integration.agentLead}
-          </p>
-        </div>
-
-        <DisclosureList>
-          <Disclosure
-            index={1}
-            lead={messages.integration.installLead}
-            title={messages.integration.installTitle}
-          >
-            <CodeBlock code={runner.install} label="Terminal" lang="bash" />
-          </Disclosure>
-
-          <Disclosure
-            index={2}
-            lead={messages.integration.payLead}
-            title={messages.integration.payTitle}
-          >
-            <CodeBlock
-              code={runner.typescript}
-              lang="typescript"
-              showLineNumbers
-            />
-            {isOwner && (
-              <p className="pt-2 text-ink-subtle text-xs">
-                {messages.integration.walletOwnerOnly}
-              </p>
-            )}
-          </Disclosure>
-
-          <Disclosure
-            index={3}
-            lead={messages.integration.collateralLead}
-            title={messages.integration.collateralTitle}
-          >
-            <CodeBlock
-              code={runner.collateral}
-              lang="typescript"
-              showLineNumbers
-            />
-          </Disclosure>
-
-          <Disclosure
-            index={4}
-            lead={messages.integration.receiptLead}
-            title={messages.integration.receiptTitle}
-          >
-            <CodeBlock
-              code={runner.receipt}
-              lang="typescript"
-              showLineNumbers
-            />
-          </Disclosure>
-        </DisclosureList>
-      </div>
-
-      <RevealLink className="self-start" external href={links.docs}>
-        {messages.integration.viewDocs}
-      </RevealLink>
-    </section>
-  );
+  return [
+    {
+      id: "run-install",
+      title: messages.integration.installTitle,
+      content: (
+        <>
+          <StepLead>{messages.integration.agentLead}</StepLead>
+          <StepLead>{messages.integration.installLead}</StepLead>
+          <CodeBlock code={runner.install} label="Terminal" lang="bash" />
+        </>
+      ),
+    },
+    {
+      id: "run-pay",
+      title: messages.integration.payTitle,
+      content: (
+        <>
+          <StepLead>{messages.integration.payLead}</StepLead>
+          <CodeBlock
+            code={runner.typescript}
+            lang="typescript"
+            showLineNumbers
+          />
+          {isOwner && (
+            <p className="text-ink-muted text-xs">
+              {messages.integration.walletOwnerOnly}
+            </p>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "run-collateral",
+      title: messages.integration.collateralTitle,
+      content: (
+        <>
+          <StepLead>{messages.integration.collateralLead}</StepLead>
+          <CodeBlock
+            code={runner.collateral}
+            lang="typescript"
+            showLineNumbers
+          />
+        </>
+      ),
+    },
+    {
+      id: "run-receipt",
+      title: messages.integration.receiptTitle,
+      content: (
+        <>
+          <StepLead>{messages.integration.receiptLead}</StepLead>
+          <CodeBlock code={runner.receipt} lang="typescript" showLineNumbers />
+        </>
+      ),
+    },
+  ];
 }

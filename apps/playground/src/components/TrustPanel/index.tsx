@@ -1,7 +1,5 @@
-import { Tag } from "@4mica/ui";
+import { EmptyState, Stars, Tag } from "@4mica/ui";
 import { BadgeCheck, ShieldQuestion } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
-import { Stars } from "@/components/Stars";
 import { messages, t } from "@/i18n";
 import { RATING_MAX, type TrustSummary } from "@/schema/trust";
 
@@ -71,7 +69,9 @@ export function TrustPanel({ summary, policy, publishedAt }: TrustPanelProps) {
         <EmptyState
           description={messages.trust.noRatings}
           icon={<ShieldQuestion className="h-4 w-4" />}
+          size="sm"
           title={messages.trust.noRatingsTitle}
+          variant="dashed"
         />
       ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
@@ -83,7 +83,7 @@ export function TrustPanel({ summary, policy, publishedAt }: TrustPanelProps) {
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Stars value={ratingAverage ?? 0} />
+            <Stars max={RATING_MAX} value={ratingAverage ?? 0} />
             <span className="text-ink-muted text-sm">
               {t(
                 ratingCount === 1
