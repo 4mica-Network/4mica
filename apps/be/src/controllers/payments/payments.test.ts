@@ -1404,6 +1404,16 @@ describe("payment routes", () => {
       expect(res.statusCode).toBe(201);
     });
 
+    it("stores the guaranteed amount in display units when it was reported in base units", async () => {
+      const res = await report({
+        ...(await signedReceipt({ amount: 10_000_000_000_000_000n })),
+        amount: "10000000000000000",
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(payment.create.mock.calls[0][0].data.amount).toBe("0.01");
+    });
+
     it("reads an ERC-20's decimals from core to check a display amount", async () => {
       const res = await report({
         ...(await signedReceipt({ asset: CHECKSUMMED, amount: 1_500_000n })),

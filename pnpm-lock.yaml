@@ -1151,6 +1151,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.7(react@19.2.7)
+      viem:
+        specifier: 'catalog:'
+        version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
     devDependencies:
       '@4mica/tailwind-config':
         specifier: workspace:*

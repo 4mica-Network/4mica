@@ -54,6 +54,7 @@ const connectFetch = async (): Promise<typeof fetch> => {
   // refusals a payer can fix, such as core asking for a checkpoint.
   return wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [{ network, client: scheme }],
+    spendControls: { allowedAssets: [{ network, asset: zeroAddress }] },
   });
 };
 

@@ -1,4 +1,4 @@
-import { NETWORKS } from "@4mica/sdk";
+import { NETWORKS, RpcProxy, resolveNetworkRpcUrl } from "@4mica/sdk";
 import { createAppClient, fromAppNetwork } from "@4mica/sdk/app";
 import {
   FourMicaEvmScheme,
@@ -7,10 +7,30 @@ import {
   x402ResourceServer,
 } from "@4mica/x402/server";
 import type { HTTPTransportContext } from "@x402/core/server";
+import { formatUnits, parseUnits } from "viem";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const NATIVE_DECIMALS = 18;
 
 export const PRODUCT_PATH = "/insight";
+
+const decimalsOf = async (network: string, asset: string | null) => {
+  if (!asset || asset === ZERO_ADDRESS) {
+    return NATIVE_DECIMALS;
+  }
+  const coreUrl = process.env["4MICA_RPC_URL"] ?? resolveNetworkRpcUrl(network);
+  if (!coreUrl) {
+    throw new Error(`No 4Mica core URL known for ${network}`);
+  }
+  const { tokens } = await new RpcProxy(coreUrl).getSupportedTokens();
+  const token = tokens.find(
+    (entry) => entry.address.toLowerCase() === asset.toLowerCase(),
+  );
+  if (token?.decimals === undefined) {
+    throw new Error(`4Mica core lists no decimals for ${asset} on ${network}`);
+  }
+  return token.decimals;
+};
 
 const connect = async () => {
   const apiKey = process.env.FOURMICA_API_KEY;
@@ -34,6 +54,8 @@ const connect = async () => {
   // x402 names networks by CAIP-2 id, such as eip155:84532.
   const network = NETWORKS[fromAppNetwork(listing.network)]
     .caip2 as `${string}:${string}`;
+  const decimals = await decimalsOf(network, asset);
+  const amount = parseUnits(listing.priceAmount, decimals).toString();
 
   const facilitator = new FourMicaFacilitatorClient(
     process.env.FACILITATOR_URL
@@ -62,7 +84,7 @@ const connect = async () => {
           recipientAddress: payTo,
           network,
           assetAddress: asset,
-          amount: paid.amount,
+          amount: formatUnits(BigInt(paid.amount), decimals),
           guaranteeClaims: receipt?.receipt,
           guaranteeSignature: receipt?.signature,
           resource: resource ?? `http://localhost:3010${PRODUCT_PATH}`,
@@ -75,7 +97,7 @@ const connect = async () => {
     [`GET ${PRODUCT_PATH}`]: {
       accepts: {
         scheme: "4mica-credit",
-        price: { amount: listing.priceAmount, asset: asset ?? ZERO_ADDRESS },
+        price: { amount, asset: asset ?? ZERO_ADDRESS },
         network,
         payTo,
       },

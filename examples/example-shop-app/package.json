@@ -18,7 +18,8 @@
     "lucide-react": "catalog:",
     "next": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "viem": "catalog:"
   },
   "devDependencies": {
     "@4mica/tailwind-config": "workspace:*",
