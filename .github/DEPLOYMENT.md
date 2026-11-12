@@ -47,6 +47,9 @@ it on a **private network address** between the two machines. It defaults to
 `127.0.0.1`, which fails closed — the deploy still succeeds and only the apex
 domain breaks. Never set it to `0.0.0.0`: `playground` holds Clerk credentials
 and a database connection, and there is no authentication in front of it.
+Docker-published ports bypass `ufw`, so restrict the port to Box A with
+[`infra/firewall/playground-edge-only.sh`](../infra/firewall/playground-edge-only.sh)
+(see [its README](../infra/firewall/README.md)).
 
 **Postgres is external to the stacks.** `apps/be/docker-compose.yml` bundles a
 `postgres` service, but that file is local-dev only; production uses
