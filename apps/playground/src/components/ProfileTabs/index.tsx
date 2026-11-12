@@ -2,8 +2,9 @@
 
 import { cn } from "@4mica/ui";
 import { m, useReducedMotion } from "framer-motion";
-import { type ReactNode, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { messages } from "@/i18n";
+import { nextTabIndex } from "@/utils/tabKeys";
 
 export interface ProfileTabsProps {
   agentCount: number;
@@ -13,6 +14,9 @@ export interface ProfileTabsProps {
 }
 
 type TabId = "agents" | "apis";
+
+const tabId = (id: TabId) => `profile-tab-${id}`;
+const panelId = (id: TabId) => `profile-panel-${id}`;
 
 export function ProfileTabs({
   agentCount,
@@ -24,15 +28,39 @@ export function ProfileTabs({
   const reduceMotion = useReducedMotion();
 
   const tabs = [
-    { id: "agents", label: messages.profile.agentsHeading, count: agentCount },
-    { id: "apis", label: messages.profile.apisHeading, count: apiCount },
+    {
+      id: "agents",
+      label: messages.profile.agentsHeading,
+      count: agentCount,
+      content: agents,
+    },
+    {
+      id: "apis",
+      label: messages.profile.apisHeading,
+      count: apiCount,
+      content: apis,
+    },
   ] as const;
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const current = tabs.findIndex((tab) => tab.id === active);
+    const next = nextTabIndex(event.key, current, tabs.length);
+    const target = next === null ? undefined : tabs[next];
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    setActive(target.id);
+    document.getElementById(tabId(target.id))?.focus();
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 flex h-14 shrink-0 items-center border-overlay/10 border-b bg-surface-deep px-4 md:static md:h-12 md:bg-transparent md:px-2">
         <div
+          aria-label={messages.profile.tabsLabel}
           className="flex w-full items-center gap-0.5 rounded-lg border border-overlay/6 p-0.5 md:inline-flex md:w-auto md:rounded-md"
+          onKeyDown={onKeyDown}
           role="tablist"
         >
           {tabs.map((tab) => {
@@ -40,18 +68,19 @@ export function ProfileTabs({
 
             return (
               <button
-                aria-controls={`profile-panel-${tab.id}`}
+                aria-controls={panelId(tab.id)}
                 aria-selected={selected}
                 className={cn(
-                  "relative inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 md:h-6 md:flex-none md:justify-start md:rounded md:text-xs",
+                  "relative inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-sm transition-colors md:h-6 md:flex-none md:justify-start md:rounded md:text-xs",
                   selected
                     ? "text-ink-body"
                     : "text-ink-muted hover:text-ink-body",
                 )}
-                id={`profile-tab-${tab.id}`}
+                id={tabId(tab.id)}
                 key={tab.id}
                 onClick={() => setActive(tab.id)}
                 role="tab"
+                tabIndex={selected ? 0 : -1}
                 type="button"
               >
                 {selected && (
@@ -76,14 +105,18 @@ export function ProfileTabs({
         </div>
       </div>
 
-      <div
-        aria-labelledby={`profile-tab-${active}`}
-        className="flex flex-1 flex-col md:min-h-0 md:overflow-y-auto"
-        id={`profile-panel-${active}`}
-        role="tabpanel"
-      >
-        {active === "agents" ? agents : apis}
-      </div>
+      {tabs.map((tab) => (
+        <div
+          aria-labelledby={tabId(tab.id)}
+          className="focus-inset flex flex-1 flex-col md:min-h-0 md:overflow-y-auto"
+          hidden={tab.id !== active}
+          id={panelId(tab.id)}
+          key={tab.id}
+          role="tabpanel"
+        >
+          {tab.content}
+        </div>
+      ))}
     </div>
   );
 }

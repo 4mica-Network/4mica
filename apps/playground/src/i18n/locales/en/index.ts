@@ -30,6 +30,7 @@ export const en = {
     verifiedHint: "This account has been verified by 4Mica.",
     agentsHeading: "Agents",
     apisHeading: "APIs",
+    tabsLabel: "Listings",
     noAgentsTitle: "No agents yet",
     noApisTitle: "No APIs yet",
     noAgents: "No published agents yet.",
@@ -166,6 +167,7 @@ export const en = {
     heading: "Integration",
     copy: "Copy",
     copied: "Copied",
+    languageTabs: "Code language",
     viewDocs: "Read the full integration guide",
 
     installTitle: "Install the SDK",
