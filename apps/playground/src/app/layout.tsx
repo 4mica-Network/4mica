@@ -1,4 +1,3 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { MotionProvider } from "@/components/MotionProvider";
@@ -46,17 +45,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
         className={`${fontVariables} min-h-dvh bg-surface-deep text-ink-body antialiased`}
       >
-        {/*
-          ClerkProvider is a client component, so wrapping <html> would put the
-          document — and the theme script in <head> — inside a client tree,
-          where React never executes a script tag. It only has to be above the
-          components that use Clerk, which all live in children.
-        */}
-        <ClerkProvider
-          publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        >
-          <MotionProvider>{children}</MotionProvider>
-        </ClerkProvider>
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );
