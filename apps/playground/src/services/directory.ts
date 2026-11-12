@@ -90,7 +90,7 @@ export const listDirectory = cache(async (): Promise<DirectoryEntry[]> => {
 export const listProfileHandles = cache(
   async (): Promise<{ username: string; updatedAt: Date }[]> => {
     const rows = await prisma.user.findMany({
-      where: RENDERABLE_OWNER,
+      where: { ...RENDERABLE_OWNER, allowSEOIndexing: true },
       select: { username: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
       take: DIRECTORY_LIMIT,

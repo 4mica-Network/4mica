@@ -1,13 +1,16 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isReservedSegment, reservedSegments } from "@4mica/url";
-import { describe, expect, it } from "vitest";
-import { parseEnv, parsePublicEnv } from "@/env";
+import { describe, expect, it, vi } from "vitest";
+import { parsePublicEnv } from "@/env";
+import { parseEnv } from "@/env.server";
 import { parseIdOrSlug, parseUsername } from "@/schema/params";
 // The pure rules module, not @/services/profile — that one imports server-only,
 // Prisma and Clerk, none of which belong in a unit test.
 import { isProfileRenderable, toPublicProfile } from "@/services/profile-rules";
 import { safeBrandColor } from "@/utils/brandColor";
+
+vi.mock("server-only", () => ({}));
 
 const VALID_ENV = {
   DATABASE_URL: "postgresql://u:p@127.0.0.1:5433/db?schema=public",

@@ -14,7 +14,6 @@ export async function GET() {
 
   const body = {
     status: db === "ok" ? "ok" : "degraded",
-    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     db,
   };
