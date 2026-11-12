@@ -102,6 +102,7 @@ export const en = {
     ratingCountOther: "{{count}} ratings",
     verifiedCount: "{{count}} from verified buyers",
     verifiedPurchase: "Verified purchase",
+    anonymousReviewer: "A 4Mica user",
     hasVerifiedBuyers: "Paid buyers have rated this",
     listedSince: "Listed since {{date}}",
     noPolicy: "No published policy",
