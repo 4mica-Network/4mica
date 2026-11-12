@@ -1,5 +1,6 @@
 import { networkInterfaces } from "node:os";
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const lanAddresses = Object.values(networkInterfaces())
@@ -41,6 +42,7 @@ const nextConfig: NextConfig = {
     "pg",
     "winston",
     "winston-daily-rotate-file",
+    "winston-transport",
   ],
 
   // Standalone tracing must start at the monorepo root or the workspace deps
@@ -84,4 +86,39 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN || undefined;
+const sentryRelease = process.env.SENTRY_RELEASE || undefined;
+const sentryRepository = process.env.SENTRY_REPOSITORY || undefined;
+const sentryEnvironment = process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT;
+
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: sentryAuthToken,
+  silent: !process.env.CI,
+  telemetry: false,
+  release: {
+    name: sentryRelease,
+    create: Boolean(sentryAuthToken && sentryRelease),
+    finalize: Boolean(sentryAuthToken && sentryRelease),
+    setCommits:
+      sentryRelease && sentryRepository
+        ? { repo: sentryRepository, commit: sentryRelease, ignoreMissing: true }
+        : false,
+    deploy:
+      sentryAuthToken && sentryRelease && sentryEnvironment
+        ? { env: sentryEnvironment }
+        : false,
+  },
+  sourcemaps: {
+    disable: !sentryAuthToken,
+    deleteSourcemapsAfterUpload: true,
+  },
+  widenClientFileUpload: true,
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+    excludeReplayIframe: true,
+    excludeReplayShadowDom: true,
+    excludeReplayWorker: true,
+  },
+});

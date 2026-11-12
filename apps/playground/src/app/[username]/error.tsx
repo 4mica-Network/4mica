@@ -1,5 +1,7 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
 import { messages } from "@/i18n";
 
 export default function ProfileError({
@@ -9,6 +11,10 @@ export default function ProfileError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-5 px-6 py-20 text-center">
       <h1 className="font-semibold text-2xl text-ink-strong">
