@@ -32,6 +32,17 @@ map $http_upgrade $connection_upgrade {
 
 server_tokens off;
 
+log_format mica_json escape=json
+  '{"time":"$time_iso8601","request_id":"$request_id",'
+  '"app_request_id":"$upstream_http_x_request_id",'
+  '"remote_addr":"$remote_addr","method":"$request_method","path":"$uri",'
+  '"status":$status,"bytes":$body_bytes_sent,"request_time":$request_time,'
+  '"upstream":"$upstream_addr","upstream_status":"$upstream_status",'
+  '"upstream_time":"$upstream_response_time","cache":"$upstream_cache_status",'
+  '"user_agent":"$http_user_agent"}';
+
+access_log /var/log/nginx/access.log mica_json;
+
 gzip on;
 gzip_vary on;
 gzip_proxied any;
@@ -92,6 +103,7 @@ server {
   proxy_set_header X-Forwarded-Proto $scheme;
   proxy_set_header Upgrade           $http_upgrade;
   proxy_set_header Connection        $connection_upgrade;
+  proxy_set_header X-Request-ID      $request_id;
 
   # --- 1. apps/web ---------------------------------------------------------
   # It is a static export (`output: "export"`) and owns the bare /_next tree

@@ -52,6 +52,11 @@ services:
     # to this box's private-network address, never 0.0.0.0.
     ports:
       - "${PLAYGROUND_BIND:-127.0.0.1}:${PLAYGROUND_PORT:-8081}:3100"
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
     volumes:
       - playground-logs:/app/logs
     networks:
