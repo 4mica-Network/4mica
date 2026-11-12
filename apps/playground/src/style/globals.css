@@ -24,3 +24,14 @@
     font-size: max(16px, 1em);
   }
 }
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 2px;
+  }
+}
+
+@utility focus-inset {
+  outline-offset: -2px;
+}

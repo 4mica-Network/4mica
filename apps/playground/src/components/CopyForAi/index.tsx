@@ -88,7 +88,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={messages.ai.trigger}
-        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 max-md:h-10 max-md:w-10 max-md:justify-center max-md:rounded-lg max-md:border-0 max-md:bg-transparent max-md:px-0 max-md:active:bg-overlay/6"
+        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong max-md:h-10 max-md:w-10 max-md:justify-center max-md:rounded-lg max-md:border-0 max-md:bg-transparent max-md:px-0 max-md:active:bg-overlay/6"
         onClick={() => setOpen((value) => !value)}
         ref={trigger}
         type="button"
@@ -134,7 +134,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                 <button
                   aria-label={isCopied ? messages.ai.copied : item.label}
                   className={cn(
-                    "flex h-9 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors focus-visible:outline-none",
+                    "focus-inset flex h-9 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors",
                     isCopied
                       ? "bg-success/10 text-ink-strong"
                       : "text-ink-body hover:bg-overlay/6 hover:text-ink-strong focus-visible:bg-overlay/6",

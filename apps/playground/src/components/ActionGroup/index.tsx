@@ -102,7 +102,7 @@ export function ActionGroup({
           <m.button
             aria-label={isDone ? done.note : (ariaLabel ?? text)}
             className={cn(
-              "relative inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+              "relative inline-flex items-center gap-1.5 transition-colors",
               md
                 ? "h-8 rounded-lg text-sm max-md:h-10 max-md:active:bg-overlay/6"
                 : "h-6 rounded text-xs",
