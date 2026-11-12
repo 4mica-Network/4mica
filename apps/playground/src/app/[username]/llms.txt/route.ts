@@ -2,7 +2,7 @@ import { buildProfileLlmsTxt } from "@/lib/llms-txt";
 import { parseUsername } from "@/schema/params";
 import { listPublicAgents } from "@/services/agents";
 import { listPublicApiListings } from "@/services/api-listings";
-import { getPublicProfile } from "@/services/profile";
+import { getAnonymousProfile } from "@/services/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET(
     return new Response("Not found\n", { status: 404 });
   }
 
-  const result = await getPublicProfile(username);
+  const result = await getAnonymousProfile(username);
 
   if (!result?.profile.isPublished) {
     return new Response("Not found\n", { status: 404 });

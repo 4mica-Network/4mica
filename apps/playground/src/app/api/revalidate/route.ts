@@ -4,6 +4,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { profileTag } from "@/actions/shared";
 import { serverEnv } from "@/env.server";
 import { parseUsername } from "@/schema/params";
+import { ownerTag } from "@/services/cache";
+import { prisma } from "@/services/db";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid_username" }, { status: 400 });
   }
 
-  revalidateTag(profileTag(username), "max");
+  const owner = await prisma.user.findUnique({
+    where: { username },
+    select: { id: true },
+  });
+
+  revalidateTag(profileTag(username), { expire: 0 });
+
+  if (owner) {
+    revalidateTag(ownerTag(owner.id), { expire: 0 });
+  }
+
   revalidatePath(`/${username}`, "layout");
 
   return NextResponse.json({ revalidated: true, username });
