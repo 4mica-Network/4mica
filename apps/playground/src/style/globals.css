@@ -5,7 +5,19 @@
    drops every design token with no build error. */
 @config "../../tailwind.config.ts";
 
-@media (width < 48rem) {
+@custom-variant md {
+  @media (width >= 48rem) and (height >= 30rem) {
+    @slot;
+  }
+}
+
+@custom-variant max-md {
+  @media not all and (width >= 48rem) and (height >= 30rem) {
+    @slot;
+  }
+}
+
+@variant max-md {
   input,
   textarea,
   select {

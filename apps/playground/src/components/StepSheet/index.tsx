@@ -100,7 +100,7 @@ export function StepSheet({ open, onClose, title, children }: StepSheetProps) {
             animate={{ y: 0 }}
             aria-labelledby={titleId}
             aria-modal="true"
-            className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl bg-surface-solid pb-[env(safe-area-inset-bottom)] outline-none"
+            className="absolute inset-x-0 bottom-0 flex max-h-[80dvh] flex-col rounded-t-2xl bg-surface-solid pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] outline-none"
             drag={reduceMotion ? false : "y"}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragControls={dragControls}
