@@ -91,6 +91,52 @@ describe("StepFlow", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("moves focus to the new panel when next is pressed", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    screen
+      .getByRole("button", {
+        name: t(messages.flow.next, { title: "Set up payment" }),
+      })
+      .focus();
+    await user.keyboard("{Enter}");
+    expect(
+      screen.getByRole("region", { name: "Set up payment" }),
+    ).toHaveFocus();
+
+    screen
+      .getByRole("button", {
+        name: t(messages.flow.next, { title: "Install the SDK" }),
+      })
+      .focus();
+    await user.keyboard("{Enter}");
+    expect(
+      screen.getByRole("region", { name: "Install the SDK" }),
+    ).toHaveFocus();
+  });
+
+  it("traps Tab inside the mobile sheet and returns focus on Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    const trigger = screen.getByRole("button", { name: /^All steps/ });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const sheet = screen.getByRole("dialog");
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+
+    const buttons = within(sheet).getAllByRole("button");
+    for (let i = 0; i <= buttons.length; i += 1) {
+      await user.tab();
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it("marks a completed step for screen readers", () => {
     renderFlow();
 

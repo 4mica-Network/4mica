@@ -74,6 +74,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
+  const focusPanel = useRef(false);
   const baseId = useId();
 
   const activeIndex = steps.findIndex((step) => step.id === activeId);
@@ -90,6 +91,13 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
     if (!mounted.current) {
       mounted.current = true;
       return;
+    }
+
+    if (focusPanel.current) {
+      focusPanel.current = false;
+      panelRef.current
+        ?.querySelector<HTMLElement>(":scope > :not([hidden])")
+        ?.focus({ preventScroll: true });
     }
 
     const header = headerRef.current?.getBoundingClientRect();
@@ -148,7 +156,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
             step.done ? `${step.title}, ${messages.flow.done}` : undefined
           }
           className={cn(
-            "relative flex w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+            "focus-inset relative flex w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors",
             surface === "sheet"
               ? "h-11 rounded-lg active:bg-overlay/4"
               : "py-1",
@@ -225,7 +233,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
               aria-controls={listId}
               aria-expanded={open}
               className={cn(
-                "relative flex w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors hover:bg-overlay/6 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+                "focus-inset relative flex w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors hover:bg-overlay/6",
                 surface === "sheet" ? "h-11 rounded-lg" : "py-1",
                 holdsActive
                   ? "text-ink-strong"
@@ -313,13 +321,14 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
             return (
               <m.div
                 animate={selected ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-                className="flex flex-col gap-5 px-4 py-5 sm:p-6"
+                className="focus-inset flex flex-col gap-5 px-4 py-5 sm:p-6"
                 hidden={!selected}
                 id={panelId(step.id)}
                 initial={false}
                 key={step.id}
                 role="region"
                 aria-label={step.title}
+                tabIndex={-1}
                 transition={enter}
               >
                 {step.content}
@@ -341,7 +350,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
               current: activeIndex + 1,
               total: steps.length,
             })}
-            className="my-1.5 flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 active:bg-overlay/6 md:hidden"
+            className="my-1.5 flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left transition-colors active:bg-overlay/6 md:hidden"
             onClick={() => setSheetOpen(true)}
             type="button"
           >
@@ -367,8 +376,11 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
           {next && (
             <m.button
               aria-label={t(messages.flow.next, { title: next.title })}
-              className="group inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-overlay/8 px-4 text-ink-strong text-sm transition-colors hover:bg-overlay/6 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 md:h-7 md:rounded-md md:bg-transparent md:px-2.5 md:text-ink-muted md:text-xs"
-              onClick={() => go(next.id)}
+              className="group inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-overlay/8 px-4 text-ink-strong text-sm transition-colors hover:bg-overlay/6 hover:text-ink-strong md:h-7 md:rounded-md md:bg-transparent md:px-2.5 md:text-ink-muted md:text-xs"
+              onClick={() => {
+                focusPanel.current = true;
+                go(next.id);
+              }}
               type="button"
               whileTap={reduceMotion ? undefined : { scale: 0.96 }}
             >
