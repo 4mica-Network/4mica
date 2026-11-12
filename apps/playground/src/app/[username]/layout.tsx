@@ -36,13 +36,13 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
 
   return (
     <div
-      className="profile-scope relative flex min-h-dvh flex-col has-[[data-fit-viewport]]:h-dvh has-[[data-fit-viewport]]:overflow-hidden"
+      className="profile-scope relative flex min-h-dvh flex-col md:has-[[data-fit-viewport]]:h-dvh md:has-[[data-fit-viewport]]:overflow-hidden"
       style={brandStyle}
     >
       <ProfileTheme preference={profile.theme} />
       <TopBar />
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-14 has-[[data-fit-viewport]]:min-h-0 has-[[data-fit-viewport]]:gap-4 has-[[data-fit-viewport]]:pt-16 has-[[data-fit-viewport]]:pb-4 sm:px-6 sm:py-20 sm:has-[[data-fit-viewport]]:pt-20 sm:has-[[data-fit-viewport]]:pb-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-14 has-[[data-fit-viewport]]:min-h-0 has-[[data-fit-viewport]]:gap-4 has-[[data-fit-viewport]]:pt-16 has-[[data-fit-viewport]]:pb-4 max-md:has-[[data-app-bar]]:gap-0! max-md:has-[[data-app-bar]]:p-0! sm:px-6 sm:py-20 sm:has-[[data-fit-viewport]]:pt-20 sm:has-[[data-fit-viewport]]:pb-6">
         {/*
           Owner-only, and only while the profile is still private: a published
           profile should look to its owner exactly as it looks to everyone else.

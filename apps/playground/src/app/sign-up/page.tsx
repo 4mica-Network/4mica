@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function SignUpPage() {
   return (
-    <main className="grid min-h-screen place-items-center px-6">
+    <main className="flex h-dvh items-center justify-center overflow-hidden bg-surface-deep">
       <Suspense fallback={<Spinner size="lg" />}>
         <AuthPanel mode="signUp" />
       </Suspense>

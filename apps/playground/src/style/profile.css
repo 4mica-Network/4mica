@@ -37,3 +37,9 @@
     transition-duration: 0.01ms;
   }
 }
+
+@media (width < 48rem) {
+  .profile-scope:has([data-app-bar]) > [data-top-bar] {
+    display: none;
+  }
+}

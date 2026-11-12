@@ -4,6 +4,7 @@ import { cn } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
+import { CopyToast } from "@/components/CopyToast";
 import { messages } from "@/i18n";
 
 const RESET_MS = 1600;
@@ -61,7 +62,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
           ) : (
             <motion.span
               animate={{ opacity: 1 }}
-              className="text-ink-subtle opacity-0 transition-opacity group-hover/copy:opacity-100 group-focus-visible/copy:opacity-100"
+              className="text-ink-subtle opacity-100 transition-opacity group-hover/copy:opacity-100 group-focus-visible/copy:opacity-100 md:opacity-0"
               exit={{ opacity: 0 }}
               initial={{ opacity: 0 }}
               key="idle"
@@ -78,7 +79,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
           <motion.span
             animate={{ opacity: 1, y: 0, scale: 1 }}
             aria-hidden="true"
-            className="pointer-events-none absolute -top-7 left-1/2 z-10 rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm"
+            className="pointer-events-none absolute -top-7 left-1/2 z-10 rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm max-md:hidden"
             exit={{ opacity: 0, y: -2, scale: 0.96 }}
             initial={{ opacity: 0, y: 4, scale: 0.96 }}
             style={{ x: "-50%" }}
@@ -92,6 +93,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
           </motion.span>
         )}
       </AnimatePresence>
+      <CopyToast note={copied ? messages.integration.copied : null} />
     </button>
   );
 }

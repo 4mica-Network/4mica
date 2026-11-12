@@ -8,7 +8,7 @@ export function ProfileFooter({ show }: { show: boolean }) {
   }
 
   return (
-    <footer className="mt-auto flex items-center justify-center gap-1.5 text-ink-muted text-xs">
+    <footer className="mt-auto hidden items-center justify-center gap-1.5 text-ink-muted text-xs md:flex">
       {messages.common.poweredBy}
       <a
         className="group flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:text-ink-strong focus-visible:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40"

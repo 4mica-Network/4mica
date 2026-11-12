@@ -25,7 +25,7 @@ export function OwnerBar({ username }: OwnerBarProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 max-md:mx-4 max-md:mt-3 max-md:mb-1">
       <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
 
       <div className="min-w-0 flex-1">
@@ -35,7 +35,7 @@ export function OwnerBar({ username }: OwnerBarProps) {
         <p className="text-ink-muted text-sm">{messages.owner.previewLead}</p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 max-md:w-full max-md:*:flex-1">
         <Button
           intent="ghost"
           size="sm"

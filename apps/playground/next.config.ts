@@ -1,11 +1,25 @@
+import { networkInterfaces } from "node:os";
 import path from "node:path";
 import type { NextConfig } from "next";
+
+const lanAddresses = Object.values(networkInterfaces())
+  .flat()
+  .filter((net) => net?.family === "IPv4" && !net.internal)
+  .map((net) => net?.address)
+  .filter((address): address is string => Boolean(address));
+
+const extraDevOrigins = (process.env.DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const nextConfig: NextConfig = {
   // Per-username pages cannot be pre-rendered, so unlike apps/web this is a
   // real Node server. `standalone` emits a self-contained server bundle.
   output: "standalone",
   reactStrictMode: true,
+
+  allowedDevOrigins: [...lanAddresses, ...extraDevOrigins],
 
   // apps/web is `output: "export"` on the SAME apex domain and emits its own
   // /_next/static/*. Two Next apps cannot share /_next on one origin — the edge

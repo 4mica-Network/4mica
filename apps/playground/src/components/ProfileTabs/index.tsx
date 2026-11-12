@@ -30,9 +30,9 @@ export function ProfileTabs({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-12 shrink-0 items-center border-overlay/10 border-b px-2">
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 flex h-14 shrink-0 items-center border-overlay/10 border-b bg-surface-deep px-4 md:static md:h-12 md:bg-transparent md:px-2">
         <div
-          className="inline-flex items-center gap-0.5 rounded-md border border-overlay/6 p-0.5"
+          className="flex w-full items-center gap-0.5 rounded-lg border border-overlay/6 p-0.5 md:inline-flex md:w-auto md:rounded-md"
           role="tablist"
         >
           {tabs.map((tab) => {
@@ -43,7 +43,7 @@ export function ProfileTabs({
                 aria-controls={`profile-panel-${tab.id}`}
                 aria-selected={selected}
                 className={cn(
-                  "relative inline-flex h-6 items-center gap-1.5 rounded px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+                  "relative inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 md:h-6 md:flex-none md:justify-start md:rounded md:text-xs",
                   selected
                     ? "text-ink-body"
                     : "text-ink-muted hover:text-ink-body",
@@ -57,7 +57,7 @@ export function ProfileTabs({
                 {selected && (
                   <motion.span
                     aria-hidden="true"
-                    className="absolute inset-0 rounded bg-overlay/6"
+                    className="absolute inset-0 rounded-md bg-overlay/6 md:rounded"
                     layoutId="profile-tab-pill"
                     transition={
                       reduceMotion
@@ -78,7 +78,7 @@ export function ProfileTabs({
 
       <div
         aria-labelledby={`profile-tab-${active}`}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        className="flex flex-1 flex-col md:min-h-0 md:overflow-y-auto"
         id={`profile-panel-${active}`}
         role="tabpanel"
       >
