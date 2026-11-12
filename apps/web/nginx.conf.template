@@ -30,6 +30,33 @@ map $http_upgrade $connection_upgrade {
   ''      close;
 }
 
+server_tokens off;
+
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_types
+  text/css
+  text/plain
+  text/xml
+  application/javascript
+  application/json
+  application/xml
+  application/manifest+json
+  application/rss+xml
+  image/svg+xml
+  text/x-component;
+
+proxy_cache_path /var/cache/nginx/playground levels=1:2 keys_zone=playground:20m
+                 max_size=1g inactive=7d use_temp_path=off;
+
+limit_req_zone $binary_remote_addr zone=mica_og:10m         rate=10r/s;
+limit_req_zone $binary_remote_addr zone=mica_auth:10m       rate=10r/s;
+limit_req_zone $binary_remote_addr zone=mica_revalidate:1m  rate=1r/s;
+limit_req_status 429;
+
 server {
   listen 80;
   server_name 4mica.io www.4mica.io;
@@ -46,6 +73,14 @@ server {
   # keepalive but recovers on its own within `valid=`.
   resolver 127.0.0.11 valid=10s ipv6=off;
   resolver_timeout 5s;
+
+  set_real_ip_from 10.0.0.0/8;
+  set_real_ip_from 172.16.0.0/12;
+  set_real_ip_from 192.168.0.0/16;
+  set_real_ip_from 127.0.0.1;
+  real_ip_header X-Real-IP;
+
+  client_max_body_size 10m;
 
   set $mica_web        ${MICA_WEB_UPSTREAM};
   set $mica_playground ${MICA_PLAYGROUND_UPSTREAM};
@@ -75,7 +110,7 @@ server {
   location = /llms.txt             { proxy_pass $mica_web; }
   location = /favicon.ico          { proxy_pass $mica_web; }
   location = /icon.png             { proxy_pass $mica_web; }
-  location = /manifest.webmanifest { proxy_pass $mica_web; }
+  location = /manifest.webmanifest { proxy_pass $mica_playground; }
 
   # Marketing pages. Mirrors `reservedSegments`.
   location ~ ^/(about|agents|blog|careers|developers|docs|dpa|interactive-protocol|leadership|legal|partners|pricing|privacy|register|roadmap|solution|solutions|status|team|terms|waitlist)(/|$) {
@@ -94,27 +129,63 @@ server {
   # for /robots.txt and /llms.txt above still win — `=` outranks a regex.
   location ~ \.txt$ { proxy_pass $mica_web; }
 
+  location ~ /\.(?!well-known/) { return 404; }
+  location ~ \.map$ { return 404; }
+
   # --- 2. Playground assets ------------------------------------------------
   # next.config.ts sets assetPrefix=/p, so this app requests its chunks at
   # /p/_next/… . Two Next apps cannot share /_next on one origin — without the
   # prefix the edge has no way to tell whose chunk a request is for, and every
   # profile page loads unstyled with no server-side error. Strip /p here; Next
   # still serves the files at /_next internally.
-  location ^~ /p/ {
+  location ^~ /p/_next/ {
     rewrite ^/p(/.*)$ $1 break;
     proxy_pass $mica_playground;
+
+    proxy_cache playground;
+    proxy_cache_lock on;
+    proxy_cache_use_stale error timeout updating http_502 http_503 http_504;
+    proxy_cache_background_update on;
+    add_header X-Cache-Status $upstream_cache_status always;
   }
+
+  location ^~ /p/ { return 404; }
 
   # --- 3. Playground API ---------------------------------------------------
   # /api/health, /api/og/<username>, /api/revalidate. `api` is reserved, so it
   # can never collide with a handle.
   location ^~ /api/ { proxy_pass $mica_playground; }
 
+  location ^~ /api/og/ {
+    limit_req zone=mica_og burst=20 nodelay;
+    proxy_pass $mica_playground;
+
+    proxy_cache playground;
+    proxy_cache_lock on;
+    proxy_cache_use_stale error timeout updating http_502 http_503 http_504;
+    proxy_cache_background_update on;
+    add_header X-Cache-Status $upstream_cache_status always;
+  }
+
+  location = /api/revalidate {
+    limit_req zone=mica_revalidate burst=5 nodelay;
+    proxy_pass $mica_playground;
+  }
+
   # --- 4. Auth -------------------------------------------------------------
-  location ^~ /sign-in     { proxy_pass $mica_playground; }
-  location ^~ /sign-up     { proxy_pass $mica_playground; }
+  location ^~ /sign-in {
+    limit_req zone=mica_auth burst=20 nodelay;
+    proxy_pass $mica_playground;
+  }
+  location ^~ /sign-up {
+    limit_req zone=mica_auth burst=20 nodelay;
+    proxy_pass $mica_playground;
+  }
   # Clerk OAuth landing.
-  location ^~ /sso-callback { proxy_pass $mica_playground; }
+  location ^~ /sso-callback {
+    limit_req zone=mica_auth burst=20 nodelay;
+    proxy_pass $mica_playground;
+  }
 
   # --- 5. The handle namespace ---------------------------------------------
   # Everything not claimed above is a profile.
