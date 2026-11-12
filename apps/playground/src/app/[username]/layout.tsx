@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { AuthProvider } from "@/components/AuthProvider";
 import { OwnerBar } from "@/components/OwnerBar";
 import { ProfileFooter } from "@/components/ProfileFooter";
 import { ProfileTheme } from "@/components/ProfileTheme";
 import { TopBar } from "@/components/TopBar";
 import { parseUsername } from "@/schema/params";
 import { getPublicProfile } from "@/services/profile";
+import { getSessionIdentity } from "@/services/viewer";
 
 interface LayoutProps {
   children: ReactNode;
@@ -19,7 +21,10 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
     notFound();
   }
 
-  const result = await getPublicProfile(username);
+  const [result, identity] = await Promise.all([
+    getPublicProfile(username),
+    getSessionIdentity(),
+  ]);
 
   if (!result) {
     notFound();
@@ -34,7 +39,7 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
       } as React.CSSProperties)
     : undefined;
 
-  return (
+  const page = (
     <div
       className="profile-scope relative flex min-h-dvh flex-col md:has-[[data-fit-viewport]]:h-dvh md:has-[[data-fit-viewport]]:overflow-hidden"
       style={brandStyle}
@@ -57,4 +62,6 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
       </div>
     </div>
   );
+
+  return identity ? <AuthProvider>{page}</AuthProvider> : page;
 }

@@ -1,12 +1,8 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { messages } from "@/i18n";
 import { links } from "@/services/links";
 import type { SessionIdentity } from "@/types";
-
-const { useUser } = vi.hoisted(() => ({ useUser: vi.fn() }));
-
-vi.mock("@clerk/nextjs", () => ({ useUser }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/4mica-workspace/api/credit-limits",
@@ -22,10 +18,6 @@ const identity = (over: Partial<SessionIdentity> = {}): SessionIdentity => ({
 });
 
 describe("TopBarActions, signed out", () => {
-  beforeEach(() => {
-    useUser.mockReturnValue({ user: null });
-  });
-
   it("carries the current page through as the redirect target", () => {
     render(<TopBarActions identity={null} />);
 
@@ -49,10 +41,6 @@ describe("TopBarActions, signed out", () => {
 });
 
 describe("TopBarActions, signed in", () => {
-  beforeEach(() => {
-    useUser.mockReturnValue({ user: null });
-  });
-
   it("replaces the join buttons with an avatar linking to the dashboard", () => {
     render(<TopBarActions identity={identity()} />);
 
@@ -72,13 +60,11 @@ describe("TopBarActions, signed in", () => {
     ).toHaveAttribute("href", links.app);
   });
 
-  it("falls back to Clerk's own user when the row carries no name or image", () => {
-    useUser.mockReturnValue({
-      user: { fullName: "Grace Hopper", imageUrl: "https://img.clerk.com/g" },
-    });
-
+  it("shows the server-resolved avatar at its rendered size", () => {
     render(
-      <TopBarActions identity={identity({ name: "", avatarUrl: null })} />,
+      <TopBarActions
+        identity={identity({ avatarUrl: "https://img.clerk.com/g" })}
+      />,
     );
 
     expect(screen.getByRole("img")).toHaveAttribute(

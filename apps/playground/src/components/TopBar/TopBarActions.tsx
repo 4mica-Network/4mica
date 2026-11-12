@@ -1,7 +1,6 @@
 "use client";
 
 import { Avatar, Button } from "@4mica/ui";
-import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { messages } from "@/i18n";
@@ -10,10 +9,8 @@ import type { SessionIdentity } from "@/types";
 import { sizedAvatarUrl } from "@/utils/avatarUrl";
 
 function DashboardLink({ identity }: { identity: SessionIdentity }) {
-  const { user } = useUser();
-
-  const name = identity.name || user?.fullName || "";
-  const avatarUrl = identity.avatarUrl ?? user?.imageUrl ?? null;
+  const name = identity.name;
+  const avatarUrl = identity.avatarUrl;
 
   return (
     <a
