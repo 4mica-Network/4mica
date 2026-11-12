@@ -24,6 +24,7 @@ import {
 import { RevealLink } from "@/components/RevealLink";
 import { type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
+import { TopBar } from "@/components/TopBar";
 import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
@@ -205,18 +206,13 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
     <>
       <JsonLd descriptor={descriptor} />
 
-      <ProfileNav
-        className="absolute top-4 left-4 z-20 max-md:hidden sm:top-6 sm:left-8"
-        displayName={profile.name || profile.username}
-        username={profile.username}
-      />
-
       <CardShell
+        account={<TopBar />}
+        accountOnMobile={false}
         nav={
           <ProfileNav
             displayName={profile.name || profile.username}
             username={profile.username}
-            variant="bar"
           />
         }
         title={agent.name}

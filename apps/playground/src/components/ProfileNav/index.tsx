@@ -1,4 +1,3 @@
-import { cn } from "@4mica/ui";
 import { ArrowLeft, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { messages } from "@/i18n";
@@ -7,44 +6,27 @@ import { profilePath } from "@/utils/profileUrl";
 export function ProfileNav({
   username,
   displayName,
-  className,
-  variant = "float",
 }: {
   username: string;
   displayName: string;
-  className?: string;
-  variant?: "float" | "bar";
 }) {
   const label = displayName || `@${username}`;
 
-  if (variant === "bar") {
-    return (
-      <nav
-        aria-label={messages.common.backToProfile}
-        className={cn("min-w-0", className)}
-      >
-        <Link
-          href={profilePath(username)}
-          className="-ml-2 flex h-11 min-w-11 items-center gap-0.5 rounded-lg pr-2 text-ink-body text-sm transition-colors active:bg-overlay/6"
-        >
-          <ChevronLeft aria-hidden="true" className="h-5 w-5 shrink-0" />
-          <span className="truncate">{label}</span>
-        </Link>
-      </nav>
-    );
-  }
-
   return (
-    <nav aria-label={messages.common.backToProfile} className={className}>
+    <nav aria-label={messages.common.backToProfile} className="min-w-0">
       <Link
         href={profilePath(username)}
-        className="link-muted group inline-flex items-center gap-1.5 text-sm"
+        className="profile-nav-link group flex items-center text-sm max-md:-ml-2 max-md:h-11 max-md:min-w-11 max-md:gap-0.5 max-md:rounded-lg max-md:pr-2 max-md:text-ink-body max-md:transition-colors max-md:active:bg-overlay/6 md:inline-flex md:gap-1.5"
       >
+        <ChevronLeft
+          aria-hidden="true"
+          className="h-5 w-5 shrink-0 md:hidden"
+        />
         <ArrowLeft
           aria-hidden="true"
-          className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5"
+          className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5 max-md:hidden"
         />
-        {label}
+        <span className="max-md:truncate">{label}</span>
       </Link>
     </nav>
   );
