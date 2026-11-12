@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   // real Node server. `standalone` emits a self-contained server bundle.
   output: "standalone",
   reactStrictMode: true,
+  poweredByHeader: false,
 
   allowedDevOrigins: [...lanAddresses, ...extraDevOrigins],
 

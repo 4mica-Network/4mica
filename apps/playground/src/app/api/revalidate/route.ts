@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 import { profileTag } from "@/actions/shared";
-import { serverEnv } from "@/env";
+import { serverEnv } from "@/env.server";
 import { parseUsername } from "@/schema/params";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const { REVALIDATE_SECRET } = serverEnv();
 
   if (!REVALIDATE_SECRET) {
-    return NextResponse.json({ error: "not_configured" }, { status: 404 });
+    return new NextResponse(null, { status: 404 });
   }
 
   const header = request.headers.get("authorization") ?? "";

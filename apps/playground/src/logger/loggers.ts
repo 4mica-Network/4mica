@@ -8,7 +8,7 @@ import {
   transports,
 } from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { serverEnv } from "@/env";
+import { serverEnv } from "@/env.server";
 
 /**
  * Ported from apps/be/src/logger/loggers.ts so both services produce the same
