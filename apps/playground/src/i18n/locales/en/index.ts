@@ -135,6 +135,8 @@ export const en = {
 
     reportAction: "Report this listing",
     reportSubmit: "Send report",
+    reportReasonLabel: "Reason",
+    reportDetailLabel: "Details",
     reportPlaceholder: "What happened? Include a request id if you have one.",
     reportNote: "Goes to the owner and to 4Mica. Nothing is published.",
     reportThanks:
