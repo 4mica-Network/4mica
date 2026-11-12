@@ -1,23 +1,58 @@
 import "server-only";
 
-import { createHighlighter, type Highlighter } from "shiki";
+import { createHighlighterCore, type HighlighterCore } from "shiki/core";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 export type CodeLang = "typescript" | "python" | "bash" | "json";
 
 const THEME = "vesper";
 
-const LANGS: CodeLang[] = ["typescript", "python", "bash", "json"];
+const HIGHLIGHT_CACHE_LIMIT = 500;
 
-let highlighterPromise: Promise<Highlighter> | null = null;
+let highlighterPromise: Promise<HighlighterCore> | null = null;
 
-function getHighlighter(): Promise<Highlighter> {
+const highlighted = new Map<string, string>();
+
+function getHighlighter(): Promise<HighlighterCore> {
   if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({ themes: [THEME], langs: LANGS });
+    highlighterPromise = createHighlighterCore({
+      themes: [import("shiki/themes/vesper.mjs")],
+      langs: [
+        import("shiki/langs/typescript.mjs"),
+        import("shiki/langs/python.mjs"),
+        import("shiki/langs/bash.mjs"),
+        import("shiki/langs/json.mjs"),
+      ],
+      engine: createJavaScriptRegexEngine(),
+    });
   }
   return highlighterPromise;
 }
 
 export async function highlight(code: string, lang: CodeLang): Promise<string> {
+  const key = `${lang}\u0000${code}`;
+  const hit = highlighted.get(key);
+
+  if (hit !== undefined) {
+    return hit;
+  }
+
+  const html = await render(code, lang);
+
+  if (highlighted.size >= HIGHLIGHT_CACHE_LIMIT) {
+    const oldest = highlighted.keys().next().value;
+
+    if (oldest !== undefined) {
+      highlighted.delete(oldest);
+    }
+  }
+
+  highlighted.set(key, html);
+
+  return html;
+}
+
+async function render(code: string, lang: CodeLang): Promise<string> {
   const highlighter = await getHighlighter();
 
   return highlighter.codeToHtml(code.trimEnd(), {
