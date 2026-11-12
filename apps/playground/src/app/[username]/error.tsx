@@ -16,7 +16,11 @@ export default function ProfileError({
   }, [error]);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-5 px-6 py-20 text-center">
+    <main
+      className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-5 px-6 py-20 text-center focus:outline-none"
+      id="content"
+      tabIndex={-1}
+    >
       <h1 className="font-semibold text-2xl text-ink-strong">
         {messages.errors.genericTitle}
       </h1>

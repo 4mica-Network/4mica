@@ -32,9 +32,13 @@ export function CardShell({
         title={title}
       />
 
-      <section className="flex flex-1 flex-col md:grid md:max-h-[40rem] md:min-h-0 md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:rounded-2xl md:border md:border-overlay/10 md:bg-overlay/2">
+      <main
+        className="flex flex-1 flex-col focus:outline-none md:grid md:max-h-[40rem] md:min-h-0 md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:rounded-2xl md:border md:border-overlay/10 md:bg-overlay/2"
+        id="content"
+        tabIndex={-1}
+      >
         {children}
-      </section>
+      </main>
     </div>
   );
 }
