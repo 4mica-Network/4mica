@@ -86,7 +86,7 @@ export function NotFoundView({
 
         {handle && (
           <Link
-            className="group flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4 transition-colors hover:bg-success/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50"
+            className="group flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4 transition-colors hover:bg-success/10"
             href="/sign-up"
           >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-success/10 text-success">
@@ -116,7 +116,7 @@ export function NotFoundView({
             {EXPLORE.map(({ href, icon: Icon, title, hint }) => (
               <li key={title}>
                 <a
-                  className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3.5 transition-colors hover:bg-overlay/4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40"
+                  className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3.5 transition-colors hover:bg-overlay/4"
                   href={href}
                   {...(href.startsWith("http")
                     ? { target: "_blank", rel: "noreferrer noopener" }

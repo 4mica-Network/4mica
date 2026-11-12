@@ -27,7 +27,7 @@ export function RevealLink({
 
   return (
     <m.a
-      className={cn("inline-flex items-center text-sm outline-none", className)}
+      className={cn("inline-flex items-center rounded-sm text-sm", className)}
       href={href}
       onBlur={() => setActive(false)}
       onFocus={() => setActive(true)}

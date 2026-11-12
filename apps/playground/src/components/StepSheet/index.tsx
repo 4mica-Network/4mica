@@ -135,7 +135,7 @@ export function StepSheet({ open, onClose, title, children }: StepSheetProps) {
                 </h2>
                 <button
                   aria-label={messages.flow.closeSteps}
-                  className="grid h-10 w-10 place-items-center rounded-full text-ink-muted transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 active:bg-overlay/6"
+                  className="grid h-10 w-10 place-items-center rounded-full text-ink-muted transition-colors active:bg-overlay/6"
                   onClick={onClose}
                   type="button"
                 >
