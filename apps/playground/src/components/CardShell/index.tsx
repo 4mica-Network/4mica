@@ -7,6 +7,7 @@ export interface CardShellProps {
   nav?: ReactNode;
   title?: string;
   account?: ReactNode;
+  accountOnMobile?: boolean;
   children: ReactNode;
 }
 
@@ -15,6 +16,7 @@ export function CardShell({
   nav,
   title,
   account,
+  accountOnMobile,
   children,
 }: CardShellProps) {
   return (
@@ -22,9 +24,13 @@ export function CardShell({
       className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col md:justify-center md:gap-3"
       data-fit-viewport
     >
-      <AppBar account={account} actions={actions} nav={nav} title={title} />
-
-      {actions && <div className="hidden justify-end md:flex">{actions}</div>}
+      <AppBar
+        account={account}
+        accountOnMobile={accountOnMobile}
+        actions={actions}
+        nav={nav}
+        title={title}
+      />
 
       <section className="flex flex-1 flex-col md:grid md:max-h-[40rem] md:min-h-0 md:grid-cols-[19rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:overflow-hidden md:rounded-2xl md:border md:border-overlay/10 md:bg-overlay/2">
         {children}

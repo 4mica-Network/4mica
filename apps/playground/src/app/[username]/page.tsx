@@ -51,7 +51,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <CardShell
-      account={<TopBar inline />}
+      account={<TopBar />}
       title={profile.name || `@${profile.username}`}
       actions={
         <ProfileActions
