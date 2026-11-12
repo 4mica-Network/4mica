@@ -47,7 +47,7 @@ export async function CodeBlock({
           {label ?? LANG_LABEL[lang]}
         </span>
         <CopyButton
-          className="text-white/50 hover:bg-white/10 hover:text-white/90 data-[copied]:text-white"
+          className="text-white/50 hover:bg-white/10 hover:text-white/90 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-white/80 data-[copied]:text-white"
           labels={{
             copy: messages.integration.copy,
             copied: messages.integration.copied,
@@ -57,7 +57,12 @@ export async function CodeBlock({
         />
       </div>
 
-      <div className="code-surface overflow-x-auto p-4">
+      <section
+        aria-label={label ?? LANG_LABEL[lang]}
+        className="code-surface focus-inset overflow-x-auto p-4"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a horizontal scroller with no focusable children must take focus to be keyboard-scrollable.
+        tabIndex={0}
+      >
         <div
           className={cn(
             "shiki-code font-mono text-[13px] leading-[1.375rem]",
@@ -66,7 +71,7 @@ export async function CodeBlock({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki escapes the source at render time; `html` contains only its own token markup.
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      </div>
+      </section>
     </div>
   );
 }
