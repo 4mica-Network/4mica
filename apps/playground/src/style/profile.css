@@ -38,7 +38,7 @@
   }
 }
 
-@media (width >= 48rem) {
+@variant md {
   .profile-nav-link {
     color: rgb(var(--ink) / 0.8);
     transition: color 200ms ease;

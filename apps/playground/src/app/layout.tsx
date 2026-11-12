@@ -50,7 +50,7 @@ export default async function RootLayout({
       </head>
       <body
         suppressHydrationWarning={true}
-        className={`${fontVariables} min-h-dvh bg-surface-deep text-ink-body antialiased`}
+        className={`${fontVariables} min-h-dvh bg-surface-deep pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-ink-body antialiased`}
       >
         <MotionProvider>{children}</MotionProvider>
       </body>
