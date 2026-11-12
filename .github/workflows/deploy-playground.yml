@@ -47,6 +47,7 @@ jobs:
             if [ -n "$pg" ] && [ "$pg" != host.docker.internal ]; then
               docker network connect 4mica-data "$pg" 2>/dev/null || true
             fi
+            printf 'SENTRY_RELEASE=%s\n' "$(git rev-parse HEAD)" >> .env
           env_contents: |
             NODE_ENV=production
             PLAYGROUND_PORT=${{ vars.PLAYGROUND_PORT || '8081' }}
@@ -73,3 +74,10 @@ jobs:
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
 
             REVALIDATE_SECRET=${{ secrets.REVALIDATE_SECRET }}
+
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ inputs.environment }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+            SENTRY_REPOSITORY=${{ github.repository }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}

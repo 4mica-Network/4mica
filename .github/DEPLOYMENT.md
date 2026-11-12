@@ -51,6 +51,12 @@ Docker-published ports bypass `ufw`, so restrict the port to Box A with
 [`infra/firewall/playground-edge-only.sh`](../infra/firewall/playground-edge-only.sh)
 (see [its README](../infra/firewall/README.md)).
 
+**Monitoring.** `playground` reports to Sentry when the environment has
+`SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (variables) and
+`SENTRY_AUTH_TOKEN` (secret). Each deploy becomes a Sentry release named after
+the deployed commit, and its source maps are uploaded so stack traces are
+readable.
+
 **Postgres is external to the stacks.** `apps/be/docker-compose.yml` bundles a
 `postgres` service, but that file is local-dev only; production uses
 `apps/be/docker-compose.prod.yml`, which contains just the one-shot `migrate`
