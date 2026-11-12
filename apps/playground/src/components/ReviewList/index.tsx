@@ -2,6 +2,7 @@ import { Avatar, EmptyState, Stars, Tag } from "@4mica/ui";
 import { BadgeCheck, MessageSquare } from "lucide-react";
 import { messages, t } from "@/i18n";
 import { type PublicReview, RATING_MAX } from "@/schema/trust";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 import { formatDate } from "@/utils/formatDate";
 
 export interface ReviewListProps {
@@ -36,7 +37,7 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
               fallback={review.authorUsername ?? review.authorName}
               name={review.authorName}
               size="sm"
-              src={review.authorAvatarUrl}
+              src={sizedAvatarUrl(review.authorAvatarUrl, 72)}
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

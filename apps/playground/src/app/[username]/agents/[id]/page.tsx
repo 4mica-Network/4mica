@@ -34,6 +34,7 @@ import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 import { bareHost } from "@/utils/bareHost";
 import { formatDate } from "@/utils/formatDate";
 import { agentPath, profilePath } from "@/utils/profileUrl";
@@ -260,7 +261,8 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
                   fallback={agent.ref}
                   name={agent.name}
                   size="md"
-                  src={agent.avatarUrl}
+                  src={sizedAvatarUrl(agent.avatarUrl, 96)}
+                  priority={true}
                 />
                 <div className="flex min-w-0 flex-col gap-1">
                   <h1 className="font-semibold text-ink-strong text-lg leading-tight">
