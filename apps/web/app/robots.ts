@@ -3,6 +3,8 @@ import type { MetadataRoute } from "next";
 
 export const dynamic = "force-static";
 
+const ALLOW_PATHS = ["/", "/api/og/"];
+
 const DISALLOW_PATHS = ["/api/"];
 
 const SITEMAP_PATHS = ["/sitemap.xml", "/sitemap-profiles.xml"];
@@ -23,7 +25,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        allow: ALLOW_PATHS,
         disallow: DISALLOW_PATHS,
       },
     ],
