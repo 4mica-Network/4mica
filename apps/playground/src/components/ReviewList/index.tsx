@@ -31,9 +31,9 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
         >
           <div className="flex items-center gap-2.5">
             <Avatar
-              alt={`${review.authorName || (review.authorUsername ?? review.authorId)}'s avatar`}
+              alt={`${review.authorName || review.authorUsername || messages.trust.anonymousReviewer}'s avatar`}
               className="profile-avatar"
-              fallback={review.authorUsername ?? review.authorId}
+              fallback={review.authorUsername ?? review.authorName}
               name={review.authorName}
               size="sm"
               src={review.authorAvatarUrl}

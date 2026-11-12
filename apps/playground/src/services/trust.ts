@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { messages } from "@/i18n";
 import type { PublicReview, TrustSummary } from "@/schema/trust";
 import { prisma } from "./db";
 
@@ -18,8 +19,51 @@ const REVIEW_SELECT = {
   ownerReply: true,
   ownerRepliedAt: true,
   createdAt: true,
-  author: { select: { id: true, username: true, name: true, avatarUrl: true } },
+  author: {
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      avatarUrl: true,
+      private: true,
+    },
+  },
 } as const;
+
+type ReviewRow = {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  verifiedPurchase: boolean;
+  ownerReply: string | null;
+  ownerRepliedAt: Date | null;
+  createdAt: Date;
+  author: {
+    id: string;
+    username: string | null;
+    name: string;
+    avatarUrl: string | null;
+    private: boolean;
+  };
+};
+
+const toPublicReview = (row: ReviewRow): PublicReview => ({
+  id: row.id,
+  rating: row.rating,
+  title: row.title,
+  body: row.body,
+  verifiedPurchase: row.verifiedPurchase,
+  ownerReply: row.ownerReply,
+  ownerRepliedAt: row.ownerRepliedAt?.toISOString() ?? null,
+  createdAt: row.createdAt.toISOString(),
+  authorId: row.author.id,
+  authorName: row.author.private
+    ? messages.trust.anonymousReviewer
+    : row.author.name,
+  authorUsername: row.author.private ? null : row.author.username,
+  authorAvatarUrl: row.author.private ? null : row.author.avatarUrl,
+});
 
 const POLICY_SELECT = {
   policyEnabled: true,
@@ -39,6 +83,7 @@ const POLICY_SELECT = {
 const visible = (kind: ResourceKind, id: string) => ({
   ...targetOf(kind, id),
   hiddenAt: null,
+  author: { deletedAt: null, banned: false },
 });
 
 export const getTrustSummary = cache(
@@ -86,20 +131,7 @@ export const listReviews = cache(
       take,
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      rating: row.rating,
-      title: row.title,
-      body: row.body,
-      verifiedPurchase: row.verifiedPurchase,
-      ownerReply: row.ownerReply,
-      ownerRepliedAt: row.ownerRepliedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      authorId: row.author.id,
-      authorName: row.author.name,
-      authorUsername: row.author.username,
-      authorAvatarUrl: row.author.avatarUrl,
-    }));
+    return rows.map(toPublicReview);
   },
 );
 
@@ -175,21 +207,6 @@ export const getViewerReview = cache(
       select: REVIEW_SELECT,
     });
 
-    return row
-      ? {
-          id: row.id,
-          rating: row.rating,
-          title: row.title,
-          body: row.body,
-          verifiedPurchase: row.verifiedPurchase,
-          ownerReply: row.ownerReply,
-          ownerRepliedAt: row.ownerRepliedAt?.toISOString() ?? null,
-          createdAt: row.createdAt.toISOString(),
-          authorId: row.author.id,
-          authorName: row.author.name,
-          authorUsername: row.author.username,
-          authorAvatarUrl: row.author.avatarUrl,
-        }
-      : null;
+    return row ? toPublicReview(row) : null;
   },
 );
