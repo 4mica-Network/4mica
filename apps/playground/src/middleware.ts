@@ -74,7 +74,7 @@ export const config = {
   matcher: [
     // Skip Next internals and anything that looks like a static file, unless
     // it appears in a search param.
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/((?!_next|api/(?:health|og|revalidate)|\\.well-known|sitemap-profiles\\.xml|[^?]*/llms\\.txt|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api(?!/(?:health|og|revalidate)(?:/|$))|trpc)(.*)",
   ],
 };

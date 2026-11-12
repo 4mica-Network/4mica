@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { parseUsername } from "@/schema/params";
+import { ownerTag } from "@/services/cache";
 import { getViewer } from "@/services/viewer";
 import { type ActionResult, profileTag } from "./shared";
 
@@ -31,6 +32,7 @@ export const revalidateProfile = async (
   // updateTag gives read-your-own-writes semantics so the owner sees the fresh
   // page on the very next render instead of one navigation later.
   updateTag(profileTag(parsed));
+  updateTag(ownerTag(viewer.id));
   revalidatePath(`/${parsed}`, "layout");
 
   return { ok: true };

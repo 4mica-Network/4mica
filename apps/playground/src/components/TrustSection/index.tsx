@@ -30,15 +30,16 @@ export async function TrustSection({
   profile,
   publishedAt,
 }: TrustSectionProps) {
-  const viewer = await getViewer();
-  const [summary, policy, reviews, faqs] = await Promise.all([
+  const [viewer, existing, summary, policy, reviews, faqs] = await Promise.all([
+    getViewer(),
+    getViewer().then((current) =>
+      current ? getViewerReview(kind, id, current.id) : null,
+    ),
     getTrustSummary(kind, id),
     getPolicy(kind, id),
     listReviews(kind, id),
     listFaqs(kind, id),
   ]);
-
-  const existing = viewer ? await getViewerReview(kind, id, viewer.id) : null;
   const resource = {
     kind,
     id,
@@ -82,6 +83,15 @@ export async function TrustSection({
           />
         )}
       </section>
+    </div>
+  );
+}
+
+export function TrustSectionSkeleton() {
+  return (
+    <div aria-busy="true" className="flex flex-col gap-8">
+      <div className="h-40 animate-pulse rounded-lg bg-overlay/5" />
+      <div className="h-24 animate-pulse rounded-lg bg-overlay/5" />
     </div>
   );
 }

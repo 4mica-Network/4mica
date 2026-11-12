@@ -1,7 +1,7 @@
 import { initials } from "@4mica/ui";
 import { ImageResponse } from "next/og";
 import { parseUsername } from "@/schema/params";
-import { getPublicProfile } from "@/services/profile";
+import { getAnonymousProfile } from "@/services/profile";
 import { SITE_NAME } from "@/services/seo";
 
 export const revalidate = 3600;
@@ -29,7 +29,7 @@ interface RouteContext {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const username = parseUsername((await params).username);
-  const result = username ? await getPublicProfile(username) : null;
+  const result = username ? await getAnonymousProfile(username) : null;
 
   const isPublic = result?.profile.isPublished ?? false;
   const profile = isPublic ? result?.profile : undefined;
@@ -128,6 +128,12 @@ export async function GET(_request: Request, { params }: RouteContext) {
         {SITE_NAME}
       </div>
     </div>,
-    OG_SIZE,
+    {
+      ...OG_SIZE,
+      headers: {
+        "cache-control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    },
   );
 }

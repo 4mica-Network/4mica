@@ -3,6 +3,7 @@ import { BookText, CalendarDays, Globe, UserRound, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { CardShell } from "@/components/CardShell";
 import { CopyValue } from "@/components/CopyValue";
 import {
@@ -23,13 +24,13 @@ import {
 import { RevealLink } from "@/components/RevealLink";
 import { type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
-import { TrustSection } from "@/components/TrustSection";
+import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildAgentDescriptor } from "@/lib/descriptor";
 import { isSellable } from "@/lib/snippets/agent";
 import { links } from "@/services/links";
-import { getPayerState } from "@/services/payer";
+import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
@@ -60,6 +61,7 @@ export async function generateMetadata({
 }
 
 export default async function AgentPage({ params }: ProfileChildPageProps) {
+  preloadPayerState();
   const resolved = await resolveAgent(await params);
 
   if (!resolved) {
@@ -179,13 +181,15 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
     title: messages.flow.reviews,
     icon: "reviews",
     content: (
-      <TrustSection
-        id={agent.id}
-        kind="agent"
-        profile={profile}
-        publishedAt={agent.publishedAt}
-        resourceRef={agent.ref}
-      />
+      <Suspense fallback={<TrustSectionSkeleton />}>
+        <TrustSection
+          id={agent.id}
+          kind="agent"
+          profile={profile}
+          publishedAt={agent.publishedAt}
+          resourceRef={agent.ref}
+        />
+      </Suspense>
     ),
   };
 

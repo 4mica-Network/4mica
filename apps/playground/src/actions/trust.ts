@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import * as v from "valibot";
 import {
   FileReportSchema,
@@ -8,6 +8,7 @@ import {
   ResourceRefSchema,
   SubmitReviewSchema,
 } from "@/schema/trust";
+import { resourceTag } from "@/services/cache";
 import { prisma } from "@/services/db";
 import {
   hasSettledPayment,
@@ -78,7 +79,9 @@ const resolveTarget = async (
   };
 };
 
-const revalidateTarget = (target: Target): void => {
+const revalidateTarget = (target: Target, resource: ResourceRef): void => {
+  updateTag(resourceTag(resource.kind, resource.id));
+
   if (target.path) {
     revalidatePath(target.path);
   }
@@ -149,7 +152,7 @@ export const submitReview = async (
     },
   });
 
-  revalidateTarget(target);
+  revalidateTarget(target, resource);
 
   return { ok: true };
 };
@@ -183,7 +186,7 @@ export const deleteOwnReview = async (
   const target = await resolveTarget(resource, { publicOnly: false });
 
   if (target) {
-    revalidateTarget(target);
+    revalidateTarget(target, resource);
   }
 
   return { ok: true };

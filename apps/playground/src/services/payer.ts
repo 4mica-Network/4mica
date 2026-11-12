@@ -11,22 +11,34 @@ export type PayerState =
   | { step: "wrong-network"; networks: PaymentNetwork[] }
   | { step: "ready"; address: string };
 
+const getPayerWallets = cache(async () => {
+  const viewer = await getViewer();
+
+  if (!viewer) {
+    return null;
+  }
+
+  return prisma.wallet.findMany({
+    where: {
+      ownerId: viewer.id,
+      status: "ACTIVE",
+      role: { in: ["PAYER", "BOTH"] },
+    },
+    select: { address: true, network: true },
+  });
+});
+
+export const preloadPayerState = (): void => {
+  void getPayerWallets();
+};
+
 export const getPayerState = cache(
   async (network: PaymentNetwork | null): Promise<PayerState> => {
-    const viewer = await getViewer();
+    const wallets = await getPayerWallets();
 
-    if (!viewer) {
+    if (!wallets) {
       return { step: "signed-out" };
     }
-
-    const wallets = await prisma.wallet.findMany({
-      where: {
-        ownerId: viewer.id,
-        status: "ACTIVE",
-        role: { in: ["PAYER", "BOTH"] },
-      },
-      select: { address: true, network: true },
-    });
 
     if (wallets.length === 0) {
       return { step: "no-wallet" };
