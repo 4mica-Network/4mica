@@ -5,6 +5,7 @@ import { publicEnv } from "@/env";
 import fontVariables from "@/fonts";
 import { themeInitScript } from "@/lib/theme";
 import { SITE_NAME } from "@/services/seo";
+import { getNonce } from "@/utils/nonce";
 import "@/style/globals.css";
 
 export const metadata: Metadata = {
@@ -31,15 +32,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
+  const nonce = await getNonce();
+
   return (
     <html className="dark" lang="en" suppressHydrationWarning={true}>
       <head>
         <link rel="preconnect" href="https://img.clerk.com" />
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input.
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+          nonce={nonce}
+          suppressHydrationWarning={true}
+        />
       </head>
       <body
         suppressHydrationWarning={true}

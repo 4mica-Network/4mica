@@ -1,14 +1,20 @@
 import { isReservedSegment } from "@4mica/url";
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  buildContentSecurityPolicy,
+  clerkFrontendApi,
+  createNonce,
+  NONCE_HEADER,
+} from "@/utils/csp";
 import { PATHNAME_HEADER } from "@/utils/pathnameHeader";
 
 /**
  * Runs on the Edge runtime.
  *
  * It must NEVER import @/logger (winston needs fs), @/services/* or @4mica/db
- * (Prisma cannot run here). Only @4mica/url — which is pure string work —
- * @clerk/nextjs/server, and next/server. A violation fails the build, loudly,
+ * (Prisma cannot run here). Only @4mica/url and @/utils — which are pure string
+ * work — @clerk/nextjs/server, and next/server. A violation fails the build, loudly,
  * which is the intended safety net.
  *
  * Note: Next 16 deprecates the `middleware` file convention in favour of
@@ -22,10 +28,28 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_-]{2,64}$/;
 const rest = (segments: string[]): string =>
   segments.length > 1 ? `/${segments.slice(1).join("/")}` : "";
 
+const CLERK_HOST = clerkFrontendApi(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+);
+
+const CSP_HEADER = "content-security-policy";
+
 const passThrough = (request: NextRequest) => {
+  const nonce = createNonce();
+  const policy = buildContentSecurityPolicy({
+    nonce,
+    clerkHost: CLERK_HOST,
+    development: process.env.NODE_ENV === "development",
+  });
+
   const headers = new Headers(request.headers);
   headers.set(PATHNAME_HEADER, request.nextUrl.pathname);
-  return NextResponse.next({ request: { headers } });
+  headers.set(NONCE_HEADER, nonce);
+  headers.set(CSP_HEADER, policy);
+
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set(CSP_HEADER, policy);
+  return response;
 };
 
 export default clerkMiddleware(async (_auth, request) => {

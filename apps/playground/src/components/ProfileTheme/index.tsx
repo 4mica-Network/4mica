@@ -10,7 +10,13 @@ import {
   watchSystemTheme,
 } from "@/lib/theme";
 
-export function ProfileTheme({ preference }: { preference: ThemePreference }) {
+export function ProfileTheme({
+  nonce,
+  preference,
+}: {
+  nonce?: string;
+  preference: ThemePreference;
+}) {
   useLayoutEffect(() => {
     const apply = () => applyTheme(resolveTheme(preference));
     apply();
@@ -26,6 +32,7 @@ export function ProfileTheme({ preference }: { preference: ThemePreference }) {
     <script
       // biome-ignore lint/security/noDangerouslySetInnerHtml: static script built from a validated three-value preference, no user text.
       dangerouslySetInnerHTML={{ __html: preferenceScript(preference) }}
+      nonce={nonce}
       suppressHydrationWarning
     />
   );
