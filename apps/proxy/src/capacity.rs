@@ -6,8 +6,6 @@ use redis::aio::ConnectionManager;
 
 use entities::account;
 
-use crate::providers::Route;
-
 #[derive(Debug, PartialEq)]
 pub enum Check {
     Cooldown {
@@ -28,6 +26,15 @@ pub enum Check {
         max: u32,
         ttl_ms: u64,
     },
+}
+
+/// What one call asks of an account.
+pub struct Demand<'a> {
+    pub bucket: &'a str,
+    pub class: Option<&'a str>,
+    pub cost: u64,
+    /// How long a concurrency slot is held if the lease is never released.
+    pub lease_ttl: Duration,
 }
 
 pub struct Lease {
@@ -54,7 +61,7 @@ pub fn payer_check(provider: &str, payer: &str, per_minute: u32, now: DateTime<U
 pub fn credential_checks(
     credential_id: i64,
     account: &account::Model,
-    route: &Route,
+    demand: &Demand,
     now: DateTime<Utc>,
 ) -> Vec<Check> {
     let limits = &account.limits;
@@ -63,20 +70,20 @@ pub fn credential_checks(
         key: cooldown_key(credential_id),
     }];
 
-    if let Some(rate) = limits.rates.get(route.bucket) {
+    if let Some(rate) = limits.rates.get(demand.bucket) {
         let window_ms = rate.per_secs * 1000;
         let window = now.timestamp_millis() as u64 / window_ms;
         checks.push(Check::Rate {
-            key: format!("proxy:rate:{account}:{}:{window}", route.bucket),
+            key: format!("proxy:rate:{account}:{}:{window}", demand.bucket),
             max: rate.max,
             window_ms,
         });
     }
-    if let Some(&max) = route.class.and_then(|c| limits.concurrency.get(c)) {
+    if let Some(&max) = demand.class.and_then(|c| limits.concurrency.get(c)) {
         checks.push(Check::Concurrency {
-            key: format!("proxy:conc:{account}:{}", route.class.unwrap_or_default()),
+            key: format!("proxy:conc:{account}:{}", demand.class.unwrap_or_default()),
             max,
-            ttl_ms: (route.timeout + Duration::from_secs(5)).as_millis() as u64,
+            ttl_ms: demand.lease_ttl.as_millis() as u64,
         });
     }
     if let Some(max) = limits.monthly_quota {
@@ -84,7 +91,7 @@ pub fn credential_checks(
         checks.push(Check::Quota {
             key: format!("proxy:quota:{account}:{}", now.format("%Y-%m")),
             max,
-            cost: route.cost,
+            cost: demand.cost,
         });
     }
     checks
@@ -179,12 +186,12 @@ mod tests {
     use super::*;
     use entities::account::{Limits, Rate};
 
-    fn route() -> Route {
-        Route {
+    fn demand() -> Demand<'static> {
+        Demand {
             bucket: "scrape",
             class: Some("browser"),
             cost: 5,
-            timeout: Duration::from_secs(30),
+            lease_ttl: Duration::from_secs(35),
         }
     }
 
@@ -203,7 +210,7 @@ mod tests {
     fn unconfigured_account_only_checks_cooldown() {
         let now = Utc::now();
         assert_eq!(
-            credential_checks(7, &account(Limits::default()), &route(), now),
+            credential_checks(7, &account(Limits::default()), &demand(), now),
             vec![Check::Cooldown {
                 key: "proxy:cooldown:7".into()
             }]
@@ -229,7 +236,7 @@ mod tests {
         };
         let window = now.timestamp_millis() / 60_000;
         assert_eq!(
-            credential_checks(7, &account(limits), &route(), now),
+            credential_checks(7, &account(limits), &demand(), now),
             vec![
                 Check::Cooldown {
                     key: "proxy:cooldown:7".into()

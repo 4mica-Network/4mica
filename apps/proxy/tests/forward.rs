@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Json;
@@ -19,29 +18,17 @@ use entities::invocation::InvocationStatus;
 use entities::{account, credential, invocation, seller};
 use migration::{Migrator, MigratorTrait};
 use proxy_4mica::capacity::Capacity;
-use proxy_4mica::providers::{Provider, Route};
+use proxy_4mica::providers::{Auth, Provider, Route};
 use proxy_4mica::{App, router};
 
-struct Fake {
-    base_url: String,
-}
-
-impl Provider for Fake {
-    fn id(&self) -> &'static str {
-        "fake"
-    }
-
-    fn base_url(&self) -> &str {
-        &self.base_url
-    }
-
-    fn route(&self, method: &Method, path: &str, _body: &[u8]) -> Option<Route> {
-        matches!((method, path), (&Method::POST, "/v1/echo" | "/v1/busy")).then_some(Route {
-            bucket: "echo",
-            class: Some("slot"),
-            cost: 2,
-            timeout: Duration::from_secs(5),
-        })
+fn fake(base_url: String) -> Provider {
+    Provider {
+        id: "fake",
+        base_url,
+        auth: Auth::Bearer,
+        timeout: Duration::from_secs(5),
+        cost_field: Some("/creditsUsed"),
+        routes: vec![Route::new(Method::POST, "/v1/", "echo", Some("slot"))],
     }
 }
 
@@ -69,7 +56,7 @@ async fn forwards_and_enforces_capacity() {
                 "/v1/echo",
                 post(|headers: HeaderMap, body: String| async move {
                     Json(
-                        json!({ "auth": headers["authorization"].to_str().unwrap(), "body": body }),
+                        json!({ "auth": headers["authorization"].to_str().unwrap(), "body": body, "creditsUsed": 1 }),
                     )
                 }),
             )
@@ -134,11 +121,10 @@ async fn forwards_and_enforces_capacity() {
     // SAFETY: set before the proxy starts; no other thread reads the environment yet.
     unsafe { std::env::set_var("PROXY_TEST_KEY", "secret") };
 
-    let fake: Arc<dyn Provider> = Arc::new(Fake { base_url: upstream });
     let proxy = serve(router(App {
         db: db.clone(),
         capacity: capacity.clone(),
-        providers: [("fake", fake)].into(),
+        providers: [("fake", fake(upstream))].into(),
         http: reqwest::Client::new(),
         payer_rate_per_minute: 60,
     }))
@@ -150,6 +136,7 @@ async fn forwards_and_enforces_capacity() {
             .bearer_auth(&token)
             .header("x-invocation-id", format!("{id}-{run}"))
             .header("x-payer", format!("payer-{run}"))
+            .header("x-max-cost", "2")
             .body("hello")
             .send()
     };
@@ -163,10 +150,22 @@ async fn forwards_and_enforces_capacity() {
 
     let ok = call("/v1/echo", "a").await.unwrap();
     assert_eq!(ok.status(), StatusCode::OK);
+    assert_eq!(ok.headers()["x-proxy-cost"], "1");
+    assert!(ok.headers().contains_key("x-proxy-credential"));
     assert_eq!(
         serde_json::from_str::<Value>(&ok.text().await.unwrap()).unwrap(),
-        json!({ "auth": "Bearer secret", "body": "hello" })
+        json!({ "auth": "Bearer secret", "body": "hello", "creditsUsed": 1 })
     );
+
+    let uncapped = http
+        .post(format!("{proxy}/fake/v1/echo"))
+        .bearer_auth(&token)
+        .header("x-invocation-id", format!("u-{run}"))
+        .header("x-payer", format!("payer-{run}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(uncapped.status(), StatusCode::BAD_REQUEST);
 
     assert_eq!(
         call("/v1/echo", "a").await.unwrap().status(),
@@ -179,10 +178,12 @@ async fn forwards_and_enforces_capacity() {
 
     let busy = call("/v1/busy", "b").await.unwrap();
     assert_eq!(busy.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(busy.headers()["x-proxy-cost"], "0");
     assert_eq!(busy.text().await.unwrap(), "slow down");
 
     let cooling = call("/v1/echo", "c").await.unwrap();
     assert_eq!(cooling.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(!cooling.headers().contains_key("x-proxy-cost"));
     assert_eq!(
         serde_json::from_str::<Value>(&cooling.text().await.unwrap()).unwrap()["code"],
         "capacity_exhausted"
@@ -200,7 +201,7 @@ async fn forwards_and_enforces_capacity() {
     assert_eq!(
         statuses,
         vec![
-            (InvocationStatus::Succeeded, Some(2)),
+            (InvocationStatus::Succeeded, Some(1)),
             (InvocationStatus::Rejected, Some(0)),
             (InvocationStatus::Rejected, None)
         ]
@@ -220,5 +221,5 @@ async fn forwards_and_enforces_capacity() {
         .query_async(&mut conn)
         .await
         .unwrap();
-    assert_eq!(used, 2);
+    assert_eq!(used, 1);
 }

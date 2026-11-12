@@ -5,7 +5,7 @@ use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, RETRY_AFTER};
-use axum::http::{HeaderMap, Method, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
 use reqwest::RequestBuilder;
@@ -13,15 +13,25 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use tracing::error;
 
+use entities::credential;
 use entities::invocation::InvocationStatus;
-use entities::{account, credential};
 
 use crate::App;
-use crate::capacity::{Lease, credential_checks, payer_check};
-use crate::providers::{Provider, Route};
+use crate::capacity::{Demand, Lease, credential_checks, payer_check};
+use crate::providers::Provider;
 use crate::repo::invocations::{self, NewInvocation, Outcome};
 use crate::repo::{credentials, sellers};
 
+/// Request: the most the call may cost, in the provider's units. Reserved from quota up front.
+pub const MAX_COST_HEADER: &str = "x-max-cost";
+/// Response: what the call actually cost, in the provider's units. Absent when the call never
+/// reached the provider.
+pub const COST_HEADER: &str = "x-proxy-cost";
+/// Response: the credential that served the call. Request: pin a follow-up call (e.g. polling an
+/// async job) to that same credential.
+pub const CREDENTIAL_HEADER: &str = "x-proxy-credential";
+
+/// Forwards a seller's call to the provider once the payer and an account have capacity for it.
 pub async fn handle(
     State(app): State<Arc<App>>,
     Path((provider_id, path)): Path<(String, String)>,
@@ -39,20 +49,16 @@ pub async fn handle(
         )
     })?;
     let path = format!("/{path}");
-    let route = provider.route(&method, &path, &body).ok_or_else(|| {
-        ApiError::new(
-            StatusCode::NOT_FOUND,
-            "unknown_endpoint",
-            "this endpoint is not offered",
-        )
-    })?;
     let invocation_id = required_header(&headers, "x-invocation-id")?;
     let payer = required_header(&headers, "x-payer")?;
+    let max_cost: u64 = parse_header(&headers, MAX_COST_HEADER)?
+        .ok_or_else(|| invalid_request(format!("{MAX_COST_HEADER} header is required")))?;
+    let pinned: Option<i64> = parse_header(&headers, CREDENTIAL_HEADER)?;
 
     let invocation = NewInvocation {
         id: invocation_id,
         seller_id,
-        provider: provider.id(),
+        provider: provider.id,
         payer,
         method: method.as_str(),
         path: &path,
@@ -65,7 +71,15 @@ pub async fn handle(
         ));
     }
 
-    let mut url = format!("{}{path}", provider.base_url());
+    let (bucket, class) = provider.limits_for(&method, &path);
+    let demand = Demand {
+        bucket,
+        class,
+        cost: max_cost,
+        lease_ttl: provider.timeout + Duration::from_secs(5),
+    };
+
+    let mut url = format!("{}{path}", provider.base_url);
     if let Some(query) = query {
         url = format!("{url}?{query}");
     }
@@ -78,44 +92,49 @@ pub async fn handle(
     let request = app
         .http
         .request(method, url)
-        .timeout(route.timeout)
+        .timeout(provider.timeout)
         .headers(forwarded)
         .body(body);
 
     let started = Instant::now();
-    let (response, outcome) = match admit(&app, provider.id(), payer, &route, invocation_id).await {
-        Ok((credential, _, key, lease)) => {
-            let done = send(
-                &app,
-                provider.as_ref(),
-                &route,
-                credential.id,
-                provider.authorize(request, &key),
-            )
-            .await;
-            if let Err(err) = app.capacity.release(lease, done.cost).await {
-                error!(invocation_id, %err, "failed to release capacity lease");
+    let (response, outcome) =
+        match lease_credential(&app, provider.id, payer, &demand, pinned, invocation_id).await {
+            Ok((credential, key, lease)) => {
+                let done = send(
+                    &app,
+                    provider,
+                    credential.id,
+                    max_cost,
+                    provider.authorize(request, &key),
+                )
+                .await;
+                if let Err(err) = app.capacity.release(lease, done.cost).await {
+                    error!(invocation_id, %err, "failed to release capacity lease");
+                }
+                let outcome = Outcome {
+                    status: done.status,
+                    credential_id: Some(credential.id),
+                    upstream_status: done.upstream_status.map(i32::from),
+                    cost: Some(done.cost as i64),
+                    latency_ms: Some(started.elapsed().as_millis() as i32),
+                };
+                let mut response = done.response;
+                let headers = response.headers_mut();
+                headers.insert(COST_HEADER, HeaderValue::from(done.cost));
+                headers.insert(CREDENTIAL_HEADER, HeaderValue::from(credential.id));
+                (response, outcome)
             }
-            let outcome = Outcome {
-                status: done.status,
-                credential_id: Some(credential.id),
-                upstream_status: done.upstream_status.map(i32::from),
-                cost: Some(done.cost as i64),
-                latency_ms: Some(started.elapsed().as_millis() as i32),
-            };
-            (done.response, outcome)
-        }
-        Err(err) => (
-            err.into_response(),
-            Outcome {
-                status: InvocationStatus::Rejected,
-                credential_id: None,
-                upstream_status: None,
-                cost: None,
-                latency_ms: None,
-            },
-        ),
-    };
+            Err(err) => (
+                err.into_response(),
+                Outcome {
+                    status: InvocationStatus::Rejected,
+                    credential_id: None,
+                    upstream_status: None,
+                    cost: None,
+                    latency_ms: None,
+                },
+            ),
+        };
 
     if let Err(err) = invocations::finish(&app.db, invocation_id, outcome).await {
         error!(invocation_id, %err, "failed to record invocation outcome");
@@ -123,6 +142,7 @@ pub async fn handle(
     Ok(response)
 }
 
+/// Resolves the seller from its bearer token.
 async fn authenticate(app: &App, headers: &HeaderMap) -> Result<i64, ApiError> {
     let unauthorized = || {
         ApiError::new(
@@ -143,6 +163,7 @@ async fn authenticate(app: &App, headers: &HeaderMap) -> Result<i64, ApiError> {
         .ok_or_else(unauthorized)
 }
 
+/// Reads a header that must be present and 1-128 characters long.
 fn required_header<'a>(headers: &'a HeaderMap, name: &'static str) -> Result<&'a str, ApiError> {
     headers
         .get(name)
@@ -158,23 +179,52 @@ fn required_header<'a>(headers: &'a HeaderMap, name: &'static str) -> Result<&'a
         })
 }
 
-async fn admit(
+/// Parses an optional header, rejecting values that do not parse.
+fn parse_header<T: std::str::FromStr>(
+    headers: &HeaderMap,
+    name: &str,
+) -> Result<Option<T>, ApiError> {
+    let Some(value) = headers.get(name) else {
+        return Ok(None);
+    };
+    value
+        .to_str()
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .map(Some)
+        .ok_or_else(|| invalid_request(format!("{name} header is not a valid number")))
+}
+
+/// A 400 with the given message.
+fn invalid_request(message: String) -> ApiError {
+    ApiError::new(StatusCode::BAD_REQUEST, "invalid_request", message)
+}
+
+/// Picks the first credential whose limits all have room, and takes the capacity it needs.
+async fn lease_credential(
     app: &App,
     provider: &str,
     payer: &str,
-    route: &Route,
+    demand: &Demand<'_>,
+    pinned: Option<i64>,
     lease_id: &str,
-) -> Result<(credential::Model, account::Model, String, Lease), ApiError> {
+) -> Result<(credential::Model, String, Lease), ApiError> {
     let now = Utc::now();
-    for (credential, account) in credentials::candidates(&app.db, provider).await? {
+    let candidates = credentials::candidates(&app.db, provider, pinned).await?;
+    if pinned.is_some() && candidates.is_empty() {
+        return Err(invalid_request(format!(
+            "{CREDENTIAL_HEADER} names no usable credential"
+        )));
+    }
+    for (credential, account) in candidates {
         let Ok(key) = std::env::var(&credential.key_env) else {
             error!(credential = credential.id, env = %credential.key_env, "credential key is not set");
             continue;
         };
         let mut checks = vec![payer_check(provider, payer, app.payer_rate_per_minute, now)];
-        checks.extend(credential_checks(credential.id, &account, route, now));
+        checks.extend(credential_checks(credential.id, &account, demand, now));
         match app.capacity.acquire(&checks, lease_id, now).await? {
-            Ok(lease) => return Ok((credential, account, key, lease)),
+            Ok(lease) => return Ok((credential, key, lease)),
             Err(0) => {
                 return Err(ApiError::new(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -199,11 +249,12 @@ struct Done {
     cost: u64,
 }
 
+/// Calls the provider; cost is its report, else `max_cost` on success or unknown outcome and 0 on failure.
 async fn send(
     app: &App,
-    provider: &dyn Provider,
-    route: &Route,
+    provider: &Provider,
     credential_id: i64,
+    max_cost: u64,
     request: RequestBuilder,
 ) -> Done {
     let failed = |code, message: &str, status, cost| Done {
@@ -223,13 +274,12 @@ async fn send(
                 0,
             );
         }
-        // The provider may have done the work, so the reserved cost stays charged.
         Err(err) if err.is_timeout() => {
             return failed(
                 StatusCode::GATEWAY_TIMEOUT,
                 "provider timed out",
                 InvocationStatus::Unknown,
-                route.cost,
+                max_cost,
             );
         }
         Err(_) => {
@@ -237,7 +287,7 @@ async fn send(
                 StatusCode::BAD_GATEWAY,
                 "provider request failed",
                 InvocationStatus::Unknown,
-                route.cost,
+                max_cost,
             );
         }
     };
@@ -254,9 +304,10 @@ async fn send(
             StatusCode::BAD_GATEWAY,
             "provider response was cut off",
             InvocationStatus::Unknown,
-            route.cost,
+            max_cost,
         );
     };
+    let reported = provider.reported_cost(&body);
 
     let (state, cost) = match status {
         StatusCode::TOO_MANY_REQUESTS => {
@@ -266,12 +317,12 @@ async fn send(
                 retry_after.unwrap_or(Duration::from_secs(60)),
             )
             .await;
-            (InvocationStatus::Rejected, 0)
+            (InvocationStatus::Rejected, reported.unwrap_or(0))
         }
         StatusCode::PAYMENT_REQUIRED => {
             error!(
                 credential = credential_id,
-                provider = provider.id(),
+                provider = provider.id,
                 "provider account is out of credits"
             );
             cool_down(app, credential_id, Duration::from_secs(3600)).await;
@@ -284,17 +335,11 @@ async fn send(
                 .into_response(),
                 status: InvocationStatus::Failed,
                 upstream_status: Some(status.as_u16()),
-                cost: 0,
+                cost: reported.unwrap_or(0),
             };
         }
-        _ if status.is_success() => (
-            InvocationStatus::Succeeded,
-            provider.cost(route, status, &body),
-        ),
-        _ => (
-            InvocationStatus::Failed,
-            provider.cost(route, status, &body),
-        ),
+        _ if status.is_success() => (InvocationStatus::Succeeded, reported.unwrap_or(max_cost)),
+        _ => (InvocationStatus::Failed, reported.unwrap_or(0)),
     };
 
     let mut response = (status, body).into_response();
@@ -309,6 +354,7 @@ async fn send(
     }
 }
 
+/// Takes a credential out of rotation for a while, logging rather than failing if that cannot be stored.
 async fn cool_down(app: &App, credential_id: i64, for_: Duration) {
     if let Err(err) = app.capacity.cool_down(credential_id, for_).await {
         error!(credential = credential_id, %err, "failed to cool down credential");
@@ -323,6 +369,7 @@ pub struct ApiError {
 }
 
 impl ApiError {
+    /// An error with a stable machine-readable code.
     fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
         Self {
             status,
@@ -331,6 +378,7 @@ impl ApiError {
         }
     }
 
+    /// Logs the cause and returns a 500 that does not leak it.
     fn internal(err: impl std::fmt::Display) -> Self {
         error!(%err, "internal error");
         Self::new(
@@ -342,18 +390,21 @@ impl ApiError {
 }
 
 impl From<sea_orm::DbErr> for ApiError {
+    /// Database failures surface as an opaque 500.
     fn from(err: sea_orm::DbErr) -> Self {
         Self::internal(err)
     }
 }
 
 impl From<redis::RedisError> for ApiError {
+    /// Valkey failures surface as an opaque 500.
     fn from(err: redis::RedisError) -> Self {
         Self::internal(err)
     }
 }
 
 impl IntoResponse for ApiError {
+    /// Renders as `{ "code", "message" }` with the error's status.
     fn into_response(self) -> Response {
         (
             self.status,
