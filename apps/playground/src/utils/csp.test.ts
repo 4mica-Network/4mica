@@ -3,6 +3,7 @@ import {
   buildContentSecurityPolicy,
   clerkFrontendApi,
   createNonce,
+  sentryEndpoints,
 } from "./csp";
 
 const keyFor = (host: string, env = "test") => `pk_${env}_${btoa(`${host}$`)}`;
@@ -78,5 +79,48 @@ describe("buildContentSecurityPolicy", () => {
     });
 
     expect(directive(dev, "script-src")).toContain("'unsafe-eval'");
+  });
+});
+
+describe("sentryEndpoints", () => {
+  const dsn = "https://abc123@o42.ingest.us.sentry.io/4507";
+
+  it("derives the ingest origin and the CSP report endpoint from a DSN", () => {
+    expect(sentryEndpoints(dsn, "prod")).toEqual({
+      origin: "https://o42.ingest.us.sentry.io",
+      reportUri:
+        "https://o42.ingest.us.sentry.io/api/4507/security/?sentry_key=abc123&sentry_environment=prod",
+    });
+  });
+
+  it("returns null for a missing or malformed DSN", () => {
+    expect(sentryEndpoints(undefined)).toBeNull();
+    expect(sentryEndpoints("")).toBeNull();
+    expect(sentryEndpoints("not a url")).toBeNull();
+    expect(sentryEndpoints("http://abc@o42.ingest.sentry.io/1")).toBeNull();
+    expect(sentryEndpoints("https://o42.ingest.sentry.io/1")).toBeNull();
+    expect(sentryEndpoints("https://abc@o42.ingest.sentry.io/x")).toBeNull();
+  });
+
+  it("is added to connect-src and report-uri only when configured", () => {
+    const sentry = sentryEndpoints(dsn);
+    const policy = buildContentSecurityPolicy({
+      nonce: "n",
+      clerkHost: null,
+      sentry,
+      development: false,
+    });
+    expect(directive(policy, "connect-src")).toContain(
+      "https://o42.ingest.us.sentry.io",
+    );
+    expect(directive(policy, "report-uri")).toEqual([sentry?.reportUri]);
+
+    const without = buildContentSecurityPolicy({
+      nonce: "n",
+      clerkHost: null,
+      development: false,
+    });
+    expect(without).not.toContain("report-uri");
+    expect(without).not.toContain("sentry");
   });
 });
