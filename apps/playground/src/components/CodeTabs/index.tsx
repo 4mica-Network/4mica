@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@4mica/ui";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { type ReactNode, useId, useState } from "react";
 
 export interface CodeTabsProps {
@@ -39,7 +39,7 @@ export function CodeTabs({ tabs }: CodeTabsProps) {
               type="button"
             >
               {selected && (
-                <motion.span
+                <m.span
                   aria-hidden="true"
                   className="absolute inset-0 rounded bg-overlay/6"
                   layoutId={`${baseId}-pill`}

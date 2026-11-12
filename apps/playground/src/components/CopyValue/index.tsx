@@ -2,7 +2,7 @@
 
 import { cn } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { Check, Copy } from "lucide-react";
 import { CopyToast } from "@/components/CopyToast";
 import { messages } from "@/i18n";
@@ -46,7 +46,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
       <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
         <AnimatePresence initial={false} mode="wait">
           {copied ? (
-            <motion.span
+            <m.span
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.7 }}
               initial={{ opacity: 0, scale: 0.7 }}
@@ -58,9 +58,9 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
               }
             >
               <Check aria-hidden="true" className="h-3.5 w-3.5 text-success" />
-            </motion.span>
+            </m.span>
           ) : (
-            <motion.span
+            <m.span
               animate={{ opacity: 1 }}
               className="text-ink-subtle opacity-100 transition-opacity group-hover/copy:opacity-100 group-focus-visible/copy:opacity-100 md:opacity-0"
               exit={{ opacity: 0 }}
@@ -69,14 +69,14 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
               transition={{ duration: 0.12 }}
             >
               <Copy aria-hidden="true" className="h-3.5 w-3.5" />
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </span>
 
       <AnimatePresence>
         {copied && (
-          <motion.span
+          <m.span
             animate={{ opacity: 1, y: 0, scale: 1 }}
             aria-hidden="true"
             className="pointer-events-none absolute -top-7 left-1/2 z-10 rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm max-md:hidden"
@@ -90,7 +90,7 @@ export function CopyValue({ value, label, mono, className }: CopyValueProps) {
             }
           >
             {messages.integration.copied}
-          </motion.span>
+          </m.span>
         )}
       </AnimatePresence>
       <CopyToast note={copied ? messages.integration.copied : null} />

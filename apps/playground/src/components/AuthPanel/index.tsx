@@ -4,7 +4,7 @@ import { Button, Spinner } from "@4mica/ui";
 import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn, useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -104,7 +104,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   };
 
   return (
-    <motion.div
+    <m.div
       animate={{ opacity: 1 }}
       className="flex h-full w-full flex-col overflow-y-auto bg-surface-deep pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
       initial={reduceMotion ? false : { opacity: 0 }}
@@ -175,6 +175,6 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           </span>
         </a>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

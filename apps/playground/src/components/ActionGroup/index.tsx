@@ -4,7 +4,7 @@ import { cn } from "@4mica/ui";
 import { writeClipboard } from "@4mica/ui/hooks";
 import {
   AnimatePresence,
-  motion,
+  m,
   type Transition,
   useReducedMotion,
 } from "framer-motion";
@@ -99,7 +99,7 @@ export function ActionGroup({
         const isDone = done?.id === id;
 
         return (
-          <motion.button
+          <m.button
             aria-label={isDone ? done.note : (ariaLabel ?? text)}
             className={cn(
               "relative inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
@@ -124,7 +124,7 @@ export function ActionGroup({
             whileTap={reduceMotion ? undefined : { scale: 0.94 }}
           >
             <span className={cn("relative grid place-items-center", iconSize)}>
-              <motion.span
+              <m.span
                 animate={
                   isDone
                     ? { opacity: 0, scale: 0.5, rotate: 45 }
@@ -135,8 +135,8 @@ export function ActionGroup({
                 transition={isDone ? fade : pop}
               >
                 <Icon aria-hidden={true} className={iconSize} />
-              </motion.span>
-              <motion.span
+              </m.span>
+              <m.span
                 animate={
                   isDone
                     ? { opacity: 1, scale: 1, rotate: 0 }
@@ -150,13 +150,13 @@ export function ActionGroup({
                   aria-hidden="true"
                   className={cn(iconSize, "text-success")}
                 />
-              </motion.span>
+              </m.span>
             </span>
             {!iconOnly && text}
 
             <AnimatePresence>
               {isDone && (
-                <motion.span
+                <m.span
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   aria-hidden="true"
                   className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm max-md:hidden"
@@ -165,10 +165,10 @@ export function ActionGroup({
                   transition={pop}
                 >
                   {done.note}
-                </motion.span>
+                </m.span>
               )}
             </AnimatePresence>
-          </motion.button>
+          </m.button>
         );
       })}
       <CopyToast note={done?.note ?? null} />

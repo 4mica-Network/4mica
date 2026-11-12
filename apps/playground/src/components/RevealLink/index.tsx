@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@4mica/ui";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -26,7 +26,7 @@ export function RevealLink({
   const Icon = external ? ExternalLink : ArrowUpRight;
 
   return (
-    <motion.a
+    <m.a
       className={cn("inline-flex items-center text-sm outline-none", className)}
       href={href}
       onBlur={() => setActive(false)}
@@ -44,7 +44,7 @@ export function RevealLink({
         {children}
       </span>
 
-      <motion.span
+      <m.span
         animate={{
           width: active ? ICON_WIDTH : 0,
           opacity: active ? 1 : 0,
@@ -59,7 +59,7 @@ export function RevealLink({
         }
       >
         <Icon className="ml-1.5 h-3.5 w-3.5" />
-      </motion.span>
-    </motion.a>
+      </m.span>
+    </m.a>
   );
 }

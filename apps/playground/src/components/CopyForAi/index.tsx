@@ -3,7 +3,7 @@
 import { cn, Dropdown } from "@4mica/ui";
 import {
   AnimatePresence,
-  motion,
+  m,
   type Transition,
   useReducedMotion,
 } from "framer-motion";
@@ -83,7 +83,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
 
   return (
     <>
-      <motion.button
+      <m.button
         aria-controls={open ? menuId : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -96,15 +96,15 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
       >
         <Sparkles aria-hidden="true" className="h-4 w-4 md:hidden" />
         <span className="max-md:hidden">{messages.ai.trigger}</span>
-        <motion.span
+        <m.span
           animate={{ rotate: open ? 180 : 0 }}
           aria-hidden="true"
           className="text-ink-muted max-md:hidden"
           transition={swap}
         >
           <ChevronDown className="h-4 w-4" />
-        </motion.span>
-      </motion.button>
+        </m.span>
+      </m.button>
 
       {open && (
         <Dropdown
@@ -117,7 +117,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
           placement="bottomLeft"
           placementOffsetY={6}
         >
-          <motion.div
+          <m.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
             aria-label={messages.ai.trigger}
             className="flex min-w-52 flex-col gap-0.5"
@@ -146,7 +146,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                 >
                   <span className="relative grid h-4 w-4 place-items-center">
                     <AnimatePresence initial={false}>
-                      <motion.span
+                      <m.span
                         animate={{ opacity: 1, scale: 1 }}
                         className="absolute inset-0 grid place-items-center"
                         exit={{ opacity: 0, scale: 0.6 }}
@@ -165,14 +165,14 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                             className="h-4 w-4 text-ink-muted"
                           />
                         )}
-                      </motion.span>
+                      </m.span>
                     </AnimatePresence>
                   </span>
                   {isCopied ? messages.ai.copied : item.label}
                 </button>
               );
             })}
-          </motion.div>
+          </m.div>
         </Dropdown>
       )}
     </>
