@@ -1,5 +1,6 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
 import {
   addColors,
   createLogger,
@@ -8,7 +9,9 @@ import {
   transports,
 } from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
+import Transport from "winston-transport";
 import { serverEnv } from "@/env.server";
+import { redactLogInfo } from "@/lib/telemetry";
 
 /**
  * Ported from apps/be/src/logger/loggers.ts so both services produce the same
@@ -31,9 +34,16 @@ addColors({
 
 const { colorize, combine, errors, json, printf, splat, timestamp } = format;
 
-const consoleFormat = combine(
-  errors({ stack: true }),
-  splat(),
+const redact = format((info) => redactLogInfo(info));
+
+const scrubbed = () => combine(errors({ stack: true }), splat(), redact());
+
+const SentryTransport = Sentry.createSentryWinstonTransport(Transport, {
+  levels: ["error", "warn"],
+});
+
+const prettyFormat = combine(
+  scrubbed(),
   timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
   colorize({ level: true }),
   printf((info) => {
@@ -53,12 +63,7 @@ const consoleFormat = combine(
   }),
 );
 
-const fileFormat = combine(
-  errors({ stack: true }),
-  splat(),
-  timestamp(),
-  json(),
-);
+export const jsonFormat = combine(scrubbed(), timestamp(), json());
 
 const rotatingFile = (filename: string, level?: string) =>
   new DailyRotateFile({
@@ -69,17 +74,25 @@ const rotatingFile = (filename: string, level?: string) =>
     maxSize: "20m",
     maxFiles: "14d",
     level,
-    format: fileFormat,
+    format: jsonFormat,
   });
 
-const buildTransports = () =>
-  serverEnv().NODE_ENV === "test"
-    ? [new transports.Console({ format: consoleFormat, silent: true })]
-    : [
-        new transports.Console({ format: consoleFormat }),
-        rotatingFile("app-%DATE%.log"),
-        rotatingFile("error-%DATE%.log", "error"),
-      ];
+const buildTransports = () => {
+  const { NODE_ENV } = serverEnv();
+
+  if (NODE_ENV === "test") {
+    return [new transports.Console({ format: prettyFormat, silent: true })];
+  }
+
+  return [
+    new transports.Console({
+      format: NODE_ENV === "production" ? jsonFormat : prettyFormat,
+    }),
+    rotatingFile("app-%DATE%.log"),
+    rotatingFile("error-%DATE%.log", "error"),
+    new SentryTransport({ format: scrubbed() }),
+  ];
+};
 
 const createScopedLogger = (label: string): Logger =>
   createLogger({

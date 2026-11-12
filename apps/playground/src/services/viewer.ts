@@ -2,7 +2,7 @@ import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 import { cache } from "react";
-import { appLogger } from "@/logger";
+import { requestLogger } from "@/logger";
 import type { SessionIdentity } from "@/types";
 import { prisma } from "./db";
 
@@ -26,9 +26,12 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
   try {
     ({ userId: clerkUserId } = await auth());
   } catch (error) {
-    appLogger.warn("clerk session resolution failed; treating as signed out", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    (await requestLogger()).warn(
+      "clerk session resolution failed; treating as signed out",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
     return null;
   }
 
@@ -71,7 +74,7 @@ export const getSessionIdentity = cache(
       clerkUserId = session.userId;
       claims = (session.sessionClaims ?? {}) as Record<string, unknown>;
     } catch (error) {
-      appLogger.warn(
+      (await requestLogger()).warn(
         "clerk session resolution failed; treating as signed out",
         {
           error: error instanceof Error ? error.message : String(error),

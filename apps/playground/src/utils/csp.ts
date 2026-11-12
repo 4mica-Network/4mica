@@ -17,6 +17,44 @@ export const clerkFrontendApi = (
   }
 };
 
+export interface SentryEndpoints {
+  origin: string;
+  reportUri: string;
+}
+
+export const sentryEndpoints = (
+  dsn: string | undefined,
+  environment?: string,
+): SentryEndpoints | null => {
+  if (!dsn) {
+    return null;
+  }
+
+  try {
+    const url = new URL(dsn);
+    const projectId = url.pathname.replace(/^\/+|\/+$/g, "");
+
+    if (
+      url.protocol !== "https:" ||
+      !url.username ||
+      !/^\d+$/.test(projectId)
+    ) {
+      return null;
+    }
+
+    const report = new URL(`${url.origin}/api/${projectId}/security/`);
+    report.searchParams.set("sentry_key", url.username);
+
+    if (environment) {
+      report.searchParams.set("sentry_environment", environment);
+    }
+
+    return { origin: url.origin, reportUri: report.toString() };
+  } catch {
+    return null;
+  }
+};
+
 export const createNonce = (): string => {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -26,12 +64,14 @@ export const createNonce = (): string => {
 export interface ContentSecurityPolicyOptions {
   nonce: string;
   clerkHost: string | null;
+  sentry?: SentryEndpoints | null;
   development: boolean;
 }
 
 export const buildContentSecurityPolicy = ({
   nonce,
   clerkHost,
+  sentry,
   development,
 }: ContentSecurityPolicyOptions): string => {
   const clerk = clerkHost ? [`https://${clerkHost}`] : [];
@@ -54,6 +94,7 @@ export const buildContentSecurityPolicy = ({
       "https://clerk-telemetry.com",
       "https://*.clerk-telemetry.com",
       "https://img.clerk.com",
+      ...(sentry ? [sentry.origin] : []),
       ...(development ? ["ws:"] : []),
     ],
     "frame-src": ["'self'", "https://challenges.cloudflare.com"],
@@ -63,6 +104,7 @@ export const buildContentSecurityPolicy = ({
     "base-uri": ["'self'"],
     "object-src": ["'none'"],
     "form-action": ["'self'"],
+    ...(sentry ? { "report-uri": [sentry.reportUri] } : {}),
   };
 
   return Object.entries(directives)
