@@ -253,9 +253,8 @@ async fn build_sdk_flow(core_url: &str, signer_key: &str) -> SdkFlow {
     sdk_4mica::X402Flow::new(sdk_client(core_url, signer_key).await).expect("init X402Flow")
 }
 
-/// A v1 payment payload that is internally consistent with the payment requirements (so
-/// `/verify` passes preflight) but carries a bogus signature (so a real `/settle` fails at
-/// `core/guarantees`).
+/// A v1 payment payload that is internally consistent with the payment requirements but carries
+/// a bogus signature, so both `/verify` and `/settle` must refuse it.
 fn unfunded_settle_body(scheme: &str, network: &str) -> Value {
     json!({
         "x402Version": 1,
@@ -416,18 +415,21 @@ async fn e2e_facilitator_endpoints() {
         "[e2e] /supported advertises x402 v1+v2; core accepts payment payloads {payload_versions:?}"
     );
 
-    // --- /verify: self-consistent payload passes preflight (no core call) ---
+    // --- /verify + /settle (negative): a payload consistent with its requirements but carrying a
+    // bogus signature. Both must refuse it locally under the ClearingHouse domain core publishes,
+    // so a seller is never told a forged payment is valid (#115). ---
     let body = unfunded_settle_body(&env.scheme, &env.network);
     let (verify_status, verify_body) = post_json(&client, &format!("{base}/verify"), &body).await;
     assert!(verify_status.is_success());
     assert_eq!(
-        verify_body["isValid"], true,
-        "verify should accept a well-formed payload: {verify_body}"
+        verify_body["isValid"], false,
+        "verify must reject a payment its payer did not sign: {verify_body}"
+    );
+    assert_eq!(
+        verify_body["invalidReason"], "invalid_payload",
+        "{verify_body}"
     );
 
-    // --- /settle (negative): same payload with a bogus signature. Since /verify
-    // accepted it, a failure here proves the facilitator forwarded to
-    // core/guarantees and surfaced core's rejection. ---
     let (settle_status, settle_body) = post_json(&client, &format!("{base}/settle"), &body).await;
     assert!(
         settle_status.is_success(),
@@ -435,20 +437,17 @@ async fn e2e_facilitator_endpoints() {
     );
     assert_eq!(
         settle_body["success"], false,
-        "unfunded/bogus-signature settle should fail at core: {settle_body}"
+        "settle must reject a payment its payer did not sign: {settle_body}"
     );
-    assert!(
-        settle_body["errorMessage"].is_string(),
-        "failed settle should carry an error message: {settle_body}"
+    assert_eq!(
+        settle_body["errorReason"], "invalid_payload",
+        "{settle_body}"
     );
     assert!(
         settle_body["extra"]["receipt"].is_null(),
         "failed settle must not return a receipt: {settle_body}"
     );
-    eprintln!(
-        "[e2e] negative /settle reached core/guarantees, error: {}",
-        settle_body["errorMessage"]
-    );
+    eprintln!("[e2e] /verify and /settle rejected a bogus payer signature");
 
     // --- /clearing/claim (negative): a well-formed claim for a cycle core has never seen.
     // The relayer is configured, so the request passes the sponsorship gate and the

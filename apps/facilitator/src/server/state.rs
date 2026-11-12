@@ -2,6 +2,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use alloy::primitives::{B256, Bytes};
+use alloy::sol_types::Eip712Domain;
 use rpc::{Guarantee, PaymentRequest, PaymentRequestPayload, ValidationRequirement};
 use sdk_4mica::{Address, U256};
 use serde_json::Map;
@@ -15,7 +16,7 @@ use crate::server::model::{
     HealthResponse, PaymentRequirements, RelayerHealth, SettleRequest, SettleResponse,
     SupportedKind, VerifyRequest, VerifyResponse, X402PaymentPayload,
 };
-use crate::verifier::ReceiptValidator;
+use crate::verifier::{ReceiptValidator, verify_payer_signature};
 use crate::{
     exact::ExactService,
     issuer::{GuaranteeIssuer, IssueError},
@@ -280,6 +281,9 @@ pub(crate) struct FourMicaHandler {
     network: String,
     verifier: Arc<dyn ReceiptValidator>,
     issuer: Arc<dyn GuaranteeIssuer>,
+    /// The ClearingHouse domain payers sign payment requests under, taken from core's public
+    /// params so `/verify` checks exactly what core checks at `/settle`.
+    payment_domain: Eip712Domain,
     /// Validator identities core whitelisted. A signed validation requirement naming anything else
     /// is rejected before we ask core to issue, since core would reject it anyway.
     validators: Vec<String>,
@@ -291,6 +295,7 @@ impl FourMicaHandler {
         network: String,
         verifier: Arc<dyn ReceiptValidator>,
         issuer: Arc<dyn GuaranteeIssuer>,
+        payment_domain: Eip712Domain,
         validators: Vec<String>,
     ) -> Self {
         Self {
@@ -298,6 +303,7 @@ impl FourMicaHandler {
             network,
             verifier,
             issuer,
+            payment_domain,
             validators,
         }
     }
@@ -460,6 +466,10 @@ impl FourMicaHandler {
         );
         self.ensure_payment_matches_requirements(payload, reqs, version)?;
         self.ensure_validation_matches_requirements(payload.validation(), reqs)?;
+        // Without this, `/verify` would vouch for any payer named in the payload, and the forgery
+        // would only surface at `/settle`, after the seller served the resource.
+        verify_payer_signature(request, &self.payment_domain)
+            .map_err(ValidationError::InvalidPayment)?;
         Ok(())
     }
 

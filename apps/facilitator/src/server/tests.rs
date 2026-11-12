@@ -2,6 +2,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use alloy::primitives::B256;
+use alloy::signers::SignerSync;
+use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::Eip712Domain;
 use async_trait::async_trait;
 use axum::{
     body::{Body, to_bytes},
@@ -139,6 +142,103 @@ async fn verify_endpoint_accepts_v2_payload() {
     assert_eq!(issuer.issue_calls(), 0);
 }
 
+/// Payloads that name the fixture payer but are not signed by it: junk, another key, and the
+/// payer's own signature over different terms. Each is paired with both x402 envelopes.
+fn forged_payments() -> Vec<(&'static str, X402PaymentPayload, PaymentRequirements)> {
+    let recipient = format!("{:#x}", recipient_address());
+    let asset = format!("{:#x}", asset_address());
+    let payment = payload_json(&recipient, &asset, "10");
+    let signatures = [
+        ("junk", json!("0x1111")),
+        (
+            "another key",
+            signed_with(&PrivateKeySigner::random(), payment.clone())["signature"].clone(),
+        ),
+        (
+            "other terms",
+            signed(payload_json(&recipient, &asset, "11"))["signature"].clone(),
+        ),
+    ];
+
+    let mut cases = Vec::new();
+    for (label, signature) in signatures {
+        for (payment_payload, requirements) in [
+            (payment_payload_v1("10"), sample_requirements()),
+            (payment_payload_v2("10"), sample_requirements_v2("10")),
+        ] {
+            let mut forged = serde_json::to_value(payment_payload).unwrap();
+            forged["payload"]["signature"] = signature.clone();
+            cases.push((
+                label,
+                serde_json::from_value(forged).expect("forged payload"),
+                requirements,
+            ));
+        }
+    }
+    cases
+}
+
+/// Regression for #115: `/verify` used to answer `isValid: true` for any payer named in the
+/// payload, so a seller would serve the resource on a forged payment.
+#[tokio::test]
+async fn verify_rejects_a_payment_not_signed_by_its_payer() {
+    for (label, payment_payload, payment_requirements) in forged_payments() {
+        let issuer = Arc::new(MockIssuer::success());
+        let state = test_state(Arc::new(MockVerifier::success()), issuer.clone());
+
+        let response = post_verify(
+            state,
+            &VerifyRequest {
+                x402_version: Some(payment_payload.x402_version()),
+                payment_payload,
+                payment_requirements,
+            },
+        )
+        .await;
+
+        assert!(!response.is_valid, "{label}: forged payment was accepted");
+        assert_eq!(
+            response.invalid_reason.as_deref(),
+            Some("invalid_payload"),
+            "{label}"
+        );
+        assert_eq!(response.payer, None, "{label}");
+        assert_eq!(issuer.issue_calls(), 0, "{label}");
+    }
+}
+
+/// `/settle` refuses the same forgeries itself rather than leaving it to core.
+#[tokio::test]
+async fn settle_rejects_a_payment_not_signed_by_its_payer_before_asking_core() {
+    for (label, payment_payload, payment_requirements) in forged_payments() {
+        let issuer = Arc::new(MockIssuer::success());
+        let router = build_router(test_state(
+            Arc::new(MockVerifier::success()),
+            issuer.clone(),
+        ));
+        let request = SettleRequest {
+            x402_version: Some(payment_payload.x402_version()),
+            payment_payload,
+            payment_requirements,
+        };
+
+        let response = router
+            .oneshot(post_json("/settle", &request))
+            .await
+            .unwrap();
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let payload: SettleResponse = serde_json::from_slice(&body).unwrap();
+        assert!(!payload.success, "{label}: forged payment was settled");
+        assert_eq!(
+            payload.error_reason.as_deref(),
+            Some("invalid_payload"),
+            "{label}"
+        );
+        assert_eq!(issuer.issue_calls(), 0, "{label}");
+    }
+}
+
 #[tokio::test]
 async fn settle_endpoint_returns_receipt() {
     let verifier = Arc::new(MockVerifier::success());
@@ -255,7 +355,7 @@ async fn settle_endpoint_accepts_v2_payload_with_checksum_addresses() {
     };
     let mut request_json = serde_json::to_value(request_body).unwrap();
     request_json["paymentPayload"]["payload"]["payload"]["user_address"] =
-        json!("0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB");
+        json!(payer().address().to_checksum(None));
     request_json["paymentPayload"]["payload"]["payload"]["recipient_address"] =
         json!("0x1111111111111111111111111111111111111111");
     request_json["paymentPayload"]["payload"]["payload"]["asset_address"] =
@@ -318,6 +418,7 @@ async fn supported_includes_exact_when_available() {
         "eip155:11155111".into(),
         verifier as Arc<dyn ReceiptValidator>,
         issuer as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         vec![TEST_VALIDATOR.into()],
     );
     let exact = Arc::new(MockExact::new());
@@ -973,6 +1074,7 @@ fn test_state(verifier: Arc<MockVerifier>, issuer: Arc<MockIssuer>) -> SharedSta
         "eip155:11155111".into(),
         verifier.clone() as Arc<dyn ReceiptValidator>,
         issuer.clone() as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         vec![TEST_VALIDATOR.into()],
     );
     Arc::new(AppState::new(
@@ -1124,6 +1226,7 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
         "eip155:11155111".into(),
         Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         Vec::new(),
     );
     let deposit_guard = SponsorGuard::new(SponsorLimits {
@@ -1239,6 +1342,7 @@ async fn deposit_is_rate_limited_globally() {
         "eip155:11155111".into(),
         Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         vec![TEST_VALIDATOR.into()],
     );
     let limits = SponsorLimits {
@@ -1288,6 +1392,7 @@ async fn deposit_marks_throttling_as_retryable() {
         "eip155:11155111".into(),
         Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         vec![TEST_VALIDATOR.into()],
     );
     let limits = SponsorLimits {
@@ -1360,6 +1465,7 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
         "eip155:11155111".into(),
         Arc::new(MockVerifier::success()) as Arc<dyn ReceiptValidator>,
         Arc::new(MockIssuer::success()) as Arc<dyn GuaranteeIssuer>,
+        payment_domain(),
         vec![TEST_VALIDATOR.into()],
     );
     let guard = SponsorGuard::new(SponsorLimits {
@@ -1817,10 +1923,7 @@ fn payment_payload_v1_with_scheme(scheme: &str, network: &str, amount: &str) -> 
         "x402Version": 1,
         "scheme": scheme,
         "network": network,
-        "payload": {
-            "payload": payload_json(&recipient, &asset, amount),
-            "signature": "0x1111"
-        }
+        "payload": signed(payload_json(&recipient, &asset, amount))
     });
 
     serde_json::from_value(value).expect("failed to deserialize payment payload v1")
@@ -1863,22 +1966,45 @@ fn payment_payload_v2_inner(amount: &str, validation: Option<Value>) -> X402Paym
             "payTo": recipient,
             "asset": asset
         },
-        "payload": {
-            "payload": payload,
-            "signature": "0x1111"
-        }
+        "payload": signed(payload)
     });
 
     serde_json::from_value(value).expect("failed to deserialize payment payload v2")
 }
 
-const PAYER: &str = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CYCLE_ID: B256 = B256::repeat_byte(0x33);
+
+/// The payer every fixture pays from. A fixed key so the fixtures are deterministic.
+fn payer() -> PrivateKeySigner {
+    PrivateKeySigner::from_bytes(&B256::repeat_byte(0xbb)).expect("payer key")
+}
+
+/// The ClearingHouse domain the test handler checks payer signatures under.
+fn payment_domain() -> Eip712Domain {
+    rpc::clearing_house_domain(11155111, Address::repeat_byte(0x04))
+}
+
+/// Wraps a payment payload in `{ payload, signature }`, signed by `signer`.
+fn signed_with(signer: &PrivateKeySigner, payload: Value) -> Value {
+    let request: PaymentRequestPayload =
+        serde_json::from_value(payload.clone()).expect("payment payload");
+    let digest = request.signing_digest(&payment_domain()).expect("digest");
+    let signature = signer.sign_hash_sync(&digest).expect("sign");
+    json!({
+        "payload": payload,
+        "signature": alloy::hex::encode_prefixed(signature.as_bytes()),
+    })
+}
+
+/// [`signed_with`] the payer the payload names.
+fn signed(payload: Value) -> Value {
+    signed_with(&payer(), payload)
+}
 
 fn payload_json(recipient: &str, asset: &str, amount: &str) -> Value {
     json!({
         "version": "v1",
-        "user_address": PAYER,
+        "user_address": format!("{:#x}", payer().address()),
         "recipient_address": recipient,
         "cycle_id": CYCLE_ID,
         "req_id": "0x0",
