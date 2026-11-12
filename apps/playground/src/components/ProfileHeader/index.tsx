@@ -7,20 +7,29 @@ import type { PublicProfile } from "@/types";
 export function ProfileHeader({ profile }: { profile: PublicProfile }) {
   return (
     <header className="flex h-full flex-col gap-5">
-      <Avatar
-        src={profile.avatarUrl}
-        name={profile.name}
-        fallback={profile.username}
-        alt={`${profile.name || profile.username}'s avatar`}
-        size="xl"
-        className="profile-avatar"
-      />
+      <div className="flex items-center gap-4 md:flex-col md:items-start md:gap-5">
+        <Avatar
+          src={profile.avatarUrl}
+          name={profile.name}
+          fallback={profile.username}
+          alt={`${profile.name || profile.username}'s avatar`}
+          size="xl"
+          className="profile-avatar shrink-0"
+        />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="font-semibold text-ink-strong text-xl">
-          {profile.name || profile.username}
-        </h1>
-        {profile.verified && <VerifiedBadge />}
+        <div className="flex min-w-0 flex-col gap-1 md:gap-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-semibold text-ink-strong text-xl">
+              {profile.name || profile.username}
+            </h1>
+            {profile.verified && <VerifiedBadge />}
+          </div>
+          {profile.name && (
+            <p className="truncate text-ink-muted text-sm md:hidden">
+              @{profile.username}
+            </p>
+          )}
+        </div>
       </div>
 
       <Prose text={profile.bio} className="text-sm" />

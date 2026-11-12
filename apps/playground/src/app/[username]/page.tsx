@@ -8,6 +8,7 @@ import { ListCard } from "@/components/ListCard";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileHeader } from "@/components/ProfileHeader";
 import { ProfileTabs } from "@/components/ProfileTabs";
+import { TopBar } from "@/components/TopBar";
 import { messages } from "@/i18n";
 import { parseUsername } from "@/schema/params";
 import { listPublicAgents } from "@/services/agents";
@@ -50,6 +51,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <CardShell
+      account={<TopBar inline />}
+      title={profile.name || `@${profile.username}`}
       actions={
         <ProfileActions
           title={profile.name || `@${profile.username}`}

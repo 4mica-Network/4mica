@@ -27,7 +27,7 @@ export function CodeTabs({ tabs }: CodeTabsProps) {
               aria-controls={`${baseId}-${tab.id}`}
               aria-selected={selected}
               className={cn(
-                "relative inline-flex h-6 items-center rounded px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+                "relative inline-flex h-9 items-center rounded px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 md:h-6 md:px-2 md:text-xs",
                 selected
                   ? "text-ink-body"
                   : "text-ink-muted hover:text-ink-body",

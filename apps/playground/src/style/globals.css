@@ -4,3 +4,11 @@
 /* src/style/ is two levels below the app root — a wrong path here silently
    drops every design token with no build error. */
 @config "../../tailwind.config.ts";
+
+@media (width < 48rem) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}

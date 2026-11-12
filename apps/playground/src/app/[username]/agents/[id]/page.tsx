@@ -201,12 +201,20 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
       <JsonLd descriptor={descriptor} />
 
       <ProfileNav
-        className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
+        className="absolute top-4 left-4 z-20 max-md:hidden sm:top-6 sm:left-8"
         displayName={profile.name || profile.username}
         username={profile.username}
       />
 
       <CardShell
+        nav={
+          <ProfileNav
+            displayName={profile.name || profile.username}
+            username={profile.username}
+            variant="bar"
+          />
+        }
+        title={agent.name}
         actions={
           <ProfileActions
             label={messages.flow.actions}

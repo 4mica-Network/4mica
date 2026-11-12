@@ -37,6 +37,11 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "public-mobile",
+      testMatch: /public\.spec\.ts/,
+      use: { ...devices["Pixel 7"] },
+    },
+    {
       name: "authenticated",
       testMatch: /authenticated\.spec\.ts/,
       dependencies: ["setup"],

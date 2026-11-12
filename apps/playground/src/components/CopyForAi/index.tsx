@@ -87,17 +87,19 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
         aria-controls={open ? menuId : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40"
+        aria-label={messages.ai.trigger}
+        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 max-md:h-10 max-md:w-10 max-md:justify-center max-md:rounded-lg max-md:border-0 max-md:bg-transparent max-md:px-0 max-md:active:bg-overlay/6"
         onClick={() => setOpen((value) => !value)}
         ref={trigger}
         type="button"
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       >
-        {messages.ai.trigger}
+        <Sparkles aria-hidden="true" className="h-4 w-4 md:hidden" />
+        <span className="max-md:hidden">{messages.ai.trigger}</span>
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           aria-hidden="true"
-          className="text-ink-muted"
+          className="text-ink-muted max-md:hidden"
           transition={swap}
         >
           <ChevronDown className="h-4 w-4" />

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { messages, t } from "@/i18n";
@@ -99,6 +99,47 @@ describe("StepFlow", () => {
         name: `Set up payment, ${messages.flow.done}`,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("picks a step from the mobile sheet and closes it", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    const trigger = screen.getByRole("button", {
+      name: t(messages.flow.openSteps, { current: 1, total: 3 }),
+    });
+    await user.click(trigger);
+
+    const sheet = screen.getByRole("dialog", {
+      name: messages.flow.stepsLabel,
+    });
+    await user.click(
+      within(sheet).getByRole("button", { name: "Install the SDK" }),
+    );
+
+    expect(
+      screen.getByRole("region", { name: "Install the SDK" }),
+    ).toHaveTextContent("npm install");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveAccessibleName(
+      t(messages.flow.openSteps, { current: 3, total: 3 }),
+    );
+  });
+
+  it("closes the mobile sheet on Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    await user.click(screen.getByRole("button", { name: /^All steps/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 
   describe("a collapsible group", () => {

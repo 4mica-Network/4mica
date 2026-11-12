@@ -29,6 +29,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   colorScheme: "dark light",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -42,7 +43,7 @@ export default function RootLayout({
       </head>
       <body
         suppressHydrationWarning={true}
-        className={`${fontVariables} min-h-screen bg-surface-deep text-ink-body antialiased`}
+        className={`${fontVariables} min-h-dvh bg-surface-deep text-ink-body antialiased`}
       >
         {/*
           ClerkProvider is a client component, so wrapping <html> would put the
