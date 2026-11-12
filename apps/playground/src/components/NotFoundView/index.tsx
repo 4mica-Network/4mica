@@ -50,12 +50,14 @@ export function NotFoundView({
   return (
     <main
       className={cn(
-        "flex w-full flex-col items-center justify-center",
+        "flex w-full flex-col items-center justify-center focus:outline-none",
         embedded
           ? "min-h-0 flex-1"
           : "h-dvh overflow-y-auto px-4 py-10 sm:px-6",
       )}
       data-fit-viewport={embedded ? true : undefined}
+      id="content"
+      tabIndex={-1}
     >
       <div className="flex w-full max-w-xl flex-col gap-8">
         <header className="flex flex-col items-center text-center">

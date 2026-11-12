@@ -6,6 +6,7 @@ export const en = {
     viewDocs: "View docs",
     openApi: "Open API",
     loading: "Loading…",
+    skipToContent: "Skip to content",
   },
 
   auth: {
