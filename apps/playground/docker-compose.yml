@@ -11,6 +11,14 @@ services:
         # nothing. nginx strips it back off.
         NEXT_PUBLIC_ASSET_PREFIX: ${NEXT_PUBLIC_ASSET_PREFIX:-/p}
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+        SENTRY_REPOSITORY: ${SENTRY_REPOSITORY:-}
+      secrets:
+        - sentry_auth_token
     image: 4mica-playground:latest
     container_name: 4mica-playground
     restart: unless-stopped
@@ -59,6 +67,10 @@ services:
 volumes:
   playground-logs:
     name: 4mica-playground-logs
+
+secrets:
+  sentry_auth_token:
+    environment: SENTRY_AUTH_TOKEN
 
 networks:
   # No 4mica-edge here. The `edge` nginx moved to apps/web on the 4mica.io box
