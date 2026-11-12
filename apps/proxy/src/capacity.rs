@@ -87,14 +87,18 @@ pub fn credential_checks(
         });
     }
     if let Some(max) = limits.monthly_quota {
-        // shortcut: calendar month in UTC, not the provider's billing cycle; add an anchor day to accounts when they diverge.
         checks.push(Check::Quota {
-            key: format!("proxy:quota:{account}:{}", now.format("%Y-%m")),
+            key: quota_key(account, now),
             max,
             cost: demand.cost,
         });
     }
     checks
+}
+
+// shortcut: calendar month in UTC, not the provider's billing cycle; add an anchor day to accounts when they diverge.
+fn quota_key(account_id: i64, at: DateTime<Utc>) -> String {
+    format!("proxy:quota:{account_id}:{}", at.format("%Y-%m"))
 }
 
 fn cooldown_key(credential_id: i64) -> String {
@@ -168,6 +172,20 @@ impl Capacity {
                 .ignore();
         }
         pipe.query_async(&mut self.conn.clone()).await
+    }
+
+    /// Moves an account's quota usage in the month of `at` by `delta`.
+    pub async fn adjust_quota(
+        &self,
+        account_id: i64,
+        at: DateTime<Utc>,
+        delta: i64,
+    ) -> redis::RedisResult<()> {
+        redis::cmd("INCRBY")
+            .arg(quota_key(account_id, at))
+            .arg(delta)
+            .query_async(&mut self.conn.clone())
+            .await
     }
 
     pub async fn cool_down(&self, credential_id: i64, for_: Duration) -> redis::RedisResult<()> {

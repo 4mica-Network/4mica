@@ -3,7 +3,7 @@ use std::time::Duration;
 use axum::Json;
 use axum::http::header::RETRY_AFTER;
 use axum::http::{HeaderMap, Method, StatusCode};
-use axum::routing::post;
+use axum::routing::{get, post};
 use sea_orm::ActiveValue::Set;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -18,7 +18,7 @@ use entities::invocation::InvocationStatus;
 use entities::{account, credential, invocation, seller};
 use migration::{Migrator, MigratorTrait};
 use proxy_4mica::capacity::Capacity;
-use proxy_4mica::providers::{Auth, Provider, Route};
+use proxy_4mica::providers::{Auth, Jobs, Provider, Route};
 use proxy_4mica::{App, router};
 
 fn fake(base_url: String) -> Provider {
@@ -28,7 +28,16 @@ fn fake(base_url: String) -> Provider {
         auth: Auth::Bearer,
         timeout: Duration::from_secs(5),
         cost_field: Some("/creditsUsed"),
-        routes: vec![Route::new(Method::POST, "/v1/", "echo", Some("slot"))],
+        jobs: Some(Jobs {
+            id_field: "/id",
+            state_field: "/status",
+            final_states: &["completed"],
+        }),
+        routes: vec![
+            Route::new(Method::POST, "/v1/jobs", "jobs", None).starts_job(),
+            Route::new(Method::GET, "/v1/jobs/", "jobs", None).follows_job(),
+            Route::new(Method::POST, "/v1/", "echo", Some("slot")),
+        ],
     }
 }
 
@@ -50,6 +59,8 @@ async fn forwards_and_enforces_capacity() {
         .await
         .unwrap();
 
+    let run = chrono::Utc::now().timestamp_micros().to_string();
+    let job_id = format!("job-{run}");
     let upstream = serve(
         axum::Router::new()
             .route(
@@ -59,6 +70,17 @@ async fn forwards_and_enforces_capacity() {
                         json!({ "auth": headers["authorization"].to_str().unwrap(), "body": body, "creditsUsed": 1 }),
                     )
                 }),
+            )
+            .route(
+                "/v1/jobs",
+                post({
+                    let job_id = job_id.clone();
+                    || async move { Json(json!({ "id": job_id })) }
+                }),
+            )
+            .route(
+                "/v1/jobs/{id}",
+                get(|| async { Json(json!({ "status": "completed", "creditsUsed": 1 })) }),
             )
             .route(
                 "/v1/busy",
@@ -73,7 +95,6 @@ async fn forwards_and_enforces_capacity() {
     )
     .await;
 
-    let run = chrono::Utc::now().timestamp_micros().to_string();
     let token = format!("token-{run}");
     seller::ActiveModel {
         name: Set(format!("seller-{run}")),
@@ -151,7 +172,6 @@ async fn forwards_and_enforces_capacity() {
     let ok = call("/v1/echo", "a").await.unwrap();
     assert_eq!(ok.status(), StatusCode::OK);
     assert_eq!(ok.headers()["x-proxy-cost"], "1");
-    assert!(ok.headers().contains_key("x-proxy-credential"));
     assert_eq!(
         serde_json::from_str::<Value>(&ok.text().await.unwrap()).unwrap(),
         json!({ "auth": "Bearer secret", "body": "hello", "creditsUsed": 1 })
@@ -176,6 +196,28 @@ async fn forwards_and_enforces_capacity() {
         StatusCode::NOT_FOUND
     );
 
+    let started = call("/v1/jobs", "j").await.unwrap();
+    assert_eq!(started.status(), StatusCode::OK);
+    assert_eq!(started.headers()["x-proxy-cost"], "2");
+    let poll = |job: &str, id: &str| {
+        http.get(format!("{proxy}/fake/v1/jobs/{job}"))
+            .bearer_auth(&token)
+            .header("x-invocation-id", format!("{id}-{run}"))
+            .header("x-payer", format!("payer-{run}"))
+            .header("x-max-cost", "0")
+            .send()
+    };
+    for id in ["p1", "p2"] {
+        let polled = poll(&job_id, id).await.unwrap();
+        assert_eq!(polled.status(), StatusCode::OK);
+        assert_eq!(polled.headers()["x-proxy-cost"], "0");
+        assert_eq!(polled.headers()["x-proxy-job-cost"], "1");
+    }
+    assert_eq!(
+        poll("unknown", "p3").await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+
     let busy = call("/v1/busy", "b").await.unwrap();
     assert_eq!(busy.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(busy.headers()["x-proxy-cost"], "0");
@@ -192,7 +234,7 @@ async fn forwards_and_enforces_capacity() {
     let statuses: Vec<(InvocationStatus, Option<i64>)> = invocation::Entity::find()
         .select_only()
         .columns([invocation::Column::Status, invocation::Column::Cost])
-        .filter(invocation::Column::Id.is_in(["a", "b", "c"].map(|id| format!("{id}-{run}"))))
+        .filter(invocation::Column::Id.is_in(["a", "b", "c", "j"].map(|id| format!("{id}-{run}"))))
         .order_by_asc(invocation::Column::Id)
         .into_tuple()
         .all(&db)
@@ -203,7 +245,8 @@ async fn forwards_and_enforces_capacity() {
         vec![
             (InvocationStatus::Succeeded, Some(1)),
             (InvocationStatus::Rejected, Some(0)),
-            (InvocationStatus::Rejected, None)
+            (InvocationStatus::Rejected, None),
+            (InvocationStatus::Succeeded, Some(1)),
         ]
     );
 
@@ -221,5 +264,6 @@ async fn forwards_and_enforces_capacity() {
         .query_async(&mut conn)
         .await
         .unwrap();
-    assert_eq!(used, 1);
+    // 1 for the echo, and the job's reserved 2 corrected to its final 1.
+    assert_eq!(used, 2);
 }

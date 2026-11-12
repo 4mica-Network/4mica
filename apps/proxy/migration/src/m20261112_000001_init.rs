@@ -129,11 +129,49 @@ impl MigrationTrait for Migration {
                     .col(Invocations::CreatedAt)
                     .to_owned(),
             )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(Jobs::Table)
+                    .col(ColumnDef::new(Jobs::Provider).text().not_null())
+                    .col(ColumnDef::new(Jobs::JobId).text().not_null())
+                    .col(ColumnDef::new(Jobs::InvocationId).text().not_null())
+                    .col(ColumnDef::new(Jobs::SellerId).big_integer().not_null())
+                    .col(ColumnDef::new(Jobs::CredentialId).big_integer().not_null())
+                    .col(ColumnDef::new(Jobs::Reserved).big_integer().not_null())
+                    .col(ColumnDef::new(Jobs::Cost).big_integer().null())
+                    .col(created_at(Jobs::CreatedAt))
+                    .col(
+                        ColumnDef::new(Jobs::SettledAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .primary_key(Index::create().col(Jobs::Provider).col(Jobs::JobId))
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Jobs::Table, Jobs::InvocationId)
+                            .to(Invocations::Table, Invocations::Id),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Jobs::Table, Jobs::SellerId)
+                            .to(Sellers::Table, Sellers::Id),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Jobs::Table, Jobs::CredentialId)
+                            .to(Credentials::Table, Credentials::Id),
+                    )
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for table in [
+            Jobs::Table.into_iden(),
             Invocations::Table.into_iden(),
             Credentials::Table.into_iden(),
             Accounts::Table.into_iden(),
@@ -219,4 +257,18 @@ enum Invocations {
     LatencyMs,
     CreatedAt,
     FinishedAt,
+}
+
+#[derive(DeriveIden)]
+enum Jobs {
+    Table,
+    Provider,
+    JobId,
+    InvocationId,
+    SellerId,
+    CredentialId,
+    Reserved,
+    Cost,
+    CreatedAt,
+    SettledAt,
 }

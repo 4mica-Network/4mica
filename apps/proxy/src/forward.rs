@@ -13,13 +13,14 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use tracing::error;
 
-use entities::credential;
 use entities::invocation::InvocationStatus;
+use entities::{account, credential, job};
 
 use crate::App;
 use crate::capacity::{Demand, Lease, credential_checks, payer_check};
-use crate::providers::Provider;
+use crate::providers::{JobRole, Provider, Route};
 use crate::repo::invocations::{self, NewInvocation, Outcome};
+use crate::repo::jobs::{self, NewJob};
 use crate::repo::{credentials, sellers};
 
 /// Request: the most the call may cost, in the provider's units. Reserved from quota up front.
@@ -27,9 +28,9 @@ pub const MAX_COST_HEADER: &str = "x-max-cost";
 /// Response: what the call actually cost, in the provider's units. Absent when the call never
 /// reached the provider.
 pub const COST_HEADER: &str = "x-proxy-cost";
-/// Response: the credential that served the call. Request: pin a follow-up call (e.g. polling an
-/// async job) to that same credential.
-pub const CREDENTIAL_HEADER: &str = "x-proxy-credential";
+/// Response to a job follow-up: the job's final cost once it has settled. It replaces what the
+/// starting call charged.
+pub const JOB_COST_HEADER: &str = "x-proxy-job-cost";
 
 /// Forwards a seller's call to the provider once the payer and an account have capacity for it.
 pub async fn handle(
@@ -53,7 +54,12 @@ pub async fn handle(
     let payer = required_header(&headers, "x-payer")?;
     let max_cost: u64 = parse_header(&headers, MAX_COST_HEADER)?
         .ok_or_else(|| invalid_request(format!("{MAX_COST_HEADER} header is required")))?;
-    let pinned: Option<i64> = parse_header(&headers, CREDENTIAL_HEADER)?;
+
+    let route = provider.route_for(&method, &path);
+    let job = match route.job {
+        Some(JobRole::Follow) => Some(find_job(&app, provider.id, seller_id, route, &path).await?),
+        _ => None,
+    };
 
     let invocation = NewInvocation {
         id: invocation_id,
@@ -71,10 +77,9 @@ pub async fn handle(
         ));
     }
 
-    let (bucket, class) = provider.limits_for(&method, &path);
     let demand = Demand {
-        bucket,
-        class,
+        bucket: route.bucket,
+        class: route.class,
         cost: max_cost,
         lease_ttl: provider.timeout + Duration::from_secs(5),
     };
@@ -97,17 +102,57 @@ pub async fn handle(
         .body(body);
 
     let started = Instant::now();
+    let pinned = job.as_ref().map(|j| j.credential_id);
     let (response, outcome) =
         match lease_credential(&app, provider.id, payer, &demand, pinned, invocation_id).await {
-            Ok((credential, key, lease)) => {
-                let done = send(
+            Ok((credential, account, key, lease)) => {
+                let mut done = send(
                     &app,
                     provider,
+                    route,
                     credential.id,
                     max_cost,
                     provider.authorize(request, &key),
                 )
                 .await;
+                if route.job == Some(JobRole::Follow) {
+                    // The reported cost here is the job's running total, which settlement charges instead.
+                    done.cost = 0;
+                }
+                let job_cost = match (route.job, &job) {
+                    (Some(JobRole::Start), _) if done.status == InvocationStatus::Succeeded => {
+                        match provider.started_job_id(&done.body) {
+                            Some(job_id) => {
+                                let new = NewJob {
+                                    provider: provider.id,
+                                    job_id: &job_id,
+                                    invocation_id,
+                                    seller_id,
+                                    credential_id: credential.id,
+                                    reserved: done.cost,
+                                };
+                                if let Err(err) = jobs::create(&app.db, new).await {
+                                    error!(invocation_id, job_id, %err, "failed to record job");
+                                }
+                            }
+                            None => error!(invocation_id, "job start response has no job id"),
+                        }
+                        None
+                    }
+                    (_, Some(job)) => {
+                        settle_job(
+                            &app,
+                            provider,
+                            route,
+                            job,
+                            &account,
+                            done.status,
+                            &done.body,
+                        )
+                        .await
+                    }
+                    _ => None,
+                };
                 if let Err(err) = app.capacity.release(lease, done.cost).await {
                     error!(invocation_id, %err, "failed to release capacity lease");
                 }
@@ -121,7 +166,9 @@ pub async fn handle(
                 let mut response = done.response;
                 let headers = response.headers_mut();
                 headers.insert(COST_HEADER, HeaderValue::from(done.cost));
-                headers.insert(CREDENTIAL_HEADER, HeaderValue::from(credential.id));
+                if let Some(cost) = job_cost {
+                    headers.insert(JOB_COST_HEADER, HeaderValue::from(cost));
+                }
                 (response, outcome)
             }
             Err(err) => (
@@ -140,6 +187,57 @@ pub async fn handle(
         error!(invocation_id, %err, "failed to record invocation outcome");
     }
     Ok(response)
+}
+
+/// The seller's job a follow-up call names; another seller's job is reported as unknown.
+async fn find_job(
+    app: &App,
+    provider: &str,
+    seller_id: i64,
+    route: &Route,
+    path: &str,
+) -> Result<job::Model, ApiError> {
+    let unknown = || ApiError::new(StatusCode::NOT_FOUND, "unknown_job", "no such job");
+    let job_id = route.job_id(path).ok_or_else(unknown)?;
+    jobs::find(&app.db, provider, job_id)
+        .await?
+        .filter(|job| job.seller_id == seller_id)
+        .ok_or_else(unknown)
+}
+
+/// The job's final cost: settles it on the first follow-up that shows a final state, moving the
+/// account's quota from the reserved to the final cost.
+async fn settle_job(
+    app: &App,
+    provider: &Provider,
+    route: &Route,
+    job: &job::Model,
+    account: &account::Model,
+    status: InvocationStatus,
+    body: &[u8],
+) -> Option<u64> {
+    if let Some(cost) = job.cost {
+        return Some(cost as u64);
+    }
+    if status != InvocationStatus::Succeeded {
+        return None;
+    }
+    let cost = provider.final_job_cost(route, body)?;
+    match jobs::settle(&app.db, job, cost).await {
+        Ok(true) if account.limits.monthly_quota.is_some() => {
+            let delta = cost as i64 - job.reserved;
+            let started = job.created_at.to_utc();
+            if let Err(err) = app.capacity.adjust_quota(account.id, started, delta).await {
+                error!(job_id = job.job_id, %err, "failed to correct quota for settled job");
+            }
+        }
+        Ok(_) => {}
+        Err(err) => {
+            error!(job_id = job.job_id, %err, "failed to settle job");
+            return None;
+        }
+    }
+    Some(cost)
 }
 
 /// Resolves the seller from its bearer token.
@@ -208,13 +306,15 @@ async fn lease_credential(
     demand: &Demand<'_>,
     pinned: Option<i64>,
     lease_id: &str,
-) -> Result<(credential::Model, String, Lease), ApiError> {
+) -> Result<(credential::Model, account::Model, String, Lease), ApiError> {
     let now = Utc::now();
     let candidates = credentials::candidates(&app.db, provider, pinned).await?;
     if pinned.is_some() && candidates.is_empty() {
-        return Err(invalid_request(format!(
-            "{CREDENTIAL_HEADER} names no usable credential"
-        )));
+        return Err(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "job_unavailable",
+            "the credential running this job has been disabled",
+        ));
     }
     for (credential, account) in candidates {
         let Ok(key) = std::env::var(&credential.key_env) else {
@@ -224,7 +324,7 @@ async fn lease_credential(
         let mut checks = vec![payer_check(provider, payer, app.payer_rate_per_minute, now)];
         checks.extend(credential_checks(credential.id, &account, demand, now));
         match app.capacity.acquire(&checks, lease_id, now).await? {
-            Ok(lease) => return Ok((credential, key, lease)),
+            Ok(lease) => return Ok((credential, account, key, lease)),
             Err(0) => {
                 return Err(ApiError::new(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -244,6 +344,8 @@ async fn lease_credential(
 
 struct Done {
     response: Response,
+    /// The provider's response body; empty when there was none.
+    body: Bytes,
     status: InvocationStatus,
     upstream_status: Option<u16>,
     cost: u64,
@@ -253,12 +355,14 @@ struct Done {
 async fn send(
     app: &App,
     provider: &Provider,
+    route: &Route,
     credential_id: i64,
     max_cost: u64,
     request: RequestBuilder,
 ) -> Done {
     let failed = |code, message: &str, status, cost| Done {
         response: ApiError::new(code, "upstream_error", message).into_response(),
+        body: Bytes::new(),
         status,
         upstream_status: None,
         cost,
@@ -307,7 +411,7 @@ async fn send(
             max_cost,
         );
     };
-    let reported = provider.reported_cost(&body);
+    let reported = provider.reported_cost(route, &body);
 
     let (state, cost) = match status {
         StatusCode::TOO_MANY_REQUESTS => {
@@ -333,6 +437,7 @@ async fn send(
                     "no capacity available",
                 )
                 .into_response(),
+                body,
                 status: InvocationStatus::Failed,
                 upstream_status: Some(status.as_u16()),
                 cost: reported.unwrap_or(0),
@@ -342,12 +447,13 @@ async fn send(
         _ => (InvocationStatus::Failed, reported.unwrap_or(0)),
     };
 
-    let mut response = (status, body).into_response();
+    let mut response = (status, body.clone()).into_response();
     if let Some(content_type) = content_type {
         response.headers_mut().insert(CONTENT_TYPE, content_type);
     }
     Done {
         response,
+        body,
         status: state,
         upstream_status: Some(status.as_u16()),
         cost,
