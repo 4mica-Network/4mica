@@ -123,6 +123,9 @@ export const en = {
     signInToReport: "Sign in to report this.",
 
     rateN: "Rate {{count}} out of 5",
+    ratingLabel: "Your rating",
+    titleLabel: "Review title",
+    bodyLabel: "Review",
     titlePlaceholder: "Sum it up in a line (optional)",
     bodyPlaceholder: "Did it return what you paid for? How fast? (optional)",
     postReview: "Post rating",
