@@ -68,6 +68,10 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  experimental: {
+    optimizePackageImports: ["@4mica/ui", "framer-motion"],
+  },
+
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "img.clerk.com" },

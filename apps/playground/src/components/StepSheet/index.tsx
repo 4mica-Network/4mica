@@ -2,7 +2,7 @@
 
 import {
   AnimatePresence,
-  motion,
+  m,
   useDragControls,
   useReducedMotion,
 } from "framer-motion";
@@ -86,7 +86,7 @@ export function StepSheet({ open, onClose, title, children }: StepSheetProps) {
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
-          <motion.div
+          <m.div
             animate={{ opacity: 1 }}
             aria-hidden="true"
             className="absolute inset-0 bg-surface-deep/70"
@@ -96,7 +96,7 @@ export function StepSheet({ open, onClose, title, children }: StepSheetProps) {
             transition={{ duration: reduceMotion ? 0 : 0.18 }}
           />
 
-          <motion.div
+          <m.div
             animate={{ y: 0 }}
             aria-labelledby={titleId}
             aria-modal="true"
@@ -147,7 +147,7 @@ export function StepSheet({ open, onClose, title, children }: StepSheetProps) {
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
               {children}
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>,

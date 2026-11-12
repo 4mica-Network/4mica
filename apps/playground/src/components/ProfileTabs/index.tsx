@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@4mica/ui";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { type ReactNode, useState } from "react";
 import { messages } from "@/i18n";
 
@@ -55,7 +55,7 @@ export function ProfileTabs({
                 type="button"
               >
                 {selected && (
-                  <motion.span
+                  <m.span
                     aria-hidden="true"
                     className="absolute inset-0 rounded-md bg-overlay/6 md:rounded"
                     layoutId="profile-tab-pill"

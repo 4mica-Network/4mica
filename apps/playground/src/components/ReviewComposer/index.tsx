@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, cn } from "@4mica/ui";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { Star } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteOwnReview, submitReview } from "@/actions/trust";
@@ -111,7 +111,7 @@ export function ReviewComposer({
           const score = index + 1;
 
           return (
-            <motion.button
+            <m.button
               aria-label={t(messages.trust.rateN, { count: String(score) })}
               className="rounded p-0.5 outline-none"
               key={score}
@@ -131,7 +131,7 @@ export function ReviewComposer({
                     : "fill-transparent text-ink-subtle/60",
                 )}
               />
-            </motion.button>
+            </m.button>
           );
         })}
       </div>
@@ -172,7 +172,7 @@ export function ReviewComposer({
 
         <AnimatePresence>
           {saved && (
-            <motion.span
+            <m.span
               animate={{ opacity: 1, y: 0 }}
               className="text-sm text-success"
               exit={{ opacity: 0 }}
@@ -180,7 +180,7 @@ export function ReviewComposer({
               transition={{ duration: reduceMotion ? 0 : 0.18 }}
             >
               {messages.trust.saved}
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </div>

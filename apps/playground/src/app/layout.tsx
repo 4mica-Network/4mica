@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import ThemeProvider from "@/context/ThemeProvider";
+import { MotionProvider } from "@/components/MotionProvider";
 import { publicEnv } from "@/env";
 import fontVariables from "@/fonts";
 import { themeInitScript } from "@/lib/theme";
@@ -54,7 +54,7 @@ export default function RootLayout({
         <ClerkProvider
           publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         >
-          <ThemeProvider>{children}</ThemeProvider>
+          <MotionProvider>{children}</MotionProvider>
         </ClerkProvider>
       </body>
     </html>

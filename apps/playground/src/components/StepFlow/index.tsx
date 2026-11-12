@@ -3,7 +3,7 @@
 import { cn } from "@4mica/ui";
 import {
   AnimatePresence,
-  motion,
+  m,
   type Transition,
   useReducedMotion,
 } from "framer-motion";
@@ -163,7 +163,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
           type="button"
         >
           {selected && (
-            <motion.span
+            <m.span
               aria-hidden="true"
               className={cn(
                 "absolute inset-0 bg-overlay/6",
@@ -241,19 +241,19 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
                 <GroupIcon className="h-3 w-3" />
               </span>
               <span className="min-w-0 flex-1 truncate">{group.label}</span>
-              <motion.span
+              <m.span
                 animate={{ rotate: open ? 180 : 0 }}
                 aria-hidden="true"
                 className="text-ink-muted"
                 transition={pill}
               >
                 <ChevronDown className="h-3.5 w-3.5" />
-              </motion.span>
+              </m.span>
             </button>
 
             <AnimatePresence initial={false}>
               {open && (
-                <motion.div
+                <m.div
                   animate={{ height: "auto", opacity: 1 }}
                   className="overflow-hidden"
                   exit={{ height: 0, opacity: 0 }}
@@ -274,7 +274,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
                   <List className="flex flex-col gap-0.5 pt-0.5 pl-4">
                     {items}
                   </List>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
           </div>
@@ -311,7 +311,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
             const selected = step.id === activeId;
 
             return (
-              <motion.div
+              <m.div
                 animate={selected ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
                 className="flex flex-col gap-5 px-4 py-5 sm:p-6"
                 hidden={!selected}
@@ -323,7 +323,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
                 transition={enter}
               >
                 {step.content}
-              </motion.div>
+              </m.div>
             );
           })}
         </div>
@@ -365,7 +365,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
           </button>
 
           {next && (
-            <motion.button
+            <m.button
               aria-label={t(messages.flow.next, { title: next.title })}
               className="group inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-overlay/8 px-4 text-ink-strong text-sm transition-colors hover:bg-overlay/6 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40 md:h-7 md:rounded-md md:bg-transparent md:px-2.5 md:text-ink-muted md:text-xs"
               onClick={() => go(next.id)}
@@ -380,7 +380,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
                 aria-hidden="true"
                 className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
               />
-            </motion.button>
+            </m.button>
           )}
         </div>
       </CardMain>

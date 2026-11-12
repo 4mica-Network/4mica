@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -21,7 +21,7 @@ export function CopyToast({ note }: { note: string | null }) {
     >
       <AnimatePresence>
         {note && (
-          <motion.span
+          <m.span
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="max-w-full truncate rounded-full bg-ink-strong px-4 py-2 font-medium text-sm text-surface"
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
@@ -33,7 +33,7 @@ export function CopyToast({ note }: { note: string | null }) {
             }
           >
             {note}
-          </motion.span>
+          </m.span>
         )}
       </AnimatePresence>
     </div>,

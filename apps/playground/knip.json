@@ -12,6 +12,5 @@
   ],
   "ignoreDependencies": ["@prisma/adapter-pg", "@prisma/client"],
   "ignoreBinaries": ["biome"],
-  "ignoreExportsUsedInFile": true,
-  "ignore": ["src/context/ThemeProvider.tsx"]
+  "ignoreExportsUsedInFile": true
 }

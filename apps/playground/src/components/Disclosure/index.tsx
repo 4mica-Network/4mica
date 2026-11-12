@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@4mica/ui";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
@@ -55,7 +55,7 @@ export function Disclosure({
             )}
           </span>
 
-          <motion.span
+          <m.span
             animate={{ rotate: open ? 180 : 0 }}
             aria-hidden="true"
             className="shrink-0 text-ink-subtle"
@@ -66,13 +66,13 @@ export function Disclosure({
             }
           >
             <ChevronDown className="h-4 w-4" />
-          </motion.span>
+          </m.span>
         </button>
       </h3>
 
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <m.div
             animate={{ height: "auto", opacity: 1 }}
             className="overflow-hidden"
             exit={{ height: 0, opacity: 0 }}
@@ -87,15 +87,15 @@ export function Disclosure({
                   }
             }
           >
-            <motion.div
+            <m.div
               animate={{ y: 0 }}
               className="pb-5 pl-10"
               initial={reduceMotion ? false : { y: -4 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             >
               {children}
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
     </li>
