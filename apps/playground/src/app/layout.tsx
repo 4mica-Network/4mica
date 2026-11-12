@@ -38,6 +38,7 @@ export default function RootLayout({
   return (
     <html className="dark" lang="en" suppressHydrationWarning={true}>
       <head>
+        <link rel="preconnect" href="https://img.clerk.com" />
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

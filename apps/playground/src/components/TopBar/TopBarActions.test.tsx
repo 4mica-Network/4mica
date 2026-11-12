@@ -83,7 +83,7 @@ describe("TopBarActions, signed in", () => {
 
     expect(screen.getByRole("img")).toHaveAttribute(
       "src",
-      "https://img.clerk.com/g",
+      "https://img.clerk.com/g?width=72&height=72&fit=crop",
     );
   });
 });

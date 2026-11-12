@@ -3,13 +3,15 @@ import { ProfileContact } from "@/components/ProfileContact";
 import { Prose } from "@/components/Prose";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import type { PublicProfile } from "@/types";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 
 export function ProfileHeader({ profile }: { profile: PublicProfile }) {
   return (
     <header className="flex h-full flex-col gap-5">
       <div className="flex items-center gap-4 md:flex-col md:items-start md:gap-5">
         <Avatar
-          src={profile.avatarUrl}
+          src={sizedAvatarUrl(profile.avatarUrl, 192)}
+          priority={true}
           name={profile.name}
           fallback={profile.username}
           alt={`${profile.name || profile.username}'s avatar`}

@@ -13,6 +13,8 @@ const extraDevOrigins = (process.env.DEV_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const assetPrefix = process.env.NEXT_PUBLIC_ASSET_PREFIX || undefined;
+
 const nextConfig: NextConfig = {
   // Per-username pages cannot be pre-rendered, so unlike apps/web this is a
   // real Node server. `standalone` emits a self-contained server bundle.
@@ -26,7 +28,7 @@ const nextConfig: NextConfig = {
   // /_next/static/*. Two Next apps cannot share /_next on one origin — the edge
   // has no way to tell whose chunk a request is for. Set
   // NEXT_PUBLIC_ASSET_PREFIX=/p in production; nginx.conf strips it back off.
-  assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || undefined,
+  assetPrefix,
 
   // @4mica/db and @4mica/url export raw TS source; @4mica/ui follows the
   // precedent set by apps/web/next.config.ts.
@@ -73,6 +75,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    path: `${assetPrefix ?? ""}/_next/image`,
     remotePatterns: [
       { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "images.clerk.dev" },
