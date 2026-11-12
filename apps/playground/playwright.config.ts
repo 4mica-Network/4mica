@@ -33,12 +33,12 @@ export default defineConfig({
     { name: "setup", testMatch: /global\.setup\.ts/ },
     {
       name: "public",
-      testMatch: /public\.spec\.ts/,
+      testMatch: /(public|keyboard)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "public-mobile",
-      testMatch: /public\.spec\.ts/,
+      testMatch: /(public|keyboard)\.spec\.ts/,
       use: { ...devices["Pixel 7"] },
     },
     {
