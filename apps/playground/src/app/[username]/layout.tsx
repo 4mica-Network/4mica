@@ -8,6 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { parseUsername } from "@/schema/params";
 import { getPublicProfile } from "@/services/profile";
 import { getSessionIdentity } from "@/services/viewer";
+import { getNonce } from "@/utils/nonce";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,9 +22,10 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
     notFound();
   }
 
-  const [result, identity] = await Promise.all([
+  const [result, identity, nonce] = await Promise.all([
     getPublicProfile(username),
     getSessionIdentity(),
+    getNonce(),
   ]);
 
   if (!result) {
@@ -44,7 +46,7 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
       className="profile-scope relative flex min-h-dvh flex-col md:has-[[data-fit-viewport]]:h-dvh md:has-[[data-fit-viewport]]:overflow-hidden"
       style={brandStyle}
     >
-      <ProfileTheme preference={profile.theme} />
+      <ProfileTheme nonce={nonce} preference={profile.theme} />
       <TopBar />
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-14 has-[[data-fit-viewport]]:min-h-0 has-[[data-fit-viewport]]:gap-4 has-[[data-fit-viewport]]:pt-16 has-[[data-fit-viewport]]:pb-4 max-md:has-[[data-app-bar]]:gap-0! max-md:has-[[data-app-bar]]:p-0! sm:px-6 sm:py-20 sm:has-[[data-fit-viewport]]:pt-20 sm:has-[[data-fit-viewport]]:pb-6">
