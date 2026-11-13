@@ -26,6 +26,7 @@ const ERRORS: Record<string, string> = {
   own_resource: messages.trust.errorOwnResource,
   invalid_review: messages.trust.errorInvalidReview,
   not_found: messages.trust.errorNotFound,
+  rate_limited: messages.trust.errorRateLimited,
 };
 
 export function ReviewComposer({

@@ -156,6 +156,8 @@ export const en = {
     errorNotFound: "That listing is no longer available.",
     errorNoRating: "Pick a star rating first.",
     errorGeneric: "That did not go through. Try again.",
+    errorRateLimited:
+      "You are doing that too often. Wait a minute and try again.",
     errorReportOwn: "You cannot report your own listing.",
     errorDescribeOther: "Tell us what is wrong so we can look into it.",
     errorDeleteMissing: "There is no review of yours to delete.",
