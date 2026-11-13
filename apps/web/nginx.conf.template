@@ -66,6 +66,23 @@ proxy_cache_path /var/cache/nginx/playground levels=1:2 keys_zone=playground:20m
 limit_req_zone $binary_remote_addr zone=mica_og:10m         rate=10r/s;
 limit_req_zone $binary_remote_addr zone=mica_auth:10m       rate=10r/s;
 limit_req_zone $binary_remote_addr zone=mica_revalidate:1m  rate=1r/s;
+
+# Every playground request (pages, RSC prefetches, server actions) shares
+# mica_pages. Server actions are POSTs to page URLs, so mica_write draws a
+# tighter budget from the same requests by keying only on mutating methods; an
+# empty key is never limited. apps/playground adds a per-user write budget on
+# top, keyed by Clerk user id, so one account behind many addresses is capped
+# too.
+map $request_method $mica_write_key {
+  default "";
+  POST    $binary_remote_addr;
+  PUT     $binary_remote_addr;
+  PATCH   $binary_remote_addr;
+  DELETE  $binary_remote_addr;
+}
+
+limit_req_zone $binary_remote_addr zone=mica_pages:10m      rate=20r/s;
+limit_req_zone $mica_write_key     zone=mica_write:10m      rate=30r/m;
 limit_req_status 429;
 
 server {
@@ -166,7 +183,10 @@ server {
   # --- 3. Playground API ---------------------------------------------------
   # /api/health, /api/og/<username>, /api/revalidate. `api` is reserved, so it
   # can never collide with a handle.
-  location ^~ /api/ { proxy_pass $mica_playground; }
+  location ^~ /api/ {
+    limit_req zone=mica_pages burst=40 nodelay;
+    proxy_pass $mica_playground;
+  }
 
   location ^~ /api/og/ {
     limit_req zone=mica_og burst=20 nodelay;
@@ -200,6 +220,11 @@ server {
   }
 
   # --- 5. The handle namespace ---------------------------------------------
-  # Everything not claimed above is a profile.
-  location / { proxy_pass $mica_playground; }
+  # Everything not claimed above is a profile. The burst absorbs a page's RSC
+  # link prefetches, which arrive together.
+  location / {
+    limit_req zone=mica_pages burst=60 nodelay;
+    limit_req zone=mica_write burst=10 nodelay;
+    proxy_pass $mica_playground;
+  }
 }

@@ -401,6 +401,21 @@ describe("reserved segments vs nginx", () => {
     );
   });
 
+  it("rate-limits the handle namespace, with a tighter budget for writes", () => {
+    expect(nginxConf).toMatch(
+      /limit_req_zone \$mica_write_key\s+zone=mica_write:/,
+    );
+    expect(nginxConf).toMatch(
+      /map \$request_method \$mica_write_key {[^}]*POST\s+\$binary_remote_addr;/,
+    );
+    expect(nginxConf).toMatch(
+      /location \/ {[^}]*limit_req zone=mica_pages [^}]*limit_req zone=mica_write [^}]*proxy_pass [^;]*mica_playground;/,
+    );
+    expect(nginxConf).toMatch(
+      /location \^~ \/api\/ {[^}]*limit_req zone=mica_pages [^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
   it("routes the profiles sitemap to the playground", () => {
     expect(nginxConf).toMatch(
       /location = \/sitemap-profiles\.xml\s+{[^}]*proxy_pass [^;]*mica_playground;/,
