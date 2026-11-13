@@ -11,8 +11,8 @@ use tracing::{info, warn};
 use super::{
     model::{
         ClaimRequest, ClaimResponse, DepositRequest, DepositResponse, PayRequest, PayResponse,
-        SettleRequest, SettleResponse, SupportedKind, SupportedResponse, VerifyRequest,
-        VerifyResponse, WithdrawRequest, WithdrawResponse,
+        SettleRequest, SettleResponse, SupportedResponse, VerifyRequest, VerifyResponse,
+        WithdrawRequest, WithdrawResponse,
     },
     state::SharedState,
 };
@@ -49,9 +49,6 @@ async fn deposit_verify_handler(
     match run_deposit_verify(&state, request).await {
         Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
-            // Counted like a submit rejection: this endpoint consumes a global rate-limit slot and
-            // several eth_calls, so abuse aimed here would otherwise be invisible on /health.
-            state.deposit_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "deposit verification failed");
             Json(VerifyResponse::invalid(&err))
         }
@@ -87,7 +84,6 @@ async fn deposit_handler(
 ) -> impl IntoResponse {
     match run_deposit(&state, request).await {
         Ok(response) => {
-            state.deposit_guard().record_sponsored();
             info!(
                 tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 from = response.from.as_deref().unwrap_or_default(),
@@ -99,7 +95,6 @@ async fn deposit_handler(
             Json(response)
         }
         Err(err) => {
-            state.deposit_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "gasless deposit failed");
             Json(DepositResponse::failure(&err))
         }
@@ -137,7 +132,6 @@ async fn withdraw_verify_handler(
     match run_withdraw_verify(&state, request).await {
         Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
-            state.withdraw_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "withdrawal verification failed");
             Json(VerifyResponse::invalid(&err))
         }
@@ -170,7 +164,6 @@ async fn withdraw_handler(
 ) -> impl IntoResponse {
     match run_withdraw(&state, request).await {
         Ok((response, action)) => {
-            state.withdraw_guard().record_sponsored();
             info!(
                 action,
                 tx_hash = response.transaction.as_deref().unwrap_or_default(),
@@ -182,7 +175,6 @@ async fn withdraw_handler(
             Json(response)
         }
         Err(err) => {
-            state.withdraw_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "gasless withdrawal failed");
             Json(WithdrawResponse::failure(&err))
         }
@@ -212,7 +204,6 @@ async fn claim_verify_handler(
     match run_claim_verify(&state, request).await {
         Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
-            state.claim_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "claim verification failed");
             Json(VerifyResponse::invalid(&err))
         }
@@ -235,7 +226,6 @@ async fn claim_handler(
 ) -> impl IntoResponse {
     match run_claim(&state, request).await {
         Ok(response) => {
-            state.claim_guard().record_sponsored();
             info!(
                 tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 creditor = response.creditor.as_deref().unwrap_or_default(),
@@ -247,7 +237,6 @@ async fn claim_handler(
             Json(response)
         }
         Err(err) => {
-            state.claim_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "sponsored net-credit claim failed");
             Json(ClaimResponse::failure(&err))
         }
@@ -273,7 +262,6 @@ async fn pay_verify_handler(
     match run_pay_verify(&state, request).await {
         Ok(()) => Json(VerifyResponse::valid(None)),
         Err(err) => {
-            state.pay_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "payment verification failed");
             Json(VerifyResponse::invalid(&err))
         }
@@ -304,7 +292,6 @@ async fn pay_handler(
 ) -> impl IntoResponse {
     match run_pay(&state, request).await {
         Ok(response) => {
-            state.pay_guard().record_sponsored();
             info!(
                 tx_hash = response.transaction.as_deref().unwrap_or_default(),
                 debtor = response.debtor.as_deref().unwrap_or_default(),
@@ -316,7 +303,6 @@ async fn pay_handler(
             Json(response)
         }
         Err(err) => {
-            state.pay_guard().record_rejected(err.is_throttling());
             warn!(reason = %err, code = %err.code(), "sponsored net-debit payment failed");
             Json(PayResponse::failure(&err))
         }
@@ -402,11 +388,9 @@ async fn supported_handler(State(state): State<SharedState>) -> impl IntoRespons
     Json(SupportedResponse::new(kinds))
 }
 
-async fn home_handler(State(state): State<SharedState>) -> impl IntoResponse {
-    let supported = state.supported().await;
+async fn home_handler() -> impl IntoResponse {
     Json(HomeResponse {
         message: "Welcome to the 4mica credit facilitator. Use /supported to discover payment schemes, /verify to validate a PAYMENT-SIGNATURE (or legacy X-PAYMENT) payload, and /settle to issue guarantees or forward debit settlements.",
-        supported,
         health: "/health",
         docs: "See README.md for a full flow walkthrough.",
     })
@@ -479,7 +463,6 @@ async fn settle_handler(
 #[derive(Serialize)]
 struct HomeResponse<'a> {
     message: &'a str,
-    supported: Vec<SupportedKind>,
     health: &'a str,
     docs: &'a str,
 }

@@ -92,7 +92,11 @@ impl From<ApiClientError> for IssueError {
                     && status != StatusCode::TOO_MANY_REQUESTS
                     && status != StatusCode::UNAUTHORIZED,
             },
-            other => Self::unavailable(format!("could not reach core: {other}")),
+            // Logged here and not returned: a transport error names the URL it failed against.
+            other => {
+                warn!(error = %other, "could not reach core");
+                Self::unavailable("could not reach core".into())
+            }
         }
     }
 }
@@ -117,7 +121,8 @@ impl GuaranteeIssuer for LiveGuaranteeIssuer {
         let mut proxy = self.proxy.clone();
         if let Some(auth) = &self.auth {
             let token = auth.access_token().await.map_err(|err| {
-                IssueError::unavailable(format!("could not authenticate with core: {err}"))
+                warn!(error = %err, "could not authenticate with core");
+                IssueError::unavailable("could not authenticate with core".into())
             })?;
             proxy = proxy.with_bearer_token(token);
         }

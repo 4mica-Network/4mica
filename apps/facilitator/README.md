@@ -224,23 +224,20 @@ The facilitator enforces that:
 
 - `GET /supported` – returns all `(scheme, network)` tuples the facilitator can service (4mica and,
   if configured, any additional `exact` flows).
-- `GET /health` – liveness probe. Returns `{ "status": "ok" }`, plus relayer and deposit detail
-  when gas sponsorship is configured:
+- `GET /health` – liveness probe. Returns `{ "status": "ok" }`, plus one entry per relayer when
+  gas sponsorship is configured:
   ```json
   {
     "status": "ok",
-    "relayers": [
-      { "network": "eip155:84532", "address": "0x…", "balanceWei": "…", "belowFloor": false }
-    ],
-    "deposits": { "sponsored": 12, "rejected": 3, "throttled": 1 },
-    "withdrawals": { "sponsored": 4, "rejected": 0, "throttled": 0 }
+    "relayers": [{ "network": "eip155:84532", "belowFloor": false }]
   }
   ```
-  Counters are per sponsored action, so a rising `rejected` names which one is being abused.
   `status` is `degraded` when any relayer is at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, or
-  when its balance cannot be read — so a plain HTTP check is enough to alert on. A rising
-  `throttled` distinguishes an abuse attempt from a merely misconfigured client. Balances are
-  cached for 15s, so polling this endpoint does not amplify into RPC load.
+  when its balance cannot be read — so a plain HTTP check is enough to alert on. The endpoint is
+  unauthenticated, so it deliberately omits the relayer's address and balance and any request
+  counts; those are in the service logs (the address and balance at startup, each refusal as a
+  `warn` line carrying its `code`). Balances are cached for 15s, so polling this endpoint does not
+  amplify into RPC load.
 - `POST /verify`
   - Request: `{ "x402Version": 1|2, "paymentPayload": { ... }, "paymentRequirements": { ... } }`.
   - Response: `{ "isValid": true, "payer" }` or `{ "isValid": false, "invalidReason",
@@ -325,6 +322,11 @@ Reasons for the sponsored endpoints:
 | `clearing_action_unavailable` / `clearing_action_mismatch` | Core could not supply the cycle's terms |
 | `chain_unavailable` / `broadcast_failed` | The chain could not be reached; nothing was submitted |
 | `rate_limited` / `duplicate_in_flight` / `relayer_underfunded` | Throttled; retry later |
+
+Messages for failures on the facilitator's side — `chain_unavailable`, `broadcast_failed`,
+`relayer_underfunded`, `gas_ceiling_exceeded`, an unreachable core, `unexpected_*_error` — are
+fixed text. The underlying error, which can name an RPC or core URL, is written to the service
+logs and never returned, so branch on the reason and read the logs for the cause.
 
 ### Sponsored net-credit claims
 

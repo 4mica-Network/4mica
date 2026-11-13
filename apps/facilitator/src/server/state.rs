@@ -107,7 +107,10 @@ impl AppState {
 
         for relayer in &self.relayers {
             let balance = match relayer.cached_balance().await {
-                Ok(balance) => Some(balance),
+                Ok(balance) => {
+                    tracing::debug!(network = relayer.network(), balance_wei = %balance, "relayer balance");
+                    Some(balance)
+                }
                 Err(err) => {
                     tracing::warn!(
                         network = relayer.network(),
@@ -126,18 +129,12 @@ impl AppState {
             degraded |= below_floor;
             relayers.push(RelayerHealth {
                 network: relayer.network().to_string(),
-                address: format!("{:#x}", relayer.address()),
-                balance_wei: balance.map(|b| b.to_string()),
                 below_floor,
             });
         }
 
         HealthResponse {
             status: if degraded { "degraded" } else { "ok" },
-            deposits: (!self.relayers.is_empty()).then(|| self.guards.deposit.counters()),
-            withdrawals: (!self.relayers.is_empty()).then(|| self.guards.withdraw.counters()),
-            claims: (!self.relayers.is_empty()).then(|| self.guards.claim.counters()),
-            debits: (!self.relayers.is_empty()).then(|| self.guards.pay.counters()),
             relayers,
         }
     }
@@ -870,9 +867,16 @@ impl ValidationError {
             Self::IssueGuarantee(err) => (!err.refused, err.details.clone()),
             _ => (false, None),
         };
+        // `Exact` and `Other` wrap whatever an upstream client or library said, which can name the
+        // upstream's URL. The full text is logged by the handler; the caller gets the code.
+        let message = match self {
+            Self::Exact(_) => "the upstream facilitator could not process the request".into(),
+            Self::Other(_) => "the request could not be processed".into(),
+            _ => self.to_string(),
+        };
         Failure {
             reason: reason.to_string(),
-            message: self.to_string(),
+            message,
             retryable,
             details,
             transaction: None,

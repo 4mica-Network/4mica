@@ -363,8 +363,8 @@ async fn e2e_facilitator_endpoints() {
     assert!(home.status().is_success());
     let home_body = home.json::<Value>().await.expect("home json");
     assert!(
-        home_body["message"].is_string() && home_body["supported"].is_array(),
-        "home response should carry a message + supported list: {home_body}"
+        home_body["message"].is_string() && home_body.get("supported").is_none(),
+        "home response should carry a message and leave discovery to /supported: {home_body}"
     );
 
     // --- /supported (advertises the configured 4mica-credit scheme + network) ---
