@@ -51,6 +51,26 @@ block. Two flags cover the rest:
 there, enable HTTP/2: `http2 on;` on nginx 1.25.1 or newer, otherwise append
 `http2` to the `listen 443 ssl` line.
 
+## Checking TLS from outside
+
+[`probe-tls.sh`](probe-tls.sh) `<host> [host...]` checks what certbot is meant
+to have set up on the live boxes, since this repo only holds the pre-certbot
+copy. For each host it requires:
+
+- `http://<host>/` to answer `301` or `308` with a `Location` on
+  `https://<host>/`, and
+- `https://<host>/` to send `Strict-Transport-Security` with `max-age` of at
+  least 180 days.
+
+It reports every failure as `::error::` and exits non-zero. Run it from
+outside the boxes, e.g. as a step after `build-react-app.yml`'s deploy:
+
+```yaml
+      - name: Confirm HTTPS redirect and HSTS
+        shell: bash
+        run: bash infra/nginx/probe-tls.sh 4mica.io www.4mica.io
+```
+
 ## The edge container
 
 `apps/web/nginx.conf.template` (deployed by CI with apps/web, not installed
