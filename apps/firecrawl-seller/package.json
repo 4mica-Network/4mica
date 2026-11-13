@@ -1,0 +1,32 @@
+{
+  "name": "@4mica/firecrawl-seller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server reselling Firecrawl over x402 with 4mica credit, through the API proxy",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "buyer": "tsx src/buyer.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@4mica/x402": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@x402/core": "catalog:",
+    "@x402/mcp": "catalog:",
+    "dotenv": "catalog:",
+    "viem": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/sdk": "workspace:*",
+    "@4mica/tsconfig": "workspace:*",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:node24",
+    "tsx": "catalog:",
+    "typescript": "catalog:typescript-latest",
+    "vitest": "catalog:"
+  }
+}

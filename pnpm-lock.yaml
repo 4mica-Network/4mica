@@ -126,6 +126,9 @@ catalogs:
     '@x402/fetch':
       specifier: 2.28.0
       version: 2.28.0
+    '@x402/mcp':
+      specifier: 2.28.0
+      version: 2.28.0
     ahooks:
       specifier: ^3.9.7
       version: 3.9.7
@@ -829,6 +832,52 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.8(@types/node@26.3.0)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@26.3.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  apps/firecrawl-seller:
+    dependencies:
+      '@4mica/x402':
+        specifier: workspace:*
+        version: link:../facilitator/packages/typescript/x402
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.30.0(zod@3.25.76)
+      '@x402/core':
+        specifier: 'catalog:'
+        version: 2.28.0
+      '@x402/mcp':
+        specifier: 'catalog:'
+        version: 2.28.0
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.4.2
+      viem:
+        specifier: 'catalog:'
+        version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@4mica/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/express':
+        specifier: 'catalog:'
+        version: 5.0.6
+      '@types/node':
+        specifier: catalog:node24
+        version: 24.12.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@types/node@24.12.4)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.4(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.9.0))
 
   apps/playground:
     dependencies:
@@ -6492,6 +6541,9 @@ packages:
 
   '@x402/fetch@2.28.0':
     resolution: {integrity: sha512-kF5IjZIz/izg2TD/Zav+SVj0jtC0zBDfE7WcKCnMZWIsZcLCyL2GgvwXCn7CCSsNjpQ/z3Rz4OqTCA4AaeKySQ==}
+
+  '@x402/mcp@2.28.0':
+    resolution: {integrity: sha512-I84qbst4aazR8lqfcw/XRURjECxzKuFsNMWgELgD63OBK39Jqjz0dar9o0X7Vdm4FcsWA/QET+F1MFFEU4QmKQ==}
 
   '@x402/paywall@2.28.0':
     resolution: {integrity: sha512-Uysf92BSzOpXoi7JXQeStioOf+BM/M9fI+/Z260l5d9rmoXldK9hhuZ3u13tTuvBlhGQESusBjkxTo6bhgRxTQ==}
@@ -17421,6 +17473,15 @@ snapshots:
   '@x402/fetch@2.28.0':
     dependencies:
       '@x402/core': 2.28.0
+
+  '@x402/mcp@2.28.0':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
+      '@x402/core': 2.28.0
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
 
   '@x402/paywall@2.28.0(@solana/sysvars@6.10.0(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3))(@tanstack/query-core@5.102.3)(@types/react@19.2.16)(algosdk@3.7.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(ioredis@5.11.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.7))(utf-8-validate@5.0.10)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
     dependencies:
