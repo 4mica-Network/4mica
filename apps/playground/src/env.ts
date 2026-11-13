@@ -17,12 +17,54 @@ const PublicEnvSchema = v.object({
 
 export type PublicEnv = v.InferOutput<typeof PublicEnvSchema>;
 
-export const parsePublicEnv = (source: {
-  NEXT_PUBLIC_BASE_URL?: string;
-  NEXT_PUBLIC_APP_URL?: string;
-  NEXT_PUBLIC_ASSET_PREFIX?: string;
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
-}): PublicEnv => {
+const APPROVED_DOMAIN = "4mica.io";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const EDGE_ASSET_PREFIX = "/p";
+
+const isLocal = (url: URL): boolean => LOCAL_HOSTS.has(url.hostname);
+
+const isApproved = (url: URL): boolean =>
+  url.hostname === APPROVED_DOMAIN ||
+  url.hostname.endsWith(`.${APPROVED_DOMAIN}`);
+
+const deployIssues = (env: PublicEnv): string[] => {
+  const issues: string[] = [];
+  const base = new URL(env.NEXT_PUBLIC_BASE_URL);
+
+  for (const key of ["NEXT_PUBLIC_BASE_URL", "NEXT_PUBLIC_APP_URL"] as const) {
+    const url = new URL(env[key]);
+
+    if (isLocal(url)) {
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        issues.push(`  - ${key}: must use http: or https:`);
+      }
+    } else if (url.protocol !== "https:") {
+      issues.push(`  - ${key}: must use https: in a deployed build`);
+    } else if (!isApproved(url)) {
+      issues.push(
+        `  - ${key}: host ${url.hostname} is not ${APPROVED_DOMAIN} or one of its subdomains`,
+      );
+    }
+  }
+
+  if (!isLocal(base) && env.NEXT_PUBLIC_ASSET_PREFIX !== EDGE_ASSET_PREFIX) {
+    issues.push(
+      `  - NEXT_PUBLIC_ASSET_PREFIX: must be ${EDGE_ASSET_PREFIX} behind the 4mica.io edge, got "${env.NEXT_PUBLIC_ASSET_PREFIX}"`,
+    );
+  }
+
+  return issues;
+};
+
+export const parsePublicEnv = (
+  source: {
+    NEXT_PUBLIC_BASE_URL?: string;
+    NEXT_PUBLIC_APP_URL?: string;
+    NEXT_PUBLIC_ASSET_PREFIX?: string;
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
+  },
+  { strict = process.env.PLAYGROUND_STRICT_ENV === "1" } = {},
+): PublicEnv => {
   const base = source.NEXT_PUBLIC_BASE_URL || "https://4mica.io";
   const result = v.safeParse(PublicEnvSchema, {
     NEXT_PUBLIC_BASE_URL: base,
@@ -35,6 +77,14 @@ export const parsePublicEnv = (source: {
   if (!result.success) {
     throw new Error(
       `Invalid public environment configuration:\n${format(result.issues)}`,
+    );
+  }
+
+  const issues = strict ? deployIssues(result.output) : [];
+
+  if (issues.length > 0) {
+    throw new Error(
+      `Invalid public environment configuration:\n${issues.join("\n")}`,
     );
   }
 
