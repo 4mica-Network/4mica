@@ -103,11 +103,11 @@ catalog:
   ky: ^2.0.2
   lint-staged: ^17.0.7
   lucide-react: ^1.17.0
-  next: ^16.2.7
+  next: ^16.4.6
   npm-registry-fetch: ^20.0.0
   ora: ^9.4.0
   picocolors: ^1.1.1
-  postcss: ^8.5.15
+  postcss: ^8.5.23
   prisma: 7.9.1
   publint: ^0.3.14
   react: ^19.2.7
@@ -141,7 +141,7 @@ catalog:
   typescript: ^5.9.0
   valibot: ^1.4.2
   viem: 2.x
-  vite: ^8.1.4
+  vite: ^8.1.7
   vitest: ^4.1.8
   wagmi: ^3.6.16
   winston: ^3.19.0
