@@ -97,7 +97,7 @@ export const submitReview = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
-  if (!(await allowWrite("submitReview"))) {
+  if (!(await allowWrite("submitReview", { failClosed: true }))) {
     return { ok: false, error: "rate_limited" };
   }
 
@@ -165,7 +165,7 @@ export const submitReview = async (
 export const deleteOwnReview = async (
   ref: ResourceRef,
 ): Promise<ActionResult> => {
-  if (!(await allowWrite("deleteOwnReview"))) {
+  if (!(await allowWrite("deleteOwnReview", { failClosed: true }))) {
     return { ok: false, error: "rate_limited" };
   }
 
@@ -205,7 +205,7 @@ export const fileReport = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
-  if (!(await allowWrite("fileReport"))) {
+  if (!(await allowWrite("fileReport", { failClosed: true }))) {
     return { ok: false, error: "rate_limited" };
   }
 

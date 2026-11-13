@@ -33,13 +33,25 @@ describe("server actions under the write limit", () => {
   });
 
   it.each([
-    ["submitReview", () => submitReview(resource, { rating: 5 })],
-    ["deleteOwnReview", () => deleteOwnReview(resource)],
-    ["fileReport", () => fileReport(resource, { reason: "SPAM" })],
-    ["revalidateProfile", () => revalidateProfile("ada")],
-  ])("%s refuses before resolving the viewer", async (name, call) => {
+    [
+      "submitReview",
+      () => submitReview(resource, { rating: 5 }),
+      [{ failClosed: true }],
+    ],
+    [
+      "deleteOwnReview",
+      () => deleteOwnReview(resource),
+      [{ failClosed: true }],
+    ],
+    [
+      "fileReport",
+      () => fileReport(resource, { reason: "SPAM" }),
+      [{ failClosed: true }],
+    ],
+    ["revalidateProfile", () => revalidateProfile("ada"), []],
+  ])("%s refuses before resolving the viewer", async (name, call, options) => {
     expect(await call()).toEqual({ ok: false, error: "rate_limited" });
-    expect(allowWrite).toHaveBeenCalledWith(name);
+    expect(allowWrite).toHaveBeenCalledWith(name, ...options);
     expect(getViewer).not.toHaveBeenCalled();
   });
 

@@ -158,4 +158,25 @@ describe("allowWrite with Valkey", () => {
       { action: "submitReview", error: "OOM" },
     );
   });
+
+  it("refuses fail-closed writes while Valkey fails, leaving the memory budget", async () => {
+    exec.mockRejectedValue(new Error("Connection is closed."));
+
+    expect(await allowWrite("fileReport", { failClosed: true })).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      "shared write limit unavailable; refusing",
+      { action: "fileReport", error: "Connection is closed." },
+    );
+
+    for (let i = 0; i < WRITE_LIMIT.limit; i += 1) {
+      expect(await allowWrite("revalidateProfile")).toBe(true);
+    }
+  });
+
+  it("refuses fail-closed writes at once while Valkey is reconnecting", async () => {
+    client.status = "reconnecting";
+
+    expect(await allowWrite("submitReview", { failClosed: true })).toBe(false);
+    expect(exec).not.toHaveBeenCalled();
+  });
 });

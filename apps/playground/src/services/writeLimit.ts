@@ -91,7 +91,10 @@ const takeShared = async (
   return count <= WRITE_LIMIT.limit;
 };
 
-export const allowWrite = async (action: string): Promise<boolean> => {
+export const allowWrite = async (
+  action: string,
+  { failClosed = false }: { failClosed?: boolean } = {},
+): Promise<boolean> => {
   let clerkUserId: string | null = null;
 
   try {
@@ -112,12 +115,17 @@ export const allowWrite = async (action: string): Promise<boolean> => {
       allowed = await takeShared(shared, clerkUserId, Date.now());
     } catch (error) {
       (await requestLogger()).warn(
-        "shared write limit unavailable; using the in-process limit",
+        failClosed
+          ? "shared write limit unavailable; refusing"
+          : "shared write limit unavailable; using the in-process limit",
         {
           action,
           error: error instanceof Error ? error.message : String(error),
         },
       );
+      if (failClosed) {
+        return false;
+      }
       allowed = memory.take(clerkUserId);
     }
   } else {
