@@ -66,11 +66,13 @@ Two scripts make the deploy check this rather than leave it to convention.
   the script fails. It needs `timeout`, which Ubuntu runners have; without it
   the script stops rather than report a false "closed".
 
-`deploy-playground.yml` calls both:
+`deploy-playground.yml` calls both. The `|| exit 1` is load-bearing:
+remote-deploy runs `pre_up` through `bash -c` without `errexit`, so a bare
+failing line would be ignored.
 
 ```yaml
           pre_up: |
-            sh "$(git rev-parse --show-toplevel)/infra/firewall/check-bind.sh" '${{ vars.PLAYGROUND_BIND || '127.0.0.1' }}'
+            sh ../../infra/firewall/check-bind.sh '${{ vars.PLAYGROUND_BIND || '127.0.0.1' }}' || exit 1
             # …the existing pre_up lines…
 
       - name: Confirm the playground port is closed to the internet
