@@ -51,6 +51,36 @@ sudo netfilter-persistent save
 Re-run `save` after any re-apply. Without it, the port is open to the whole
 private network again after a reboot until the script is run.
 
+## Deploy-time checks
+
+Two scripts make the deploy check this rather than leave it to convention.
+
+- [`check-bind.sh`](check-bind.sh) `<PLAYGROUND_BIND>` runs on Box B before
+  `compose up`. It exits non-zero unless the value is an IPv4 address in
+  10/8, 172.16/12 or 192.168/16 that is assigned to an interface on the box.
+  `127.0.0.1` passes with a warning, because the edge can't reach it. `0.0.0.0`
+  and public addresses fail.
+- [`probe-closed.sh`](probe-closed.sh) `<public-host> [port]` runs on the
+  GitHub runner after the deploy. The runner is on the public internet, so a
+  successful TCP connect to the port means the firewall above is missing, and
+  the script fails. It needs `timeout`, which Ubuntu runners have; without it
+  the script stops rather than report a false "closed".
+
+`deploy-playground.yml` calls both:
+
+```yaml
+          pre_up: |
+            sh "$(git rev-parse --show-toplevel)/infra/firewall/check-bind.sh" '${{ vars.PLAYGROUND_BIND || '127.0.0.1' }}'
+            # …the existing pre_up lines…
+
+      - name: Confirm the playground port is closed to the internet
+        shell: bash
+        run: bash infra/firewall/probe-closed.sh "$SERVER_HOST" "$PORT"
+        env:
+          SERVER_HOST: ${{ secrets.BE_SERVER_HOST }}
+          PORT: ${{ vars.PLAYGROUND_PORT || '8081' }}
+```
+
 ## What it does not cover
 
 - IPv6. `PLAYGROUND_BIND` is an IPv4 address, and Docker only publishes on IPv6
