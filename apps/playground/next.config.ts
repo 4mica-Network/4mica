@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "@prisma/adapter-pg",
     "@prisma/client",
+    "ioredis",
     "pg",
     "winston",
     "winston-daily-rotate-file",

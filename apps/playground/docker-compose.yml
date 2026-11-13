@@ -40,6 +40,7 @@ services:
       DATABASE_URL: ${DATABASE_URL_OVERRIDE:-postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-host.docker.internal}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-4mica}?schema=public}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+      VALKEY_URL: ${VALKEY_URL:-redis://4mica-be-valkey:6379}
     # Makes `host.docker.internal` resolve to the host on Linux, where Docker
     # does not provide it by default.
     extra_hosts:

@@ -34,6 +34,16 @@ const ServerEnvSchema = v.object({
       v.minLength(32, "REVALIDATE_SECRET must be at least 32 characters"),
     ),
   ]),
+  VALKEY_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.regex(
+        /^rediss?:\/\//,
+        "VALKEY_URL must be a redis:// or rediss:// URL — Valkey speaks the Redis protocol",
+      ),
+    ),
+  ]),
 });
 
 export type ServerEnv = v.InferOutput<typeof ServerEnvSchema>;
@@ -47,6 +57,7 @@ export const parseEnv = (source: NodeJS.ProcessEnv): ServerEnv => {
     DATABASE_URL: source.DATABASE_URL ?? "",
     CLERK_SECRET_KEY: source.CLERK_SECRET_KEY ?? "",
     REVALIDATE_SECRET: source.REVALIDATE_SECRET ?? "",
+    VALKEY_URL: source.VALKEY_URL ?? "",
   });
 
   if (!result.success) {
