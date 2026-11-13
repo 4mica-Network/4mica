@@ -47,6 +47,46 @@ describe("env contract", () => {
     ).toThrow(/must start with pk_/);
   });
 
+  describe("in a deployed build", () => {
+    const PROD = {
+      NEXT_PUBLIC_BASE_URL: "https://4mica.io",
+      NEXT_PUBLIC_APP_URL: "https://app.4mica.io",
+      NEXT_PUBLIC_ASSET_PREFIX: "/p",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_abc",
+    };
+    const parse = (overrides: Partial<typeof PROD>) =>
+      parsePublicEnv({ ...PROD, ...overrides }, { strict: true });
+
+    it("accepts the deployed configuration", () => {
+      expect(parse({}).NEXT_PUBLIC_ASSET_PREFIX).toBe("/p");
+      expect(
+        parse({ NEXT_PUBLIC_BASE_URL: "https://dev.4mica.io" }),
+      ).toBeTruthy();
+    });
+
+    it.each([
+      ["NEXT_PUBLIC_BASE_URL", "http://4mica.io", /must use https:/],
+      ["NEXT_PUBLIC_APP_URL", "ftp://app.4mica.io", /must use https:/],
+      ["NEXT_PUBLIC_APP_URL", "javascript:alert(1)", /must use https:/],
+      ["NEXT_PUBLIC_BASE_URL", "https://4mica.io.evil.test", /not 4mica\.io/],
+      ["NEXT_PUBLIC_APP_URL", "https://evil4mica.io", /not 4mica\.io/],
+      ["NEXT_PUBLIC_ASSET_PREFIX", "", /must be \/p/],
+      ["NEXT_PUBLIC_ASSET_PREFIX", "/q", /must be \/p/],
+    ])("rejects %s=%s", (key, value, message) => {
+      expect(() => parse({ [key]: value })).toThrow(message);
+    });
+
+    it("allows a strict build against localhost without the prefix", () => {
+      expect(
+        parse({
+          NEXT_PUBLIC_BASE_URL: "http://localhost:3100",
+          NEXT_PUBLIC_APP_URL: "http://localhost:4173",
+          NEXT_PUBLIC_ASSET_PREFIX: "",
+        }).NEXT_PUBLIC_BASE_URL,
+      ).toBe("http://localhost:3100");
+    });
+  });
+
   it("defaults the app URL to the base URL", () => {
     const env = parsePublicEnv({
       NEXT_PUBLIC_BASE_URL: "https://example.test",

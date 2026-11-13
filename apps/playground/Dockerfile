@@ -59,6 +59,8 @@ ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL \
 # connected to — same trick as packages/db/prisma.config.ts.
 ENV DATABASE_URL=postgresql://unset:unset@127.0.0.1:1/unset
 
+ENV PLAYGROUND_STRICT_ENV=1
+
 # src/env.ts rejects a CLERK_SECRET_KEY that is not sk_-prefixed, and the same
 # metadata collection evaluates it. Deliberately a build-only sentinel rather
 # than an ARG: a real key passed as a build arg is recorded in the image

@@ -105,6 +105,17 @@ If the prefix is ever unset in a production build, **every page loads with no
 CSS or JS and nothing appears in the server logs.** Treat it as a required CI
 build arg.
 
+The Dockerfile sets `PLAYGROUND_STRICT_ENV=1`, which makes `src/env.ts` fail
+the build unless:
+
+- `NEXT_PUBLIC_BASE_URL` and `NEXT_PUBLIC_APP_URL` are `https:` URLs on
+  `4mica.io` or one of its subdomains, and
+- `NEXT_PUBLIC_ASSET_PREFIX` is exactly `/p`.
+
+`localhost`, `127.0.0.1` and `[::1]` are exempt, with no prefix required, so a
+local image still builds against a local base URL. Plain `pnpm build` outside
+Docker doesn't set the flag and behaves as before.
+
 ### `@4mica/db` throws at import
 
 `packages/db/src/index.ts` throws when `DATABASE_URL` is unset, and `next build`
