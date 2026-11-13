@@ -9,6 +9,7 @@
  */
 
 import type { Hex } from "viem";
+import { ZERO_ADDRESS } from "@/amounts";
 import {
   type CheckpointMismatchError,
   type CheckpointRequiredError,
@@ -36,7 +37,7 @@ import {
   ValidationError,
 } from "@/utils";
 
-export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export { ZERO_ADDRESS };
 
 /**
  * Current payment payload version. Clients always sign at this version; core
@@ -716,7 +717,7 @@ export class CorePublicParameters {
 export interface SupportedTokenInfo {
   symbol: string;
   address: string;
-  decimals?: number;
+  decimals: number;
   /**
    * The token's own EIP-712 `DOMAIN_SEPARATOR()`, relayed by core so clients
    * can build gasless-deposit signatures without an Ethereum RPC. `undefined`
@@ -738,19 +739,34 @@ export class SupportedTokensResponse {
       for (const token of tokensRaw as Record<string, unknown>[]) {
         const address = getAny(token, "address");
         if (typeof address !== "string" || address.length === 0) continue;
-        const decimals = getAny(token, "decimals");
+        // Core always sends both.
+        const symbol = getAny(token, "symbol");
+        const rawDecimals = getAny(token, "decimals");
+        const decimals =
+          rawDecimals === undefined ||
+          rawDecimals === null ||
+          rawDecimals === ""
+            ? Number.NaN
+            : Number(rawDecimals);
+        if (typeof symbol !== "string" || symbol === "") {
+          throw new InvalidParamsError(
+            `core's token list has no symbol for ${address}`,
+          );
+        }
+        if (!Number.isInteger(decimals) || decimals < 0) {
+          throw new InvalidParamsError(
+            `core's token list has no valid decimals for ${address}`,
+          );
+        }
         const domainSeparator = getAny(
           token,
           "domain_separator",
           "domainSeparator",
         );
         tokens.push({
-          symbol: String(getAny(token, "symbol") ?? ""),
+          symbol,
           address,
-          decimals:
-            decimals === undefined || decimals === null
-              ? undefined
-              : Number(decimals),
+          decimals,
           domainSeparator:
             domainSeparator === undefined || domainSeparator === null
               ? undefined

@@ -104,3 +104,89 @@ describe("ConfigBuilder", () => {
     expect(cfg.facilitatorUrl).toBe("https://facilitator.example");
   });
 });
+
+describe("ConfigBuilder env prefixes and facilitator defaults", () => {
+  const KEY = "11".repeat(32);
+
+  it("reads FOURMICA_ variables", () => {
+    const cfg = new ConfigBuilder()
+      .fromEnv({
+        FOURMICA_NETWORK: "base",
+        FOURMICA_WALLET_PRIVATE_KEY: KEY,
+        FOURMICA_FACILITATOR_URL: "https://facilitator.example/",
+      })
+      .build();
+    expect(cfg.rpcUrl).toBe("https://base.api.4mica.io/");
+    expect(cfg.facilitatorUrl).toBe("https://facilitator.example/");
+  });
+
+  it("accepts both prefixes when they agree, and refuses them when they differ", () => {
+    const agree = new ConfigBuilder()
+      .fromEnv({
+        FOURMICA_WALLET_PRIVATE_KEY: KEY,
+        "4MICA_WALLET_PRIVATE_KEY": KEY,
+        "4MICA_RPC_URL": "https://example.com",
+      })
+      .build();
+    expect(agree.rpcUrl).toBe("https://example.com");
+
+    expect(() =>
+      new ConfigBuilder().fromEnv({
+        FOURMICA_NETWORK: "base",
+        "4MICA_NETWORK": "base-sepolia",
+      }),
+    ).toThrow(/FOURMICA_NETWORK and 4MICA_NETWORK/);
+  });
+
+  it("defaults the facilitator to the network's hosted one", () => {
+    const sepolia = new ConfigBuilder()
+      .network("base-sepolia")
+      .walletPrivateKey(KEY)
+      .build();
+    expect(sepolia.facilitatorUrl).toBe("https://testnet.payment.4mica.io/");
+
+    const base = new ConfigBuilder()
+      .network("base")
+      .walletPrivateKey(KEY)
+      .build();
+    expect(base.facilitatorUrl).toBeUndefined();
+
+    const fromEnv = new ConfigBuilder()
+      .fromEnv({
+        FOURMICA_NETWORK: "base-sepolia",
+        FOURMICA_WALLET_PRIVATE_KEY: KEY,
+      })
+      .build();
+    expect(fromEnv.facilitatorUrl).toBe("https://testnet.payment.4mica.io/");
+  });
+
+  it("lets an explicit facilitator win, in either order", () => {
+    for (const builder of [
+      new ConfigBuilder()
+        .facilitatorUrl("https://mine.example/")
+        .network("base-sepolia"),
+      new ConfigBuilder()
+        .network("base-sepolia")
+        .facilitatorUrl("https://mine.example/"),
+    ]) {
+      expect(builder.walletPrivateKey(KEY).build().facilitatorUrl).toBe(
+        "https://mine.example/",
+      );
+    }
+  });
+
+  it("drops the hosted facilitator when rpcUrl points at a self-hosted core", () => {
+    const cfg = new ConfigBuilder()
+      .network("base-sepolia")
+      .rpcUrl("https://core.example/")
+      .walletPrivateKey(KEY)
+      .build();
+    expect(cfg.facilitatorUrl).toBeUndefined();
+  });
+
+  it("leaves the facilitator unset when no network was chosen", () => {
+    const cfg = new ConfigBuilder().walletPrivateKey(KEY).build();
+    expect(cfg.rpcUrl).toBe("https://base.sepolia.api.4mica.io/");
+    expect(cfg.facilitatorUrl).toBeUndefined();
+  });
+});

@@ -3,20 +3,21 @@ title: "Quickstart"
 description: "Make your first 4Mica-powered x402 request in minutes."
 ---
 
-After you complete this guide, you will have a wallet ready to pay with 4Mica credit and a client that can handle HTTP 402 responses automatically.
+After you complete this guide, you will have deposited collateral into 4Mica and made a paid request with a client that handles HTTP 402 responses automatically.
 
 ## Before you begin
 
 4Mica's approach is to deposit collateral once, sign payment guarantees as requests happen, and settle net positions through clearing cycles instead of sending an on-chain transaction for every paid request. To start, you need:
 
 - A wallet private key or supported signer for your agent or service.
-- A little Base Sepolia ETH if you deposit self-funded; gasless deposits through the facilitator need none.
 - Collateral in a token core accepts on the network: on Base Sepolia, Aave's test USDC or USDT.
-- [Node.js](https://nodejs.org/) if you want to follow the example below.
+- [Node.js](https://nodejs.org/) and TypeScript 5.2 or later if you want to follow the example below.
 
-Use Base Sepolia (`eip155:84532`) for development. Move to Base (`eip155:8453`) when you are ready for production traffic.
+On Base Sepolia the deposit is gasless through the hosted facilitator, so the wallet needs no ETH for it.
 
-If you do not have these yet, start with a test wallet. Create a new wallet in [MetaMask](https://metamask.io/), [Coinbase Wallet](https://www.coinbase.com/wallet/downloads), [Rabby](https://rabby.io/), or another EVM wallet, then export the private key for that wallet only. Use this key for development and keep your main wallet separate.
+Use Base Sepolia (`eip155:84532`) for development. Base (`eip155:8453`) still runs the previous protocol version; see [supported networks](/getting-started/supported-networks).
+
+If you do not have a wallet yet, start with a test wallet. Create a new wallet in [MetaMask](https://metamask.io/), [Coinbase Wallet](https://www.coinbase.com/wallet/downloads), [Rabby](https://rabby.io/), or another EVM wallet, then export the private key for that wallet only. Use this key for development and keep your main wallet separate.
 
 Get test collateral from Aave's faucet contract on Base Sepolia. The USDC core accepts there is Aave's
 test token, `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f`, not Circle's, and anyone can mint it:
@@ -28,43 +29,68 @@ cast send 0xD9145b5F45Ad4519c7ACcD6E0A4A82e83bB8A6Dc "mint(address,address,uint2
 ```
 
 That is 10 USDC (six decimals). The same mint is available on the Aave app's testnet faucet page.
-Then [deposit a small amount](/core-concepts/deposits-and-withdrawals) into 4Mica; the deposit is
-gasless through the facilitator, so the wallet needs no ETH for it. `GET /core/tokens` on the
-network's core API lists every accepted token.
+`GET /core/tokens` on the network's core API lists every accepted token.
 
+Put the key in an environment variable:
 
 ```bash
-PRIVATE_KEY=0xYourPrivateKey
+export PRIVATE_KEY=0xYourPrivateKey
 ```
 
 <Warning>Keep private keys in environment variables instead of committing them to your code.</Warning>
 
 <Tip>For production, use a dedicated service wallet, hardware-backed signer, MPC wallet, or hosted key management system. Rotate keys regularly and limit how much collateral any one wallet can control.</Tip>
 
-## Register collateral
+## Install the SDK
 
-Deposit collateral into 4Mica before your first paid request. This registers the wallet and gives 4Mica a balance to secure future payment guarantees.
+```bash
+pnpm install @4mica/sdk@alpha
+```
 
-During registration, choose the same network you plan to use in your x402 client. Follow the [deposits and withdrawals guide](/core-concepts/deposits-and-withdrawals) for the collateral flow, then wait for the deposit to finalize before continuing.
+## Deposit and make your first paid request
 
-## Install the packages
+Connect a session, deposit collateral, then call the paid API with `client.fetch`. When the API returns HTTP 402 payment requirements, `client.fetch` signs a guarantee within your spend limits, retries the request once, and returns the paid response.
 
-Install the 4Mica x402 client, the x402 fetch wrapper, and viem:
+```ts
+import { FourMica } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  network: "base-sepolia",
+});
+
+const deposit = await client.deposit("5 USDC");
+console.log(deposit.status, deposit.explorerUrl); // "spendable", https://sepolia.basescan.org/tx/…
+
+const response = await client.fetch("https://api.example.com/data");
+const data = await response.json();
+console.log(client.paymentFor(response)); // { protocol: "x402", amount: "0.1", asset: { symbol: "USDC", … }, … }
+```
+
+- **`deposit`** resolves once core counts the collateral (`status: "spendable"`). If that takes longer than 60 seconds it returns `status: "pending"` instead of throwing: the money has moved, and `await deposit.spendable()` waits again. You only need to deposit once; later runs can skip it.
+- **`fetch`** has the same signature as the global `fetch`. It pays only up to `1 USDC` per request unless you set `spend` limits; see [Make paid requests automatically](/buyer/make-paid-requests-automatically).
+- **`await using`** closes the session when `client` goes out of scope, even if a call throws.
+
+<Note>
+`await using` needs TypeScript 5.2 or later. Plain JavaScript needs a runtime with native `await using` (Node 24 or later); otherwise call `await client.close()` in a `finally` block.
+</Note>
+
+If the request succeeds, your client received the protected response and the seller received a settled payment guarantee. For the full setup, see the [Buyer Quick Start](/buyer/quick-start).
+
+## Already using `@x402/fetch`?
+
+If your client is already built on `@x402/fetch`, register the 4Mica scheme with it instead. Deposit collateral first, as above.
 
 ```bash
 pnpm install @4mica/x402 @x402/fetch viem
 ```
-
-## Make your first paid request
-
-Wrap your normal `fetch` client with the 4Mica scheme. When the API returns HTTP 402 payment requirements, the wrapper creates a unique request ID, signs the guarantee, retries the request, and returns the paid response.
 
 ```ts
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { privateKeyToAccount } from "viem/accounts";
 
-const account = privateKeyToAccount(process.env.PRIVATE_KEY);
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
 const scheme = await FourMicaEvmScheme.create(account);
 
 const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
@@ -72,14 +98,11 @@ const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
 });
 
 const response = await fetchWithPayment("https://api.example.com/data");
-const data = await response.json();
 ```
 
 <Note>
 `@x402/fetch` only pays in assets its scheme client recognises. `FourMicaEvmScheme` recognises whatever 4Mica core lists for the network, so the seller's advertised USDC passes the client's spend controls and the default `$1` per-payment cap applies. Pass `spendControls` to raise the cap or allow other assets.
 </Note>
-
-If the request succeeds, your client received the protected response and the seller received a settled payment guarantee. For the full setup, see the [Buyer Quick Start](/buyer/quick-start).
 
 ## Protect a route
 
@@ -107,6 +130,7 @@ The middleware returns HTTP 402 responses, verifies payment payloads, settles gu
 A successful first run should end with:
 
 - The buyer receiving a normal HTTP response from the protected route.
+- `client.paymentFor(response)` reporting what was paid.
 - The seller receiving a settled guarantee for the request amount.
 - A payable guarantee that can enter a clearing cycle.
 

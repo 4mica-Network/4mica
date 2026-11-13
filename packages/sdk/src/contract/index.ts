@@ -341,6 +341,38 @@ export class ContractGateway {
     return receipt;
   }
 
+  async erc20Balance(token: string): Promise<bigint> {
+    const account = this.walletClient.account;
+    if (!account) {
+      throw new ContractError("wallet client has no account configured");
+    }
+    const erc20 = this.erc20(token);
+    try {
+      return (await erc20.read.balanceOf([account.address])) as bigint;
+    } catch (error) {
+      throw wrapViemError(error, "ERC20 balance read failed");
+    }
+  }
+
+  async nativeBalance(): Promise<bigint> {
+    const account = this.walletClient.account;
+    if (!account) {
+      throw new ContractError("wallet client has no account configured");
+    }
+    return this.view(
+      () => this.publicClient.getBalance({ address: account.address }),
+      "native balance read failed",
+    );
+  }
+
+  /** Seconds. */
+  async withdrawalGracePeriod(): Promise<bigint> {
+    return this.view(
+      () => this.contract.read.withdrawalGracePeriod(),
+      "withdrawalGracePeriod read failed",
+    );
+  }
+
   async erc20Allowance(token: string, spender?: string): Promise<bigint> {
     const account = this.walletClient.account;
     if (!account) {

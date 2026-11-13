@@ -1,0 +1,74 @@
+{
+  "description": "Shared cases for parsing human amounts. Every SDK that parses decimal amounts runs these. `error` names the failure: `invalid` (malformed input) or `precision` (more decimal places than the token has).",
+  "toBaseUnits": [
+    { "amount": "5", "decimals": 6, "base": "5000000" },
+    { "amount": "0.10", "decimals": 6, "base": "100000" },
+    { "amount": "0.1", "decimals": 6, "base": "100000" },
+    { "amount": "1.5", "decimals": 6, "base": "1500000" },
+    { "amount": "0.000001", "decimals": 6, "base": "1" },
+    { "amount": "1.500000000", "decimals": 6, "base": "1500000" },
+    { "amount": "0", "decimals": 6, "base": "0" },
+    { "amount": "007", "decimals": 2, "base": "700" },
+    { "amount": "12", "decimals": 0, "base": "12" },
+    { "amount": "0.01", "decimals": 18, "base": "10000000000000000" },
+    {
+      "amount": "123456789.1234567891234567891",
+      "decimals": 18,
+      "error": "precision"
+    },
+    {
+      "amount": "123456789.123456789123456789",
+      "decimals": 18,
+      "base": "123456789123456789123456789"
+    },
+    {
+      "amount": "123456789.123456789123456789",
+      "decimals": 27,
+      "base": "123456789123456789123456789000000000"
+    },
+    { "amount": " 2.5 ", "decimals": 6, "base": "2500000" },
+    { "amount": "0.0000015", "decimals": 6, "error": "precision" },
+    { "amount": "0.0000001", "decimals": 6, "error": "precision" },
+    { "amount": "1.5", "decimals": 0, "error": "precision" },
+    { "amount": "1e3", "decimals": 6, "error": "invalid" },
+    { "amount": "1e-7", "decimals": 6, "error": "invalid" },
+    { "amount": "1.5abc", "decimals": 6, "error": "invalid" },
+    { "amount": "-1", "decimals": 6, "error": "invalid" },
+    { "amount": "+1", "decimals": 6, "error": "invalid" },
+    { "amount": ".5", "decimals": 6, "error": "invalid" },
+    { "amount": "5.", "decimals": 6, "error": "invalid" },
+    { "amount": "1,000", "decimals": 6, "error": "invalid" },
+    { "amount": "1_000", "decimals": 6, "error": "invalid" },
+    { "amount": "0x10", "decimals": 6, "error": "invalid" },
+    { "amount": "", "decimals": 6, "error": "invalid" },
+    { "amount": "NaN", "decimals": 6, "error": "invalid" },
+    { "amount": "Infinity", "decimals": 6, "error": "invalid" }
+  ],
+  "parseAmount": [
+    { "input": "5 USDC", "amount": "5", "asset": "USDC" },
+    { "input": "  0.5   usdc ", "amount": "0.5", "asset": "usdc" },
+    { "input": "0.01 ETH", "amount": "0.01", "asset": "ETH" },
+    {
+      "input": "1 0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f",
+      "amount": "1",
+      "asset": "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f"
+    },
+    { "input": "5", "error": "invalid" },
+    { "input": "USDC", "error": "invalid" },
+    { "input": "5 USDC USDC", "error": "invalid" },
+    { "input": "USDC 5", "error": "invalid" },
+    { "input": "-5 USDC", "error": "invalid" },
+    { "input": "1e3 USDC", "error": "invalid" },
+    { "input": "", "error": "invalid" }
+  ],
+  "formatUnits": [
+    { "base": "5000000", "decimals": 6, "amount": "5" },
+    { "base": "100000", "decimals": 6, "amount": "0.1" },
+    { "base": "1", "decimals": 6, "amount": "0.000001" },
+    { "base": "0", "decimals": 6, "amount": "0" },
+    { "base": "1234500", "decimals": 6, "amount": "1.2345" },
+    { "base": "12", "decimals": 0, "amount": "12" },
+    { "base": "-1500000", "decimals": 6, "amount": "-1.5" },
+    { "base": "10000000000000000", "decimals": 18, "amount": "0.01" }
+  ]
+}

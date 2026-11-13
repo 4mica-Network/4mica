@@ -9,11 +9,14 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     app: "src/app/index.ts",
+    networks: "src/networks/index.ts",
+    amounts: "src/amounts/index.ts",
   },
   outDir: "dist",
   format: ["esm", "cjs"],
   dts: true,
-  splitting: false,
+  // Shared chunks keep `instanceof` working across entry points.
+  splitting: true,
   clean: true,
   sourcemap: true,
   minify: false,
