@@ -36,6 +36,7 @@ export const isPayable = (
  */
 export const buildApiListingSnippets = (
   listing: PublicApiListing,
+  { sellerText = true }: { sellerText?: boolean } = {},
 ): ApiListingSnippets | null => {
   if (!isPayable(listing)) {
     return null;
@@ -46,11 +47,11 @@ export const buildApiListingSnippets = (
   const price = formatPrice(
     listing.priceAmount,
     listing.priceCurrency,
-    listing.priceLabel,
+    sellerText ? listing.priceLabel : null,
   );
 
   const descriptorParts = [
-    listing.name,
+    sellerText ? listing.name : null,
     `${listing.method} ${url}`,
     price === null ? null : `${price} per call`,
   ];
