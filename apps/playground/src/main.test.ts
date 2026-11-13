@@ -416,6 +416,13 @@ describe("reserved segments vs nginx", () => {
     );
   });
 
+  it("hides /api/health from public clients at the edge", () => {
+    expect(nginxConf).toMatch(/geo \$mica_internal {[^}]*default\s+0;/);
+    expect(nginxConf).toMatch(
+      /location = \/api\/health {\s*if \(\$mica_internal = 0\) {\s*return 404;\s*}[^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
   it("routes the profiles sitemap to the playground", () => {
     expect(nginxConf).toMatch(
       /location = \/sitemap-profiles\.xml\s+{[^}]*proxy_pass [^;]*mica_playground;/,

@@ -85,6 +85,17 @@ limit_req_zone $binary_remote_addr zone=mica_pages:10m      rate=20r/s;
 limit_req_zone $mica_write_key     zone=mica_write:10m      rate=30r/m;
 limit_req_status 429;
 
+# Addresses that may reach /api/health: this box's own deploy probe and Docker
+# networks. Evaluated after real_ip, so a public client is judged by its real
+# address, which the host nginx always overwrites into X-Real-IP.
+geo $mica_internal {
+  default        0;
+  127.0.0.1      1;
+  10.0.0.0/8     1;
+  172.16.0.0/12  1;
+  192.168.0.0/16 1;
+}
+
 server {
   listen 80;
   server_name 4mica.io www.4mica.io;
@@ -185,6 +196,18 @@ server {
   # can never collide with a handle.
   location ^~ /api/ {
     limit_req zone=mica_pages burst=40 nodelay;
+    proxy_pass $mica_playground;
+  }
+
+  # The playground's healthcheck runs SELECT 1, so the public must not be able
+  # to drive it or read the database's status from it. The host nginx already
+  # answers 404; this keeps it so if the edge is ever reached another way,
+  # while build-react-app.yml's post_up probe from this box still gets through.
+  location = /api/health {
+    if ($mica_internal = 0) {
+      return 404;
+    }
+    limit_req zone=mica_pages burst=5 nodelay;
     proxy_pass $mica_playground;
   }
 
