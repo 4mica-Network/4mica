@@ -219,6 +219,25 @@ impl Refusal for DepositError {
         }
     }
 
+    fn public_message(&self) -> String {
+        match self {
+            Self::Chain(_) => "the chain could not be reached; retry shortly".into(),
+            Self::Broadcast(_) => {
+                "the deposit could not be broadcast; nothing was submitted".into()
+            }
+            Self::ReceiptUnavailable { tx_hash, .. } => {
+                format!("deposit {tx_hash} was broadcast but its receipt could not be read")
+            }
+            Self::RelayerBalanceTooLow { .. } => {
+                "gas sponsorship is temporarily unavailable; retry later".into()
+            }
+            Self::GasCeilingExceeded { .. } => {
+                "the deposit needs more gas than this facilitator sponsors".into()
+            }
+            other => other.to_string(),
+        }
+    }
+
     fn retryable(&self) -> bool {
         self.is_retryable()
     }

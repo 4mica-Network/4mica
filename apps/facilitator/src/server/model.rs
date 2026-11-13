@@ -16,7 +16,6 @@ use alloy::primitives::{Address, B256, U256};
 use crate::clearing::{ClaimError, ClaimTerms, PayError, PayTerms};
 use crate::deposit::{DepositError, DepositIntent, Eip2612Permit};
 use crate::error_code::Failure;
-use crate::limits::SponsorCounters;
 use crate::withdraw::{WithdrawError, WithdrawIntent};
 
 #[derive(Clone, Copy, Debug)]
@@ -111,38 +110,26 @@ impl SupportedResponse {
     }
 }
 
-/// Health, with enough operational detail to alert on.
+/// Health, as much as a public endpoint should say.
 ///
 /// A bare `{"status":"ok"}` cannot distinguish a working facilitator from one whose relayer ran dry
-/// hours ago, so the relayer's balance and the deposit counters are surfaced here. `status` is
-/// `degraded` when any relayer has fallen to or below its configured floor, so a plain HTTP check
-/// is enough to page on.
+/// hours ago, so `status` is `degraded` when any relayer has fallen to or below its configured
+/// floor and a plain HTTP check is enough to page on. Balances, addresses and request counts stay
+/// in the logs: none of them is something a caller needs.
 #[derive(Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub relayers: Vec<RelayerHealth>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposits: Option<SponsorCounters>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub withdrawals: Option<SponsorCounters>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub claims: Option<SponsorCounters>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub debits: Option<SponsorCounters>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelayerHealth {
     pub network: String,
-    pub address: String,
-    /// `None` when the balance could not be read — itself worth alerting on, and distinct from a
-    /// balance of zero.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub balance_wei: Option<String>,
-    /// True when at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, i.e. deposits are being
-    /// refused. Always false when no floor is configured.
+    /// True when at or below `X402_DEPOSIT_MIN_RELAYER_BALANCE_WEI`, or when the balance could not
+    /// be read — either way sponsorship cannot be relied on. Always false for a readable balance
+    /// when no floor is configured.
     pub below_floor: bool,
 }
 
@@ -722,6 +709,91 @@ mod tests {
         assert_eq!(body["extra"]["retryable"], false);
         assert_eq!(body["extra"]["details"]["uncheckpointed"], 64);
         assert!(body["extra"].get("receipt").is_none());
+    }
+
+    /// The secrets a response must never carry: an RPC URL with its key, the relayer's balance and
+    /// floor, and the configured gas ceiling. Each is still in the error's `Display`, which is
+    /// what the logs record.
+    #[test]
+    fn sponsored_failures_keep_upstream_and_internal_detail_out_of_the_response() {
+        const RPC: &str = "https://rpc.example/v2/secret-key";
+        let chain = || anyhow::anyhow!("error sending request for url ({RPC})");
+        let tx_hash = B256::repeat_byte(0xab);
+
+        let deposits = [
+            DepositError::Chain(chain()),
+            DepositError::Broadcast(format!("transport: {RPC}")),
+            DepositError::ReceiptUnavailable {
+                tx_hash,
+                reason: format!("transport: {RPC}"),
+            },
+            DepositError::RelayerBalanceTooLow {
+                balance: U256::from(4_242u64),
+                floor: U256::from(9_999u64),
+            },
+            DepositError::GasCeilingExceeded {
+                estimated: 4_242,
+                ceiling: 9_999,
+            },
+        ];
+        for err in &deposits {
+            let logged = err.to_string();
+            let body = serde_json::to_string(&DepositResponse::failure(err)).unwrap();
+            assert!(
+                logged.contains(RPC) || logged.contains("9999"),
+                "the log line should still say what happened: {logged}"
+            );
+            for secret in [RPC, "secret-key", "4242", "9999"] {
+                assert!(!body.contains(secret), "{secret} leaked in {body}");
+            }
+        }
+
+        let withdraw = WithdrawError::Chain(chain());
+        let claim = ClaimError::Broadcast(format!("transport: {RPC}"));
+        let pay = PayError::Chain(chain());
+        for body in [
+            serde_json::to_string(&WithdrawResponse::failure(&withdraw)).unwrap(),
+            serde_json::to_string(&ClaimResponse::failure(&claim)).unwrap(),
+            serde_json::to_string(&PayResponse::failure(&pay)).unwrap(),
+            serde_json::to_string(&VerifyResponse::invalid(&withdraw)).unwrap(),
+        ] {
+            assert!(!body.contains("secret-key"), "RPC URL leaked in {body}");
+        }
+    }
+
+    /// A broadcast transaction's hash is the one thing the caller does need from that failure.
+    #[test]
+    fn an_unread_receipt_still_reports_its_transaction() {
+        let tx_hash = B256::repeat_byte(0xab);
+        let err = DepositError::ReceiptUnavailable {
+            tx_hash,
+            reason: "timeout".into(),
+        };
+
+        let body = serde_json::to_value(DepositResponse::failure(&err)).unwrap();
+        assert_eq!(body["errorReason"], "settlement_pending");
+        assert_eq!(body["transaction"], format!("{tx_hash:#x}"));
+        assert!(
+            body["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("{tx_hash}"))
+        );
+    }
+
+    #[test]
+    fn upstream_facilitator_errors_are_not_echoed() {
+        let err = ValidationError::Exact(
+            "error sending request for url (https://debit.internal/settle)".into(),
+        );
+
+        let body = serde_json::to_value(SettleResponse::failed(
+            err.failure(ErrorCode::UnexpectedSettleError),
+            "eip155:1",
+        ))
+        .unwrap();
+        assert_eq!(body["errorReason"], "unexpected_settle_error");
+        assert!(!body.to_string().contains("debit.internal"));
     }
 
     #[test]

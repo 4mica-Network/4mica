@@ -14,6 +14,7 @@ use std::sync::Arc;
 use alloy::primitives::{Address, B256, U256};
 use reqwest::Url;
 use rpc::{ClearingSettlementAction, ClearingSettlementActionResponse};
+use tracing::warn;
 
 use crate::auth::AuthSession;
 use crate::error_body::parse_error_message;
@@ -95,13 +96,21 @@ impl ClearingActions {
 
         let mut request = self.client.get(url);
         if let Some(auth) = &self.auth {
-            let token = auth.access_token().await.map_err(|err| err.to_string())?;
+            let token = auth.access_token().await.map_err(|err| {
+                warn!(error = %err, "could not authenticate with core");
+                "could not authenticate with core".to_string()
+            })?;
             request = request.bearer_auth(token);
         }
 
-        let response = request.send().await.map_err(|err| err.to_string())?;
+        // Transport errors are logged here and not returned: they name the URL they failed against.
+        let unreachable = |err: reqwest::Error| {
+            warn!(error = %err, "could not reach core");
+            "could not reach core".to_string()
+        };
+        let response = request.send().await.map_err(unreachable)?;
         let status = response.status();
-        let bytes = response.bytes().await.map_err(|err| err.to_string())?;
+        let bytes = response.bytes().await.map_err(unreachable)?;
         if !status.is_success() {
             return Err(format!(
                 "core returned {status}: {}",

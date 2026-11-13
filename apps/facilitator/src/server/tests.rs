@@ -1265,8 +1265,10 @@ async fn withdrawals_have_their_own_rate_limit_budget() {
 }
 
 /// The counters are reported per action, so an operator can tell which one is being abused.
+/// `/health` is unauthenticated, so it says whether the service is usable and nothing about how
+/// busy it is or what the relayer holds.
 #[tokio::test]
-async fn health_reports_withdrawal_counters_separately() {
+async fn health_reports_status_only_without_relayers() {
     let relayerless = build_router(test_state(
         Arc::new(MockVerifier::success()),
         Arc::new(MockIssuer::success()),
@@ -1284,11 +1286,46 @@ async fn health_reports_withdrawal_counters_separately() {
     let payload: Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
 
-    // No relayers means neither set of counters is meaningful, so both are omitted rather than
-    // reported as zero — the same rule `deposits` already follows.
-    assert!(payload.get("deposits").is_none());
-    assert!(payload.get("withdrawals").is_none());
-    assert!(payload.get("claims").is_none());
+    assert_eq!(payload, json!({ "status": "ok" }));
+}
+
+/// The relayer's entry carries the alerting flag and nothing that identifies or sizes the wallet.
+#[test]
+fn relayer_health_exposes_neither_address_nor_balance() {
+    let body = serde_json::to_value(super::model::RelayerHealth {
+        network: "eip155:84532".into(),
+        below_floor: true,
+    })
+    .unwrap();
+
+    assert_eq!(
+        body,
+        json!({ "network": "eip155:84532", "belowFloor": true })
+    );
+}
+
+/// The home route points at the others; it does not repeat `/supported`.
+#[tokio::test]
+async fn home_does_not_list_supported_kinds() {
+    let router = build_router(test_state(
+        Arc::new(MockVerifier::success()),
+        Arc::new(MockIssuer::success()),
+    ));
+    let response = router
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let payload: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+
+    assert!(payload["message"].is_string());
+    assert!(payload.get("supported").is_none());
 }
 
 /// A facilitator with no relayer is a supported deployment, so `/deposit` must answer with a clear
@@ -1453,13 +1490,12 @@ async fn health_stays_backward_compatible_without_a_relayer() {
     let payload: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(payload["status"], "ok");
     assert!(payload.get("relayers").is_none());
-    assert!(payload.get("deposits").is_none());
 }
 
-/// Rejections must be counted, and throttling counted twice — once as a rejection, once as
-/// throttling. `throttled` rising on its own is what distinguishes abuse from a broken client.
+/// The global limit applies before anything else, so the request over it is refused as throttled
+/// while the ones under it fail on their own merits.
 #[tokio::test]
-async fn throttled_deposits_are_counted_separately_from_other_rejections() {
+async fn deposits_over_the_global_limit_are_rate_limited() {
     let handler = FourMicaHandler::new(
         "4mica-credit".into(),
         "eip155:11155111".into(),
@@ -1485,20 +1521,26 @@ async fn throttled_deposits_are_counted_separately_from_other_rejections() {
     let router = build_router(state);
 
     // Two get through the global limit and fail on the missing relayer; the third is throttled.
+    let mut reasons = Vec::new();
     for _ in 0..3 {
-        let _ = router
+        let response = router
             .clone()
             .oneshot(post_json("/deposit", &deposit_body(None)))
             .await
             .unwrap();
+        let payload: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        reasons.push(payload["errorReason"].as_str().unwrap().to_string());
     }
 
-    let counters = guard.counters();
-    assert_eq!(counters.sponsored, 0);
-    assert_eq!(counters.rejected, 3, "every refusal counts as a rejection");
     assert_eq!(
-        counters.throttled, 1,
-        "only the rate-limited one counts as throttled"
+        reasons,
+        [
+            "sponsorship_unavailable",
+            "sponsorship_unavailable",
+            "rate_limited"
+        ]
     );
 }
 
