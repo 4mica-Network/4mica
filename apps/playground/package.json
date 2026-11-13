@@ -31,6 +31,7 @@
     "@prisma/client": "catalog:",
     "@sentry/nextjs": "catalog:",
     "framer-motion": "catalog:",
+    "ioredis": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "react": "catalog:",

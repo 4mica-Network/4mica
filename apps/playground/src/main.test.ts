@@ -28,6 +28,16 @@ describe("env contract", () => {
     ).toThrow(/postgres/);
   });
 
+  it("accepts an unset VALKEY_URL and rejects a non-redis one", () => {
+    expect(parseEnv(VALID_ENV).VALKEY_URL).toBe("");
+    expect(
+      parseEnv({ ...VALID_ENV, VALKEY_URL: "rediss://valkey:6380" }).VALKEY_URL,
+    ).toBe("rediss://valkey:6380");
+    expect(() =>
+      parseEnv({ ...VALID_ENV, VALKEY_URL: "valkey://valkey:6379" }),
+    ).toThrow(/redis:\/\//);
+  });
+
   it("rejects a Clerk secret that is not sk_-prefixed", () => {
     expect(() =>
       parseEnv({ ...VALID_ENV, CLERK_SECRET_KEY: "pk_test_oops" }),

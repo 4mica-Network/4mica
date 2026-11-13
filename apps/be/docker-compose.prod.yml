@@ -43,6 +43,7 @@ services:
       start_period: 5s
     networks:
       - default
+      - data
 
   be:
     build:

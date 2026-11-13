@@ -170,6 +170,16 @@ editing belongs in `apps/dashboard` against the already-validated
 `PATCH /me/profile` — duplicating it here would create two write paths for the
 same fields.
 
+Every write action first calls `allowWrite()` (`src/services/writeLimit.ts`),
+which allows each Clerk user 10 writes per minute before any database query.
+The count lives in Valkey under `playground:write:<clerk-user-id>:<minute>`, so
+it holds across replicas and restarts. In production that is apps/be's Valkey,
+reached as `4mica-be-valkey` over `4mica-data`, which is `VALKEY_URL`'s compose
+default. With `VALKEY_URL` unset, or Valkey unreachable, it falls back to a
+per-process counter and logs `shared write limit unavailable`. A Valkey outage
+weakens the limit but never blocks writes. The edge nginx's per-IP limits stay
+in front of all of it.
+
 ### What is never exposed
 
 `AGENT_PUBLIC_SELECT` omits `walletAddress` and `creditLimit`: a credit limit is
