@@ -225,7 +225,7 @@ export const en = {
     done: "Done",
     next: "Next: {{title}}",
     nextShort: "Next",
-    openSteps: "All steps, {{current}} of {{total}}",
+    openSteps: "All steps:",
     stepCount: "Step {{current}} of {{total}}",
     closeSteps: "Close steps",
     overview: "Overview",

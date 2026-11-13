@@ -152,7 +152,7 @@ describe("StepFlow", () => {
     renderFlow();
 
     const trigger = screen.getByRole("button", {
-      name: t(messages.flow.openSteps, { current: 1, total: 3 }),
+      name: `${messages.flow.openSteps} Overview ${t(messages.flow.stepCount, { current: 1, total: 3 })}`,
     });
     await user.click(trigger);
 
@@ -170,7 +170,7 @@ describe("StepFlow", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(trigger).toHaveAccessibleName(
-      t(messages.flow.openSteps, { current: 3, total: 3 }),
+      `${messages.flow.openSteps} Install the SDK ${t(messages.flow.stepCount, { current: 3, total: 3 })}`,
     );
   });
 

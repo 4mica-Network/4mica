@@ -346,14 +346,11 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
           <button
             aria-expanded={sheetOpen}
             aria-haspopup="dialog"
-            aria-label={t(messages.flow.openSteps, {
-              current: activeIndex + 1,
-              total: steps.length,
-            })}
             className="my-1.5 flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left transition-colors active:bg-overlay/6 md:hidden"
             onClick={() => setSheetOpen(true)}
             type="button"
           >
+            <span className="sr-only">{messages.flow.openSteps}</span>{" "}
             <span
               aria-hidden="true"
               className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-overlay/6 text-ink-body"
@@ -363,7 +360,7 @@ export function StepFlow({ identity, groups }: StepFlowProps) {
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-ink-strong text-sm">
                 {active?.title}
-              </span>
+              </span>{" "}
               <span className="text-ink-muted text-xs tabular-nums">
                 {t(messages.flow.stepCount, {
                   current: activeIndex + 1,

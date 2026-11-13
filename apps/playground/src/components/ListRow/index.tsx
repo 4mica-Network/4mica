@@ -17,14 +17,14 @@ export function ListRow({ href, title, description, tags }: ListRowProps) {
         className="absolute top-1/2 right-4 h-4 w-4 -translate-y-1/2 text-ink-subtle md:hidden"
       />
       <div className="flex flex-col gap-1.5">
-        <h3 className="font-semibold text-ink-strong">
+        <h2 className="font-semibold text-ink-strong">
           <Link
             className="after:absolute after:inset-0 focus-visible:outline-none"
             href={href}
           >
             {title}
           </Link>
-        </h3>
+        </h2>
         {description && (
           <p className="text-ink-muted text-sm leading-relaxed">
             {description}

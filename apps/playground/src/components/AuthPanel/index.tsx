@@ -138,7 +138,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             <p className="mt-6 text-center text-ink-muted text-xs">
               {copy.switchLead}{" "}
               <Link
-                className="text-brand hover:underline hover:underline-offset-2"
+                className="text-brand underline underline-offset-2"
                 href={`${copy.switchHref}?redirect_url=${encodeURIComponent(redirectUrlComplete)}`}
               >
                 {copy.switchAction}
@@ -148,7 +148,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
             <p className="mt-2 text-center text-ink-muted text-xs">
               {messages.auth.help}{" "}
               <a
-                className="text-brand hover:underline hover:underline-offset-2"
+                className="text-brand underline underline-offset-2"
                 href={links.mailto.support}
               >
                 {messages.auth.contact}

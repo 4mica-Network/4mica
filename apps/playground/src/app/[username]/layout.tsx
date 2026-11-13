@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { AuthProvider } from "@/components/AuthProvider";
+import { LazyAuthProvider } from "@/components/LazyAuthProvider";
 import { OwnerBar } from "@/components/OwnerBar";
 import { ProfileFooter } from "@/components/ProfileFooter";
 import { ProfileTheme } from "@/components/ProfileTheme";
@@ -71,5 +71,9 @@ export default async function ProfileLayout({ children, params }: LayoutProps) {
     </div>
   );
 
-  return identity ? <AuthProvider>{page}</AuthProvider> : page;
+  return identity ? (
+    <LazyAuthProvider nonce={nonce}>{page}</LazyAuthProvider>
+  ) : (
+    page
+  );
 }

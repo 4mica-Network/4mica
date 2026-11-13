@@ -74,7 +74,7 @@ export function NotFoundView({
                 <span className="text-brand">/{handle}</span>{" "}
                 {messages.notFound.handleLeadAfter}{" "}
                 <Link
-                  className="text-brand underline-offset-4 hover:underline"
+                  className="text-brand underline underline-offset-4"
                   href="/sign-up"
                 >
                   {messages.notFound.claimNow}
