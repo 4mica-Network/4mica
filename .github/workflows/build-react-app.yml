@@ -99,3 +99,14 @@ jobs:
             # box's PLAYGROUND_BIND and PLAYGROUND_PORT. Required: `edge`
             # refuses to start without it rather than serving a broken apex.
             PLAYGROUND_UPSTREAM=${{ vars.PLAYGROUND_UPSTREAM }}
+
+      - name: Confirm HTTPS redirect and HSTS
+        shell: bash
+        env:
+          BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL || 'https://4mica.io' }}
+        run: |
+          host="${BASE_URL#*://}"
+          host="${host%%/*}"
+          hosts=("$host")
+          [ "$host" = 4mica.io ] && hosts+=("www.4mica.io")
+          bash infra/nginx/probe-tls.sh "${hosts[@]}"
