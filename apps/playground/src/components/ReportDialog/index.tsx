@@ -34,6 +34,7 @@ const ERRORS: Record<string, string> = {
   invalid_report: messages.trust.errorInvalidReport,
   not_found: messages.trust.errorNotFound,
   own_resource: messages.trust.errorReportOwn,
+  rate_limited: messages.trust.errorRateLimited,
 };
 
 export function ReportDialog({

@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { parseUsername } from "@/schema/params";
 import { ownerTag } from "@/services/cache";
 import { getViewer } from "@/services/viewer";
+import { allowWrite } from "@/services/writeLimit";
 import { type ActionResult, profileTag } from "./shared";
 
 /**
@@ -20,6 +21,10 @@ export const revalidateProfile = async (
 
   if (!parsed) {
     return { ok: false, error: "invalid_username" };
+  }
+
+  if (!(await allowWrite("revalidateProfile"))) {
+    return { ok: false, error: "rate_limited" };
   }
 
   const viewer = await getViewer();

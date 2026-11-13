@@ -16,6 +16,7 @@ import {
   targetOf,
 } from "@/services/trust";
 import { getViewer } from "@/services/viewer";
+import { allowWrite } from "@/services/writeLimit";
 import type { ActionResult } from "./shared";
 
 interface ResourceRef {
@@ -96,6 +97,10 @@ export const submitReview = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("submitReview"))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {
@@ -160,6 +165,10 @@ export const submitReview = async (
 export const deleteOwnReview = async (
   ref: ResourceRef,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("deleteOwnReview"))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {
@@ -196,6 +205,10 @@ export const fileReport = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("fileReport"))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {
