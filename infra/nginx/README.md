@@ -65,11 +65,15 @@ here) also carries the cross-cutting edge policy for 4mica.io:
 - **`/p/` is narrowed to `/p/_next/`.** Any other `/p/<path>` is a 404, so the
   prefix cannot become a second URL for every playground page.
 - **Rate limits.** `/api/og/`, `/api/revalidate` and the auth routes are limited
-  per client and answer `429` past their burst. They key on the real client
+  per client and answer `429` past their burst. Every other playground request
+  (profile pages, RSC prefetches, `/api/`) shares a 20 r/s budget, and
+  mutating methods, which is how server actions arrive, draw from a tighter
+  30 r/min one as well. They key on the real client
   address, which the host nginx forwards in `X-Real-IP` and the edge trusts from
   private ranges only.
 - **Refusals.** Dotfiles (except `/.well-known/`) and `*.map` return 404 before
-  reaching an upstream.
+  reaching an upstream. So does `/api/health` for any client outside loopback
+  and the private ranges, as a second layer behind the host block's 404.
 - `/manifest.webmanifest` goes to apps/playground, which is the only app that
   ships one.
 
