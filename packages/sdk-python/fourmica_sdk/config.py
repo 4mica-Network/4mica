@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Mapping, Optional, Union
 
 if TYPE_CHECKING:
@@ -43,11 +43,12 @@ class AuthConfig:
 @dataclass
 class Config:
     rpc_url: str
-    wallet_private_key: Optional[str]
+    # Secrets stay out of repr(), and so out of logs and tracebacks.
+    wallet_private_key: Optional[str] = field(repr=False)
     evm_signer: Optional["EvmSigner"] = None
     ethereum_http_rpc_url: Optional[str] = None
     contract_address: Optional[str] = None
-    bearer_token: Optional[str] = None
+    bearer_token: Optional[str] = field(default=None, repr=False)
     auth: Optional[AuthConfig] = None
     facilitator_url: Optional[str] = None
     """Facilitator that sponsors gas. Without one, every operation is self-funded."""
