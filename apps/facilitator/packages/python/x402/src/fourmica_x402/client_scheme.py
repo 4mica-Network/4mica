@@ -167,11 +167,14 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
     async def _connect(self, rpc_url: str) -> _Payer:
         _ensure_ssl_certs()
         _patch_web3_ssl_context()
+        # The environment first, so the key and the core this scheme was given
+        # win over FOURMICA_WALLET_PRIVATE_KEY, FOURMICA_NETWORK and
+        # FOURMICA_RPC_URL: each network's payer must sign against its own core.
         cfg = (
             ConfigBuilder()
+            .from_env()
             .wallet_private_key(self._private_key)
             .rpc_url(rpc_url)
-            .from_env()
             .build()
         )
         client = await FourMicaClient.connect(cfg)
