@@ -6,9 +6,12 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "@/App";
 import { ClerkAuthProvider } from "@/auth/ClerkAuthProvider";
 import { Notifications } from "@/components/Notifications";
+import { captureVerifyToken } from "@/lib/verifyToken";
 import "@/i18n";
 import "react-toastify/dist/ReactToastify.css";
 import "@/styles.css";
+
+captureVerifyToken();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");

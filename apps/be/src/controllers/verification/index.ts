@@ -21,7 +21,7 @@ const outcomeUrl = (result: VerificationResult): string =>
   `${config.appUrl}/settings/profile?verify=${result}`;
 
 const confirmUrl = (token: string): string =>
-  `${config.appUrl}/settings/profile?verifyToken=${encodeURIComponent(token)}`;
+  `${config.appUrl}/settings/profile#verifyToken=${encodeURIComponent(token)}`;
 
 type EmailClient = NonNullable<FastifyInstance["email"]>;
 
