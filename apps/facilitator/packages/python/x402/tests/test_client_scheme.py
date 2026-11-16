@@ -261,3 +261,32 @@ def test_default_scheme_fails_when_a_core_the_caller_named_is_down(monkeypatch):
         create_default_client_scheme(
             "0x" + "11" * 32, core_urls={"eip155:31337": "http://localhost:3000"}
         )
+
+
+def test_the_given_key_and_core_win_over_the_environment(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from fourmica_x402 import client_scheme
+
+    configs = []
+
+    async def connect(cfg):
+        configs.append(cfg)
+        return SimpleNamespace(payment=StubPayment())
+
+    monkeypatch.setattr(client_scheme.FourMicaClient, "connect", connect)
+    monkeypatch.setattr(client_scheme.X402Flow, "from_client", lambda client: StubFlow())
+    # What a FourMica session in the same process would be configured with.
+    monkeypatch.setenv("FOURMICA_NETWORK", "base")
+    monkeypatch.setenv("FOURMICA_WALLET_PRIVATE_KEY", "0x" + "22" * 32)
+    monkeypatch.setenv("FOURMICA_BEARER_TOKEN", "from-env")
+
+    scheme = FourMicaEvmScheme("0x" + "11" * 32)
+    asyncio.run(scheme._connect(SEPOLIA_CORE))
+
+    (cfg,) = configs
+    assert cfg.rpc_url == SEPOLIA_CORE
+    assert cfg.wallet_private_key == "0x" + "11" * 32
+    # Settings the scheme takes no argument for still come from the environment.
+    assert cfg.bearer_token == "from-env"
