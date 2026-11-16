@@ -116,7 +116,13 @@ export function SignInPage() {
           rel="noopener noreferrer"
           className="flex items-center gap-2 opacity-90 transition-opacity hover:opacity-100"
         >
-          <img src="/icon.png" alt="" className="h-6 w-auto" />
+          <img
+            src="/icon.png"
+            alt=""
+            width={33}
+            height={24}
+            className="h-6 w-auto"
+          />
           <span className="font-semibold text-ink-strong text-lg tracking-tight">
             {t("auth.signIn.brand")}
           </span>
