@@ -195,7 +195,7 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.patch(
     "/me/webhooks/:id",
     {
-      ...base,
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Update a webhook's url, events or status",
@@ -236,7 +236,7 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/webhooks/:id",
     {
-      ...base,
+      ...strict,
       schema: {
         tags: ["developer"],
         summary: "Delete a webhook endpoint",

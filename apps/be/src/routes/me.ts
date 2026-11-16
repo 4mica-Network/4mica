@@ -87,7 +87,10 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
 
   app.patch(
     "/me/account",
-    patchOptions(app, "Update account settings"),
+    {
+      ...patchOptions(app, "Update account settings"),
+      preHandler: [...guards(app).preHandler, sensitiveRateLimit(app)],
+    },
     updateAccountHandler,
   );
 
