@@ -354,6 +354,11 @@ Values the single-box layout pins:
 - **Build-time vs runtime.** All `VITE_*` and `NEXT_PUBLIC_*` values are inlined
   during `docker build`. Changing one requires a rebuild, not a restart —
   `up -d --build` handles it, but a manual `docker compose restart` will not.
+- **The dashboard build refuses an untrusted `VITE_API_URL`.** It must be an
+  `https` origin on `4mica.io` or a subdomain; anything else fails
+  `docker build`. The same build renders the nginx security headers, whose CSP
+  names that origin and the Clerk host decoded from
+  `VITE_CLERK_PUBLISHABLE_KEY`, so a malformed key fails the build too.
 
 ## Bootstrapping the server
 
