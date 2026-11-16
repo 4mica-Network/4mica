@@ -46,10 +46,13 @@ ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY \
 # the only workspace package that emits one.
 RUN turbo build --filter=@4mica/dashboard
 
+RUN node apps/dashboard/scripts/render-security-headers.mjs /app/security-headers.conf
+
 FROM nginx:1.27-alpine AS runner
 
 # vite.config.ts sets no build.outDir, so the export lands in the Vite default.
 COPY --from=builder /app/apps/dashboard/dist /usr/share/nginx/html
 COPY apps/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 EXPOSE 80
