@@ -57,6 +57,7 @@ export function renderSecurityHeaders(
 ): string {
   const headers: [string, string][] = [
     ["Content-Security-Policy", buildContentSecurityPolicy(apiOrigin, clerk)],
+    ["Strict-Transport-Security", "max-age=31536000"],
     ["X-Frame-Options", "DENY"],
     ["X-Content-Type-Options", "nosniff"],
     ["Referrer-Policy", "strict-origin-when-cross-origin"],

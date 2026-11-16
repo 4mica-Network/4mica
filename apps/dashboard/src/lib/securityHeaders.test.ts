@@ -81,6 +81,7 @@ describe("renderSecurityHeaders", () => {
 
     expect(lines.map((line) => line.split(" ")[1])).toEqual([
       "Content-Security-Policy",
+      "Strict-Transport-Security",
       "X-Frame-Options",
       "X-Content-Type-Options",
       "Referrer-Policy",
