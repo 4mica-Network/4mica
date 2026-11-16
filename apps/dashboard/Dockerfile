@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM node:24-alpine AS base
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV TURBO_TELEMETRY_DISABLED=1
 
 RUN apk add --no-cache libc6-compat && \
-    npm install -g pnpm@10.28.2 turbo
+    npm install -g pnpm@10.28.2 turbo@2.9.16
 
 FROM base AS pruner
 WORKDIR /app
@@ -48,11 +48,11 @@ RUN turbo build --filter=@4mica/dashboard
 
 RUN node apps/dashboard/scripts/render-security-headers.mjs /app/security-headers.conf
 
-FROM nginx:1.27-alpine AS runner
+FROM nginxinc/nginx-unprivileged:1.27-alpine@sha256:65e3e85dbaed8ba248841d9d58a899b6197106c23cb0ff1a132b7bfe0547e4c0 AS runner
 
 # vite.config.ts sets no build.outDir, so the export lands in the Vite default.
 COPY --from=builder /app/apps/dashboard/dist /usr/share/nginx/html
 COPY apps/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
-EXPOSE 80
+EXPOSE 8080
