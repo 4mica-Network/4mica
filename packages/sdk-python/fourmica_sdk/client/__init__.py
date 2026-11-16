@@ -12,6 +12,7 @@ from typing import Union
 from ..auth import AuthTokens
 from ..config import Config
 from ..models import PaymentRequest, PaymentRequestPayload
+from ..rpc import RpcProxy
 from .account import AccountClient
 from .ctx import ClientCtx
 from .deposit import DepositClient
@@ -46,6 +47,17 @@ class Client:
     @classmethod
     async def connect(cls, cfg: Config) -> "Client":
         return cls(await ClientCtx.create(cfg))
+
+    @property
+    def ctx(self) -> ClientCtx:
+        """What the sub-clients share: configuration, connections, and the
+        metadata resolved at connect time."""
+        return self._ctx
+
+    @property
+    def rpc(self) -> RpcProxy:
+        """The proxy to core's API, for calls no sub-client wraps."""
+        return self._ctx.rpc
 
     @property
     def signer_address(self) -> str:

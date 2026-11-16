@@ -121,10 +121,6 @@ def test_reads_v1_bodies_with_either_amount_field_and_normalizes_shorthand_netwo
         # What signing would refuse is not offered as payable either.
         v2_challenge([entry(payTo="0x123"), entry(asset="USDC")]),
         v2_challenge([entry(extra={"validation": {"validator": "0x1"}})]),
-        httpx.Response(
-            402,
-            headers={"PAYMENT-REQUIRED": b64({"x402Version": 2, "accepts": [entry()]})},
-        ),
     ],
 )
 def test_ignores_responses_that_are_not_payable_x402(response):
@@ -163,6 +159,34 @@ async def test_pays_v2_in_payment_signature_and_v1_in_x_payment():
         assert json.loads(base64.b64decode(headers["X-PAYMENT"]))["x402Version"] == 1
     recipient, amount, asset = client.new_payment.await_args.args
     assert (recipient, amount, asset.address) == (SELLER, 10_000, USDC)
+
+
+async def test_echoes_extra_as_the_seller_advertised_it():
+    """The upstream TypeScript seller matches `accepted` against what it
+    advertised, and an advertised `extra: {}` does not match a missing key."""
+    client = FakeClient()
+
+    async def accepted(option: dict) -> dict:
+        (terms,) = X402.terms(v2_challenge([option]))
+        async with httpx.AsyncClient() as http:
+            headers = await X402.pay(terms, client, http)
+        return json.loads(base64.b64decode(headers["PAYMENT-SIGNATURE"]))["accepted"]
+
+    assert (await accepted(entry(extra={})))["extra"] == {}
+    assert "extra" not in await accepted(entry())
+    kept = entry(extra={"rpcUrl": "https://core.example"}, maxTimeoutSeconds=300)
+    assert await accepted(kept) == kept
+
+
+async def test_signs_a_challenge_that_names_no_resource():
+    required = {"x402Version": 2, "accepts": [entry()]}
+    (terms,) = X402.terms(
+        httpx.Response(402, headers={"PAYMENT-REQUIRED": b64(required)})
+    )
+    async with httpx.AsyncClient() as http:
+        headers = await X402.pay(terms, FakeClient(), http)
+    envelope = json.loads(base64.b64decode(headers["PAYMENT-SIGNATURE"]))
+    assert envelope["resource"] == {"url": ""}
 
 
 async def test_signs_a_valid_v2_option_that_sits_beside_malformed_ones():

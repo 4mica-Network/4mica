@@ -131,7 +131,7 @@ async def connect(stack: Stack, http: httpx.AsyncClient = None) -> FourMica:
         },
         http_client=http,
     )
-    ctx = (await client.low_level())._ctx
+    ctx = (await client.low_level()).ctx
     attach_facilitator(ctx, stack.facilitator)
     ctx._gateway = stack.gateway
     return client
@@ -168,7 +168,7 @@ async def test_deposits_through_the_facilitator_and_waits_for_core(stack):
 
 async def test_approves_before_its_own_transaction_when_there_is_no_facilitator(stack):
     async with await connect(stack) as client:
-        (await client.low_level())._ctx.facilitator = Facilitator(None)
+        (await client.low_level()).ctx.facilitator = Facilitator(None)
         result = await client.deposit("5 USDC")
     assert result.status == "spendable"
     assert result.route is TokenRoute.SELF_FUNDED

@@ -157,6 +157,22 @@ class ClaimReceipt:
     raw: Optional[Dict[str, Any]] = field(default=None, repr=False)
 
 
+def base_units(value: Union[int, str]) -> int:
+    """A whole number of base units, from an int or a decimal or 0x-hex
+    string. A float is refused: truncating ``1.9`` to ``1`` would move the
+    wrong amount without saying so."""
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return parse_u256(value)
+        except ValueError as exc:
+            raise InvalidParamsError(f"invalid amount: {exc}") from exc
+    raise InvalidParamsError(
+        f"amount must be a whole number of base units, got {value!r}"
+    )
+
+
 def confirm_echoed(field_name: str, raw: Optional[str], expected: str) -> str:
     """Checks a value a server echoed back against what was asked for, taking
     the request's own value when the echo is omitted. An echo that disagrees —

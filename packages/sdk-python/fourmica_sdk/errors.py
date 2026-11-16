@@ -367,23 +367,37 @@ class SponsorshipError(FourMicaError):
 
 
 class FacilitatorNotConfiguredError(SponsorshipError):
-    """No facilitator URL was configured, so there is nobody to pay the gas."""
+    """Nobody will pay the gas: no facilitator URL was configured, or the one
+    configured sponsors nothing, in which case the message is its own."""
 
-    def __init__(self) -> None:
+    def __init__(self, message: Optional[str] = None) -> None:
         super().__init__(
-            "no facilitator configured; set FOURMICA_FACILITATOR_URL or "
+            f"the facilitator sponsors no gas: {message}"
+            if message
+            else "no facilitator configured; set FOURMICA_FACILITATOR_URL or "
             "ConfigBuilder.facilitator_url"
         )
 
 
 class FacilitatorRejectedError(SponsorshipError):
     """The facilitator refused. ``code`` is carried verbatim so a caller can
-    branch on a code this SDK predates."""
+    branch on a code this SDK predates. ``transaction`` is set when the
+    refusal came after broadcasting: check it on-chain before doing anything
+    else. ``details`` is whatever the facilitator attached."""
 
-    def __init__(self, code: str, message: str, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        retryable: bool = False,
+        transaction: Optional[str] = None,
+        details: Any = None,
+    ) -> None:
         super().__init__(f"facilitator rejected the request ({code}): {message}")
         self.code = code
         self.retryable = retryable
+        self.transaction = transaction
+        self.details = details
 
 
 class SponsorshipTransportError(SponsorshipError):

@@ -73,7 +73,7 @@ class FakeClient:
         self.gateway = gateway or fake_gateway()
         self.builder = builder or fake_builder()
         self._totals = list(totals) if totals is not None else [0]
-        self._ctx = SimpleNamespace(
+        self.ctx = SimpleNamespace(
             cfg=SimpleNamespace(wallet_private_key=private_key),
             gateway=AsyncMock(return_value=self.gateway),
         )

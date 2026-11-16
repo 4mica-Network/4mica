@@ -166,6 +166,10 @@ class PaymentRequirementsV2:
     pay_to: str
     extra: Dict[str, Any] = field(default_factory=dict)
     max_timeout_seconds: Optional[int] = None
+    extra_advertised: bool = field(default=False, repr=False, compare=False)
+    """Whether the seller sent an ``extra`` object at all. An empty one is
+    echoed back as ``{}``: sellers match the ``accepted`` a payer returns
+    against what they advertised, and ``{}`` does not match a missing key."""
 
     @classmethod
     def from_raw(cls, raw: Dict[str, Any]) -> "PaymentRequirementsV2":
@@ -201,6 +205,7 @@ class PaymentRequirementsV2:
             max_timeout_seconds=int(max_timeout_seconds)
             if max_timeout_seconds is not None
             else None,
+            extra_advertised=isinstance(raw.get("extra"), dict),
         )
 
     def to_payload(self) -> Dict[str, Any]:
@@ -211,7 +216,7 @@ class PaymentRequirementsV2:
             "amount": self.amount,
             "payTo": self.pay_to,
         }
-        if self.extra:
+        if self.extra or self.extra_advertised:
             payload["extra"] = dict(self.extra)
         if self.max_timeout_seconds is not None:
             payload["maxTimeoutSeconds"] = self.max_timeout_seconds

@@ -52,7 +52,7 @@ class NetworkSession:
     async def chain(self) -> Optional[ContractGateway]:
         """The chain gateway, or ``None`` for a remote signer: it has no local
         key to read the wallet with or send a transaction from."""
-        ctx = self.client._ctx
+        ctx = self.client.ctx
         if not ctx.cfg.wallet_private_key:
             return None
         return await ctx.gateway()

@@ -7,9 +7,11 @@ from ..client.model import Asset, DepositReceipt
 from ..errors import (
     AmountZeroError,
     Erc20AllowanceRequiredError,
+    FacilitatorNotConfiguredError,
     GasRequiredError,
     InsufficientBalanceError,
     InvalidParamsError,
+    SponsorshipTransportError,
 )
 from .models import (
     DEFAULT_DEPOSIT_TIMEOUT_SECS,
@@ -87,7 +89,13 @@ async def deposit(
     else:
         try:
             receipt = await client.deposit.of(asset, amount).send()
-        except Erc20AllowanceRequiredError:
+        except (
+            Erc20AllowanceRequiredError,
+            # The facilitator sponsors nothing, or was never reached. Neither
+            # sent a transaction, so the wallet's own cannot double it up.
+            FacilitatorNotConfiguredError,
+            SponsorshipTransportError,
+        ):
             receipt = await self_funded()
 
     def result(status: DepositStatus) -> DepositResult:

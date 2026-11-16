@@ -242,6 +242,12 @@ async def test_closes_on_leaving_the_block_even_when_it_raises(core):
         await client.balance()
 
 
+async def test_its_own_http_client_waits_longer_than_httpx_does_by_default(core):
+    async with await FourMica.connect(private_key=KEY) as client:
+        # httpx's 5 seconds would drop the answer to a request already paid for.
+        assert client._http.timeout.read == 300
+
+
 async def test_closes_its_own_http_client_but_not_one_it_was_given(core):
     own = await FourMica.connect(private_key=KEY)
     await own.aclose()

@@ -82,7 +82,7 @@ async def finalize_withdrawal(session: NetworkSession, asset: str) -> WithdrawRe
 
 
 async def pending_withdrawals(session: NetworkSession) -> List[PendingWithdrawal]:
-    gateway = await session.client._ctx.gateway()
+    gateway = await session.client.ctx.gateway()
     positions, grace = await asyncio.gather(
         session.client.account.assets(), gateway.withdrawal_grace_period()
     )

@@ -19,9 +19,12 @@ from fourmica_sdk.errors import (
     AmountPrecisionError,
     AmountZeroError,
     Erc20AllowanceRequiredError,
+    FacilitatorNotConfiguredError,
     GasRequiredError,
     InsufficientBalanceError,
     InvalidParamsError,
+    OutcomeUnknownError,
+    SponsorshipTransportError,
     TokenNotSupportedError,
 )
 from fourmica_sdk.facade.deposit import deposit
@@ -134,6 +137,31 @@ async def test_approves_and_sends_its_own_transaction_where_no_facilitator_is_ho
         await deposit(fake_session(broke), "5 USDC")
 
 
+@pytest.mark.parametrize(
+    "refusal",
+    [
+        FacilitatorNotConfiguredError("gas sponsorship is not enabled"),
+        SponsorshipTransportError("facilitator request failed: connection refused"),
+    ],
+)
+async def test_sends_its_own_transaction_when_nothing_was_sponsored(refusal):
+    builder = fake_builder()
+    builder.send = AsyncMock(side_effect=refusal)
+    client = FakeClient(builder=builder, totals=[0, 5_000_000])
+    result = await deposit(fake_session(client), "5 USDC")
+    builder.self_funded_builder.approve.assert_awaited_once()
+    assert result.route is TokenRoute.SELF_FUNDED
+
+
+async def test_never_sends_a_second_deposit_after_an_unknown_outcome():
+    builder = fake_builder()
+    builder.send = AsyncMock(side_effect=OutcomeUnknownError("timed out"))
+    client = FakeClient(builder=builder)
+    with pytest.raises(OutcomeUnknownError):
+        await deposit(fake_session(client), "5 USDC")
+    builder.self_funded.assert_not_called()
+
+
 async def test_gas_self_needs_gas_money():
     gateway = fake_gateway(native_balance=AsyncMock(return_value=0))
     client = FakeClient(gateway=gateway)
@@ -219,5 +247,5 @@ async def test_a_remote_signer_deposits_gaslessly_without_reading_the_wallet():
     client = FakeClient(private_key=None, totals=[0, 5_000_000])
     result = await deposit(fake_session(client), "5 USDC")
     assert result.status == "spendable"
-    client._ctx.gateway.assert_not_awaited()
+    client.ctx.gateway.assert_not_awaited()
     client.builder.send.assert_awaited_once()
