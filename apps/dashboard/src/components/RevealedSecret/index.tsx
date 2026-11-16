@@ -1,8 +1,6 @@
 import { Button, Card, cn } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
-import { dismissRevealedSecret } from "@stores/developer/actions";
-import { selectRevealedSecret } from "@stores/developer/selector";
-import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import type { RevealedSecret } from "@stores/developer/type";
 import { Check, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -68,24 +66,28 @@ export function SecretRevealCard({
   );
 }
 
-export function RevealedSecretBanner() {
+export function RevealedSecretBanner({
+  secret,
+  onDismiss,
+}: {
+  secret: RevealedSecret | null;
+  onDismiss: () => void;
+}) {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const revealed = useAppSelector(selectRevealedSecret);
 
-  if (!revealed) {
+  if (!secret) {
     return null;
   }
 
   return (
     <SecretRevealCard
       title={
-        revealed.kind === "apiKey"
+        secret.kind === "apiKey"
           ? t("developer.reveal.keyTitle")
           : t("developer.reveal.secretTitle")
       }
-      plaintext={revealed.plaintext}
-      onDismiss={() => dispatch(dismissRevealedSecret())}
+      plaintext={secret.plaintext}
+      onDismiss={onDismiss}
     />
   );
 }

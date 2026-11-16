@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { PageSpinner } from "@/components/PageSpinner";
 import { RevealedSecretBanner } from "@/components/RevealedSecret";
 import { SettingsPage } from "@/components/SettingsPage";
+import { useEphemeralSecret } from "@/hooks/useEphemeralSecret";
 import { ApiKeysCard } from "./ApiKeysCard";
 import { WebhooksCard } from "./WebhooksCard";
 
@@ -15,6 +16,7 @@ export function DeveloperSettings() {
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectIsDeveloperLoading);
   const hasLoaded = useAppSelector(selectHasLoadedDeveloper);
+  const { secret, reveal, clear } = useEphemeralSecret();
 
   useEffect(() => {
     dispatch(fetchDeveloper());
@@ -29,9 +31,9 @@ export function DeveloperSettings() {
         <PageSpinner />
       ) : (
         <>
-          <RevealedSecretBanner />
-          <ApiKeysCard />
-          <WebhooksCard />
+          <RevealedSecretBanner secret={secret} onDismiss={clear} />
+          <ApiKeysCard onReveal={reveal} />
+          <WebhooksCard onReveal={reveal} />
         </>
       )}
     </SettingsPage>

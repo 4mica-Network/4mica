@@ -1,11 +1,5 @@
 import type { RootState } from "@stores/index";
-import type {
-  ApiKey,
-  DeveloperState,
-  RevealedSecret,
-  Webhook,
-  WebhookEvent,
-} from "./type";
+import type { ApiKey, DeveloperState, Webhook, WebhookEvent } from "./type";
 
 export const selectDeveloper = (state: RootState): DeveloperState =>
   state.developer;
@@ -18,9 +12,6 @@ export const selectWebhooks = (state: RootState): Webhook[] =>
 
 export const selectWebhookEvents = (state: RootState): WebhookEvent[] =>
   state.developer.events;
-
-export const selectRevealedSecret = (state: RootState): RevealedSecret | null =>
-  state.developer.revealed;
 
 export const selectIsDeveloperLoading = (state: RootState): boolean =>
   state.developer.isLoading;

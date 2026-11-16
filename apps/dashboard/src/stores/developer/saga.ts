@@ -19,7 +19,7 @@ import {
   updateWebhookSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import type { WebhookStatus } from "./type";
+import type { RevealSecret, WebhookStatus } from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
@@ -61,23 +61,19 @@ export function* createApiKey(action: {
   type: string;
   payload: { name: string };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const created = (yield call(() =>
       api.createApiKey(action.payload),
     )) as Awaited<ReturnType<typeof api.createApiKey>>;
 
-    yield put(
-      createApiKeySucceeded(
-        created.apiKey,
-        {
-          kind: "apiKey",
-          id: created.apiKey.id,
-          plaintext: created.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(createApiKeySucceeded(created.apiKey, action.meta));
+    action.onReveal?.({
+      kind: "apiKey",
+      id: created.apiKey.id,
+      plaintext: created.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.keyCreated", "API key created"),
       content: t(
@@ -144,23 +140,19 @@ export function* createWebhook(action: {
   type: string;
   payload: { url: string; description?: string | null; events: string[] };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const created = (yield call(() =>
       api.createWebhook(action.payload),
     )) as Awaited<ReturnType<typeof api.createWebhook>>;
 
-    yield put(
-      createWebhookSucceeded(
-        created.webhook,
-        {
-          kind: "webhookSecret",
-          id: created.webhook.id,
-          plaintext: created.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(createWebhookSucceeded(created.webhook, action.meta));
+    action.onReveal?.({
+      kind: "webhookSecret",
+      id: created.webhook.id,
+      plaintext: created.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.webhookCreated", "Webhook created"),
       content: t(
@@ -200,23 +192,19 @@ export function* rotateWebhookSecret(action: {
   type: string;
   payload: { id: string };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const rotated = (yield call(() =>
       api.rotateWebhookSecret(action.payload.id),
     )) as Awaited<ReturnType<typeof api.rotateWebhookSecret>>;
 
-    yield put(
-      rotateWebhookSecretSucceeded(
-        rotated.webhook,
-        {
-          kind: "webhookSecret",
-          id: rotated.webhook.id,
-          plaintext: rotated.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(rotateWebhookSecretSucceeded(rotated.webhook, action.meta));
+    action.onReveal?.({
+      kind: "webhookSecret",
+      id: rotated.webhook.id,
+      plaintext: rotated.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.secretRotated", "Signing secret rotated"),
       content: t(
