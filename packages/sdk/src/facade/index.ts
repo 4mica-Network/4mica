@@ -102,7 +102,7 @@ function toBalance(asset: AssetRef, total: bigint, locked: bigint): Balance {
 export class FourMica {
   private readonly sessions = new Map<string, Promise<NetworkSession>>();
   private readonly payments = new WeakMap<Response, PaymentRecord>();
-  private closed = false;
+  private closing?: Promise<void>;
 
   private constructor(
     private readonly signer: Account,
@@ -149,7 +149,7 @@ export class FourMica {
   }
 
   private session(network?: string): Promise<NetworkSession> {
-    if (this.closed) {
+    if (this.closing) {
       return Promise.reject(new ClientError("this FourMica session is closed"));
     }
     if (network === undefined) return Promise.resolve(this.home);
@@ -279,13 +279,15 @@ export class FourMica {
     return this.payments.get(response);
   }
 
-  async close(): Promise<void> {
-    if (this.closed) return;
-    this.closed = true;
-    const sessions = await Promise.all(
-      [...this.sessions.values()].map((s) => s.catch(() => undefined)),
-    );
-    await Promise.all(sessions.map((s) => s?.client.aclose()));
+  /** Concurrent and repeated calls share one cleanup, and its outcome. */
+  close(): Promise<void> {
+    this.closing ??= (async () => {
+      const sessions = await Promise.all(
+        [...this.sessions.values()].map((s) => s.catch(() => undefined)),
+      );
+      await Promise.all(sessions.map((s) => s?.client.aclose()));
+    })();
+    return this.closing;
   }
 
   async [asyncDispose](): Promise<void> {

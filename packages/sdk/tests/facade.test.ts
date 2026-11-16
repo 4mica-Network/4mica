@@ -134,6 +134,34 @@ describe("FourMica sessions", () => {
     await expect(client.deposit("1 USDC")).rejects.toThrow(ClientError);
   });
 
+  it("concurrent close() calls wait on the same cleanup", async () => {
+    const client = await FourMica.connect({ privateKey: KEY });
+    let finish = () => {};
+    clients[0].client.aclose.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = client.close();
+    let secondDone = false;
+    const second = client.close().then(() => {
+      secondDone = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(secondDone).toBe(false);
+    finish();
+    await Promise.all([first, second]);
+    expect(clients[0].client.aclose).toHaveBeenCalledOnce();
+  });
+
+  it("every close() caller sees a failed cleanup", async () => {
+    const client = await FourMica.connect({ privateKey: KEY });
+    clients[0].client.aclose.mockRejectedValue(new Error("socket stuck"));
+    await expect(client.close()).rejects.toThrow("socket stuck");
+    await expect(client.close()).rejects.toThrow("socket stuck");
+  });
+
   it("closes on scope exit with await using, even when the block throws", async () => {
     await expect(
       (async () => {
