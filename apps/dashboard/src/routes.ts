@@ -1,26 +1,85 @@
-import { type ComponentType, createElement } from "react";
+import { type ComponentType, createElement, lazy } from "react";
 import { Navigate } from "react-router-dom";
-import { AccountSettings } from "@/pages/account";
-import { AgentAdvanced } from "@/pages/agent-advanced";
-import { AgentDetail } from "@/pages/agent-detail";
-import { Agents } from "@/pages/agents";
-import { ApiDetail } from "@/pages/api-detail";
-import { Apis } from "@/pages/apis";
-import { BusinessSettings } from "@/pages/business";
-import { ComplianceSettings } from "@/pages/compliance";
-import { CustomerDetail } from "@/pages/customer-detail";
-import { Customers } from "@/pages/customers";
-import { DeveloperSettings } from "@/pages/developer";
-import { Disputes } from "@/pages/disputes";
-import { Help } from "@/pages/help";
-import { HelpRequestDetail } from "@/pages/help-request";
-import { NotificationSettings } from "@/pages/notification";
-import { Overview } from "@/pages/overview";
-import { Payments } from "@/pages/payments";
-import { PlansSettings } from "@/pages/plans";
-import { ProfileSettings } from "@/pages/profile";
-import { TeamSettings } from "@/pages/team";
-import { Wallet } from "@/pages/wallet";
+
+const AccountSettings = lazy(() =>
+  import("@/pages/account").then((page) => ({ default: page.AccountSettings })),
+);
+const AgentAdvanced = lazy(() =>
+  import("@/pages/agent-advanced").then((page) => ({
+    default: page.AgentAdvanced,
+  })),
+);
+const AgentDetail = lazy(() =>
+  import("@/pages/agent-detail").then((page) => ({
+    default: page.AgentDetail,
+  })),
+);
+const Agents = lazy(() =>
+  import("@/pages/agents").then((page) => ({ default: page.Agents })),
+);
+const ApiDetail = lazy(() =>
+  import("@/pages/api-detail").then((page) => ({ default: page.ApiDetail })),
+);
+const Apis = lazy(() =>
+  import("@/pages/apis").then((page) => ({ default: page.Apis })),
+);
+const BusinessSettings = lazy(() =>
+  import("@/pages/business").then((page) => ({
+    default: page.BusinessSettings,
+  })),
+);
+const ComplianceSettings = lazy(() =>
+  import("@/pages/compliance").then((page) => ({
+    default: page.ComplianceSettings,
+  })),
+);
+const CustomerDetail = lazy(() =>
+  import("@/pages/customer-detail").then((page) => ({
+    default: page.CustomerDetail,
+  })),
+);
+const Customers = lazy(() =>
+  import("@/pages/customers").then((page) => ({ default: page.Customers })),
+);
+const DeveloperSettings = lazy(() =>
+  import("@/pages/developer").then((page) => ({
+    default: page.DeveloperSettings,
+  })),
+);
+const Disputes = lazy(() =>
+  import("@/pages/disputes").then((page) => ({ default: page.Disputes })),
+);
+const Help = lazy(() =>
+  import("@/pages/help").then((page) => ({ default: page.Help })),
+);
+const HelpRequestDetail = lazy(() =>
+  import("@/pages/help-request").then((page) => ({
+    default: page.HelpRequestDetail,
+  })),
+);
+const NotificationSettings = lazy(() =>
+  import("@/pages/notification").then((page) => ({
+    default: page.NotificationSettings,
+  })),
+);
+const Overview = lazy(() =>
+  import("@/pages/overview").then((page) => ({ default: page.Overview })),
+);
+const Payments = lazy(() =>
+  import("@/pages/payments").then((page) => ({ default: page.Payments })),
+);
+const PlansSettings = lazy(() =>
+  import("@/pages/plans").then((page) => ({ default: page.PlansSettings })),
+);
+const ProfileSettings = lazy(() =>
+  import("@/pages/profile").then((page) => ({ default: page.ProfileSettings })),
+);
+const TeamSettings = lazy(() =>
+  import("@/pages/team").then((page) => ({ default: page.TeamSettings })),
+);
+const Wallet = lazy(() =>
+  import("@/pages/wallet").then((page) => ({ default: page.Wallet })),
+);
 
 export interface RouteMeta {
   path?: string;

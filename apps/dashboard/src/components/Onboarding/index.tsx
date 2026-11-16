@@ -3,15 +3,23 @@ import {
   selectHasCompletedOnboarding,
   selectNeedsOnboarding,
 } from "@stores/user/selector";
+import { lazy, Suspense } from "react";
 import { IntegrationChecklist } from "@/components/IntegrationChecklist";
-import { Wizard } from "./Wizard";
+
+const Wizard = lazy(() =>
+  import("./Wizard").then((module) => ({ default: module.Wizard })),
+);
 
 export function OnboardingGate() {
   const needsOnboarding = useAppSelector(selectNeedsOnboarding);
   const hasCompleted = useAppSelector(selectHasCompletedOnboarding);
 
   if (needsOnboarding) {
-    return <Wizard />;
+    return (
+      <Suspense fallback={null}>
+        <Wizard />
+      </Suspense>
+    );
   }
 
   if (hasCompleted) {
