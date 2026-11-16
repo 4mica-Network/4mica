@@ -11,6 +11,10 @@ export type AssetRef = TokenLike;
 export interface SpendLimits {
   /** Default `"1 USDC"`. */
   perPayment?: string | readonly string[];
+  /**
+   * Counted in memory by this session only; processes sharing a wallet each
+   * get their own.
+   */
   total?: string | readonly string[];
   payTo?: readonly string[];
 }

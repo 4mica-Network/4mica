@@ -68,7 +68,8 @@ Set limits once, in `FourMica.connect({ spend })`. Amounts are written like depo
 | `payTo` | Any address | Only pay these seller addresses. |
 
 - **A payment is only allowed in an asset that has a `perPayment` entry.** A seller cannot get round the cap by asking for a different token. With the default, the session pays only USDC.
-- **`total` counts every payment the session makes**, reserved before signing so concurrent requests cannot overshoot it. A payment whose signing or retry throws, or whose retry comes back 402, is released again. The count lives in the session; a new `connect` starts from zero.
+- **`total` counts every payment the session sends**, reserved before signing so concurrent requests cannot overshoot it. A payment that was never sent because signing threw, or that the seller refused with a 402, is released again. One that was sent stays counted even if the request then fails or the seller answers with an error, because the seller may still redeem it.
+- **`total` is local to one session.** The count is kept in memory by the process that called `connect`: a new `connect` starts from zero, and several processes sharing a wallet each get their own `total`. Across all of them, the hard limit is the collateral the wallet has deposited.
 - **Violations throw `SpendLimitError`** before anything is signed. `err.limit` names the limit (`"perPayment"`, `"total"`, `"assets"` or `"payTo"`) and `err.url` the resource.
 - **A limit in an asset the network does not list does not apply there**, so one `spend` setting can cover several networks.
 
