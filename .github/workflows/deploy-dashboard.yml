@@ -16,7 +16,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  scan:
+    uses: ./.github/workflows/dependency-scan.yml
+
   deploy:
+    needs: scan
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
