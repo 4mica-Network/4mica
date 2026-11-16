@@ -122,7 +122,8 @@ async function coreTotal(
 /**
  * The money has moved by now, so poll errors are retried and running out of
  * time returns `false`. Comparing totals can race with other activity on the
- * wallet; that only moves when the wait ends.
+ * wallet; that only moves when the wait ends. A request that hangs is left
+ * behind at the deadline, not aborted.
  */
 async function untilCounted(
   session: NetworkSession,
@@ -131,14 +132,26 @@ async function untilCounted(
   timeoutMs: number,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
-  let delay = FIRST_POLL_MS;
-  for (;;) {
-    try {
-      if ((await coreTotal(session, asset)) >= target) return true;
-    } catch {}
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) return false;
-    await sleep(Math.min(delay, remaining));
-    delay = Math.min(delay * 2, MAX_POLL_MS);
+  const poll = async () => {
+    let delay = FIRST_POLL_MS;
+    for (;;) {
+      try {
+        if ((await coreTotal(session, asset)) >= target) return true;
+      } catch {}
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return false;
+      await sleep(Math.min(delay, remaining));
+      delay = Math.min(delay * 2, MAX_POLL_MS);
+    }
+  };
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  try {
+    return await Promise.race([poll(), expired]);
+  } finally {
+    clearTimeout(timer);
   }
 }

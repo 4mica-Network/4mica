@@ -166,6 +166,17 @@ describe("FourMica deposit", () => {
     );
   });
 
+  it("returns pending on time when a core request hangs", async () => {
+    const fake = fakeClient({ totals: [0n] });
+    fake.client.rpc.getUserAssetBalance
+      .mockResolvedValueOnce({ total: 0n, locked: 0n } as never)
+      .mockReturnValue(new Promise(() => {}) as never);
+    const result = await deposit(fakeSession(fake), "5 USDC", {
+      timeoutMs: 20,
+    });
+    expect(result.status).toBe("pending");
+  });
+
   it("keeps polling through core errors once the money has moved", async () => {
     const fake = fakeClient({ totals: [0n] });
     fake.client.rpc.getUserAssetBalance
