@@ -681,3 +681,102 @@ export class Permit2AllowanceRequiredError extends SponsorshipError {
 
 /** Thrown for x402 flow issues (invalid scheme, settlement errors, etc.). */
 export class X402Error extends FourMicaError {}
+
+// --- amounts and assets -------------------------------------------------
+
+export interface ListedToken {
+  symbol: string;
+  address: string;
+}
+
+const listTokens = (tokens: readonly ListedToken[]): string =>
+  tokens.length === 0
+    ? "none"
+    : tokens.map((t) => `${t.symbol} (${t.address})`).join(", ");
+
+export class TokenNotSupportedError extends InvalidParamsError {
+  readonly asset: string;
+  readonly network?: string;
+  readonly supported: readonly ListedToken[];
+
+  constructor(options: {
+    asset: string;
+    network?: string;
+    supported: readonly ListedToken[];
+  }) {
+    const where = options.network ? ` on ${options.network}` : "";
+    super(
+      `${options.asset} is not accepted${where}; accepted: ` +
+        `${listTokens(options.supported)}, or the native asset`,
+    );
+    this.asset = options.asset;
+    this.network = options.network;
+    this.supported = options.supported;
+  }
+}
+
+export class AmbiguousTokenError extends InvalidParamsError {
+  readonly symbol: string;
+  readonly matches: readonly ListedToken[];
+
+  constructor(symbol: string, matches: readonly ListedToken[]) {
+    super(
+      `${symbol} matches more than one accepted token: ` +
+        `${listTokens(matches)}; pass the token address instead`,
+    );
+    this.symbol = symbol;
+    this.matches = matches;
+  }
+}
+
+export class AmountPrecisionError extends InvalidParamsError {
+  readonly amount: string;
+  readonly decimals: number;
+
+  constructor(amount: string, decimals: number) {
+    super(
+      `${amount} has more decimal places than the token's ${decimals}; ` +
+        "round it yourself, the SDK never rounds an amount",
+    );
+    this.amount = amount;
+    this.decimals = decimals;
+  }
+}
+
+export class InsufficientBalanceError extends FourMicaError {
+  readonly asset: string;
+  readonly needed: string;
+  readonly available: string;
+
+  constructor(options: { asset: string; needed: string; available: string }) {
+    super(
+      `the wallet holds ${options.available} ${options.asset} but this needs ` +
+        `${options.needed}; fund the wallet first`,
+    );
+    this.asset = options.asset;
+    this.needed = options.needed;
+    this.available = options.available;
+  }
+}
+
+/** The wallet must send its own transaction and has no gas money. */
+export class GasRequiredError extends FourMicaError {}
+
+/** Nothing was signed. */
+export class SpendLimitError extends PaymentError {
+  readonly limit: "perPayment" | "total" | "assets" | "payTo";
+  readonly url: string;
+
+  constructor(
+    limit: "perPayment" | "total" | "assets" | "payTo",
+    url: string,
+    detail: string,
+  ) {
+    super(
+      `payment for ${url} refused by the session's spend limits (${limit}): ` +
+        `${detail}; raise the limit in FourMica.connect({ spend }) to allow it`,
+    );
+    this.limit = limit;
+    this.url = url;
+  }
+}

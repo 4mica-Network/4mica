@@ -1,4 +1,11 @@
-import { RpcProxy, resolveNetworkRpcUrl, type SupportedTokensResponse } from '@4mica/sdk'
+import {
+  InvalidParamsError,
+  RpcProxy,
+  resolveNetworkRpcUrl,
+  type SupportedTokensResponse,
+} from '@4mica/sdk'
+import { parseDecimal, resolveToken, toBaseUnits } from '@4mica/sdk/amounts'
+import { resolveNetwork } from '@4mica/sdk/networks'
 import { SDK_DEFAULT_ASSET_TRANSFER_METHOD } from '@x402/core/server'
 import type {
   AssetAmount,
@@ -120,12 +127,11 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
       }
     }
 
-    // Parse Money to decimal number
-    const amount = this.parseMoneyToDecimal(price)
+    const amount = parseMoneyToDecimal(price)
 
     // Try each custom money parser in order
     for (const parser of this.moneyParsers) {
-      const result = await parser(amount, network)
+      const result = await parser(Number(amount), network)
       if (result !== null) {
         return result
       }
@@ -167,65 +173,23 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
   }
 
   /**
-   * Parse Money (string | number) to a decimal number.
-   * Handles formats like "$1.50", "1.50", 1.50, etc.
-   *
-   * @param money - The money value to parse
-   * @returns Decimal number
-   */
-  private parseMoneyToDecimal(money: string | number): number {
-    if (typeof money === 'number') {
-      return money
-    }
-
-    // Remove $ sign and whitespace, then parse
-    const cleanMoney = money.replace(/^\$/, '').trim()
-    const amount = parseFloat(cleanMoney)
-
-    if (Number.isNaN(amount)) {
-      throw new Error(`Invalid money format: ${money}`)
-    }
-
-    return amount
-  }
-
-  /**
    * Default money conversion implementation.
    * Converts a decimal amount to the stablecoin core lists for the network.
    *
-   * @param amount - The decimal amount (e.g., 1.50)
+   * @param amount - The decimal amount (e.g., "1.50")
    * @param network - The network to use
    * @returns The parsed asset amount in the default stablecoin
    */
-  private async defaultMoneyConversion(amount: number, network: Network): Promise<AssetAmount> {
+  private async defaultMoneyConversion(amount: string, network: Network): Promise<AssetAmount> {
     const asset = await this.getDefaultAsset(network)
 
     return {
-      amount: this.convertToTokenAmount(amount.toString(), asset.decimals),
+      amount: toBaseUnits(amount, asset.decimals).toString(),
       asset: asset.address,
       // No EIP-3009 domain hints: a 4mica-credit payer signs against core's
       // ClearingHouse domain, never the token's, and reads it from core.
       extra: {},
     }
-  }
-
-  /**
-   * Convert decimal amount to token units (e.g., 0.10 -> 100000 for 6-decimal tokens)
-   *
-   * @param decimalAmount - The decimal amount to convert
-   * @param decimals - The number of decimals for the token
-   * @returns The token amount as a string
-   */
-  private convertToTokenAmount(decimalAmount: string, decimals: number): string {
-    const amount = parseFloat(decimalAmount)
-    if (Number.isNaN(amount)) {
-      throw new Error(`Invalid amount: ${decimalAmount}`)
-    }
-    // Convert to smallest unit (e.g., for USDC with 6 decimals: 0.10 * 10^6 = 100000)
-    const [intPart, decPart = ''] = String(amount).split('.')
-    const paddedDec = decPart.padEnd(decimals, '0').slice(0, decimals)
-    const tokenAmount = (intPart + paddedDec).replace(/^0+/, '') || '0'
-    return tokenAmount
   }
 
   private coreUrlFor(network: Network): string {
@@ -248,22 +212,38 @@ export class FourMicaEvmScheme implements SchemeNetworkServer {
     const coreUrl = this.coreUrlFor(network)
 
     const { tokens } = await FourMicaEvmScheme.loadSupportedTokens(coreUrl)
-    const wanted = this.stablecoinSymbol.toLowerCase()
-    const token = tokens.find((entry) => entry.symbol.toLowerCase() === wanted)
-    if (!token) {
-      const listed = tokens.map((entry) => entry.symbol).join(', ') || 'none'
-      throw new Error(
-        `Core at ${coreUrl} lists no ${this.stablecoinSymbol} for network ${network} (listed: ${listed})`
-      )
-    }
-    if (token.decimals === undefined) {
-      throw new Error(
-        `Core at ${coreUrl} reports no decimals for ${token.symbol} on network ${network}`
-      )
-    }
+    const token = resolveToken(tokens, this.stablecoinSymbol, {
+      network,
+      nativeSymbol: resolveNetwork(network)?.info.nativeSymbol,
+    })
 
     return { address: token.address, decimals: token.decimals }
   }
+}
+
+/** `"$1.50"`, `"1.50"` or `1.5` → an exact decimal string. */
+function parseMoneyToDecimal(money: string | number): string {
+  if (typeof money === 'number') {
+    if (!Number.isFinite(money) || money < 0) {
+      throw new InvalidParamsError(`Invalid money amount: ${money}`)
+    }
+    return numberToDecimalString(money)
+  }
+  return parseDecimal(money.trim().replace(/^\$/, ''))
+}
+
+/** `1e-7` → `"0.0000001"`: expands the exponent, never rounds. */
+function numberToDecimalString(value: number): string {
+  const text = String(value)
+  const match = /^(\d+)(?:\.(\d+))?e([+-]\d+)$/.exec(text)
+  if (!match) return text
+
+  const [, whole, fraction = '', exponent] = match
+  const digits = whole + fraction
+  const point = whole.length + Number(exponent)
+  if (point <= 0) return `0.${'0'.repeat(-point)}${digits}`
+  if (point >= digits.length) return digits + '0'.repeat(point - digits.length)
+  return `${digits.slice(0, point)}.${digits.slice(point)}`
 }
 
 /** Memoise a per-network lookup, dropping a rejected entry so the next call retries. */

@@ -1,3 +1,4 @@
+import { formatUnits } from "@/amounts";
 import { InvalidParamsError } from "@/errors";
 import { parsePaymentHeader } from "@/x402/envelope";
 
@@ -8,18 +9,8 @@ export interface ParsedPayment {
   amount: string;
 }
 
-export function toDisplayAmount(raw: bigint, decimals: number): string {
-  if (decimals === 0) {
-    return raw.toString();
-  }
-
-  const negative = raw < 0n;
-  const digits = (negative ? -raw : raw).toString().padStart(decimals + 1, "0");
-  const whole = digits.slice(0, -decimals);
-  const fraction = digits.slice(-decimals).replace(/0+$/, "");
-
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
-}
+/** @deprecated Use `formatUnits` from `@4mica/sdk/amounts`. */
+export const toDisplayAmount = formatUnits;
 
 const asBigInt = (value: unknown): bigint | null => {
   if (typeof value === "bigint") {
@@ -63,6 +54,6 @@ export function paymentFromHeader(
     reqId,
     payerAddress,
     amountRaw,
-    amount: toDisplayAmount(amountRaw, decimals),
+    amount: formatUnits(amountRaw, decimals),
   };
 }
