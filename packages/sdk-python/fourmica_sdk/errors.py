@@ -8,7 +8,7 @@ on codes this SDK predates.
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 
 class FourMicaError(Exception):
@@ -85,13 +85,13 @@ class ClientInitializationError(ClientError):
 
 class ChainRpcUnavailableError(ClientError):
     """No Ethereum RPC endpoint is available, so nothing that reads chain state
-    or sends a transaction can run. Set ``4MICA_ETHEREUM_HTTP_RPC_URL`` or
+    or sends a transaction can run. Set ``FOURMICA_ETHEREUM_HTTP_RPC_URL`` or
     ``ConfigBuilder.ethereum_http_rpc_url``."""
 
     def __init__(self) -> None:
         super().__init__(
-            "no Ethereum RPC endpoint is available; set 4MICA_ETHEREUM_HTTP_RPC_URL "
-            "or ConfigBuilder.ethereum_http_rpc_url"
+            "no Ethereum RPC endpoint is available; set "
+            "FOURMICA_ETHEREUM_HTTP_RPC_URL or ConfigBuilder.ethereum_http_rpc_url"
         )
 
 
@@ -371,7 +371,7 @@ class FacilitatorNotConfiguredError(SponsorshipError):
 
     def __init__(self) -> None:
         super().__init__(
-            "no facilitator configured; set 4MICA_FACILITATOR_URL or "
+            "no facilitator configured; set FOURMICA_FACILITATOR_URL or "
             "ConfigBuilder.facilitator_url"
         )
 
@@ -413,8 +413,91 @@ class X402Error(FourMicaError):
     """Raised for x402 flow issues (invalid scheme, settlement errors, etc.)."""
 
 
+# --- amounts, assets and spend limits -------------------------------------
+
+
+def _list_tokens(tokens: Sequence[Any]) -> str:
+    if not tokens:
+        return "none"
+    return ", ".join(f"{t.symbol} ({t.address})" for t in tokens)
+
+
+class TokenNotSupportedError(InvalidParamsError):
+    """The asset is not one core accepts on this network. ``supported`` is
+    core's token list, each entry with ``symbol`` and ``address``."""
+
+    def __init__(
+        self, asset: str, supported: Sequence[Any], network: Optional[str] = None
+    ) -> None:
+        where = f" on {network}" if network else ""
+        super().__init__(
+            f"{asset} is not accepted{where}; accepted: "
+            f"{_list_tokens(supported)}, or the native asset"
+        )
+        self.asset = asset
+        self.network = network
+        self.supported = list(supported)
+
+
+class AmbiguousTokenError(InvalidParamsError):
+    """Two accepted tokens report this symbol; name the one meant by address."""
+
+    def __init__(self, symbol: str, matches: Sequence[Any]) -> None:
+        super().__init__(
+            f"{symbol} matches more than one accepted token: "
+            f"{_list_tokens(matches)}; pass the token address instead"
+        )
+        self.symbol = symbol
+        self.matches = list(matches)
+
+
+class AmountPrecisionError(InvalidParamsError):
+    """The amount has more decimal places than the token. Never rounded."""
+
+    def __init__(self, amount: str, decimals: int) -> None:
+        super().__init__(
+            f"{amount} has more decimal places than the token's {decimals}; "
+            "round it yourself, the SDK never rounds an amount"
+        )
+        self.amount = amount
+        self.decimals = decimals
+
+
+class InsufficientBalanceError(FourMicaError):
+    """The wallet holds less of the asset than the operation moves. ``needed``
+    and ``available`` are decimal strings in the asset's own units."""
+
+    def __init__(self, asset: str, needed: str, available: str) -> None:
+        super().__init__(
+            f"the wallet holds {available} {asset} but this needs {needed}; "
+            "fund the wallet first"
+        )
+        self.asset = asset
+        self.needed = needed
+        self.available = available
+
+
+class GasRequiredError(FourMicaError):
+    """The wallet must send its own transaction and has no gas money."""
+
+
+class SpendLimitError(PaymentError):
+    """A payment the session's spend limits refused. Nothing was signed.
+    ``limit`` is ``"per_payment"``, ``"total"``, ``"assets"`` or ``"pay_to"``."""
+
+    def __init__(self, limit: str, url: str, detail: str) -> None:
+        super().__init__(
+            f"payment for {url} refused by the session's spend limits ({limit}): "
+            f"{detail}; raise the limit in FourMica.connect(spend=...) to allow it"
+        )
+        self.limit = limit
+        self.url = url
+
+
 __all__: List[str] = [
     "AddressMismatchError",
+    "AmbiguousTokenError",
+    "AmountPrecisionError",
     "AmountZeroError",
     "AuthConfigError",
     "AuthDecodeError",
@@ -437,8 +520,10 @@ __all__: List[str] = [
     "FacilitatorRejectedError",
     "FourMicaError",
     "FutureTimestampError",
+    "GasRequiredError",
     "GracePeriodNotElapsedError",
     "InsufficientAvailableError",
+    "InsufficientBalanceError",
     "InsufficientLiquidityError",
     "InvalidParamsError",
     "InvalidPayerAddressError",
@@ -454,11 +539,13 @@ __all__: List[str] = [
     "RevertedOnChainError",
     "RpcError",
     "SigningError",
+    "SpendLimitError",
     "SponsorshipError",
     "SponsorshipTransportError",
     "StablecoinDepositsDisabledError",
     "StaleTimestampError",
     "TimestampNotPastCutoffError",
+    "TokenNotSupportedError",
     "TransferFailedError",
     "UnknownRevertError",
     "UnreadableReceiptSignatureError",

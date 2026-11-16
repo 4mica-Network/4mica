@@ -285,6 +285,18 @@ class ContractGateway:
             ).call()
         )
 
+    async def erc20_balance(self, token_address: str) -> int:
+        """What the signer's wallet holds of *token_address*, in base units."""
+        contract = self._erc20(token_address)
+        return int(await self._view(contract.functions.balanceOf(self.account.address)))
+
+    async def native_balance(self) -> int:
+        """What the signer's wallet holds of the chain's native asset, in wei."""
+        try:
+            return int(await self.w3.eth.get_balance(self.account.address))
+        except Exception as exc:
+            raise ContractError(f"native balance read failed: {exc}") from exc
+
     async def _wait_for_erc20_allowance(
         self,
         contract: Any,
@@ -447,6 +459,10 @@ class ContractGateway:
             return await func.call()
         except Exception as exc:
             raise self._decode_contract_error(exc) from exc
+
+    async def withdrawal_grace_period(self) -> int:
+        """Seconds between a withdrawal request and when it can be finalized."""
+        return int(await self._view(self.contract.functions.withdrawalGracePeriod()))
 
     async def principal_balance(self, user: str, asset: str) -> int:
         return parse_u256(

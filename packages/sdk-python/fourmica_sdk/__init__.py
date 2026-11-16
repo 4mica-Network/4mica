@@ -2,12 +2,17 @@
 
 Quickstart::
 
-    from fourmica_sdk import Client, ConfigBuilder
+    from fourmica_sdk import FourMica
 
-    cfg = ConfigBuilder().network("base-sepolia").wallet_private_key("0x...").build()
-    client = await Client.connect(cfg)
+    async with await FourMica.connect(private_key="0x...") as client:
+        await client.deposit("5 USDC")
+        response = await client.fetch("https://api.example.com/data")
+
+``Client`` and ``ConfigBuilder`` give exact control over each step;
+``await client.low_level()`` hands over the ``Client`` behind a session.
 """
 
+from .amounts import AmountSpec, Token
 from .auth import AuthClient, AuthNonceResponse, AuthSession, AuthTokens, SiweTemplate
 from .authorizations import (
     Eip2612Permit,
@@ -31,6 +36,9 @@ from .client.model import (
 from .config import AuthConfig, Config, ConfigBuilder
 from .errors import (
     AddressMismatchError,
+    AmbiguousTokenError,
+    AmountPrecisionError,
+    AmountZeroError,
     AuthError,
     ChainRpcUnavailableError,
     CheckpointMismatchError,
@@ -46,10 +54,14 @@ from .errors import (
     FacilitatorRejectedError,
     FourMicaError,
     FutureTimestampError,
+    GasRequiredError,
+    GracePeriodNotElapsedError,
+    InsufficientBalanceError,
     InvalidParamsError,
     InvalidPayerAddressError,
     MalformedReceiptError,
     MissingTokenDomainSeparatorError,
+    NoWithdrawalRequestedError,
     OutcomeUnknownError,
     PaymentError,
     Permit2AllowanceRequiredError,
@@ -57,13 +69,25 @@ from .errors import (
     RevertedOnChainError,
     RpcError,
     SigningError,
+    SpendLimitError,
     SponsorshipError,
     StaleTimestampError,
     TimestampNotPastCutoffError,
+    TokenNotSupportedError,
     UnknownRevertError,
     UnreadableReceiptSignatureError,
     UntrustedCheckpointBatchError,
     X402Error,
+)
+from .facade import (
+    Balance,
+    DepositResult,
+    FourMica,
+    PaymentRecord,
+    PendingWithdrawal,
+    RawBalance,
+    SpendLimits,
+    WithdrawResult,
 )
 from .guarantee import (
     CLEARING_HOUSE_EIP712_NAME,
@@ -106,7 +130,13 @@ from .models import (
     UserSuspensionStatus,
     ValidationRequirement,
 )
-from .networks import NETWORKS, NetworkInfo, resolve_network_rpc_url
+from .networks import (
+    DEFAULT_NETWORK,
+    NETWORKS,
+    NetworkInfo,
+    resolve_network,
+    resolve_network_rpc_url,
+)
 from .rpc import RpcProxy
 from .signing import EvmSigner, LocalAccountSigner, PayerSigner
 from .x402 import (
@@ -127,6 +157,10 @@ from .x402 import (
 __all__ = [
     "ActiveCycleResponse",
     "AddressMismatchError",
+    "AmbiguousTokenError",
+    "AmountPrecisionError",
+    "AmountSpec",
+    "AmountZeroError",
     "Asset",
     "AssetBalanceInfo",
     "AssetPosition",
@@ -136,6 +170,7 @@ __all__ = [
     "AuthNonceResponse",
     "AuthSession",
     "AuthTokens",
+    "Balance",
     "ChainRpcUnavailableError",
     "CheckpointAcceptedResponse",
     "CheckpointBatchResponse",
@@ -163,21 +198,27 @@ __all__ = [
     "CoreRefusalError",
     "CycleMismatchDetails",
     "CycleMismatchError",
+    "DEFAULT_NETWORK",
     "DepositReceipt",
+    "DepositResult",
     "Eip2612Permit",
     "Erc20AllowanceRequiredError",
     "EvmSigner",
     "FacilitatorNotConfiguredError",
     "FacilitatorRejectedError",
     "FlowSigner",
+    "FourMica",
     "FourMicaError",
     "FutureTimestampDetails",
     "FutureTimestampError",
+    "GasRequiredError",
+    "GracePeriodNotElapsedError",
     "Guarantee",
     "guarantee_registry_domain_separator",
     "GUARANTEE_REGISTRY_EIP712_NAME",
     "GUARANTEE_REGISTRY_EIP712_VERSION",
     "GuaranteeReceipt",
+    "InsufficientBalanceError",
     "InvalidParamsError",
     "InvalidPayerAddressError",
     "LocalAccountSigner",
@@ -185,22 +226,27 @@ __all__ = [
     "MissingTokenDomainSeparatorError",
     "NetworkInfo",
     "NETWORKS",
+    "NoWithdrawalRequestedError",
     "OutcomeUnknownError",
     "PayerSigner",
     "PAYMENT_PAYLOAD_VERSION",
     "PaymentError",
+    "PaymentRecord",
     "PaymentRequest",
     "PaymentRequestPayload",
     "PaymentRequirementsExtra",
     "PaymentRequirementsV1",
     "PaymentRequirementsV2",
     "PayReceipt",
+    "PendingWithdrawal",
     "Permit2AllowanceRequiredError",
     "Permit2Authorization",
+    "RawBalance",
     "ReceiptSignerMismatchError",
     "ReceiveAuthorization",
     "recipient_commitment",
     "RecipientPaymentInfo",
+    "resolve_network",
     "resolve_network_rpc_url",
     "RevertedOnChainError",
     "Route",
@@ -211,6 +257,8 @@ __all__ = [
     "SignedCheckpoint",
     "SigningError",
     "SiweTemplate",
+    "SpendLimitError",
+    "SpendLimits",
     "SponsorshipError",
     "StablecoinPosition",
     "StaleTimestampDetails",
@@ -219,6 +267,8 @@ __all__ = [
     "SupportedTokensResponse",
     "TimestampNotPastCutoffDetails",
     "TimestampNotPastCutoffError",
+    "Token",
+    "TokenNotSupportedError",
     "TokenRoute",
     "TxReceiptWaitOptions",
     "UnknownRevertError",
@@ -231,6 +281,7 @@ __all__ = [
     "WithdrawalCancelAuthorization",
     "WithdrawalRequestAuthorization",
     "WithdrawReceipt",
+    "WithdrawResult",
     "X402Error",
     "X402Flow",
     "X402PaymentRequired",

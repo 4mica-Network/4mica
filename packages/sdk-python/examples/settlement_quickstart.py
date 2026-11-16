@@ -1,7 +1,7 @@
 """Settle a committed clearing cycle from either side.
 
-Env: 4MICA_NETWORK (or 4MICA_RPC_URL), 4MICA_WALLET_PRIVATE_KEY, CYCLE_ID
-(text id or 0x-prefixed on-chain id), and ROLE=pay|claim.
+Env: FOURMICA_NETWORK (or FOURMICA_RPC_URL), FOURMICA_WALLET_PRIVATE_KEY,
+CYCLE_ID (text id or 0x-prefixed on-chain id), and ROLE=pay|claim.
 """
 
 import asyncio

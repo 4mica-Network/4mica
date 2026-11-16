@@ -63,3 +63,67 @@ def test_from_env_network_takes_precedence(monkeypatch):
     monkeypatch.setenv("4MICA_WALLET_PRIVATE_KEY", KEY)
     cfg = ConfigBuilder().from_env().build()
     assert cfg.rpc_url == "https://base.sepolia.api.4mica.io/"
+
+
+def test_from_env_reads_fourmica_variables(monkeypatch):
+    monkeypatch.setenv("FOURMICA_NETWORK", "base")
+    monkeypatch.setenv("FOURMICA_WALLET_PRIVATE_KEY", KEY)
+    monkeypatch.setenv("FOURMICA_FACILITATOR_URL", "https://facilitator.example/")
+    cfg = ConfigBuilder().from_env().build()
+    assert cfg.rpc_url == "https://base.api.4mica.io/"
+    assert cfg.wallet_private_key == KEY
+    assert cfg.facilitator_url == "https://facilitator.example/"
+
+
+def test_from_env_takes_a_mapping_instead_of_the_process_environment(monkeypatch):
+    monkeypatch.setenv("FOURMICA_NETWORK", "base")
+    env = {"FOURMICA_RPC_URL": "https://env.example/", "4MICA_WALLET_PRIVATE_KEY": KEY}
+    cfg = ConfigBuilder().from_env(env).build()
+    assert cfg.rpc_url == "https://env.example/"
+
+
+def test_both_prefixes_may_agree_but_not_differ():
+    env = {
+        "FOURMICA_WALLET_PRIVATE_KEY": KEY,
+        "4MICA_WALLET_PRIVATE_KEY": KEY,
+        "FOURMICA_NETWORK": "base",
+        "4MICA_NETWORK": "base",
+    }
+    assert ConfigBuilder().from_env(env).build().rpc_url == "https://base.api.4mica.io/"
+    env["4MICA_NETWORK"] = "base-sepolia"
+    with pytest.raises(ConfigError, match="FOURMICA_NETWORK and 4MICA_NETWORK"):
+        ConfigBuilder().from_env(env)
+
+
+def test_an_empty_variable_counts_as_unset():
+    env = {"FOURMICA_NETWORK": "", "4MICA_NETWORK": "base", "FOURMICA_RPC_URL": ""}
+    cfg = ConfigBuilder().wallet_private_key(KEY).from_env(env).build()
+    assert cfg.rpc_url == "https://base.api.4mica.io/"
+
+
+def test_network_brings_its_hosted_facilitator():
+    cfg = ConfigBuilder().network("base-sepolia").wallet_private_key(KEY).build()
+    assert cfg.facilitator_url == "https://testnet.payment.4mica.io/"
+    # No facilitator is hosted for this one.
+    cfg = ConfigBuilder().network("ethereum-sepolia").wallet_private_key(KEY).build()
+    assert cfg.facilitator_url is None
+
+
+def test_an_explicit_facilitator_wins_in_either_order():
+    for build in (
+        lambda b: b.network("base-sepolia").facilitator_url("https://mine.example/"),
+        lambda b: b.facilitator_url("https://mine.example/").network("base-sepolia"),
+    ):
+        cfg = build(ConfigBuilder().wallet_private_key(KEY)).build()
+        assert cfg.facilitator_url == "https://mine.example/"
+
+
+def test_rpc_url_drops_the_hosted_facilitator():
+    cfg = (
+        ConfigBuilder()
+        .network("base-sepolia")
+        .rpc_url("https://self-hosted.example/")
+        .wallet_private_key(KEY)
+        .build()
+    )
+    assert cfg.facilitator_url is None

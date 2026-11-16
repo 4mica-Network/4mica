@@ -15,6 +15,81 @@ pip install "sdk-4mica[cdp]"   # with the Coinbase CDP wallet backend
 
 Requires Python 3.10+.
 
+## Quick start
+
+```python
+import asyncio
+from fourmica_sdk import FourMica
+
+
+async def main():
+    async with await FourMica.connect(
+        private_key="0x...", network="base-sepolia"
+    ) as client:
+        await client.deposit("5 USDC")  # gasless where it can
+        response = await client.fetch("https://api.example.com/data")
+        print(response.status_code, client.payment_for(response))
+
+
+asyncio.run(main())
+```
+
+`FourMica` is the short way in: connect once, then deposit, pay and withdraw
+with amounts written the way people write them. It matches `FourMica` in the
+TypeScript SDK.
+
+| Call | What it does |
+|---|---|
+| `await FourMica.connect(...)` | `private_key=` or `signer=`, else `FOURMICA_WALLET_PRIVATE_KEY`. `network=` defaults to `FOURMICA_NETWORK`, else `base-sepolia`; `rpc_url=` names a self-hosted core. |
+| `await client.deposit("5 USDC")` | Deposits collateral and waits until core counts it. `gas="self"` sends the wallet's own transaction; `wait="mined"` returns without waiting. |
+| `await client.balance("USDC")` | `total`, `locked` and `available` as decimal strings, with base units under `raw`. Without an asset: every asset held, keyed by symbol. |
+| `await client.fetch(url, method="GET", **kwargs)` | An `httpx` request that pays a 4Mica 402 within the spend limits and retries once. `client.payment_for(response)` says what was paid. |
+| `await client.withdraw("2 USDC")` | Requests a withdrawal. |
+| `await client.withdrawals()` | Pending requests, and when each can be finalized. |
+| `await client.finalize_withdrawal("USDC")` / `cancel_withdrawal("USDC")` | Pays out a request after the grace period, or cancels it. |
+| `await client.low_level()` | The `Client` underneath, for anything else. |
+
+Every call that touches a network takes `network=` to use another one; the
+session connects to it on first use. `async with` (or `await client.aclose()`)
+closes them all.
+
+**Amounts are decimal strings**, `"5 USDC"` or
+`{"amount": "5", "asset": "USDC"}`. Numbers are refused, because `5` could
+mean five tokens or five base units. An asset is a symbol, `"ETH"` for the
+native asset, or a token address, checked against the tokens core accepts.
+An amount with more decimal places than the token has is an error, never
+rounded.
+
+**`deposit` does not raise when core is slow.** Once the transaction is mined
+the money has moved, so running out of `timeout_secs` (default 60) returns
+`status="pending"`; `await result.spendable()` waits again.
+
+**`fetch` only pays within its limits.** By default that is at most 1 USDC per
+payment, and nothing in any other asset:
+
+```python
+from fourmica_sdk import FourMica, SpendLimits
+
+client = await FourMica.connect(
+    private_key="0x...",
+    spend=SpendLimits(
+        per_payment=["0.10 USDC", "0.10 USDT"],  # the assets it may pay in
+        total="5 USDC",  # for this session, counted in memory
+        pay_to=["0xSeller..."],  # optional: the only payees
+    ),
+)
+```
+
+A payment over a limit raises `SpendLimitError` before anything is signed. A
+402 that is not a `4mica-credit` offer on a network the session has open comes
+back untouched. The request body is sent again on the retry, so pass `json=`,
+`data=` or bytes, not a stream.
+
+**A remote signer** (`signer=`, such as the CDP backend) signs payments and
+gasless deposits and withdrawals, but cannot send a transaction or read the
+wallet: the balance check before a deposit is skipped, and `withdrawals()`
+needs a local key.
+
 ## Connecting
 
 ```python
@@ -44,10 +119,16 @@ An Ethereum RPC endpoint is only needed for paths that read chain state or
 send transactions; signing-only clients never touch the chain.
 
 Configuration can also come from the environment via
-`ConfigBuilder().from_env()`: `4MICA_NETWORK` / `4MICA_RPC_URL`,
-`4MICA_WALLET_PRIVATE_KEY`, `4MICA_ETHEREUM_HTTP_RPC_URL`,
-`4MICA_CONTRACT_ADDRESS`, `4MICA_FACILITATOR_URL`, `4MICA_BEARER_TOKEN`,
-`4MICA_AUTH_URL`, `4MICA_AUTH_REFRESH_MARGIN_SECS`.
+`ConfigBuilder().from_env()`: `FOURMICA_NETWORK` / `FOURMICA_RPC_URL`,
+`FOURMICA_WALLET_PRIVATE_KEY`, `FOURMICA_ETHEREUM_HTTP_RPC_URL`,
+`FOURMICA_CONTRACT_ADDRESS`, `FOURMICA_FACILITATOR_URL`,
+`FOURMICA_BEARER_TOKEN`, `FOURMICA_AUTH_URL`,
+`FOURMICA_AUTH_REFRESH_MARGIN_SECS`. The older `4MICA_` prefix still works,
+but a shell cannot `export` a name that starts with a digit; setting both
+prefixes to different values is a `ConfigError`.
+
+`.network(...)` also selects that network's hosted facilitator where there is
+one, so gasless routes work without `.facilitator_url(...)`.
 
 SIWE auth is on by default (the SDK signs in with your wallet and refreshes
 tokens automatically); a `bearer_token` replaces it.
@@ -202,8 +283,9 @@ balance = await client.account.asset_balance("0xToken...")
 
 ### Gasless routes
 
-With a facilitator configured (`.facilitator_url(...)` or
-`4MICA_FACILITATOR_URL`), token-moving operations can run without the signer
+With a facilitator configured (`.network(...)` on a network that hosts one,
+`.facilitator_url(...)` or `FOURMICA_FACILITATOR_URL`), token-moving
+operations can run without the signer
 paying gas: the payer signs an authorization and the facilitator submits it.
 Unpinned `send()` prefers gasless and falls back to self-funding when nothing
 will sponsor it; a pin makes the route explicit:
