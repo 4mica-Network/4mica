@@ -50,9 +50,8 @@ export async function deposit(
     });
   }
 
-  const wait = options.wait ?? "spendable";
-  const baseline =
-    wait === "spendable" ? await coreTotal(session, token.address) : 0n;
+  // Read even for `wait: "mined"`: `spendable()` on the result measures from it.
+  const baseline = await coreTotal(session, token.address);
 
   const selfFunded = async (): Promise<DepositReceipt> => {
     if ((await gateway.nativeBalance()) === 0n) {
@@ -104,7 +103,9 @@ export async function deposit(
         : "pending",
     );
 
-  return wait === "mined" ? result("mined") : counted(options.timeoutMs);
+  return options.wait === "mined"
+    ? result("mined")
+    : counted(options.timeoutMs);
 }
 
 async function coreTotal(

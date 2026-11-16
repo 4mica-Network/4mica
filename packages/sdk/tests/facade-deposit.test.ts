@@ -130,13 +130,23 @@ describe("FourMica deposit", () => {
     ).rejects.toThrow(GasRequiredError);
   });
 
-  it("wait: mined does not ask core", async () => {
-    const fake = fakeClient();
+  it("wait: mined does not wait for core, and spendable() still waits for this deposit", async () => {
+    // Core already counts more than the 5 USDC being deposited.
+    const fake = fakeClient({ totals: [100_000_000n] });
     const result = await deposit(fakeSession(fake), "5 USDC", {
       wait: "mined",
     });
     expect(result.status).toBe("mined");
-    expect(fake.client.rpc.getUserAssetBalance).not.toHaveBeenCalled();
+    expect(fake.client.rpc.getUserAssetBalance).toHaveBeenCalledOnce();
+
+    expect((await result.spendable({ timeoutMs: 20 })).status).toBe("pending");
+    fake.client.rpc.getUserAssetBalance.mockResolvedValue({
+      total: 105_000_000n,
+      locked: 0n,
+    } as never);
+    expect((await result.spendable({ timeoutMs: 20 })).status).toBe(
+      "spendable",
+    );
   });
 
   it("returns pending instead of throwing when core is slow, and spendable() waits again", async () => {
