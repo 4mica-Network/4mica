@@ -15,6 +15,7 @@ import { ArrowUpRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
@@ -45,7 +46,7 @@ export function CreateApiListingModal({
   const isSaving = useAppSelector(selectIsApiListingPending(PENDING_KEY));
   const error = useAppSelector(selectApiListingError);
   const issues = useAppSelector(selectApiListingIssues);
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
 
   const [step, setStep] = useState(0);
   useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);

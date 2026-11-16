@@ -25,6 +25,7 @@ import {
   useWatch,
 } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { EditableCard } from "@/components/EditableCard";
 import {
   FieldRow,
@@ -178,7 +179,7 @@ function ListingCard({
 
 function WalletField() {
   const { t } = useTranslation();
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
   const walletId = useWatch({ name: "walletId" }) as string | undefined;
   const chosenWallet = wallets.find((wallet) => wallet.id === walletId);
 
@@ -214,7 +215,7 @@ function WalletField() {
 
 function ListingPriceField() {
   const { t } = useTranslation();
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
   const walletId = useWatch({ name: "walletId" }) as string | undefined;
   const chosenWallet = wallets.find((wallet) => wallet.id === walletId);
 

@@ -17,6 +17,7 @@ import { ArrowUpRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
@@ -47,8 +48,8 @@ export function CreateAgentModal({
   const isSaving = useAppSelector(selectIsAgentPending(PENDING_KEY));
   const error = useAppSelector(selectAgentError);
   const issues = useAppSelector(selectAgentIssues);
-  const sellerWallets = useAppSelector(selectSellerWallets);
-  const payerWallets = useAppSelector(selectPayerWallets);
+  const sellerWallets = useAppSelector(selectSellerWallets, shallowEqual);
+  const payerWallets = useAppSelector(selectPayerWallets, shallowEqual);
 
   const [step, setStep] = useState(0);
   useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
