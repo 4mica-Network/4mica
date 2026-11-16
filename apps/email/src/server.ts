@@ -11,7 +11,6 @@ export const initApp = async (
   toRegister: RouteRegistration[] = routes,
 ): Promise<FastifyInstance> => {
   const app = Fastify({
-    trustProxy: true,
     bodyLimit: 262_144,
   });
 
