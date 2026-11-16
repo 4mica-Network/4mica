@@ -1,35 +1,15 @@
 import { HttpMethod } from "@4mica/http";
 import type {
-  Payment,
   PaymentDirection,
-  PaymentListResponse,
   PaymentNetwork,
   PaymentSort,
   PaymentStats,
   PaymentStatus,
   PaymentSummary,
 } from "@stores/payment/type";
-import { safeExternalUrl } from "@utils/safeUrl";
-import { z } from "zod";
 import { httpClient } from "./client";
 
-const paymentSchema = z.looseObject({
-  id: z.string(),
-  resource: z.unknown().transform(safeExternalUrl),
-});
-
-const paymentListSchema = z.looseObject({
-  items: z.array(paymentSchema),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
-});
-
-export const parsePayment = (value: unknown): Payment =>
-  paymentSchema.parse(value) as unknown as Payment;
-
-export const parsePaymentList = (value: unknown): PaymentListResponse =>
-  paymentListSchema.parse(value) as unknown as PaymentListResponse;
+const schema = () => import("./paymentSchema");
 
 export interface ListPaymentsParams
   extends Record<string, string | number | boolean | undefined> {
@@ -50,7 +30,7 @@ export const getPayments = (params: ListPaymentsParams = {}) =>
       method: HttpMethod.GET,
       params,
     })
-    .then(parsePaymentList);
+    .then(async (body) => (await schema()).parsePaymentList(body));
 
 export const getPaymentSummary = () =>
   httpClient.request<PaymentSummary>({
@@ -71,4 +51,4 @@ export const getPayment = (id: string) =>
       url: `/me/payments/${encodeURIComponent(id)}`,
       method: HttpMethod.GET,
     })
-    .then(parsePayment);
+    .then(async (body) => (await schema()).parsePayment(body));

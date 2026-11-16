@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePayment, parsePaymentList } from "./payment";
+import { parsePayment, parsePaymentList } from "./paymentSchema";
 
 describe("payment response parsing", () => {
   it("keeps an https resource and unrelated fields", () => {
