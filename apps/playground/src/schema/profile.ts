@@ -1,10 +1,11 @@
 import * as v from "valibot";
+import { HttpsUrlOrNullSchema } from "./params";
 
 const PublicProfileSchema = v.object({
   username: v.string(),
   name: v.string(),
   bio: v.nullable(v.string()),
-  avatarUrl: v.nullable(v.string()),
+  avatarUrl: HttpsUrlOrNullSchema,
   verified: v.boolean(),
   memberSince: v.string(),
   email: v.nullable(v.string()),
