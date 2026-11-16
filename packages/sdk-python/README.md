@@ -86,15 +86,16 @@ client = await FourMica.connect(
 
 A payment over a limit raises `SpendLimitError` before anything is signed. A
 402 that is not a `4mica-credit` offer on a network the session has open comes
-back untouched.
+back untouched. The request body is read into memory once, so the retry sends
+the same bytes even for a file or a generator. Redirects are not followed
+unless the `http_client` you pass follows them.
 
 `total` counts every payment the session sends. One that was never sent
 because signing failed, or that the seller refused with another 402, is
 released again. One that was sent stays counted even if the request then
 fails, because the seller may still redeem it. The count is kept in memory by
 this session: a new `connect` starts from zero, and across processes sharing a
-wallet the hard limit is the collateral deposited. The request body is sent again on the retry, so pass `json=`,
-`data=` or bytes, not a stream.
+wallet the hard limit is the collateral deposited.
 
 **A remote signer** (`signer=`, such as the CDP backend) signs payments and
 gasless deposits and withdrawals, but cannot send a transaction or read the

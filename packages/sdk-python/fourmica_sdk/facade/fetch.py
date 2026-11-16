@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import httpx
 
@@ -15,7 +25,11 @@ from .session import NetworkSession, asset_ref
 def _as_list(value: Union[str, Sequence[str], None]) -> List[str]:
     if value is None:
         return []
-    return [value] if isinstance(value, str) else list(value)
+    # Anything that is not a collection is one entry, for `parse_amount` to
+    # accept or refuse with a message that names it.
+    if isinstance(value, str) or not isinstance(value, Iterable):
+        return [value]
+    return list(value)
 
 
 @dataclass(frozen=True)
@@ -44,14 +58,16 @@ class SpendLimiter:
 
     async def reserve(
         self, session: NetworkSession, terms: PaymentTerms, url: str
-    ) -> Union[Reservation, SpendLimitError]:
+    ) -> Reservation:
+        """Counts *terms* against the limits, or raises
+        :class:`SpendLimitError`."""
         if self._pay_to is not None and terms.pay_to.lower() not in self._pay_to:
-            return SpendLimitError(
+            raise SpendLimitError(
                 "pay_to", url, f"{terms.pay_to} is not in the allowed payees"
             )
         token = await session.try_token(terms.asset)
         if token is None:
-            return SpendLimitError(
+            raise SpendLimitError(
                 "assets",
                 url,
                 f"{terms.asset} is not an asset 4Mica accepts on {session.caip2}",
@@ -63,13 +79,13 @@ class SpendLimiter:
 
         per_payment = await self._limit_for(session, self._per_payment, asset)
         if per_payment is None:
-            return SpendLimitError(
+            raise SpendLimitError(
                 "assets",
                 url,
                 f"the seller asks for {asset.symbol}, which no per_payment limit names",
             )
         if terms.amount > per_payment:
-            return SpendLimitError(
+            raise SpendLimitError(
                 "per_payment",
                 url,
                 f"the seller asks {show(terms.amount)}, over the "
@@ -81,7 +97,7 @@ class SpendLimiter:
         key = f"{session.caip2}:{asset.address.lower()}"
         spent = self._spent.get(key, 0)
         if total is not None and spent + terms.amount > total:
-            return SpendLimitError(
+            raise SpendLimitError(
                 "total",
                 url,
                 f"{show(spent)} spent so far; {show(terms.amount)} more would "
@@ -115,9 +131,18 @@ class FetchContext:
 
 
 async def paying_fetch(
-    ctx: FetchContext, method: str, url: Any, headers: Any = None, **kwargs: Any
+    ctx: FetchContext, method: str, url: Union[str, httpx.URL], **kwargs: Any
 ) -> httpx.Response:
-    response = await ctx.http.request(method, url, headers=headers, **kwargs)
+    send_options = {
+        name: kwargs.pop(name)
+        for name in ("auth", "follow_redirects")
+        if name in kwargs
+    }
+    request = ctx.http.build_request(method, url, **kwargs)
+    # Read once, so the retry carries the same bytes whatever the body was
+    # built from: a file or a generator would be spent by the first send.
+    body = await request.aread()
+    response = await ctx.http.send(request, **send_options)
     if response.status_code != 402:
         return response
 
@@ -130,16 +155,17 @@ async def paying_fetch(
     if not options:
         return response
 
-    refusal: Optional[SpendLimitError] = None
+    refusals: List[SpendLimitError] = []
     for protocol, terms, session in options:
-        reservation = await ctx.limiter.reserve(session, terms, str(url))
-        if isinstance(reservation, SpendLimitError):
-            refusal = refusal or reservation
+        try:
+            reservation = await ctx.limiter.reserve(session, terms, str(request.url))
+        except SpendLimitError as refusal:
+            refusals.append(refusal)
             continue
 
-        paying = httpx.Headers(headers)
+        headers = request.headers.copy()
         try:
-            paying.update(await protocol.pay(terms, session.client, ctx.http))
+            headers.update(await protocol.pay(terms, session.client, ctx.http))
         except BaseException:
             # Nothing has left this process.
             ctx.limiter.release(reservation)
@@ -147,7 +173,16 @@ async def paying_fetch(
         # Retried once; a second 402 goes back to the caller. If this raises
         # the amount stays reserved: the seller may hold the payment and
         # redeem it.
-        paid = await ctx.http.request(method, url, headers=paying, **kwargs)
+        paid = await ctx.http.send(
+            httpx.Request(
+                request.method,
+                request.url,
+                headers=headers,
+                content=body,
+                extensions=request.extensions,
+            ),
+            **send_options,
+        )
         if paid.status_code == 402:
             ctx.limiter.release(reservation)
             return paid
@@ -167,5 +202,5 @@ async def paying_fetch(
                 ),
             )
         return paid
-    assert refusal is not None
-    raise refusal
+    # Every option was refused; the first is the one the seller preferred.
+    raise refusals[0]

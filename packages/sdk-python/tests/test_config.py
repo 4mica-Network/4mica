@@ -127,3 +127,11 @@ def test_rpc_url_drops_the_hosted_facilitator():
         .build()
     )
     assert cfg.facilitator_url is None
+
+
+def test_secrets_stay_out_of_repr():
+    cfg = ConfigBuilder().wallet_private_key(KEY).bearer_token("s3cret").build()
+    shown = repr(cfg)
+    assert KEY not in shown and KEY[2:] not in shown
+    assert "s3cret" not in shown
+    assert cfg.rpc_url in shown

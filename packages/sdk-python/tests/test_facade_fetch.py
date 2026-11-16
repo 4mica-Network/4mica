@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import io
 import json
 from typing import Callable, List, Optional
 
@@ -234,6 +235,46 @@ async def test_pays_the_valid_option_beside_one_it_could_not_sign():
     assert len(records) == 1
 
 
+async def test_the_retry_carries_the_same_bytes_for_a_body_that_can_be_read_once():
+    async def chunks():
+        yield b"first "
+        yield b"second"
+
+    seller = Seller(lambda: v2_challenge([entry()]))
+    ctx, _, _ = context(seller.http)
+    await paying_fetch(ctx, "POST", URL, content=chunks())
+    assert [call.content for call in seller.calls] == [b"first second"] * 2
+
+    upload = io.BytesIO(b"file contents")
+    seller = Seller(lambda: v2_challenge([entry()]))
+    ctx, _, _ = context(seller.http)
+    await paying_fetch(ctx, "POST", URL, files={"report": ("r.txt", upload)})
+    unpaid, paid = seller.calls
+    assert b"file contents" in paid.content
+    assert paid.content == unpaid.content
+    assert paid.headers["content-type"] == unpaid.headers["content-type"]
+
+
+async def test_the_retry_keeps_the_query_and_the_clients_own_headers():
+    calls = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200) if is_paid(request) else v2_challenge([entry()])
+
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(handle),
+        base_url="https://api.example.com",
+        headers={"x-client": "agent"},
+    )
+    ctx, records, _ = context(http)
+    await paying_fetch(ctx, "GET", "/data", params={"q": "1"}, timeout=5)
+    assert [str(call.url) for call in calls] == [URL + "?q=1"] * 2
+    assert calls[1].headers["x-client"] == "agent"
+    assert calls[1].extensions["timeout"] == calls[0].extensions["timeout"]
+    assert len(records) == 1
+
+
 async def test_never_loops_on_a_second_402_and_does_not_count_it():
     def challenge():
         return v2_challenge([entry(amount="600000")])
@@ -436,6 +477,8 @@ def test_rejects_malformed_limits_up_front():
         SpendLimits(per_payment="1"),
         SpendLimits(total="lots of USDC"),
         SpendLimits(per_payment=["1 USDC", "-2 USDT"]),
+        # A number is refused by name, not as "int is not iterable".
+        SpendLimits(per_payment=1),
     ):
         with pytest.raises(InvalidParamsError):
             SpendLimiter(limits)

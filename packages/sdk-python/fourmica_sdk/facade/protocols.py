@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Protocol
 import httpx
 
 from ..client import Client
+from ..errors import X402Error
 from ..networks import resolve_network
 from ..utils import parse_address, parse_u256
 from ..x402 import (
@@ -146,7 +147,7 @@ class X402Protocol:
                         ),
                     )
                 )
-            except Exception:
+            except (X402Error, ValueError, TypeError, AttributeError):
                 continue
         return terms
 

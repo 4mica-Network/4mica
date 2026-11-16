@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any, Mapping, Optional, Protocol, Sequence, Union
 
 from .errors import (
     AmbiguousTokenError,
@@ -32,6 +32,19 @@ class AmountSpec:
 
 #: ``"5 USDC"``, ``{"amount": "5", "asset": "USDC"}`` or an :class:`AmountSpec`.
 AmountInput = Union[str, AmountSpec, Mapping[str, Any]]
+
+
+class TokenLike(Protocol):
+    """Anything with a token's three fields, such as an entry of core's list."""
+
+    @property
+    def symbol(self) -> str: ...
+
+    @property
+    def address(self) -> str: ...
+
+    @property
+    def decimals(self) -> int: ...
 
 
 @dataclass(frozen=True)
@@ -81,6 +94,8 @@ def parse_amount(value: AmountInput) -> AmountSpec:
                 f'expected an amount and its asset, such as "5 USDC", got {value!r}'
             )
         return AmountSpec(amount=parse_decimal(parts[0]), asset=parts[1])
+    amount: Any
+    asset: Any
     if isinstance(value, AmountSpec):
         amount, asset = value.amount, value.asset
     elif isinstance(value, Mapping):
@@ -121,7 +136,7 @@ def is_native_asset(value: str, native_symbol: str = "ETH") -> bool:
 
 
 def resolve_token(
-    tokens: Sequence[Any],
+    tokens: Sequence[TokenLike],
     value: str,
     native_symbol: str = "ETH",
     network: Optional[str] = None,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import List, Optional
 
-from ..amounts import ResolvedToken, Token, is_native_asset, resolve_token
+from ..amounts import ResolvedToken, Token, TokenLike, is_native_asset, resolve_token
 from ..client import Client
 from ..contract import ContractGateway
 from ..errors import TokenNotSupportedError
@@ -61,5 +61,5 @@ class NetworkSession:
         return f"{self.info.explorer_url}/tx/{tx_hash}" if self.info else None
 
 
-def asset_ref(token: Token) -> AssetRef:
+def asset_ref(token: TokenLike) -> AssetRef:
     return Token(symbol=token.symbol, address=token.address, decimals=token.decimals)

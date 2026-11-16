@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Awaitable, Callable, Dict, Optional, Sequence, Union
+from typing import Awaitable, Callable, Dict, Literal, Optional, Sequence, Union
 
 from ..amounts import Token
 from ..client.model import Route, TokenRoute
@@ -12,6 +12,10 @@ from ..client.model import Route, TokenRoute
 AssetRef = Token
 
 DEFAULT_DEPOSIT_TIMEOUT_SECS = 60.0
+
+Gas = Literal["auto", "self"]
+Wait = Literal["spendable", "mined"]
+DepositStatus = Literal["spendable", "pending", "mined"]
 
 
 @dataclass(frozen=True)
@@ -29,7 +33,7 @@ class SpendLimits:
 
 @dataclass(frozen=True)
 class DepositResult:
-    status: str
+    status: DepositStatus
     """``"spendable"``, ``"mined"``, or ``"pending"``: mined, but not yet
     counted by core when the wait ended."""
     tx_hash: str

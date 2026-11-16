@@ -11,7 +11,12 @@ from facade_helpers import KEY, SELLER, USDC, FakeClient
 
 from fourmica_sdk import Client, FourMica, SpendLimits
 from fourmica_sdk.amounts import Token
-from fourmica_sdk.errors import ClientError, ConfigError, SpendLimitError
+from fourmica_sdk.errors import (
+    ClientError,
+    ConfigError,
+    InvalidParamsError,
+    SpendLimitError,
+)
 from fourmica_sdk.facade.models import Balance, RawBalance
 from fourmica_sdk.networks import NETWORKS
 from fourmica_sdk.signing import LocalAccountSigner
@@ -113,9 +118,14 @@ async def test_refuses_conflicting_or_unknown_options_before_connecting(core):
         await FourMica.connect(private_key=KEY, protocols=["mpp"])
     with pytest.raises(ConfigError, match='unknown network "solana"'):
         await FourMica.connect(private_key=KEY, network="solana")
-    with pytest.raises(Exception, match="amount and its asset"):
+    with pytest.raises(InvalidParamsError, match="amount and its asset"):
         await FourMica.connect(private_key=KEY, spend=SpendLimits(per_payment="1"))
     assert core.configs == []
+
+
+async def test_takes_one_protocol_as_a_plain_string(core):
+    async with await FourMica.connect(private_key=KEY, protocols="x402") as client:
+        assert [protocol.name for protocol in client._protocols] == ["x402"]
 
 
 async def test_a_remote_signer_is_used_on_every_network(core):

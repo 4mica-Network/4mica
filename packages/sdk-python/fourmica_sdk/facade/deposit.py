@@ -11,7 +11,13 @@ from ..errors import (
     InsufficientBalanceError,
     InvalidParamsError,
 )
-from .models import DEFAULT_DEPOSIT_TIMEOUT_SECS, DepositResult
+from .models import (
+    DEFAULT_DEPOSIT_TIMEOUT_SECS,
+    DepositResult,
+    DepositStatus,
+    Gas,
+    Wait,
+)
 from .session import NetworkSession, asset_ref
 
 _FIRST_POLL_SECS = 0.5
@@ -21,10 +27,11 @@ _MAX_POLL_SECS = 5.0
 async def deposit(
     session: NetworkSession,
     value: AmountInput,
-    gas: str = "auto",
-    wait: str = "spendable",
+    gas: Gas = "auto",
+    wait: Wait = "spendable",
     timeout_secs: float = DEFAULT_DEPOSIT_TIMEOUT_SECS,
 ) -> DepositResult:
+    # Checked at runtime too: not every caller runs a type checker.
     if gas not in ("auto", "self"):
         raise InvalidParamsError(f'gas must be "auto" or "self", got {gas!r}')
     if wait not in ("spendable", "mined"):
@@ -83,7 +90,7 @@ async def deposit(
         except Erc20AllowanceRequiredError:
             receipt = await self_funded()
 
-    def result(status: str) -> DepositResult:
+    def result(status: DepositStatus) -> DepositResult:
         return DepositResult(
             status=status,
             tx_hash=receipt.tx_hash,

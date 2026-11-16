@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, overload
 from weakref import WeakKeyDictionary
 
 import httpx
@@ -29,10 +29,12 @@ from .models import (
     Balance,
     Balances,
     DepositResult,
+    Gas,
     PaymentRecord,
     PendingWithdrawal,
     RawBalance,
     SpendLimits,
+    Wait,
     WithdrawResult,
 )
 from .protocols import PROTOCOLS, PaymentProtocol, PaymentTerms
@@ -120,7 +122,10 @@ class FourMica:
     """Connect once, then deposit, pay and withdraw with amounts like
     ``"5 USDC"``. Each network the session touches gets its own
     :class:`~fourmica_sdk.Client`, connected on first use; :meth:`low_level`
-    returns it."""
+    returns it.
+
+    Build one with :meth:`connect`, not the constructor. Like the HTTP client
+    inside it, a session belongs to the event loop it was connected on."""
 
     def __init__(
         self,
@@ -155,7 +160,7 @@ class FourMica:
         rpc_url: Optional[str] = None,
         facilitator_url: Optional[str] = None,
         spend: Optional[SpendLimits] = None,
-        protocols: Sequence[str] = ("x402",),
+        protocols: Union[str, Sequence[str]] = ("x402",),
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> "FourMica":
         """Signs with *private_key* or *signer*. With neither, the whole
@@ -167,7 +172,7 @@ class FourMica:
         if private_key and signer is not None:
             raise ConfigError("pass private_key or signer, not both")
         chosen = []
-        for name in protocols:
+        for name in [protocols] if isinstance(protocols, str) else protocols:
             if name not in PROTOCOLS:
                 raise ConfigError(
                     f'unknown payment protocol "{name}"; known: ' + ", ".join(PROTOCOLS)
@@ -187,6 +192,7 @@ class FourMica:
 
     @property
     def address(self) -> str:
+        """The address the session signs as, and the account deposits credit."""
         return self._home.client.signer_address
 
     @property
@@ -232,8 +238,8 @@ class FourMica:
         amount: AmountInput,
         *,
         network: Optional[str] = None,
-        gas: str = "auto",
-        wait: str = "spendable",
+        gas: Gas = "auto",
+        wait: Wait = "spendable",
         timeout_secs: float = DEFAULT_DEPOSIT_TIMEOUT_SECS,
     ) -> DepositResult:
         """Deposits collateral, gasless where it can, and waits for core to
@@ -242,6 +248,14 @@ class FourMica:
         time is not an error: the result says ``"pending"``."""
         session = await self._session(network)
         return await _deposit(session, amount, gas, wait, timeout_secs)
+
+    @overload
+    async def balance(self, *, network: Optional[str] = None) -> Balances: ...
+
+    @overload
+    async def balance(
+        self, asset: str, *, network: Optional[str] = None
+    ) -> Balance: ...
 
     async def balance(
         self, asset: Optional[str] = None, *, network: Optional[str] = None
@@ -278,27 +292,30 @@ class FourMica:
     async def finalize_withdrawal(
         self, asset: str, *, network: Optional[str] = None
     ) -> WithdrawResult:
+        """Pays out the pending withdrawal of *asset*. Before the grace period
+        has passed it raises, saying when it will be possible."""
         return await finalize_withdrawal(await self._session(network), asset)
 
     async def cancel_withdrawal(
         self, asset: str, *, network: Optional[str] = None
     ) -> WithdrawResult:
+        """Cancels the pending withdrawal of *asset*."""
         return await cancel_withdrawal(await self._session(network), asset)
 
     async def withdrawals(
         self, *, network: Optional[str] = None
-    ) -> list[PendingWithdrawal]:
+    ) -> List[PendingWithdrawal]:
         """Pending withdrawal requests, and when each can be finalized."""
         return await pending_withdrawals(await self._session(network))
 
     async def fetch(
-        self, url: Any, *, method: str = "GET", **kwargs: Any
+        self, url: Union[str, httpx.URL], *, method: str = "GET", **kwargs: Any
     ) -> httpx.Response:
         """Sends the request, taking the keyword arguments of
         ``httpx.AsyncClient.request``. Pays a 4Mica 402 on a network this
         session has open, within the spend limits, and retries once; anything
-        else comes back untouched. The body is sent again on the retry, so
-        pass one that can be: bytes, ``json=`` or ``data=``, not a stream."""
+        else comes back untouched. The body is read into memory once and sent
+        again unchanged on the retry."""
         await self._session()
         open_sessions = dict(self._sessions)
         return await paying_fetch(
@@ -322,7 +339,7 @@ class FourMica:
         """Closes every network's client. Concurrent and repeated calls share
         one cleanup, and its outcome."""
         if self._closing is None:
-            self._closing = asyncio.ensure_future(self._close())
+            self._closing = asyncio.create_task(self._close())
         # Shielded: one caller being cancelled must not cancel it for the rest.
         await asyncio.shield(self._closing)
 
