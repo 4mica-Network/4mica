@@ -2,9 +2,11 @@ import { setAuthTokenProvider } from "@api/client";
 import { useAuth } from "@clerk/clerk-react";
 import { fetchConfig } from "@stores/config/actions";
 import { useAppDispatch } from "@stores/hooks";
+import { resetSession } from "@stores/session";
 import { fetchUser } from "@stores/user/actions";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { FullScreenLoader } from "@/auth/FullScreenLoader";
+import { clearVerifyToken } from "@/lib/verifyToken";
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, userId, getToken } = useAuth();
@@ -23,9 +25,15 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (tokenReady && isSignedIn && userId) {
-      dispatch(fetchUser());
+    if (!tokenReady || !isSignedIn || !userId) {
+      return;
     }
+    dispatch(resetSession());
+    dispatch(fetchUser());
+    return () => {
+      dispatch(resetSession());
+      clearVerifyToken();
+    };
   }, [dispatch, isSignedIn, tokenReady, userId]);
 
   useEffect(() => {
