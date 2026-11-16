@@ -72,7 +72,7 @@ Set limits once, in `FourMica.connect({ spend })`. Amounts are written like depo
 - **Violations throw `SpendLimitError`** before anything is signed. `err.limit` names the limit (`"perPayment"`, `"total"`, `"assets"` or `"payTo"`) and `err.url` the resource.
 - **A limit in an asset the network does not list does not apply there**, so one `spend` setting can cover several networks.
 
-`client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment.
+`client.paymentFor(response)` returns what was paid for a response: `protocol`, `network`, `asset`, `amount` (a decimal string), `amountRaw` and `payTo`. It returns `undefined` when the request needed no payment, or when the seller failed the request without taking one.
 
 ## What your policy should handle
 

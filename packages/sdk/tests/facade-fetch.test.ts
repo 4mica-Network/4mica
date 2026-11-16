@@ -206,6 +206,66 @@ describe("paying fetch", () => {
     expect(ok.calls).toHaveLength(2);
   });
 
+  describe("when the paid request comes back", () => {
+    const settlement = (success: boolean) => ({
+      "PAYMENT-RESPONSE": utf8ToBase64(JSON.stringify({ success })),
+    });
+    const answering = (answer: () => Response) =>
+      vi.fn(async (input: RequestInfo | URL) =>
+        (input as Request).headers.has("PAYMENT-SIGNATURE")
+          ? answer()
+          : v2Challenge([entry({ amount: "600000" })]),
+      ) as unknown as typeof fetch;
+
+    it("does not record a seller error, and keeps the amount reserved", async () => {
+      const failing = answering(() => new Response("boom", { status: 500 }));
+      const limiter = new SpendLimiter({ total: "1 USDC" });
+      const { ctx, records } = context(failing, { limiter });
+      const res = await payingFetch(ctx, URL_);
+      expect(res.status).toBe(500);
+      expect(records).toEqual([]);
+      await expect(payingFetch(ctx, URL_)).rejects.toMatchObject({
+        limit: "total",
+      });
+    });
+
+    it("records a seller error that says it settled", async () => {
+      const charged = answering(
+        () => new Response("boom", { status: 500, headers: settlement(true) }),
+      );
+      const { ctx, records } = context(charged);
+      await payingFetch(ctx, URL_);
+      expect(records).toHaveLength(1);
+    });
+
+    it("does not record a success that says it did not settle", async () => {
+      const free = answering(
+        () => new Response("ok", { headers: settlement(false) }),
+      );
+      const { ctx, records } = context(free);
+      await payingFetch(ctx, URL_);
+      expect(records).toEqual([]);
+    });
+
+    it("reads the v1 header too, and ignores one it cannot parse", async () => {
+      const response = (headers: Record<string, string>) =>
+        new Response("", { headers });
+      expect(
+        x402Protocol.settled(
+          response({
+            "X-PAYMENT-RESPONSE": settlement(true)["PAYMENT-RESPONSE"],
+          }),
+        ),
+      ).toBe(true);
+      expect(
+        x402Protocol.settled(
+          response({ "PAYMENT-RESPONSE": "not base64 json" }),
+        ),
+      ).toBeUndefined();
+      expect(x402Protocol.settled(response({}))).toBeUndefined();
+    });
+  });
+
   it("releases the reservation when signing fails", async () => {
     const challenge = () => v2Challenge([entry({ amount: "600000" })]);
     const { fetchFn, calls } = seller(challenge);
@@ -316,6 +376,7 @@ describe("paying fetch", () => {
         } satisfies PaymentTerms,
       ],
       pay: vi.fn(async () => ({ "X-PAYMENT": name })),
+      settled: () => undefined,
     });
 
     it("prefers protocols in the given order", async () => {

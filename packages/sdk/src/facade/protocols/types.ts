@@ -18,4 +18,6 @@ export interface PaymentProtocol {
   terms(response: Response): Promise<PaymentTerms[]>;
   /** Headers to retry with. */
   pay(terms: PaymentTerms, client: Client): Promise<Record<string, string>>;
+  /** Whether the seller took the payment; `undefined` when it does not say. */
+  settled(response: Response): boolean | undefined;
 }

@@ -168,14 +168,18 @@ export async function payingFetch(
       ctx.limiter.release(reservation);
       return paid;
     }
-    ctx.record(paid, {
-      protocol: protocol.name,
-      network: terms.network,
-      asset: reservation.asset,
-      amount: formatUnits(terms.amount, reservation.asset.decimals),
-      amountRaw: terms.amount,
-      payTo: terms.payTo,
-    });
+    // A seller that says nothing is taken to charge for what it delivered.
+    // The amount stays reserved either way: the payment is in its hands.
+    if (protocol.settled(paid) ?? paid.ok) {
+      ctx.record(paid, {
+        protocol: protocol.name,
+        network: terms.network,
+        asset: reservation.asset,
+        amount: formatUnits(terms.amount, reservation.asset.decimals),
+        amountRaw: terms.amount,
+        payTo: terms.payTo,
+      });
+    }
     return paid;
   }
   throw refusal as SpendLimitError;

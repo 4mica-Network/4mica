@@ -96,4 +96,18 @@ export const x402Protocol: PaymentProtocol = {
     const signed = await flow.signPayment(requirements);
     return { "X-PAYMENT": signed.header };
   },
+
+  // v2 answers in `PAYMENT-RESPONSE`, v1 in `X-PAYMENT-RESPONSE`.
+  settled(response: Response): boolean | undefined {
+    const header =
+      response.headers.get("PAYMENT-RESPONSE") ??
+      response.headers.get("X-PAYMENT-RESPONSE");
+    if (!header) return undefined;
+    try {
+      const raw: unknown = JSON.parse(base64ToUtf8(header.trim()));
+      return isRecord(raw) ? raw.success === true : undefined;
+    } catch {
+      return undefined;
+    }
+  },
 };
