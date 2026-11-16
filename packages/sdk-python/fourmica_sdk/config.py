@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Mapping, Optional, Union
 
 if TYPE_CHECKING:
     from .signing import EvmSigner
 
 from .errors import ConfigError
-from .networks import resolve_network_rpc_url
+from .networks import DEFAULT_NETWORK, NETWORKS, resolve_network
 from .utils import (
     ValidationError,
     normalize_address,
@@ -16,7 +16,22 @@ from .utils import (
     validate_url,
 )
 
-DEFAULT_RPC_URL = "https://base.sepolia.api.4mica.io/"
+DEFAULT_RPC_URL = NETWORKS[DEFAULT_NETWORK].rpc_url
+
+# Shells cannot ``export`` a name starting with a digit, hence ``FOURMICA_``.
+_ENV_PREFIXES = ("FOURMICA_", "4MICA_")
+
+
+def read_env(env: Mapping[str, str], name: str) -> Optional[str]:
+    """``FOURMICA_<name>``, else the older ``4MICA_<name>``; empty counts as
+    unset. Both set to different values is a :class:`ConfigError`."""
+    preferred, legacy = (env.get(prefix + name) for prefix in _ENV_PREFIXES)
+    if preferred and legacy and preferred != legacy:
+        raise ConfigError(
+            f"FOURMICA_{name} and 4MICA_{name} are both set, to different "
+            "values; unset one of them"
+        )
+    return preferred or legacy or None
 
 
 @dataclass
@@ -53,24 +68,28 @@ class ConfigBuilder:
         self._auth_url: Optional[str] = None
         self._auth_refresh_margin_secs: Optional[Union[int, str]] = 60
         self._facilitator_url: Optional[str] = None
+        self._network_facilitator_url: Optional[str] = None
 
     def rpc_url(self, value: str) -> "ConfigBuilder":
         """Set the 4Mica core API URL directly; :meth:`network` selects a hosted
         network by name instead."""
         self._rpc_url = value
+        self._network_facilitator_url = None
         return self
 
     def network(self, value: str) -> "ConfigBuilder":
         """Select a hosted 4Mica network by shorthand (``"base"``) or CAIP-2 id
-        (``"eip155:8453"``). Mutually exclusive with :meth:`rpc_url` — last
-        call wins."""
-        url = resolve_network_rpc_url(value)
-        if not url:
+        (``"eip155:8453"``): its core API URL and, where one is hosted, its
+        facilitator. Mutually exclusive with :meth:`rpc_url` — last call wins."""
+        resolved = resolve_network(value)
+        if not resolved:
             raise ConfigError(
                 f'unknown network "{value}". Use a known shorthand (e.g. "base") '
                 "or CAIP-2 id, or call rpc_url() directly."
             )
-        self._rpc_url = url
+        info = resolved[1]
+        self._rpc_url = info.rpc_url
+        self._network_facilitator_url = info.facilitator_url
         return self
 
     def wallet_private_key(self, value: str) -> "ConfigBuilder":
@@ -119,27 +138,42 @@ class ConfigBuilder:
         self._auth_refresh_margin_secs = value
         return self
 
-    def from_env(self) -> "ConfigBuilder":
-        env = os.environ
-        if "4MICA_NETWORK" in env:
-            self.network(env["4MICA_NETWORK"])
-        elif "4MICA_RPC_URL" in env:
-            self._rpc_url = env["4MICA_RPC_URL"]
-        if "4MICA_WALLET_PRIVATE_KEY" in env:
-            self._wallet_private_key = env["4MICA_WALLET_PRIVATE_KEY"]
-        if "4MICA_ETHEREUM_HTTP_RPC_URL" in env:
-            self._ethereum_http_rpc_url = env["4MICA_ETHEREUM_HTTP_RPC_URL"]
-        if "4MICA_CONTRACT_ADDRESS" in env:
-            self._contract_address = env["4MICA_CONTRACT_ADDRESS"]
-        if "4MICA_FACILITATOR_URL" in env:
-            self._facilitator_url = env["4MICA_FACILITATOR_URL"]
-        if "4MICA_BEARER_TOKEN" in env:
-            self._bearer_token = env["4MICA_BEARER_TOKEN"]
-        if "4MICA_AUTH_URL" in env:
-            self._auth_url = env["4MICA_AUTH_URL"]
+    def from_env(self, env: Optional[Mapping[str, str]] = None) -> "ConfigBuilder":
+        """Load settings from ``FOURMICA_*`` variables (the older ``4MICA_``
+        prefix also works): ``NETWORK`` (which wins over ``RPC_URL``),
+        ``RPC_URL``, ``WALLET_PRIVATE_KEY``, ``ETHEREUM_HTTP_RPC_URL``,
+        ``CONTRACT_ADDRESS``, ``FACILITATOR_URL``, ``BEARER_TOKEN``,
+        ``AUTH_URL`` and ``AUTH_REFRESH_MARGIN_SECS``. Reads ``os.environ``
+        unless *env* is given."""
+        source = os.environ if env is None else env
+        network = read_env(source, "NETWORK")
+        rpc_url = read_env(source, "RPC_URL")
+        if network:
+            self.network(network)
+        elif rpc_url:
+            self.rpc_url(rpc_url)
+        wallet_private_key = read_env(source, "WALLET_PRIVATE_KEY")
+        if wallet_private_key:
+            self._wallet_private_key = wallet_private_key
+        ethereum_http_rpc_url = read_env(source, "ETHEREUM_HTTP_RPC_URL")
+        if ethereum_http_rpc_url:
+            self._ethereum_http_rpc_url = ethereum_http_rpc_url
+        contract_address = read_env(source, "CONTRACT_ADDRESS")
+        if contract_address:
+            self._contract_address = contract_address
+        facilitator_url = read_env(source, "FACILITATOR_URL")
+        if facilitator_url:
+            self._facilitator_url = facilitator_url
+        bearer_token = read_env(source, "BEARER_TOKEN")
+        if bearer_token:
+            self._bearer_token = bearer_token
+        auth_url = read_env(source, "AUTH_URL")
+        if auth_url:
+            self._auth_url = auth_url
             self._auth_enabled = True
-        if "4MICA_AUTH_REFRESH_MARGIN_SECS" in env:
-            self._auth_refresh_margin_secs = env["4MICA_AUTH_REFRESH_MARGIN_SECS"]
+        refresh_margin = read_env(source, "AUTH_REFRESH_MARGIN_SECS")
+        if refresh_margin:
+            self._auth_refresh_margin_secs = refresh_margin
             self._auth_enabled = True
         return self
 
@@ -181,8 +215,9 @@ class ConfigBuilder:
                 if self._contract_address
                 else None
             )
+            facilitator_source = self._facilitator_url or self._network_facilitator_url
             facilitator_url = (
-                validate_url(self._facilitator_url) if self._facilitator_url else None
+                validate_url(facilitator_source) if facilitator_source else None
             )
             auth_config = None
             if self._auth_enabled and not self._bearer_token:

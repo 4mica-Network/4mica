@@ -1,8 +1,8 @@
 """Issue and verify a payment guarantee as the recipient.
 
 Expects the payer's claims payload fields and signature (see
-payer_quickstart.py). Env: 4MICA_NETWORK (or 4MICA_RPC_URL),
-4MICA_WALLET_PRIVATE_KEY, PAYER_ADDRESS, REQ_ID, AMOUNT, TIMESTAMP,
+payer_quickstart.py). Env: FOURMICA_NETWORK (or FOURMICA_RPC_URL),
+FOURMICA_WALLET_PRIVATE_KEY, PAYER_ADDRESS, REQ_ID, AMOUNT, TIMESTAMP,
 PAYER_SIGNATURE, optional ERC20_TOKEN.
 """
 
