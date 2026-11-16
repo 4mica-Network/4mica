@@ -40,7 +40,7 @@ TypeScript SDK.
 
 | Call | What it does |
 |---|---|
-| `await FourMica.connect(...)` | `private_key=` or `signer=`, else `FOURMICA_WALLET_PRIVATE_KEY`. `network=` defaults to `FOURMICA_NETWORK`, else `base-sepolia`; `rpc_url=` names a self-hosted core. |
+| `await FourMica.connect(...)` | `private_key=` or `signer=`; `network=` defaults to `base-sepolia`, and `rpc_url=` names a self-hosted core. With no key or signer, the whole configuration is read from `FOURMICA_*`. |
 | `await client.deposit("5 USDC")` | Deposits collateral and waits until core counts it. `gas="self"` sends the wallet's own transaction; `wait="mined"` returns without waiting. |
 | `await client.balance("USDC")` | `total`, `locked` and `available` as decimal strings, with base units under `raw`. Without an asset: every asset held, keyed by symbol. |
 | `await client.fetch(url, method="GET", **kwargs)` | An `httpx` request that pays a 4Mica 402 within the spend limits and retries once. `client.payment_for(response)` says what was paid. |
@@ -52,6 +52,10 @@ TypeScript SDK.
 Every call that touches a network takes `network=` to use another one; the
 session connects to it on first use. `async with` (or `await client.aclose()`)
 closes them all.
+
+**The environment is read only when no key or signer is passed.**
+`FourMica.connect(private_key=...)` ignores `FOURMICA_NETWORK` and the other
+variables; pass `network=` yourself.
 
 **Amounts are decimal strings**, `"5 USDC"` or
 `{"amount": "5", "asset": "USDC"}`. Numbers are refused, because `5` could
@@ -82,7 +86,14 @@ client = await FourMica.connect(
 
 A payment over a limit raises `SpendLimitError` before anything is signed. A
 402 that is not a `4mica-credit` offer on a network the session has open comes
-back untouched. The request body is sent again on the retry, so pass `json=`,
+back untouched.
+
+`total` counts every payment the session sends. One that was never sent
+because signing failed, or that the seller refused with another 402, is
+released again. One that was sent stays counted even if the request then
+fails, because the seller may still redeem it. The count is kept in memory by
+this session: a new `connect` starts from zero, and across processes sharing a
+wallet the hard limit is the collateral deposited. The request body is sent again on the retry, so pass `json=`,
 `data=` or bytes, not a stream.
 
 **A remote signer** (`signer=`, such as the CDP backend) signs payments and

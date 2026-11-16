@@ -23,7 +23,7 @@ class SpendLimits:
     total: Union[str, Sequence[str], None] = None
     """Counted in memory by this session only; processes sharing a wallet each
     get their own."""
-    pay_to: Optional[Sequence[str]] = None
+    pay_to: Union[str, Sequence[str], None] = None
     """When set, the only payees the session pays."""
 
 

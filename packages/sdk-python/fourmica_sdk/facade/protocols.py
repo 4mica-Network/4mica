@@ -12,9 +12,10 @@ import httpx
 
 from ..client import Client
 from ..networks import resolve_network
-from ..utils import parse_u256
+from ..utils import parse_address, parse_u256
 from ..x402 import (
     SCHEME_4MICA_CREDIT,
+    PaymentRequirementsExtra,
     PaymentRequirementsV1,
     PaymentRequirementsV2,
     Requirements,
@@ -84,13 +85,40 @@ def _requirements_of(version: int, entry: Dict[str, Any]) -> Requirements:
     )
 
 
+def _version(required: Dict[str, Any]) -> Optional[int]:
+    """1 or 2, as a number or its string; ``None`` for anything else."""
+    raw = required.get("x402Version")
+    if isinstance(raw, str) and raw.strip() in ("1", "2"):
+        return int(raw)
+    if isinstance(raw, bool) or raw not in (1, 2):
+        return None
+    return int(raw)
+
+
+def _signable(
+    version: int, required: Dict[str, Any], requirements: Requirements
+) -> Optional[X402PaymentRequired]:
+    """Checks everything ``pay`` needs beyond the amount, so an option it
+    could not sign is skipped while reading the 402. For v2, the challenge
+    cut down to this one option: a malformed sibling must not stop it being
+    signed."""
+    parse_address(requirements.pay_to, "payTo")
+    parse_address(requirements.asset, "asset")
+    PaymentRequirementsExtra.from_raw(requirements.extra)
+    if version != 2:
+        return None
+    return X402PaymentRequired.from_raw(
+        {**required, "x402Version": 2, "accepts": [requirements.to_payload()]}
+    )
+
+
 class X402Protocol:
     name = "x402"
 
     def terms(self, response: httpx.Response) -> List[PaymentTerms]:
         required = _read_required(response)
-        version = required.get("x402Version") if required else None
-        if required is None or isinstance(version, bool) or version not in (1, 2):
+        version = _version(required) if required else None
+        if required is None or version is None:
             return []
         accepts = required.get("accepts")
 
@@ -112,7 +140,10 @@ class X402Protocol:
                         asset=requirements.asset.strip(),
                         amount=parse_u256(requirements.amount),
                         pay_to=requirements.pay_to.strip(),
-                        offer=(required, requirements),
+                        offer=(
+                            _signable(version, required, requirements),
+                            requirements,
+                        ),
                     )
                 )
             except Exception:
@@ -122,17 +153,10 @@ class X402Protocol:
     async def pay(
         self, terms: PaymentTerms, client: Client, http: httpx.AsyncClient
     ) -> Dict[str, str]:
-        required, requirements = terms.offer
+        payment_required, requirements = terms.offer
         flow = X402Flow(client, http)
-        if isinstance(requirements, PaymentRequirementsV2):
-            # Only the option `terms` validated: a malformed sibling must not
-            # stop this one being signed.
-            signed = await flow.sign_payment_v2(
-                X402PaymentRequired.from_raw(
-                    {**required, "accepts": [requirements.to_payload()]}
-                ),
-                requirements,
-            )
+        if payment_required is not None:
+            signed = await flow.sign_payment_v2(payment_required, requirements)
             return {"PAYMENT-SIGNATURE": signed.header}
         signed = await flow.sign_payment(requirements)
         return {"X-PAYMENT": signed.header}
