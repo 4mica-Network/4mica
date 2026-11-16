@@ -32,9 +32,9 @@ import { DEFAULT_NETWORK, NETWORKS, resolveNetwork } from "@/networks";
 export type * from "@/facade/models";
 export type { PaymentProtocol, PaymentTerms } from "@/facade/protocols/types";
 
-const PROTOCOLS: Readonly<Record<string, PaymentProtocol>> = {
-  x402: x402Protocol,
-};
+const PROTOCOLS: ReadonlyMap<string, PaymentProtocol> = new Map([
+  ["x402", x402Protocol],
+]);
 
 // Declared as `@types/node` does, so the emitted types also check against a
 // `lib` without `esnext.disposable`; the two declarations merge.
@@ -119,11 +119,11 @@ export class FourMica {
       throw new ConfigError("pass privateKey or signer, not both");
     }
     const protocols = (options.protocols ?? ["x402"]).map((name) => {
-      const protocol = PROTOCOLS[name];
+      const protocol = PROTOCOLS.get(name);
       if (!protocol) {
         throw new ConfigError(
           `unknown payment protocol "${name}"; known: ` +
-            Object.keys(PROTOCOLS).join(", "),
+            [...PROTOCOLS.keys()].join(", "),
         );
       }
       return protocol;

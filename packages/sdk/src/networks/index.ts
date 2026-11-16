@@ -45,10 +45,10 @@ export function resolveNetwork(
   network: string,
 ): { name: string; info: NetworkInfo } | undefined {
   const key = network.trim().toLowerCase();
-  const name =
-    key in NETWORKS
-      ? key
-      : Object.keys(NETWORKS).find((n) => NETWORKS[n].caip2 === key);
+  // `in` would also match `constructor` and `__proto__`.
+  const name = Object.hasOwn(NETWORKS, key)
+    ? key
+    : Object.keys(NETWORKS).find((n) => NETWORKS[n].caip2 === key);
   return name === undefined ? undefined : { name, info: NETWORKS[name] };
 }
 

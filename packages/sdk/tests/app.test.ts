@@ -242,6 +242,7 @@ describe("fromAppNetwork", () => {
     expect(fromAppNetwork("ETHEREUM_SEPOLIA")).toBe("ethereum-sepolia");
     expect(fromAppNetwork("eip155:84532")).toBe("base-sepolia");
     expect(() => fromAppNetwork("polygon")).toThrow(InvalidParamsError);
+    expect(() => fromAppNetwork("constructor")).toThrow(InvalidParamsError);
   });
 });
 

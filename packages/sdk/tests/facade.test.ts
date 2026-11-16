@@ -93,6 +93,12 @@ describe("FourMica.connect", () => {
       FourMica.connect({ privateKey: KEY, protocols: ["mpp"] }),
     ).rejects.toThrow(/unknown payment protocol "mpp"/);
     await expect(
+      FourMica.connect({ privateKey: KEY, protocols: ["constructor"] }),
+    ).rejects.toThrow(/unknown payment protocol "constructor"/);
+    await expect(
+      FourMica.connect({ privateKey: KEY, network: "constructor" }),
+    ).rejects.toThrow(/unknown network "constructor"/);
+    await expect(
       FourMica.connect({ privateKey: KEY, spend: { perPayment: "1" } }),
     ).rejects.toThrow();
     expect(Client.connect).not.toHaveBeenCalled();

@@ -38,6 +38,9 @@ describe("networks", () => {
     expect(resolveNetwork("base-sepolia")?.info.chainId).toBe(84532);
     expect(resolveNetwork(" EIP155:8453 ")?.name).toBe("base");
     expect(resolveNetwork("solana")).toBeUndefined();
+    // Inherited from Object.prototype, not networks.
+    expect(resolveNetwork("constructor")).toBeUndefined();
+    expect(resolveNetwork("__proto__")).toBeUndefined();
     expect(resolveNetworkRpcUrl("eip155:84532")).toBe(
       "https://base.sepolia.api.4mica.io/",
     );
