@@ -359,6 +359,11 @@ Values the single-box layout pins:
   `docker build`. The same build renders the nginx security headers, whose CSP
   names that origin and the Clerk host decoded from
   `VITE_CLERK_PUBLISHABLE_KEY`, so a malformed key fails the build too.
+- **The dashboard deploy is gated on a dependency scan.**
+  `deploy-dashboard.yml` runs `dependency-scan.yml` first: OSV-Scanner matches
+  `pnpm-lock.yaml` offline against the downloaded npm advisory database, and
+  any advisory at CVSS 7.0 or above in the dashboard's production dependencies
+  stops the deploy.
 
 ## Bootstrapping the server
 

@@ -117,7 +117,7 @@ catalog:
   react-hook-form: ^7.65.0
   react-i18next: ^17.0.9
   react-redux: ^9.3.0
-  react-router-dom: ^7.18.1
+  react-router-dom: ^7.18.5
   react-toastify: ^11.1.0
   redux: ^5.0.1
   redux-saga: ^1.5.1
@@ -159,4 +159,4 @@ catalogs:
   typescript-latest:
     typescript: ^5.9.0
   zod4:
-    zod: ^4.4.3
+    zod: ^4.6.7
