@@ -351,6 +351,11 @@ Values the single-box layout pins:
   `pnpm-lock.yaml` offline against the downloaded npm advisory database, and
   any advisory at CVSS 7.0 or above in the dashboard's production dependencies
   stops the deploy.
+- **The dashboard deploy ends by probing HTTPS.** `infra/nginx/probe-tls.sh`
+  must see an HTTP→HTTPS redirect and an HSTS header on the app and API hosts,
+  the same check `build-react-app.yml` runs for `4mica.io`. The dashboard
+  container sends HSTS itself; the redirect is the one certbot adds to the
+  host nginx.
 
 ## Bootstrapping the server
 
