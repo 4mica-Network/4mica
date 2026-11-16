@@ -7,6 +7,7 @@ import {
 import { cn, Tag, Tooltip } from "@4mica/ui";
 import type { Payment } from "@stores/payment/type";
 import { formatDateTime } from "@utils/format";
+import { safeExternalUrl } from "@utils/safeUrl";
 import { ArrowDownLeft, ArrowUpRight, ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { STATUS_LABEL_KEYS, STATUS_TAG_VARIANT } from "./constants";
@@ -23,6 +24,7 @@ export function PaymentRow({ payment }: { payment: Payment }) {
     payment.agentName ??
     payment.description ??
     t("payment.row.untitled");
+  const resourceUrl = safeExternalUrl(payment.resource);
 
   return (
     <div
@@ -79,9 +81,9 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           <span className="text-ink-subtle text-xs">
             {formatDateTime(payment.settledAt ?? payment.createdAt)}
           </span>
-          {payment.resource && (
+          {resourceUrl && (
             <a
-              href={payment.resource}
+              href={resourceUrl}
               target="_blank"
               rel="noreferrer noopener"
               className="inline-flex items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
