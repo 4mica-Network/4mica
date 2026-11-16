@@ -149,20 +149,21 @@ export async function payingFetch(
       continue;
     }
 
-    let paid: Response;
+    const headers = new Headers(request.headers);
     try {
-      const headers = new Headers(request.headers);
       for (const [name, value] of Object.entries(
         await protocol.pay(terms, session.client),
       )) {
         headers.set(name, value);
       }
-      // Retried once; a second 402 goes back to the caller.
-      paid = await ctx.fetchFn(new Request(request, { headers }));
     } catch (err) {
+      // Nothing has left this process.
       ctx.limiter.release(reservation);
       throw err;
     }
+    // Retried once; a second 402 goes back to the caller. If this throws the
+    // amount stays reserved: the seller may hold the payment and redeem it.
+    const paid = await ctx.fetchFn(new Request(request, { headers }));
     if (paid.status === 402) {
       ctx.limiter.release(reservation);
       return paid;

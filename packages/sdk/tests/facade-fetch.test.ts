@@ -206,6 +206,40 @@ describe("paying fetch", () => {
     expect(ok.calls).toHaveLength(2);
   });
 
+  it("releases the reservation when signing fails", async () => {
+    const challenge = () => v2Challenge([entry({ amount: "600000" })]);
+    const { fetchFn, calls } = seller(challenge);
+    const fake = fakeClient();
+    fake.client.signPayment.mockRejectedValueOnce(new Error("user rejected"));
+    const limiter = new SpendLimiter({ total: "1 USDC" });
+    const { ctx } = context(fetchFn, { limiter, fake });
+    await expect(payingFetch(ctx, URL_)).rejects.toThrow("user rejected");
+    expect(calls).toHaveLength(1);
+    // Released: a 0.6 USDC payment still fits the 1 USDC total.
+    await expect(payingFetch(ctx, URL_)).resolves.toMatchObject({
+      status: 200,
+    });
+  });
+
+  it("keeps the reservation when the paid request fails in transit", async () => {
+    const challenge = () => v2Challenge([entry({ amount: "600000" })]);
+    const dropped = vi.fn(async (input: RequestInfo | URL) => {
+      if ((input as Request).headers.has("PAYMENT-SIGNATURE")) {
+        throw new TypeError("fetch failed");
+      }
+      return challenge();
+    }) as unknown as typeof fetch;
+    const limiter = new SpendLimiter({ total: "1 USDC" });
+    const { ctx } = context(dropped, { limiter });
+    await expect(payingFetch(ctx, URL_)).rejects.toThrow("fetch failed");
+    // The seller may have redeemed it, so 0.6 USDC more would pass the total.
+    const ok = seller(challenge);
+    await expect(
+      payingFetch({ ...ctx, fetchFn: ok.fetchFn }, URL_),
+    ).rejects.toMatchObject({ limit: "total" });
+    expect(ok.calls).toHaveLength(1);
+  });
+
   it("refuses over the default 1 USDC per payment, signing nothing", async () => {
     const { fetchFn, calls } = seller(() =>
       v2Challenge([entry({ amount: "2000000" })]),
