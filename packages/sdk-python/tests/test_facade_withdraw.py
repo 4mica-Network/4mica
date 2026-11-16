@@ -117,7 +117,7 @@ async def test_finalizes_once_the_grace_period_has_ended():
 
 async def test_a_remote_signer_finalizes_without_the_chain_check():
     client = FakeClient(private_key=None)
-    client._ctx.gateway = AsyncMock(side_effect=ClientError("no local key"))
+    client.ctx.gateway = AsyncMock(side_effect=ClientError("no local key"))
     session = fake_session(client)
     await finalize_withdrawal(session, "USDC")
     assert asked(client.withdraw.finalize) == [(USDC,)]

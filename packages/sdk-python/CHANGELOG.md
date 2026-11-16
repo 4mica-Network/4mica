@@ -55,6 +55,38 @@
   an `int`, no longer `Optional`, and a token missing `symbol` or `decimals`
   raises `InvalidParamsError` instead of defaulting. Core always sends both.
 - An environment variable set to the empty string now counts as unset.
+- `Client.ctx` and `Client.rpc` are public, as in the TypeScript SDK.
+- `X402Flow`'s own HTTP client allows 30 seconds, and `FourMica.fetch`'s
+  allows five minutes for the answer, in place of httpx's 5-second default.
+
+### Fixed
+
+- **An x402 v2 payment echoes `extra` as the seller advertised it.** An
+  advertised `extra: {}` was dropped from `accepted`, which the upstream
+  TypeScript seller middleware refuses as "No matching payment
+  requirements". `PaymentRequirementsV2.to_payload()` now keeps it.
+- **Payer signatures are sent in the form core and the facilitator
+  accept**: `v` of 27 or 28 and a low `s`. A remote signer answering with
+  `v` of 0 or 1 had every payment refused.
+- **A sponsored request the facilitator already broadcast is never resent
+  self-funded.** `settlement_pending`, `invalid_transaction_state` and
+  `duplicate_in_flight` used to trigger the self-funded fallback on
+  withdrawals, claims and payments. `FacilitatorRejectedError` now carries
+  the facilitator's `transaction` and `details`.
+- A connect timeout to the facilitator is "never sent", not "outcome
+  unknown", so the self-funded fallback applies.
+- A facilitator that sponsors no gas is reported in its own words instead of
+  "no facilitator configured".
+- `rpc.health()` returns an unhealthy core's report instead of retrying and
+  raising on its 503.
+- Self-funded transactions are sent one at a time, so two started together
+  no longer share a nonce.
+- `deposit.of()` and `withdraw.request()` refuse a float amount instead of
+  truncating it.
+- A `wallet_private_key` and an `evm_signer` for two different accounts are
+  refused at connect: payments were signed by one and transactions sent by
+  the other.
+- `repr(Config)` no longer shows the private key or bearer token.
 
 ## 2.0.0a1 - Unreleased
 

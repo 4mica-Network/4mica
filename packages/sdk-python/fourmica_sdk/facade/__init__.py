@@ -62,6 +62,11 @@ __all__ = [
 ]
 
 
+# httpx's default gives up on the answer after 5 seconds, which on the paid
+# retry is after the payment has left. A slow seller gets five minutes.
+_FETCH_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=30.0, pool=10.0)
+
+
 def _home_config(
     private_key: Optional[str],
     signer: Optional[EvmSigner],
@@ -186,7 +191,9 @@ class FourMica:
             home,
             chosen,
             limiter,
-            httpx.AsyncClient() if http_client is None else http_client,
+            httpx.AsyncClient(timeout=_FETCH_TIMEOUT)
+            if http_client is None
+            else http_client,
             owns_http=http_client is None,
         )
 

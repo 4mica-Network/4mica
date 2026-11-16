@@ -32,7 +32,7 @@ from .facilitator import (
     refuses_the_authorization,
     rejection_error,
 )
-from .model import Asset, DepositReceipt, TokenRoute
+from .model import Asset, DepositReceipt, TokenRoute, base_units
 
 
 class DepositClient:
@@ -47,7 +47,7 @@ class DepositClient:
 
     def of(self, asset: Union[Asset, str, None], amount: int) -> "DepositBuilder":
         """Starts a deposit of *amount* in *asset* (``None`` for native ETH)."""
-        return DepositBuilder(self._ctx, Asset.coerce(asset), int(amount))
+        return DepositBuilder(self._ctx, Asset.coerce(asset), base_units(amount))
 
 
 class _DepositBase:

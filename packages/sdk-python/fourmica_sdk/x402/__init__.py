@@ -76,7 +76,8 @@ class X402Flow:
         self, signer: FlowSigner, client: Optional[httpx.AsyncClient] = None
     ) -> None:
         self.signer = signer
-        self.http = client or httpx.AsyncClient()
+        # The facilitator client's allowance: /settle waits on core.
+        self.http = client or httpx.AsyncClient(timeout=30.0)
 
     @classmethod
     def from_client(cls, client: "Client") -> "X402Flow":

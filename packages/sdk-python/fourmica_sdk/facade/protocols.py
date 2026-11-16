@@ -22,6 +22,7 @@ from ..x402 import (
     Requirements,
     X402Flow,
     X402PaymentRequired,
+    X402ResourceInfo,
 )
 
 
@@ -106,10 +107,19 @@ def _signable(
     parse_address(requirements.pay_to, "payTo")
     parse_address(requirements.asset, "asset")
     PaymentRequirementsExtra.from_raw(requirements.extra)
-    if version != 2:
+    if not isinstance(requirements, PaymentRequirementsV2):
         return None
-    return X402PaymentRequired.from_raw(
-        {**required, "x402Version": 2, "accepts": [requirements.to_payload()]}
+    resource = required.get("resource")
+    extensions = required.get("extensions")
+    return X402PaymentRequired(
+        x402_version=2,
+        # Signed with an empty one when the seller names none, as both x402
+        # packages' own buyers do.
+        resource=X402ResourceInfo.from_raw(resource)
+        if isinstance(resource, dict) and resource.get("url")
+        else X402ResourceInfo(url=""),
+        accepts=[requirements],
+        extensions=extensions if isinstance(extensions, dict) else None,
     )
 
 

@@ -32,7 +32,7 @@ from .facilitator import (
     rejection_error,
     sponsorship_unavailable,
 )
-from .model import Asset, Route, WithdrawReceipt
+from .model import Asset, Route, WithdrawReceipt, base_units
 
 
 class WithdrawClient:
@@ -45,9 +45,10 @@ class WithdrawClient:
     def request(self, asset: Union[Asset, str, None], amount: int) -> "RequestBuilder":
         """Starts a withdrawal request for *amount* of *asset*. The grace
         period runs from the request; finalize once it elapses."""
-        if int(amount) <= 0:
+        units = base_units(amount)
+        if units <= 0:
             raise AmountZeroError("withdrawal amount must be positive")
-        return RequestBuilder(self._ctx, Asset.coerce(asset), int(amount))
+        return RequestBuilder(self._ctx, Asset.coerce(asset), units)
 
     def cancel(self, asset: Union[Asset, str, None]) -> "CancelBuilder":
         """Starts a cancellation of the pending withdrawal request for *asset*."""

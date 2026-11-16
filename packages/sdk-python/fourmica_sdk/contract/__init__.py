@@ -126,6 +126,9 @@ class ContractGateway:
         self._clearing_house_abi = load_abi("clearing_house.json")
         self._erc20_cache: Dict[str, Any] = {}
         self._clearing_house_cache: Dict[str, Any] = {}
+        # Each transaction reads the account's nonce, so two prepared at once
+        # would share one and the second be refused.
+        self._send_lock = asyncio.Lock()
         self._error_abis = [
             self.contract.abi,
             self._clearing_house_abi,
@@ -263,9 +266,10 @@ class ContractGateway:
     async def _send(
         self, func, value: int = 0, wait_options: Optional[TxReceiptWaitOptions] = None
     ) -> Dict[str, Any]:
-        tx = await self._prepare_tx(func, value=value)
-        built = await self._build_tx(func, tx)
-        return await self._build_and_send(built, wait_options)
+        async with self._send_lock:
+            tx = await self._prepare_tx(func, value=value)
+            built = await self._build_tx(func, tx)
+            return await self._build_and_send(built, wait_options)
 
     # --- ERC-20 ---------------------------------------------------------
 
