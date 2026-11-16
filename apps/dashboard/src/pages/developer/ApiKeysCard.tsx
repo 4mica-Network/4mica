@@ -11,7 +11,7 @@ import {
   selectDeveloperIssues,
   selectIsDeveloperPending,
 } from "@stores/developer/selector";
-import type { ApiKey } from "@stores/developer/type";
+import type { ApiKey, RevealSecret } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";
 import { KeyRound, Trash2 } from "lucide-react";
@@ -84,7 +84,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
   );
 }
 
-export function ApiKeysCard() {
+export function ApiKeysCard({ onReveal }: { onReveal: RevealSecret }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const apiKeys = useAppSelector(selectApiKeys);
@@ -100,7 +100,7 @@ export function ApiKeysCard() {
     if (!trimmed || isCreating) {
       return;
     }
-    dispatch(createApiKey({ name: trimmed }));
+    dispatch(createApiKey({ name: trimmed }, onReveal));
   };
 
   return (
