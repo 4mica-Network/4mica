@@ -11,12 +11,13 @@ import developerReducer from "./developer/reducer";
 import paymentReducer from "./payment/reducer";
 import resourceKeyReducer from "./resourceKey/reducer";
 import rootSaga from "./rootSaga";
+import { withSessionReset } from "./session";
 import supportReducer from "./support/reducer";
 import trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
 import walletReducer from "./wallet/reducer";
 
-const rootReducer = combineReducers({
+const appReducer = combineReducers({
   user: userReducer,
   developer: developerReducer,
   banner: bannerReducer,
@@ -33,7 +34,9 @@ const rootReducer = combineReducers({
   support: supportReducer,
 });
 
-export type RootState = ReturnType<typeof rootReducer>;
+export type RootState = ReturnType<typeof appReducer>;
+
+const rootReducer = withSessionReset<RootState>(appReducer);
 
 const sagaMiddleware = createSagaMiddleware();
 
