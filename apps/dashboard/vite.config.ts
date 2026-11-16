@@ -17,9 +17,12 @@ export default defineConfig(({ command, mode }) => {
     plugins: [react(), tailwindcss()],
     build: {
       sourcemap: false,
-      minify: "esbuild",
+      rolldownOptions: {
+        output: {
+          minify: { compress: { dropConsole: true, dropDebugger: true } },
+        },
+      },
     },
-    esbuild: command === "build" ? { drop: ["console", "debugger"] } : {},
     resolve: {
       alias: {
         "@4mica/url": fileURLToPath(
