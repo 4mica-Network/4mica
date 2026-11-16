@@ -1,5 +1,9 @@
 import * as v from "valibot";
-import { PaymentNetworkSchema, VisibilitySchema } from "./params";
+import {
+  HttpsUrlOrNullSchema,
+  PaymentNetworkSchema,
+  VisibilitySchema,
+} from "./params";
 
 const PublicAgentSchema = v.object({
   id: v.string(),
@@ -7,8 +11,8 @@ const PublicAgentSchema = v.object({
   name: v.string(),
   headline: v.nullable(v.string()),
   description: v.nullable(v.string()),
-  avatarUrl: v.nullable(v.string()),
-  docsUrl: v.nullable(v.string()),
+  avatarUrl: HttpsUrlOrNullSchema,
+  docsUrl: HttpsUrlOrNullSchema,
   status: v.picklist(["PENDING", "ACTIVE", "SUSPENDED"] as const),
   visibility: VisibilitySchema,
   createdAt: v.string(),
