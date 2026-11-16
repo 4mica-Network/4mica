@@ -143,6 +143,23 @@ describe("x402 adapter", () => {
       scheme: "4mica-credit",
     });
   });
+
+  it("signs a valid v2 option that sits beside malformed ones", async () => {
+    const terms = await x402Protocol.terms(
+      v2Challenge([
+        "junk",
+        { scheme: "exact", network: "eip155:8453" },
+        entry(),
+      ]),
+    );
+    expect(terms).toHaveLength(1);
+    const headers = await x402Protocol.pay(terms[0], fakeClient().asClient);
+    const envelope = JSON.parse(base64ToUtf8(headers["PAYMENT-SIGNATURE"]));
+    expect(envelope.accepted).toMatchObject({
+      scheme: "4mica-credit",
+      payTo: SELLER,
+    });
+  });
 });
 
 describe("paying fetch", () => {

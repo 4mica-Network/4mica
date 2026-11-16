@@ -87,8 +87,13 @@ export const x402Protocol: PaymentProtocol = {
     const { required, requirements } = terms.offer as X402Offer;
     const flow = X402Flow.fromClient(client);
     if (requirements instanceof PaymentRequirementsV2) {
+      // Only the option `terms` validated: a malformed sibling must not stop
+      // this one being signed.
       const signed = await flow.signPaymentV2(
-        X402PaymentRequired.fromRaw(required),
+        X402PaymentRequired.fromRaw({
+          ...required,
+          accepts: [requirements.toPayload()],
+        }),
         requirements,
       );
       return { "PAYMENT-SIGNATURE": signed.header };
