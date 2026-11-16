@@ -89,6 +89,15 @@ async def test_reads_the_environment_when_no_signer_is_passed(core, monkeypatch)
     await asyncio.gather(client.aclose(), other.aclose(), ambient.aclose())
 
 
+async def test_an_explicit_key_means_the_environment_is_not_read(core, monkeypatch):
+    monkeypatch.setenv("FOURMICA_NETWORK", "base")
+    monkeypatch.setenv("FOURMICA_FACILITATOR_URL", "https://env.example/")
+    client = await FourMica.connect(private_key=KEY)
+    assert client.network == "base-sepolia"
+    assert core.configs[0].facilitator_url == "https://testnet.payment.4mica.io/"
+    await client.aclose()
+
+
 async def test_says_how_to_supply_a_signer_when_there_is_none(core):
     with pytest.raises(
         ConfigError, match="pass private_key or signer.*FOURMICA_WALLET_PRIVATE_KEY"
@@ -182,6 +191,36 @@ async def test_concurrent_aclose_calls_wait_on_the_same_cleanup(core):
     await closing
     assert finished[0] == "client"
     core.clients[0].aclose.assert_awaited_once()
+
+
+async def test_every_aclose_caller_sees_a_failed_cleanup(core):
+    client = await FourMica.connect(private_key=KEY)
+    await client.low_level("base")
+    core.clients[0].aclose = AsyncMock(side_effect=RuntimeError("socket stuck"))
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="socket stuck"):
+            await client.aclose()
+    # The other network was still closed, once.
+    core.clients[0].aclose.assert_awaited_once()
+    core.clients[1].aclose.assert_awaited_once()
+    assert client._http.is_closed
+
+
+async def test_a_cancelled_aclose_caller_does_not_stop_the_cleanup(core):
+    client = await FourMica.connect(private_key=KEY)
+    release = asyncio.Event()
+
+    async def slow_close():
+        await release.wait()
+
+    core.clients[0].aclose = AsyncMock(side_effect=slow_close)
+    impatient = asyncio.ensure_future(client.aclose())
+    await asyncio.sleep(0.01)
+    impatient.cancel()
+    release.set()
+    await client.aclose()
+    core.clients[0].aclose.assert_awaited_once()
+    assert client._http.is_closed
 
 
 async def test_closes_on_leaving_the_block_even_when_it_raises(core):

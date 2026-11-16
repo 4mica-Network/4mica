@@ -142,7 +142,7 @@ class FourMica:
             WeakKeyDictionary()
         )
         self._lock = asyncio.Lock()
-        self._closed = False
+        self._closing: Optional["asyncio.Future[None]"] = None
 
     @classmethod
     async def connect(
@@ -158,12 +158,12 @@ class FourMica:
         protocols: Sequence[str] = ("x402",),
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> "FourMica":
-        """*private_key* or *signer*, else ``FOURMICA_*`` from *env*
-        (``os.environ`` by default). *network* defaults to
-        ``FOURMICA_NETWORK``, else ``DEFAULT_NETWORK``; *rpc_url* names a
-        self-hosted core instead. *protocols* is in order of preference.
-        *http_client* is what :meth:`fetch` sends with, and stays the
-        caller's to close."""
+        """Signs with *private_key* or *signer*. With neither, the whole
+        configuration is read from ``FOURMICA_*`` in *env* (``os.environ`` by
+        default); with one, the environment is not read at all. *network*
+        defaults to ``DEFAULT_NETWORK``; *rpc_url* names a self-hosted core
+        instead. *protocols* is in order of preference. *http_client* is what
+        :meth:`fetch` sends with, and stays the caller's to close."""
         if private_key and signer is not None:
             raise ConfigError("pass private_key or signer, not both")
         chosen = []
@@ -195,7 +195,7 @@ class FourMica:
         return self._home.name
 
     async def _session(self, network: Optional[str] = None) -> NetworkSession:
-        if self._closed:
+        if self._closing is not None:
             raise ClientError("this FourMica session is closed")
         if network is None:
             return self._home
@@ -209,7 +209,7 @@ class FourMica:
             )
         name, info = resolved
         async with self._lock:
-            if self._closed:
+            if self._closing is not None:
                 raise ClientError("this FourMica session is closed")
             session = self._sessions.get(info.caip2)
             if session is None:
@@ -319,14 +319,25 @@ class FourMica:
         return self._payments.get(response)
 
     async def aclose(self) -> None:
-        """Closes every network's client. Safe to call again."""
+        """Closes every network's client. Concurrent and repeated calls share
+        one cleanup, and its outcome."""
+        if self._closing is None:
+            self._closing = asyncio.ensure_future(self._close())
+        # Shielded: one caller being cancelled must not cancel it for the rest.
+        await asyncio.shield(self._closing)
+
+    async def _close(self) -> None:
+        # The lock waits out a network that is still connecting.
         async with self._lock:
-            if self._closed:
-                return
-            self._closed = True
-            await asyncio.gather(*(s.client.aclose() for s in self._sessions.values()))
+            outcomes = await asyncio.gather(
+                *(s.client.aclose() for s in self._sessions.values()),
+                return_exceptions=True,
+            )
             if self._owns_http:
                 await self._http.aclose()
+        for outcome in outcomes:
+            if isinstance(outcome, BaseException):
+                raise outcome
 
     async def __aenter__(self) -> "FourMica":
         return self

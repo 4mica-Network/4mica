@@ -55,7 +55,7 @@ def fake_builder(route: TokenRoute = TokenRoute.EIP3009):
 class FakeClient:
     """*totals* are successive core totals, the last one repeating; ``None``
     means core holds nothing. *private_key* ``None`` stands for a remote
-    signer."""
+    signer, and *gasless* ``False`` for a network with no facilitator."""
 
     def __init__(
         self,
@@ -66,6 +66,7 @@ class FakeClient:
         totals: Optional[List[Optional[int]]] = None,
         positions: Optional[list] = None,
         private_key: Optional[str] = KEY,
+        gasless: bool = True,
     ) -> None:
         self.signer_address = USER
         self.public_params = SimpleNamespace(chain_id=chain_id)
@@ -87,7 +88,10 @@ class FakeClient:
                 )
             )
         )
-        self.deposit = SimpleNamespace(of=MagicMock(return_value=self.builder))
+        self.deposit = SimpleNamespace(
+            of=MagicMock(return_value=self.builder),
+            is_gasless_available=MagicMock(return_value=gasless),
+        )
         withdrawn = WithdrawReceipt(
             tx_hash=TX_HASH, route=Route.GASLESS, account=USER, asset=USDC
         )

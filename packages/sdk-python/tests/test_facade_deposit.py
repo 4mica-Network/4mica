@@ -1,3 +1,5 @@
+import asyncio
+import time
 from unittest.mock import AsyncMock
 
 import pytest
@@ -115,6 +117,23 @@ async def test_gas_self_approves_and_sends_the_wallets_own_transaction():
     assert result.route is TokenRoute.SELF_FUNDED
 
 
+async def test_approves_and_sends_its_own_transaction_where_no_facilitator_is_hosted():
+    client = FakeClient(gasless=False, totals=[0, 5_000_000])
+    result = await deposit(fake_session(client), "5 USDC")
+    # The low-level send() would go out with no allowance.
+    client.builder.send.assert_not_awaited()
+    client.builder.self_funded_builder.approve.assert_awaited_once()
+    client.builder.self_funded_builder.send.assert_awaited_once()
+    assert result.route is TokenRoute.SELF_FUNDED
+
+    broke = FakeClient(
+        gasless=False,
+        gateway=fake_gateway(native_balance=AsyncMock(return_value=0)),
+    )
+    with pytest.raises(GasRequiredError, match="needs ETH for gas"):
+        await deposit(fake_session(broke), "5 USDC")
+
+
 async def test_gas_self_needs_gas_money():
     gateway = fake_gateway(native_balance=AsyncMock(return_value=0))
     client = FakeClient(gateway=gateway)
@@ -162,6 +181,22 @@ async def test_returns_pending_when_core_is_slow_and_spendable_waits_again():
 
     client._totals[:] = [5_000_000]
     assert (await result.spendable(timeout_secs=1)).status == "spendable"
+
+
+async def test_returns_pending_on_time_when_a_core_request_hangs():
+    client = FakeClient()
+    reads = iter([0])
+
+    async def hangs_after_the_baseline(asset):
+        for total in reads:
+            return type("Balance", (), {"total": total, "locked": 0})()
+        await asyncio.Event().wait()
+
+    client.account.asset_balance = AsyncMock(side_effect=hangs_after_the_baseline)
+    started = time.monotonic()
+    result = await deposit(fake_session(client), "5 USDC", timeout_secs=0.05)
+    assert result.status == "pending"
+    assert time.monotonic() - started < 1
 
 
 async def test_keeps_polling_through_core_errors_once_the_money_has_moved():

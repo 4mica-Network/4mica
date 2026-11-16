@@ -73,7 +73,9 @@ async def deposit(
                 "gas; a native deposit cannot be gasless"
             )
         receipt = await client.deposit.of(asset, amount).self_funded().send()
-    elif gas == "self":
+    elif gas == "self" or not client.deposit.is_gasless_available():
+        # With no facilitator the low-level send() is the wallet's own
+        # transaction, and does not approve the token first.
         receipt = await self_funded()
     else:
         try:

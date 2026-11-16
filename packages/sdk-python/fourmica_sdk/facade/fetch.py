@@ -34,7 +34,9 @@ class SpendLimiter:
         self._per_payment = _as_list(limits.per_payment)
         self._total = _as_list(limits.total)
         self._pay_to = (
-            None if limits.pay_to is None else {a.lower() for a in limits.pay_to}
+            None
+            if limits.pay_to is None
+            else {payee.lower() for payee in _as_list(limits.pay_to)}
         )
         self._spent: Dict[str, int] = {}
         for spec in (*self._per_payment, *self._total):

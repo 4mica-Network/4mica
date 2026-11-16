@@ -117,10 +117,25 @@ def test_reads_v1_bodies_with_either_amount_field_and_normalizes_shorthand_netwo
         httpx.Response(402, json={"x402Version": 1, "accepts": "none"}),
         httpx.Response(402, headers={"PAYMENT-REQUIRED": "%%%"}, json={}),
         v2_challenge([entry(amount="-1"), entry(payTo=None), "junk"]),
+        # What signing would refuse is not offered as payable either.
+        v2_challenge([entry(payTo="0x123"), entry(asset="USDC")]),
+        v2_challenge([entry(extra={"validation": {"validator": "0x1"}})]),
+        httpx.Response(
+            402,
+            headers={"PAYMENT-REQUIRED": b64({"x402Version": 2, "accepts": [entry()]})},
+        ),
     ],
 )
 def test_ignores_responses_that_are_not_payable_x402(response):
     assert X402.terms(response) == []
+
+
+def test_reads_a_version_sent_as_a_string():
+    required = {"x402Version": "2", "resource": {"url": URL}, "accepts": [entry()]}
+    v2 = httpx.Response(402, headers={"PAYMENT-REQUIRED": b64(required)})
+    assert len(X402.terms(v2)) == 1
+    v1 = httpx.Response(402, json={"x402Version": "1", "accepts": [entry()]})
+    assert len(X402.terms(v1)) == 1
 
 
 def test_reads_a_header_sent_without_base64_padding():
@@ -209,6 +224,14 @@ async def test_pays_once_retries_once_with_the_same_request_and_records_it():
             pay_to=SELLER,
         )
     ]
+
+
+async def test_pays_the_valid_option_beside_one_it_could_not_sign():
+    unsignable = entry(extra={"validation": {"validator": "0x1"}})
+    seller = Seller(lambda: v2_challenge([unsignable, entry()]))
+    ctx, records, _ = context(seller.http)
+    assert (await paying_fetch(ctx, "GET", URL)).status_code == 200
+    assert len(records) == 1
 
 
 async def test_never_loops_on_a_second_402_and_does_not_count_it():
@@ -337,9 +360,11 @@ async def test_refuses_assets_no_limit_names_and_payees_not_allowed():
         await paying_fetch(ctx, "GET", URL)
     assert raised.value.limit == "pay_to"
 
-    allowed = SpendLimiter(SpendLimits(pay_to=[SELLER.lower()]))
-    ctx, _, _ = context(seller.http, limiter=allowed)
-    assert (await paying_fetch(ctx, "GET", URL)).status_code == 200
+    # A list, or one address on its own.
+    for pay_to in ([SELLER.lower()], SELLER):
+        allowed = SpendLimiter(SpendLimits(pay_to=pay_to))
+        ctx, _, _ = context(seller.http, limiter=allowed)
+        assert (await paying_fetch(ctx, "GET", URL)).status_code == 200
 
 
 async def test_enforces_the_session_total_across_payments():

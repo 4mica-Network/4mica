@@ -25,6 +25,7 @@ from stubs import (
 
 import fourmica_sdk.client.ctx as ctx_module
 from fourmica_sdk import FourMica
+from fourmica_sdk.client.facilitator import Facilitator
 from fourmica_sdk.client.model import Route, TokenRoute
 from fourmica_sdk.errors import InsufficientBalanceError
 from fourmica_sdk.guarantee import clearing_house_domain_separator
@@ -88,8 +89,20 @@ class Stack:
             native_balance=AsyncMock(return_value=10**18),
             withdrawal_grace_period=AsyncMock(return_value=3600),
             get_user_assets=AsyncMock(return_value=[]),
+            approve_erc20=AsyncMock(side_effect=self._approved_on_chain),
+            deposit=AsyncMock(side_effect=self._deposited_on_chain),
             aclose=AsyncMock(return_value=None),
         )
+        self.transactions = []
+
+    async def _approved_on_chain(self, token, amount, wait_options=None):
+        self.transactions.append(("approve", token, amount))
+        return {"transactionHash": TX_HASH}
+
+    async def _deposited_on_chain(self, amount, token, wait_options=None):
+        self.transactions.append(("deposit", token, amount))
+        self.total += amount
+        return {"transactionHash": TX_HASH}
 
     def facilitator(self, request: httpx.Request) -> httpx.Response:
         self.facilitator_calls.append((request.url.path, json.loads(request.content)))
@@ -151,6 +164,19 @@ async def test_deposits_through_the_facilitator_and_waits_for_core(stack):
     assert path == "/deposit"
     assert (body["asset"], body["amount"]) == (TOKEN_ADDRESS, "5000000")
     assert body["authorization"]["from"] == TEST_ADDRESS
+
+
+async def test_approves_before_its_own_transaction_when_there_is_no_facilitator(stack):
+    async with await connect(stack) as client:
+        (await client.low_level())._ctx.facilitator = Facilitator(None)
+        result = await client.deposit("5 USDC")
+    assert result.status == "spendable"
+    assert result.route is TokenRoute.SELF_FUNDED
+    assert stack.facilitator_calls == []
+    assert stack.transactions == [
+        ("approve", TOKEN_ADDRESS, 5_000_000),
+        ("deposit", TOKEN_ADDRESS, 5_000_000),
+    ]
 
 
 async def test_checks_the_wallet_on_chain_before_signing(stack):
