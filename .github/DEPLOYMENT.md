@@ -346,11 +346,13 @@ Values the single-box layout pins:
   `docker build`. The same build renders the nginx security headers, whose CSP
   names that origin and the Clerk host decoded from
   `VITE_CLERK_PUBLISHABLE_KEY`, so a malformed key fails the build too.
-- **The dashboard deploy is gated on a dependency scan.**
-  `deploy-dashboard.yml` runs `dependency-scan.yml` first: OSV-Scanner matches
+- **The dashboard, web and email deploys are gated on a dependency scan.**
+  Each workflow runs `dependency-scan.yml` first: OSV-Scanner matches
   `pnpm-lock.yaml` offline against the downloaded npm advisory database, and
-  any advisory at CVSS 7.0 or above in the dashboard's production dependencies
-  stops the deploy.
+  any advisory at CVSS 7.0 or above in that app's production dependencies
+  stops the deploy. `be` and `playground` are not gated yet: `zod@3` (via
+  `@coinbase/cdp-sdk` and `abitype`) and `deepmerge-ts@7` (via `@prisma/config`)
+  have no fix within their major version.
 - **The dashboard deploy ends by probing HTTPS.** `infra/nginx/probe-tls.sh`
   must see an HTTP→HTTPS redirect and an HSTS header on the app and API hosts,
   the same check `build-react-app.yml` runs for `4mica.io`. The dashboard

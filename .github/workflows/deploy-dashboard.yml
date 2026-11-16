@@ -18,6 +18,8 @@ concurrency:
 jobs:
   scan:
     uses: ./.github/workflows/dependency-scan.yml
+    with:
+      filters: '["@4mica/dashboard..."]'
 
   deploy:
     needs: scan
