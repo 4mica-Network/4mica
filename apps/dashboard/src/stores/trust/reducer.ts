@@ -1,8 +1,10 @@
+import { isSameResource, type ResourceRef } from "@stores/shared/type";
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { Faq, Report, ResourcePolicy, Review, TrustState } from "./type";
 
 export const INITIAL_STATE: TrustState = {
+  resource: null,
   policy: null,
   faqs: [],
   summary: null,
@@ -16,16 +18,30 @@ export const INITIAL_STATE: TrustState = {
 interface TrustAction {
   type: string;
   payload?: unknown;
-  meta?: { pendingKey: string };
+  meta?: { pendingKey?: string; resource?: ResourceRef };
 }
 
 export default function trustReducer(
   state: TrustState = INITIAL_STATE,
   action: TrustAction = { type: "" },
 ): TrustState {
+  if (
+    action.meta?.resource &&
+    !isSameResource(state.resource, action.meta.resource)
+  ) {
+    return state;
+  }
+
   switch (action.type) {
     case actionTypes.RESET_TRUST:
       return INITIAL_STATE;
+
+    case actionTypes.FETCH_TRUST_REQUESTED: {
+      const resource = action.payload as ResourceRef;
+      return isSameResource(state.resource, resource)
+        ? state
+        : { ...INITIAL_STATE, resource };
+    }
 
     case actionTypes.FETCH_TRUST_PENDING:
       return { ...state, pending: setPending(state.pending, "trust", true) };
