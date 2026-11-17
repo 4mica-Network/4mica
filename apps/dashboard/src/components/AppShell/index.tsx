@@ -128,7 +128,7 @@ export function AppShell() {
         tabIndex={-1}
         className="min-w-0 flex-1 overflow-y-auto outline-none"
       >
-        <div className="relative flex min-h-full w-full flex-col px-6 py-6">
+        <div className="relative mx-auto flex min-h-full w-full max-w-400 flex-col px-6 py-6">
           <Outlet />
         </div>
       </main>
