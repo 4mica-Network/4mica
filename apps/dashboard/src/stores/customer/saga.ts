@@ -547,23 +547,23 @@ export function* removeCustomerIdentity(action: {
   }
 }
 
-export function* refetchActivity(action: {
-  type: string;
-  payload: { id: string };
-}): Generator {
-  yield* fetchCustomerActivity(action);
-}
-
 export default [
-  takeLatest(actionTypes.FETCH_CUSTOMERS_REQUESTED, fetchCustomers),
-  takeLatest(actionTypes.SET_CUSTOMER_FILTERS, fetchCustomers),
-  takeLatest(actionTypes.SET_CUSTOMER_PAGE, fetchCustomers),
+  takeLatest(
+    [
+      actionTypes.FETCH_CUSTOMERS_REQUESTED,
+      actionTypes.SET_CUSTOMER_FILTERS,
+      actionTypes.SET_CUSTOMER_PAGE,
+    ],
+    fetchCustomers,
+  ),
   takeLatest(actionTypes.FETCH_CUSTOMER_DETAIL_REQUESTED, fetchCustomerDetail),
   takeLatest(
-    actionTypes.FETCH_CUSTOMER_ACTIVITY_REQUESTED,
+    [
+      actionTypes.FETCH_CUSTOMER_ACTIVITY_REQUESTED,
+      actionTypes.SET_CUSTOMER_ACTIVITY_PAGE,
+    ],
     fetchCustomerActivity,
   ),
-  takeLatest(actionTypes.SET_CUSTOMER_ACTIVITY_PAGE, refetchActivity),
   takeEvery(actionTypes.CREATE_CUSTOMER_REQUESTED, createCustomer),
   takeEvery(actionTypes.UPDATE_CUSTOMER_REQUESTED, updateCustomer),
   takeLatest(actionTypes.FETCH_CUSTOMER_CREDIT_REQUESTED, fetchCustomerCredit),

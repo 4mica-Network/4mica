@@ -1,4 +1,5 @@
-import { all } from "redux-saga/effects";
+import type { Task } from "redux-saga";
+import { all, cancel, fork, take } from "redux-saga/effects";
 import agentSaga from "./agent/saga";
 import apiListingSaga from "./apiListing/saga";
 import balanceSaga from "./balance/saga";
@@ -9,12 +10,13 @@ import customerSaga from "./customer/saga";
 import developerSaga from "./developer/saga";
 import paymentSaga from "./payment/saga";
 import resourceKeySaga from "./resourceKey/saga";
+import { SESSION_RESET } from "./session";
 import supportSaga from "./support/saga";
 import trustSaga from "./trust/saga";
 import userSaga from "./user/saga";
 import walletSaga from "./wallet/saga";
 
-export default function* rootSaga() {
+function* watchers() {
   yield all([
     ...userSaga,
     ...developerSaga,
@@ -31,4 +33,12 @@ export default function* rootSaga() {
     ...configSaga,
     ...supportSaga,
   ]);
+}
+
+export default function* rootSaga(): Generator {
+  while (true) {
+    const task = yield fork(watchers);
+    yield take(SESSION_RESET);
+    yield cancel(task as Task);
+  }
 }

@@ -224,10 +224,15 @@ export function* batchDeleteWallets(action: {
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_WALLETS_REQUESTED, fetchWallets),
+  takeLatest(
+    [
+      actionTypes.FETCH_WALLETS_REQUESTED,
+      actionTypes.SET_WALLET_FILTERS,
+      actionTypes.SET_WALLET_PAGE,
+    ],
+    fetchWallets,
+  ),
   takeLatest(actionTypes.FETCH_ACTIVE_WALLETS_REQUESTED, fetchActiveWallets),
-  takeLatest(actionTypes.SET_WALLET_FILTERS, fetchWallets),
-  takeLatest(actionTypes.SET_WALLET_PAGE, fetchWallets),
   takeEvery(actionTypes.CREATE_WALLET_REQUESTED, createWallet),
   takeEvery(actionTypes.UPDATE_WALLET_REQUESTED, updateWallet),
   takeEvery(actionTypes.DELETE_WALLET_REQUESTED, deleteWallet),
