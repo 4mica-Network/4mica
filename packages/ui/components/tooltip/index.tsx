@@ -370,6 +370,13 @@ export function Tooltip({
     if (disabled && currentOpen) setOpenSafe(false);
   }, [disabled, currentOpen, setOpenSafe]);
 
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
   const node = content ?? title;
 
   const bubbleEnter = useCallback(() => {
