@@ -7,6 +7,16 @@ import resourceKeyReducer, {
   INITIAL_STATE as KEYS_INITIAL,
 } from "@stores/resourceKey/reducer";
 import type { ResourceRef } from "@stores/shared/type";
+import { scoped } from "@stores/shared/type";
+import {
+  fetchTrust,
+  resetTrust,
+  savePolicySucceeded,
+} from "@stores/trust/actions";
+import trustReducer, {
+  INITIAL_STATE as TRUST_INITIAL,
+} from "@stores/trust/reducer";
+import type { ResourcePolicy } from "@stores/trust/type";
 import { describe, expect, it } from "vitest";
 
 const agentA: ResourceRef = { kind: "agent", id: "agt_a" };
@@ -23,6 +33,9 @@ const key = {
   createdAt: "2026-08-05T00:00:00.000Z",
   updatedAt: "2026-08-05T00:00:00.000Z",
 };
+
+const policy = (id: string) =>
+  ({ id, policyEnabled: true, faqEnabled: true }) as ResourcePolicy;
 
 describe("secret keys stay on the resource they were created for", () => {
   it("does not reveal agent A's new key on agent B's page", () => {
@@ -56,5 +69,30 @@ describe("secret keys stay on the resource they were created for", () => {
     );
 
     expect(state.revealed?.plaintext).toBe("4mica_sk_secret_for_a");
+  });
+});
+
+describe("trust details stay on the resource they belong to", () => {
+  it("ignores agent A's saved policy once agent B is open", () => {
+    let state = trustReducer(TRUST_INITIAL, fetchTrust(agentA));
+    state = trustReducer(state, resetTrust());
+    state = trustReducer(state, fetchTrust(agentB));
+
+    state = trustReducer(
+      state,
+      scoped(savePolicySucceeded(policy("pol_a")), agentA),
+    );
+
+    expect(state.policy).toBeNull();
+  });
+
+  it("applies a saved policy for the open resource", () => {
+    let state = trustReducer(TRUST_INITIAL, fetchTrust(agentA));
+    state = trustReducer(
+      state,
+      scoped(savePolicySucceeded(policy("pol_a")), agentA),
+    );
+
+    expect(state.policy?.id).toBe("pol_a");
   });
 });

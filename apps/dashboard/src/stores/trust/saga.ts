@@ -4,7 +4,7 @@ import {
   refreshAfterWrite,
   writeSucceededTypes,
 } from "@stores/refreshAfterWrite";
-import type { ResourceRef } from "@stores/shared/type";
+import { type ResourceRef, scoped } from "@stores/shared/type";
 import type { PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
@@ -32,9 +32,16 @@ const toMessage = (error: unknown, fallback: string): string =>
     ),
   });
 
-function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+function* fail(
+  error: unknown,
+  fallback: string,
+  meta: PendingMeta,
+  resource: ResourceRef,
+) {
   const message = toMessage(error, fallback);
-  yield put(trustActionFailed(message, toIssueMap(error), meta));
+  yield put(
+    scoped(trustActionFailed(message, toIssueMap(error), meta), resource),
+  );
 
   notifyError({
     title: t("store.trust.failedTitle", "Something went wrong"),
@@ -66,21 +73,27 @@ export function* fetchTrust(action: {
     ];
 
     yield put(
-      fetchTrustSucceeded({
-        policy: policy.policy,
-        summary,
-        reviews: reviews.data,
-        reports: reports.data,
-        faqs: faqs.data,
-      }),
+      scoped(
+        fetchTrustSucceeded({
+          policy: policy.policy,
+          summary,
+          reviews: reviews.data,
+          reports: reports.data,
+          faqs: faqs.data,
+        }),
+        action.payload,
+      ),
     );
   } catch (error) {
     yield put(
-      fetchTrustFailed(
-        toMessage(
-          error,
-          t("store.trust.fetchFailed", "Couldn't load trust details."),
+      scoped(
+        fetchTrustFailed(
+          toMessage(
+            error,
+            t("store.trust.fetchFailed", "Couldn't load trust details."),
+          ),
         ),
+        action.payload,
       ),
     );
   }
@@ -98,7 +111,7 @@ export function* savePolicy(action: {
       api.savePolicy(resource.kind, resource.id, policy),
     )) as Awaited<ReturnType<typeof api.savePolicy>>;
 
-    yield put(savePolicySucceeded(result.policy));
+    yield put(scoped(savePolicySucceeded(result.policy), resource));
 
     notifySuccess({
       title: t("store.trust.policySaved", "Policy updated"),
@@ -108,7 +121,12 @@ export function* savePolicy(action: {
       ),
     });
   } catch (error) {
-    yield* fail(error, "Couldn't save that policy.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't save that policy.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -124,9 +142,14 @@ export function* replyToReview(action: {
       api.replyToReview(resource.kind, resource.id, reviewId, reply),
     )) as Awaited<ReturnType<typeof api.replyToReview>>;
 
-    yield put(replyToReviewSucceeded(result.review));
+    yield put(scoped(replyToReviewSucceeded(result.review), resource));
   } catch (error) {
-    yield* fail(error, "Couldn't post that reply.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't post that reply.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -153,9 +176,14 @@ export function* updateReport(action: {
       ),
     )) as Awaited<ReturnType<typeof api.updateReport>>;
 
-    yield put(updateReportSucceeded(result.report));
+    yield put(scoped(updateReportSucceeded(result.report), resource));
   } catch (error) {
-    yield* fail(error, "Couldn't update that report.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't update that report.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -164,7 +192,7 @@ function* refreshFaqs(resource: ResourceRef, pendingKey: string) {
     api.getFaqs(resource.kind, resource.id),
   )) as Awaited<ReturnType<typeof api.getFaqs>>;
 
-  yield put(faqsChanged(result.data, pendingKey));
+  yield put(scoped(faqsChanged(result.data, pendingKey), resource));
 }
 
 export function* createFaq(action: {
@@ -178,7 +206,12 @@ export function* createFaq(action: {
     yield call(() => api.createFaq(resource.kind, resource.id, faq));
     yield* refreshFaqs(resource, action.meta.pendingKey);
   } catch (error) {
-    yield* fail(error, "Couldn't add that question.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't add that question.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -197,7 +230,12 @@ export function* updateFaq(action: {
     yield call(() => api.updateFaq(resource.kind, resource.id, faqId, faq));
     yield* refreshFaqs(resource, action.meta.pendingKey);
   } catch (error) {
-    yield* fail(error, "Couldn't save that question.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't save that question.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -212,7 +250,12 @@ export function* deleteFaq(action: {
     yield call(() => api.deleteFaq(resource.kind, resource.id, faqId));
     yield* refreshFaqs(resource, action.meta.pendingKey);
   } catch (error) {
-    yield* fail(error, "Couldn't remove that question.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't remove that question.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 
@@ -228,9 +271,16 @@ export function* reorderFaqs(action: {
       api.reorderFaqs(resource.kind, resource.id, ids),
     )) as Awaited<ReturnType<typeof api.reorderFaqs>>;
 
-    yield put(faqsChanged(result.data, action.meta.pendingKey));
+    yield put(
+      scoped(faqsChanged(result.data, action.meta.pendingKey), resource),
+    );
   } catch (error) {
-    yield* fail(error, "Couldn't reorder those questions.", action.meta);
+    yield* fail(
+      error,
+      "Couldn't reorder those questions.",
+      action.meta,
+      action.payload.resource,
+    );
   }
 }
 

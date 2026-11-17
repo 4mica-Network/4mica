@@ -27,3 +27,11 @@ export const isSameResource = (
   a: ResourceRef | null | undefined,
   b: ResourceRef | null | undefined,
 ): boolean => Boolean(a && b && a.kind === b.kind && a.id === b.id);
+
+export const scoped = <A extends { type: string }>(
+  action: A,
+  resource: ResourceRef,
+): A & { meta: { resource: ResourceRef } } => ({
+  ...action,
+  meta: { ...(action as { meta?: object }).meta, resource },
+});
