@@ -1,5 +1,5 @@
 import { cn } from "@4mica/ui";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Monitor } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation } from "react-router-dom";
@@ -7,10 +7,31 @@ import { OnboardingGate } from "@/components/Onboarding";
 import { COLLAPSED_WIDTH, Sidebar } from "@/components/Sidebar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
+const SUPPORTED_QUERY = "(min-width: 768px)";
 const DESKTOP_QUERY = "(min-width: 1024px)";
+
+function UnsupportedScreen() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-surface-deep px-6 text-center text-ink-body">
+      <div className="flex max-w-sm flex-col items-center gap-4">
+        <span className="grid h-12 w-12 place-items-center rounded-xl border border-overlay/10 bg-surface">
+          <Monitor aria-hidden="true" className="h-5 w-5 text-ink-muted" />
+        </span>
+        <h1 className="font-medium text-ink-strong text-lg">
+          {t("shell.unsupported.title")}
+        </h1>
+        <p className="text-ink-muted text-sm leading-relaxed">
+          {t("shell.unsupported.body")}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function AppShell() {
   const { t } = useTranslation();
+  const isSupported = useMediaQuery(SUPPORTED_QUERY);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const { pathname } = useLocation();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -45,6 +66,10 @@ export function AppShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOverlay]);
+
+  if (!isSupported) {
+    return <UnsupportedScreen />;
+  }
 
   const toggle = () =>
     isDesktop ? setDesktopCollapsed((v) => !v) : setOverlayOpen((v) => !v);

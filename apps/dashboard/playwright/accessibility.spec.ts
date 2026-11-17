@@ -37,8 +37,10 @@ test("the skip link moves focus into the main content", async ({ page }) => {
   await expect(page.getByRole("main")).toBeFocused();
 });
 
-test("stays usable at 200% zoom", async ({ page }) => {
-  await page.setViewportSize({ width: 640, height: 450 });
+test("fits the smallest supported width without scrolling sideways", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 512 });
   await page.goto("/payments");
 
   await expect(
