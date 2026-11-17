@@ -165,7 +165,7 @@ describe("IdentitiesPanel", () => {
       .getByTestId("customer-identity-remove-identity_1")
       .closest("div");
 
-    expect(actions?.className).toContain("lg:opacity-0");
+    expect(actions?.className).toContain("lg:pointer-fine:opacity-0");
     expect(actions?.className).toContain("lg:group-hover:opacity-100");
   });
 
@@ -728,7 +728,7 @@ describe("CouponsPanel", () => {
       .getByTestId("customer-coupon-remove-coupon_1")
       .closest("div");
 
-    expect(actions?.className).toContain("lg:opacity-0");
+    expect(actions?.className).toContain("lg:pointer-fine:opacity-0");
   });
 
   it("lists a coupon with its code and worth", () => {

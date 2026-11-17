@@ -119,7 +119,7 @@ export function WalletRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
         <Tooltip title={t("wallet.row.copy")} placement="bottom">
