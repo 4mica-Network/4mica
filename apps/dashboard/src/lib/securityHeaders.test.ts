@@ -99,6 +99,7 @@ describe("renderSecurityHeaders", () => {
       "X-Content-Type-Options",
       "Referrer-Policy",
       "Permissions-Policy",
+      "X-Robots-Tag",
     ]);
     for (const line of lines) {
       expect(line).toMatch(/^add_header \S+ "[^"]+" always;$/);
