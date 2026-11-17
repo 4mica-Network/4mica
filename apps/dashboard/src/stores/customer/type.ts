@@ -208,6 +208,7 @@ export interface CustomerFilters {
 }
 
 export interface CustomerDetail {
+  id: string | null;
   customer: Customer | null;
   overview: CustomerOverview | null;
   credit: CustomerCreditBalance | null;

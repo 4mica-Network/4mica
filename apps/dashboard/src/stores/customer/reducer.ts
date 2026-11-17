@@ -15,6 +15,7 @@ import type {
 export const ACTIVITY_PAGE_SIZE = 10;
 
 const EMPTY_DETAIL: CustomerDetail = {
+  id: null,
   customer: null,
   overview: null,
   credit: null,
@@ -139,6 +140,13 @@ export default function customerReducer(
         selectedIds: [],
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
+
+    case actionTypes.FETCH_CUSTOMER_DETAIL_REQUESTED: {
+      const { id } = action.payload as { id: string };
+      return state.detail.id === id
+        ? state
+        : { ...state, detail: { ...EMPTY_DETAIL, id } };
+    }
 
     case actionTypes.FETCH_CUSTOMER_DETAIL_PENDING:
       return {

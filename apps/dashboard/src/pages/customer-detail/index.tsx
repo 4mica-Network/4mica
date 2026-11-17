@@ -3,7 +3,9 @@ import {
   resetCustomerDetail,
 } from "@stores/customer/actions";
 import {
-  selectCustomerDetail,
+  selectCustomerDetailId,
+  selectCustomerDetailLoadError,
+  selectCustomerDetailNotFound,
   selectCustomerOverview,
   selectDetailCustomer,
   selectHasLoadedCustomerDetail,
@@ -32,10 +34,13 @@ export function CustomerDetail() {
   const dispatch = useAppDispatch();
   const { id = "" } = useParams<{ id: string }>();
 
-  const customer = useAppSelector(selectDetailCustomer);
+  const shown = useAppSelector(selectDetailCustomer);
+  const customer = shown?.id === id ? shown : null;
+  const shownId = useAppSelector(selectCustomerDetailId);
   const overview = useAppSelector(selectCustomerOverview);
   const hasLoaded = useAppSelector(selectHasLoadedCustomerDetail);
-  const { loadError, notFound } = useAppSelector(selectCustomerDetail);
+  const loadError = useAppSelector(selectCustomerDetailLoadError);
+  const notFound = useAppSelector(selectCustomerDetailNotFound);
 
   usePageTitle(
     customer
@@ -55,7 +60,7 @@ export function CustomerDetail() {
     };
   }, [dispatch, id]);
 
-  if (!hasLoaded && !customer) {
+  if (!customer && (!hasLoaded || shownId !== id)) {
     return <PageSpinner />;
   }
 
