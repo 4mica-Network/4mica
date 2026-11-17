@@ -71,6 +71,11 @@ function failLoad(error: unknown, fallback: string) {
   });
 }
 
+function* isShowing(id: string): Generator<unknown, boolean, unknown> {
+  const state = (yield select(selectCustomerState)) as CustomerState;
+  return state.detail.id === id;
+}
+
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
   yield put(customerActionFailed(message, toIssueMap(error), meta));
@@ -138,11 +143,17 @@ export function* fetchCustomerDetail(action: {
       Awaited<ReturnType<typeof api.getCustomerOverview>> | null,
     ];
 
+    if (!(yield* isShowing(id))) {
+      return;
+    }
     yield put(fetchCustomerDetailSucceeded({ customer, overview }));
     yield put(fetchCustomerActivityAction(id));
     yield put(fetchCustomerCreditAction(id));
     yield put(fetchCustomerCouponsAction(id));
   } catch (error) {
+    if (!(yield* isShowing(id))) {
+      return;
+    }
     yield put(
       fetchCustomerDetailFailed(
         toMessage(
@@ -167,6 +178,9 @@ export function* fetchCustomerActivity(action: {
       api.getCustomerActivity(action.payload.id, { page, limit }),
     )) as Awaited<ReturnType<typeof api.getCustomerActivity>>;
 
+    if (!(yield* isShowing(action.payload.id))) {
+      return;
+    }
     yield put(fetchCustomerActivitySucceeded(result));
   } catch {}
 }
@@ -226,6 +240,9 @@ export function* fetchCustomerCoupons(action: {
       api.getCustomerCoupons(action.payload.id),
     )) as Awaited<ReturnType<typeof api.getCustomerCoupons>>;
 
+    if (!(yield* isShowing(action.payload.id))) {
+      return;
+    }
     yield put(fetchCustomerCouponsSucceeded(result.items));
   } catch (error) {
     failLoad(error, "Couldn't load this customer's coupons.");
@@ -312,7 +329,9 @@ export function* fetchCustomerCredit(action: {
       api.getCustomerCredit(action.payload.id),
     )) as Awaited<ReturnType<typeof api.getCustomerCredit>>;
 
-    yield put(fetchCustomerCreditSucceeded(result));
+    if (yield* isShowing(action.payload.id)) {
+      yield put(fetchCustomerCreditSucceeded(result));
+    }
   } catch (error) {
     failLoad(error, "Couldn't load this customer's credit.");
   }
@@ -353,7 +372,9 @@ export function* zeroCustomerCredit(action: {
       api.zeroCustomerCredit(action.payload.id),
     )) as Awaited<ReturnType<typeof api.zeroCustomerCredit>>;
 
-    yield put(fetchCustomerCreditSucceeded(result));
+    if (yield* isShowing(action.payload.id)) {
+      yield put(fetchCustomerCreditSucceeded(result));
+    }
     yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCreditAction(action.payload.id));
 
