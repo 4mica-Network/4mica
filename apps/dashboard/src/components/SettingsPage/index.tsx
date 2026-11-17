@@ -1,5 +1,8 @@
-import { useAppSelector } from "@stores/hooks";
-import { selectIsUserLoading } from "@stores/user/selector";
+import { EmptyState } from "@4mica/ui";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { fetchUser } from "@stores/user/actions";
+import { selectIsUserLoading, selectUserState } from "@stores/user/selector";
+import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { PageSpinner } from "@/components/PageSpinner";
@@ -15,7 +18,9 @@ export function SettingsPage({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectIsUserLoading);
+  const { user, error } = useAppSelector(selectUserState);
   const title = t(titleKey);
   usePageTitle(title);
 
@@ -28,7 +33,22 @@ export function SettingsPage({
             <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
           </div>
 
-          {isLoading ? <PageSpinner /> : children}
+          {isLoading ? (
+            <PageSpinner />
+          ) : !user && error ? (
+            <EmptyState
+              icon={<TriangleAlert className="h-5 w-5" />}
+              title={t("settings.loadFailure.title")}
+              description={error}
+              action={{
+                label: t("loadFailure.retry"),
+                onClick: () => dispatch(fetchUser()),
+              }}
+              data-testid="settings-load-failure"
+            />
+          ) : (
+            children
+          )}
         </div>
       </div>
     </div>

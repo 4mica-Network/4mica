@@ -1,10 +1,12 @@
 import { fetchDeveloper } from "@stores/developer/actions";
 import {
+  selectDeveloperError,
   selectHasLoadedDeveloper,
   selectIsDeveloperLoading,
 } from "@stores/developer/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
+import { RetryState } from "@/components/LoadFailure";
 import { PageSpinner } from "@/components/PageSpinner";
 import { RevealedSecretBanner } from "@/components/RevealedSecret";
 import { SettingsPage } from "@/components/SettingsPage";
@@ -16,6 +18,7 @@ export function DeveloperSettings() {
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectIsDeveloperLoading);
   const hasLoaded = useAppSelector(selectHasLoadedDeveloper);
+  const error = useAppSelector(selectDeveloperError);
   const { secret, reveal, clear } = useEphemeralSecret();
 
   useEffect(() => {
@@ -29,6 +32,11 @@ export function DeveloperSettings() {
     >
       {isLoading && !hasLoaded ? (
         <PageSpinner />
+      ) : !hasLoaded && error ? (
+        <RetryState
+          message={error}
+          onRetry={() => dispatch(fetchDeveloper())}
+        />
       ) : (
         <>
           <RevealedSecretBanner secret={secret} onDismiss={clear} />
