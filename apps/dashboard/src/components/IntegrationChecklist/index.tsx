@@ -93,7 +93,7 @@ export function IntegrationChecklist() {
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-ink-strong text-sm">
+              <span className="block font-medium text-ink-strong text-sm">
                 {t("checklist.title")}
               </span>
               <span className="block text-ink-muted text-xs tabular-nums">
