@@ -107,8 +107,8 @@ export const ComboBox = ({
           "flex w-full items-center rounded-lg border border-overlay/15 px-3 py-2.5 text-left text-ink-body text-sm outline-none transition",
           disabled
             ? "cursor-not-allowed opacity-50"
-            : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/40",
-          visible && "border-overlay/50 ring-1 ring-overlay/40",
+            : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/60",
+          visible && "border-overlay/50 ring-1 ring-overlay/60",
           className,
         )}
         {...(dataTestId ? { "data-testid": `${dataTestId}-trigger` } : {})}

@@ -56,7 +56,7 @@ export function CategoryPicker() {
             <label
               key={category}
               className={cn(
-                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-overlay/40",
+                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-overlay/60",
                 isSelected
                   ? "border-overlay/40 bg-overlay/10"
                   : "border-overlay/10 hover:border-overlay/20 hover:bg-overlay/5",

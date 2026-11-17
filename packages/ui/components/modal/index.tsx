@@ -117,7 +117,7 @@ export const Modal = ({
                     type="button"
                     onClick={onClose}
                     aria-label={closeLabel}
-                    className="-mt-1 -mr-1 shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/40"
+                    className="-mt-1 -mr-1 shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60"
                     data-testid={`${prefix}-close`}
                   >
                     <X className="h-4 w-4" />

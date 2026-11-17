@@ -122,7 +122,7 @@ export const VideoPlayer = ({
           setIsPlaying(true);
           onPlay?.();
         }}
-        className="absolute inset-0 h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/40"
+        className="absolute inset-0 h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60"
         data-testid={`${prefix}-play-button`}
       >
         {poster}
