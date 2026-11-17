@@ -6,6 +6,7 @@ import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { Masked } from "@/components/Masked";
 import {
   STATUS_LABEL_KEYS,
   STATUS_TAG_VARIANT,
@@ -71,7 +72,7 @@ export function CustomerRow({ customer }: { customer: Customer }) {
 
           {wallet?.address && (
             <Tag size="sm" variant="neutral" className="font-mono">
-              {shortenAddress(wallet.address)}
+              <Masked>{shortenAddress(wallet.address)}</Masked>
             </Tag>
           )}
 

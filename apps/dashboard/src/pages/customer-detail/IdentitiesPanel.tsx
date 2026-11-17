@@ -38,6 +38,7 @@ import {
   SectionRow,
   SectionRows,
 } from "@/components/layout";
+import { Masked } from "@/components/Masked";
 import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
@@ -131,21 +132,23 @@ function IdentityRow({
       }
     >
       <div className="flex min-w-0 flex-col gap-1.5">
-        {identity.address && identity.network ? (
-          <a
-            href={explorerAddressUrl(identity.network, identity.address)}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="flex min-w-0 items-center gap-1 font-medium text-ink-strong text-sm transition-colors hover:text-brand"
-          >
-            {shortenAddress(identity.address)}
-            <ArrowUpRight className="h-4 w-4 shrink-0" />
-          </a>
-        ) : (
-          <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
-            {identity.value}
-          </span>
-        )}
+        <Masked>
+          {identity.address && identity.network ? (
+            <a
+              href={explorerAddressUrl(identity.network, identity.address)}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex min-w-0 items-center gap-1 font-medium text-ink-strong text-sm transition-colors hover:text-brand"
+            >
+              {shortenAddress(identity.address)}
+              <ArrowUpRight className="h-4 w-4 shrink-0" />
+            </a>
+          ) : (
+            <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
+              {identity.value}
+            </span>
+          )}
+        </Masked>
 
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Tag size="sm" variant="neutral">
