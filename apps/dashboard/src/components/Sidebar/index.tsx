@@ -85,10 +85,13 @@ function useDisplayName(): string {
 function AvatarCircle() {
   const { t } = useTranslation();
   const { user } = useUser();
+  const imageUrl = user?.imageUrl;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   return (
     <Avatar
-      src={user?.imageUrl}
+      src={imageUrl && imageUrl !== failedUrl ? imageUrl : null}
+      onError={() => setFailedUrl(imageUrl ?? null)}
       name={t("monogram")}
       alt=""
       size="xs"
