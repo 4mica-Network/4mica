@@ -1,4 +1,5 @@
 import { store } from "@stores/index";
+import { MotionConfig } from "framer-motion";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
@@ -38,8 +39,10 @@ createRoot(root).render(
       <Provider store={store}>
         <BrowserRouter>
           <ClerkAuthProvider>
-            <App />
-            <Notifications />
+            <MotionConfig reducedMotion="user">
+              <App />
+              <Notifications />
+            </MotionConfig>
           </ClerkAuthProvider>
         </BrowserRouter>
       </Provider>
