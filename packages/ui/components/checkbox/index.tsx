@@ -74,6 +74,7 @@ export const Checkbox = ({
       onClick={() => onChange?.(!checked)}
       className={cn(
         "flex w-full cursor-pointer items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-overlay/60",
+        !children && "relative after:absolute after:-inset-1",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}

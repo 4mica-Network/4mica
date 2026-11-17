@@ -86,7 +86,7 @@ export function PaymentRow({ payment }: { payment: Payment }) {
               href={resourceUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
+              className="inline-flex min-h-6 items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
             >
               {t("payment.row.resource")}
               <ExternalLink className="h-3 w-3" />
@@ -114,7 +114,7 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           href={explorerAddressUrl(payment.network, counterparty)}
           target="_blank"
           rel="noreferrer noopener"
-          className="text-ink-subtle text-xs transition-colors hover:text-ink-body"
+          className="inline-flex min-h-6 items-center text-ink-subtle text-xs transition-colors hover:text-ink-body"
         >
           {payment.assetAddress
             ? t("payment.row.erc20")
