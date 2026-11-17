@@ -27,7 +27,7 @@ const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
 
 const rowClass = (active: boolean) =>
   cn(
-    "flex h-9 w-full items-center overflow-hidden rounded-md font-medium text-sm transition-colors",
+    "flex h-9 w-full items-center overflow-hidden rounded-md font-medium text-sm",
     active
       ? "bg-overlay/10 text-ink-strong"
       : "text-ink-muted hover:bg-overlay/5 hover:text-ink-body",
