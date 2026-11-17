@@ -39,24 +39,6 @@ const UI_TO_TOAST: Record<PlacementCamel, ToastPosition> = {
   bottomRight: "bottom-right",
 };
 
-const POSITION_TO_CONTAINER: Partial<Record<ToastPosition, string>> = {
-  "top-left": "notify-top-left",
-  "top-right": "notify-top-right",
-  "top-center": "notify-top-center",
-  "bottom-left": "notify-bottom-left",
-  "bottom-right": "notify-bottom-right",
-  "bottom-center": "notify-bottom-center",
-};
-
-export const NOTIFY_CONTAINER_IDS = [
-  "notify-top-left",
-  "notify-top-right",
-  "notify-bottom-left",
-  "notify-bottom-right",
-] as const;
-
-const DEFAULT_CONTAINER_ID = "notify-bottom-right";
-
 function resolveToastPosition(
   placement?: NotificationPlacement,
   fallback: ToastPosition = "bottom-right",
@@ -80,17 +62,9 @@ function notify({
   placement?: NotificationPlacement;
   options?: ToastOptions;
 }) {
-  const {
-    position: positionOverride,
-    containerId: containerIdOverride,
-    ...restOptions
-  } = options;
+  const { position: positionOverride, ...restOptions } = options;
 
   const position = positionOverride ?? resolveToastPosition(placement);
-  const containerId =
-    containerIdOverride ??
-    POSITION_TO_CONTAINER[position] ??
-    DEFAULT_CONTAINER_ID;
 
   toast(
     (toastProps) => (
@@ -100,9 +74,7 @@ function notify({
       position,
       autoClose: 6000,
       className: "w-[400px]",
-      ariaLabel: title,
       hideProgressBar: true,
-      containerId,
       ...restOptions,
     },
   );
