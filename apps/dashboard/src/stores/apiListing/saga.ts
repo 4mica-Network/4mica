@@ -209,9 +209,14 @@ export function* batchDeleteApiListings(action: {
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_API_LISTINGS_REQUESTED, fetchApiListings),
-  takeLatest(actionTypes.SET_API_LISTING_FILTERS, fetchApiListings),
-  takeLatest(actionTypes.SET_API_LISTING_PAGE, fetchApiListings),
+  takeLatest(
+    [
+      actionTypes.FETCH_API_LISTINGS_REQUESTED,
+      actionTypes.SET_API_LISTING_FILTERS,
+      actionTypes.SET_API_LISTING_PAGE,
+    ],
+    fetchApiListings,
+  ),
   takeEvery(actionTypes.CREATE_API_LISTING_REQUESTED, createApiListing),
   takeEvery(actionTypes.UPDATE_API_LISTING_REQUESTED, updateApiListing),
   takeEvery(actionTypes.PUBLISH_API_LISTING_REQUESTED, publishApiListing),

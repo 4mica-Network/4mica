@@ -245,11 +245,13 @@ export function* batchDeleteSupportRequests(action: {
 
 export default [
   takeLatest(
-    actionTypes.FETCH_SUPPORT_REQUESTS_REQUESTED,
+    [
+      actionTypes.FETCH_SUPPORT_REQUESTS_REQUESTED,
+      actionTypes.SET_SUPPORT_FILTERS,
+      actionTypes.SET_SUPPORT_PAGE,
+    ],
     fetchSupportRequests,
   ),
-  takeLatest(actionTypes.SET_SUPPORT_FILTERS, fetchSupportRequests),
-  takeLatest(actionTypes.SET_SUPPORT_PAGE, fetchSupportRequests),
   takeLatest(actionTypes.FETCH_SUPPORT_REQUEST_REQUESTED, fetchSupportRequest),
   takeEvery(actionTypes.CREATE_SUPPORT_REQUEST_REQUESTED, createSupportRequest),
   takeEvery(actionTypes.UPDATE_SUPPORT_REQUEST_REQUESTED, updateSupportRequest),

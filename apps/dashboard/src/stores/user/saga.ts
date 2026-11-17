@@ -297,7 +297,7 @@ export function* completeOnboarding(action: {
 }
 
 export default [
-  takeEvery(actionTypes.FETCH_USER_REQUESTED, fetchUser),
+  takeLatest(actionTypes.FETCH_USER_REQUESTED, fetchUser),
   takeLatest(actionTypes.CHECK_USERNAME_REQUESTED, checkUsername),
   takeLatest(actionTypes.COMPLETE_ONBOARDING_REQUESTED, completeOnboarding),
   takeLatest(

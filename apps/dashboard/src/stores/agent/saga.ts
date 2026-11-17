@@ -207,9 +207,14 @@ export function* batchDeleteAgents(action: {
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_AGENTS_REQUESTED, fetchAgents),
-  takeLatest(actionTypes.SET_AGENT_FILTERS, fetchAgents),
-  takeLatest(actionTypes.SET_AGENT_PAGE, fetchAgents),
+  takeLatest(
+    [
+      actionTypes.FETCH_AGENTS_REQUESTED,
+      actionTypes.SET_AGENT_FILTERS,
+      actionTypes.SET_AGENT_PAGE,
+    ],
+    fetchAgents,
+  ),
   takeEvery(actionTypes.CREATE_AGENT_REQUESTED, createAgent),
   takeEvery(actionTypes.UPDATE_AGENT_REQUESTED, updateAgent),
   takeEvery(actionTypes.PUBLISH_AGENT_REQUESTED, publishAgent),

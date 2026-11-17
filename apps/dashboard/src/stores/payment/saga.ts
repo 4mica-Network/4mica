@@ -81,9 +81,14 @@ export function* fetchPaymentStats(action: {
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_PAYMENTS_REQUESTED, fetchPayments),
-  takeLatest(actionTypes.SET_PAYMENT_FILTERS, fetchPayments),
-  takeLatest(actionTypes.SET_PAYMENT_PAGE, fetchPayments),
+  takeLatest(
+    [
+      actionTypes.FETCH_PAYMENTS_REQUESTED,
+      actionTypes.SET_PAYMENT_FILTERS,
+      actionTypes.SET_PAYMENT_PAGE,
+    ],
+    fetchPayments,
+  ),
   takeLatest(actionTypes.FETCH_PAYMENT_SUMMARY_REQUESTED, fetchPaymentSummary),
   takeLatest(actionTypes.FETCH_PAYMENT_STATS_REQUESTED, fetchPaymentStats),
 ];
