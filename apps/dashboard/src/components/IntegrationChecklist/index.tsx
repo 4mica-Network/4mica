@@ -12,20 +12,22 @@ import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { links } from "@/lib/links";
 import { ChecklistItem } from "./ChecklistItem";
 import { useChecklist } from "./useChecklist";
 
 interface ChecklistPrefs {
-  collapsed: boolean;
+  collapsed?: boolean;
   dismissed: boolean;
   version?: number;
 }
 
 export const CHECKLIST_VERSION = 2;
 
+const COMPACT_QUERY = "(max-width: 767px), (max-height: 699px)";
+
 const DEFAULT_PREFS: ChecklistPrefs = {
-  collapsed: false,
   dismissed: false,
   version: CHECKLIST_VERSION,
 };
@@ -53,7 +55,9 @@ export function IntegrationChecklist() {
     { defaultValue: DEFAULT_PREFS },
   );
 
-  const { collapsed, dismissed } = prefs ?? DEFAULT_PREFS;
+  const compact = useMediaQuery(COMPACT_QUERY, false);
+  const { dismissed } = prefs ?? DEFAULT_PREFS;
+  const collapsed = prefs?.collapsed ?? compact;
 
   useEffect(() => {
     dispatch(fetchDeveloper());
@@ -68,7 +72,10 @@ export function IntegrationChecklist() {
   }
 
   return (
-    <div className="fixed right-6 bottom-6 z-40 w-[320px] max-w-[calc(100vw-3rem)]">
+    <aside
+      aria-label={t("checklist.title")}
+      className="fixed right-6 bottom-6 z-40 w-[320px] max-w-[calc(100vw-3rem)]"
+    >
       <div className="overflow-hidden rounded-lg border border-overlay/10 bg-surface shadow-lg">
         <div className="flex items-center gap-2 px-4 py-3">
           <Rocket className="h-4 w-4 shrink-0 text-brand" />
@@ -155,6 +162,6 @@ export function IntegrationChecklist() {
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </aside>
   );
 }

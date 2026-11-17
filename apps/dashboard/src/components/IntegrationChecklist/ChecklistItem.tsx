@@ -43,6 +43,15 @@ export function ChecklistItem({ item }: { item: Item }) {
           >
             {item.title}
           </span>
+          <span className="sr-only">
+            {t(
+              item.done
+                ? "checklist.status.done"
+                : item.pending
+                  ? "checklist.status.pending"
+                  : "checklist.status.todo",
+            )}
+          </span>
           <span className="mt-0.5 block text-ink-muted text-xs">
             {item.pending ? t("checklist.kybPending") : item.hint}
           </span>
