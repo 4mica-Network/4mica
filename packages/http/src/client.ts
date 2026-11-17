@@ -12,7 +12,7 @@ import {
   retryAfterMs,
   sleep,
 } from "./resilience";
-import { resolveAuthToken } from "./token";
+import { notifyUnauthorized, resolveAuthToken } from "./token";
 
 export enum HttpMethod {
   GET = "GET",
@@ -194,23 +194,39 @@ export class HttpClient {
       fetchHeaders.set("Accept", "application/json");
     }
 
-    if (!skipAuth && !fetchHeaders.has("Authorization")) {
+    const attachesToken = !skipAuth && !fetchHeaders.has("Authorization");
+    if (attachesToken) {
       const token = await resolveAuthToken();
       if (token) {
         fetchHeaders.set("Authorization", `Bearer ${token}`);
       }
     }
 
-    const response = await fetch(normalizeUrl(fullUrl), {
-      method,
-      headers: fetchHeaders,
-      signal,
-      body: isFormData
-        ? (data as FormData)
-        : data
-          ? JSON.stringify(data)
-          : undefined,
-    });
+    const body = isFormData
+      ? (data as FormData)
+      : data
+        ? JSON.stringify(data)
+        : undefined;
+    const send = () =>
+      fetch(normalizeUrl(fullUrl), {
+        method,
+        headers: fetchHeaders,
+        signal,
+        body,
+      });
+
+    let response = await send();
+
+    if (response.status === 401 && attachesToken) {
+      const fresh = await resolveAuthToken({ forceRefresh: true });
+      if (fresh && fresh !== fetchHeaders.get("Authorization")?.slice(7)) {
+        fetchHeaders.set("Authorization", `Bearer ${fresh}`);
+        response = await send();
+      }
+      if (response.status === 401) {
+        notifyUnauthorized();
+      }
+    }
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);

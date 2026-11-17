@@ -14,7 +14,10 @@ export {
   type RetryPolicy,
 } from "./resilience";
 export {
+  type AuthTokenOptions,
   type AuthTokenProvider,
   resolveAuthToken,
   setAuthTokenProvider,
+  setUnauthorizedHandler,
+  type UnauthorizedHandler,
 } from "./token";
