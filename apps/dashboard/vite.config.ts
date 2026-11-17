@@ -4,17 +4,41 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { requireTrustedApiUrl } from "./src/api/apiUrl";
+import { socialImageUrl } from "./src/lib/socialImage";
 
 const require = createRequire(import.meta.url);
 const pkg = require("./package.json") as { version: string };
 
 export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
   if (command === "build" && mode === "production") {
-    requireTrustedApiUrl(loadEnv(mode, process.cwd(), "VITE_").VITE_API_URL);
+    requireTrustedApiUrl(env.VITE_API_URL);
   }
+  const socialImage = socialImageUrl(env.VITE_APP_URL);
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: "social-image",
+        transformIndexHtml: () =>
+          socialImage
+            ? [
+                {
+                  tag: "meta",
+                  attrs: { property: "og:image", content: socialImage },
+                  injectTo: "head",
+                },
+                {
+                  tag: "meta",
+                  attrs: { property: "og:image:alt", content: "4Mica logo" },
+                  injectTo: "head",
+                },
+              ]
+            : [],
+      },
+    ],
     build: {
       sourcemap: false,
       rolldownOptions: {
