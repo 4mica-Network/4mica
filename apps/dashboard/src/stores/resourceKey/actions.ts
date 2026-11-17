@@ -1,6 +1,9 @@
 import type { ApiKey } from "@stores/developer/type";
 import type { ResourceRef } from "@stores/shared/type";
 import type { PendingMeta } from "@stores/utils";
+
+export type ResourceMeta = PendingMeta & { resource?: ResourceRef };
+
 import actionTypes from "./actionTypes";
 import type { RevealedResourceKey } from "./type";
 
@@ -36,7 +39,7 @@ export const createResourceKey = (resource: ResourceRef, name: string) => ({
 export const createResourceKeySucceeded = (
   apiKey: ApiKey,
   revealed: RevealedResourceKey,
-  meta: PendingMeta,
+  meta: ResourceMeta,
 ) => ({
   type: actionTypes.CREATE_RESOURCE_KEY_SUCCEEDED,
   payload: { apiKey, revealed },
@@ -51,7 +54,7 @@ export const revokeResourceKey = (resource: ResourceRef, keyId: string) => ({
 
 export const revokeResourceKeySucceeded = (
   apiKey: ApiKey,
-  meta: PendingMeta,
+  meta: ResourceMeta,
 ) => ({
   type: actionTypes.REVOKE_RESOURCE_KEY_SUCCEEDED,
   payload: apiKey,
@@ -66,7 +69,7 @@ export const deleteResourceKey = (resource: ResourceRef, keyId: string) => ({
 
 export const deleteResourceKeySucceeded = (
   keyId: string,
-  meta: PendingMeta,
+  meta: ResourceMeta,
 ) => ({
   type: actionTypes.DELETE_RESOURCE_KEY_SUCCEEDED,
   payload: { id: keyId },
@@ -76,7 +79,7 @@ export const deleteResourceKeySucceeded = (
 export const resourceKeyActionFailed = (
   message: string,
   issues: Record<string, string>,
-  meta: PendingMeta,
+  meta: ResourceMeta,
 ) => ({
   type: actionTypes.RESOURCE_KEY_ACTION_FAILED,
   payload: { message, issues },
