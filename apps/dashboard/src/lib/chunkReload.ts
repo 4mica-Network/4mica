@@ -9,6 +9,9 @@ export const isChunkLoadError = (error: unknown): boolean =>
   (error.name === "ChunkLoadError" || CHUNK_FAILURE.test(error.message));
 
 export function reloadForNewVersion(now = Date.now()): boolean {
+  if (!navigator.onLine) {
+    return false;
+  }
   let last = 0;
   try {
     last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0);

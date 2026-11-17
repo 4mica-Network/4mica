@@ -43,6 +43,8 @@
   "crash.reload": "Reload page",
   "crash.newVersion.title": "A new version of the dashboard is available",
   "crash.newVersion.description": "Reload to get it. Anything you haven't saved on this page will be lost.",
+  "crash.offline.title": "You're offline",
+  "crash.offline.description": "This page couldn't load without a connection. It will reload as soon as you're back online.",
   "offline.banner": "You're offline. Changes won't save until your connection is back.",
   "http.offline": "You're offline. Reconnect, then try again.",
   "http.checkConnection": "Check your connection and try again.",
