@@ -1,5 +1,9 @@
 import * as api from "@api/trust";
 import i18n from "@i18n";
+import {
+  refreshAfterWrite,
+  writeSucceededTypes,
+} from "@stores/refreshAfterWrite";
 import type { ResourceRef } from "@stores/shared/type";
 import type { PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
@@ -231,6 +235,11 @@ export function* reorderFaqs(action: {
 }
 
 export default [
+  refreshAfterWrite({
+    fetchType: actionTypes.FETCH_TRUST_REQUESTED,
+    writeTypes: writeSucceededTypes(actionTypes),
+    isLoading: (state) => Boolean(state.trust.pending.trust),
+  }),
   takeLatest(actionTypes.FETCH_TRUST_REQUESTED, fetchTrust),
   takeEvery(actionTypes.CREATE_FAQ_REQUESTED, createFaq),
   takeEvery(actionTypes.UPDATE_FAQ_REQUESTED, updateFaq),

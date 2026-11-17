@@ -1,5 +1,9 @@
 import * as api from "@api/resourceKey";
 import i18n from "@i18n";
+import {
+  refreshAfterWrite,
+  writeSucceededTypes,
+} from "@stores/refreshAfterWrite";
 import type { ResourceRef } from "@stores/shared/type";
 import type { PendingMeta } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
@@ -144,6 +148,11 @@ export function* deleteResourceKey(action: {
 }
 
 export default [
+  refreshAfterWrite({
+    fetchType: actionTypes.FETCH_RESOURCE_KEYS_REQUESTED,
+    writeTypes: writeSucceededTypes(actionTypes),
+    isLoading: (state) => state.resourceKey.isLoading,
+  }),
   takeLatest(actionTypes.FETCH_RESOURCE_KEYS_REQUESTED, fetchResourceKeys),
   takeEvery(actionTypes.CREATE_RESOURCE_KEY_REQUESTED, createResourceKey),
   takeEvery(actionTypes.REVOKE_RESOURCE_KEY_REQUESTED, revokeResourceKey),

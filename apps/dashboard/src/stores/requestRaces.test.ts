@@ -21,9 +21,25 @@ const deferred = <T>(): Deferred<T> => {
   return promise;
 };
 
-const { getPayments, getMe } = vi.hoisted(() => ({
+const { getPayments, getMe, developerApi } = vi.hoisted(() => ({
   getPayments: vi.fn(),
   getMe: vi.fn(),
+  developerApi: {
+    getApiKeys: vi.fn(),
+    getWebhooks: vi.fn(),
+    getWebhookEvents: vi.fn(),
+    createApiKey: vi.fn(),
+  },
+}));
+
+vi.mock("@api/developer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...developerApi,
+}));
+
+vi.mock("@/lib/notify", () => ({
+  notifySuccess: vi.fn(),
+  notifyError: vi.fn(),
 }));
 
 vi.mock("@api/payment", () => ({
@@ -42,6 +58,21 @@ const { store } = await import("./index");
 const { fetchPayments, setPaymentFilters } = await import("./payment/actions");
 const { fetchUser } = await import("./user/actions");
 const { resetSession } = await import("./session");
+const { fetchDeveloper, createApiKey } = await import("./developer/actions");
+
+const apiKey = (id: string) => ({
+  id,
+  name: id,
+  prefix: "4mica_sk_ab12",
+  last4: "wxyz",
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+  createdAt: "2026-08-05T00:00:00.000Z",
+  updatedAt: "2026-08-05T00:00:00.000Z",
+});
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const page = (id: string) => ({
   items: [{ id, resource: null }],
@@ -96,5 +127,32 @@ describe("request races", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(getMe).toHaveBeenCalledTimes(1);
+  });
+
+  it("a key created while the page is still loading survives the older load", async () => {
+    const staleKeys = deferred<ReturnType<typeof apiKey>[]>();
+    developerApi.getApiKeys
+      .mockReturnValueOnce(staleKeys)
+      .mockResolvedValueOnce([apiKey("key_new"), apiKey("key_old")]);
+    developerApi.getWebhooks.mockResolvedValue([]);
+    developerApi.getWebhookEvents.mockResolvedValue([]);
+    developerApi.createApiKey.mockResolvedValue({
+      apiKey: apiKey("key_new"),
+      plaintext: "4mica_sk_secret",
+    });
+
+    store.dispatch(fetchDeveloper());
+    store.dispatch(createApiKey({ name: "key_new" }));
+    await settle();
+
+    staleKeys.resolve([apiKey("key_old")]);
+    await settle();
+
+    expect(staleKeys.cancelled).toBe(true);
+    expect(store.getState().developer.apiKeys.map((key) => key.id)).toEqual([
+      "key_new",
+      "key_old",
+    ]);
+    expect(store.getState().developer.isLoading).toBe(false);
   });
 });

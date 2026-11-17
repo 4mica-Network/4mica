@@ -1,5 +1,9 @@
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import {
+  refreshAfterWrite,
+  writeSucceededTypes,
+} from "@stores/refreshAfterWrite";
 import type { PendingMeta } from "@stores/utils";
 import { toIssueMap, toMessage } from "@utils/http-errors";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
@@ -231,6 +235,11 @@ export function* deleteWebhook(action: {
 }
 
 export default [
+  refreshAfterWrite({
+    fetchType: actionTypes.FETCH_DEVELOPER_REQUESTED,
+    writeTypes: writeSucceededTypes(actionTypes),
+    isLoading: (state) => state.developer.isLoading,
+  }),
   takeLatest(actionTypes.FETCH_DEVELOPER_REQUESTED, fetchDeveloper),
   takeEvery(actionTypes.CREATE_API_KEY_REQUESTED, createApiKey),
   takeEvery(actionTypes.RENAME_API_KEY_REQUESTED, renameApiKey),
