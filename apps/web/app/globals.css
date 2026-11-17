@@ -3,6 +3,36 @@
 @import "@4mica/tailwind-config/styles.css";
 @config "../tailwind.config.ts";
 
+@keyframes hero-rise {
+  from {
+    opacity: 0.01;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-fade {
+  from {
+    opacity: 0.01;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hero-rise {
+  animation: hero-rise 0.55s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise {
+    animation-name: hero-fade;
+  }
+}
+
 @keyframes marquee {
   from {
     transform: translateX(0);
