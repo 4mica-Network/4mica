@@ -1,4 +1,17 @@
 import { normalizeUrl } from "./normalize-url";
+import {
+  backoffDelay,
+  DEFAULT_RETRY,
+  DEFAULT_TIMEOUT_MS,
+  HttpTimeoutError,
+  isAbortError,
+  isNetworkError,
+  isRetryableStatus,
+  linkSignals,
+  type RetryPolicy,
+  retryAfterMs,
+  sleep,
+} from "./resilience";
 import { resolveAuthToken } from "./token";
 
 export enum HttpMethod {
@@ -17,27 +30,47 @@ export interface HttpRequestConfig<TData = unknown> {
   headers?: Record<string, string>;
   signal?: AbortSignal;
   skipAuth?: boolean;
+  timeoutMs?: number;
+  retry?: RetryPolicy | false;
 }
+
+export interface HttpClientOptions {
+  timeoutMs?: number;
+  retry?: RetryPolicy | false;
+}
+
+const IDEMPOTENT_METHODS = new Set<string>([HttpMethod.GET]);
 
 export class HttpError extends Error {
   readonly status: number;
   readonly statusText: string;
   readonly body: unknown;
+  readonly retryAfterMs: number | null;
 
-  constructor(status: number, statusText: string, body: unknown) {
+  constructor(
+    status: number,
+    statusText: string,
+    body: unknown,
+    retryAfterMs: number | null = null,
+  ) {
     super(`HTTP ${status} ${statusText}`);
     this.name = "HttpError";
     this.status = status;
     this.statusText = statusText;
     this.body = body;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
 export class HttpClient {
   private baseURL: string;
+  private timeoutMs: number;
+  private retry: RetryPolicy | false;
 
-  constructor(baseURL: string) {
+  constructor(baseURL: string, options: HttpClientOptions = {}) {
     this.baseURL = baseURL;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.retry = options.retry ?? DEFAULT_RETRY;
   }
 
   private buildUrl(
@@ -62,6 +95,51 @@ export class HttpClient {
   public async request<TResponse, TData = unknown>(
     config: HttpRequestConfig<TData>,
   ): Promise<TResponse> {
+    const policy = IDEMPOTENT_METHODS.has(config.method)
+      ? (config.retry ?? this.retry)
+      : false;
+    const retries = policy ? policy.retries : 0;
+
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.attempt<TResponse, TData>(config);
+      } catch (error) {
+        const delay =
+          policy && attempt < retries
+            ? this.retryDelay(error, attempt, policy)
+            : null;
+        if (delay === null) {
+          throw error;
+        }
+        await sleep(delay, config.signal);
+      }
+    }
+  }
+
+  private retryDelay(
+    error: unknown,
+    attempt: number,
+    policy: RetryPolicy,
+  ): number | null {
+    if (error instanceof HttpError) {
+      if (!isRetryableStatus(error.status)) {
+        return null;
+      }
+      const requested = error.retryAfterMs;
+      if (requested !== null) {
+        return requested <= policy.maxDelayMs ? requested : null;
+      }
+      return backoffDelay(attempt, policy);
+    }
+    if (error instanceof HttpTimeoutError || isNetworkError(error)) {
+      return backoffDelay(attempt, policy);
+    }
+    return null;
+  }
+
+  private async attempt<TResponse, TData>(
+    config: HttpRequestConfig<TData>,
+  ): Promise<TResponse> {
     const {
       url,
       method,
@@ -70,7 +148,37 @@ export class HttpClient {
       headers = {},
       signal,
       skipAuth,
+      timeoutMs = this.timeoutMs,
     } = config;
+
+    const timeout = new AbortController();
+    const timer = setTimeout(
+      () => timeout.abort(new HttpTimeoutError(timeoutMs)),
+      timeoutMs,
+    );
+    const linked = linkSignals(signal, timeout.signal);
+
+    try {
+      return await this.send<TResponse, TData>(
+        { url, method, data, params, headers, skipAuth },
+        linked.signal,
+      );
+    } catch (error) {
+      if (timeout.signal.aborted && !signal?.aborted && isAbortError(error)) {
+        throw timeout.signal.reason;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      linked.dispose();
+    }
+  }
+
+  private async send<TResponse, TData>(
+    config: Omit<HttpRequestConfig<TData>, "signal">,
+    signal: AbortSignal,
+  ): Promise<TResponse> {
+    const { url, method, data, params, headers = {}, skipAuth } = config;
 
     const fullUrl = this.buildUrl(url, params);
     const isFormData =
@@ -106,7 +214,12 @@ export class HttpClient {
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      throw new HttpError(response.status, response.statusText, body);
+      throw new HttpError(
+        response.status,
+        response.statusText,
+        body,
+        retryAfterMs(response.headers.get("retry-after")),
+      );
     }
 
     const contentType = response.headers.get("content-type") ?? "";
