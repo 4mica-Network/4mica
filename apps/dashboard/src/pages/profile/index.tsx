@@ -47,6 +47,7 @@ function useVerificationOutcome() {
       content: t(`page.settings.profile.verify.${outcome}.body`, {
         defaultValue: "",
       }),
+      options: { toastId: `verify-outcome-${outcome}` },
     });
 
     setParams({}, { replace: true });
