@@ -310,7 +310,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
       onAnimationComplete={() => setSettled(!collapsed)}
-      className="flex h-screen shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
+      className="flex h-dvh shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
         {inSettings ? (

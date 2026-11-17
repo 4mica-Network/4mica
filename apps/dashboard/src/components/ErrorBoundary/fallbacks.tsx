@@ -53,7 +53,7 @@ export function PageCrash(props: FallbackProps) {
 
 export function AppCrash(props: FallbackProps) {
   return (
-    <div className="grid min-h-screen place-items-center bg-surface-deep p-6">
+    <div className="grid min-h-dvh place-items-center bg-surface-deep p-6">
       <CrashMessage {...props} />
     </div>
   );
