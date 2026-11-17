@@ -46,7 +46,7 @@ const UI_TO_TOAST: Record<PlacementCamel, ToastPosition> = {
   bottomRight: "bottom-right",
 };
 
-function resolveToastPosition(
+export function toastPosition(
   placement?: NotificationPlacement,
   fallback: ToastPosition = "bottom-right",
 ): ToastPosition {
@@ -71,14 +71,15 @@ function notify({
 }) {
   const { position: positionOverride, ...restOptions } = options;
 
-  const position = positionOverride ?? resolveToastPosition(placement);
+  const position =
+    positionOverride ?? (placement ? toastPosition(placement) : undefined);
 
   toast(
     (toastProps) => (
       <Notification {...toastProps} data={{ title, content, type }} />
     ),
     {
-      position,
+      ...(position ? { position } : {}),
       autoClose: 6000,
       hideProgressBar: true,
       ...restOptions,
