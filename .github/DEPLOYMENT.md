@@ -259,7 +259,7 @@ service deploys green but cannot reach its neighbours.
 | web + edge (Box A) | `SERVER_HOST` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `WEB_PORT`, `EDGE_PORT`, **`PLAYGROUND_UPSTREAM`** |
 | be | `BE_SERVER_HOST`, `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `BE_PORT`, `LOG_LEVEL`, `CORS_ORIGINS`, `EMAIL_SERVICE_URL`, `PLAYGROUND_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_AUTHORIZED_PARTIES`, `SHUTDOWN_*`, `RATE_LIMIT_*` |
 | email | `EMAIL_SERVER_HOST`, `RESEND_API_KEY` | `EMAIL_DRY_RUN`, `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, `EMAIL_REPLY_TO`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL` |
-| dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL` |
+| dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL`, `DASHBOARD_SENTRY_DSN` (optional) |
 | playground (Box B) | `BE_SERVER_HOST` (same host as be), `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `PLAYGROUND_PORT`, **`PLAYGROUND_BIND`**, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
 
 Values the single-box layout pins:
@@ -359,6 +359,13 @@ Values the single-box layout pins:
   `docker build`. The same build renders the nginx security headers, whose CSP
   names that origin and the Clerk host decoded from
   `VITE_CLERK_PUBLISHABLE_KEY`, so a malformed key fails the build too.
+- **Dashboard Sentry is off until `DASHBOARD_SENTRY_DSN` is set.** The
+  variable becomes `VITE_SENTRY_DSN` at build time; with it unset the Sentry
+  chunk is never downloaded. With it set, the dashboard reports errors and
+  Core Web Vitals (LCP, CLS, INP) for a 10% sample of page loads through the
+  same scrubbers as the playground (`packages/telemetry`), and the build adds
+  the DSN's ingest origin to the CSP `connect-src`. Use a separate Sentry
+  project from the playground's `SENTRY_DSN`.
 - **The dashboard, web and email deploys are gated on a dependency scan.**
   Each workflow runs `dependency-scan.yml` first: OSV-Scanner matches
   `pnpm-lock.yaml` offline against the downloaded npm advisory database, and

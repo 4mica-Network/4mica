@@ -20,10 +20,12 @@
   "dependencies": {
     "@4mica/http": "workspace:*",
     "@4mica/rules": "workspace:*",
+    "@4mica/telemetry": "workspace:*",
     "@4mica/ui": "workspace:*",
     "@4mica/url": "workspace:*",
     "@clerk/clerk-react": "catalog:",
     "@hookform/resolvers": "catalog:",
+    "@sentry/react": "catalog:",
     "ahooks": "catalog:",
     "framer-motion": "catalog:",
     "i18next": "catalog:",

@@ -53,6 +53,7 @@ catalog:
   '@reown/appkit-adapter-wagmi': ^1.8.20
   '@sentry/core': 11.9.0
   '@sentry/nextjs': 11.9.0
+  '@sentry/react': 11.9.0
   '@shikijs/rehype': ^3.23.0
   '@tailwindcss/postcss': ^4.3.0
   '@tailwindcss/vite': ^4.3.0
