@@ -92,6 +92,7 @@
   "settings.account.security": "Seguridad",
   "settings.account.privacyMode": "Modo de privacidad",
   "settings.account.privacyModeHint": "Ocultar saldos y contrapartes en la interfaz.",
+  "privacy.hidden": "Oculto",
   "settings.account.twoFactor": "Autenticación en dos pasos",
   "settings.account.twoFactorHint": "Exigir un segundo factor al iniciar sesión. Se configura y gestiona en los ajustes de seguridad de inicio de sesión.",
   "settings.account.twoFactorOn": "Activada",

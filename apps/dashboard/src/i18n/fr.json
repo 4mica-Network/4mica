@@ -92,6 +92,7 @@
   "settings.account.security": "Sécurité",
   "settings.account.privacyMode": "Mode confidentialité",
   "settings.account.privacyModeHint": "Masquer les soldes et les contreparties dans l’interface.",
+  "privacy.hidden": "Masqué",
   "settings.account.twoFactor": "Authentification à deux facteurs",
   "settings.account.twoFactorHint": "Exiger un second facteur à la connexion. Configuration et gestion dans les paramètres de sécurité de connexion.",
   "settings.account.twoFactorOn": "Activée",
