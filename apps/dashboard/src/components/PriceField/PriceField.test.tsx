@@ -66,6 +66,6 @@ describe("PriceField", () => {
         "Choose a receiving wallet to pick the token buyers pay in",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Token" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Token / })).toBeDisabled();
   });
 });

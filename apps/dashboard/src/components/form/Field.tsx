@@ -3,6 +3,7 @@ import { createContext, type ReactNode, use, useId } from "react";
 
 export interface FieldA11y {
   id?: string;
+  labelId?: string;
   describedBy?: string;
   required?: boolean;
 }
@@ -15,16 +16,19 @@ const joinIds = (...ids: (string | undefined)[]): string | undefined =>
   ids.filter(Boolean).join(" ") || undefined;
 
 function FieldLabel({
+  id,
   htmlFor,
   required,
   children,
 }: {
+  id: string;
   htmlFor: string;
   required?: boolean;
   children: ReactNode;
 }) {
   return (
     <label
+      id={id}
       htmlFor={htmlFor}
       className="inline-flex items-center gap-1 font-medium text-ink-strong text-sm"
     >
@@ -47,7 +51,12 @@ function Hint({ id, children }: { id: string; children: ReactNode }) {
 const useFieldIds = (htmlFor: string | undefined) => {
   const generated = useId();
   const id = htmlFor ?? `field-${generated}`;
-  return { id, hintId: `${id}-hint`, errorId: `${id}-row-error` };
+  return {
+    id,
+    labelId: `${id}-label`,
+    hintId: `${id}-hint`,
+    errorId: `${id}-row-error`,
+  };
 };
 
 export function FieldRow({
@@ -65,9 +74,10 @@ export function FieldRow({
   action?: ReactNode;
   children: ReactNode;
 }) {
-  const { id, hintId } = useFieldIds(htmlFor);
+  const { id, labelId, hintId } = useFieldIds(htmlFor);
   const field: FieldA11y = {
     id,
+    labelId,
     required,
     describedBy: description ? hintId : undefined,
   };
@@ -76,7 +86,7 @@ export function FieldRow({
     <div className="flex flex-col py-3 first:pt-0 last:pb-0">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <FieldLabel htmlFor={id} required={required}>
+          <FieldLabel id={labelId} htmlFor={id} required={required}>
             {title}
           </FieldLabel>
           {description && <Hint id={hintId}>{description}</Hint>}
@@ -105,9 +115,10 @@ export function SettingRow({
   error?: string;
   children: ReactNode;
 }) {
-  const { id, hintId, errorId } = useFieldIds(htmlFor);
+  const { id, labelId, hintId, errorId } = useFieldIds(htmlFor);
   const field: FieldA11y = {
     id,
+    labelId,
     required,
     describedBy: joinIds(
       description ? hintId : undefined,
@@ -118,7 +129,7 @@ export function SettingRow({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 sm:pr-6">
-        <FieldLabel htmlFor={id} required={required}>
+        <FieldLabel id={labelId} htmlFor={id} required={required}>
           {title}
         </FieldLabel>
         {description && <Hint id={hintId}>{description}</Hint>}

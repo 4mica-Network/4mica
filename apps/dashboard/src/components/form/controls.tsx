@@ -116,6 +116,7 @@ export function Select({ id, onChange, ...props }: SelectProps) {
       noResultsText={t("form.noResults")}
       {...props}
       id={controlId}
+      aria-labelledby={props["aria-label"] ? undefined : field.labelId}
       aria-describedby={field.describedBy}
       data-testid={controlId}
       onChange={(option) => option && onChange(String(option.value))}
@@ -136,6 +137,9 @@ export function ComboBox({
     <UiComboBox
       {...props}
       id={id ?? field.id}
+      aria-labelledby={
+        props["aria-label"] || props.label ? undefined : field.labelId
+      }
       aria-describedby={field.describedBy}
       searchPlaceholder={t("form.search")}
       noResultsText={t("form.noResults")}
