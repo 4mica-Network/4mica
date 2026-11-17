@@ -84,7 +84,7 @@ export function SignInPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="flex min-h-screen w-full flex-col overflow-y-auto bg-surface-deep"
+      className="flex min-h-dvh w-full flex-col overflow-y-auto bg-surface-deep"
     >
       <div className="flex w-full flex-1 flex-col items-center justify-center gap-24 p-10">
         <div className="flex flex-col items-center">

@@ -13,7 +13,7 @@ const DESKTOP_QUERY = "(min-width: 1024px)";
 function UnsupportedScreen() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-deep px-6 text-center text-ink-body">
+    <div className="flex min-h-dvh items-center justify-center bg-surface-deep px-6 text-center text-ink-body">
       <div className="flex max-w-sm flex-col items-center gap-4">
         <span className="grid h-12 w-12 place-items-center rounded-xl border border-overlay/10 bg-surface">
           <Monitor aria-hidden="true" className="h-5 w-5 text-ink-muted" />
@@ -75,7 +75,7 @@ export function AppShell() {
     isDesktop ? setDesktopCollapsed((v) => !v) : setOverlayOpen((v) => !v);
 
   return (
-    <div className="flex h-screen bg-surface-deep text-ink-body">
+    <div className="flex h-dvh bg-surface-deep text-ink-body">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-ink-strong focus:text-sm focus:shadow-lg"
@@ -88,7 +88,7 @@ export function AppShell() {
       >
         <div
           className={cn(
-            "relative h-screen",
+            "relative h-dvh",
             !isDesktop && "absolute inset-y-0 left-0 z-40",
             isOverlay && "shadow-2xl",
           )}

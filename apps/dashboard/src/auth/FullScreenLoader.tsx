@@ -14,7 +14,7 @@ export function FullScreenLoader() {
   }, []);
 
   return (
-    <div className="grid min-h-screen place-items-center bg-surface-deep p-6">
+    <div className="grid min-h-dvh place-items-center bg-surface-deep p-6">
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
         <Spinner size="lg" className="text-ink-subtle" />
         {slow ? (

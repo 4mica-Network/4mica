@@ -85,7 +85,7 @@ export const Modal = ({
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              "relative flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-overlay/10 bg-surface shadow-2xl outline-none",
+              "relative flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-xl border border-overlay/10 bg-surface shadow-2xl outline-none",
               SIZES[size],
               className,
             )}
