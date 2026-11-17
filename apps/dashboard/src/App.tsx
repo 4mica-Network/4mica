@@ -2,6 +2,7 @@ import { type ComponentType, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { AppShell } from "@/components/AppShell";
+import { PageBoundary } from "@/components/ErrorBoundary/PageBoundary";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsLayout } from "@/components/SettingsLayout";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -10,9 +11,11 @@ import { SsoCallbackPage } from "@/pages/sso-callback";
 import { APP_PAGES, SETTINGS_PAGES } from "@/routes";
 
 const page = (Component: ComponentType) => (
-  <Suspense fallback={<PageSpinner />}>
-    <Component />
-  </Suspense>
+  <PageBoundary>
+    <Suspense fallback={<PageSpinner />}>
+      <Component />
+    </Suspense>
+  </PageBoundary>
 );
 
 export function App() {
@@ -20,8 +23,8 @@ export function App() {
 
   return (
     <Routes>
-      <Route path="/sign-in" element={<SignInPage />} />
-      <Route path="/sso-callback" element={<SsoCallbackPage />} />
+      <Route path="/sign-in" element={page(SignInPage)} />
+      <Route path="/sso-callback" element={page(SsoCallbackPage)} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
