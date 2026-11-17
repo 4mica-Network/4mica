@@ -1,5 +1,5 @@
 import { formatPrice, PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Checkbox, cn, Spinner, Tag } from "@4mica/ui";
+import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   agentPendingKeys,
   publishAgent,
@@ -15,6 +15,7 @@ import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import {
   STATUS_LABEL_KEYS,
   STATUS_TAG_VARIANT,

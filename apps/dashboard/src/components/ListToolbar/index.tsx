@@ -1,8 +1,9 @@
-import { cn, InputField, type Option, Select, Spinner } from "@4mica/ui";
+import { cn, InputField, type Option, Select } from "@4mica/ui";
 import { useDebounceEffect } from "ahooks";
 import { Search as SearchIcon, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/Spinner";
 
 function Root({
   children,

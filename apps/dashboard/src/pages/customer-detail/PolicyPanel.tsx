@@ -1,5 +1,5 @@
 import { isDecimalAmount, trimAmount } from "@4mica/rules";
-import { Button, cn, Spinner } from "@4mica/ui";
+import { Button, cn } from "@4mica/ui";
 import {
   resetCustomerUsage,
   setCustomerPolicy,
@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
 import { SectionCard, SectionFooter, SectionInset } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useDraft } from "@/hooks/useDraft";
 import {
   QUOTA_PERIOD_OPTIONS,

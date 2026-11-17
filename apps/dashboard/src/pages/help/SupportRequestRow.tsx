@@ -1,4 +1,4 @@
-import { Checkbox, cn, Spinner } from "@4mica/ui";
+import { Checkbox, cn } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   supportPendingKeys,
@@ -20,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import { isDone } from "./constants";
 
 export const supportRequestPath = (id: string) =>

@@ -167,6 +167,7 @@ export function CreateApiListingModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("apiListing.create.title")}

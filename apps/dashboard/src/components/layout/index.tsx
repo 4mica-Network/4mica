@@ -1,6 +1,7 @@
-import { Card, cn, Spinner } from "@4mica/ui";
+import { Card, cn } from "@4mica/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/Spinner";
 
 export function SavingIndicator() {
   const { t } = useTranslation();

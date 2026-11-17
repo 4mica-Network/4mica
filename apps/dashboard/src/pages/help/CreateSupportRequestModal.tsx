@@ -142,6 +142,7 @@ export function CreateSupportRequestModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("help.create.title")}

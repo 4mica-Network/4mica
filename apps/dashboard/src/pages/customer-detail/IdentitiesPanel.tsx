@@ -3,7 +3,7 @@ import {
   PAYMENT_NETWORKS,
   shortenAddress,
 } from "@4mica/rules";
-import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
+import { Button, EmptyState, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   addCustomerIdentity,
@@ -38,6 +38,7 @@ import {
   SectionRow,
   SectionRows,
 } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import { useServerIssues } from "@/hooks/useServerIssues";

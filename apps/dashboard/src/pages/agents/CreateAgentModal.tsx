@@ -166,6 +166,7 @@ export function CreateAgentModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("agent.create.title")}

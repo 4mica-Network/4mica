@@ -170,6 +170,7 @@ export function Wizard() {
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen
       onClose={() => {}}
       title={t("onboarding.title")}
