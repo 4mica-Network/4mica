@@ -39,3 +39,6 @@ export const selectHasLoadedPayments = (state: RootState): boolean =>
 
 export const selectPaymentError = (state: RootState): string | null =>
   state.payment.error;
+
+export const selectPaymentInsightsFailed = (state: RootState): boolean =>
+  state.payment.insightsFailed;
