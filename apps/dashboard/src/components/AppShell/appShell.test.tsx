@@ -51,16 +51,14 @@ describe("AppShell", () => {
     window.matchMedia = original;
   });
 
-  it("keeps the app usable on narrow viewports such as 200% zoom", () => {
+  it("asks for a larger screen on phones instead of rendering the app", () => {
     setWidth(390);
     renderShell();
 
-    expect(screen.getByText("page")).toBeInTheDocument();
-    expect(screen.getByRole("main")).toBeInTheDocument();
-    expect(screen.getByTestId("sidebar")).toHaveAttribute(
-      "data-collapsed",
-      "true",
-    );
+    expect(
+      screen.getByRole("heading", { name: "Open 4Mica on a larger screen" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("page")).not.toBeInTheDocument();
   });
 
   it("offers a skip link that targets the focusable main content", () => {
