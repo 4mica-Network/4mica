@@ -4,6 +4,7 @@ import type { CustomerOverview, SpendBucket } from "@stores/customer/type";
 import { formatDateTime } from "@utils/format";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { currentLocale } from "@/i18n/locale";
 
 function Amount({ buckets }: { buckets: SpendBucket[] }) {
   const { t } = useTranslation();
@@ -105,7 +106,7 @@ export function OverviewTiles({
         }
       >
         <span className="font-semibold text-ink-strong text-sm">
-          {overview.txnCount.toLocaleString()}
+          {overview.txnCount.toLocaleString(currentLocale())}
         </span>
       </Tile>
 
