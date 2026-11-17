@@ -23,7 +23,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
-    animation: none;
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
   }
 }
