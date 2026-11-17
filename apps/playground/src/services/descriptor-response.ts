@@ -6,12 +6,12 @@ const PRIVATE_CACHE = "private, no-store";
 
 export const descriptorResponse = (
   descriptor: ResourceDescriptor,
-  indexable: boolean,
+  { visible, indexable }: { visible: boolean; indexable: boolean },
 ): Response =>
   Response.json(descriptor, {
     headers: {
       "access-control-allow-origin": "*",
-      "cache-control": indexable ? PUBLIC_CACHE : PRIVATE_CACHE,
+      "cache-control": visible ? PUBLIC_CACHE : PRIVATE_CACHE,
       "x-robots-tag": indexable ? "all" : "noindex",
     },
   });
