@@ -33,19 +33,21 @@ window.addEventListener("vite:preloadError", (event) => {
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");
 
-createRoot(root).render(
-  <StrictMode>
-    <ErrorBoundary fallback={AppCrash}>
-      <Provider store={store}>
-        <BrowserRouter>
-          <ClerkAuthProvider>
-            <MotionConfig reducedMotion="user">
-              <App />
-              <Notifications />
-            </MotionConfig>
-          </ClerkAuthProvider>
-        </BrowserRouter>
-      </Provider>
-    </ErrorBoundary>
-  </StrictMode>,
-);
+if (!document.documentElement.hasAttribute("data-unsupported")) {
+  createRoot(root).render(
+    <StrictMode>
+      <ErrorBoundary fallback={AppCrash}>
+        <Provider store={store}>
+          <BrowserRouter>
+            <ClerkAuthProvider>
+              <MotionConfig reducedMotion="user">
+                <App />
+                <Notifications />
+              </MotionConfig>
+            </ClerkAuthProvider>
+          </BrowserRouter>
+        </Provider>
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+}
