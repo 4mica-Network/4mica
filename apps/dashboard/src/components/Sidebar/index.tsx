@@ -20,6 +20,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
+import { preloadPage } from "@/routes";
 
 const EXPANDED_WIDTH = 256;
 export const COLLAPSED_WIDTH = 60;
@@ -117,6 +118,8 @@ function NavRow({
         <NavLink
           to={item.to}
           end={end}
+          onMouseEnter={() => preloadPage(item.to)}
+          onFocus={() => preloadPage(item.to)}
           className={({ isActive }) => rowClass(isActive)}
         >
           <RowIcon icon={item.icon} />
