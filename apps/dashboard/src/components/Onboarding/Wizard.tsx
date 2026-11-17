@@ -47,6 +47,13 @@ export function Wizard() {
 
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
+  const usernameCandidate = username.trim().toLowerCase();
+  const usernameStatus =
+    usernameCandidate === (user?.username ?? "")
+      ? "idle"
+      : usernameCheck.value === usernameCandidate
+        ? usernameCheck.status
+        : "checking";
   const [businessDraft, setBusinessDraft] = useState<BusinessDraft>({
     legalName: business?.legalName ?? "",
     businessType: business?.businessType ?? "",
@@ -90,9 +97,7 @@ export function Wizard() {
       case "name":
         return name.trim().length > 0;
       case "username":
-        return (
-          username.trim().length > 0 && usernameCheck.status !== "checking"
-        );
+        return username.trim().length > 0 && usernameStatus !== "checking";
       case "business":
         return businessDraft.legalName.trim().length > 0;
       default:
@@ -105,7 +110,7 @@ export function Wizard() {
       case "name":
         return isNameValid(name);
       case "username":
-        return isUsernameValid(username, usernameCheck.status);
+        return isUsernameValid(username, usernameStatus);
       case "business":
         return isBusinessValid(businessDraft.legalName, businessDraft.country);
       default:
