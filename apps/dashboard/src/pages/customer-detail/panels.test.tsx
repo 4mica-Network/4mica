@@ -1039,6 +1039,6 @@ describe("RemovePanel", () => {
       </MemoryRouter>,
     );
 
-    expect(navigate).toHaveBeenCalledWith("/customers");
+    expect(navigate).toHaveBeenCalledWith("/customers", { replace: true });
   });
 });
