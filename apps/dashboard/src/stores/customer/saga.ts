@@ -25,6 +25,7 @@ import {
   batchDeleteCustomersSucceeded,
   createCustomerSucceeded,
   customerActionFailed,
+  customerActionSucceeded,
   customerIdentityChanged,
   deleteCustomerSucceeded,
   fetchCustomerActivity as fetchCustomerActivityAction,
@@ -57,6 +58,13 @@ const toMessage = (error: unknown, fallback: string): string =>
       "Your session has expired. Refresh the page and sign in again.",
     ),
   });
+
+function failLoad(error: unknown, fallback: string) {
+  notifyError({
+    title: t("store.customer.failedTitle", "Something went wrong"),
+    content: toMessage(error, fallback),
+  });
+}
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
@@ -207,7 +215,9 @@ export function* fetchCustomerCoupons(action: {
     )) as Awaited<ReturnType<typeof api.getCustomerCoupons>>;
 
     yield put(fetchCustomerCouponsSucceeded(result.items));
-  } catch {}
+  } catch (error) {
+    failLoad(error, "Couldn't load this customer's coupons.");
+  }
 }
 
 export function* createCustomerCoupon(action: {
@@ -220,6 +230,7 @@ export function* createCustomerCoupon(action: {
       api.createCustomerCoupon(action.payload.id, action.payload.data),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
 
     notifySuccess({
@@ -248,6 +259,7 @@ export function* updateCustomerCoupon(action: {
       ),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
   } catch (error) {
     yield* fail(error, "Couldn't change that coupon.", action.meta);
@@ -264,6 +276,7 @@ export function* deleteCustomerCoupon(action: {
       api.deleteCustomerCoupon(action.payload.id, action.payload.couponId),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
 
     notifySuccess({
@@ -288,7 +301,9 @@ export function* fetchCustomerCredit(action: {
     )) as Awaited<ReturnType<typeof api.getCustomerCredit>>;
 
     yield put(fetchCustomerCreditSucceeded(result));
-  } catch {}
+  } catch (error) {
+    failLoad(error, "Couldn't load this customer's credit.");
+  }
 }
 
 export function* grantCustomerCredit(action: {
@@ -301,6 +316,7 @@ export function* grantCustomerCredit(action: {
       api.grantCustomerCredit(action.payload.id, action.payload.data),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCreditAction(action.payload.id));
 
     notifySuccess({
@@ -326,6 +342,8 @@ export function* zeroCustomerCredit(action: {
     )) as Awaited<ReturnType<typeof api.zeroCustomerCredit>>;
 
     yield put(fetchCustomerCreditSucceeded(result));
+    yield put(customerActionSucceeded(action.meta));
+    yield put(fetchCustomerCreditAction(action.payload.id));
 
     notifySuccess({
       title: t("store.customer.creditZeroed", "Credit cleared"),
@@ -567,6 +585,13 @@ export default [
   takeEvery(actionTypes.CREATE_CUSTOMER_REQUESTED, createCustomer),
   takeEvery(actionTypes.UPDATE_CUSTOMER_REQUESTED, updateCustomer),
   takeLatest(actionTypes.FETCH_CUSTOMER_CREDIT_REQUESTED, fetchCustomerCredit),
+  takeLatest(
+    actionTypes.FETCH_CUSTOMER_COUPONS_REQUESTED,
+    fetchCustomerCoupons,
+  ),
+  takeEvery(actionTypes.CREATE_CUSTOMER_COUPON_REQUESTED, createCustomerCoupon),
+  takeEvery(actionTypes.UPDATE_CUSTOMER_COUPON_REQUESTED, updateCustomerCoupon),
+  takeEvery(actionTypes.DELETE_CUSTOMER_COUPON_REQUESTED, deleteCustomerCoupon),
   takeEvery(actionTypes.GRANT_CUSTOMER_CREDIT_REQUESTED, grantCustomerCredit),
   takeEvery(actionTypes.ZERO_CUSTOMER_CREDIT_REQUESTED, zeroCustomerCredit),
   takeEvery(actionTypes.SET_CUSTOMER_POLICY_REQUESTED, setCustomerPolicy),

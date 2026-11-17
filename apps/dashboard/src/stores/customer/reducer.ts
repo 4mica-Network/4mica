@@ -254,6 +254,12 @@ export default function customerReducer(
     case actionTypes.CLEAR_CUSTOMER_SELECTION:
       return { ...state, selectedIds: [] };
 
+    case actionTypes.CUSTOMER_ACTION_SUCCEEDED:
+      return {
+        ...state,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+
     case actionTypes.CUSTOMER_ACTION_FAILED: {
       const payload = action.payload as {
         message?: string;
