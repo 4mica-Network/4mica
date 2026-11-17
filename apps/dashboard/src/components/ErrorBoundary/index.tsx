@@ -28,7 +28,10 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, _info: ErrorInfo): void {
-    if (isChunkLoadError(error) && reloadForNewVersion()) {
+    if (
+      isChunkLoadError(error) &&
+      (!navigator.onLine || reloadForNewVersion())
+    ) {
       return;
     }
     reportError(error);
