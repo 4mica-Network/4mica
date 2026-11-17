@@ -8,6 +8,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   NoWalletError,
   signMessage,
+  WalletAccountChangedError,
   WalletRejectedError,
 } from "@/lib/wallet-signer";
 import {
@@ -50,7 +51,13 @@ const toMessage = (error: unknown, fallback: string): string => {
       "You dismissed the signature request, so nothing was linked.",
     );
   }
-  return fallback;
+  if (error instanceof WalletAccountChangedError) {
+    return t(
+      "store.wallet.accountChanged",
+      "Your wallet switched to a different account. Switch back to the address you're linking, then try again.",
+    );
+  }
+  return messageOf(error, fallback);
 };
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {

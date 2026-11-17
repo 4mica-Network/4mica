@@ -22,12 +22,14 @@ vi.mock("@api/wallet", () => ({
 
 class NoWalletError extends Error {}
 class WalletRejectedError extends Error {}
+class WalletAccountChangedError extends Error {}
 
 vi.mock("@/lib/wallet-signer", () => ({
   signMessage,
   connectWallet: vi.fn(),
   hasInjectedWallet: () => true,
   NoWalletError,
+  WalletAccountChangedError,
   WalletRejectedError,
 }));
 
@@ -192,6 +194,24 @@ describe("createWallet saga", () => {
     expect(createWalletRequest).not.toHaveBeenCalled();
     expect(types(dispatched)).toEqual([actionTypes.WALLET_ACTION_FAILED]);
     expect(notifyError).toHaveBeenCalled();
+  });
+
+  it("tells the user to switch back when the wallet changed account mid-link", async () => {
+    createWalletChallenge.mockResolvedValue(CHALLENGE);
+    signMessage.mockRejectedValue(new WalletAccountChangedError());
+
+    const dispatched = await record(createWallet, walletState(), {
+      type: actionTypes.CREATE_WALLET_REQUESTED,
+      payload,
+      meta: CREATE_META,
+    });
+
+    const failure = dispatched.find(
+      (a) => a.type === actionTypes.WALLET_ACTION_FAILED,
+    );
+    expect((failure?.payload as { message: string }).message).toContain(
+      "Switch back to the address you're linking",
+    );
   });
 
   it("stays quiet when the user dismisses the signature prompt", async () => {
