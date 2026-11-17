@@ -1,7 +1,7 @@
 import type { AgentInput } from "@api/agent";
 import * as api from "@api/agent";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import {
   isNotFound,
   toMessage as messageOf,
@@ -21,6 +21,7 @@ import {
   fetchAgentsPending,
   fetchAgentsSucceeded,
   publishAgentSucceeded,
+  setAgentPage,
   updateAgentSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -66,6 +67,12 @@ export function* fetchAgents(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getAgents>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setAgentPage(lastPage));
+      return;
+    }
 
     yield put(fetchAgentsSucceeded(result));
   } catch (error) {

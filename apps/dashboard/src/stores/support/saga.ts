@@ -1,7 +1,7 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/support";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import {
   isNotFound,
   toMessage as messageOf,
@@ -21,6 +21,7 @@ import {
   fetchSupportRequestsPending,
   fetchSupportRequestsSucceeded,
   replySupportRequestSucceeded,
+  setSupportPage,
   supportActionFailed,
   updateSupportRequestSucceeded,
 } from "./actions";
@@ -71,6 +72,12 @@ export function* fetchSupportRequests(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getSupportRequests>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setSupportPage(lastPage));
+      return;
+    }
 
     yield put(fetchSupportRequestsSucceeded(result));
   } catch (error) {

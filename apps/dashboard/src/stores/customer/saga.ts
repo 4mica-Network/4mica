@@ -10,7 +10,7 @@ import type {
 } from "@api/customer";
 import * as api from "@api/customer";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import {
   isNotFound,
   toMessage as messageOf,
@@ -45,6 +45,7 @@ import {
   fetchCustomersFailed,
   fetchCustomersPending,
   fetchCustomersSucceeded,
+  setCustomerPage,
   setCustomerPolicySucceeded,
   setCustomerStatusSucceeded,
   updateCustomerSucceeded,
@@ -100,6 +101,12 @@ export function* fetchCustomers(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getCustomers>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setCustomerPage(lastPage));
+      return;
+    }
 
     yield put(fetchCustomersSucceeded(result));
   } catch (error) {

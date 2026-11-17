@@ -1,6 +1,6 @@
 import * as api from "@api/payment";
 import i18n from "@i18n";
-import { definedParams } from "@stores/utils";
+import { definedParams, pageBeyondEnd } from "@stores/utils";
 import { toMessage as messageOf } from "@utils/http-errors";
 import { call, put, select, takeLatest } from "redux-saga/effects";
 import {
@@ -11,6 +11,7 @@ import {
   fetchPaymentsFailed,
   fetchPaymentsPending,
   fetchPaymentsSucceeded,
+  setPaymentPage,
 } from "./actions";
 import actionTypes from "./actionTypes";
 import { selectPaymentState } from "./selector";
@@ -47,6 +48,12 @@ export function* fetchPayments(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getPayments>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setPaymentPage(lastPage));
+      return;
+    }
 
     yield put(fetchPaymentsSucceeded(result));
   } catch (error) {
