@@ -5,6 +5,7 @@ import { ArrowDownWideNarrow, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { currentLocale } from "@/i18n/locale";
 import { formatAmount, type RankKey, rankBy } from "./metrics";
 import { Panel } from "./Panel";
 
@@ -40,7 +41,9 @@ export function Leaderboard({
   const total = ranked.reduce((sum, entry) => sum + entry.value, 0);
 
   const format = (value: number) =>
-    sort === "amount" ? formatAmount(value) : value.toLocaleString();
+    sort === "amount"
+      ? formatAmount(value)
+      : value.toLocaleString(currentLocale());
 
   return (
     <Panel
