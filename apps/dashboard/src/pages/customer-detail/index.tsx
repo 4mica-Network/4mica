@@ -1,9 +1,9 @@
-import { Button } from "@4mica/ui";
 import {
   fetchCustomerDetail,
   resetCustomerDetail,
 } from "@stores/customer/actions";
 import {
+  selectCustomerDetail,
   selectCustomerOverview,
   selectDetailCustomer,
   selectHasLoadedCustomerDetail,
@@ -11,8 +11,9 @@ import {
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { LoadFailure } from "@/components/LoadFailure";
 import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AccessPanel } from "./AccessPanel";
@@ -34,6 +35,7 @@ export function CustomerDetail() {
   const customer = useAppSelector(selectDetailCustomer);
   const overview = useAppSelector(selectCustomerOverview);
   const hasLoaded = useAppSelector(selectHasLoadedCustomerDetail);
+  const { loadError, notFound } = useAppSelector(selectCustomerDetail);
 
   usePageTitle(
     customer
@@ -59,14 +61,14 @@ export function CustomerDetail() {
 
   if (!customer) {
     return (
-      <div className="flex flex-col items-start gap-4 py-10">
-        <p className="text-ink-muted text-sm">
-          {t("customer.detail.notFound")}
-        </p>
-        <Button asChild intent="outline" size="sm">
-          <Link to="/customers">{t("customer.detail.back")}</Link>
-        </Button>
-      </div>
+      <LoadFailure
+        notFound={notFound || !loadError}
+        notFoundLabel={t("customer.detail.notFound")}
+        message={loadError}
+        onRetry={() => id && dispatch(fetchCustomerDetail(id))}
+        backTo="/customers"
+        backLabel={t("customer.detail.back")}
+      />
     );
   }
 

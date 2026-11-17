@@ -11,7 +11,11 @@ import type {
 import * as api from "@api/customer";
 import i18n from "@i18n";
 import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import {
   all,
   call,
@@ -121,10 +125,10 @@ export function* fetchCustomerDetail(action: {
 
     const [customer, overview] = (yield all([
       call(() => api.getCustomer(id)),
-      call(() => api.getCustomerOverview(id)),
+      call(() => api.getCustomerOverview(id).catch(() => null)),
     ])) as [
       Awaited<ReturnType<typeof api.getCustomer>>,
-      Awaited<ReturnType<typeof api.getCustomerOverview>>,
+      Awaited<ReturnType<typeof api.getCustomerOverview>> | null,
     ];
 
     yield put(fetchCustomerDetailSucceeded({ customer, overview }));
@@ -138,6 +142,7 @@ export function* fetchCustomerDetail(action: {
           error,
           t("store.customer.detailFailed", "Couldn't load that customer."),
         ),
+        isNotFound(error),
       ),
     );
   }

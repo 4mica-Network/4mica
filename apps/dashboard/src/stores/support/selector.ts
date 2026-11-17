@@ -68,3 +68,7 @@ export const selectSupportError = (state: RootState): string | null =>
 
 export const selectSupportIssues = (state: RootState): Record<string, string> =>
   state.support.validationIssues;
+
+export const selectCurrentSupportRequestNotFound = (
+  state: RootState,
+): boolean => state.support.currentNotFound;

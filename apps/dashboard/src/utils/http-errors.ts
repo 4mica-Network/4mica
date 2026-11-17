@@ -45,6 +45,9 @@ export const toIssueMap = (error: unknown): Record<string, string> => {
   return map;
 };
 
+export const isNotFound = (error: unknown): boolean =>
+  error instanceof HttpError && error.status === 404;
+
 export const toMessage = (
   error: unknown,
   fallback: string,

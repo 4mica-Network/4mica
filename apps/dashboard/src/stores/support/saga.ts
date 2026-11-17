@@ -2,7 +2,11 @@ import { HttpError } from "@4mica/http";
 import * as api from "@api/support";
 import i18n from "@i18n";
 import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
@@ -98,6 +102,7 @@ export function* fetchSupportRequest(action: {
           error,
           t("store.support.fetchOneFailed", "Couldn't load that request."),
         ),
+        isNotFound(error),
       ),
     );
   }
