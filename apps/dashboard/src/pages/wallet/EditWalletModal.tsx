@@ -108,6 +108,7 @@ export function EditWalletModal({
     <Modal
       isOpen={Boolean(wallet)}
       onClose={onClose}
+      disableOverlayClose
       title={t("wallet.edit.title")}
       description={t("wallet.edit.description")}
       size="lg"

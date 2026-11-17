@@ -96,6 +96,7 @@ export function EditSupportRequestModal({
     <Modal
       isOpen={Boolean(request)}
       onClose={onClose}
+      disableOverlayClose
       title={t("help.edit.title")}
       description={t("help.edit.description")}
       size="lg"
