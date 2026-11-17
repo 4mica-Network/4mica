@@ -21,6 +21,7 @@ export const INITIAL_STATE: SupportState = {
   current: null,
   isLoadingCurrent: false,
   currentError: null,
+  currentNotFound: false,
   pending: {},
   error: null,
   validationIssues: {},
@@ -96,6 +97,9 @@ export default function supportReducer(
         currentError:
           (action.payload as { message?: string })?.message ??
           "Failed to load that request.",
+        currentNotFound: Boolean(
+          (action.payload as { notFound?: boolean })?.notFound,
+        ),
       };
 
     case actionTypes.RESET_SUPPORT_REQUEST:
@@ -104,6 +108,7 @@ export default function supportReducer(
         current: null,
         isLoadingCurrent: false,
         currentError: null,
+        currentNotFound: false,
       };
 
     case actionTypes.CREATE_SUPPORT_REQUEST_REQUESTED:

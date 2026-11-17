@@ -221,6 +221,8 @@ export interface CustomerDetail {
   };
   isLoading: boolean;
   hasLoaded: boolean;
+  loadError: string | null;
+  notFound: boolean;
 }
 
 export type CustomerState = {

@@ -269,15 +269,18 @@ export const fetchCustomerDetailPending = () => ({
 
 export const fetchCustomerDetailSucceeded = (payload: {
   customer: Customer;
-  overview: CustomerOverview;
+  overview: CustomerOverview | null;
 }) => ({
   type: actionTypes.FETCH_CUSTOMER_DETAIL_SUCCEEDED,
   payload,
 });
 
-export const fetchCustomerDetailFailed = (message: string) => ({
+export const fetchCustomerDetailFailed = (
+  message: string,
+  notFound = false,
+) => ({
   type: actionTypes.FETCH_CUSTOMER_DETAIL_FAILED,
-  payload: { message },
+  payload: { message, notFound },
 });
 
 export const fetchCustomerActivity = (id: string) => ({
