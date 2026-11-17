@@ -1,7 +1,7 @@
 import type { ApiListingInput } from "@api/apiListing";
 import * as api from "@api/apiListing";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import {
   isNotFound,
   toMessage as messageOf,
@@ -21,6 +21,7 @@ import {
   fetchApiListingsPending,
   fetchApiListingsSucceeded,
   publishApiListingSucceeded,
+  setApiListingPage,
   updateApiListingSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -65,6 +66,12 @@ export function* fetchApiListings(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getApiListings>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setApiListingPage(lastPage));
+      return;
+    }
 
     yield put(fetchApiListingsSucceeded(result));
   } catch (error) {

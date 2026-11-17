@@ -1,7 +1,7 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/wallet";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -19,6 +19,7 @@ import {
   fetchWalletsFailed,
   fetchWalletsPending,
   fetchWalletsSucceeded,
+  setWalletPage,
   updateWalletSucceeded,
   walletActionFailed,
 } from "./actions";
@@ -82,6 +83,12 @@ export function* fetchWallets(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getWallets>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setWalletPage(lastPage));
+      return;
+    }
 
     yield put(fetchWalletsSucceeded(result));
   } catch (error) {
