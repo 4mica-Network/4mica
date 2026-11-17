@@ -1,4 +1,3 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/support";
 import i18n from "@i18n";
 import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
@@ -36,14 +35,12 @@ import type {
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 const toMessage = (error: unknown, fallback: string): string =>
-  error instanceof HttpError
-    ? messageOf(error, fallback, {
-        sessionExpired: t(
-          "store.support.sessionExpired",
-          "Your session has expired. Refresh the page and sign in again.",
-        ),
-      })
-    : fallback;
+  messageOf(error, fallback, {
+    sessionExpired: t(
+      "store.support.sessionExpired",
+      "Your session has expired. Refresh the page and sign in again.",
+    ),
+  });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
