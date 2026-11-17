@@ -32,11 +32,13 @@ import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";
 import { PageSpinner } from "@/components/PageSpinner";
 import { PaymentRow } from "@/components/PaymentRow";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { NETWORK_OPTIONS } from "@/lib/networks";
 import { SummaryTiles } from "./SummaryTiles";
 
 export function Payments() {
   const { t } = useTranslation();
+  usePageTitle(t("page.payments.title"));
   const dispatch = useAppDispatch();
 
   const payments = useAppSelector(selectPayments);

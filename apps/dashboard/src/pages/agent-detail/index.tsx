@@ -85,6 +85,10 @@ export function AgentDetail() {
       <BackBar label={t("agentDetail.backToAgents")} to="/agents" />
 
       <div className="mx-auto flex w-full flex-col gap-10 lg:max-w-3xl">
+        <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
+          {agent.name}
+        </h1>
+
         <ToggleSection
           checked={policyEnabled}
           description={t("appDetail.policyLead")}

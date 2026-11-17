@@ -29,7 +29,7 @@ export function SettingsPage({
       <div className="flex w-full flex-1 animate-fade-in flex-col overflow-y-auto pr-3 pb-10">
         <div className="mx-auto flex w-full flex-col gap-8 lg:max-w-3xl">
           <div className="flex w-full flex-col items-start">
-            <h2 className="font-semibold text-ink-strong text-lg">{title}</h2>
+            <h1 className="font-semibold text-ink-strong text-lg">{title}</h1>
             <p className="mt-1 text-ink-muted text-sm">{t(descriptionKey)}</p>
           </div>
 
