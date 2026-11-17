@@ -3,7 +3,7 @@ import {
   PAYMENT_NETWORKS,
   shortenAddress,
 } from "@4mica/rules";
-import { Button, Checkbox, cn, Spinner, Tag, Tooltip } from "@4mica/ui";
+import { Button, Checkbox, cn, Tag, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import {
   ROLE_LABEL_KEYS,
   STATUS_LABEL_KEYS,

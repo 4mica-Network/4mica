@@ -1,4 +1,4 @@
-import { Button, Card, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, InputField, Tag } from "@4mica/ui";
 import type { ApiKey } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SettingsSection } from "@/components/layout";
 import { SecretRevealCard } from "@/components/RevealedSecret";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function SecretKeyRow({

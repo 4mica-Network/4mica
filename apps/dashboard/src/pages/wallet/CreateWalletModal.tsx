@@ -3,7 +3,7 @@ import {
   PAYMENT_NETWORKS,
   shortenAddress,
 } from "@4mica/rules";
-import { Button, Modal, Spinner, Tag } from "@4mica/ui";
+import { Button, Modal, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { clearWalletIssues, createWallet } from "@stores/wallet/actions";
@@ -33,6 +33,7 @@ import {
   FormTextInput,
 } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -321,6 +322,7 @@ export function CreateWalletModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("wallet.create.title")}

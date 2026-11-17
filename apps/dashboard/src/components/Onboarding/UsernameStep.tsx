@@ -1,9 +1,9 @@
-import { Spinner } from "@4mica/ui";
 import { isGeneratedUsername } from "@4mica/url";
 import { isUsernameShapeValid } from "@utils/user-rules";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { FieldRow, TextInput } from "@/components/form";
+import { Spinner } from "@/components/Spinner";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { links } from "@/lib/links";
 

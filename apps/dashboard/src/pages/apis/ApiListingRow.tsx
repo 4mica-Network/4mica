@@ -1,5 +1,5 @@
 import { formatPrice, PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Checkbox, cn, Spinner, Tag } from "@4mica/ui";
+import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   apiListingPendingKeys,
   publishApiListing,
@@ -15,6 +15,7 @@ import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import { VISIBILITY_LABEL_KEYS, VISIBILITY_TAG_VARIANT } from "./constants";
 
 export function ApiListingRow({

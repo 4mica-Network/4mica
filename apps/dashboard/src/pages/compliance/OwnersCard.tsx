@@ -1,4 +1,4 @@
-import { Button, Card, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, Switch, Tag } from "@4mica/ui";
 import {
   compliancePendingKeys,
   createOwner,
@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, SettingRow, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import {
   useCountryOptions,
   useTranslatedConfigOptions,

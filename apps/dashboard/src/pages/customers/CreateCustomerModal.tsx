@@ -146,6 +146,7 @@ export function CreateCustomerModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("customer.create.title")}

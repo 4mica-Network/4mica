@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { customerPendingKeys, deleteCustomer } from "@stores/customer/actions";
 import {
   selectCustomerError,
@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SectionCard } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 export function RemovePanel({ customer }: { customer: Customer }) {

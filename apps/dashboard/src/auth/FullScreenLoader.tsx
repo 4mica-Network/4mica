@@ -1,6 +1,7 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/Spinner";
 
 export const SLOW_LOAD_MS = 12_000;
 

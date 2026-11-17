@@ -94,6 +94,7 @@ export function EditSupportRequestModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={Boolean(request)}
       onClose={onClose}
       disableOverlayClose

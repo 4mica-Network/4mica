@@ -111,6 +111,7 @@ export function Select({ id, onChange, ...props }: SelectProps) {
   const controlId = id ?? field.id;
   return (
     <UiSelect
+      placeholder={t("form.selectPlaceholder")}
       searchPlaceholder={t("form.search")}
       noDataText={t("form.noResults")}
       noResultsText={t("form.noResults")}
@@ -135,6 +136,7 @@ export function ComboBox({
   const field = useFieldA11y();
   return (
     <UiComboBox
+      placeholder={t("form.selectManyPlaceholder")}
       {...props}
       id={id ?? field.id}
       aria-labelledby={

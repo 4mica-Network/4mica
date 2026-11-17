@@ -134,6 +134,7 @@ export function PhoneVerificationDialog({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       size="md"

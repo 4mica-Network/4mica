@@ -106,6 +106,7 @@ export function EditWalletModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={Boolean(wallet)}
       onClose={onClose}
       disableOverlayClose
