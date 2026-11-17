@@ -15,6 +15,7 @@ import {
   fetchResourceKeysFailed,
   fetchResourceKeysPending,
   fetchResourceKeysSucceeded,
+  type ResourceMeta,
   resourceKeyActionFailed,
   revokeResourceKeySucceeded,
 } from "./actions";
@@ -30,7 +31,7 @@ const toMessage = (error: unknown, fallback: string): string =>
     ),
   });
 
-function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+function* fail(error: unknown, fallback: string, meta: ResourceMeta) {
   const message = toMessage(error, fallback);
   yield put(resourceKeyActionFailed(message, toIssueMap(error), meta));
 
@@ -53,16 +54,20 @@ export function* fetchResourceKeys(action: {
       ReturnType<typeof api.getResourceKeys>
     >;
 
-    yield put(fetchResourceKeysSucceeded(result.items));
+    yield put({
+      ...fetchResourceKeysSucceeded(result.items),
+      meta: { resource: action.payload },
+    });
   } catch (error) {
-    yield put(
-      fetchResourceKeysFailed(
+    yield put({
+      ...fetchResourceKeysFailed(
         toMessage(
           error,
           t("store.resourceKey.fetchFailed", "Couldn't load the keys."),
         ),
       ),
-    );
+      meta: { resource: action.payload },
+    });
   }
 }
 
@@ -82,7 +87,7 @@ export function* createResourceKey(action: {
       createResourceKeySucceeded(
         created.apiKey,
         { id: created.apiKey.id, plaintext: created.plaintext },
-        action.meta,
+        { ...action.meta, resource },
       ),
     );
 
@@ -94,7 +99,10 @@ export function* createResourceKey(action: {
       ),
     });
   } catch (error) {
-    yield* fail(error, "Couldn't create the key.", action.meta);
+    yield* fail(error, "Couldn't create the key.", {
+      ...action.meta,
+      resource,
+    });
   }
 }
 
@@ -110,7 +118,7 @@ export function* revokeResourceKey(action: {
       api.revokeResourceKey(resource.kind, resource.id, keyId),
     )) as Awaited<ReturnType<typeof api.revokeResourceKey>>;
 
-    yield put(revokeResourceKeySucceeded(key, action.meta));
+    yield put(revokeResourceKeySucceeded(key, { ...action.meta, resource }));
 
     notifySuccess({
       title: t("store.resourceKey.revoked", "Secret key revoked"),
@@ -120,7 +128,10 @@ export function* revokeResourceKey(action: {
       ),
     });
   } catch (error) {
-    yield* fail(error, "Couldn't revoke the key.", action.meta);
+    yield* fail(error, "Couldn't revoke the key.", {
+      ...action.meta,
+      resource,
+    });
   }
 }
 
@@ -133,7 +144,7 @@ export function* deleteResourceKey(action: {
 
   try {
     yield call(() => api.deleteResourceKey(resource.kind, resource.id, keyId));
-    yield put(deleteResourceKeySucceeded(keyId, action.meta));
+    yield put(deleteResourceKeySucceeded(keyId, { ...action.meta, resource }));
 
     notifySuccess({
       title: t("store.resourceKey.deleted", "Secret key deleted"),
@@ -143,7 +154,10 @@ export function* deleteResourceKey(action: {
       ),
     });
   } catch (error) {
-    yield* fail(error, "Couldn't delete the key.", action.meta);
+    yield* fail(error, "Couldn't delete the key.", {
+      ...action.meta,
+      resource,
+    });
   }
 }
 

@@ -1,9 +1,11 @@
 import type { ApiKey } from "@stores/developer/type";
+import { isSameResource, type ResourceRef } from "@stores/shared/type";
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type { ResourceKeyState, RevealedResourceKey } from "./type";
 
 export const INITIAL_STATE: ResourceKeyState = {
+  resource: null,
   items: [],
   revealed: null,
   isLoading: false,
@@ -16,8 +18,17 @@ export const INITIAL_STATE: ResourceKeyState = {
 interface ResourceKeyAction {
   type: string;
   payload?: unknown;
-  meta?: { pendingKey: string };
+  meta?: { pendingKey?: string; resource?: ResourceRef };
 }
+
+const RESOURCE_SCOPED = new Set<string>([
+  actionTypes.FETCH_RESOURCE_KEYS_SUCCEEDED,
+  actionTypes.FETCH_RESOURCE_KEYS_FAILED,
+  actionTypes.CREATE_RESOURCE_KEY_SUCCEEDED,
+  actionTypes.REVOKE_RESOURCE_KEY_SUCCEEDED,
+  actionTypes.DELETE_RESOURCE_KEY_SUCCEEDED,
+  actionTypes.RESOURCE_KEY_ACTION_FAILED,
+]);
 
 const replaceById = <T extends { id: string }>(items: T[], next: T): T[] =>
   items.map((item) => (item.id === next.id ? next : item));
@@ -26,9 +37,24 @@ export default function resourceKeyReducer(
   state: ResourceKeyState = INITIAL_STATE,
   action: ResourceKeyAction = { type: "" },
 ): ResourceKeyState {
+  if (
+    RESOURCE_SCOPED.has(action.type) &&
+    action.meta?.resource &&
+    !isSameResource(state.resource, action.meta.resource)
+  ) {
+    return state;
+  }
+
   switch (action.type) {
     case actionTypes.RESET_RESOURCE_KEYS:
       return INITIAL_STATE;
+
+    case actionTypes.FETCH_RESOURCE_KEYS_REQUESTED: {
+      const resource = action.payload as ResourceRef;
+      return isSameResource(state.resource, resource)
+        ? state
+        : { ...INITIAL_STATE, resource };
+    }
 
     case actionTypes.FETCH_RESOURCE_KEYS_PENDING:
       return { ...state, isLoading: true, error: null };

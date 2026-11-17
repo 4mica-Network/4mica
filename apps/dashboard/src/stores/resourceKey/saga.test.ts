@@ -220,7 +220,7 @@ describe("resourceKey sagas", () => {
     expect(dispatched[0]).toEqual({
       type: actionTypes.DELETE_RESOURCE_KEY_SUCCEEDED,
       payload: { id: "key_1" },
-      meta: ROW_META,
+      meta: { ...ROW_META, resource },
     });
   });
 });

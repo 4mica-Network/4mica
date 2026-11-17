@@ -22,3 +22,8 @@ export interface ResourceRef {
   kind: ResourceKind;
   id: string;
 }
+
+export const isSameResource = (
+  a: ResourceRef | null | undefined,
+  b: ResourceRef | null | undefined,
+): boolean => Boolean(a && b && a.kind === b.kind && a.id === b.id);
