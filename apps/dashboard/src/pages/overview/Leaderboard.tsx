@@ -69,7 +69,7 @@ export function Leaderboard({
               current === "amount" ? "settledCount" : "amount",
             )
           }
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-overlay/5 hover:text-ink-body focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/60"
+          className="inline-flex min-h-6 items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-overlay/5 hover:text-ink-body focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/60"
           aria-label={t("overview.leaders.sortBy", {
             key: t(`overview.leaders.sort.${sort}`),
           })}

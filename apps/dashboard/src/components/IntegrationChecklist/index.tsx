@@ -118,7 +118,7 @@ export function IntegrationChecklist() {
               })
             }
             aria-label={t("checklist.dismiss")}
-            className="shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong"
+            className="shrink-0 rounded-md p-1.5 text-ink-subtle transition-colors hover:text-ink-strong"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -149,11 +149,15 @@ export function IntegrationChecklist() {
                 <span className="flex items-center gap-3 text-xs">
                   <NavLink
                     to="/help"
-                    className="text-ink-body transition-colors hover:text-ink-strong"
+                    className="inline-flex min-h-6 items-center text-ink-body transition-colors hover:text-ink-strong"
                   >
                     {t("checklist.helpCenter")}
                   </NavLink>
-                  <Link href={links.mailto.support} variant="accent">
+                  <Link
+                    href={links.mailto.support}
+                    variant="accent"
+                    className="inline-flex min-h-6 items-center"
+                  >
                     {t("checklist.contactSupport")}
                   </Link>
                 </span>
