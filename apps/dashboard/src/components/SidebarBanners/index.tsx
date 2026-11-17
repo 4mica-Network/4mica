@@ -4,12 +4,17 @@ import {
   fetchBanners,
   recordBannerInteraction,
 } from "@stores/banner/actions";
-import { selectBanners } from "@stores/banner/selector";
+import {
+  selectBanners,
+  selectHasLoadedBanners,
+  selectIsLoadingBanners,
+  selectViewedBannerIds,
+} from "@stores/banner/selector";
 import type { Banner } from "@stores/banner/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
 import { useLocalStorageState } from "ahooks";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 const DISMISSED_KEY = "4mica:banners:dismissed";
@@ -18,6 +23,9 @@ export function SidebarBanners() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const banners = useAppSelector(selectBanners);
+  const hasLoaded = useAppSelector(selectHasLoadedBanners);
+  const isLoading = useAppSelector(selectIsLoadingBanners);
+  const viewedIds = useAppSelector(selectViewedBannerIds);
   const userId = useAppSelector(selectUser)?.id;
 
   const [dismissedIds, setDismissedIds] = useLocalStorageState<string[]>(
@@ -26,28 +34,24 @@ export function SidebarBanners() {
   );
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || hasLoaded || isLoading) {
       return;
     }
     dispatch(fetchBanners());
-  }, [dispatch, userId]);
+  }, [dispatch, userId, hasLoaded, isLoading]);
 
   const visible = useMemo(
     () => banners.filter((item) => !dismissedIds?.includes(item.id)),
     [banners, dismissedIds],
   );
 
-  const reported = useRef(new Set<string>());
-
   useEffect(() => {
     for (const item of visible) {
-      if (reported.current.has(item.id)) {
-        continue;
+      if (!viewedIds.includes(item.id)) {
+        dispatch(recordBannerInteraction(item.id, "VIEWED"));
       }
-      reported.current.add(item.id);
-      dispatch(recordBannerInteraction(item.id, "VIEWED"));
     }
-  }, [visible, dispatch]);
+  }, [visible, viewedIds, dispatch]);
 
   const handleDismiss = (item: Banner) => {
     setDismissedIds([...(dismissedIds ?? []), item.id]);

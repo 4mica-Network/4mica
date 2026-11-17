@@ -23,5 +23,6 @@ export interface BannerState {
   banners: Banner[];
   isLoading: boolean;
   hasLoaded: boolean;
+  viewedIds: string[];
   error: string | null;
 }

@@ -9,3 +9,9 @@ export const selectBanners = (state: RootState): Banner[] =>
 
 export const selectHasLoadedBanners = (state: RootState): boolean =>
   state.banner.hasLoaded;
+
+export const selectIsLoadingBanners = (state: RootState): boolean =>
+  state.banner.isLoading;
+
+export const selectViewedBannerIds = (state: RootState): string[] =>
+  state.banner.viewedIds;
