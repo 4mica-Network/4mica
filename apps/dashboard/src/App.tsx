@@ -6,6 +6,7 @@ import { PageBoundary } from "@/components/ErrorBoundary/PageBoundary";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsLayout } from "@/components/SettingsLayout";
+import { useAppLanguage } from "@/hooks/useAppLanguage";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SignInPage } from "@/pages/sign-in";
 import { SsoCallbackPage } from "@/pages/sso-callback";
@@ -21,6 +22,7 @@ const page = (Component: ComponentType) => (
 
 export function App() {
   useAppTheme();
+  useAppLanguage();
 
   return (
     <>
