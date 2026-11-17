@@ -2,7 +2,11 @@ import type { ApiListingInput } from "@api/apiListing";
 import * as api from "@api/apiListing";
 import i18n from "@i18n";
 import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
@@ -10,6 +14,8 @@ import {
   batchDeleteApiListingsSucceeded,
   createApiListingSucceeded,
   deleteApiListingSucceeded,
+  fetchApiListingFailed,
+  fetchApiListingSucceeded,
   fetchApiListings as fetchApiListingsAction,
   fetchApiListingsFailed,
   fetchApiListingsPending,
@@ -208,7 +214,30 @@ export function* batchDeleteApiListings(action: {
   }
 }
 
+export function* fetchApiListing(action: {
+  type: string;
+  payload: { id: string };
+}): Generator {
+  try {
+    const item = (yield call(() =>
+      api.getApiListing(action.payload.id),
+    )) as Awaited<ReturnType<typeof api.getApiListing>>;
+    yield put(fetchApiListingSucceeded(item));
+  } catch (error) {
+    yield put(
+      fetchApiListingFailed(
+        toMessage(
+          error,
+          t("store.apiListing.fetchOneFailed", "Couldn't load that API."),
+        ),
+        isNotFound(error),
+      ),
+    );
+  }
+}
+
 export default [
+  takeLatest(actionTypes.FETCH_API_LISTING_REQUESTED, fetchApiListing),
   takeLatest(
     [
       actionTypes.FETCH_API_LISTINGS_REQUESTED,

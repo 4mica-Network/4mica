@@ -134,3 +134,18 @@ export const agentActionFailed = (
 export const clearAgentIssues = () => ({
   type: actionTypes.CLEAR_AGENT_ISSUES,
 });
+
+export const fetchAgent = (id: string) => ({
+  type: actionTypes.FETCH_AGENT_REQUESTED,
+  payload: { id },
+});
+
+export const fetchAgentSucceeded = (item: Agent) => ({
+  type: actionTypes.FETCH_AGENT_SUCCEEDED,
+  payload: item,
+});
+
+export const fetchAgentFailed = (message: string, notFound: boolean) => ({
+  type: actionTypes.FETCH_AGENT_FAILED,
+  payload: { message, notFound },
+});

@@ -1,13 +1,17 @@
-import { Button } from "@4mica/ui";
-import { fetchAgents } from "@stores/agent/actions";
-import { selectAgents, selectHasLoadedAgents } from "@stores/agent/selector";
+import { fetchAgent } from "@stores/agent/actions";
+import {
+  selectCurrentAgent,
+  selectCurrentAgentError,
+  selectCurrentAgentNotFound,
+} from "@stores/agent/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
 import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { LoadFailure } from "@/components/LoadFailure";
 import { SettingsSection } from "@/components/layout";
 import { PageSpinner } from "@/components/PageSpinner";
 import { FaqEditor } from "@/components/Resource/FaqEditor";
@@ -23,12 +27,13 @@ export function AgentDetail() {
   const dispatch = useAppDispatch();
   const { id = "" } = useParams<{ id: string }>();
 
-  const agents = useAppSelector(selectAgents);
-  const hasLoaded = useAppSelector(selectHasLoadedAgents);
+  const current = useAppSelector(selectCurrentAgent);
+  const loadError = useAppSelector(selectCurrentAgentError);
+  const notFound = useAppSelector(selectCurrentAgentNotFound);
   const policy = useAppSelector(selectPolicy);
   const isSavingPolicy = useAppSelector(selectIsTrustPending("savePolicy"));
 
-  const agent = agents.find((row) => row.id === id) ?? null;
+  const agent = current?.id === id ? current : null;
   const resource = { kind: "agent" as const, id };
 
   usePageTitle(
@@ -38,10 +43,10 @@ export function AgentDetail() {
   );
 
   useEffect(() => {
-    if (!hasLoaded) {
-      dispatch(fetchAgents());
+    if (id) {
+      dispatch(fetchAgent(id));
     }
-  }, [dispatch, hasLoaded]);
+  }, [dispatch, id]);
 
   useEffect(() => {
     if (!id) {
@@ -55,18 +60,20 @@ export function AgentDetail() {
     };
   }, [dispatch, id]);
 
-  if (!hasLoaded && !agent) {
+  if (!agent && !loadError) {
     return <PageSpinner />;
   }
 
   if (!agent) {
     return (
-      <div className="flex flex-col items-start gap-4 py-10">
-        <p className="text-ink-muted text-sm">{t("agentDetail.notFound")}</p>
-        <Button asChild intent="outline" size="sm">
-          <Link to="/agents">{t("agentDetail.backToAgents")}</Link>
-        </Button>
-      </div>
+      <LoadFailure
+        notFound={notFound}
+        notFoundLabel={t("agentDetail.notFound")}
+        message={loadError}
+        onRetry={() => dispatch(fetchAgent(id))}
+        backTo="/agents"
+        backLabel={t("agentDetail.backToAgents")}
+      />
     );
   }
 

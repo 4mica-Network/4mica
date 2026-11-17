@@ -1,16 +1,17 @@
-import { Button } from "@4mica/ui";
-import { fetchApiListings } from "@stores/apiListing/actions";
+import { fetchApiListing } from "@stores/apiListing/actions";
 import {
-  selectApiListings,
-  selectHasLoadedApiListings,
+  selectCurrentApiListing,
+  selectCurrentApiListingError,
+  selectCurrentApiListingNotFound,
 } from "@stores/apiListing/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
 import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { LoadFailure } from "@/components/LoadFailure";
 import { SettingsSection } from "@/components/layout";
 import { PageSpinner } from "@/components/PageSpinner";
 import { FaqEditor } from "@/components/Resource/FaqEditor";
@@ -27,12 +28,13 @@ export function ApiDetail() {
   const dispatch = useAppDispatch();
   const { id = "" } = useParams<{ id: string }>();
 
-  const listings = useAppSelector(selectApiListings);
-  const hasLoaded = useAppSelector(selectHasLoadedApiListings);
+  const current = useAppSelector(selectCurrentApiListing);
+  const loadError = useAppSelector(selectCurrentApiListingError);
+  const notFound = useAppSelector(selectCurrentApiListingNotFound);
   const policy = useAppSelector(selectPolicy);
   const isSavingPolicy = useAppSelector(selectIsTrustPending("savePolicy"));
 
-  const listing = listings.find((row) => row.id === id) ?? null;
+  const listing = current?.id === id ? current : null;
   const resource = { kind: "listing" as const, id };
 
   usePageTitle(
@@ -42,10 +44,10 @@ export function ApiDetail() {
   );
 
   useEffect(() => {
-    if (!hasLoaded) {
-      dispatch(fetchApiListings());
+    if (id) {
+      dispatch(fetchApiListing(id));
     }
-  }, [dispatch, hasLoaded]);
+  }, [dispatch, id]);
 
   useEffect(() => {
     if (!id) {
@@ -59,18 +61,20 @@ export function ApiDetail() {
     };
   }, [dispatch, id]);
 
-  if (!hasLoaded && !listing) {
+  if (!listing && !loadError) {
     return <PageSpinner />;
   }
 
   if (!listing) {
     return (
-      <div className="flex flex-col items-start gap-4 py-10">
-        <p className="text-ink-muted text-sm">{t("appDetail.notFound")}</p>
-        <Button asChild intent="outline" size="sm">
-          <Link to="/apis">{t("appDetail.backToApps")}</Link>
-        </Button>
-      </div>
+      <LoadFailure
+        notFound={notFound}
+        notFoundLabel={t("appDetail.notFound")}
+        message={loadError}
+        onRetry={() => dispatch(fetchApiListing(id))}
+        backTo="/apis"
+        backLabel={t("appDetail.backToApps")}
+      />
     );
   }
 
