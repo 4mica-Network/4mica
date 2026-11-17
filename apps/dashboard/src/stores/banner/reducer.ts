@@ -5,6 +5,7 @@ export const INITIAL_STATE: BannerState = {
   banners: [],
   isLoading: false,
   hasLoaded: false,
+  viewedIds: [],
   error: null,
 };
 
@@ -35,6 +36,13 @@ const bannerReducer = (
     case actionTypes.FETCH_BANNERS_FAILED: {
       const { message } = action.payload as { message: string };
       return { ...state, isLoading: false, hasLoaded: true, error: message };
+    }
+
+    case actionTypes.BANNER_VIEW_RECORDED: {
+      const { id } = action.payload as { id: string };
+      return state.viewedIds.includes(id)
+        ? state
+        : { ...state, viewedIds: [...state.viewedIds, id] };
     }
 
     case actionTypes.DISMISS_BANNER_REQUESTED: {
