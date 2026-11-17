@@ -3,9 +3,10 @@ import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useSearchParams } from "react-router-dom";
+import { SLOW_LOAD_MS } from "@/auth/FullScreenLoader";
 import { links } from "@/lib/links";
 
 function GoogleIcon() {
@@ -37,15 +38,26 @@ export function SignInPage() {
   const { isSignedIn } = useAuth();
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
+    return () => clearTimeout(timer);
+  }, [isLoaded]);
 
   const redirectUrlComplete = safeRedirectPath(params.get("redirect_url"));
 
   const signInWithGoogle = async () => {
-    if (!isLoaded) {
+    if (!isLoaded || redirecting) {
       return;
     }
 
     setError(null);
+    setRedirecting(true);
 
     try {
       await signIn.authenticateWithRedirect({
@@ -54,6 +66,7 @@ export function SignInPage() {
         redirectUrlComplete,
       });
     } catch (err) {
+      setRedirecting(false);
       setError(
         isClerkAPIResponseError(err)
           ? (err.errors[0]?.longMessage ?? t("auth.signIn.error"))
@@ -85,6 +98,7 @@ export function SignInPage() {
               intent="soft"
               block
               disabled={!isLoaded}
+              loading={redirecting}
               onClick={() => void signInWithGoogle()}
               icon={<GoogleIcon />}
               className="h-12 gap-2 rounded-md bg-overlay/5 font-normal text-sm hover:bg-overlay/10"
@@ -95,6 +109,15 @@ export function SignInPage() {
             {error && (
               <p role="alert" className="mt-6 text-center text-danger text-sm">
                 {error}
+              </p>
+            )}
+
+            {!isLoaded && slow && (
+              <p
+                role="status"
+                className="mt-6 text-center text-ink-muted text-sm"
+              >
+                {t("loader.slow")}
               </p>
             )}
 
