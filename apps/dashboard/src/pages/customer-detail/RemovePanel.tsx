@@ -24,7 +24,9 @@ export function RemovePanel({ customer }: { customer: Customer }) {
 
   const error = useAppSelector(selectCustomerError);
 
-  useOnSuccess(isDeleting, Boolean(error), () => navigate("/customers"));
+  useOnSuccess(isDeleting, Boolean(error), () =>
+    navigate("/customers", { replace: true }),
+  );
 
   return (
     <SectionCard

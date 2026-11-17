@@ -31,7 +31,7 @@ export function RemovePanel({ request }: { request: SupportRequestDetail }) {
   const requestedDelete = useRef(false);
   useOnSuccess(isDeleting, Boolean(error), () => {
     if (requestedDelete.current) {
-      navigate("/help");
+      navigate("/help", { replace: true });
     }
   });
   useEffect(() => {
