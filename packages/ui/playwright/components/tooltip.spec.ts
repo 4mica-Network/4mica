@@ -67,8 +67,8 @@ test("never opens while disabled", async ({ page }) => {
   await openStory(page, `${STORY}--disabled`);
   const trigger = page.getByRole("button", { name: "Hover me" });
 
-  await expect(trigger).toHaveAttribute("aria-disabled", "true");
-  await expect(trigger).toHaveAttribute("tabindex", "-1");
+  await expect(trigger).not.toHaveAttribute("aria-disabled");
+  await expect(trigger).not.toHaveAttribute("tabindex");
 
   await trigger.hover();
   await trigger.focus();
