@@ -4,6 +4,7 @@ import {
   updateCompliance,
 } from "@stores/compliance/actions";
 import {
+  selectComplianceError,
   selectComplianceIssues,
   selectComplianceProfile,
   selectHasLoadedCompliance,
@@ -30,6 +31,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form";
+import { RetryState } from "@/components/LoadFailure";
 import { SettingsSection } from "@/components/layout";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsPage } from "@/components/SettingsPage";
@@ -78,6 +80,7 @@ export function ComplianceSettings() {
   const locked = useAppSelector(selectIsComplianceLocked);
   const isLoading = useAppSelector(selectIsComplianceLoading);
   const hasLoaded = useAppSelector(selectHasLoadedCompliance);
+  const loadError = useAppSelector(selectComplianceError);
 
   const savingIncorporation = useAppSelector(isSaving("incorporation"));
   const savingOperations = useAppSelector(isSaving("operations"));
@@ -205,6 +208,11 @@ export function ComplianceSettings() {
     >
       {isLoading && !hasLoaded ? (
         <PageSpinner />
+      ) : !hasLoaded && loadError ? (
+        <RetryState
+          message={loadError}
+          onRetry={() => dispatch(fetchCompliance())}
+        />
       ) : (
         <>
           <ReviewCard />

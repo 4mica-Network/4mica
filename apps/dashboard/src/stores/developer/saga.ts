@@ -38,7 +38,7 @@ export function* fetchDeveloper(): Generator {
     const [apiKeys, webhooks, events] = (yield all([
       call(api.getApiKeys),
       call(api.getWebhooks),
-      call(api.getWebhookEvents),
+      call(() => api.getWebhookEvents().catch(() => [])),
     ])) as [
       Awaited<ReturnType<typeof api.getApiKeys>>,
       Awaited<ReturnType<typeof api.getWebhooks>>,
