@@ -10,7 +10,7 @@ test("sign-in page renders and Clerk loads", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Continue with Google" }),
   ).toBeEnabled();
-  await expect(page).toHaveTitle("4Mica Dashboard");
+  await expect(page).toHaveTitle("Sign in to 4Mica");
 });
 
 test("sso-callback page is served", async ({ page }) => {
