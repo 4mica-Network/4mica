@@ -7,6 +7,7 @@ import {
   fetchPaymentSummary,
 } from "@stores/payment/actions";
 import {
+  selectPaymentInsightsFailed,
   selectPaymentStats,
   selectPaymentSummary,
 } from "@stores/payment/selector";
@@ -32,6 +33,7 @@ export function Overview() {
   const summary = useAppSelector(selectPaymentSummary);
   const stats = useAppSelector(selectPaymentStats);
   const balances = useAppSelector(selectBalanceState);
+  const insightsFailed = useAppSelector(selectPaymentInsightsFailed);
 
   usePageTitle(t("page.overview.title"));
 
@@ -43,6 +45,25 @@ export function Overview() {
   useEffect(() => {
     dispatch(fetchPaymentStats(range));
   }, [dispatch, range]);
+
+  if ((!summary || !stats) && insightsFailed) {
+    return (
+      <EmptyState
+        className="flex-1"
+        icon={<TriangleAlert className="h-5 w-5" />}
+        title={t("overview.errorState.title")}
+        description={t("overview.errorState.description")}
+        action={{
+          label: t("overview.errorState.retry"),
+          onClick: () => {
+            dispatch(fetchPaymentSummary());
+            dispatch(fetchPaymentStats(range));
+          },
+        }}
+        data-testid="overview-error"
+      />
+    );
+  }
 
   if (!summary || !stats || (balances.isLoading && !balances.hasLoaded)) {
     return <PageSpinner />;

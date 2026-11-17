@@ -4,7 +4,9 @@ import { definedParams } from "@stores/utils";
 import { toMessage as messageOf } from "@utils/http-errors";
 import { call, put, select, takeLatest } from "redux-saga/effects";
 import {
+  fetchPaymentStatsFailed,
   fetchPaymentStatsSucceeded,
+  fetchPaymentSummaryFailed,
   fetchPaymentSummarySucceeded,
   fetchPaymentsFailed,
   fetchPaymentsPending,
@@ -65,7 +67,9 @@ export function* fetchPaymentSummary(): Generator {
       ReturnType<typeof api.getPaymentSummary>
     >;
     yield put(fetchPaymentSummarySucceeded(summary));
-  } catch {}
+  } catch {
+    yield put(fetchPaymentSummaryFailed());
+  }
 }
 
 export function* fetchPaymentStats(action: {
@@ -77,7 +81,9 @@ export function* fetchPaymentStats(action: {
       api.getPaymentStats(action.payload.months),
     )) as Awaited<ReturnType<typeof api.getPaymentStats>>;
     yield put(fetchPaymentStatsSucceeded(stats));
-  } catch {}
+  } catch {
+    yield put(fetchPaymentStatsFailed());
+  }
 }
 
 export default [

@@ -113,6 +113,7 @@ export type PaymentState = {
   filters: PaymentFilters;
   summary: PaymentSummary | null;
   stats: PaymentStats | null;
+  insightsFailed: boolean;
   isLoading: boolean;
   hasLoaded: boolean;
   error: string | null;
