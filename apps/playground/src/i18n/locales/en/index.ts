@@ -309,9 +309,7 @@ export const en = {
 
   owner: {
     previewTitle: "Only you can see this",
-    previewLead:
-      "Your profile is private. Publish it to make this page visible to everyone.",
-    publishAction: "Profile settings",
+    publishAction: "Publish",
     refreshAction: "Refresh",
     refreshed: "Refreshed",
     refreshFailed: "Could not refresh",
