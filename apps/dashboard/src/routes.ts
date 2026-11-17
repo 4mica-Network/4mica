@@ -1,84 +1,72 @@
 import { type ComponentType, createElement, lazy } from "react";
 import { Navigate } from "react-router-dom";
 
-const AccountSettings = lazy(() =>
-  import("@/pages/account").then((page) => ({ default: page.AccountSettings })),
+type PageLoader = () => Promise<ComponentType>;
+
+const lazyPage = (load: PageLoader) =>
+  Object.assign(
+    lazy(() => load().then((component) => ({ default: component }))),
+    { preload: load },
+  );
+
+const AccountSettings = lazyPage(() =>
+  import("@/pages/account").then((page) => page.AccountSettings),
 );
-const AgentAdvanced = lazy(() =>
-  import("@/pages/agent-advanced").then((page) => ({
-    default: page.AgentAdvanced,
-  })),
+const AgentAdvanced = lazyPage(() =>
+  import("@/pages/agent-advanced").then((page) => page.AgentAdvanced),
 );
-const AgentDetail = lazy(() =>
-  import("@/pages/agent-detail").then((page) => ({
-    default: page.AgentDetail,
-  })),
+const AgentDetail = lazyPage(() =>
+  import("@/pages/agent-detail").then((page) => page.AgentDetail),
 );
-const Agents = lazy(() =>
-  import("@/pages/agents").then((page) => ({ default: page.Agents })),
+const Agents = lazyPage(() =>
+  import("@/pages/agents").then((page) => page.Agents),
 );
-const ApiDetail = lazy(() =>
-  import("@/pages/api-detail").then((page) => ({ default: page.ApiDetail })),
+const ApiDetail = lazyPage(() =>
+  import("@/pages/api-detail").then((page) => page.ApiDetail),
 );
-const Apis = lazy(() =>
-  import("@/pages/apis").then((page) => ({ default: page.Apis })),
+const Apis = lazyPage(() => import("@/pages/apis").then((page) => page.Apis));
+const BusinessSettings = lazyPage(() =>
+  import("@/pages/business").then((page) => page.BusinessSettings),
 );
-const BusinessSettings = lazy(() =>
-  import("@/pages/business").then((page) => ({
-    default: page.BusinessSettings,
-  })),
+const ComplianceSettings = lazyPage(() =>
+  import("@/pages/compliance").then((page) => page.ComplianceSettings),
 );
-const ComplianceSettings = lazy(() =>
-  import("@/pages/compliance").then((page) => ({
-    default: page.ComplianceSettings,
-  })),
+const CustomerDetail = lazyPage(() =>
+  import("@/pages/customer-detail").then((page) => page.CustomerDetail),
 );
-const CustomerDetail = lazy(() =>
-  import("@/pages/customer-detail").then((page) => ({
-    default: page.CustomerDetail,
-  })),
+const Customers = lazyPage(() =>
+  import("@/pages/customers").then((page) => page.Customers),
 );
-const Customers = lazy(() =>
-  import("@/pages/customers").then((page) => ({ default: page.Customers })),
+const DeveloperSettings = lazyPage(() =>
+  import("@/pages/developer").then((page) => page.DeveloperSettings),
 );
-const DeveloperSettings = lazy(() =>
-  import("@/pages/developer").then((page) => ({
-    default: page.DeveloperSettings,
-  })),
+const Disputes = lazyPage(() =>
+  import("@/pages/disputes").then((page) => page.Disputes),
 );
-const Disputes = lazy(() =>
-  import("@/pages/disputes").then((page) => ({ default: page.Disputes })),
+const Help = lazyPage(() => import("@/pages/help").then((page) => page.Help));
+const HelpRequestDetail = lazyPage(() =>
+  import("@/pages/help-request").then((page) => page.HelpRequestDetail),
 );
-const Help = lazy(() =>
-  import("@/pages/help").then((page) => ({ default: page.Help })),
+const NotificationSettings = lazyPage(() =>
+  import("@/pages/notification").then((page) => page.NotificationSettings),
 );
-const HelpRequestDetail = lazy(() =>
-  import("@/pages/help-request").then((page) => ({
-    default: page.HelpRequestDetail,
-  })),
+const Overview = lazyPage(() =>
+  import("@/pages/overview").then((page) => page.Overview),
 );
-const NotificationSettings = lazy(() =>
-  import("@/pages/notification").then((page) => ({
-    default: page.NotificationSettings,
-  })),
+const Payments = lazyPage(() =>
+  import("@/pages/payments").then((page) => page.Payments),
 );
-const Overview = lazy(() =>
-  import("@/pages/overview").then((page) => ({ default: page.Overview })),
+const PlansSettings = lazyPage(() =>
+  import("@/pages/plans").then((page) => page.PlansSettings),
 );
-const Payments = lazy(() =>
-  import("@/pages/payments").then((page) => ({ default: page.Payments })),
+const ProfileSettings = lazyPage(() =>
+  import("@/pages/profile").then((page) => page.ProfileSettings),
 );
-const PlansSettings = lazy(() =>
-  import("@/pages/plans").then((page) => ({ default: page.PlansSettings })),
+const TeamSettings = lazyPage(() =>
+  import("@/pages/team").then((page) => page.TeamSettings),
 );
-const ProfileSettings = lazy(() =>
-  import("@/pages/profile").then((page) => ({ default: page.ProfileSettings })),
-);
-const TeamSettings = lazy(() =>
-  import("@/pages/team").then((page) => ({ default: page.TeamSettings })),
-);
-const Wallet = lazy(() =>
-  import("@/pages/wallet").then((page) => ({ default: page.Wallet })),
+const Wallet = lazyPage(() =>
+  import("@/pages/wallet").then((page) => page.Wallet),
 );
 
 export interface RouteMeta {
@@ -122,3 +110,23 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "compliance", component: ComplianceSettings },
   { path: "developer", component: DeveloperSettings },
 ];
+
+export const pageAt = (to: string): ComponentType | undefined => {
+  const path = to.replace(/^\/+|\/+$/g, "");
+  if (path === "") {
+    return APP_PAGES.find((page) => page.index)?.component;
+  }
+  if (path === "settings") {
+    return SETTINGS_PAGES[0]?.component;
+  }
+  if (path.startsWith("settings/")) {
+    return SETTINGS_PAGES.find((page) => `settings/${page.path}` === path)
+      ?.component;
+  }
+  return APP_PAGES.find((page) => page.path === path)?.component;
+};
+
+export const preloadPage = (to: string): void => {
+  const page = pageAt(to) as { preload?: PageLoader } | undefined;
+  page?.preload?.().catch(() => {});
+};
