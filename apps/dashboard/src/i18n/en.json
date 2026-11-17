@@ -42,6 +42,7 @@
   "offline.banner": "You're offline. Changes won't save until your connection is back.",
   "http.offline": "You're offline. Reconnect, then try again.",
   "http.checkConnection": "Check your connection and try again.",
+  "loader.slow": "This is taking longer than usual. Check your connection, or reload the page.",
   "settings.save": "Save changes",
   "settings.saving": "Saving…",
   "settings.discard": "Discard",

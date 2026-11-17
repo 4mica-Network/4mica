@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/i18n";
+import { FullScreenLoader, SLOW_LOAD_MS } from "@/auth/FullScreenLoader";
 import { PageBoundary } from "@/components/ErrorBoundary/PageBoundary";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { isChunkLoadError, reloadForNewVersion } from "@/lib/chunkReload";
@@ -208,5 +209,21 @@ describe("offline banner", () => {
       window.dispatchEvent(new Event("online"));
     });
     expect(screen.queryByTestId("offline-banner")).toBeNull();
+  });
+});
+
+describe("initial load", () => {
+  it("explains a slow sign-in service and offers a reload instead of spinning forever", () => {
+    vi.useFakeTimers();
+    render(<FullScreenLoader />);
+    expect(screen.queryByText(/taking longer than usual/)).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(SLOW_LOAD_MS);
+    });
+
+    expect(screen.getByText(/taking longer than usual/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reload page" }));
+    expect(reload).toHaveBeenCalled();
   });
 });
