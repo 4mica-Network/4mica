@@ -233,7 +233,7 @@
   "settings.account.securityHint": "Une protection supplémentaire pour votre compte et vos données",
   "settings.profile.nameHint": "Le nom affiché aux clients et aux collaborateurs",
   "settings.profile.bioHint": "Une courte phrase à votre sujet, affichée sur votre profil public",
-  "settings.profile.seoHint": "Autoriser les moteurs de recherche à accéder à votre contenu public",
+  "settings.profile.seoHint": "Permet aux moteurs de recherche de référencer votre profil public ainsi que les agents et API qui y sont affichés. Les agents et API masqués ne sont jamais indexés. Les modifications s’appliquent en moins d’une minute.",
   "settings.profile.emailVisibilityHint": "Permettre aux autres de voir votre e-mail sur votre profil public",
   "settings.profile.phoneVisibilityHint": "Permettre aux autres de voir votre numéro de téléphone sur votre profil public",
   "settings.profile.brandingHint": "Choisissez comment 4Mica apparaît sur les pages que voient vos clients",
