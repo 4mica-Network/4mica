@@ -45,6 +45,7 @@
   "loader.slow": "This is taking longer than usual. Check your connection, or reload the page.",
   "help.create.categoriesUnavailable": "Request types didn't load, so a request can't be started yet. Check your connection and try again.",
   "help.create.categoriesRetry": "Try again",
+  "developer.reveal.copyFailed": "Couldn't copy automatically. Select the key above and copy it yourself before closing this.",
   "settings.save": "Save changes",
   "settings.saving": "Saving…",
   "settings.discard": "Discard",

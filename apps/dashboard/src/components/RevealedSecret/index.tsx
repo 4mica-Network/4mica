@@ -2,6 +2,7 @@ import { Button, Card, cn } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import type { RevealedSecret } from "@stores/developer/type";
 import { Check, Copy } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export function SecretRevealCard({
@@ -19,7 +20,8 @@ export function SecretRevealCard({
 }) {
   const { t } = useTranslation();
   const { copied, copy: copyText } = useCopyToClipboard();
-  const copy = () => copyText(plaintext);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copy = async () => setCopyFailed(!(await copyText(plaintext)));
 
   return (
     <Card
@@ -35,7 +37,7 @@ export function SecretRevealCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-md border border-overlay/15 bg-surface-deep px-3 py-2 font-mono text-ink-body text-xs">
+          <code className="min-w-0 flex-1 select-all truncate rounded-md border border-overlay/15 bg-surface-deep px-3 py-2 font-mono text-ink-body text-xs">
             {plaintext}
           </code>
           <Button
@@ -55,6 +57,12 @@ export function SecretRevealCard({
             </span>
           </Button>
         </div>
+
+        {copyFailed && (
+          <p role="alert" className="text-danger text-xs">
+            {t("developer.reveal.copyFailed")}
+          </p>
+        )}
 
         <div className="flex justify-end">
           <Button type="button" size="sm" intent="ghost" onClick={onDismiss}>
