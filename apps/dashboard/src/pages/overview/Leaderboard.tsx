@@ -100,7 +100,7 @@ export function Leaderboard({
               >
                 <Link
                   to={style.href(entry.id)}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/5 focus-visible:outline-none"
+                  className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60 focus-visible:ring-inset"
                   data-testid={`overview-leader-${entry.slug}`}
                 >
                   <span

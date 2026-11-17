@@ -58,7 +58,7 @@ export function ApiListingRow({
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
-          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline"
+          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline focus-visible:after:rounded-sm focus-visible:after:ring-2 focus-visible:after:ring-overlay/60 focus-visible:after:ring-inset"
           data-testid={`api-listing-name-${listing.id}`}
           to={`/apis/${listing.id}`}
         >
