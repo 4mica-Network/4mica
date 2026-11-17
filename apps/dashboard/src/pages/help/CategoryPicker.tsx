@@ -2,6 +2,7 @@ import { Button, cn } from "@4mica/ui";
 import { fetchConfig } from "@stores/config/actions";
 import { selectConfigState } from "@stores/config/selector";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { useId } from "react";
 import { useController } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useConfigList } from "@/hooks/useConfigOptions";
@@ -17,6 +18,8 @@ export function CategoryPicker() {
   const categories = useConfigList("supportCategories");
   const { isLoading } = useAppSelector(selectConfigState);
   const { field, fieldState } = useController({ name: "category" });
+  const errorId = useId();
+  const errorMessage = fieldState.error?.message;
 
   if (categories.length === 0) {
     return (
@@ -42,7 +45,10 @@ export function CategoryPicker() {
   }
 
   return (
-    <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
+    <fieldset
+      aria-describedby={errorMessage ? errorId : undefined}
+      className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0"
+    >
       <legend className="mb-3 text-ink-muted text-sm">
         {t("help.create.categoryPrompt")}
       </legend>
@@ -93,9 +99,9 @@ export function CategoryPicker() {
         })}
       </div>
 
-      {fieldState.error?.message && (
-        <p aria-live="polite" className="text-danger text-xs">
-          {t(fieldState.error.message)}
+      {errorMessage && (
+        <p id={errorId} aria-live="polite" className="text-danger text-xs">
+          {t(errorMessage)}
         </p>
       )}
     </fieldset>
