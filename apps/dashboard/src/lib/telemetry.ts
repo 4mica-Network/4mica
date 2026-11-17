@@ -50,3 +50,7 @@ export function initTelemetry(dsn: string): void {
     beforeSendMetric: () => null,
   });
 }
+
+export function captureError(error: unknown): void {
+  Sentry.captureException(error);
+}

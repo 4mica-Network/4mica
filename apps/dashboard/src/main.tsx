@@ -5,7 +5,10 @@ import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "@/App";
 import { ClerkAuthProvider } from "@/auth/ClerkAuthProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppCrash } from "@/components/ErrorBoundary/fallbacks";
 import { Notifications } from "@/components/Notifications";
+import { reloadForNewVersion } from "@/lib/chunkReload";
 import { captureVerifyToken } from "@/lib/verifyToken";
 import "@/i18n";
 import "react-toastify/dist/ReactToastify.css";
@@ -15,23 +18,31 @@ captureVerifyToken();
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
-  void import("@/lib/telemetry").then(({ initTelemetry }) =>
-    initTelemetry(sentryDsn),
-  );
+  void import("@/lib/telemetry")
+    .then(({ initTelemetry }) => initTelemetry(sentryDsn))
+    .catch(() => {});
 }
+
+window.addEventListener("vite:preloadError", (event) => {
+  if (reloadForNewVersion()) {
+    event.preventDefault();
+  }
+});
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");
 
 createRoot(root).render(
   <StrictMode>
-    <Provider store={store}>
-      <BrowserRouter>
-        <ClerkAuthProvider>
-          <App />
-          <Notifications />
-        </ClerkAuthProvider>
-      </BrowserRouter>
-    </Provider>
+    <ErrorBoundary fallback={AppCrash}>
+      <Provider store={store}>
+        <BrowserRouter>
+          <ClerkAuthProvider>
+            <App />
+            <Notifications />
+          </ClerkAuthProvider>
+        </BrowserRouter>
+      </Provider>
+    </ErrorBoundary>
   </StrictMode>,
 );
