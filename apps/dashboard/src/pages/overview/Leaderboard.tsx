@@ -5,6 +5,7 @@ import { ArrowDownWideNarrow, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { currentLocale } from "@/i18n/locale";
 import { formatAmount, type RankKey, rankBy } from "./metrics";
 import { Panel } from "./Panel";
@@ -29,6 +30,7 @@ export function Leaderboard({
   listings: RankedEntry[];
   agents: RankedEntry[];
 }) {
+  const { mask } = usePrivacy();
   const { t } = useTranslation();
   const [source, setSource] = useState<Source>(
     listings.length === 0 && agents.length > 0 ? "agents" : "listings",
@@ -42,7 +44,7 @@ export function Leaderboard({
 
   const format = (value: number) =>
     sort === "amount"
-      ? formatAmount(value)
+      ? mask(formatAmount(value))
       : value.toLocaleString(currentLocale());
 
   return (

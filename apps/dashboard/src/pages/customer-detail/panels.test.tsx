@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 
 const storeState = {
+  user: { user: null as { privacyMode: boolean } | null },
   customer: {
     pending: {} as Record<string, boolean>,
     validationIssues: {} as Record<string, string>,

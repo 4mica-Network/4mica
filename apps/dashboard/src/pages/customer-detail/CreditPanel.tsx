@@ -25,8 +25,10 @@ import {
   SectionRow,
   SectionRows,
 } from "@/components/layout";
+import { Masked } from "@/components/Masked";
 import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import {
   CREDIT_KIND_LABEL_KEYS,
@@ -155,6 +157,7 @@ function GrantForm({
 }
 
 export function CreditPanel({ customer }: { customer: Customer }) {
+  const { mask } = usePrivacy();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -204,14 +207,15 @@ export function CreditPanel({ customer }: { customer: Customer }) {
             </span>
             <p className="mt-0.5 text-ink-muted text-sm">
               {t("customer.credit.split", {
-                promotional: trimAmount(balance?.promotional ?? "0"),
-                prepaid: trimAmount(balance?.prepaid ?? "0"),
+                promotional: mask(trimAmount(balance?.promotional ?? "0")),
+                prepaid: mask(trimAmount(balance?.prepaid ?? "0")),
               })}
             </p>
           </div>
 
           <span className="shrink-0 font-semibold text-ink-strong text-sm">
-            {trimAmount(balance?.total ?? "0")} {customer.limitCurrency}
+            <Masked>{trimAmount(balance?.total ?? "0")}</Masked>{" "}
+            {customer.limitCurrency}
           </span>
         </div>
 
@@ -276,7 +280,7 @@ export function CreditPanel({ customer }: { customer: Customer }) {
                 }
               >
                 {entry.amount.startsWith("-") ? "" : "+"}
-                {trimAmount(entry.amount)}
+                <Masked>{trimAmount(entry.amount)}</Masked>
               </span>
             </SectionRow>
           ))}
