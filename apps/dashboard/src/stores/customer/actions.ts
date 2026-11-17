@@ -324,6 +324,11 @@ export const clearCustomerSelection = () => ({
   type: actionTypes.CLEAR_CUSTOMER_SELECTION,
 });
 
+export const customerActionSucceeded = (meta: PendingMeta) => ({
+  type: actionTypes.CUSTOMER_ACTION_SUCCEEDED,
+  meta,
+});
+
 export const customerActionFailed = (
   message: string,
   issues: Record<string, string>,
