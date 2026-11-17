@@ -70,6 +70,7 @@ export function renderSecurityHeaders(
     ["X-Content-Type-Options", "nosniff"],
     ["Referrer-Policy", "strict-origin-when-cross-origin"],
     ["Permissions-Policy", "camera=(), microphone=(), geolocation=()"],
+    ["X-Robots-Tag", "noindex, nofollow"],
   ];
 
   return headers
