@@ -1,4 +1,4 @@
-import { Tooltip } from "@4mica/ui";
+import { Switch, Tooltip } from "@4mica/ui";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,5 +38,39 @@ describe("Tooltip", () => {
     vi.advanceTimersByTime(200);
 
     expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("Switch", () => {
+  const state = () => screen.getByRole("switch").getAttribute("aria-checked");
+
+  it("snaps back to the saved value when a save fails", () => {
+    const { rerender } = render(<Switch initialState={false} />);
+
+    fireEvent.click(screen.getByRole("switch"));
+    expect(state()).toBe("true");
+
+    rerender(<Switch initialState={false} disabled />);
+    rerender(<Switch initialState={false} />);
+
+    expect(state()).toBe("false");
+  });
+
+  it("keeps the new value when the save succeeds", () => {
+    const { rerender } = render(<Switch initialState={false} />);
+
+    fireEvent.click(screen.getByRole("switch"));
+    rerender(<Switch initialState={false} disabled />);
+    rerender(<Switch initialState />);
+
+    expect(state()).toBe("true");
+  });
+
+  it("follows its value while permanently disabled", () => {
+    const { rerender } = render(<Switch initialState={false} disabled />);
+
+    rerender(<Switch initialState disabled />);
+
+    expect(state()).toBe("true");
   });
 });
