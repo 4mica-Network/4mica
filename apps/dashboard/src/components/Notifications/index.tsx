@@ -1,4 +1,4 @@
-import { ToastContainer } from "react-toastify";
+import { Slide, ToastContainer } from "react-toastify";
 
 export function Notifications() {
   return (
@@ -8,7 +8,7 @@ export function Notifications() {
       hideProgressBar
       draggable={false}
       icon={false}
-      toastClassName="!bg-surface !border !border-overlay/10 !rounded-lg !shadow-lg"
+      transition={Slide}
     />
   );
 }
