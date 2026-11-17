@@ -1,4 +1,5 @@
 import { HttpError } from "@4mica/http";
+import i18n from "@i18n";
 
 interface ApiIssue {
   path?: unknown;
@@ -55,6 +56,20 @@ export const toMessage = (
 ): string => {
   if (!(error instanceof HttpError)) {
     return fallback;
+  }
+
+  const code = (error.body as { error?: unknown } | null)?.error;
+
+  if (error.status === 403 && code === "account_disabled") {
+    return i18n.t("http.accountDisabled");
+  }
+
+  if (error.status === 429) {
+    const seconds =
+      error.retryAfterMs === null ? null : Math.ceil(error.retryAfterMs / 1000);
+    return seconds && seconds > 0
+      ? i18n.t("http.rateLimitedFor", { count: seconds })
+      : i18n.t("http.rateLimited");
   }
 
   if (sessionExpired && (error.status === 401 || error.status === 403)) {

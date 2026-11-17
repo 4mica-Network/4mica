@@ -263,7 +263,7 @@ describe("auth failures", () => {
     expect(message).toContain("session has expired");
   });
 
-  it("uses the same wording for a 403", async () => {
+  it("says the account is disabled rather than asking for a new sign-in", async () => {
     createWalletChallenge.mockRejectedValue(
       new HttpError(403, "Forbidden", {
         error: "account_disabled",
@@ -281,7 +281,7 @@ describe("auth failures", () => {
       (a) => a.type === actionTypes.WALLET_ACTION_FAILED,
     );
     expect((failure?.payload as { message: string }).message).toContain(
-      "session has expired",
+      "account is disabled",
     );
   });
 
