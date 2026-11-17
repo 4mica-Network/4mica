@@ -2,7 +2,7 @@ import { HttpClient, type HttpRequestConfig } from "@4mica/http";
 import { CANCEL } from "redux-saga";
 import { LOCAL_API_URL, requireTrustedApiUrl } from "./apiUrl";
 
-export { setAuthTokenProvider } from "@4mica/http";
+export { setAuthTokenProvider, setUnauthorizedHandler } from "@4mica/http";
 
 const API_URL = import.meta.env.PROD
   ? requireTrustedApiUrl(import.meta.env.VITE_API_URL)
