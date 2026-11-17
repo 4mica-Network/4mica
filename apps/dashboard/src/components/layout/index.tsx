@@ -145,7 +145,7 @@ export function SectionRow({
     >
       {children}
       {actions && (
-        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
           {actions}
         </div>
       )}

@@ -84,7 +84,7 @@ describe("WalletRow", () => {
       .closest("div") as HTMLElement;
 
     expect(controls.className).not.toMatch(/(^|\s)opacity-0(\s|$)/);
-    expect(controls.className).toMatch(/lg:opacity-0/);
+    expect(controls.className).toMatch(/lg:pointer-fine:opacity-0/);
     expect(controls.className).toMatch(/lg:group-hover:opacity-100/);
   });
 
