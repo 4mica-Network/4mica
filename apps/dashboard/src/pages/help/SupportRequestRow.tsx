@@ -65,7 +65,7 @@ export function SupportRequestRow({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <Link
           to={supportRequestPath(request.id)}
-          className="min-w-0 truncate font-semibold text-base text-ink-strong after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+          className="min-w-0 truncate font-semibold text-base text-ink-strong after:absolute after:inset-0 after:content-[''] focus-visible:underline focus-visible:outline-none focus-visible:after:rounded-sm focus-visible:after:ring-2 focus-visible:after:ring-overlay/60 focus-visible:after:ring-inset"
           data-testid={`support-link-${request.id}`}
         >
           {request.subject}

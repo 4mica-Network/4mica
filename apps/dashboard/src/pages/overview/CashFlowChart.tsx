@@ -295,7 +295,7 @@ export function CashFlowChart({
                 <button
                   key={month}
                   type="button"
-                  className="absolute inset-y-0 focus-visible:bg-overlay/5 focus-visible:outline-none"
+                  className="absolute inset-y-0 focus-visible:bg-overlay/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60 focus-visible:ring-inset"
                   style={zoneOf(index)}
                   onMouseEnter={() => setHovered(index)}
                   onMouseLeave={() => setHovered(null)}

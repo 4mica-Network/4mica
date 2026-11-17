@@ -221,7 +221,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
             to="/settings/profile"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
           >
             <UserCog aria-hidden="true" className="h-4 w-4" />
             {t("sidebar.preferences")}
@@ -233,7 +233,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
               setOpen(false);
               void signOut({ redirectUrl: "/sign-in" });
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />
             {t("sidebar.signOut")}
