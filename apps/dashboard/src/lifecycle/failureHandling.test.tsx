@@ -1,10 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { HttpError, HttpTimeoutError } from "@4mica/http";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { lazy, Suspense } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/i18n";
 import { PageBoundary } from "@/components/ErrorBoundary/PageBoundary";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { isChunkLoadError, reloadForNewVersion } from "@/lib/chunkReload";
+import { toMessage } from "@/utils/http-errors";
 
 const reload = vi.fn();
 
@@ -155,5 +158,55 @@ describe("stale chunk detection", () => {
     expect(reloadForNewVersion(105_000)).toBe(false);
     expect(reloadForNewVersion(200_000)).toBe(true);
     expect(reload).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("network failure copy", () => {
+  it("tells an offline user to reconnect", () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+
+    expect(toMessage(new TypeError("Failed to fetch"), "Couldn't save.")).toBe(
+      "You're offline. Reconnect, then try again.",
+    );
+  });
+
+  it("adds what to do next when the network drops or times out", () => {
+    expect(toMessage(new TypeError("Failed to fetch"), "Couldn't save.")).toBe(
+      "Couldn't save. Check your connection and try again.",
+    );
+    expect(toMessage(new HttpTimeoutError(30_000), "Couldn't save.")).toBe(
+      "Couldn't save. Check your connection and try again.",
+    );
+  });
+
+  it("keeps the server's explanation for a rejected request", () => {
+    expect(
+      toMessage(
+        new HttpError(422, "Unprocessable", { message: "Name is taken." }),
+        "Couldn't save.",
+      ),
+    ).toBe("Name is taken.");
+  });
+});
+
+describe("offline banner", () => {
+  it("appears when the connection drops and goes when it returns", () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    render(<OfflineBanner />);
+    expect(screen.queryByTestId("offline-banner")).toBeNull();
+
+    onLine.mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(screen.getByTestId("offline-banner")).toHaveTextContent(
+      "You're offline",
+    );
+
+    onLine.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(screen.queryByTestId("offline-banner")).toBeNull();
   });
 });
