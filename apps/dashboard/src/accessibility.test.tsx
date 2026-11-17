@@ -215,7 +215,7 @@ describe("accessibility", () => {
 
   describe("notifications", () => {
     it("announces through one live region with the full message", async () => {
-      render(<Notifications />);
+      render(withStore(<Notifications />));
 
       act(() => {
         notifySuccess({ title: "Saved", content: "Your changes are live." });

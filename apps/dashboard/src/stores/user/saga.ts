@@ -13,7 +13,7 @@ import {
 } from "@api/user";
 import i18n from "@i18n";
 import { toIssueMap, toMessage } from "@utils/http-errors";
-import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
+import { call, put, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   checkUsernameFailed,
@@ -31,13 +31,7 @@ import {
   updateUserSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import { selectUser } from "./selector";
-import type { Business, NotificationPlacement, User } from "./type";
-
-function* placement(): Generator<unknown, NotificationPlacement> {
-  const user = (yield select(selectUser)) as User | null;
-  return user?.notificationPlacement ?? "bottomRight";
-}
+import type { Business, User } from "./type";
 
 export function* fetchUser(): Generator {
   try {
@@ -90,7 +84,6 @@ export function* updateUser(action: {
         defaultValue: "Update failed",
       }),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -118,7 +111,6 @@ export function* updateBusiness(action: {
         defaultValue: "Update failed",
       }),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -139,7 +131,6 @@ export function* sendEmailVerification(action: {
         defaultValue:
           "We sent you a link. Open it while signed in and press confirm.",
       }),
-      placement: (yield* placement()) as NotificationPlacement,
     });
   } catch (error) {
     const message = toMessage(
@@ -156,7 +147,6 @@ export function* sendEmailVerification(action: {
         defaultValue: "Couldn't send the email",
       }),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -182,7 +172,6 @@ export function* confirmEmailVerification(action: {
     notifySuccess({
       title: i18n.t("page.settings.profile.verify.success.title"),
       content: i18n.t("page.settings.profile.verify.success.body"),
-      placement: (yield* placement()) as NotificationPlacement,
     });
   } catch (error) {
     const code =
@@ -197,7 +186,6 @@ export function* confirmEmailVerification(action: {
     notifyError({
       title: i18n.t(`page.settings.profile.verify.${outcome}.title`),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -213,7 +201,6 @@ export function* syncPhoneVerification(action: {
     notifySuccess({
       title: i18n.t("settings.account.phoneVerify.successTitle"),
       content: i18n.t("settings.account.phoneVerify.successBody"),
-      placement: (yield* placement()) as NotificationPlacement,
     });
   } catch (error) {
     const message = toMessage(
@@ -225,7 +212,6 @@ export function* syncPhoneVerification(action: {
     notifyError({
       title: i18n.t("settings.account.phoneVerify.failedTitle"),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
@@ -266,7 +252,6 @@ export function* completeOnboarding(action: {
         defaultValue: "Update failed",
       }),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
     return;
   }
@@ -291,7 +276,6 @@ export function* completeOnboarding(action: {
         defaultValue: "Setup incomplete",
       }),
       content: message,
-      placement: (yield* placement()) as NotificationPlacement,
     });
   }
 }
