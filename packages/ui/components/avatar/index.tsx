@@ -27,6 +27,7 @@ export interface AvatarProps extends VariantProps<typeof avatar> {
   fallback?: string;
   alt?: string;
   className?: string;
+  onError?: () => void;
 }
 
 export function Avatar({
@@ -37,6 +38,7 @@ export function Avatar({
   size,
   priority = false,
   className,
+  onError,
 }: AvatarProps) {
   const base = cn(avatar({ size }), className);
   const pixels = PIXELS[size ?? "md"];
@@ -52,6 +54,7 @@ export function Avatar({
         loading={priority ? "eager" : "lazy"}
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
+        onError={onError}
       />
     );
   }
