@@ -3,6 +3,7 @@ import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateAccount } from "@stores/user/actions";
 import { selectIsSectionSaving, selectUser } from "@stores/user/selector";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { VerifiedBadge } from "@/components/badges";
 import { InstantCard } from "@/components/EditableCard";
@@ -11,10 +12,10 @@ import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useConfigOptions, useTimezoneOptions } from "@/hooks/useConfigOptions";
 
-const THEME_LABELS: Record<string, string> = {
-  dark: "Dark",
-  light: "Light",
-  system: "System",
+const THEME_LABEL_KEYS: Record<string, string> = {
+  dark: "settings.account.themeOption.dark",
+  light: "settings.account.themeOption.light",
+  system: "settings.account.themeOption.system",
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -24,23 +25,31 @@ const LANGUAGE_LABELS: Record<string, string> = {
   es: "Español",
 };
 
-const HOME_LABELS: Record<string, string> = {
-  overview: "Overview",
-  payments: "Payments",
-  wallet: "Wallet",
-  customers: "Customers",
-  agents: "Agents",
-  apis: "APIs",
+const HOME_LABEL_KEYS: Record<string, string> = {
+  overview: "nav.home",
+  payments: "nav.payments",
+  wallet: "nav.wallet",
+  customers: "nav.customers",
+  agents: "nav.agents",
+  apis: "nav.apis",
 };
 
-const themeLabel = (value: string) => THEME_LABELS[value] ?? value;
 const languageLabel = (value: string) => LANGUAGE_LABELS[value] ?? value;
-const homeLabel = (value: string) => HOME_LABELS[value] ?? value;
 
 export function AccountSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
+  const themeLabel = useCallback(
+    (value: string) =>
+      THEME_LABEL_KEYS[value] ? t(THEME_LABEL_KEYS[value]) : value,
+    [t],
+  );
+  const homeLabel = useCallback(
+    (value: string) =>
+      HOME_LABEL_KEYS[value] ? t(HOME_LABEL_KEYS[value]) : value,
+    [t],
+  );
   const languages = useConfigOptions("languages", languageLabel);
   const themes = useConfigOptions("themes", themeLabel);
   const homes = useConfigOptions("homes", homeLabel);
