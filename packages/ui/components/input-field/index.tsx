@@ -188,7 +188,7 @@ export const InputField = forwardRef<
   }, [allowResizing, variant, adjustTextareaHeight]);
 
   const baseClass = cn(
-    "w-full rounded-lg border border-overlay/15 bg-transparent px-3 py-2.5 text-ink-body text-sm shadow-none outline-none transition placeholder:text-ink-subtle hover:border-overlay/30 focus:border-overlay/50 focus:outline-none focus:ring-1 focus:ring-overlay/40 disabled:opacity-50",
+    "w-full rounded-lg border border-overlay/15 bg-transparent px-3 py-2.5 text-ink-body text-sm shadow-none outline-none transition placeholder:text-ink-subtle hover:border-overlay/30 focus:border-overlay/50 focus:outline-none focus:ring-1 focus:ring-overlay/60 disabled:opacity-50",
     variant === "textarea"
       ? cn("min-h-[60px]", allowResizing ? "resize-y" : "resize-none")
       : "max-h-[240px]",
@@ -274,7 +274,7 @@ export const InputField = forwardRef<
         <div
           className={cn(
             "group relative flex w-full rounded-lg",
-            prefix && "focus-within:ring-1 focus-within:ring-overlay/40",
+            prefix && "focus-within:ring-1 focus-within:ring-overlay/60",
           )}
         >
           {prefix && (

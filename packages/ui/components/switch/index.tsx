@@ -32,7 +32,7 @@ const outer = cva(
     "duration-300",
     "outline-none",
     "focus-visible:ring-2",
-    "focus-visible:ring-overlay/40",
+    "focus-visible:ring-overlay/60",
     "focus-visible:ring-offset-2",
     "focus-visible:ring-offset-surface-deep",
   ],
