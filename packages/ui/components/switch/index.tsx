@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
 
 export interface SwitchColors {
@@ -93,6 +93,14 @@ export const Switch = ({
   useEffect(() => {
     setIsOn(initialState);
   }, [initialState]);
+
+  const wasDisabled = useRef(disabled);
+  useEffect(() => {
+    if (wasDisabled.current && !disabled) {
+      setIsOn(initialState);
+    }
+    wasDisabled.current = disabled;
+  }, [disabled, initialState]);
 
   const handleToggle = () => {
     if (disabled) {
