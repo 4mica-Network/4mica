@@ -143,6 +143,8 @@
   "settings.notifications.inAppHint": "Alertas de pagos, disputas y actividad de agentes.",
   "settings.notifications.sms": "Notificaciones por SMS",
   "settings.notifications.placement": "Posición de las notificaciones",
+  "settings.notifications.placementPreview": "Las notificaciones aparecerán aquí",
+  "settings.notifications.placementPreviewBody": "Puede cambiarlo en cualquier momento.",
   "settings.notifications.placementOption.topLeft": "Arriba a la izquierda",
   "settings.notifications.placementOption.topRight": "Arriba a la derecha",
   "settings.notifications.placementOption.bottomLeft": "Abajo a la izquierda",

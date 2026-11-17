@@ -9,6 +9,7 @@ import { Select, SettingRow, SwitchCard } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useConfigOptions } from "@/hooks/useConfigOptions";
+import { notifySuccess } from "@/lib/notify";
 
 const PLACEMENT_LABEL_KEYS: Record<string, string> = {
   topLeft: "settings.notifications.placementOption.topLeft",
@@ -92,9 +93,14 @@ export function NotificationSettings() {
               value={user.notificationPlacement}
               options={placements}
               disabled={!user.allowNotification}
-              onChange={(v) =>
-                set("notificationPlacement", v as NotificationPlacement)
-              }
+              onChange={(v) => {
+                set("notificationPlacement", v as NotificationPlacement);
+                notifySuccess({
+                  title: t("settings.notifications.placementPreview"),
+                  content: t("settings.notifications.placementPreviewBody"),
+                  placement: v as NotificationPlacement,
+                });
+              }}
             />
           </SettingRow>
         </InstantCard>
