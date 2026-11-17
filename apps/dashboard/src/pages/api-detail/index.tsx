@@ -86,6 +86,10 @@ export function ApiDetail() {
       <BackBar label={t("appDetail.backToApps")} to="/apis" />
 
       <div className="mx-auto flex w-full flex-col gap-10 lg:max-w-3xl">
+        <h1 className="font-semibold text-ink-strong text-lg tracking-tight">
+          {listing.name}
+        </h1>
+
         <DetailsForm listing={listing} />
 
         <ToggleSection

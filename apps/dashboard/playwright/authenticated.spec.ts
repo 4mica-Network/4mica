@@ -15,16 +15,14 @@ for (const entry of [...APP_PAGES, ...SETTINGS_PAGES]) {
     await expect(
       page
         .getByRole("heading", {
-          level: entry.level,
+          level: 1,
           name: entry.heading,
           exact: true,
         })
         .first(),
     ).toBeVisible();
 
-    if (entry.titled) {
-      await expect(page).toHaveTitle(`${entry.heading} - ${ORG}`);
-    }
+    await expect(page).toHaveTitle(`${entry.heading} - ${ORG}`);
 
     await expect(page.getByTestId("onboarding")).toHaveCount(0);
     await expect(page.locator('[data-testid$="-error"]')).toHaveCount(0);

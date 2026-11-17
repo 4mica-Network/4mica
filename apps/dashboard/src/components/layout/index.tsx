@@ -25,7 +25,7 @@ function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h3 className="font-semibold text-base text-ink-strong">{title}</h3>
+        <h2 className="font-semibold text-base text-ink-strong">{title}</h2>
         {description && (
           <p className="mt-1 text-ink-muted text-sm">{description}</p>
         )}
