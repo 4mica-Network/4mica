@@ -4,6 +4,7 @@ import type { CustomerOverview, SpendBucket } from "@stores/customer/type";
 import { formatDateTime } from "@utils/format";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
 import { currentLocale } from "@/i18n/locale";
 
 function Amount({ buckets }: { buckets: SpendBucket[] }) {
@@ -20,7 +21,7 @@ function Amount({ buckets }: { buckets: SpendBucket[] }) {
           key={`${bucket.network}:${bucket.assetAddress ?? "native"}`}
           className="font-semibold text-ink-strong text-sm"
         >
-          {trimAmount(bucket.amount)}{" "}
+          <Masked>{trimAmount(bucket.amount)}</Masked>{" "}
           <span className="font-normal text-ink-muted">
             {bucket.assetAddress
               ? t("payment.row.erc20")

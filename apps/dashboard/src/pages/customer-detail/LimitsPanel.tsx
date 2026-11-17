@@ -4,6 +4,7 @@ import type { Customer, CustomerOverview } from "@stores/customer/type";
 import { Gauge } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SectionCard } from "@/components/layout";
+import { usePrivacy } from "@/hooks/usePrivacy";
 
 const rankingTotal = (overview: CustomerOverview): number =>
   overview.recentSpend.reduce((sum, bucket) => sum + Number(bucket.amount), 0);
@@ -22,6 +23,7 @@ function LimitRow({
   testId: string;
 }) {
   const { t } = useTranslation();
+  const { mask } = usePrivacy();
 
   const ceiling = Number(limit);
   const ratio = spent !== undefined && ceiling > 0 ? spent / ceiling : 0;
@@ -52,7 +54,7 @@ function LimitRow({
           <div className="flex items-baseline justify-between gap-4 text-sm">
             <span className="text-ink-muted">
               {t("customer.limits.spent", {
-                amount: trimAmount(String(spent)),
+                amount: mask(trimAmount(String(spent))),
               })}
             </span>
             <span className={over ? "text-danger" : "text-ink-muted"}>
