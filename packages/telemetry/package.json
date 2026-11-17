@@ -1,0 +1,27 @@
+{
+  "name": "@4mica/telemetry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fail-closed scrubbing for anything a 4Mica app sends to Sentry or writes to a log.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .turbo"
+  },
+  "dependencies": {
+    "@sentry/core": "catalog:"
+  },
+  "devDependencies": {
+    "@4mica/tsconfig": "workspace:*",
+    "typescript": "catalog:typescript-latest"
+  }
+}
