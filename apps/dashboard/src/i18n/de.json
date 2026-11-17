@@ -92,6 +92,7 @@
   "settings.account.security": "Sicherheit",
   "settings.account.privacyMode": "Datenschutzmodus",
   "settings.account.privacyModeHint": "Salden und Gegenparteien in der Oberfläche verbergen.",
+  "privacy.hidden": "Ausgeblendet",
   "settings.account.twoFactor": "Zwei-Faktor-Authentifizierung",
   "settings.account.twoFactorHint": "Bei der Anmeldung einen zweiten Faktor verlangen. Einrichtung und Verwaltung erfolgen in Ihren Sicherheitseinstellungen für die Anmeldung.",
   "settings.account.twoFactorOn": "An",
