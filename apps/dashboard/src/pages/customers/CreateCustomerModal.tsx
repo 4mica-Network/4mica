@@ -1,6 +1,6 @@
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCustomer } from "@stores/customer/actions";
+import { clearCustomerIssues, createCustomer } from "@stores/customer/actions";
 import {
   selectCustomerError,
   selectCustomerIssues,
@@ -71,7 +71,8 @@ export function CreateCustomerModal({
     }
     reset();
     setStep(0);
-  }, [isOpen, reset]);
+    dispatch(clearCustomerIssues());
+  }, [isOpen, reset, dispatch]);
 
   useServerIssues(issues, setError);
 

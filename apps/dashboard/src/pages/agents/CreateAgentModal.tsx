@@ -1,6 +1,6 @@
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createAgent } from "@stores/agent/actions";
+import { clearAgentIssues, createAgent } from "@stores/agent/actions";
 import {
   selectAgentError,
   selectAgentIssues,
@@ -88,6 +88,7 @@ export function CreateAgentModal({
     }
     reset();
     setStep(0);
+    dispatch(clearAgentIssues());
     dispatch(fetchActiveWallets());
   }, [isOpen, reset, dispatch]);
 

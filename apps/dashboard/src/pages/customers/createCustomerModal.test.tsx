@@ -184,4 +184,43 @@ describe("CreateCustomerModal", () => {
 
     expect(screen.getByText("is already in use")).toBeInTheDocument();
   });
+
+  it("keeps what the user typed and stays open when the create fails", async () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <CreateCustomerModal isOpen onClose={onClose} />,
+    );
+    setField("create-customer-name", "Acme Procurement");
+    next();
+    await waitFor(() =>
+      expect(document.getElementById("create-customer-address")).not.toBeNull(),
+    );
+    submit();
+    await waitFor(() => expect(lastCreate()).toBeDefined());
+
+    state.pending = { createCustomer: true };
+    rerender(<CreateCustomerModal isOpen onClose={onClose} />);
+    state.pending = {};
+    state.error =
+      "Couldn't add that customer. Check your connection and try again.";
+    rerender(<CreateCustomerModal isOpen onClose={onClose} />);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.getElementById("create-customer-address")).not.toBeNull();
+    expect(screen.getByTestId("create-customer-submit")).toBeEnabled();
+
+    dispatch.mockClear();
+    submit();
+    await waitFor(() => expect(lastCreate()).toBeDefined());
+    expect(lastCreate()?.payload).toMatchObject({ name: "Acme Procurement" });
+  });
+
+  it("clears an earlier, unrelated error when it opens", () => {
+    state.error = "Couldn't load your customers.";
+    open();
+
+    expect(dispatch.mock.calls.map(([action]) => action.type)).toContain(
+      actionTypes.CLEAR_CUSTOMER_ISSUES,
+    );
+  });
 });

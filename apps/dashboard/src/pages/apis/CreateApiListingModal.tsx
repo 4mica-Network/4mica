@@ -1,7 +1,10 @@
 import { slugify } from "@4mica/rules";
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createApiListing } from "@stores/apiListing/actions";
+import {
+  clearApiListingIssues,
+  createApiListing,
+} from "@stores/apiListing/actions";
 import {
   selectApiListingError,
   selectApiListingIssues,
@@ -97,6 +100,7 @@ export function CreateApiListingModal({
     }
     reset();
     setStep(0);
+    dispatch(clearApiListingIssues());
     dispatch(fetchActiveWallets());
   }, [isOpen, reset, dispatch]);
 
