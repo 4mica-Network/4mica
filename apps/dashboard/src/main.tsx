@@ -13,6 +13,13 @@ import "@/styles.css";
 
 captureVerifyToken();
 
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (sentryDsn) {
+  void import("@/lib/telemetry").then(({ initTelemetry }) =>
+    initTelemetry(sentryDsn),
+  );
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");
 

@@ -64,6 +64,19 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp).toContain("form-action 'self'");
   });
 
+  it("allows the Sentry ingest origin only when one is configured", () => {
+    const withSentry = buildContentSecurityPolicy(
+      API,
+      live,
+      "https://o42.ingest.us.sentry.io",
+    );
+
+    expect(withSentry).toContain(
+      `connect-src 'self' ${API} https://clerk.4mica.io https://o42.ingest.us.sentry.io;`,
+    );
+    expect(csp).not.toContain("sentry");
+  });
+
   it("adds Clerk telemetry only for a development instance", () => {
     const dev = buildContentSecurityPolicy(API, {
       origin: "https://able-cat-1.clerk.accounts.dev",

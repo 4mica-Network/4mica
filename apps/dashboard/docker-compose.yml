@@ -10,6 +10,8 @@ services:
         VITE_API_URL: ${VITE_API_URL}
         VITE_BASE_URL: ${VITE_BASE_URL}
         VITE_APP_URL: ${VITE_APP_URL}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-local}
     image: 4mica-dashboard:latest
     container_name: 4mica-dashboard
     restart: unless-stopped

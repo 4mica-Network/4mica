@@ -29,8 +29,12 @@ export function clerkInstanceFromKey(key: string | undefined): ClerkInstance {
 export function buildContentSecurityPolicy(
   apiOrigin: string,
   clerk: ClerkInstance,
+  sentryOrigin: string | null = null,
 ): string {
   const connect = ["'self'", apiOrigin, clerk.origin];
+  if (sentryOrigin) {
+    connect.push(sentryOrigin);
+  }
   if (clerk.development) {
     connect.push(CLERK_TELEMETRY_ORIGIN);
   }
@@ -54,9 +58,13 @@ export function buildContentSecurityPolicy(
 export function renderSecurityHeaders(
   apiOrigin: string,
   clerk: ClerkInstance,
+  sentryOrigin: string | null = null,
 ): string {
   const headers: [string, string][] = [
-    ["Content-Security-Policy", buildContentSecurityPolicy(apiOrigin, clerk)],
+    [
+      "Content-Security-Policy",
+      buildContentSecurityPolicy(apiOrigin, clerk, sentryOrigin),
+    ],
     ["Strict-Transport-Security", "max-age=31536000"],
     ["X-Frame-Options", "DENY"],
     ["X-Content-Type-Options", "nosniff"],
