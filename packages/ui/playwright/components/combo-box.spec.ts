@@ -86,12 +86,15 @@ test("reflects a preselected set", async ({ page }) => {
 
 test("opens from the keyboard and closes on Escape", async ({ page }) => {
   await openStory(page, `${STORY}--with-label`);
-  const trigger = page.getByLabel("Supported regions");
+  const trigger = page.getByRole("button", { name: "Supported regions" });
 
   await trigger.focus();
   await page.keyboard.press("ArrowDown");
 
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("dialog", { name: "Supported regions" }),
+  ).toBeVisible();
   await expect(page.getByRole("searchbox")).toBeFocused();
 
   await page.keyboard.press("Escape");
