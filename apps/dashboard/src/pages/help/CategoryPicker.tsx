@@ -1,4 +1,7 @@
-import { cn } from "@4mica/ui";
+import { Button, cn } from "@4mica/ui";
+import { fetchConfig } from "@stores/config/actions";
+import { selectConfigState } from "@stores/config/selector";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useController } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useConfigList } from "@/hooks/useConfigOptions";
@@ -10,8 +13,33 @@ import {
 
 export function CategoryPicker() {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const categories = useConfigList("supportCategories");
+  const { isLoading } = useAppSelector(selectConfigState);
   const { field, fieldState } = useController({ name: "category" });
+
+  if (categories.length === 0) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col items-start gap-3 rounded-lg border border-overlay/10 px-4 py-3"
+        data-testid="help-categories-unavailable"
+      >
+        <p className="text-ink-muted text-sm">
+          {t("help.create.categoriesUnavailable")}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          intent="outline"
+          loading={isLoading}
+          onClick={() => dispatch(fetchConfig())}
+        >
+          {t("help.create.categoriesRetry")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
