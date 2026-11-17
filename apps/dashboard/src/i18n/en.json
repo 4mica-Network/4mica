@@ -43,6 +43,8 @@
   "http.offline": "You're offline. Reconnect, then try again.",
   "http.checkConnection": "Check your connection and try again.",
   "loader.slow": "This is taking longer than usual. Check your connection, or reload the page.",
+  "help.create.categoriesUnavailable": "Request types didn't load, so a request can't be started yet. Check your connection and try again.",
+  "help.create.categoriesRetry": "Try again",
   "settings.save": "Save changes",
   "settings.saving": "Saving…",
   "settings.discard": "Discard",
