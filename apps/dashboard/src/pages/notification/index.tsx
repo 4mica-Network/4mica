@@ -2,6 +2,7 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { updateNotifications } from "@stores/user/actions";
 import { selectIsSectionSaving, selectUser } from "@stores/user/selector";
 import type { NotificationPlacement } from "@stores/user/type";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { InstantCard } from "@/components/EditableCard";
 import { Select, SettingRow, SwitchCard } from "@/components/form";
@@ -9,19 +10,22 @@ import { SettingsSection } from "@/components/layout";
 import { SettingsPage } from "@/components/SettingsPage";
 import { useConfigOptions } from "@/hooks/useConfigOptions";
 
-const PLACEMENT_LABELS: Record<string, string> = {
-  topLeft: "Top left",
-  topRight: "Top right",
-  bottomLeft: "Bottom left",
-  bottomRight: "Bottom right",
+const PLACEMENT_LABEL_KEYS: Record<string, string> = {
+  topLeft: "settings.notifications.placementOption.topLeft",
+  topRight: "settings.notifications.placementOption.topRight",
+  bottomLeft: "settings.notifications.placementOption.bottomLeft",
+  bottomRight: "settings.notifications.placementOption.bottomRight",
 };
-
-const placementLabel = (value: string) => PLACEMENT_LABELS[value] ?? value;
 
 export function NotificationSettings() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectUser);
+  const placementLabel = useCallback(
+    (value: string) =>
+      PLACEMENT_LABEL_KEYS[value] ? t(PLACEMENT_LABEL_KEYS[value]) : value,
+    [t],
+  );
   const placements = useConfigOptions("notificationPlacements", placementLabel);
 
   const savingInApp = useAppSelector(
