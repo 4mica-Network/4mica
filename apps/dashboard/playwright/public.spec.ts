@@ -1,3 +1,4 @@
+import { axeViolations } from "./axe";
 import { expect, test } from "./fixtures";
 
 test("sign-in page renders and Clerk loads", async ({ page }) => {
@@ -30,4 +31,13 @@ test("unknown routes redirect to sign-in", async ({ page }) => {
   await expect(page).toHaveURL(
     "/sign-in?redirect_url=%2Fthis-page-does-not-exist",
   );
+});
+
+test("sign-in page has no WCAG 2.2 AA violations", async ({ page }) => {
+  await page.goto("/sign-in");
+  await expect(
+    page.getByRole("button", { name: "Continue with Google" }),
+  ).toBeEnabled();
+
+  expect(await axeViolations(page)).toEqual([]);
 });
