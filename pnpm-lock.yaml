@@ -69,6 +69,9 @@ catalogs:
     '@react-email/ui':
       specifier: ^6.9.2
       version: 6.9.2
+    '@sentry/core':
+      specifier: 11.9.0
+      version: 11.9.0
     '@sentry/nextjs':
       specifier: 11.9.0
       version: 11.9.0
@@ -860,6 +863,9 @@ importers:
       '@4mica/tailwind-config':
         specifier: workspace:*
         version: link:../../packages/tailwind-config
+      '@4mica/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@4mica/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1501,6 +1507,19 @@ importers:
       tailwindcss-animate:
         specifier: 'catalog:'
         version: 1.0.7(tailwindcss@4.3.0)
+      typescript:
+        specifier: catalog:typescript-latest
+        version: 5.9.3
+
+  packages/telemetry:
+    dependencies:
+      '@sentry/core':
+        specifier: 'catalog:'
+        version: 11.9.0
+    devDependencies:
+      '@4mica/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
       typescript:
         specifier: catalog:typescript-latest
         version: 5.9.3

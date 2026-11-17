@@ -1,4 +1,4 @@
-import type { Breadcrumb, BrowserOptions, Event, Log } from "@sentry/nextjs";
+import type { Breadcrumb, ClientOptions, Event, Log } from "@sentry/core";
 import {
   createRecord,
   SENSITIVE_KEY,
@@ -8,7 +8,7 @@ import {
 import { FILTERED, safeStringify, scrubText, scrubUrl } from "./text";
 
 type StreamedSpanJSON = Parameters<
-  NonNullable<BrowserOptions["beforeSendSpan"]>
+  NonNullable<ClientOptions["beforeSendSpan"]>
 >[0];
 
 type Contexts = NonNullable<Event["contexts"]>;

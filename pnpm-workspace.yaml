@@ -51,6 +51,7 @@ catalog:
   '@react-google-maps/api': ^2.20.8
   '@reown/appkit': ^1.8.20
   '@reown/appkit-adapter-wagmi': ^1.8.20
+  '@sentry/core': 11.9.0
   '@sentry/nextjs': 11.9.0
   '@shikijs/rehype': ^3.23.0
   '@tailwindcss/postcss': ^4.3.0
