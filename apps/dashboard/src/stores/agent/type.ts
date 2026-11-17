@@ -60,6 +60,9 @@ export interface AgentFilters {
 }
 
 export type AgentState = {
+  current: Agent | null;
+  currentError: string | null;
+  currentNotFound: boolean;
   items: Agent[];
   total: number;
   page: number;

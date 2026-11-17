@@ -146,3 +146,18 @@ export const apiListingActionFailed = (
 export const clearApiListingIssues = () => ({
   type: actionTypes.CLEAR_API_LISTING_ISSUES,
 });
+
+export const fetchApiListing = (id: string) => ({
+  type: actionTypes.FETCH_API_LISTING_REQUESTED,
+  payload: { id },
+});
+
+export const fetchApiListingSucceeded = (item: ApiListing) => ({
+  type: actionTypes.FETCH_API_LISTING_SUCCEEDED,
+  payload: item,
+});
+
+export const fetchApiListingFailed = (message: string, notFound: boolean) => ({
+  type: actionTypes.FETCH_API_LISTING_FAILED,
+  payload: { message, notFound },
+});

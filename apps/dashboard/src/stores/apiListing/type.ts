@@ -58,6 +58,9 @@ export interface ApiListingFilters {
 }
 
 export type ApiListingState = {
+  current: ApiListing | null;
+  currentError: string | null;
+  currentNotFound: boolean;
   items: ApiListing[];
   total: number;
   page: number;

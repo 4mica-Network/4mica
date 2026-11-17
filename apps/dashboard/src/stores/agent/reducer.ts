@@ -3,6 +3,9 @@ import actionTypes from "./actionTypes";
 import type { Agent, AgentFilters, AgentState } from "./type";
 
 export const INITIAL_STATE: AgentState = {
+  current: null,
+  currentError: null,
+  currentNotFound: false,
   items: [],
   total: 0,
   page: 1,
@@ -72,9 +75,32 @@ export default function agentReducer(
         validationIssues: {},
       };
 
-    case actionTypes.CREATE_AGENT_SUCCEEDED:
+    case actionTypes.FETCH_AGENT_REQUESTED:
+      return { ...state, currentError: null, currentNotFound: false };
+
+    case actionTypes.FETCH_AGENT_SUCCEEDED:
+      return { ...state, current: action.payload as Agent };
+
+    case actionTypes.FETCH_AGENT_FAILED: {
+      const payload = action.payload as { message: string; notFound: boolean };
+      return {
+        ...state,
+        currentError: payload.message,
+        currentNotFound: payload.notFound,
+      };
+    }
+
     case actionTypes.UPDATE_AGENT_SUCCEEDED:
-    case actionTypes.PUBLISH_AGENT_SUCCEEDED:
+    case actionTypes.PUBLISH_AGENT_SUCCEEDED: {
+      const updated = action.payload as Agent;
+      return {
+        ...state,
+        current: state.current?.id === updated.id ? updated : state.current,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.CREATE_AGENT_SUCCEEDED:
     case actionTypes.DELETE_AGENT_SUCCEEDED:
       return {
         ...state,

@@ -42,3 +42,12 @@ export const selectAgentIssues = (state: RootState): Record<string, string> =>
 export const selectAreAllAgentsSelected = (state: RootState): boolean =>
   state.agent.items.length > 0 &&
   state.agent.items.every((item) => state.agent.selectedIds.includes(item.id));
+
+export const selectCurrentAgent = (state: RootState): Agent | null =>
+  state.agent.current;
+
+export const selectCurrentAgentError = (state: RootState): string | null =>
+  state.agent.currentError;
+
+export const selectCurrentAgentNotFound = (state: RootState): boolean =>
+  state.agent.currentNotFound;
