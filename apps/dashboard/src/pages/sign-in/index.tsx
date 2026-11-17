@@ -2,6 +2,7 @@ import { Button } from "@4mica/ui";
 import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
+import { useTitle } from "ahooks";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,6 +35,7 @@ function GoogleIcon() {
 
 export function SignInPage() {
   const { t } = useTranslation();
+  useTitle(t("auth.signIn.title"));
   const { isLoaded, signIn } = useSignIn();
   const { isSignedIn } = useAuth();
   const [params] = useSearchParams();
