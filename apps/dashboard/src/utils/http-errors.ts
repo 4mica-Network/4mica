@@ -1,4 +1,4 @@
-import { HttpError } from "@4mica/http";
+import { HttpError, HttpTimeoutError } from "@4mica/http";
 import i18n from "@i18n";
 
 interface ApiIssue {
@@ -55,6 +55,12 @@ export const toMessage = (
   { sessionExpired }: { sessionExpired?: string } = {},
 ): string => {
   if (!(error instanceof HttpError)) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return i18n.t("http.offline");
+    }
+    if (error instanceof HttpTimeoutError || error instanceof TypeError) {
+      return `${fallback} ${i18n.t("http.checkConnection")}`;
+    }
     return fallback;
   }
 
