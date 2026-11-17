@@ -572,7 +572,7 @@ export function CreateWalletModal({
                   href={links.docsNoCustody}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-brand hover:underline"
+                  className="text-brand underline underline-offset-2"
                 >
                   {t("wallet.create.connect.safetyLink")}
                 </a>

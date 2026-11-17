@@ -80,7 +80,7 @@ export function SignInPage() {
   }
 
   return (
-    <motion.div
+    <motion.main
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
@@ -125,7 +125,7 @@ export function SignInPage() {
               {t("auth.signIn.help")}{" "}
               <a
                 href={links.mailto.support}
-                className="text-brand hover:underline hover:underline-offset-2"
+                className="text-brand underline underline-offset-2"
               >
                 {t("auth.signIn.contact")}
               </a>
@@ -151,6 +151,6 @@ export function SignInPage() {
           </span>
         </a>
       </div>
-    </motion.div>
+    </motion.main>
   );
 }
