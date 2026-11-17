@@ -10,6 +10,36 @@
     <title>4Mica Dashboard</title>
     <script src="/theme-init.js"></script>
     <script src="/browser-check.js" defer></script>
+    <style>
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        opacity: 0;
+        animation: boot-in 0.2s 0.4s forwards;
+      }
+      .boot::after {
+        content: "";
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        opacity: 0.6;
+        animation: boot-spin 0.8s linear infinite;
+      }
+      @keyframes boot-in {
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(1turn);
+        }
+      }
+    </style>
   </head>
   <body>
     <noscript>
@@ -18,7 +48,9 @@
         <p>The 4Mica dashboard needs JavaScript. Turn it on, then reload this page.</p>
       </main>
     </noscript>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status" aria-label="Loading the dashboard"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
