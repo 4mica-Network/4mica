@@ -1,14 +1,17 @@
 import { Button, Spinner } from "@4mica/ui";
 import { customerPendingKeys, deleteCustomer } from "@stores/customer/actions";
-import { selectIsCustomerPending } from "@stores/customer/selector";
+import {
+  selectCustomerError,
+  selectIsCustomerPending,
+} from "@stores/customer/selector";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SectionCard } from "@/components/layout";
+import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 export function RemovePanel({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
@@ -19,17 +22,9 @@ export function RemovePanel({ customer }: { customer: Customer }) {
     selectIsCustomerPending(customerPendingKeys.row(customer.id)),
   );
 
-  const sawDeleting = useRef(false);
-  useEffect(() => {
-    if (isDeleting) {
-      sawDeleting.current = true;
-      return;
-    }
-    if (sawDeleting.current) {
-      sawDeleting.current = false;
-      navigate("/customers");
-    }
-  }, [isDeleting, navigate]);
+  const error = useAppSelector(selectCustomerError);
+
+  useOnSuccess(isDeleting, Boolean(error), () => navigate("/customers"));
 
   return (
     <SectionCard
