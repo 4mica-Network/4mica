@@ -17,8 +17,10 @@ const networks: Record<string, NetworkEntry> = JSON.parse(
 const shorthandFor = {
   base: "base",
   baseSepolia: "base-sepolia",
-  ethereumSepolia: "ethereum-sepolia",
 } as const;
+
+// Still in the SDKs, but retired on the site, so links carries no entry.
+const RETIRED = ["ethereum-sepolia"];
 
 const entry = (key: keyof typeof shorthandFor): NetworkEntry => {
   const shorthand = shorthandFor[key];
@@ -40,12 +42,14 @@ describe(`links agree with ${SOURCE}`, () => {
     );
   });
 
-  it(`links.api covers every network in ${SOURCE}`, () => {
+  it(`links.api covers every live network in ${SOURCE}`, () => {
     const covered = Object.keys(links.api).map(
       (key) => shorthandFor[key as keyof typeof shorthandFor],
     );
     expect(covered.sort(), `links.api networks drifted from ${SOURCE}`).toEqual(
-      Object.keys(networks).sort(),
+      Object.keys(networks)
+        .filter((name) => !RETIRED.includes(name))
+        .sort(),
     );
   });
 
