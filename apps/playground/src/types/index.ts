@@ -20,3 +20,7 @@ export interface ProfilePageProps {
 export interface ProfileChildPageProps {
   params: Promise<{ username: string; id: string }>;
 }
+
+export interface ResourcePageProps extends ProfileChildPageProps {
+  searchParams: Promise<{ view?: string | string[] }>;
+}
