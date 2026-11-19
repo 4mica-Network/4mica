@@ -122,10 +122,9 @@ describe("unsupported browsers", () => {
 describe("the page shell", () => {
   const html = readFileSync("index.html", "utf8");
 
-  it("shows a loader before the app bundle arrives on slow connections", () => {
-    expect(html).toMatch(
-      /<div id="root">\s*<div class="boot" role="status" aria-label="Loading the dashboard"><\/div>\s*<\/div>/,
-    );
+  it("paints no spinner of its own before the app bundle arrives", () => {
+    expect(html).toContain('<div id="root"></div>');
+    expect(html).not.toContain("boot");
   });
 
   it("checks browser support without blocking the first paint", () => {
