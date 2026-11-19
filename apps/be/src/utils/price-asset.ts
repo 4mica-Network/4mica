@@ -35,3 +35,12 @@ export const resolvePriceAsset = (
 
   return { ok: true, assetAddress: asset.address, priceCurrency: asset.symbol };
 };
+
+export const priceAssetDecimals = ({
+  network,
+  assetAddress,
+}: {
+  network: PaymentNetwork | null;
+  assetAddress: string | null;
+}): number | null =>
+  network ? (findPaymentAsset(network, assetAddress)?.decimals ?? null) : null;

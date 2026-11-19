@@ -115,7 +115,7 @@ const storedKey = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const storedListing = () => ({
+const storedListing = (over: Record<string, unknown> = {}) => ({
   id: LISTING_ID,
   slug: "weather",
   name: "Weather",
@@ -138,6 +138,7 @@ const storedListing = () => ({
   x402Endpoint: null,
   createdAt: new Date(),
   updatedAt: new Date(),
+  ...over,
 });
 
 const storedAgent = () => ({
@@ -467,6 +468,7 @@ describe("resource key routes", () => {
       const body = res.json();
       expect(body.kind).toBe("listing");
       expect(body.listing.id).toBe(LISTING_ID);
+      expect(body.listing.assetDecimals).toBeNull();
       expect(body.agent).toBeNull();
       expect(body.policy.refundPolicy).toBe("Any 5xx is refunded.");
       expect(body.faqs).toHaveLength(1);
@@ -480,6 +482,28 @@ describe("resource key routes", () => {
         listingId: LISTING_ID,
       });
       expect(agent.findFirst).not.toHaveBeenCalled();
+      await instance.close();
+    });
+
+    it("gives the decimals of the token a listing is priced in", async () => {
+      apiKey.findUnique.mockResolvedValue(
+        storedKey({ listingId: LISTING_ID, listing: { deletedAt: null } }),
+      );
+      apiListing.findFirst.mockResolvedValue(
+        storedListing({
+          network: "BASE_SEPOLIA",
+          assetAddress: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+        }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/v1/resource",
+        headers: KEY_AUTH,
+      });
+
+      expect(res.json().listing.assetDecimals).toBe(6);
       await instance.close();
     });
 
@@ -501,6 +525,7 @@ describe("resource key routes", () => {
       const body = res.json();
       expect(body.kind).toBe("agent");
       expect(body.agent.id).toBe(AGENT_ID);
+      expect(body.agent.assetDecimals).toBe(18);
       expect(body.listing).toBeNull();
       expect(body.policy).toBeNull();
       expect(body.faqs).toEqual([]);
