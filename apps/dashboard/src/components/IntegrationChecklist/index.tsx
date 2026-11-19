@@ -7,7 +7,7 @@ import { fetchPaymentSummary } from "@stores/payment";
 import { selectUser } from "@stores/user/selector";
 import { fetchWallets } from "@stores/wallet";
 import { useLocalStorageState } from "ahooks";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -126,7 +126,7 @@ export function IntegrationChecklist() {
 
         <AnimatePresence initial={false}>
           {!collapsed && (
-            <motion.div
+            <m.div
               key="body"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -162,7 +162,7 @@ export function IntegrationChecklist() {
                   </Link>
                 </span>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

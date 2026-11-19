@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { X } from "lucide-react";
 import { type ReactNode, useId, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -61,7 +61,7 @@ export const Modal = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-9990 flex items-center justify-center p-4">
-          <motion.div
+          <m.div
             key="overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -72,7 +72,7 @@ export const Modal = ({
             data-testid={`${prefix}-overlay`}
           />
 
-          <motion.div
+          <m.div
             key="panel"
             ref={panelRef}
             tabIndex={-1}
@@ -144,7 +144,7 @@ export const Modal = ({
                 {footer}
               </div>
             )}
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>,

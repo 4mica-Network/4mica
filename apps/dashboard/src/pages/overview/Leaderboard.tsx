@@ -1,10 +1,11 @@
 import { cn, Segmented } from "@4mica/ui";
 import type { RankedEntry } from "@stores/payment/type";
-import { LayoutGroup, motion } from "framer-motion";
+import { LayoutGroup, m } from "framer-motion";
 import { ArrowDownWideNarrow, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { LayoutMotionProvider } from "@/components/MotionProvider";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { currentLocale } from "@/i18n/locale";
 import { formatAmount, type RankKey, rankBy } from "./metrics";
@@ -95,58 +96,60 @@ export function Leaderboard({
           </p>
         </div>
       ) : (
-        <LayoutGroup id={source}>
-          <ol className="flex flex-col gap-1 px-2 pb-3">
-            {ranked.map((entry, index) => (
-              <motion.li
-                layout
-                key={entry.id}
-                transition={{ type: "spring", stiffness: 500, damping: 40 }}
-              >
-                <Link
-                  to={style.href(entry.id)}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60 focus-visible:ring-inset"
-                  data-testid={`overview-leader-${entry.slug}`}
+        <LayoutMotionProvider>
+          <LayoutGroup id={source}>
+            <ol className="flex flex-col gap-1 px-2 pb-3">
+              {ranked.map((entry, index) => (
+                <m.li
+                  layout
+                  key={entry.id}
+                  transition={{ type: "spring", stiffness: 500, damping: 40 }}
                 >
-                  <span
-                    className={cn(
-                      "w-4 shrink-0 text-right font-mono text-xs tabular-nums",
-                      index === 0 ? "text-ink-strong" : "text-ink-subtle",
-                    )}
+                  <Link
+                    to={style.href(entry.id)}
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60 focus-visible:ring-inset"
+                    data-testid={`overview-leader-${entry.slug}`}
                   >
-                    {index + 1}
-                  </span>
+                    <span
+                      className={cn(
+                        "w-4 shrink-0 text-right font-mono text-xs tabular-nums",
+                        index === 0 ? "text-ink-strong" : "text-ink-subtle",
+                      )}
+                    >
+                      {index + 1}
+                    </span>
 
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="truncate font-medium text-ink-body text-sm group-hover:text-ink-strong">
-                        {entry.name}
-                      </span>
-                      <span className="shrink-0 font-mono text-ink-strong text-sm tabular-nums">
-                        {format(entry.value)}
-                        <span className="ml-2 inline-block w-9 text-right text-ink-subtle text-xs">
-                          {total === 0
-                            ? "—"
-                            : `${Math.round((entry.value / total) * 100)}%`}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="truncate font-medium text-ink-body text-sm group-hover:text-ink-strong">
+                          {entry.name}
                         </span>
-                      </span>
+                        <span className="shrink-0 font-mono text-ink-strong text-sm tabular-nums">
+                          {format(entry.value)}
+                          <span className="ml-2 inline-block w-9 text-right text-ink-subtle text-xs">
+                            {total === 0
+                              ? "—"
+                              : `${Math.round((entry.value / total) * 100)}%`}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-overlay/5">
+                        <m.div
+                          className={cn("h-full rounded-full", style.bar)}
+                          initial={false}
+                          animate={{
+                            width: `${peak === 0 ? 0 : (entry.value / peak) * 100}%`,
+                          }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-overlay/5">
-                      <motion.div
-                        className={cn("h-full rounded-full", style.bar)}
-                        initial={false}
-                        animate={{
-                          width: `${peak === 0 ? 0 : (entry.value / peak) * 100}%`,
-                        }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                      />
-                    </div>
-                  </div>
-                </Link>
-              </motion.li>
-            ))}
-          </ol>
-        </LayoutGroup>
+                  </Link>
+                </m.li>
+              ))}
+            </ol>
+          </LayoutGroup>
+        </LayoutMotionProvider>
       )}
     </Panel>
   );

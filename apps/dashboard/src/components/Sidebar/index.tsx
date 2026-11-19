@@ -3,7 +3,7 @@ import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   ArrowLeft,
   Check,
@@ -200,13 +200,13 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
             {displayName}
           </span>
-          <motion.span
+          <m.span
             animate={{ rotate: open ? 180 : 0 }}
             transition={{ duration: 0.18 }}
             className="shrink-0 text-ink-subtle"
           >
             <ChevronDown aria-hidden="true" className="h-4 w-4" />
-          </motion.span>
+          </m.span>
         </span>
       </button>
 
@@ -308,7 +308,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     : t("sidebar.copyPublicProfile");
 
   return (
-    <motion.aside
+    <m.aside
       initial={false}
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
@@ -366,13 +366,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         {!inSettings && (
           <>
             {!collapsed && settled && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15 }}
               >
                 <SidebarBanners />
-              </motion.div>
+              </m.div>
             )}
             <div className="flex flex-col gap-0.5">
               <ActionRow
@@ -403,6 +403,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           </Label>
         </div>
       </div>
-    </motion.aside>
+    </m.aside>
   );
 }
