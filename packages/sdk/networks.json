@@ -1,0 +1,32 @@
+{
+  "base": {
+    "caip2": "eip155:8453",
+    "chainId": 8453,
+    "label": "Base",
+    "rpcUrl": "https://base.api.4mica.io/",
+    "facilitatorUrl": null,
+    "explorerUrl": "https://basescan.org",
+    "nativeSymbol": "ETH",
+    "testnet": false
+  },
+  "base-sepolia": {
+    "caip2": "eip155:84532",
+    "chainId": 84532,
+    "label": "Base Sepolia",
+    "rpcUrl": "https://base.sepolia.api.4mica.io/",
+    "facilitatorUrl": "https://testnet.payment.4mica.io/",
+    "explorerUrl": "https://sepolia.basescan.org",
+    "nativeSymbol": "ETH",
+    "testnet": true
+  },
+  "ethereum-sepolia": {
+    "caip2": "eip155:11155111",
+    "chainId": 11155111,
+    "label": "Ethereum Sepolia",
+    "rpcUrl": "https://ethereum.sepolia.api.4mica.io/",
+    "facilitatorUrl": null,
+    "explorerUrl": "https://sepolia.etherscan.io",
+    "nativeSymbol": "ETH",
+    "testnet": true
+  }
+}

@@ -20,7 +20,9 @@ use std::str::FromStr;
 use alloy::sol_types::Eip712Domain;
 use anyhow::{Context, Result, bail};
 use reqwest::Url;
-use rpc::{CorePublicParameters, PAYMENT_PAYLOAD_VERSION, guarantee_registry_domain};
+use rpc::{
+    CorePublicParameters, PAYMENT_PAYLOAD_VERSION, clearing_house_domain, guarantee_registry_domain,
+};
 use sdk_4mica::Address;
 use serde::Deserialize;
 
@@ -97,6 +99,8 @@ pub struct PublicParameters {
     pub guarantee_signer: Address,
     /// The GuaranteeRegistry's EIP-712 domain, which receipts are signed under.
     pub guarantee_domain: Eip712Domain,
+    /// The ClearingHouse's EIP-712 domain, which payers sign their payment requests under.
+    pub payment_domain: Eip712Domain,
     /// Validator identities this operator whitelisted. A signed validation requirement may only
     /// name one of these. By convention a URL or CAIP-10 account id, not an address.
     pub validators: Vec<String>,
@@ -131,6 +135,7 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
         &params.guarantee_registry_address,
         "guarantee_registry_address",
     )?;
+    let clearing_house = core_address(&params.clearing_house_address, "clearing_house_address")?;
     let validators = normalize_validators(&params.validators)?;
     let contract_address = core_address(&params.contract_address, "contract_address")?;
 
@@ -145,6 +150,7 @@ fn public_parameters_from_core(params: CorePublicParameters) -> Result<PublicPar
     Ok(PublicParameters {
         guarantee_signer,
         guarantee_domain: guarantee_registry_domain(params.chain_id, guarantee_registry),
+        payment_domain: clearing_house_domain(params.chain_id, clearing_house),
         validators,
         contract_address,
         ethereum_http_rpc_url,
@@ -475,6 +481,38 @@ mod tests {
                 .as_ref()
                 .map(Url::as_str),
             Some("https://rpc.example/")
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_derives_the_payment_domain_from_the_clearing_house() {
+        clear_network_env();
+        let params = sample_core_params();
+
+        let public_params = public_parameters_from_core(params).expect("public params");
+        assert_eq!(
+            public_params.payment_domain,
+            clearing_house_domain(
+                11155111,
+                Address::from_str("0x0000000000000000000000000000000000000004").unwrap()
+            )
+        );
+    }
+
+    /// Without the ClearingHouse address there is no domain to check payer signatures under, so
+    /// `/verify` could not tell a forged payment from a real one.
+    #[test]
+    #[serial]
+    fn public_parameters_from_core_requires_the_clearing_house_address() {
+        clear_network_env();
+        let mut params = sample_core_params();
+        params.clearing_house_address = String::new();
+
+        let err = public_parameters_from_core(params).unwrap_err();
+        assert!(
+            err.to_string().contains("invalid clearing_house_address"),
+            "unexpected error: {err}"
         );
     }
 

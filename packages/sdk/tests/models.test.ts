@@ -356,11 +356,25 @@ describe("token and balance models", () => {
           decimals: 6,
           domain_separator: `0x${"11".repeat(32)}`,
         },
-        { symbol: "RAW", address: RECIPIENT },
+        { symbol: "RAW", address: RECIPIENT, decimals: 18 },
       ],
     });
     expect(tokens.tokens[0]?.domainSeparator).toBe(`0x${"11".repeat(32)}`);
     expect(tokens.tokens[1]?.domainSeparator).toBeUndefined();
+  });
+
+  it("refuses a token list missing a symbol or decimals", () => {
+    for (const token of [
+      { address: ASSET, decimals: 6 },
+      { symbol: "", address: ASSET, decimals: 6 },
+      { symbol: "USDC", address: ASSET },
+      { symbol: "USDC", address: ASSET, decimals: null },
+      { symbol: "USDC", address: ASSET, decimals: -1 },
+    ]) {
+      expect(() =>
+        SupportedTokensResponse.fromRpc({ chain_id: 1, tokens: [token] }),
+      ).toThrow(InvalidParamsError);
+    }
   });
 
   it("parses asset balances", () => {

@@ -112,9 +112,20 @@ impl fmt::Display for ErrorCode {
     }
 }
 
-/// An error the facilitator reports to its caller. Its `Display` is the message.
+/// An error the facilitator reports to its caller.
+///
+/// `Display` is the full story and goes to the logs. [`Self::public_message`] is what the caller
+/// reads, and the two differ wherever the full story would carry something that is not the
+/// caller's business: an upstream error string (which can embed an RPC or core URL, credentials
+/// included), the relayer's balance, or a configured limit.
 pub trait Refusal: fmt::Display {
     fn code(&self) -> ErrorCode;
+
+    /// The message put in the response. Defaults to `Display`; override for variants that wrap
+    /// upstream errors or internal state.
+    fn public_message(&self) -> String {
+        self.to_string()
+    }
 
     /// Whether repeating the identical request later may succeed.
     fn retryable(&self) -> bool;
@@ -144,7 +155,7 @@ impl<E: Refusal + ?Sized> From<&E> for Failure {
     fn from(err: &E) -> Self {
         Self {
             reason: err.code().to_string(),
-            message: err.to_string(),
+            message: err.public_message(),
             retryable: err.retryable(),
             details: err.details(),
             transaction: err.transaction(),

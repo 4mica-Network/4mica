@@ -38,6 +38,26 @@
         "default": "./dist/app.cjs"
       }
     },
+    "./networks": {
+      "import": {
+        "types": "./dist/networks.d.ts",
+        "default": "./dist/networks.js"
+      },
+      "require": {
+        "types": "./dist/networks.d.cts",
+        "default": "./dist/networks.cjs"
+      }
+    },
+    "./amounts": {
+      "import": {
+        "types": "./dist/amounts.d.ts",
+        "default": "./dist/amounts.js"
+      },
+      "require": {
+        "types": "./dist/amounts.d.cts",
+        "default": "./dist/amounts.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [

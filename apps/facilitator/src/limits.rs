@@ -24,7 +24,6 @@
 //!   earlier would be trivially bypassed by varying `from` on every request.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -104,26 +103,9 @@ struct GuardState {
     last_sweep: Option<Instant>,
 }
 
-/// Running totals since process start. Griefing is only actionable if someone can see it, and
-/// until now the service emitted no signal at all — a slow drain would have gone unnoticed.
-#[derive(Debug, Default, Clone, Copy, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SponsorCounters {
-    /// Transactions broadcast and mined successfully.
-    pub sponsored: u64,
-    /// Requests refused for any reason — bad signature, throttling, gas ceiling.
-    pub rejected: u64,
-    /// Subset of `rejected` refused by throttling specifically. A rising number here is the
-    /// signature of an abuse attempt rather than a misconfigured client.
-    pub throttled: u64,
-}
-
 pub struct SponsorGuard {
     limits: SponsorLimits,
     state: Mutex<GuardState>,
-    sponsored: AtomicU64,
-    rejected: AtomicU64,
-    throttled: AtomicU64,
 }
 
 impl SponsorGuard {
@@ -131,32 +113,7 @@ impl SponsorGuard {
         Arc::new(Self {
             limits,
             state: Mutex::new(GuardState::default()),
-            sponsored: AtomicU64::new(0),
-            rejected: AtomicU64::new(0),
-            throttled: AtomicU64::new(0),
         })
-    }
-
-    pub fn record_sponsored(&self) {
-        self.sponsored.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// `throttled` marks a rejection that came from these limits rather than from the request
-    /// itself. Passed in rather than inspected because the caller holds an action-specific error
-    /// type, and only it can tell the two apart.
-    pub fn record_rejected(&self, throttled: bool) {
-        self.rejected.fetch_add(1, Ordering::Relaxed);
-        if throttled {
-            self.throttled.fetch_add(1, Ordering::Relaxed);
-        }
-    }
-
-    pub fn counters(&self) -> SponsorCounters {
-        SponsorCounters {
-            sponsored: self.sponsored.load(Ordering::Relaxed),
-            rejected: self.rejected.load(Ordering::Relaxed),
-            throttled: self.throttled.load(Ordering::Relaxed),
-        }
     }
 
     pub fn limits(&self) -> &SponsorLimits {

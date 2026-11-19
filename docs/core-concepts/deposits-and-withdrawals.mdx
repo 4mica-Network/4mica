@@ -16,6 +16,42 @@ open obligation cannot safely leave at the same moment.
 Together, deposits and withdrawals define the boundary between money the wallet
 owns and collateral the protocol can rely on.
 
+## Deposit and withdraw with the SDK
+
+```ts
+import { FourMica } from "@4mica/sdk";
+
+await using client = await FourMica.connect({
+  privateKey: process.env.PRIVATE_KEY,
+  network: "base-sepolia",
+});
+
+const deposit = await client.deposit("5 USDC"); // gasless; waits until spendable
+const { available, locked } = await client.balance("USDC");
+
+await client.withdraw("2 USDC"); // request only: the grace period starts
+
+// Later, once the grace period has ended:
+const [pending] = await client.withdrawals(); // pending.readyAt, pending.ready
+if (pending?.ready) await client.finalizeWithdrawal("USDC");
+// To keep the collateral instead: await client.cancelWithdrawal("USDC");
+```
+
+- **`deposit`** is gasless where the network's facilitator can sponsor it
+  (Base Sepolia has one); `gas: "self"` sends the wallet's own transaction.
+  It checks the wallet balance before any signature prompt
+  (`InsufficientBalanceError`) and resolves once Core counts the collateral.
+  After `timeoutMs` (default 60 seconds) it returns `status: "pending"`
+  instead of throwing: the money has moved, and `deposit.spendable()` waits
+  again.
+- **`balance`** reports `total`, `locked`, and `available` as decimal strings.
+- **`withdraw`** only requests. An early `finalizeWithdrawal` throws
+  `GracePeriodNotElapsedError` with the ready time.
+
+For exact control over routes, approvals, and base-unit amounts, use
+`await client.lowLevel()` and the intent builders in
+[client operations](/sdks/typescript/client-operations#deposits-and-withdrawals).
+
 ## Why collateral exists
 
 In a direct payment, the buyer transfers funds before the seller serves the
@@ -109,14 +145,16 @@ address before approving or depositing an ERC-20.
 
 The two deposit paths differ:
 
-| Asset | Before deposit | Deposit amount |
+| Asset | How it is sent | Gas |
 | --- | --- | --- |
-| Native ETH | No token approval | Wei |
-| ERC-20 | Approve the Core4Mica contract | Token base units |
+| Native ETH | Always the wallet's own transaction | Paid by the wallet, on top of the amount |
+| ERC-20 | A gasless authorization where the facilitator sponsors it; otherwise the wallet's own transaction after an approval | None when gasless |
 
-For example, a token with six decimals represents one unit as `1_000_000`.
-Never pass a human-formatted decimal value to an SDK method that expects base
-units.
+`client.deposit` takes `"5 USDC"` and converts it with the token's decimals;
+an amount with more decimals than the token has is an error, never rounded.
+The `Client` builders take base units instead: a token with six decimals
+represents one unit as `1_000_000`. Never pass a human-formatted decimal value
+to an SDK method that expects base units.
 
 ## Deposit lifecycle
 
@@ -131,7 +169,7 @@ sequenceDiagram
     participant Core as 4Mica Core
     participant Agent
 
-    alt ERC-20 deposit
+    alt Self-funded ERC-20 deposit
         Wallet->>Token: Approve deposit amount
         Token-->>Wallet: Approval confirmed
     end
@@ -148,10 +186,11 @@ The practical steps are:
 
 1. **Discover configuration.** Confirm the network, Core deployment, token
    address, decimals, and wallet.
-2. **Fund gas.** The wallet needs the network's native asset to submit the
-   approval and deposit transactions.
-3. **Approve the token.** ERC-20 deposits require an allowance. ETH deposits do
-   not.
+2. **Fund gas if needed.** A gasless deposit needs none. Native ETH and
+   self-funded deposits need the network's native asset for gas.
+3. **Approve the token if needed.** A self-funded ERC-20 deposit requires an
+   allowance; `gas: "self"` approves exactly the amount. ETH deposits and
+   gasless deposits do not.
 4. **Submit the deposit.** Send the intended amount to the Core4Mica deposit
    flow.
 5. **Wait for finality.** A transaction being included in a block does not
@@ -161,10 +200,14 @@ The practical steps are:
 7. **Verify capacity.** Confirm the collateral appears before allowing the
    agent to sign paid requests.
 
+`client.deposit` covers steps 2 to 7: it resolves once Core counts the
+collateral.
+
 <Note>
 Finality and synchronization time vary by network and deployment. Do not
 hard-code a fixed delay or assume a transaction receipt means the collateral is
-immediately spendable.
+immediately spendable. That is why `client.deposit` polls Core rather than
+returning at the receipt.
 </Note>
 
 ## Approval safety for ERC-20 deposits
@@ -303,11 +346,13 @@ The steps are:
    clearing positions, disputes, defaults, and any active withdrawal.
 3. **Choose the amount and asset.** A withdrawal is scoped to collateral
    available on the selected network.
-4. **Request withdrawal.** This starts the deployment's configured timelock.
+4. **Request withdrawal.** `client.withdraw("2 USDC")` starts the
+   deployment's configured timelock.
 5. **Wait for the grace period.** During this time, late events and obligations
-   can be accounted for.
-6. **Finalize withdrawal.** Submit the final transaction after the waiting
-   period.
+   can be accounted for. `client.withdrawals()` reports when each request is
+   ready (`readyAt`).
+6. **Finalize withdrawal.** `client.finalizeWithdrawal("USDC")` submits the
+   final transaction after the waiting period.
 7. **Verify completion.** Confirm the finalized transaction and refresh the
    wallet's collateral position.
 
@@ -329,8 +374,8 @@ The withdrawal delay gives the protocol time to observe finalized chain events,
 resolve guarantees, close clearing phases, and protect valid recipients.
 
 The delay is not a fixed universal number. It is a deployment parameter. Read
-current contract or operator configuration instead of copying a duration from
-an example.
+it from `client.withdrawals()`, or from current contract or operator
+configuration, instead of copying a duration from an example.
 
 ## What can block a withdrawal?
 
@@ -394,8 +439,9 @@ Check the transaction status, network, destination contract, token address,
 amount units, and chain finality. Then confirm that Core has synchronized the
 event.
 
-Do not submit another deposit automatically unless you know the first
-transaction failed.
+If `client.deposit` returned `status: "pending"`, call `deposit.spendable()`
+to wait again. Do not submit another deposit automatically unless you know the
+first transaction failed.
 
 ### ERC-20 approval fails
 
@@ -422,7 +468,9 @@ Use [error handling](/buyer/error-handling) for buyer-facing failure states.
 ### Withdrawal cannot finalize
 
 Check the configured waiting period, locked collateral, open guarantee states,
-cycle position, requested amount, wallet, asset, network, and gas balance.
+cycle position, requested amount, wallet, asset, network, and gas balance. An
+early `client.finalizeWithdrawal` throws `GracePeriodNotElapsedError` naming
+the time it becomes ready.
 
 If local state conflicts with protocol state, reconcile from the authoritative
 API and chain before retrying.

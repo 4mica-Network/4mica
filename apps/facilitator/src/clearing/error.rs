@@ -315,6 +315,23 @@ impl Refusal for ClaimError {
         }
     }
 
+    fn public_message(&self) -> String {
+        match self {
+            Self::Chain(_) => "the chain could not be reached; retry shortly".into(),
+            Self::Broadcast(_) => "the claim could not be broadcast; nothing was submitted".into(),
+            Self::ReceiptUnavailable { tx_hash, .. } => {
+                format!("claim {tx_hash} was broadcast but its receipt could not be read")
+            }
+            Self::RelayerBalanceTooLow { .. } => {
+                "gas sponsorship is temporarily unavailable; retry later".into()
+            }
+            Self::GasCeilingExceeded { .. } => {
+                "the claim needs more gas than this facilitator sponsors".into()
+            }
+            other => other.to_string(),
+        }
+    }
+
     fn retryable(&self) -> bool {
         self.is_retryable()
     }
@@ -351,6 +368,25 @@ impl Refusal for PayError {
             Self::RelayerBalanceTooLow { .. } => ErrorCode::RelayerUnderfunded,
             Self::GasCeilingExceeded { .. } => ErrorCode::GasCeilingExceeded,
             Self::Permit2AllowanceRequired(_) => ErrorCode::Permit2AllowanceRequired,
+        }
+    }
+
+    fn public_message(&self) -> String {
+        match self {
+            Self::Chain(_) => "the chain could not be reached; retry shortly".into(),
+            Self::Broadcast(_) => {
+                "the payment could not be broadcast; nothing was submitted".into()
+            }
+            Self::ReceiptUnavailable { tx_hash, .. } => {
+                format!("payment {tx_hash} was broadcast but its receipt could not be read")
+            }
+            Self::RelayerBalanceTooLow { .. } => {
+                "gas sponsorship is temporarily unavailable; retry later".into()
+            }
+            Self::GasCeilingExceeded { .. } => {
+                "the payment needs more gas than this facilitator sponsors".into()
+            }
+            other => other.to_string(),
         }
     }
 

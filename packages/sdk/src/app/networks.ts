@@ -1,6 +1,6 @@
 import type { AppNetwork } from "@/app/models";
 import { InvalidParamsError } from "@/errors";
-import { NETWORKS } from "@/networks";
+import { resolveNetwork } from "@/networks";
 
 const APP_NETWORKS: ReadonlySet<string> = new Set([
   "BASE",
@@ -18,14 +18,7 @@ export function toAppNetwork(network: string): AppNetwork {
     return value.toUpperCase() as AppNetwork;
   }
 
-  const lower = value.toLowerCase();
-  if (lower in NETWORKS) {
-    return fromShorthand(lower) as AppNetwork;
-  }
-
-  const shorthand = Object.keys(NETWORKS).find(
-    (key) => NETWORKS[key].caip2 === lower,
-  );
+  const shorthand = resolveNetwork(value)?.name;
   if (shorthand) {
     return fromShorthand(shorthand) as AppNetwork;
   }
