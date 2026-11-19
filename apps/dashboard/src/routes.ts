@@ -1,71 +1,80 @@
 import { type ComponentType, createElement, lazy } from "react";
 import { Navigate } from "react-router-dom";
+import { type TranslatedModule, translated } from "@/i18n/manifest";
 
 type PageLoader = () => Promise<ComponentType>;
 
-const lazyPage = (load: PageLoader) =>
-  Object.assign(
-    lazy(() => load().then((component) => ({ default: component }))),
-    { preload: load },
+const lazyPage = (module: TranslatedModule, load: PageLoader) => {
+  const loadWithTranslations = translated(module, load);
+  return Object.assign(
+    lazy(() =>
+      loadWithTranslations().then((component) => ({ default: component })),
+    ),
+    { preload: loadWithTranslations },
   );
+};
 
-const AccountSettings = lazyPage(() =>
+const AccountSettings = lazyPage("pages/account", () =>
   import("@/pages/account").then((page) => page.AccountSettings),
 );
-const AgentAdvanced = lazyPage(() =>
+const AgentAdvanced = lazyPage("pages/agent-advanced", () =>
   import("@/pages/agent-advanced").then((page) => page.AgentAdvanced),
 );
-const AgentDetail = lazyPage(() =>
+const AgentDetail = lazyPage("pages/agent-detail", () =>
   import("@/pages/agent-detail").then((page) => page.AgentDetail),
 );
-const Agents = lazyPage(() =>
+const Agents = lazyPage("pages/agents", () =>
   import("@/pages/agents").then((page) => page.Agents),
 );
-const ApiDetail = lazyPage(() =>
+const ApiDetail = lazyPage("pages/api-detail", () =>
   import("@/pages/api-detail").then((page) => page.ApiDetail),
 );
-const Apis = lazyPage(() => import("@/pages/apis").then((page) => page.Apis));
-const BusinessSettings = lazyPage(() =>
+const Apis = lazyPage("pages/apis", () =>
+  import("@/pages/apis").then((page) => page.Apis),
+);
+const BusinessSettings = lazyPage("pages/business", () =>
   import("@/pages/business").then((page) => page.BusinessSettings),
 );
-const ComplianceSettings = lazyPage(() =>
+const ComplianceSettings = lazyPage("pages/compliance", () =>
   import("@/pages/compliance").then((page) => page.ComplianceSettings),
 );
-const CustomerDetail = lazyPage(() =>
+const CustomerDetail = lazyPage("pages/customer-detail", () =>
   import("@/pages/customer-detail").then((page) => page.CustomerDetail),
 );
-const Customers = lazyPage(() =>
+const Customers = lazyPage("pages/customers", () =>
   import("@/pages/customers").then((page) => page.Customers),
 );
-const DeveloperSettings = lazyPage(() =>
+const DeveloperSettings = lazyPage("pages/developer", () =>
   import("@/pages/developer").then((page) => page.DeveloperSettings),
 );
-const Disputes = lazyPage(() =>
+const Disputes = lazyPage("pages/disputes", () =>
   import("@/pages/disputes").then((page) => page.Disputes),
 );
-const Help = lazyPage(() => import("@/pages/help").then((page) => page.Help));
-const HelpRequestDetail = lazyPage(() =>
+const Help = lazyPage("pages/help", () =>
+  import("@/pages/help").then((page) => page.Help),
+);
+const HelpRequestDetail = lazyPage("pages/help-request", () =>
   import("@/pages/help-request").then((page) => page.HelpRequestDetail),
 );
-const NotificationSettings = lazyPage(() =>
+const NotificationSettings = lazyPage("pages/notification", () =>
   import("@/pages/notification").then((page) => page.NotificationSettings),
 );
-const Overview = lazyPage(() =>
+const Overview = lazyPage("pages/overview", () =>
   import("@/pages/overview").then((page) => page.Overview),
 );
-const Payments = lazyPage(() =>
+const Payments = lazyPage("pages/payments", () =>
   import("@/pages/payments").then((page) => page.Payments),
 );
-const PlansSettings = lazyPage(() =>
+const PlansSettings = lazyPage("pages/plans", () =>
   import("@/pages/plans").then((page) => page.PlansSettings),
 );
-const ProfileSettings = lazyPage(() =>
+const ProfileSettings = lazyPage("pages/profile", () =>
   import("@/pages/profile").then((page) => page.ProfileSettings),
 );
-const TeamSettings = lazyPage(() =>
+const TeamSettings = lazyPage("pages/team", () =>
   import("@/pages/team").then((page) => page.TeamSettings),
 );
-const Wallet = lazyPage(() =>
+const Wallet = lazyPage("pages/wallet", () =>
   import("@/pages/wallet").then((page) => page.Wallet),
 );
 

@@ -1,3 +1,4 @@
+import { TranslationRegistryProvider } from "@4mica/i18n";
 import { store } from "@stores/index";
 import { MotionConfig } from "framer-motion";
 import { StrictMode } from "react";
@@ -10,9 +11,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppCrash } from "@/components/ErrorBoundary/fallbacks";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Notifications } from "@/components/Notifications";
+import { languageReady, translations } from "@/i18n";
 import { reloadForNewVersion } from "@/lib/chunkReload";
 import { captureVerifyToken } from "@/lib/verifyToken";
-import "@/i18n";
 import "react-toastify/dist/ReactToastify.css";
 import "@/styles.css";
 
@@ -35,22 +36,26 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Root element #root not found");
 
 if (!document.documentElement.hasAttribute("data-unsupported")) {
-  createRoot(root).render(
-    <StrictMode>
-      <ErrorBoundary fallback={AppCrash}>
-        <Provider store={store}>
-          <BrowserRouter>
-            <ClerkAuthProvider>
-              <MotionConfig reducedMotion="user">
-                <MotionProvider>
-                  <App />
-                  <Notifications />
-                </MotionProvider>
-              </MotionConfig>
-            </ClerkAuthProvider>
-          </BrowserRouter>
-        </Provider>
-      </ErrorBoundary>
-    </StrictMode>,
-  );
+  languageReady.then(() => {
+    createRoot(root).render(
+      <StrictMode>
+        <ErrorBoundary fallback={AppCrash}>
+          <TranslationRegistryProvider registry={translations}>
+            <Provider store={store}>
+              <BrowserRouter>
+                <ClerkAuthProvider>
+                  <MotionConfig reducedMotion="user">
+                    <MotionProvider>
+                      <App />
+                      <Notifications />
+                    </MotionProvider>
+                  </MotionConfig>
+                </ClerkAuthProvider>
+              </BrowserRouter>
+            </Provider>
+          </TranslationRegistryProvider>
+        </ErrorBoundary>
+      </StrictMode>,
+    );
+  });
 }

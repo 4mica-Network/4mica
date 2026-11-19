@@ -4,15 +4,20 @@ import {
   selectNeedsOnboarding,
 } from "@stores/user/selector";
 import { lazy, Suspense } from "react";
+import { translated } from "@/i18n/manifest";
 
-const Wizard = lazy(() =>
-  import("./Wizard").then((module) => ({ default: module.Wizard })),
+const Wizard = lazy(
+  translated("components/Onboarding/Wizard", () =>
+    import("./Wizard").then((module) => ({ default: module.Wizard })),
+  ),
 );
 
-const IntegrationChecklist = lazy(() =>
-  import("@/components/IntegrationChecklist").then((module) => ({
-    default: module.IntegrationChecklist,
-  })),
+const IntegrationChecklist = lazy(
+  translated("components/IntegrationChecklist", () =>
+    import("@/components/IntegrationChecklist").then((module) => ({
+      default: module.IntegrationChecklist,
+    })),
+  ),
 );
 
 export function OnboardingGate() {

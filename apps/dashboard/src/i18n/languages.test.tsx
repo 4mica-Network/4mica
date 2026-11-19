@@ -7,14 +7,14 @@ import { createStore } from "redux";
 import { afterEach, describe, expect, it } from "vitest";
 import { useAppLanguage } from "@/hooks/useAppLanguage";
 import { formatDate } from "@/utils/format";
-import de from "./de.json";
-import en from "./en.json";
-import es from "./es.json";
-import fr from "./fr.json";
 import i18n, { applyLanguage, LANGUAGE_STORAGE_KEY } from "./index";
+import { catalogue } from "./testCatalogues";
 
-const CATALOGUES = { de, fr, es } as Record<string, Record<string, string>>;
-const english = en as Record<string, string>;
+const de = catalogue("de");
+const fr = catalogue("fr");
+const es = catalogue("es");
+const CATALOGUES: Record<string, Record<string, string>> = { de, fr, es };
+const english = catalogue("en");
 
 const placeholders = (value: string) =>
   [...value.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((match) => match[1]).sort();
@@ -27,8 +27,17 @@ afterEach(async () => {
 describe.each(Object.keys(CATALOGUES))("the %s catalogue", (language) => {
   const catalogue = CATALOGUES[language];
 
-  it("has exactly the English keys in the same order", () => {
-    expect(Object.keys(catalogue)).toEqual(Object.keys(english));
+  it("has the English keys in the same order, plus the plural forms its grammar needs", () => {
+    const extraForms = new Intl.PluralRules(language)
+      .resolvedOptions()
+      .pluralCategories.filter((form) => form !== "one" && form !== "other");
+    const expected = Object.keys(english).flatMap((key) =>
+      key.endsWith("_other")
+        ? [key, ...extraForms.map((form) => key.replace(/_other$/, `_${form}`))]
+        : [key],
+    );
+
+    expect(Object.keys(catalogue)).toEqual(expected);
   });
 
   it("keeps every placeholder and leaves nothing blank", () => {
