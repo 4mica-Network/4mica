@@ -251,6 +251,7 @@ export default async function ApiListingPage({
         title={listing.name}
         actions={
           <div className="flex items-stretch gap-2">
+            {profile.isOwner && <ViewSwitch view={view} />}
             {handoff && (
               <CopyForAi markdown={handoff.markdown} prompt={handoff.prompt} />
             )}
@@ -286,8 +287,6 @@ export default async function ApiListingPage({
                     <VisibilityTag visibility={listing.visibility} />
                   )}
                 </div>
-
-                {profile.isOwner && <ViewSwitch view={view} />}
 
                 {listing.summary && (
                   <p className="text-ink-muted text-sm leading-relaxed">
