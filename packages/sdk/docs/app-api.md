@@ -55,11 +55,14 @@ const { kind, listing, agent, policy, faqs } = await app.resource();
 if (kind === "listing" && listing) {
   console.log(listing.priceAmount, listing.priceCurrency, listing.payToAddress);
   console.log(listing.network); // "BASE" | "BASE_SEPOLIA" | "ETHEREUM_SEPOLIA"
+  console.log(listing.assetDecimals); // 18 for ETH, 6 for USDC
 }
 console.log(policy?.refundPolicy, policy?.rateLimit);
 ```
 
-Exactly one of `listing` or `agent` is set, named by `kind`. `policy` is `null` until you fill it in
+Exactly one of `listing` or `agent` is set, named by `kind`. `priceAmount` is in the asset's display
+units (`"0.01"` ETH); `assetDecimals` converts it to the base units x402 prices in, and is `null`
+until the listing has a network. `policy` is `null` until you fill it in
 on the dashboard.
 
 ### Check a payer before serving: `app.resolveCustomer()`
@@ -122,14 +125,19 @@ With a listing or agent key the payment is attributed automatically. You can sti
 
 - `paymentFromHeader(header, decimals = 18)` reads `reqId`, `payerAddress` and the amount from the
   payment header a seller's middleware just verified (`PAYMENT-SIGNATURE` in x402 v2), and
-  converts the amount to a display string.
-  Pass `6` for USDC.
+  converts the amount to a display string. Pass the listing's `assetDecimals`.
+- `parseSettlement(settlement)` reads an x402 `onAfterSettle` context into what `reportPayment`
+  takes: `reqId`, `payerAddress`, the amount in the asset's base units, and the guarantee receipt
+  as `guaranteeClaims` and `guaranteeSignature` (`null` when the facilitator returned none).
 - `toAppNetwork(network)` converts `"base"`, `"eip155:8453"` or `"BASE"` to the API's enum. The
   client calls it for you on `network` inputs.
 - `fromAppNetwork(network)` goes the other way: `"BASE_SEPOLIA"` from `resource()` becomes
-  `"base-sepolia"`, which the core client takes. x402 middleware wants the CAIP-2 id:
-  `NETWORKS[fromAppNetwork(network)].caip2`.
-- `toDisplayAmount(raw, decimals)` formats base units as a decimal string.
+  `"base-sepolia"`, which the core client takes.
+- `toCaip2(network)` from `@4mica/sdk` gives the CAIP-2 id x402 middleware wants, from any of
+  those forms: `toCaip2("BASE_SEPOLIA")` is `"eip155:84532"`.
+- `toDisplayAmount(raw, decimals)` formats base units as a decimal string, and `toBaseUnits(amount,
+  decimals)` from `@4mica/sdk` goes the other way: `toBaseUnits("0.01", 18)` is
+  `10000000000000000n`.
 
 ## 4. Putting it together with x402 middleware
 
@@ -139,32 +147,57 @@ the guarantee receipt arrives in the resource server's `onAfterSettle` hook. A r
 with an error is not settled, so a refused payer is not charged.
 
 ```ts
-import { NETWORKS } from "@4mica/sdk";
-import { createAppClient, fromAppNetwork, paymentFromHeader } from "@4mica/sdk/app";
+import { toBaseUnits, toCaip2, ZERO_ADDRESS } from "@4mica/sdk";
+import {
+  createAppClient,
+  parseSettlement,
+  paymentFromHeader,
+} from "@4mica/sdk/app";
 import { FourMicaFacilitatorClient, x402ResourceServer } from "@4mica/x402/server";
 import { paymentMiddleware } from "@4mica/x402/server/express";
 import express from "express";
 
 const app = createAppClient({ apiKey: process.env.FOURMICA_API_KEY! });
 const { listing } = await app.resource();
-const network = NETWORKS[fromAppNetwork(listing!.network!)].caip2 as `${string}:${string}`;
 
-const server = new x402ResourceServer(new FourMicaFacilitatorClient()).onAfterSettle(
-  async ({ paymentPayload, result }) => {
-    const paid = (paymentPayload.payload as { payload: Record<string, string> }).payload;
-    const receipt = result.extra?.receipt as { receipt: string; signature: string } | undefined;
-    void app.reportPayment({
-      reqId: paid.req_id,
-      payerAddress: paid.user_address,
-      recipientAddress: listing!.payToAddress!,
+if (!listing) {
+  throw new Error("This key is not tied to a listing.");
+}
+
+const {
+  payToAddress: payTo,
+  assetAddress: asset,
+  assetDecimals: decimals,
+  network,
+  priceAmount: price,
+} = listing;
+
+if (!payTo || !network || !price || decimals === null) {
+  throw new Error("Finish payment setup for this listing in the dashboard.");
+}
+
+const facilitator = new FourMicaFacilitatorClient();
+const server = new x402ResourceServer(facilitator);
+
+server.onAfterSettle(async (settlement) => {
+  const { reqId, payerAddress, amount, guaranteeClaims, guaranteeSignature } =
+    parseSettlement(settlement);
+
+  try {
+    await app.reportPayment({
+      reqId,
+      payerAddress,
+      amount,
+      guaranteeClaims,
+      guaranteeSignature,
+      recipientAddress: payTo,
       network,
-      assetAddress: listing!.assetAddress,
-      amount: paid.amount,
-      guaranteeClaims: receipt?.receipt,
-      guaranteeSignature: receipt?.signature,
+      assetAddress: asset,
     });
-  },
-);
+  } catch (error) {
+    console.error("Payment report failed:", error);
+  }
+});
 
 const http = express();
 
@@ -174,9 +207,12 @@ http.use(
       "GET /data": {
         accepts: {
           scheme: "4mica-credit",
-          price: { amount: listing!.priceAmount!, asset: listing!.assetAddress! },
-          network,
-          payTo: listing!.payToAddress!,
+          price: {
+            amount: toBaseUnits(price, decimals).toString(),
+            asset: asset ?? ZERO_ADDRESS,
+          },
+          network: toCaip2(network),
+          payTo,
         },
       },
     },
@@ -185,7 +221,10 @@ http.use(
 );
 
 http.get("/data", async (req, res) => {
-  const paid = paymentFromHeader(req.get("payment-signature")!, 6);
+  const paid = paymentFromHeader(
+    req.get("payment-signature") ?? "",
+    decimals,
+  );
   const decision = await app.resolveCustomer({
     payerAddress: paid.payerAddress,
     network,

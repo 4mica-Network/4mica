@@ -28,6 +28,9 @@ export type {
 export { fromAppNetwork, toAppNetwork } from "@/app/networks";
 export {
   type ParsedPayment,
+  parseSettlement,
   paymentFromHeader,
+  type SettledPayment,
+  type SettlementContext,
   toDisplayAmount,
 } from "@/app/payment";

@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { InvalidParamsError } from "@/errors";
 import {
   DEFAULT_NETWORK,
   NETWORKS,
   resolveNetwork,
   resolveNetworkRpcUrl,
+  toCaip2,
 } from "@/networks";
 
 const read = (path: string) =>
@@ -47,6 +49,20 @@ describe("networks", () => {
     expect(resolveNetwork("base-sepolia")?.info.facilitatorUrl).toBe(
       "https://testnet.payment.4mica.io/",
     );
+  });
+
+  it("resolves a shorthand, an app enum or a CAIP-2 id to CAIP-2", () => {
+    expect(toCaip2("base-sepolia")).toBe("eip155:84532");
+    expect(toCaip2("BASE_SEPOLIA")).toBe("eip155:84532");
+    expect(toCaip2("BASE")).toBe("eip155:8453");
+    expect(toCaip2(" eip155:8453 ")).toBe("eip155:8453");
+    for (const name of Object.keys(NETWORKS)) {
+      expect(toCaip2(name.toUpperCase().replace(/-/g, "_"))).toBe(
+        NETWORKS[name].caip2,
+      );
+    }
+    expect(() => toCaip2("solana")).toThrow(InvalidParamsError);
+    expect(() => toCaip2("__proto__")).toThrow(InvalidParamsError);
   });
 
   it("cannot be mutated by a consumer", () => {
