@@ -1,9 +1,9 @@
 import "dotenv/config";
 
-import { NETWORKS } from "@4mica/sdk";
+import { toBaseUnits, toCaip2, ZERO_ADDRESS } from "@4mica/sdk";
 import {
   createAppClient,
-  fromAppNetwork,
+  parseSettlement,
   paymentFromHeader,
 } from "@4mica/sdk/app";
 import {
@@ -13,8 +13,6 @@ import {
 import { paymentMiddleware } from "@4mica/x402/server/express";
 import express from "express";
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 const apiKey = process.env.FOURMICA_API_KEY;
 if (!apiKey) {
   throw new Error("FOURMICA_API_KEY is not set");
@@ -22,17 +20,26 @@ if (!apiKey) {
 const api = createAppClient({ apiKey, baseUrl: process.env.FOURMICA_API_URL });
 const { listing, policy } = await api.resource();
 
-if (!listing?.payToAddress || !listing.network || !listing.priceAmount) {
+if (!listing) {
+  throw new Error("FOURMICA_API_KEY is not tied to a listing.");
+}
+
+const {
+  name,
+  summary,
+  payToAddress: payTo,
+  assetAddress: asset,
+  assetDecimals: decimals,
+  network,
+  priceAmount: price,
+} = listing;
+
+if (!payTo || !network || !price || decimals === null) {
   throw new Error(
     "Give the listing a receiving wallet, a network and a price in the dashboard first.",
   );
 }
 
-const payTo = listing.payToAddress;
-const asset = listing.assetAddress;
-// x402 names networks by CAIP-2 id, such as eip155:84532.
-const network = NETWORKS[fromAppNetwork(listing.network)]
-  .caip2 as `${string}:${string}`;
 const port = Number(process.env.PORT ?? 3000);
 
 const facilitator = new FourMicaFacilitatorClient(
@@ -40,31 +47,30 @@ const facilitator = new FourMicaFacilitatorClient(
     ? { url: process.env.FACILITATOR_URL }
     : undefined,
 );
+const server = new x402ResourceServer(facilitator);
 
 // Settlement runs after the route answers, so the guarantee receipt is only
 // known here, not in the handler.
-const server = new x402ResourceServer(facilitator).onAfterSettle(
-  async ({ paymentPayload, result }) => {
-    const paid = (paymentPayload.payload as { payload: Record<string, string> })
-      .payload;
-    const receipt = result.extra?.receipt as
-      | { receipt: string; signature: string }
-      | undefined;
-    api
-      .reportPayment({
-        reqId: paid.req_id,
-        payerAddress: paid.user_address,
-        recipientAddress: payTo,
-        network,
-        assetAddress: asset,
-        amount: paid.amount,
-        guaranteeClaims: receipt?.receipt,
-        guaranteeSignature: receipt?.signature,
-        resource: `http://localhost:${port}/quote`,
-      })
-      .catch((error) => console.error("[seller] report failed:", error));
-  },
-);
+server.onAfterSettle(async (settlement) => {
+  const { reqId, payerAddress, amount, guaranteeClaims, guaranteeSignature } =
+    parseSettlement(settlement);
+
+  try {
+    await api.reportPayment({
+      reqId,
+      payerAddress,
+      amount,
+      guaranteeClaims,
+      guaranteeSignature,
+      recipientAddress: payTo,
+      network,
+      assetAddress: asset,
+      resource: `http://localhost:${port}/quote`,
+    });
+  } catch (error) {
+    console.error("[seller] report failed:", error);
+  }
+});
 
 const app = express();
 
@@ -74,11 +80,14 @@ app.use(
       "GET /quote": {
         accepts: {
           scheme: "4mica-credit",
-          price: { amount: listing.priceAmount, asset: asset ?? ZERO_ADDRESS },
-          network,
+          price: {
+            amount: toBaseUnits(price, decimals).toString(),
+            asset: asset ?? ZERO_ADDRESS,
+          },
+          network: toCaip2(network),
           payTo,
         },
-        description: listing.summary ?? listing.name,
+        description: summary ?? name,
       },
     },
     server,
@@ -86,7 +95,7 @@ app.use(
 );
 
 app.get("/quote", async (req, res) => {
-  const paid = paymentFromHeader(req.get("payment-signature") ?? "", 0);
+  const paid = paymentFromHeader(req.get("payment-signature") ?? "", decimals);
 
   const decision = await api.resolveCustomer({
     payerAddress: paid.payerAddress,
@@ -103,10 +112,8 @@ app.get("/quote", async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`[seller] ${listing.name} on http://localhost:${port}`);
-  console.log(
-    `  GET /quote costs ${listing.priceAmount} on ${network}, paid to ${payTo}`,
-  );
+  console.log(`[seller] ${name} on http://localhost:${port}`);
+  console.log(`  GET /quote costs ${price} on ${network}, paid to ${payTo}`);
   if (policy?.refundPolicy) {
     console.log(`  refund policy: ${policy.refundPolicy}`);
   }
