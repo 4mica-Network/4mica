@@ -49,6 +49,7 @@
   "crash.offline.title": "Está sin conexión",
   "crash.offline.description": "Esta página no se pudo cargar sin conexión. Se recargará en cuanto vuelva a estar en línea.",
   "offline.banner": "Está sin conexión. Los cambios no se guardarán hasta que se restablezca la conexión.",
+  "offline.startup": "Está sin conexión. El panel se abrirá en cuanto se restablezca la conexión.",
   "http.offline": "Está sin conexión. Vuelva a conectarse e inténtelo de nuevo.",
   "http.checkConnection": "Compruebe su conexión e inténtelo de nuevo.",
   "loader.slow": "Esto está tardando más de lo habitual. Compruebe su conexión o recargue la página.",

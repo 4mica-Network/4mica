@@ -226,4 +226,40 @@ describe("initial load", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reload page" }));
     expect(reload).toHaveBeenCalled();
   });
+
+  it("says the app is offline instead of spinning, and opens it once the connection is back", () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    render(<FullScreenLoader />);
+
+    expect(screen.getByTestId("offline-startup")).toHaveTextContent(
+      "You're offline. The dashboard will open as soon as your connection is back.",
+    );
+    expect(reload).not.toHaveBeenCalled();
+
+    onLine.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads after a connection drop during loading, but never while it stays online", () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    render(<FullScreenLoader />);
+    expect(screen.queryByTestId("offline-startup")).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
+
+    onLine.mockReturnValue(false);
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    expect(screen.getByTestId("offline-startup")).toBeInTheDocument();
+
+    onLine.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
 });

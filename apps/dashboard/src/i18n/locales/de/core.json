@@ -48,6 +48,7 @@
   "crash.offline.title": "Sie sind offline",
   "crash.offline.description": "Diese Seite konnte ohne Verbindung nicht geladen werden. Sie wird neu geladen, sobald Sie wieder online sind.",
   "offline.banner": "Sie sind offline. Änderungen werden erst gespeichert, wenn Ihre Verbindung wiederhergestellt ist.",
+  "offline.startup": "Sie sind offline. Das Dashboard öffnet sich, sobald Ihre Verbindung wiederhergestellt ist.",
   "http.offline": "Sie sind offline. Stellen Sie die Verbindung wieder her und versuchen Sie es erneut.",
   "http.checkConnection": "Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   "loader.slow": "Das dauert länger als üblich. Prüfen Sie Ihre Verbindung oder laden Sie die Seite neu.",

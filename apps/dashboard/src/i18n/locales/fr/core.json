@@ -49,6 +49,7 @@
   "crash.offline.title": "Vous êtes hors ligne",
   "crash.offline.description": "Cette page n’a pas pu se charger sans connexion. Elle se rechargera dès que vous serez de nouveau en ligne.",
   "offline.banner": "Vous êtes hors ligne. Les modifications ne seront pas enregistrées tant que la connexion n’est pas rétablie.",
+  "offline.startup": "Vous êtes hors ligne. Le tableau de bord s’ouvrira dès que votre connexion sera rétablie.",
   "http.offline": "Vous êtes hors ligne. Reconnectez-vous, puis réessayez.",
   "http.checkConnection": "Vérifiez votre connexion et réessayez.",
   "loader.slow": "Le chargement prend plus de temps que d’habitude. Vérifiez votre connexion ou rechargez la page.",
