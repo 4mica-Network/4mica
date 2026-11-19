@@ -262,8 +262,8 @@ export const en = {
 
   view: {
     label: "View as",
-    seller: "Seller",
-    buyer: "Buyer",
+    seller: "Server guide",
+    buyer: "Customer view",
   },
 
   ai: {

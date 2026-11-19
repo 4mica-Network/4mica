@@ -22,32 +22,29 @@ export function ViewSwitch({ view }: ViewSwitchProps) {
   return (
     <nav
       aria-label={messages.view.label}
-      className="flex items-center gap-2 text-xs"
+      className="inline-flex items-stretch gap-0.5 rounded-xl border border-overlay/10 bg-overlay/4 p-0.5 text-sm max-md:rounded-lg"
     >
-      <span className="text-ink-muted">{messages.view.label}</span>
-      <div className="inline-flex items-center gap-0.5 rounded-md border border-overlay/6 p-0.5">
-        {options.map((option) => {
-          const selected = option.id === view;
+      {options.map((option) => {
+        const selected = option.id === view;
 
-          return (
-            <Link
-              aria-current={selected ? "page" : undefined}
-              className={cn(
-                "inline-flex h-6 items-center rounded px-2.5 transition-colors",
-                selected
-                  ? "bg-overlay/8 text-ink-strong"
-                  : "text-ink-muted hover:text-ink-body",
-              )}
-              href={option.href}
-              key={option.id}
-              replace
-              scroll={false}
-            >
-              {option.label}
-            </Link>
-          );
-        })}
-      </div>
+        return (
+          <Link
+            aria-current={selected ? "page" : undefined}
+            className={cn(
+              "inline-flex items-center whitespace-nowrap rounded-lg px-3 transition-colors max-md:rounded-md max-md:px-2.5",
+              selected
+                ? "bg-overlay/10 text-ink-strong"
+                : "text-ink-muted hover:text-ink-body",
+            )}
+            href={option.href}
+            key={option.id}
+            replace
+            scroll={false}
+          >
+            {option.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

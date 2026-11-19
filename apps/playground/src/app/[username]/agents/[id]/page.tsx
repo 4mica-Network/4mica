@@ -284,6 +284,7 @@ export default async function AgentPage({
         title={agent.name}
         actions={
           <div className="flex items-stretch gap-2">
+            {profile.isOwner && <ViewSwitch view={view} />}
             {handoff && (
               <CopyForAi markdown={handoff.markdown} prompt={handoff.prompt} />
             )}
@@ -333,8 +334,6 @@ export default async function AgentPage({
                   {agent.headline}
                 </p>
               )}
-
-              {profile.isOwner && <ViewSwitch view={view} />}
 
               {isSellable(agent) && <PriceHeadline {...price} />}
             </header>
