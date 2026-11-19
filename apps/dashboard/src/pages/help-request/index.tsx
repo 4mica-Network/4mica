@@ -2,13 +2,11 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchSupportRequest,
   resetSupportRequest,
-} from "@stores/support/actions";
-import {
   selectCurrentSupportRequest,
   selectCurrentSupportRequestError,
   selectCurrentSupportRequestNotFound,
   selectIsLoadingCurrentSupportRequest,
-} from "@stores/support/selector";
+} from "@stores/support";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";

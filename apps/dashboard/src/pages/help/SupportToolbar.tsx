@@ -1,17 +1,15 @@
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   clearSupportSelection,
-  setSupportFilters,
-  setSupportSelection,
-  supportPendingKeys,
-} from "@stores/support/actions";
-import {
   selectAreAllSupportRequestsSelected,
   selectIsSupportPending,
   selectSelectedSupportIds,
   selectSupportFilters,
   selectSupportRequests,
-} from "@stores/support/selector";
+  setSupportFilters,
+  setSupportSelection,
+  supportPendingKeys,
+} from "@stores/support";
 import type { SupportCategory, SupportStatus } from "@stores/support/type";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";

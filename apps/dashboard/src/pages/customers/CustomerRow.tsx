@@ -1,7 +1,9 @@
 import { PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
 import { Checkbox, cn, Tag } from "@4mica/ui";
-import { toggleCustomerSelected } from "@stores/customer/actions";
-import { selectIsCustomerSelected } from "@stores/customer/selector";
+import {
+  selectIsCustomerSelected,
+  toggleCustomerSelected,
+} from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";

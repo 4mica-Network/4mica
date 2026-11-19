@@ -3,12 +3,10 @@ import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   agentPendingKeys,
   publishAgent,
-  toggleAgentSelected,
-} from "@stores/agent/actions";
-import {
   selectIsAgentPending,
   selectIsAgentSelected,
-} from "@stores/agent/selector";
+  toggleAgentSelected,
+} from "@stores/agent";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";

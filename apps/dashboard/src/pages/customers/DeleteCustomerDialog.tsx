@@ -1,5 +1,4 @@
-import { customerPendingKeys } from "@stores/customer/actions";
-import { selectIsCustomerPending } from "@stores/customer/selector";
+import { customerPendingKeys, selectIsCustomerPending } from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppSelector } from "@stores/hooks";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";

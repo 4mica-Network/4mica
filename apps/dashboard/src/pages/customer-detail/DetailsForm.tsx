@@ -1,10 +1,11 @@
 import { Button } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { customerPendingKeys, updateCustomer } from "@stores/customer/actions";
 import {
+  customerPendingKeys,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+  updateCustomer,
+} from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { blankToNull } from "@utils/format";

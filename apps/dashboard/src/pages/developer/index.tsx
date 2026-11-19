@@ -1,9 +1,9 @@
-import { fetchDeveloper } from "@stores/developer/actions";
 import {
+  fetchDeveloper,
   selectDeveloperError,
   selectHasLoadedDeveloper,
   selectIsDeveloperLoading,
-} from "@stores/developer/selector";
+} from "@stores/developer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { RetryState } from "@/components/LoadFailure";

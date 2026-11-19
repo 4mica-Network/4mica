@@ -1,42 +1,67 @@
-import { applyMiddleware, combineReducers, compose, createStore } from "redux";
+import {
+  applyMiddleware,
+  combineReducers,
+  compose,
+  createStore,
+  type Reducer,
+} from "redux";
 import createSagaMiddleware from "redux-saga";
-import agentReducer from "./agent/reducer";
-import apiListingReducer from "./apiListing/reducer";
-import balanceReducer from "./balance/reducer";
+import type agentReducer from "./agent/reducer";
+import type apiListingReducer from "./apiListing/reducer";
+import type balanceReducer from "./balance/reducer";
 import bannerReducer from "./banner/reducer";
-import complianceReducer from "./compliance/reducer";
+import bannerSaga from "./banner/saga";
+import type complianceReducer from "./compliance/reducer";
 import configReducer from "./config/reducer";
-import customerReducer from "./customer/reducer";
-import developerReducer from "./developer/reducer";
-import paymentReducer from "./payment/reducer";
-import resourceKeyReducer from "./resourceKey/reducer";
-import rootSaga from "./rootSaga";
+import configSaga from "./config/saga";
+import type customerReducer from "./customer/reducer";
+import type developerReducer from "./developer/reducer";
+import type paymentReducer from "./payment/reducer";
+import { onStoreRegistered } from "./registry";
+import type resourceKeyReducer from "./resourceKey/reducer";
+import { sessionScoped } from "./rootSaga";
 import { withSessionReset } from "./session";
-import supportReducer from "./support/reducer";
-import trustReducer from "./trust/reducer";
+import type supportReducer from "./support/reducer";
+import type trustReducer from "./trust/reducer";
 import userReducer from "./user/reducer";
-import walletReducer from "./wallet/reducer";
+import userSaga from "./user/saga";
+import type walletReducer from "./wallet/reducer";
 
-const appReducer = combineReducers({
+const eagerReducers = {
   user: userReducer,
-  developer: developerReducer,
-  banner: bannerReducer,
-  wallet: walletReducer,
-  apiListing: apiListingReducer,
-  trust: trustReducer,
-  agent: agentReducer,
-  payment: paymentReducer,
-  balance: balanceReducer,
-  customer: customerReducer,
-  resourceKey: resourceKeyReducer,
-  compliance: complianceReducer,
   config: configReducer,
-  support: supportReducer,
-});
+  banner: bannerReducer,
+};
 
-export type RootState = ReturnType<typeof appReducer>;
+export interface LazyReducers {
+  developer: typeof developerReducer;
+  wallet: typeof walletReducer;
+  apiListing: typeof apiListingReducer;
+  trust: typeof trustReducer;
+  agent: typeof agentReducer;
+  payment: typeof paymentReducer;
+  balance: typeof balanceReducer;
+  customer: typeof customerReducer;
+  resourceKey: typeof resourceKeyReducer;
+  compliance: typeof complianceReducer;
+  support: typeof supportReducer;
+}
 
-const rootReducer = withSessionReset<RootState>(appReducer);
+type AllReducers = typeof eagerReducers & LazyReducers;
+
+export type RootState = {
+  [K in keyof AllReducers]: ReturnType<AllReducers[K]>;
+};
+
+const lazyReducers: Partial<LazyReducers> = {};
+
+const rootReducer = () =>
+  withSessionReset<RootState>(
+    combineReducers({
+      ...eagerReducers,
+      ...lazyReducers,
+    }) as unknown as Reducer<RootState, { type: string }>,
+  );
 
 const sagaMiddleware = createSagaMiddleware();
 
@@ -46,10 +71,16 @@ const composeEnhancers =
     : compose;
 
 export const store = createStore(
-  rootReducer,
+  rootReducer(),
   composeEnhancers(applyMiddleware(sagaMiddleware)),
 );
 
-sagaMiddleware.run(rootSaga);
+sagaMiddleware.run(sessionScoped, [...userSaga, ...configSaga, ...bannerSaga]);
+
+onStoreRegistered(({ name, reducer, watchers }) => {
+  Object.assign(lazyReducers, { [name]: reducer });
+  store.replaceReducer(rootReducer());
+  sagaMiddleware.run(sessionScoped, watchers);
+});
 
 export type AppDispatch = typeof store.dispatch;

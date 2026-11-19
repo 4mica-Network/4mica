@@ -4,14 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   clearWalletIssues,
-  updateWallet,
-  walletPendingKeys,
-} from "@stores/wallet/actions";
-import {
   selectIsWalletPending,
   selectWalletError,
   selectWalletIssues,
-} from "@stores/wallet/selector";
+  updateWallet,
+  walletPendingKeys,
+} from "@stores/wallet";
 import type { Wallet } from "@stores/wallet/type";
 import { useEffect, useId } from "react";
 import { useForm, useWatch } from "react-hook-form";

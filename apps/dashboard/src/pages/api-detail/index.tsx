@@ -1,12 +1,17 @@
-import { fetchApiListing } from "@stores/apiListing/actions";
 import {
+  fetchApiListing,
   selectCurrentApiListing,
   selectCurrentApiListingError,
   selectCurrentApiListingNotFound,
-} from "@stores/apiListing/selector";
+} from "@stores/apiListing";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
-import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
+import {
+  fetchTrust,
+  resetTrust,
+  savePolicy,
+  selectIsTrustPending,
+  selectPolicy,
+} from "@stores/trust";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";

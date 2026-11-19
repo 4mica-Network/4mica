@@ -1,17 +1,18 @@
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { clearAgentIssues, createAgent } from "@stores/agent/actions";
 import {
+  clearAgentIssues,
+  createAgent,
   selectAgentError,
   selectAgentIssues,
   selectIsAgentPending,
-} from "@stores/agent/selector";
+} from "@stores/agent";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchActiveWallets } from "@stores/wallet/actions";
 import {
+  fetchActiveWallets,
   selectPayerWallets,
   selectSellerWallets,
-} from "@stores/wallet/selector";
+} from "@stores/wallet";
 import { blankToNull } from "@utils/format";
 import { ArrowUpRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useState } from "react";

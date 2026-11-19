@@ -1,12 +1,10 @@
 import { Button, Card } from "@4mica/ui";
 import {
   compliancePendingKeys,
-  submitCompliance,
-} from "@stores/compliance/actions";
-import {
   selectCompliance,
   selectIsCompliancePending,
-} from "@stores/compliance/selector";
+  submitCompliance,
+} from "@stores/compliance";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";
 import { ArrowUpRight, Check, Circle } from "lucide-react";

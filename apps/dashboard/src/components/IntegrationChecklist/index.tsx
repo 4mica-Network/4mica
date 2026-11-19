@@ -1,11 +1,11 @@
 import { Link } from "@4mica/ui";
-import { fetchAgents } from "@stores/agent/actions";
-import { fetchApiListings } from "@stores/apiListing/actions";
-import { fetchDeveloper } from "@stores/developer/actions";
+import { fetchAgents } from "@stores/agent";
+import { fetchApiListings } from "@stores/apiListing";
+import { fetchDeveloper } from "@stores/developer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchPaymentSummary } from "@stores/payment/actions";
+import { fetchPaymentSummary } from "@stores/payment";
 import { selectUser } from "@stores/user/selector";
-import { fetchWallets } from "@stores/wallet/actions";
+import { fetchWallets } from "@stores/wallet";
 import { useLocalStorageState } from "ahooks";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";

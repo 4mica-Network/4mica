@@ -1,16 +1,14 @@
 import {
   clearCustomerSelection,
   customerPendingKeys,
-  setCustomerFilters,
-  setCustomerSelection,
-} from "@stores/customer/actions";
-import {
   selectAreAllCustomersSelected,
   selectCustomerFilters,
   selectCustomers,
   selectIsCustomerPending,
   selectSelectedCustomerIds,
-} from "@stores/customer/selector";
+  setCustomerFilters,
+  setCustomerSelection,
+} from "@stores/customer";
 import type {
   CustomerSort,
   CustomerStatus,

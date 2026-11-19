@@ -3,12 +3,10 @@ import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   apiListingPendingKeys,
   publishApiListing,
-  toggleApiListingSelected,
-} from "@stores/apiListing/actions";
-import {
   selectIsApiListingPending,
   selectIsApiListingSelected,
-} from "@stores/apiListing/selector";
+  toggleApiListingSelected,
+} from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";

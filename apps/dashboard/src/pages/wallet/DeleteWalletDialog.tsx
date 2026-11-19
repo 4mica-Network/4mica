@@ -1,7 +1,6 @@
 import { shortenAddress } from "@4mica/rules";
 import { useAppSelector } from "@stores/hooks";
-import { walletPendingKeys } from "@stores/wallet/actions";
-import { selectIsWalletPending } from "@stores/wallet/selector";
+import { selectIsWalletPending, walletPendingKeys } from "@stores/wallet";
 import type { Wallet } from "@stores/wallet/type";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 

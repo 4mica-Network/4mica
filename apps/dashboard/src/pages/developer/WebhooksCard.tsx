@@ -4,15 +4,13 @@ import {
   deleteWebhook,
   developerPendingKeys,
   rotateWebhookSecret,
-  updateWebhook,
-} from "@stores/developer/actions";
-import {
   selectDeveloperError,
   selectDeveloperIssues,
   selectIsDeveloperPending,
   selectWebhookEvents,
   selectWebhooks,
-} from "@stores/developer/selector";
+  updateWebhook,
+} from "@stores/developer";
 import type { RevealSecret, Webhook } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Trash2, Webhook as WebhookIcon } from "lucide-react";

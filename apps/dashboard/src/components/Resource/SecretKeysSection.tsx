@@ -9,14 +9,12 @@ import {
   resetResourceKeys,
   resourceKeyPendingKeys,
   revokeResourceKey,
-} from "@stores/resourceKey/actions";
-import {
   selectIsResourceKeyPending,
   selectResourceKeyError,
   selectResourceKeyIssues,
   selectResourceKeys,
   selectRevealedResourceKey,
-} from "@stores/resourceKey/selector";
+} from "@stores/resourceKey";
 import type { ResourceRef } from "@stores/shared/type";
 import { formatDate } from "@utils/format";
 import { KeyRound, Plus, Trash2 } from "lucide-react";

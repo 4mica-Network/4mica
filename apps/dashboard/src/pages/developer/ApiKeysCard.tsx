@@ -4,13 +4,11 @@ import {
   deleteApiKey,
   developerPendingKeys,
   revokeApiKey,
-} from "@stores/developer/actions";
-import {
   selectApiKeys,
   selectDeveloperError,
   selectDeveloperIssues,
   selectIsDeveloperPending,
-} from "@stores/developer/selector";
+} from "@stores/developer";
 import type { ApiKey, RevealSecret } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";

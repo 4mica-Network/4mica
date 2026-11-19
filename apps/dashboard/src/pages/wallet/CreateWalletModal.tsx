@@ -6,13 +6,14 @@ import {
 import { Button, Modal, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { clearWalletIssues, createWallet } from "@stores/wallet/actions";
 import {
+  clearWalletIssues,
+  createWallet,
   selectIsWalletPending,
   selectWalletError,
   selectWalletIssues,
   selectWallets,
-} from "@stores/wallet/selector";
+} from "@stores/wallet";
 import type { PaymentNetwork } from "@stores/wallet/type";
 import { blankToNull } from "@utils/format";
 import {

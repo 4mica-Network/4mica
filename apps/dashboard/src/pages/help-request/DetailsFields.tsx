@@ -2,14 +2,12 @@ import { Button } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
-  supportPendingKeys,
-  updateSupportRequest,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
   selectSupportIssues,
-} from "@stores/support/selector";
+  supportPendingKeys,
+  updateSupportRequest,
+} from "@stores/support";
 import type {
   SupportCategory,
   SupportRequestDetail,

@@ -1,14 +1,12 @@
 import { Checkbox, cn } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
+  selectIsSupportPending,
+  selectIsSupportRequestSelected,
   supportPendingKeys,
   toggleSupportRequestSelected,
   updateSupportRequest,
-} from "@stores/support/actions";
-import {
-  selectIsSupportPending,
-  selectIsSupportRequestSelected,
-} from "@stores/support/selector";
+} from "@stores/support";
 import type { SupportRequest } from "@stores/support/type";
 import {
   CircleCheck,

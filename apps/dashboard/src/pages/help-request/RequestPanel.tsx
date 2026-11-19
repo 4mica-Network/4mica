@@ -3,12 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   replySupportRequest,
-  supportPendingKeys,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
-} from "@stores/support/selector";
+  supportPendingKeys,
+} from "@stores/support";
 import type {
   SupportMessage,
   SupportRequestDetail,

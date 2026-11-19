@@ -55,10 +55,10 @@ vi.mock("@api/user", async (importOriginal) => ({
 }));
 
 const { store } = await import("./index");
-const { fetchPayments, setPaymentFilters } = await import("./payment/actions");
+const { fetchPayments, setPaymentFilters } = await import("./payment");
 const { fetchUser } = await import("./user/actions");
 const { resetSession } = await import("./session");
-const { fetchDeveloper, createApiKey } = await import("./developer/actions");
+const { fetchDeveloper, createApiKey } = await import("./developer");
 
 const apiKey = (id: string) => ({
   id,

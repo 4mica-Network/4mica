@@ -4,9 +4,6 @@ import {
   batchDeleteSupportRequests,
   deleteSupportRequest,
   fetchSupportRequests,
-  setSupportPage,
-} from "@stores/support/actions";
-import {
   selectHasLoadedSupport,
   selectIsSupportLoading,
   selectSelectedSupportIds,
@@ -16,7 +13,8 @@ import {
   selectSupportPage,
   selectSupportRequests,
   selectSupportTotal,
-} from "@stores/support/selector";
+  setSupportPage,
+} from "@stores/support";
 import type { SupportRequest } from "@stores/support/type";
 import { LifeBuoy, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";

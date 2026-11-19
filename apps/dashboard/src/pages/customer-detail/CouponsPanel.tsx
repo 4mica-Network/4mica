@@ -4,14 +4,12 @@ import {
   createCustomerCoupon,
   customerPendingKeys,
   deleteCustomerCoupon,
-  updateCustomerCoupon,
-} from "@stores/customer/actions";
-import {
   selectCustomerCoupons,
   selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+  updateCustomerCoupon,
+} from "@stores/customer";
 import type {
   Customer,
   CustomerCoupon,
