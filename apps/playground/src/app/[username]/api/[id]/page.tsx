@@ -264,6 +264,7 @@ export default async function ApiListingPage({
         }
       >
         <StepFlow
+          key={view}
           groups={[
             { id: "overview", steps: [overview] },
             {

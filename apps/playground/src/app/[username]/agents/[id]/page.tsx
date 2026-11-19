@@ -297,6 +297,7 @@ export default async function AgentPage({
         }
       >
         <StepFlow
+          key={view}
           groups={[
             { id: "overview", steps: [overview] },
             ...integrate,
