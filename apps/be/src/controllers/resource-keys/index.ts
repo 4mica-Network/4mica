@@ -14,6 +14,7 @@ import {
   type ResourceKind,
 } from "@controllers/trust/repository";
 import { appLogger } from "@logger/index";
+import { priceAssetDecimals } from "@utils/price-asset";
 import type { RouteHandler } from "fastify";
 import {
   createResourceKey,
@@ -119,5 +120,14 @@ export const getResourceHandler: RouteHandler = async (request, reply) => {
     listFaqs(key.kind, key.id),
   ]);
 
-  return reply.send({ kind: key.kind, listing, agent, policy, faqs });
+  return reply.send({
+    kind: key.kind,
+    listing: listing && {
+      ...listing,
+      assetDecimals: priceAssetDecimals(listing),
+    },
+    agent: agent && { ...agent, assetDecimals: priceAssetDecimals(agent) },
+    policy,
+    faqs,
+  });
 };
