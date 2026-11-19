@@ -213,9 +213,12 @@ describe("offline banner", () => {
 });
 
 describe("initial load", () => {
-  it("explains a slow sign-in service and offers a reload instead of spinning forever", () => {
+  it("shows no spinner, then explains a slow sign-in service and offers a reload", () => {
     vi.useFakeTimers();
     render(<FullScreenLoader />);
+    expect(
+      screen.getByTestId("startup-loader").querySelector("svg"),
+    ).toBeNull();
     expect(screen.queryByText(/taking longer than usual/)).toBeNull();
 
     act(() => {
