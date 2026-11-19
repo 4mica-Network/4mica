@@ -38,6 +38,18 @@ NAMES_THE_REQUEST = frozenset(
     }
 )
 
+# The facilitator has broadcast, or is broadcasting, a transaction for this
+# request. Sending another from the caller's own wallet would race it or run
+# after it: a second withdrawal request restarts the grace period, and a
+# second claim or payment reverts.
+ALREADY_SUBMITTED = frozenset(
+    {
+        "settlement_pending",
+        "invalid_transaction_state",
+        "duplicate_in_flight",
+    }
+)
+
 # Additional claim-shaped rejections: the self-funded path resolves the same
 # terms from the same core and submits to the same contract.
 NAMES_THE_CLAIM = frozenset(
@@ -89,7 +101,14 @@ class Facilitator:
 
         try:
             response = await self._client.post(base + path, json=body)
-        except (httpx.ConnectError, httpx.InvalidURL, httpx.UnsupportedProtocol) as exc:
+        except (
+            httpx.ConnectError,
+            # Timed out before a connection existed: nothing was sent.
+            httpx.ConnectTimeout,
+            httpx.PoolTimeout,
+            httpx.InvalidURL,
+            httpx.UnsupportedProtocol,
+        ) as exc:
             raise SponsorshipTransportError(
                 f"facilitator request failed: {exc}"
             ) from exc
@@ -161,11 +180,16 @@ def rejection_error(
     if code == "permit2_allowance_required":
         return Permit2AllowanceRequiredError(text, eip2612_nonce(payload))
     if code == "sponsorship_unavailable":
-        return FacilitatorNotConfiguredError()
+        return FacilitatorNotConfiguredError(message)
+    transaction = payload.get("transaction")
     return FacilitatorRejectedError(
         code=str(code),
         message=str(text),
         retryable=bool(_extra(payload).get("retryable")),
+        transaction=transaction
+        if isinstance(transaction, str) and transaction
+        else None,
+        details=_extra(payload).get("details"),
     )
 
 
@@ -180,7 +204,7 @@ def sponsorship_unavailable(exc: FourMicaError, names_the_request: frozenset) ->
     if isinstance(exc, Permit2AllowanceRequiredError):
         return False
     if isinstance(exc, FacilitatorRejectedError):
-        return exc.code not in names_the_request
+        return exc.code not in ALREADY_SUBMITTED and exc.code not in names_the_request
     return isinstance(exc, SponsorshipError)
 
 

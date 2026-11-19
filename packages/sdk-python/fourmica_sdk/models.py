@@ -632,7 +632,7 @@ class CorePublicParameters:
 class SupportedTokenInfo:
     symbol: str
     address: str
-    decimals: Optional[int] = None
+    decimals: int
     domain_separator: Optional[str] = None
     """The token's own EIP-712 ``DOMAIN_SEPARATOR()``, relayed by core so
     clients can build gasless-deposit signatures without an Ethereum RPC.
@@ -646,18 +646,42 @@ class SupportedTokensResponse:
 
     @classmethod
     def from_rpc(cls, raw: Dict[str, Any]) -> "SupportedTokensResponse":
-        tokens = [
-            SupportedTokenInfo(
-                symbol=str(t.get("symbol", "")),
-                address=str(t.get("address", "")),
-                decimals=int(t["decimals"]) if t.get("decimals") is not None else None,
-                domain_separator=_get_any(t, "domain_separator", "domainSeparator"),
+        tokens = []
+        for t in raw.get("tokens", []):
+            # Core always sends both.
+            address = str(t.get("address", ""))
+            symbol = t.get("symbol")
+            if not isinstance(symbol, str) or not symbol:
+                raise InvalidParamsError(
+                    f"core's token list has no symbol for {address}"
+                )
+            try:
+                decimals = _token_decimals(t.get("decimals"))
+            except ValueError:
+                raise InvalidParamsError(
+                    f"core's token list has no valid decimals for {address}"
+                ) from None
+            tokens.append(
+                SupportedTokenInfo(
+                    symbol=symbol,
+                    address=address,
+                    decimals=decimals,
+                    domain_separator=_get_any(t, "domain_separator", "domainSeparator"),
+                )
             )
-            for t in raw.get("tokens", [])
-        ]
         return cls(
             chain_id=int(_get_any(raw, "chain_id", "chainId") or 0), tokens=tokens
         )
+
+
+def _token_decimals(raw: Any) -> int:
+    """A non-negative integer, as a number or a digit string; anything else is
+    a ``ValueError``."""
+    if isinstance(raw, str) and raw.strip().isdigit():
+        raw = int(raw)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise ValueError("not a non-negative integer")
+    return raw
 
 
 class ClearingParticipantRole(str, Enum):

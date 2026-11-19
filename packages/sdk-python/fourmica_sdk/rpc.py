@@ -265,4 +265,19 @@ class RpcProxy:
         return UserSuspensionStatus.from_rpc(raw)
 
     async def health(self) -> Dict[str, Any]:
-        return await self._get("/core/health", authed=False)
+        """Core's health report. An unhealthy core answers 503 with the same
+        report, which is returned rather than retried and raised."""
+        try:
+            response = await self._client.get(
+                "/core/health", headers=await self._headers(authed=False)
+            )
+        except httpx.HTTPError as exc:
+            raise RpcError(f"request to /core/health failed: {exc}") from exc
+        if response.status_code == 503:
+            try:
+                report = response.json()
+            except ValueError:
+                report = None
+            if isinstance(report, dict):
+                return report
+        return await self._decode(response)

@@ -333,9 +333,26 @@ def test_supported_tokens_carry_domain_separator():
                     "decimals": 6,
                     "domain_separator": "0x" + "aa" * 32,
                 },
-                {"symbol": "ODD", "address": "0x" + "11" * 20},
+                {"symbol": "ODD", "address": "0x" + "11" * 20, "decimals": "18"},
             ],
         }
     )
     assert tokens.tokens[0].domain_separator == "0x" + "aa" * 32
     assert tokens.tokens[1].domain_separator is None
+    assert tokens.tokens[1].decimals == 18
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        {"address": "0x" + "11" * 20, "decimals": 6},
+        {"symbol": "", "address": "0x" + "11" * 20, "decimals": 6},
+        {"symbol": "USDC", "address": "0x" + "11" * 20},
+        {"symbol": "USDC", "address": "0x" + "11" * 20, "decimals": None},
+        {"symbol": "USDC", "address": "0x" + "11" * 20, "decimals": -1},
+        {"symbol": "USDC", "address": "0x" + "11" * 20, "decimals": "six"},
+    ],
+)
+def test_token_list_missing_symbol_or_decimals_is_refused(token):
+    with pytest.raises(InvalidParamsError):
+        SupportedTokensResponse.from_rpc({"chain_id": 1, "tokens": [token]})

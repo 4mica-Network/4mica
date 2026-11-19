@@ -123,6 +123,14 @@ class ClientCtx:
         signer: EvmSigner
         if cfg.evm_signer is not None:
             signer = cfg.evm_signer
+            if cfg.wallet_private_key:
+                local = LocalAccountSigner(cfg.wallet_private_key).address
+                if normalize_address(local) != normalize_address(signer.address):
+                    raise ClientInitializationError(
+                        f"wallet_private_key is {local} but evm_signer is "
+                        f"{signer.address}: payments would be signed by one and "
+                        "transactions sent by the other; configure one account"
+                    )
         elif cfg.wallet_private_key:
             signer = LocalAccountSigner(cfg.wallet_private_key)
         else:
