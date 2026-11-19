@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { COLLECTIONS, translations } from "@/i18n";
 
 /**
  * Testing Library registers its own `afterEach(cleanup)` only when Vitest runs
@@ -11,3 +12,5 @@ import { afterEach } from "vitest";
  * elements". Mirrors apps/playground/vitest.setup.ts.
  */
 afterEach(cleanup);
+
+await translations.load(COLLECTIONS, "en");
