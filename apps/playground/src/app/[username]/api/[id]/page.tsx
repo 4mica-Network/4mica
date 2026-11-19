@@ -7,6 +7,7 @@ import { CardShell } from "@/components/CardShell";
 import { CopyForAi } from "@/components/CopyForAi";
 import { CopyValue } from "@/components/CopyValue";
 import { buildApiIntegrationSteps } from "@/components/IntegrationSection/ApiIntegration";
+import { buildSellerSteps } from "@/components/IntegrationSection/SellerIntegration";
 import { JsonLd } from "@/components/JsonLd";
 import { MethodTag } from "@/components/MethodTag";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
@@ -28,6 +29,8 @@ import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildApiListingHandoff } from "@/lib/ai-handoff";
 import { buildApiListingDescriptor } from "@/lib/descriptor";
+import { isPayable } from "@/lib/snippets/api-listing";
+import { buildSellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
 import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveApiListing } from "@/services/resource";
@@ -167,18 +170,31 @@ export default async function ApiListingPage({
       : []),
   ];
 
-  const setup: FlowStep[] = profile.isOwner
-    ? []
-    : [
-        {
-          id: "setup",
-          title: messages.flow.setup,
-          done: payerState.step === "ready",
-          content: (
-            <PayWithFourMica network={listing.network} state={payerState} />
-          ),
-        },
-      ];
+  const integrate = profile.isOwner
+    ? {
+        label: messages.integration.sellerHeading,
+        steps: buildSellerSteps(
+          isPayable(listing)
+            ? buildSellerSnippets({ kind: "listing", ...listing })
+            : null,
+          `${links.app}/apis/${listing.id}`,
+          messages.integration.notPayableOwner,
+        ),
+      }
+    : {
+        label: messages.flow.integrate,
+        steps: [
+          {
+            id: "setup",
+            title: messages.flow.setup,
+            done: payerState.step === "ready",
+            content: (
+              <PayWithFourMica network={listing.network} state={payerState} />
+            ),
+          },
+          ...buildApiIntegrationSteps(listing),
+        ],
+      };
 
   const reviews: FlowStep = {
     id: "reviews",
@@ -220,7 +236,7 @@ export default async function ApiListingPage({
         title={listing.name}
         actions={
           <div className="flex items-stretch gap-2">
-            {handoff && (
+            {handoff && !profile.isOwner && (
               <CopyForAi markdown={handoff.markdown} prompt={handoff.prompt} />
             )}
             <ProfileActions
@@ -236,14 +252,11 @@ export default async function ApiListingPage({
             { id: "overview", steps: [overview] },
             {
               id: "integrate",
-              label: messages.flow.integrate,
+              label: integrate.label,
               icon: "integrate",
               numbered: true,
               collapsible: true,
-              steps: [
-                ...setup,
-                ...buildApiIntegrationSteps(listing, profile.isOwner),
-              ],
+              steps: integrate.steps,
             },
             { id: "more", steps: [...about, reviews, support] },
           ]}

@@ -10,6 +10,7 @@ import {
   buildAgentBuyerSteps,
   buildAgentRunSteps,
 } from "@/components/IntegrationSection/AgentIntegration";
+import { buildSellerSteps } from "@/components/IntegrationSection/SellerIntegration";
 import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { PriceHeadline, pricingNote } from "@/components/PriceHeadline";
@@ -22,7 +23,7 @@ import {
   ResourceFacts,
 } from "@/components/ResourceFacts";
 import { RevealLink } from "@/components/RevealLink";
-import { type FlowStep, StepFlow } from "@/components/StepFlow";
+import { type FlowGroup, type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
 import { TopBar } from "@/components/TopBar";
 import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
@@ -30,6 +31,7 @@ import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildAgentDescriptor } from "@/lib/descriptor";
 import { isSellable } from "@/lib/snippets/agent";
+import { buildSellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
 import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
@@ -165,16 +167,53 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
       : []),
   ];
 
-  const setup: FlowStep[] = profile.isOwner
-    ? []
+  const integrate: FlowGroup[] = profile.isOwner
+    ? [
+        {
+          id: "sell",
+          label: messages.integration.sellerHeading,
+          icon: "integrate",
+          numbered: true,
+          collapsible: true,
+          steps: buildSellerSteps(
+            isSellable(agent)
+              ? buildSellerSnippets({
+                  kind: "agent",
+                  method: "POST",
+                  url: agent.endpointUrl,
+                })
+              : null,
+            `${links.app}/agents/${agent.id}`,
+            messages.integration.agentNotSellableOwner,
+          ),
+        },
+        {
+          id: "run",
+          label: messages.integration.agentRunHeading,
+          icon: "run",
+          numbered: true,
+          collapsible: true,
+          steps: buildAgentRunSteps(agent),
+        },
+      ]
     : [
         {
-          id: "setup",
-          title: messages.flow.setup,
-          done: payerState.step === "ready",
-          content: (
-            <PayWithFourMica network={agent.network} state={payerState} />
-          ),
+          id: "call",
+          label: messages.integration.agentBuyerHeading,
+          icon: "integrate",
+          numbered: true,
+          collapsible: true,
+          steps: [
+            {
+              id: "setup",
+              title: messages.flow.setup,
+              done: payerState.step === "ready",
+              content: (
+                <PayWithFourMica network={agent.network} state={payerState} />
+              ),
+            },
+            ...buildAgentBuyerSteps(agent),
+          ],
         },
       ];
 
@@ -227,25 +266,7 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
         <StepFlow
           groups={[
             { id: "overview", steps: [overview] },
-            {
-              id: "call",
-              label: messages.integration.agentBuyerHeading,
-              icon: "integrate",
-              numbered: true,
-              collapsible: true,
-              steps: [
-                ...setup,
-                ...buildAgentBuyerSteps(agent, profile.isOwner),
-              ],
-            },
-            {
-              id: "run",
-              label: messages.integration.agentRunHeading,
-              icon: "run",
-              numbered: true,
-              collapsible: true,
-              steps: buildAgentRunSteps(agent, profile.isOwner),
-            },
+            ...integrate,
             { id: "more", steps: [...about, reviews, support] },
           ]}
           identity={
