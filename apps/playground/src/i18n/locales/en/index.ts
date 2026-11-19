@@ -260,6 +260,12 @@ export const en = {
     actions: "Page actions",
   },
 
+  view: {
+    label: "View as",
+    seller: "Seller",
+    buyer: "Buyer",
+  },
+
   ai: {
     trigger: "Copy for AI",
     markdown: "Copy as markdown",
