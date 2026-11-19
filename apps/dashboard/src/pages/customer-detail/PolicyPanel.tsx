@@ -2,13 +2,11 @@ import { isDecimalAmount, trimAmount } from "@4mica/rules";
 import { Button, cn } from "@4mica/ui";
 import {
   resetCustomerUsage,
-  setCustomerPolicy,
-} from "@stores/customer/actions";
-import {
   selectCustomerIssues,
   selectIsCustomerPolicyPending,
   selectIsCustomerUsageResetPending,
-} from "@stores/customer/selector";
+  setCustomerPolicy,
+} from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { blankToNull } from "@utils/format";

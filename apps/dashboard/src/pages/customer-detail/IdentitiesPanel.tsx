@@ -9,13 +9,11 @@ import {
   addCustomerIdentity,
   customerPendingKeys,
   removeCustomerIdentity,
-  updateCustomerIdentity,
-} from "@stores/customer/actions";
-import {
   selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+  updateCustomerIdentity,
+} from "@stores/customer";
 import type { Customer, CustomerIdentity } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";

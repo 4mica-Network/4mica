@@ -1,10 +1,10 @@
 import { Button, Card, cn } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
+  selectIsSupportPending,
   supportPendingKeys,
   updateSupportRequest,
-} from "@stores/support/actions";
-import { selectIsSupportPending } from "@stores/support/selector";
+} from "@stores/support";
 import type { SupportRequestDetail, SupportStatus } from "@stores/support/type";
 import { formatDateTime } from "@utils/format";
 import { CircleCheck, RotateCcw } from "lucide-react";

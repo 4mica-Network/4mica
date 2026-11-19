@@ -1,5 +1,4 @@
-import { agentPendingKeys } from "@stores/agent/actions";
-import { selectIsAgentPending } from "@stores/agent/selector";
+import { agentPendingKeys, selectIsAgentPending } from "@stores/agent";
 import type { Agent } from "@stores/agent/type";
 import { useAppSelector } from "@stores/hooks";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";

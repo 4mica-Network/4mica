@@ -2,12 +2,12 @@ import { isWebUrl } from "@4mica/rules";
 import { InputField } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import type { ResourceRef } from "@stores/shared/type";
-import { savePolicy } from "@stores/trust/actions";
 import {
+  savePolicy,
   selectIsTrustPending,
   selectPolicy,
   selectTrustIssues,
-} from "@stores/trust/selector";
+} from "@stores/trust";
 import type { PolicyInput } from "@stores/trust/type";
 import { hasErrors, isEmail } from "@utils/validation";
 import { useMemo } from "react";

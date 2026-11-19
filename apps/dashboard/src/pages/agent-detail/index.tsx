@@ -1,12 +1,17 @@
-import { fetchAgent } from "@stores/agent/actions";
 import {
+  fetchAgent,
   selectCurrentAgent,
   selectCurrentAgentError,
   selectCurrentAgentNotFound,
-} from "@stores/agent/selector";
+} from "@stores/agent";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchTrust, resetTrust, savePolicy } from "@stores/trust/actions";
-import { selectIsTrustPending, selectPolicy } from "@stores/trust/selector";
+import {
+  fetchTrust,
+  resetTrust,
+  savePolicy,
+  selectIsTrustPending,
+  selectPolicy,
+} from "@stores/trust";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";

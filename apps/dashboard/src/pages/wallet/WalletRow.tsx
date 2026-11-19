@@ -7,14 +7,12 @@ import { Button, Checkbox, cn, Tag, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
+  selectIsWalletPending,
+  selectIsWalletSelected,
   toggleWalletSelected,
   updateWallet,
   walletPendingKeys,
-} from "@stores/wallet/actions";
-import {
-  selectIsWalletPending,
-  selectIsWalletSelected,
-} from "@stores/wallet/selector";
+} from "@stores/wallet";
 import type { Wallet } from "@stores/wallet/type";
 import {
   Check,

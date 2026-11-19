@@ -2,15 +2,13 @@ import { SIGNED_DECIMAL_AMOUNT_PATTERN, trimAmount } from "@4mica/rules";
 import { Button, Tag } from "@4mica/ui";
 import {
   grantCustomerCredit,
-  zeroCustomerCredit,
-} from "@stores/customer/actions";
-import {
   selectCustomerCredit,
   selectCustomerCreditEntries,
   selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+  zeroCustomerCredit,
+} from "@stores/customer";
 import type { Customer, CustomerCreditKind } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";

@@ -2,12 +2,10 @@ import { Button } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   deleteSupportRequest,
-  supportPendingKeys,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
-} from "@stores/support/selector";
+  supportPendingKeys,
+} from "@stores/support";
 import type { SupportRequestDetail } from "@stores/support/type";
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";

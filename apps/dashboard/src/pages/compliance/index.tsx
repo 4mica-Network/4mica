@@ -1,16 +1,14 @@
 import {
   compliancePendingKeys,
   fetchCompliance,
-  updateCompliance,
-} from "@stores/compliance/actions";
-import {
   selectComplianceError,
   selectComplianceIssues,
   selectComplianceProfile,
   selectHasLoadedCompliance,
   selectIsComplianceLoading,
   selectIsComplianceLocked,
-} from "@stores/compliance/selector";
+  updateCompliance,
+} from "@stores/compliance";
 import type {
   ComplianceUpdate,
   CustomerBase,

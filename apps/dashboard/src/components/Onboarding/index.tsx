@@ -4,10 +4,15 @@ import {
   selectNeedsOnboarding,
 } from "@stores/user/selector";
 import { lazy, Suspense } from "react";
-import { IntegrationChecklist } from "@/components/IntegrationChecklist";
 
 const Wizard = lazy(() =>
   import("./Wizard").then((module) => ({ default: module.Wizard })),
+);
+
+const IntegrationChecklist = lazy(() =>
+  import("@/components/IntegrationChecklist").then((module) => ({
+    default: module.IntegrationChecklist,
+  })),
 );
 
 export function OnboardingGate() {
@@ -23,7 +28,11 @@ export function OnboardingGate() {
   }
 
   if (hasCompleted) {
-    return <IntegrationChecklist />;
+    return (
+      <Suspense fallback={null}>
+        <IntegrationChecklist />
+      </Suspense>
+    );
   }
 
   return null;

@@ -1,15 +1,13 @@
 import {
   fetchCustomerDetail,
   resetCustomerDetail,
-} from "@stores/customer/actions";
-import {
   selectCustomerDetailId,
   selectCustomerDetailLoadError,
   selectCustomerDetailNotFound,
   selectCustomerOverview,
   selectDetailCustomer,
   selectHasLoadedCustomerDetail,
-} from "@stores/customer/selector";
+} from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";

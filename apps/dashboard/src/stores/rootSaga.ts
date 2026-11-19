@@ -1,43 +1,14 @@
 import type { Task } from "redux-saga";
-import { all, cancel, fork, take } from "redux-saga/effects";
-import agentSaga from "./agent/saga";
-import apiListingSaga from "./apiListing/saga";
-import balanceSaga from "./balance/saga";
-import bannerSaga from "./banner/saga";
-import complianceSaga from "./compliance/saga";
-import configSaga from "./config/saga";
-import customerSaga from "./customer/saga";
-import developerSaga from "./developer/saga";
-import paymentSaga from "./payment/saga";
-import resourceKeySaga from "./resourceKey/saga";
+import { all, cancel, type ForkEffect, fork, take } from "redux-saga/effects";
 import { SESSION_RESET } from "./session";
-import supportSaga from "./support/saga";
-import trustSaga from "./trust/saga";
-import userSaga from "./user/saga";
-import walletSaga from "./wallet/saga";
 
-function* watchers() {
-  yield all([
-    ...userSaga,
-    ...developerSaga,
-    ...bannerSaga,
-    ...walletSaga,
-    ...apiListingSaga,
-    ...trustSaga,
-    ...agentSaga,
-    ...paymentSaga,
-    ...balanceSaga,
-    ...customerSaga,
-    ...resourceKeySaga,
-    ...complianceSaga,
-    ...configSaga,
-    ...supportSaga,
-  ]);
-}
+export type Watchers = ForkEffect[];
 
-export default function* rootSaga(): Generator {
+export function* sessionScoped(watchers: Watchers): Generator {
   while (true) {
-    const task = yield fork(watchers);
+    const task = yield fork(function* () {
+      yield all(watchers);
+    });
     yield take(SESSION_RESET);
     yield cancel(task as Task);
   }

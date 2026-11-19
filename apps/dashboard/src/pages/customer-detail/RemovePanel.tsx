@@ -1,9 +1,10 @@
 import { Button } from "@4mica/ui";
-import { customerPendingKeys, deleteCustomer } from "@stores/customer/actions";
 import {
+  customerPendingKeys,
+  deleteCustomer,
   selectCustomerError,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+} from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Trash2 } from "lucide-react";

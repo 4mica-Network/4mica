@@ -3,16 +3,14 @@ import {
   compliancePendingKeys,
   createOwner,
   deleteOwner,
-  updateOwner,
-} from "@stores/compliance/actions";
-import {
   selectBeneficialOwners,
   selectComplianceError,
   selectComplianceIssues,
   selectIsComplianceLocked,
   selectIsCompliancePending,
   selectOwnershipAssigned,
-} from "@stores/compliance/selector";
+  updateOwner,
+} from "@stores/compliance";
 import {
   type BeneficialOwner,
   type BeneficialOwnerInput,

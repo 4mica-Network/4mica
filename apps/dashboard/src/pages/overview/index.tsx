@@ -1,16 +1,13 @@
 import { EmptyState } from "@4mica/ui";
-import { fetchBalances } from "@stores/balance/actions";
-import { selectBalanceState } from "@stores/balance/selector";
+import { fetchBalances, selectBalanceState } from "@stores/balance";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchPaymentStats,
   fetchPaymentSummary,
-} from "@stores/payment/actions";
-import {
   selectPaymentInsightsFailed,
   selectPaymentStats,
   selectPaymentSummary,
-} from "@stores/payment/selector";
+} from "@stores/payment";
 import { ArrowRightLeft, Landmark, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
