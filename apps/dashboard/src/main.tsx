@@ -8,6 +8,7 @@ import { App } from "@/App";
 import { ClerkAuthProvider } from "@/auth/ClerkAuthProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppCrash } from "@/components/ErrorBoundary/fallbacks";
+import { MotionProvider } from "@/components/MotionProvider";
 import { Notifications } from "@/components/Notifications";
 import { reloadForNewVersion } from "@/lib/chunkReload";
 import { captureVerifyToken } from "@/lib/verifyToken";
@@ -41,8 +42,10 @@ if (!document.documentElement.hasAttribute("data-unsupported")) {
           <BrowserRouter>
             <ClerkAuthProvider>
               <MotionConfig reducedMotion="user">
-                <App />
-                <Notifications />
+                <MotionProvider>
+                  <App />
+                  <Notifications />
+                </MotionProvider>
               </MotionConfig>
             </ClerkAuthProvider>
           </BrowserRouter>

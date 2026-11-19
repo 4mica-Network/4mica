@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
@@ -86,7 +86,7 @@ export const Checkbox = ({
       >
         <AnimatePresence>
           {checked && (
-            <motion.span
+            <m.span
               key="check-icon"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -96,7 +96,7 @@ export const Checkbox = ({
               data-testid={`${prefix}-icon`}
             >
               <Check className="h-3 w-3" strokeWidth={3} />
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </span>
