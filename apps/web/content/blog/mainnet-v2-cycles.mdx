@@ -72,8 +72,8 @@ block, someone pays gas on it, and the chain's throughput sets the ceiling. An
 agent run that makes hundreds of paid calls reaches that ceiling quickly, and a
 busy chain or a gas spike raises the cost of every call in the run. The x402
 `batch-settlement` scheme fixes this issue with an idle escrow, but the escrow
-is a channel between one payer and one provider, so an agent that uses fifty
-providers has to pre-fund fifty of them.
+is a channel between one payer and one provider, so an agent that uses 50
+providers has to pre-fund 50 of them.
 
 `4mica-credit` handles all three with one open collateral position. The agent's
 funds are reserved at authorization, so the provider knows the $1.00 is there
@@ -111,10 +111,10 @@ never pays, the reserved collateral does.
 ## Why net settlement changes settlement economics
 
 Every payment guarantee in a cycle, between any agent and any provider, nets
-into one position per participant. Forty outgoing guarantees and twenty-seven
-incoming ones become one net position, so one on-chain settlement replaces
-sixty-seven. An agent that made a million requests across hundreds of APIs
-settles one position for the cycle, and so does each API.
+into one position per participant. In one cycle, 40 outgoing guarantees and 27
+incoming ones become one net position, so one on-chain settlement replaces 67.
+An agent that made a million requests across hundreds of APIs settles one
+position for the cycle, and so does each API.
 
 This is what an open collateral position enables. The agent never has to fund
 an idle balance or a payment channel per provider; it deposits once, pays any
