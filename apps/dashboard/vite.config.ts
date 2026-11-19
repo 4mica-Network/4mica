@@ -4,10 +4,42 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { requireTrustedApiUrl } from "./src/api/apiUrl";
+import { serviceWorkerPlugin } from "./src/lib/serviceWorker/plugin";
 import { socialImageUrl } from "./src/lib/socialImage";
 
 const require = createRequire(import.meta.url);
 const pkg = require("./package.json") as { version: string };
+
+const vendor = (packages: string) =>
+  new RegExp(`[\\\\/]node_modules[\\\\/](${packages})[\\\\/]`);
+
+const VENDOR_CHUNKS = [
+  {
+    name: "vendor-react",
+    test: vendor("react|react-dom|scheduler"),
+    priority: 30,
+  },
+  {
+    name: "vendor-router",
+    test: vendor("react-router|react-router-dom"),
+    priority: 20,
+  },
+  {
+    name: "vendor-i18n",
+    test: vendor("i18next|react-i18next"),
+    priority: 20,
+  },
+  {
+    name: "vendor-redux",
+    test: vendor("redux|react-redux|redux-saga|@redux-saga/[^\\\\/]+"),
+    priority: 20,
+  },
+  {
+    name: "vendor-clerk",
+    test: vendor("@clerk/[^\\\\/]+|swr|dequal"),
+    priority: 20,
+  },
+];
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
@@ -20,6 +52,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      serviceWorkerPlugin(),
       {
         name: "social-image",
         transformIndexHtml: () =>
@@ -44,6 +77,7 @@ export default defineConfig(({ command, mode }) => {
       rolldownOptions: {
         output: {
           minify: { compress: { dropConsole: true, dropDebugger: true } },
+          codeSplitting: { groups: VENDOR_CHUNKS },
         },
       },
     },

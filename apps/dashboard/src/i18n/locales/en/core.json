@@ -48,6 +48,7 @@
   "crash.offline.title": "You're offline",
   "crash.offline.description": "This page couldn't load without a connection. It will reload as soon as you're back online.",
   "offline.banner": "You're offline. Changes won't save until your connection is back.",
+  "offline.startup": "You're offline. The dashboard will open as soon as your connection is back.",
   "http.offline": "You're offline. Reconnect, then try again.",
   "http.checkConnection": "Check your connection and try again.",
   "loader.slow": "This is taking longer than usual. Check your connection, or reload the page.",

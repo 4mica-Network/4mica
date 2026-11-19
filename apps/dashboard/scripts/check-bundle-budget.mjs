@@ -4,7 +4,7 @@ import { gzipSync } from "node:zlib";
 
 const KB = 1024;
 const BUDGETS = {
-  startupJs: 290 * KB,
+  startupJs: 205 * KB,
   startupCss: 25 * KB,
   lazyChunk: 60 * KB,
 };

@@ -13,11 +13,13 @@ import { MotionProvider } from "@/components/MotionProvider";
 import { Notifications } from "@/components/Notifications";
 import { languageReady, translations } from "@/i18n";
 import { reloadForNewVersion } from "@/lib/chunkReload";
+import { registerServiceWorker } from "@/lib/serviceWorker/register";
 import { captureVerifyToken } from "@/lib/verifyToken";
 import "react-toastify/dist/ReactToastify.css";
 import "@/styles.css";
 
 captureVerifyToken();
+registerServiceWorker();
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
