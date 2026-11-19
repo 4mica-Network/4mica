@@ -2,6 +2,7 @@ import { Avatar, EmptyState, Stars, Tag } from "@4mica/ui";
 import { BadgeCheck, MessageSquare } from "lucide-react";
 import { messages, t } from "@/i18n";
 import { type PublicReview, RATING_MAX } from "@/schema/trust";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 import { formatDate } from "@/utils/formatDate";
 
 export interface ReviewListProps {
@@ -31,12 +32,12 @@ export function ReviewList({ reviews, ownerName }: ReviewListProps) {
         >
           <div className="flex items-center gap-2.5">
             <Avatar
-              alt={`${review.authorName || (review.authorUsername ?? review.authorId)}'s avatar`}
+              alt={`${review.authorName || review.authorUsername || messages.trust.anonymousReviewer}'s avatar`}
               className="profile-avatar"
-              fallback={review.authorUsername ?? review.authorId}
+              fallback={review.authorUsername ?? review.authorName}
               name={review.authorName}
               size="sm"
-              src={review.authorAvatarUrl}
+              src={sizedAvatarUrl(review.authorAvatarUrl, 72)}
             />
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

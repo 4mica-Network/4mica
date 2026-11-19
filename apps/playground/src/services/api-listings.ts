@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { PublicApiListing } from "@/schema/api-listing";
 import type { HttpMethod, PaymentNetwork } from "@/schema/params";
+import { cachedPublic, ownerTag } from "./cache";
 import { type Prisma, prisma } from "./db";
 
 export const API_LISTING_PUBLIC_SELECT = {
@@ -76,44 +77,71 @@ export const toPublicApiListing = (row: ApiListingRow): PublicApiListing => ({
   x402Endpoint: row.x402Endpoint,
 });
 
-export const listPublicApiListings = cache(
-  async (
-    ownerId: string,
-    includeHidden = false,
-  ): Promise<PublicApiListing[]> => {
-    const rows = await prisma.apiListing.findMany({
-      where: {
-        ownerId,
-        deletedAt: null,
-        ...(includeHidden ? {} : { visibility: "PUBLIC" }),
-      },
-      select: API_LISTING_PUBLIC_SELECT,
-      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-      take: 50,
-    });
+const queryApiListings = async (
+  ownerId: string,
+  includeHidden: boolean,
+): Promise<PublicApiListing[]> => {
+  const rows = await prisma.apiListing.findMany({
+    where: {
+      ownerId,
+      deletedAt: null,
+      ...(includeHidden ? {} : { visibility: "PUBLIC" }),
+    },
+    select: API_LISTING_PUBLIC_SELECT,
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    take: 50,
+  });
 
-    return rows.map(toPublicApiListing);
-  },
+  return rows.map(toPublicApiListing);
+};
+
+const loadPublicApiListings = cachedPublic(
+  "api-listings:list",
+  (ownerId: string) => queryApiListings(ownerId, false),
+  (ownerId) => [ownerTag(ownerId)],
+);
+
+export const listPublicApiListings = cache(
+  (ownerId: string, includeHidden = false): Promise<PublicApiListing[]> =>
+    includeHidden
+      ? queryApiListings(ownerId, true)
+      : loadPublicApiListings(ownerId),
+);
+
+const queryApiListing = async (
+  ownerId: string,
+  idOrSlug: string,
+  includeHidden: boolean,
+): Promise<PublicApiListing | null> => {
+  const row = await prisma.apiListing.findFirst({
+    where: {
+      ownerId,
+      deletedAt: null,
+      ...(includeHidden
+        ? {}
+        : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
+      OR: [{ slug: idOrSlug }, { id: idOrSlug }],
+    },
+    select: API_LISTING_PUBLIC_SELECT,
+  });
+
+  return row ? toPublicApiListing(row) : null;
+};
+
+const loadPublicApiListing = cachedPublic(
+  "api-listings:one",
+  (ownerId: string, idOrSlug: string) =>
+    queryApiListing(ownerId, idOrSlug, false),
+  (ownerId) => [ownerTag(ownerId)],
 );
 
 export const getPublicApiListing = cache(
-  async (
+  (
     ownerId: string,
     idOrSlug: string,
     includeHidden = false,
-  ): Promise<PublicApiListing | null> => {
-    const row = await prisma.apiListing.findFirst({
-      where: {
-        ownerId,
-        deletedAt: null,
-        ...(includeHidden
-          ? {}
-          : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
-        OR: [{ slug: idOrSlug }, { id: idOrSlug }],
-      },
-      select: API_LISTING_PUBLIC_SELECT,
-    });
-
-    return row ? toPublicApiListing(row) : null;
-  },
+  ): Promise<PublicApiListing | null> =>
+    includeHidden
+      ? queryApiListing(ownerId, idOrSlug, true)
+      : loadPublicApiListing(ownerId, idOrSlug),
 );

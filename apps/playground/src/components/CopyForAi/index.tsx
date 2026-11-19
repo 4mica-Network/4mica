@@ -3,7 +3,7 @@
 import { cn, Dropdown } from "@4mica/ui";
 import {
   AnimatePresence,
-  motion,
+  m,
   type Transition,
   useReducedMotion,
 } from "framer-motion";
@@ -83,26 +83,28 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
 
   return (
     <>
-      <motion.button
+      <m.button
         aria-controls={open ? menuId : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40"
+        aria-label={messages.ai.trigger}
+        className="inline-flex items-center gap-2 rounded-xl border border-overlay/10 bg-overlay/4 pr-2.5 pl-3.5 text-ink-body text-sm transition-colors hover:bg-overlay/8 hover:text-ink-strong max-md:h-10 max-md:w-10 max-md:justify-center max-md:rounded-lg max-md:border-0 max-md:bg-transparent max-md:px-0 max-md:active:bg-overlay/6"
         onClick={() => setOpen((value) => !value)}
         ref={trigger}
         type="button"
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       >
-        {messages.ai.trigger}
-        <motion.span
+        <Sparkles aria-hidden="true" className="h-4 w-4 md:hidden" />
+        <span className="max-md:hidden">{messages.ai.trigger}</span>
+        <m.span
           animate={{ rotate: open ? 180 : 0 }}
           aria-hidden="true"
-          className="text-ink-muted"
+          className="text-ink-muted max-md:hidden"
           transition={swap}
         >
           <ChevronDown className="h-4 w-4" />
-        </motion.span>
-      </motion.button>
+        </m.span>
+      </m.button>
 
       {open && (
         <Dropdown
@@ -115,7 +117,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
           placement="bottomLeft"
           placementOffsetY={6}
         >
-          <motion.div
+          <m.div
             animate={{ opacity: 1, y: 0, scale: 1 }}
             aria-label={messages.ai.trigger}
             className="flex min-w-52 flex-col gap-0.5"
@@ -132,7 +134,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                 <button
                   aria-label={isCopied ? messages.ai.copied : item.label}
                   className={cn(
-                    "flex h-9 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors focus-visible:outline-none",
+                    "focus-inset flex h-9 items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors",
                     isCopied
                       ? "bg-success/10 text-ink-strong"
                       : "text-ink-body hover:bg-overlay/6 hover:text-ink-strong focus-visible:bg-overlay/6",
@@ -144,7 +146,7 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                 >
                   <span className="relative grid h-4 w-4 place-items-center">
                     <AnimatePresence initial={false}>
-                      <motion.span
+                      <m.span
                         animate={{ opacity: 1, scale: 1 }}
                         className="absolute inset-0 grid place-items-center"
                         exit={{ opacity: 0, scale: 0.6 }}
@@ -163,14 +165,14 @@ export function CopyForAi({ markdown, prompt }: CopyForAiProps) {
                             className="h-4 w-4 text-ink-muted"
                           />
                         )}
-                      </motion.span>
+                      </m.span>
                     </AnimatePresence>
                   </span>
                   {isCopied ? messages.ai.copied : item.label}
                 </button>
               );
             })}
-          </motion.div>
+          </m.div>
         </Dropdown>
       )}
     </>

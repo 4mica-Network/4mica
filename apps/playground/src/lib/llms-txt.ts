@@ -7,53 +7,50 @@ import {
   buildApiListingDescriptor,
   type ResourceDescriptor,
 } from "./descriptor";
-import { singleLine } from "./snippets/shared";
+import { untrustedBlock, untrustedNotice } from "./untrusted";
 
-const line = (label: string, value: string | null): string | null =>
-  value === null ? null : `  - ${label}: ${singleLine(value)}`;
+const entryData = (descriptor: ResourceDescriptor) => ({
+  name: descriptor.name,
+  summary: descriptor.summary,
+  page: descriptor.page,
+  machineDescriptor: descriptor.descriptor,
+  price: descriptor.payment?.price.display ?? null,
+  network: descriptor.payment?.networkLabel ?? null,
+  payTo: descriptor.payment?.payTo ?? null,
+  call: descriptor.resource,
+  docs: descriptor.docs,
+  status: descriptor.invocable
+    ? "ready to call"
+    : "not payable yet — no receiving wallet or endpoint",
+});
 
-const entrySection = (descriptor: ResourceDescriptor): string => {
-  const price = descriptor.payment?.price.display ?? null;
-  const rows = [
-    descriptor.summary ? `  ${singleLine(descriptor.summary)}` : null,
-    line("Page", descriptor.page),
-    line("Machine descriptor", descriptor.descriptor),
-    line("Price", price === null ? null : `${price} per request`),
-    line("Network", descriptor.payment?.networkLabel ?? null),
-    line("Pay to", descriptor.payment?.payTo ?? null),
-    line(
-      "Call",
-      descriptor.resource
-        ? `${descriptor.resource.method} ${descriptor.resource.url}`
-        : null,
-    ),
-    line("Docs", descriptor.docs),
-    line(
-      "Status",
-      descriptor.invocable
-        ? "ready to call"
-        : "not payable yet — no receiving wallet or endpoint",
-    ),
-  ].filter((row): row is string => row !== null);
-
-  return [`### ${singleLine(descriptor.name)}`, ...rows, ""].join("\n");
-};
+const entrySection = (
+  heading: string,
+  tag: string,
+  descriptor: ResourceDescriptor,
+  index: number,
+): string =>
+  [
+    `### ${heading} ${index + 1}`,
+    "",
+    untrustedBlock(tag, entryData(descriptor)),
+    "",
+  ].join("\n");
 
 export const buildProfileLlmsTxt = (
   profile: PublicProfile,
   listings: PublicApiListing[],
   agents: PublicAgent[],
 ): string => {
-  const title = singleLine(profile.name || `@${profile.username}`);
   const apis = listings.map((listing) =>
     buildApiListingDescriptor(listing, profile),
   );
   const bots = agents.map((agent) => buildAgentDescriptor(agent, profile));
 
   const sections: string[] = [
-    `# ${title} on 4Mica`,
+    `# @${profile.username} on 4Mica`,
     "",
-    `> ${singleLine(profile.bio || `Paid APIs and agents published by @${profile.username}.`)}`,
+    `> Paid APIs and agents published by @${profile.username}.`,
     "",
     "Every resource below is paid for with x402 using the 4mica-credit scheme:",
     "call it without a payment header, read the payment requirements from the",
@@ -65,14 +62,37 @@ export const buildProfileLlmsTxt = (
     `- Integration docs: ${links.docs}`,
     `- Support: ${links.email.support}`,
     "",
+    "## Publisher",
+    "",
+    untrustedNotice(`@${profile.username}`, ""),
+    "",
+    untrustedBlock("untrusted-profile-data", {
+      name: profile.name || null,
+      bio: profile.bio || null,
+    }),
+    "",
   ];
 
   if (apis.length > 0) {
-    sections.push("## APIs", "", ...apis.map(entrySection), "");
+    sections.push(
+      "## APIs",
+      "",
+      ...apis.map((api, index) =>
+        entrySection("API", "untrusted-api-data", api, index),
+      ),
+      "",
+    );
   }
 
   if (bots.length > 0) {
-    sections.push("## Agents", "", ...bots.map(entrySection), "");
+    sections.push(
+      "## Agents",
+      "",
+      ...bots.map((bot, index) =>
+        entrySection("Agent", "untrusted-agent-data", bot, index),
+      ),
+      "",
+    );
   }
 
   if (apis.length === 0 && bots.length === 0) {

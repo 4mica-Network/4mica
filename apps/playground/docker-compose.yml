@@ -11,6 +11,14 @@ services:
         # nothing. nginx strips it back off.
         NEXT_PUBLIC_ASSET_PREFIX: ${NEXT_PUBLIC_ASSET_PREFIX:-/p}
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+        SENTRY_REPOSITORY: ${SENTRY_REPOSITORY:-}
+      secrets:
+        - sentry_auth_token
     image: 4mica-playground:latest
     container_name: 4mica-playground
     restart: unless-stopped
@@ -32,6 +40,7 @@ services:
       DATABASE_URL: ${DATABASE_URL_OVERRIDE:-postgresql://${POSTGRES_USER:-4mica}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-host.docker.internal}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-4mica}?schema=public}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
+      VALKEY_URL: ${VALKEY_URL:-redis://4mica-be-valkey:6379}
     # Makes `host.docker.internal` resolve to the host on Linux, where Docker
     # does not provide it by default.
     extra_hosts:
@@ -44,6 +53,11 @@ services:
     # to this box's private-network address, never 0.0.0.0.
     ports:
       - "${PLAYGROUND_BIND:-127.0.0.1}:${PLAYGROUND_PORT:-8081}:3100"
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
     volumes:
       - playground-logs:/app/logs
     networks:
@@ -59,6 +73,10 @@ services:
 volumes:
   playground-logs:
     name: 4mica-playground-logs
+
+secrets:
+  sentry_auth_token:
+    environment: SENTRY_AUTH_TOKEN
 
 networks:
   # No 4mica-edge here. The `edge` nginx moved to apps/web on the 4mica.io box

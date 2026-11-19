@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import * as v from "valibot";
 import {
   FileReportSchema,
@@ -8,6 +8,7 @@ import {
   ResourceRefSchema,
   SubmitReviewSchema,
 } from "@/schema/trust";
+import { resourceTag } from "@/services/cache";
 import { prisma } from "@/services/db";
 import {
   hasSettledPayment,
@@ -15,6 +16,7 @@ import {
   targetOf,
 } from "@/services/trust";
 import { getViewer } from "@/services/viewer";
+import { allowWrite } from "@/services/writeLimit";
 import type { ActionResult } from "./shared";
 
 interface ResourceRef {
@@ -78,7 +80,9 @@ const resolveTarget = async (
   };
 };
 
-const revalidateTarget = (target: Target): void => {
+const revalidateTarget = (target: Target, resource: ResourceRef): void => {
+  updateTag(resourceTag(resource.kind, resource.id));
+
   if (target.path) {
     revalidatePath(target.path);
   }
@@ -93,6 +97,10 @@ export const submitReview = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("submitReview", { failClosed: true }))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {
@@ -149,7 +157,7 @@ export const submitReview = async (
     },
   });
 
-  revalidateTarget(target);
+  revalidateTarget(target, resource);
 
   return { ok: true };
 };
@@ -157,6 +165,10 @@ export const submitReview = async (
 export const deleteOwnReview = async (
   ref: ResourceRef,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("deleteOwnReview", { failClosed: true }))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {
@@ -183,7 +195,7 @@ export const deleteOwnReview = async (
   const target = await resolveTarget(resource, { publicOnly: false });
 
   if (target) {
-    revalidateTarget(target);
+    revalidateTarget(target, resource);
   }
 
   return { ok: true };
@@ -193,6 +205,10 @@ export const fileReport = async (
   ref: ResourceRef,
   input: unknown,
 ): Promise<ActionResult> => {
+  if (!(await allowWrite("fileReport", { failClosed: true }))) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const viewer = await getViewer();
 
   if (!viewer) {

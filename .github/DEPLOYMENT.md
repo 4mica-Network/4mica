@@ -47,6 +47,18 @@ it on a **private network address** between the two machines. It defaults to
 `127.0.0.1`, which fails closed — the deploy still succeeds and only the apex
 domain breaks. Never set it to `0.0.0.0`: `playground` holds Clerk credentials
 and a database connection, and there is no authentication in front of it.
+Docker-published ports bypass `ufw`, so restrict the port to Box A with
+[`infra/firewall/playground-edge-only.sh`](../infra/firewall/playground-edge-only.sh)
+(see [its README](../infra/firewall/README.md)). The deploy enforces both
+halves: `pre_up` runs `check-bind.sh` and refuses anything but a private address
+on the box, and a final step fails the run if the GitHub runner — which is on
+the public internet — can open the port.
+
+**Monitoring.** `playground` reports to Sentry when the environment has
+`SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (variables) and
+`SENTRY_AUTH_TOKEN` (secret). Each deploy becomes a Sentry release named after
+the deployed commit, and its source maps are uploaded so stack traces are
+readable.
 
 **Postgres is external to the stacks.** `apps/be/docker-compose.yml` bundles a
 `postgres` service, but that file is local-dev only; production uses

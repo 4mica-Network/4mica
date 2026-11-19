@@ -2,6 +2,7 @@ import { Tag } from "@4mica/ui";
 import { BookText, CalendarDays, Globe, Shapes, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { CardShell } from "@/components/CardShell";
 import { CopyForAi } from "@/components/CopyForAi";
 import { CopyValue } from "@/components/CopyValue";
@@ -21,13 +22,14 @@ import {
 import { RevealLink } from "@/components/RevealLink";
 import { type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
-import { TrustSection } from "@/components/TrustSection";
+import { TopBar } from "@/components/TopBar";
+import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildApiListingHandoff } from "@/lib/ai-handoff";
 import { buildApiListingDescriptor } from "@/lib/descriptor";
 import { links } from "@/services/links";
-import { getPayerState } from "@/services/payer";
+import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveApiListing } from "@/services/resource";
 import { buildApiListingMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
@@ -48,6 +50,7 @@ export async function generateMetadata({
 export default async function ApiListingPage({
   params,
 }: ProfileChildPageProps) {
+  preloadPayerState();
   const resolved = await resolveApiListing(await params);
 
   if (!resolved) {
@@ -182,13 +185,15 @@ export default async function ApiListingPage({
     title: messages.flow.reviews,
     icon: "reviews",
     content: (
-      <TrustSection
-        id={listing.id}
-        kind="listing"
-        profile={profile}
-        publishedAt={listing.publishedAt}
-        resourceRef={listing.ref}
-      />
+      <Suspense fallback={<TrustSectionSkeleton />}>
+        <TrustSection
+          id={listing.id}
+          kind="listing"
+          profile={profile}
+          publishedAt={listing.publishedAt}
+          resourceRef={listing.ref}
+        />
+      </Suspense>
     ),
   };
 
@@ -203,13 +208,16 @@ export default async function ApiListingPage({
     <>
       <JsonLd descriptor={descriptor} />
 
-      <ProfileNav
-        className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
-        displayName={profile.name || profile.username}
-        username={profile.username}
-      />
-
       <CardShell
+        account={<TopBar />}
+        accountOnMobile={false}
+        nav={
+          <ProfileNav
+            displayName={profile.name || profile.username}
+            username={profile.username}
+          />
+        }
+        title={listing.name}
         actions={
           <div className="flex items-stretch gap-2">
             {handoff && (

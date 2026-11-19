@@ -46,6 +46,11 @@ services:
       # the template ($host, $connection_upgrade, …) is replaced with an empty
       # string and the config silently stops working.
       NGINX_ENVSUBST_FILTER: "^MICA_"
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
     ports:
       - "127.0.0.1:${EDGE_PORT:-8088}:80"
     networks:

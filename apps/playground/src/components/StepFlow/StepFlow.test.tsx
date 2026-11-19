@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { messages, t } from "@/i18n";
@@ -91,6 +91,52 @@ describe("StepFlow", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("moves focus to the new panel when next is pressed", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    screen
+      .getByRole("button", {
+        name: t(messages.flow.next, { title: "Set up payment" }),
+      })
+      .focus();
+    await user.keyboard("{Enter}");
+    expect(
+      screen.getByRole("region", { name: "Set up payment" }),
+    ).toHaveFocus();
+
+    screen
+      .getByRole("button", {
+        name: t(messages.flow.next, { title: "Install the SDK" }),
+      })
+      .focus();
+    await user.keyboard("{Enter}");
+    expect(
+      screen.getByRole("region", { name: "Install the SDK" }),
+    ).toHaveFocus();
+  });
+
+  it("traps Tab inside the mobile sheet and returns focus on Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    const trigger = screen.getByRole("button", { name: /^All steps/ });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+
+    const sheet = screen.getByRole("dialog");
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+
+    const buttons = within(sheet).getAllByRole("button");
+    for (let i = 0; i <= buttons.length; i += 1) {
+      await user.tab();
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it("marks a completed step for screen readers", () => {
     renderFlow();
 
@@ -99,6 +145,47 @@ describe("StepFlow", () => {
         name: `Set up payment, ${messages.flow.done}`,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("picks a step from the mobile sheet and closes it", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    const trigger = screen.getByRole("button", {
+      name: `${messages.flow.openSteps} Overview ${t(messages.flow.stepCount, { current: 1, total: 3 })}`,
+    });
+    await user.click(trigger);
+
+    const sheet = screen.getByRole("dialog", {
+      name: messages.flow.stepsLabel,
+    });
+    await user.click(
+      within(sheet).getByRole("button", { name: "Install the SDK" }),
+    );
+
+    expect(
+      screen.getByRole("region", { name: "Install the SDK" }),
+    ).toHaveTextContent("npm install");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveAccessibleName(
+      `${messages.flow.openSteps} Install the SDK ${t(messages.flow.stepCount, { current: 3, total: 3 })}`,
+    );
+  });
+
+  it("closes the mobile sheet on Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+
+    await user.click(screen.getByRole("button", { name: /^All steps/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 
   describe("a collapsible group", () => {
