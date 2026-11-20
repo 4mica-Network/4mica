@@ -1,8 +1,9 @@
 import { Args, Flags } from "@oclif/core";
 import { amountInput } from "../core/amount.js";
 import { confirmFunds } from "../core/confirm.js";
+import { previewDeposit, renderPreview } from "../core/preview.js";
 import { withSession } from "../core/session.js";
-import { asset, yes } from "../flags.js";
+import { asset, dryRun, yes } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
 import { spinner, step } from "../ui/log.js";
 import { fields } from "../ui/output.js";
@@ -38,11 +39,13 @@ export default class Deposit extends NetworkCommand {
       min: 1,
       summary: "how long to wait for core to count the deposit",
     }),
+    "dry-run": dryRun,
     yes,
   };
   static examples = [
     "<%= config.bin %> <%= command.id %> 5 --asset USDC",
     '<%= config.bin %> <%= command.id %> "0.01 ETH" --network base-sepolia',
+    "<%= config.bin %> <%= command.id %> 5 --asset USDC --dry-run",
     "<%= config.bin %> <%= command.id %> 5 --asset USDC --yes --json",
   ];
 
@@ -53,6 +56,17 @@ export default class Deposit extends NetworkCommand {
     const label = `${amount.amount} ${amount.asset}`;
 
     return withSession(settings, async (client) => {
+      if (flags["dry-run"]) {
+        const preview = await previewDeposit(
+          settings,
+          client,
+          amount,
+          flags.gas as "auto" | "self",
+        );
+        this.log(renderPreview(preview));
+        return preview;
+      }
+
       await confirmFunds(
         {
           action: `Deposit ${label}`,

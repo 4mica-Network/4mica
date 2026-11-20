@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 import { BaseCommand } from "../base.js";
+import { resolveRunContext } from "../core/context.js";
 import { DASHBOARD_URL, runLocalDashboard } from "../core/dashboard.js";
 import { openBrowser } from "../core/runner.js";
 
@@ -31,6 +32,14 @@ export default class Dashboard extends BaseCommand {
     if (flags.local) {
       await runLocalDashboard({ open: flags.open });
       return;
+    }
+    // This command used to start the dev server whenever it ran inside the
+    // monorepo; say where that went.
+    if ((await resolveRunContext()).inMonorepo) {
+      this.note(
+        "`dashboard` now opens the hosted dashboard; the dev server of this " +
+          "checkout is `dashboard --local`",
+      );
     }
     if (flags.open) await openBrowser(DASHBOARD_URL);
     this.log(DASHBOARD_URL);

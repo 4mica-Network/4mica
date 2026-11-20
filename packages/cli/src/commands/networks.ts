@@ -1,5 +1,6 @@
-import { DEFAULT_NETWORK, NETWORKS } from "@4mica/sdk/networks";
+import { NETWORKS } from "@4mica/sdk/networks";
 import { BaseCommand } from "../base.js";
+import { DEFAULT_TESTNET } from "../core/settings.js";
 import { table } from "../ui/output.js";
 
 export default class Networks extends BaseCommand {
@@ -11,7 +12,7 @@ export default class Networks extends BaseCommand {
     const networks = Object.entries(NETWORKS).map(([name, info]) => ({
       name,
       ...info,
-      default: name === DEFAULT_NETWORK,
+      default: name === DEFAULT_TESTNET,
     }));
     this.log(
       table(
@@ -26,7 +27,7 @@ export default class Networks extends BaseCommand {
         ]),
       ),
     );
-    this.note(`default: ${DEFAULT_NETWORK}`);
+    this.note(`default: ${DEFAULT_TESTNET}`);
     return networks;
   }
 }

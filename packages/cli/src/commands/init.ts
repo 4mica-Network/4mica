@@ -1,7 +1,9 @@
 import { Args, Flags } from "@oclif/core";
 import { BaseCommand } from "../base.js";
+import { readConfig } from "../core/config-file.js";
 import { DASHBOARD_URL } from "../core/dashboard.js";
 import { openBrowser, runScript } from "../core/runner.js";
+import { canPrompt } from "../core/runtime.js";
 import { scaffold } from "../core/scaffold.js";
 import { usageError } from "../errors.js";
 import type { PartialInit } from "../prompts/flow.js";
@@ -29,7 +31,8 @@ export default class Init extends BaseCommand {
     "Asks for whatever is not given as a flag. Without a terminal it never " +
     "asks: --template is then required, everything else takes its default, " +
     "and the project is started only with --run. Projects run in demo mode " +
-    "and need no credentials.";
+    "and need no credentials. It creates no wallet and sends nothing: it " +
+    "ends by listing what a real payment still needs.";
   static args = {
     dir: Args.string({ description: "target directory; defaults to the name" }),
   };
@@ -89,8 +92,7 @@ export default class Init extends BaseCommand {
     if (flags.run !== undefined) init.run = flags.run;
     if (flags.dashboard !== undefined) init.openDashboard = flags.dashboard;
 
-    const canAsk =
-      process.stdin.isTTY === true && !flags.yes && !this.jsonEnabled();
+    const canAsk = canPrompt() && !flags.yes && !this.jsonEnabled();
     if (!canAsk) {
       if (!init.type && !flags.yes) {
         throw usageError("nothing to ask with: --template is required here", {
@@ -114,7 +116,8 @@ export default class Init extends BaseCommand {
       Object.assign(init, filled);
     }
 
-    const project = await scaffold(init);
+    const { "key-file": keyFile } = await readConfig(this.config.configDir);
+    const project = await scaffold(init, Boolean(keyFile));
 
     // Before the dev server, which blocks.
     if (project.options.openDashboard) await openBrowser(DASHBOARD_URL);

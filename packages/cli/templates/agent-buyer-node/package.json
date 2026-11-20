@@ -7,9 +7,8 @@
     "start": "tsx src/critic.ts"
   },
   "dependencies": {
-    "@4mica/x402": "workspace:*",
-    "@anthropic-ai/sdk": "^0.110.0",
-    "@x402/fetch": "catalog:"
+    "@4mica/sdk": "workspace:*",
+    "@anthropic-ai/sdk": "^0.110.0"
   },
   "devDependencies": {
     "@types/node": "catalog:node24",

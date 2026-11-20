@@ -16,9 +16,16 @@ runs with **zero credentials**. Start this, then run a matching buyer to exercis
 
 ## Go live
 
-Swap the stand-in facilitator for `new FourMicaFacilitatorClient()` from
-`@4mica/x402/server` and set `PAY_TO` to your wallet. The seller needs no key:
-the facilitator verifies each payment and gets the guarantee from 4mica core.
+Create a `.env` file here with one line, naming the wallet you are paid at:
+
+```bash
+PAY_TO=0xYourWalletAddress
+```
+
+With `PAY_TO` set, payments are checked by the 4mica facilitator and guaranteed
+by 4mica core; without it, any payment is accepted. No code changes, and the
+seller needs no key. `4mica wallets create` makes a wallet and prints its
+address.
 
 ## Manage agents & transactions
 

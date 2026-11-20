@@ -1,5 +1,5 @@
 import { walletAddress } from "../core/session.js";
-import { networkName } from "../core/settings.js";
+import { networkName, origin, type Resolved } from "../core/settings.js";
 import { NetworkCommand } from "../network-command.js";
 import { fields } from "../ui/output.js";
 
@@ -7,32 +7,35 @@ export default class Whoami extends NetworkCommand {
   static summary = "show the wallet and network the cli will use";
   static description =
     "Makes no network call. The address is derived from the wallet key, " +
-    "which is read from FOURMICA_WALLET_PRIVATE_KEY or --env-file and is " +
-    "never printed.";
+    "which is never printed. The key is taken from --key-file, then " +
+    "FOURMICA_WALLET_PRIVATE_KEY in the environment or in ./.env, then the " +
+    "key file named in the config file.";
   static examples = [
     "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> <%= command.id %> --env-file .env",
+    "<%= config.bin %> <%= command.id %> --key-file ~/.4mica/key",
   ];
 
   async run() {
     const { flags } = await this.parse(Whoami);
     const settings = await this.settings(flags);
     const address = await walletAddress(settings);
-    const from = (source?: string) => (source ? ` (from ${source})` : "");
+    const from = (resolved: Resolved) =>
+      ` (from ${origin(settings, resolved)})`;
     this.log(
       fields([
-        ["address", address + from(settings.key?.source)],
+        [
+          "address",
+          `${address} (from ${settings.key?.file ?? settings.key?.source})`,
+        ],
         [
           "network",
-          networkName(settings) +
-            from((settings.network ?? settings.rpcUrl).source),
+          networkName(settings) + from(settings.network ?? settings.rpcUrl),
         ],
         ["core", settings.rpcUrl.value],
         [
           "facilitator",
           settings.facilitatorUrl &&
-            settings.facilitatorUrl.value +
-              from(settings.facilitatorUrl.source),
+            settings.facilitatorUrl.value + from(settings.facilitatorUrl),
         ],
       ]),
     );

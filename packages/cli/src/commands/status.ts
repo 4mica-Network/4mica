@@ -1,9 +1,9 @@
-import { networkName } from "../core/settings.js";
+import { listAssets } from "../core/assets.js";
+import { connect } from "../core/session.js";
+import { networkName, type Settings } from "../core/settings.js";
 import { NetworkCommand } from "../network-command.js";
-import { err, ok } from "../ui/log.js";
+import { out, waiting } from "../ui/log.js";
 import { table } from "../ui/output.js";
-
-const TIMEOUT_MS = 10_000;
 
 interface Probe {
   url: string;
@@ -16,9 +16,8 @@ interface Probe {
 async function probe(base: string, path: string): Promise<Probe> {
   const url = new URL(path, base.endsWith("/") ? base : `${base}/`).href;
   try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    // Timed out by --request-timeout, like every other request.
+    const response = await fetch(url);
     const body: unknown = await response.json().catch(() => undefined);
     return { url, up: response.ok, detail: `HTTP ${response.status}`, body };
   } catch (error) {
@@ -42,9 +41,46 @@ function kinds(body: unknown): string[] {
   ];
 }
 
+interface Readiness {
+  address: string;
+  /** What the wallet itself holds, such as "10 USDC". */
+  holds: string[];
+  /** Collateral available to spend. */
+  collateral: string[];
+}
+
+/**
+ * Whether the wallet in use could pay: does it hold anything, and has any of
+ * it been deposited. Read from the chain and from core.
+ */
+async function readiness(settings: Settings): Promise<Readiness> {
+  const { formatUnits } = await import("@4mica/sdk/amounts");
+  const client = await connect(settings);
+  try {
+    const gateway = await (await client.lowLevel()).ctx.gateway();
+    const holds: string[] = [];
+    for (const token of await listAssets(settings, client)) {
+      const raw = token.native
+        ? await gateway.nativeBalance()
+        : await gateway.erc20Balance(token.address);
+      if (raw > 0n)
+        holds.push(`${formatUnits(raw, token.decimals)} ${token.symbol}`);
+    }
+    const collateral = Object.values(await client.balance())
+      .filter((b) => b.raw.available > 0n)
+      .map((b) => `${b.available} ${b.asset.symbol}`);
+    return { address: client.address, holds, collateral };
+  } finally {
+    await client.close();
+  }
+}
+
 export default class Status extends NetworkCommand {
   static summary = "check core and facilitator health";
-  static description = "Exits 1 when a service does not answer.";
+  static description =
+    "Exits 1 when a service does not answer. With a wallet in use it also " +
+    "says whether the wallet is funded and has collateral; neither changes " +
+    "the exit code.";
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --network base --json",
@@ -55,14 +91,18 @@ export default class Status extends NetworkCommand {
     const settings = await this.settings(flags);
     const facilitatorUrl = settings.facilitatorUrl?.value;
 
-    const [core, facilitator, supported] = await Promise.all([
-      probe(settings.rpcUrl.value, "core/health"),
-      facilitatorUrl ? probe(facilitatorUrl, "health") : undefined,
-      facilitatorUrl ? probe(facilitatorUrl, "supported") : undefined,
-    ]);
+    const [core, facilitator, supported] = await waiting(
+      `Checking ${networkName(settings)}`,
+      () =>
+        Promise.all([
+          probe(settings.rpcUrl.value, "core/health"),
+          facilitatorUrl ? probe(facilitatorUrl, "health") : undefined,
+          facilitatorUrl ? probe(facilitatorUrl, "supported") : undefined,
+        ]),
+    );
     const schemes = supported?.up ? kinds(supported.body) : [];
 
-    const state = (p: Probe) => (p.up ? ok("up") : err("down"));
+    const state = (p: Probe) => (p.up ? out.green("up") : out.red("down"));
     const rows = [["core", settings.rpcUrl.value, state(core), core.detail]];
     rows.push(
       facilitator
@@ -74,7 +114,36 @@ export default class Status extends NetworkCommand {
           ]
         : ["facilitator", "-", "none", "not hosted on this network"],
     );
-    this.log(table(["SERVICE", "URL", "STATE", "DETAIL"], rows));
+
+    // A wallet that cannot be read is reported, not fatal: this command is
+    // about the services.
+    let wallet: Readiness | { error: string } | undefined;
+    if (settings.key && core.up) {
+      wallet = await waiting("Checking the wallet", () =>
+        readiness(settings).catch((error: Error) => ({ error: error.message })),
+      );
+      if ("error" in wallet) {
+        rows.push(["wallet", "-", out.red("unknown"), wallet.error]);
+      } else {
+        const none = out.dim("none");
+        rows.push(
+          [
+            "wallet",
+            wallet.address,
+            wallet.holds.length > 0 ? out.green("funded") : "empty",
+            wallet.holds.join(", ") || none,
+          ],
+          [
+            "collateral",
+            wallet.address,
+            wallet.collateral.length > 0 ? out.green("ready") : "none",
+            wallet.collateral.join(", ") ||
+              "deposit with `4mica deposit <amount> --asset <asset>`",
+          ],
+        );
+      }
+    }
+    this.log(table(["CHECK", "WHERE", "STATE", "DETAIL"], rows));
 
     if (!core.up || facilitator?.up === false) process.exitCode = 1;
     return {
@@ -86,6 +155,7 @@ export default class Status extends NetworkCommand {
         detail: facilitator.detail,
         schemes,
       },
+      wallet,
     };
   }
 }

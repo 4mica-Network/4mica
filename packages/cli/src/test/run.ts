@@ -19,8 +19,13 @@ export interface Outcome {
 export async function runCommand(
   command: { run(argv: string[], root: string): Promise<unknown> },
   argv: string[],
+  /** A config directory to reuse, when one command should see another's work. */
+  home?: string,
 ): Promise<Outcome> {
-  vi.stubEnv("XDG_CONFIG_HOME", await mkdtemp(join(tmpdir(), "4mica-cli-")));
+  const dir = home ?? (await mkdtemp(join(tmpdir(), "4mica-cli-")));
+  vi.stubEnv("XDG_CONFIG_HOME", dir);
+  // An empty directory, so no developer's ./.env is picked up.
+  const cwd = vi.spyOn(process, "cwd").mockReturnValue(dir);
   for (const key of Object.keys(process.env)) {
     if (/^(FOURMICA|4MICA)_/.test(key)) vi.stubEnv(key, undefined);
   }
@@ -38,6 +43,7 @@ export async function runCommand(
     outcome.error = error as Outcome["error"];
   } finally {
     write.mockRestore();
+    cwd.mockRestore();
     quiet.mockRestore();
     vi.unstubAllEnvs();
   }

@@ -13,7 +13,8 @@ export default class ConfigSet extends BaseCommand {
   static summary = "save a setting to the config file";
   static description =
     "`network` and `rpc-url` both choose the core to talk to, so setting " +
-    "one removes the other. The wallet key is never stored here.";
+    "one removes the other. The wallet key is never stored here; " +
+    "`key-file` stores the path of the file that holds it.";
   static args = {
     key: Args.string({ description: CONFIG_KEYS.join(", "), required: true }),
     value: Args.string({ required: true }),
@@ -21,6 +22,7 @@ export default class ConfigSet extends BaseCommand {
   static examples = [
     "<%= config.bin %> <%= command.id %> network base-sepolia",
     "<%= config.bin %> <%= command.id %> asset USDC",
+    "<%= config.bin %> <%= command.id %> key-file ~/.4mica/key",
   ];
 
   async run() {

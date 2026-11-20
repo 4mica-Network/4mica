@@ -1,9 +1,10 @@
 import { Args } from "@oclif/core";
 import { amountInput } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { previewWithdrawalRequest, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
-import { asset, yes } from "../../flags.js";
+import { asset, dryRun, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
 import { step } from "../../ui/log.js";
 
@@ -19,7 +20,7 @@ export default class WithdrawalsRequest extends NetworkCommand {
       required: true,
     }),
   };
-  static flags = { asset, yes };
+  static flags = { asset, "dry-run": dryRun, yes };
   static examples = [
     "<%= config.bin %> <%= command.id %> 5 --asset USDC",
     "<%= config.bin %> withdraw 5 --asset USDC --yes",
@@ -32,6 +33,16 @@ export default class WithdrawalsRequest extends NetworkCommand {
     const label = `${amount.amount} ${amount.asset}`;
 
     return withSession(settings, async (client) => {
+      if (flags["dry-run"]) {
+        const preview = await previewWithdrawalRequest(
+          settings,
+          client,
+          amount,
+        );
+        this.log(renderPreview(preview));
+        return preview;
+      }
+
       await confirmFunds(
         { action: `Request a withdrawal of ${label}`, address: client.address },
         settings,

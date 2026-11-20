@@ -1,7 +1,7 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EXIT } from "../errors.js";
 import {
   configPath,
@@ -56,6 +56,19 @@ describe("withSetting", () => {
     expect(
       withSetting({ network: "base" }, "rpc-url", "http://localhost:3000"),
     ).toEqual({ "rpc-url": "http://localhost:3000" });
+  });
+
+  it("stores a key file by its absolute path, and only if it exists", async () => {
+    const dir = await tempDir();
+    await writeFile(join(dir, "key"), "0xabc");
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(dir);
+    expect(withSetting({}, "key-file", "key")).toEqual({
+      "key-file": join(dir, "key"),
+    });
+    expect(() => withSetting({}, "key-file", "missing")).toThrow(
+      expect.objectContaining({ code: "KEY_FILE_NOT_FOUND" }),
+    );
+    cwd.mockRestore();
   });
 
   it.each([

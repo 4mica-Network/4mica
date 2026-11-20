@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { parseEnv } from "node:util";
 import {
-  DEFAULT_NETWORK,
   NETWORKS,
   type NetworkInfo,
   resolveNetwork,
@@ -19,10 +18,21 @@ export interface Resolved {
 
 export type Env = Record<string, string | undefined>;
 
+/** A key file that has been read: where it is, who named it, what it holds. */
+export interface KeyFile {
+  path: string;
+  source: "flag" | "config";
+  key: string;
+}
+
 export interface SettingsInput {
   flags: { network?: string; "rpc-url"?: string; asset?: string };
   env: Env;
   envFile?: Env;
+  /** Path of `envFile`, for telling the user where a value came from. */
+  envFilePath?: string;
+  /** From `--key-file`, else from the config file's `key-file`. */
+  keyFile?: KeyFile;
   config: ConfigFile;
 }
 
@@ -33,11 +43,30 @@ export interface Settings {
   rpcUrl: Resolved;
   facilitatorUrl?: Resolved;
   asset?: Resolved;
-  /** Where the wallet key came from; the key itself stays in `sdkEnv`. */
-  key?: { source: Source };
+  /**
+   * Where the wallet key came from, and the file if it came from one. The
+   * key itself stays in `sdkEnv`.
+   */
+  key?: { source: Source; file?: string };
   /** Every `FOURMICA_*` variable in effect, for `FourMica.connect({ env })`. */
   sdkEnv: Record<string, string>;
+  /** The env file that was read, if any. */
+  envFilePath?: string;
 }
+
+/** `flag`, `env`, `config`, `default`, or the path of the env file. */
+export const origin = (settings: Settings, resolved: Resolved): string =>
+  resolved.source === "env-file"
+    ? (settings.envFilePath ?? "env-file")
+    : resolved.source;
+
+/**
+ * Where the cli goes when nothing names a network. Always a testnet, and
+ * deliberately not the SDK's `DEFAULT_NETWORK`, which moves to mainnet at
+ * general availability: a terminal command that moves real money should have
+ * been told to, by `--network base` or `4mica config set network base`.
+ */
+export const DEFAULT_TESTNET = "base-sepolia";
 
 // A shell cannot export a name starting with a digit; the scaffolded `.env`
 // files still use the `4MICA_` spelling.
@@ -94,7 +123,7 @@ export function resolveSettings(input: SettingsInput): Settings {
       at(readEnv(envFile, "RPC_URL"), "env-file"),
     ],
     [at(config.network, "config"), at(config["rpc-url"], "config")],
-    [at(DEFAULT_NETWORK, "default"), undefined],
+    [at(DEFAULT_TESTNET, "default"), undefined],
   ];
   const [network, url] = levels.find(([n, u]) => n ?? u) ?? [];
 
@@ -133,13 +162,27 @@ export function resolveSettings(input: SettingsInput): Settings {
   delete sdkEnv.FOURMICA_NETWORK;
   delete sdkEnv.FOURMICA_RPC_URL;
 
-  const key = fromEnv("WALLET_PRIVATE_KEY");
+  // A key file named on the command line wins; one named in the config
+  // file is the last resort, like every other config value.
+  const { keyFile } = input;
+  const fromVariable = fromEnv("WALLET_PRIVATE_KEY");
+  const useKeyFile = keyFile && (keyFile.source === "flag" || !fromVariable);
+  if (useKeyFile) sdkEnv.FOURMICA_WALLET_PRIVATE_KEY = keyFile.key;
+  const key = useKeyFile
+    ? { source: keyFile.source, file: keyFile.path }
+    : fromVariable && {
+        source: fromVariable.source,
+        file:
+          fromVariable.source === "env-file" ? input.envFilePath : undefined,
+      };
+
   return {
     ...settings,
     facilitatorUrl,
     asset: at(flags.asset, "flag") ?? at(config.asset, "config"),
-    key: key && { source: key.source },
+    key,
     sdkEnv,
+    envFilePath: input.envFilePath,
   };
 }
 

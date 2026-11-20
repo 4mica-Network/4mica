@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { NETWORKS, resolveNetwork } from "@4mica/sdk/networks";
 import { configError, usageError } from "../errors.js";
 
@@ -8,6 +9,7 @@ export const CONFIG_KEYS = [
   "rpc-url",
   "facilitator-url",
   "asset",
+  "key-file",
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -92,7 +94,18 @@ export function normalizeSetting(key: ConfigKey, value: string): string {
     }
     return network.name;
   }
-  return key === "asset" ? trimmed : requireUrl(key, trimmed);
+  if (key === "asset") return trimmed;
+  if (key === "key-file") {
+    // Absolute, so that it means the same file from any directory.
+    const path = resolve(trimmed);
+    if (!existsSync(path)) {
+      throw usageError(`there is no file at ${path}`, {
+        code: "KEY_FILE_NOT_FOUND",
+      });
+    }
+    return path;
+  }
+  return requireUrl(key, trimmed);
 }
 
 /**

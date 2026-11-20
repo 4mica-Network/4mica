@@ -1,4 +1,4 @@
-import { dim } from "./log.js";
+import { out } from "./log.js";
 
 /**
  * One header row, one record per line, so the output survives `grep`.
@@ -15,7 +15,7 @@ export function table(headers: string[], rows: string[][]): string {
       )
       .join("  ")
       .trimEnd();
-  return [dim(line(headers)), ...rows.map(line)].join("\n");
+  return [out.dim(line(headers)), ...rows.map(line)].join("\n");
 }
 
 /** `key: value` lines; entries without a value are left out. */

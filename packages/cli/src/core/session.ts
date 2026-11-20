@@ -1,6 +1,8 @@
-import type { FourMica } from "@4mica/sdk";
-import { configError, noSigner } from "../errors.js";
-import type { Settings } from "./settings.js";
+import type { FourMica, SpendLimits } from "@4mica/sdk";
+import { noSigner } from "../errors.js";
+import { waiting } from "../ui/log.js";
+import { networkName, type Settings } from "./settings.js";
+import { addressFromKey } from "./wallets.js";
 
 const KEY = "FOURMICA_WALLET_PRIVATE_KEY";
 
@@ -10,27 +12,19 @@ function requireKey(settings: Settings): string {
   return key;
 }
 
-/** No network call. The key is never echoed, even when it is malformed. */
+/** No network call. */
 export async function walletAddress(settings: Settings): Promise<string> {
-  const key = requireKey(settings);
-  const { privateKeyToAccount } = await import("viem/accounts");
-  try {
-    return privateKeyToAccount(
-      (key.startsWith("0x") ? key : `0x${key}`) as `0x${string}`,
-    ).address;
-  } catch {
-    throw configError(`${KEY} is not a valid private key`, {
-      code: "BAD_SIGNER",
-      suggestions: ["it should be 64 hex characters, with or without 0x"],
-    });
-  }
+  return addressFromKey(requireKey(settings), settings.key?.file ?? KEY);
 }
 
 /**
  * The SDK is imported here, on first use, so that commands which never
  * connect (`--help`, `init`, `networks`) do not pay for loading viem.
  */
-export async function connect(settings: Settings): Promise<FourMica> {
+export async function connect(
+  settings: Settings,
+  spend?: SpendLimits,
+): Promise<FourMica> {
   requireKey(settings);
   const { FourMica } = await import("@4mica/sdk");
   return FourMica.connect({
@@ -39,14 +33,20 @@ export async function connect(settings: Settings): Promise<FourMica> {
       ? { network: settings.network.value }
       : { rpcUrl: settings.rpcUrl.value }),
     facilitatorUrl: settings.facilitatorUrl?.value,
+    spend,
   });
 }
 
 export async function withSession<T>(
   settings: Settings,
   use: (client: FourMica) => Promise<T>,
+  /** Limits on what `client.fetch` may pay. */
+  spend?: SpendLimits,
 ): Promise<T> {
-  const client = await connect(settings);
+  // Connecting logs in to core: a second or two with nothing else to show.
+  const client = await waiting(`Connecting to ${networkName(settings)}`, () =>
+    connect(settings, spend),
+  );
   try {
     return await use(client);
   } finally {
