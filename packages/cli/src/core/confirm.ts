@@ -2,6 +2,7 @@ import { createInterface } from "node:readline/promises";
 import { usageError } from "../errors.js";
 import { pc, warn } from "../ui/log.js";
 import { fields } from "../ui/output.js";
+import { canPrompt, runtime } from "./runtime.js";
 import { networkName, type Settings } from "./settings.js";
 
 export interface Summary {
@@ -29,24 +30,34 @@ export async function confirmFunds(
   settings: Settings,
   options: { yes: boolean },
 ): Promise<void> {
-  process.stderr.write(
-    `${pc.bold(summary.action)}\n${fields([
-      ["network", describeNetwork(settings)],
-      ["wallet", summary.address],
-      ...(summary.details ?? []),
-    ])}\n`,
-  );
+  // The one thing --quiet does not hide is a question being asked.
+  if (!(options.yes && runtime.quiet)) {
+    process.stderr.write(
+      `${pc.bold(summary.action)}\n${fields([
+        ["network", describeNetwork(settings)],
+        ["wallet", summary.address],
+        ...(summary.details ?? []),
+      ])}\n`,
+    );
+  }
   if (options.yes) return;
-  if (!process.stdin.isTTY) {
-    throw usageError("confirmation needed, and there is no terminal to ask", {
+  if (!canPrompt()) {
+    throw usageError("confirmation needed, and it cannot be asked for here", {
       code: "CONFIRMATION_REQUIRED",
       suggestions: ["pass --yes to send without asking"],
     });
   }
+  // Real funds take more than a reflexive "y": the network's name, typed.
+  const name = networkName(settings);
+  const mainnet = settings.info?.testnet === false;
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   try {
-    const answer = await rl.question("Send it? [y/N] ");
-    if (!/^y(es)?$/i.test(answer.trim())) {
+    const answer = (
+      await rl.question(
+        mainnet ? `Type ${name} to send it: ` : "Send it? [y/N] ",
+      )
+    ).trim();
+    if (mainnet ? answer !== name : !/^y(es)?$/i.test(answer)) {
       throw usageError("cancelled; nothing was sent", { code: "CANCELLED" });
     }
   } finally {

@@ -100,7 +100,7 @@ Build it, then run the compiled binary:
 
 ```bash
 pnpm --filter @4mica/cli build
-node packages/cli/bin/run.js               # lists the commands
+node packages/cli/bin/run.js --help        # lists the commands
 node packages/cli/bin/run.js init          # interactive prompt flow
 node packages/cli/bin/run.js deposit --help
 ```

@@ -1,14 +1,15 @@
 import { requireAsset } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { previewPendingWithdrawal, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
-import { asset, yes } from "../../flags.js";
+import { asset, dryRun, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
 import { step } from "../../ui/log.js";
 
 export default class WithdrawalsFinalize extends NetworkCommand {
   static summary = "pay out a withdrawal whose grace period has passed";
-  static flags = { asset, yes };
+  static flags = { asset, "dry-run": dryRun, yes };
   static examples = [
     "<%= config.bin %> <%= command.id %> --asset USDC",
     "<%= config.bin %> <%= command.id %> --asset USDC --yes --json",
@@ -20,6 +21,17 @@ export default class WithdrawalsFinalize extends NetworkCommand {
     const name = requireAsset(settings.asset?.value);
 
     return withSession(settings, async (client) => {
+      if (flags["dry-run"]) {
+        const preview = await previewPendingWithdrawal(
+          settings,
+          client,
+          name,
+          "finalize",
+        );
+        this.log(renderPreview(preview));
+        return preview;
+      }
+
       await confirmFunds(
         {
           action: `Finalize the withdrawal of ${name}`,

@@ -60,6 +60,11 @@
       "nonExistentFlag": 2,
       "requiredArgs": 2,
       "unexpectedArgs": 2
+    },
+    "topics": {
+      "guarantees": {
+        "description": "check guarantee receipts"
+      }
     }
   },
   "scripts": {
@@ -81,7 +86,6 @@
     "ora": "catalog:",
     "picocolors": "catalog:",
     "read-pkg": "catalog:",
-    "terminal-link": "catalog:",
     "viem": "catalog:"
   },
   "devDependencies": {

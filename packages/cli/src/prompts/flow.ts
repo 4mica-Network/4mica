@@ -43,9 +43,9 @@ export async function runInitFlow(
     );
     if (!fromScratch) {
       cancel(
-        "No problem — add 4Mica to an existing app with " +
-          "`npm i @4mica/sdk @4mica/sdk-node`, then wrap a route with a " +
-          "paywall. Docs: https://4mica.io/docs",
+        "No problem. In an existing app, `npm i @4mica/x402` to charge for " +
+          "a route, or `npm i @4mica/sdk` to pay for one. " +
+          "Docs: https://docs.4mica.io",
         io,
       );
       process.exit(0);

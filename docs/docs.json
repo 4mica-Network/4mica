@@ -116,6 +116,7 @@
         "group": "SDKs",
         "pages": [
           "sdks/backend",
+          "sdks/cli",
           {
             "group": "TypeScript SDK",
             "pages": [

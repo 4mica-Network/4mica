@@ -1,7 +1,7 @@
-import { DEFAULT_NETWORK, NETWORKS } from "@4mica/sdk/networks";
+import { NETWORKS } from "@4mica/sdk/networks";
 import { describe, expect, it } from "vitest";
 import { EXIT } from "../errors.js";
-import { readEnv, resolveSettings } from "./settings.js";
+import { DEFAULT_TESTNET, readEnv, resolveSettings } from "./settings.js";
 
 const exitOf = (run: () => unknown): number | undefined => {
   try {
@@ -13,13 +13,15 @@ const exitOf = (run: () => unknown): number | undefined => {
 };
 
 describe("resolveSettings", () => {
-  it("falls back to the SDK's default network", () => {
+  it("falls back to a testnet, whatever the SDK's default becomes", () => {
     const settings = resolveSettings({ flags: {}, env: {}, config: {} });
     expect(settings.network).toEqual({
-      value: DEFAULT_NETWORK,
+      value: DEFAULT_TESTNET,
       source: "default",
     });
-    expect(settings.rpcUrl.value).toBe(NETWORKS[DEFAULT_NETWORK].rpcUrl);
+    expect(settings.rpcUrl.value).toBe(NETWORKS[DEFAULT_TESTNET].rpcUrl);
+    // Fails the build if this network is ever dropped or goes live.
+    expect(settings.info?.testnet).toBe(true);
   });
 
   it("takes a flag over env, env over the env file, the file over config", () => {
@@ -100,6 +102,52 @@ describe("resolveSettings", () => {
     expect(settings.sdkEnv).toEqual({
       FOURMICA_WALLET_PRIVATE_KEY: "0xabc",
       FOURMICA_AUTH_URL: "x",
+    });
+  });
+
+  describe("wallet key", () => {
+    const keyFile = (source: "flag" | "config") => ({
+      path: "/keys/wallet",
+      source,
+      key: "0xfile",
+    });
+    const env = { FOURMICA_WALLET_PRIVATE_KEY: "0xenv" };
+
+    it("prefers --key-file to the environment", () => {
+      const settings = resolveSettings({
+        flags: {},
+        env,
+        keyFile: keyFile("flag"),
+        config: {},
+      });
+      expect(settings.key).toEqual({ source: "flag", file: "/keys/wallet" });
+      expect(settings.sdkEnv.FOURMICA_WALLET_PRIVATE_KEY).toBe("0xfile");
+    });
+
+    it("uses the config file's key file only when nothing else has a key", () => {
+      const fromConfig = keyFile("config");
+      expect(
+        resolveSettings({ flags: {}, env, keyFile: fromConfig, config: {} })
+          .sdkEnv.FOURMICA_WALLET_PRIVATE_KEY,
+      ).toBe("0xenv");
+      expect(
+        resolveSettings({ flags: {}, env: {}, keyFile: fromConfig, config: {} })
+          .key,
+      ).toEqual({ source: "config", file: "/keys/wallet" });
+    });
+
+    it("says which env file a key came from", () => {
+      const settings = resolveSettings({
+        flags: {},
+        env: {},
+        envFile: { FOURMICA_WALLET_PRIVATE_KEY: "0xdotenv" },
+        envFilePath: "/project/.env",
+        config: {},
+      });
+      expect(settings.key).toEqual({
+        source: "env-file",
+        file: "/project/.env",
+      });
     });
   });
 

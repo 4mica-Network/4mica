@@ -38,6 +38,24 @@ describe("deposit", () => {
     expect(client.deposit).not.toHaveBeenCalled();
   });
 
+  it("does not ask with --no-input, even where it could", async () => {
+    const tty = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    const { error } = await runCommand(Deposit, [
+      "5",
+      "--asset",
+      "USDC",
+      "--no-input",
+    ]);
+    if (tty) Object.defineProperty(process.stdin, "isTTY", tty);
+    else Reflect.deleteProperty(process.stdin, "isTTY");
+    expect(error).toMatchObject({ code: "CONFIRMATION_REQUIRED" });
+    expect(client.deposit).not.toHaveBeenCalled();
+  });
+
   it("rejects a bad amount before connecting or confirming", async () => {
     const { error } = await runCommand(Deposit, ["5", "--yes"]);
     expect(error).toMatchObject({ code: "NO_ASSET" });

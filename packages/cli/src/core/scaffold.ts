@@ -1,15 +1,16 @@
 import { access } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
-import terminalLink from "terminal-link";
 import { failure, usageError } from "../errors.js";
 import { type PartialInit, runInitFlow } from "../prompts/flow.js";
 import type { InitOptions } from "../types.js";
-import { brand, dim, ok, pc, step, warn } from "../ui/log.js";
+import { brand, ok, pc, step } from "../ui/log.js";
 import { resolveRunContext } from "./context.js";
 import { copyTemplate } from "./copy-engine.js";
+import { fundingSteps, renderSteps, type Step } from "./next-steps.js";
 import { detectPackageManager } from "./package-manager.js";
 import { gitInit, install } from "./runner.js";
+import { runtime } from "./runtime.js";
 import { resolveTemplate } from "./template-registry.js";
 
 // stdout is kept for the command's result.
@@ -24,6 +25,8 @@ export interface Scaffolded {
   installed: boolean;
   /** package.json script that starts the project. */
   runScript: string;
+  /** What is done and what is left, down to taking the project live. */
+  nextSteps: Step[];
   options: InitOptions;
 }
 
@@ -41,8 +44,12 @@ function isInside(child: string, parent: string): boolean {
   return !rel.startsWith("..") && !isAbsolute(rel);
 }
 
-export async function scaffold(flags: PartialInit): Promise<Scaffolded> {
-  intro(brand("4mica"), io);
+export async function scaffold(
+  flags: PartialInit,
+  /** Whether the cli already has a wallet to offer the project. */
+  hasWallet = false,
+): Promise<Scaffolded> {
+  if (!runtime.quiet) intro(brand("4mica"), io);
 
   const context = await resolveRunContext();
   const defaultPm = await detectPackageManager(
@@ -96,8 +103,11 @@ export async function scaffold(flags: PartialInit): Promise<Scaffolded> {
     );
   }
 
-  printNextSteps(opts, template.runScript);
-  outro(ok("Done — happy building!"), io);
+  const nextSteps = stepsAfter(opts, template.runScript, hasWallet);
+  if (!runtime.quiet) {
+    note(renderSteps(nextSteps), "Next steps", io);
+    outro(ok("Done — happy building!"), io);
+  }
 
   return {
     dir: targetDir,
@@ -106,20 +116,48 @@ export async function scaffold(flags: PartialInit): Promise<Scaffolded> {
     packageManager: opts.packageManager,
     installed: opts.install,
     runScript: template.runScript,
+    nextSteps,
     options: opts,
   };
 }
 
-function printNextSteps(
-  opts: { dir: string; packageManager: string; install: boolean },
+/**
+ * The project runs in demo mode as it is. The rest of the list is what a
+ * real payment needs: a wallet, and for the side that pays, collateral.
+ */
+function stepsAfter(
+  opts: InitOptions,
   script: string,
-): void {
-  const docs = terminalLink("4mica.io/docs", "https://4mica.io/docs");
-  const lines = [`cd ${opts.dir}`];
-  if (!opts.install) lines.push(`${opts.packageManager} install`);
-  lines.push(`${opts.packageManager} run ${script}`);
-  lines.push("");
-  lines.push(`${dim("Demo mode needs no config. Going live?")} ${docs}`);
-  lines.push(`${dim("Env template:")} ${warn(join(opts.dir, ".env.example"))}`);
-  note(lines.join("\n"), "Next steps", io);
+  hasWallet: boolean,
+): Step[] {
+  const { dir, packageManager: pm } = opts;
+  const pays =
+    opts.type === "buyer" ||
+    (opts.type === "agent" && opts.agentRole === "buyer");
+  return [
+    { done: true, step: "project created", command: dir },
+    {
+      done: opts.install,
+      step: opts.install ? "dependencies installed" : "install dependencies",
+      command: opts.install ? undefined : `cd ${dir} && ${pm} install`,
+    },
+    {
+      done: false,
+      step: "run it in demo mode",
+      command: `cd ${dir} && ${pm} run ${script}`,
+    },
+    {
+      done: hasWallet,
+      step: pays ? "wallet to pay from" : "wallet to be paid at",
+      command: hasWallet ? "4mica whoami" : "4mica wallets create",
+    },
+    ...(pays ? fundingSteps() : []),
+    {
+      done: false,
+      step: "take the project live",
+      command: pays
+        ? `set FOURMICA_WALLET_PRIVATE_KEY in ${join(dir, ".env")}`
+        : `set PAY_TO in ${join(dir, ".env")}`,
+    },
+  ];
 }

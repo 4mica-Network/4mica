@@ -12,6 +12,7 @@ vi.mock("../core/scaffold.js", () => ({
     packageManager: init.packageManager,
     installed: init.install,
     runScript: "dev",
+    nextSteps: [{ done: true, step: "project created", command: "project" }],
     options: init,
   })),
 }));
@@ -35,16 +36,19 @@ describe("init without a terminal", () => {
 
   it("fills every other answer with its default", async () => {
     await runCommand(Init, ["--template", "agent-buyer-node"]);
-    expect(scaffold).toHaveBeenCalledWith({
-      type: "agent",
-      agentRole: "buyer",
-      framework: "express",
-      name: "my-buyer-agent",
-      packageManager: "pnpm",
-      install: true,
-      run: false,
-      openDashboard: false,
-    });
+    expect(scaffold).toHaveBeenCalledWith(
+      {
+        type: "agent",
+        agentRole: "buyer",
+        framework: "express",
+        name: "my-buyer-agent",
+        packageManager: "pnpm",
+        install: true,
+        run: false,
+        openDashboard: false,
+      },
+      false,
+    );
   });
 
   it("scaffolds the default template with --yes", async () => {
@@ -58,6 +62,7 @@ describe("init without a terminal", () => {
         packageManager: "npm",
         install: false,
       }),
+      false,
     );
   });
 
@@ -65,6 +70,7 @@ describe("init without a terminal", () => {
     await runCommand(Init, ["--type", "seller", "--framework", "express"]);
     expect(scaffold).toHaveBeenCalledWith(
       expect.objectContaining({ type: "seller", name: "my-seller-express" }),
+      false,
     );
   });
 
@@ -81,6 +87,7 @@ describe("init without a terminal", () => {
       packageManager: "pnpm",
       installed: true,
       runScript: "dev",
+      nextSteps: [{ done: true, step: "project created", command: "project" }],
     });
   });
 });

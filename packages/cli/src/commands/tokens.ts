@@ -1,5 +1,6 @@
 import { networkName } from "../core/settings.js";
 import { NetworkCommand } from "../network-command.js";
+import { waiting } from "../ui/log.js";
 import { table } from "../ui/output.js";
 
 export default class Tokens extends NetworkCommand {
@@ -15,9 +16,10 @@ export default class Tokens extends NetworkCommand {
     const { flags } = await this.parse(Tokens);
     const settings = await this.settings(flags);
     const { RpcProxy } = await import("@4mica/sdk");
-    const { chainId, tokens } = await new RpcProxy(
-      settings.rpcUrl.value,
-    ).getSupportedTokens();
+    const { chainId, tokens } = await waiting(
+      `Asking ${networkName(settings)} for its tokens`,
+      () => new RpcProxy(settings.rpcUrl.value).getSupportedTokens(),
+    );
     this.log(
       table(
         ["SYMBOL", "ADDRESS", "DECIMALS"],

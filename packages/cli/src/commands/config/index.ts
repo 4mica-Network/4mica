@@ -1,5 +1,5 @@
 import { configPath } from "../../core/config-file.js";
-import type { Resolved } from "../../core/settings.js";
+import { origin, type Resolved } from "../../core/settings.js";
 import { NetworkCommand } from "../../network-command.js";
 import { table } from "../../ui/output.js";
 
@@ -23,11 +23,15 @@ export default class Config extends NetworkCommand {
       "rpc-url": settings.rpcUrl,
       "facilitator-url": settings.facilitatorUrl,
       asset: settings.asset,
+      "key-file":
+        settings.key?.source === "flag" || settings.key?.source === "config"
+          ? { value: settings.key.file as string, source: settings.key.source }
+          : undefined,
     };
     const row = (key: string, setting?: Resolved) => [
       key,
       setting?.value ?? "-",
-      setting?.source ?? "-",
+      setting ? origin(settings, setting) : "-",
     ];
     this.log(
       table(
@@ -38,7 +42,9 @@ export default class Config extends NetworkCommand {
           [
             "wallet-key",
             settings.key ? "set" : "-",
-            settings.key?.source ?? "-",
+            (settings.key?.source === "env-file"
+              ? settings.key.file
+              : settings.key?.source) ?? "-",
           ],
         ],
       ),
@@ -46,7 +52,7 @@ export default class Config extends NetworkCommand {
     return {
       file: configPath(this.config.configDir),
       settings: effective,
-      walletKey: { set: Boolean(settings.key), source: settings.key?.source },
+      walletKey: { set: Boolean(settings.key), ...settings.key },
     };
   }
 }
