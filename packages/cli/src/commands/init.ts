@@ -1,105 +1,132 @@
-import { access } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
-import { intro, note, outro } from "@clack/prompts";
-import terminalLink from "terminal-link";
-import { resolveRunContext } from "../core/context.js";
-import { copyTemplate } from "../core/copy-engine.js";
-import { detectPackageManager } from "../core/package-manager.js";
-import { gitInit, install, runScript } from "../core/runner.js";
-import { resolveTemplate } from "../core/template-registry.js";
-import { type PartialInit, runInitFlow } from "../prompts/flow.js";
-import { brand, dim, ok, pc, step, warn } from "../ui/log.js";
-import { launchDashboard } from "./dashboard.js";
+import { Args, Flags } from "@oclif/core";
+import { BaseCommand } from "../base.js";
+import { DASHBOARD_URL } from "../core/dashboard.js";
+import { openBrowser, runScript } from "../core/runner.js";
+import { scaffold } from "../core/scaffold.js";
+import { usageError } from "../errors.js";
+import type { PartialInit } from "../prompts/flow.js";
+import type {
+  AgentRole,
+  BuildType,
+  Framework,
+  PackageManager,
+} from "../types.js";
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** Template id → what the scaffolder calls it. */
+export const TEMPLATES: Record<string, PartialInit> = {
+  "agent-seller-express": { type: "agent", agentRole: "seller" },
+  "agent-buyer-node": { type: "agent", agentRole: "buyer" },
+  "seller-express": { type: "seller", framework: "express" },
+  "buyer-express": { type: "buyer", framework: "express" },
+};
+const DEFAULT_TEMPLATE = "agent-seller-express";
 
-function isInside(child: string, parent: string): boolean {
-  const rel = relative(parent, child);
-  return !rel.startsWith("..") && !isAbsolute(rel);
-}
+const replaced = { deprecated: { to: "template" }, hidden: true };
 
-export async function initCommand(flags: PartialInit): Promise<void> {
-  intro(brand("4mica"));
-
-  const context = await resolveRunContext();
-  const defaultPm = await detectPackageManager(
-    process.cwd(),
-    flags.packageManager,
-  );
-  const opts = await runInitFlow(flags, defaultPm);
-
-  const template = resolveTemplate(opts);
-  const templateDir = join(context.templatesDir, template.dir);
-  const targetDir = resolve(process.cwd(), opts.dir);
-
-  if (!(await exists(templateDir))) {
-    throw new Error(`Template not found: ${template.dir}`);
-  }
-  if (await exists(targetDir)) {
-    throw new Error(
-      `Directory already exists: ${opts.dir} — choose another name.`,
-    );
-  }
-
-  const keepWorkspace =
-    context.inMonorepo &&
-    context.monorepoRoot !== undefined &&
-    isInside(targetDir, context.monorepoRoot);
-
-  await step(`Scaffolding ${pc.bold(opts.name)}`, () =>
-    copyTemplate({
-      templateDir,
-      targetDir,
-      tokens: {
-        PROJECT_NAME: opts.name,
-        DESCRIPTION: template.description,
-        PORT: String(template.port),
-        TMPFILE: template.tmpfile,
-      },
-      keepWorkspace,
+export default class Init extends BaseCommand {
+  static summary = "scaffold a new agent or payment app";
+  static description =
+    "Asks for whatever is not given as a flag. Without a terminal it never " +
+    "asks: --template is then required, everything else takes its default, " +
+    "and the project is started only with --run. Projects run in demo mode " +
+    "and need no credentials.";
+  static args = {
+    dir: Args.string({ description: "target directory; defaults to the name" }),
+  };
+  static flags = {
+    template: Flags.string({
+      char: "t",
+      exclusive: ["type", "role", "framework"],
+      options: Object.keys(TEMPLATES),
+      summary: "what to scaffold",
     }),
-  );
+    name: Flags.string({ summary: "project name" }),
+    pm: Flags.string({
+      options: ["pnpm", "npm", "yarn", "bun"],
+      summary: "package manager to install with",
+    }),
+    install: Flags.boolean({
+      allowNo: true,
+      default: true,
+      summary: "install dependencies",
+    }),
+    run: Flags.boolean({
+      allowNo: true,
+      exclusive: ["json"],
+      summary: "start the project once it is scaffolded; asked when not given",
+    }),
+    dashboard: Flags.boolean({
+      allowNo: true,
+      summary: "open the dashboard afterwards",
+    }),
+    yes: Flags.boolean({
+      char: "y",
+      summary: "accept the defaults without asking",
+    }),
+    type: Flags.string({ ...replaced, options: ["agent", "seller", "buyer"] }),
+    role: Flags.string({ ...replaced, options: ["seller", "buyer"] }),
+    framework: Flags.string({ ...replaced, options: ["express"] }),
+  };
+  static examples = [
+    "<%= config.bin %> <%= command.id %>",
+    "<%= config.bin %> <%= command.id %> my-api --template seller-express --pm pnpm",
+    "<%= config.bin %> <%= command.id %> --template agent-buyer-node --yes --json",
+  ];
 
-  await gitInit(targetDir);
+  async run() {
+    const { args, flags } = await this.parse(Init);
 
-  if (opts.install) {
-    await step(
-      `Installing dependencies with ${opts.packageManager}`,
-      () => install(opts.packageManager, targetDir),
-      "Dependencies installed",
-    );
+    const init: PartialInit = flags.template
+      ? { ...TEMPLATES[flags.template] }
+      : {};
+    if (flags.type) init.type = flags.type as BuildType;
+    if (flags.role) init.agentRole = flags.role as AgentRole;
+    if (flags.framework) init.framework = flags.framework as Framework;
+    if (args.dir) init.dir = args.dir;
+    if (flags.name) init.name = flags.name;
+    if (flags.pm) init.packageManager = flags.pm as PackageManager;
+    init.install = flags.install;
+    if (flags.run !== undefined) init.run = flags.run;
+    if (flags.dashboard !== undefined) init.openDashboard = flags.dashboard;
+
+    const canAsk =
+      process.stdin.isTTY === true && !flags.yes && !this.jsonEnabled();
+    if (!canAsk) {
+      if (!init.type && !flags.yes) {
+        throw usageError("nothing to ask with: --template is required here", {
+          code: "TEMPLATE_REQUIRED",
+          suggestions: [
+            `pass --template, one of: ${Object.keys(TEMPLATES).join(", ")}`,
+            `or --yes to scaffold ${DEFAULT_TEMPLATE}`,
+          ],
+        });
+      }
+      const filled = { ...TEMPLATES[DEFAULT_TEMPLATE], ...init };
+      filled.agentRole ??= "seller";
+      filled.framework ??= "express";
+      filled.packageManager ??= "pnpm";
+      filled.openDashboard ??= false;
+      filled.run ??= false;
+      filled.name ??=
+        filled.type === "agent"
+          ? `my-${filled.agentRole}-agent`
+          : `my-${filled.type}-${filled.framework}`;
+      Object.assign(init, filled);
+    }
+
+    const project = await scaffold(init);
+
+    // Before the dev server, which blocks.
+    if (project.options.openDashboard) await openBrowser(DASHBOARD_URL);
+    if (project.installed && project.options.run) {
+      await runScript(
+        project.options.packageManager,
+        project.runScript,
+        project.dir,
+      );
+    }
+
+    const { options: _, ...result } = project;
+    return result;
   }
-
-  printNextSteps(opts, template.runScript);
-  outro(ok("Done — happy building!"));
-
-  // Launch the dashboard detached BEFORE the (blocking) dev server.
-  if (opts.openDashboard) {
-    await launchDashboard({ open: true, background: true });
-  }
-
-  if (opts.install && opts.run) {
-    await runScript(opts.packageManager, template.runScript, targetDir);
-  }
-}
-
-function printNextSteps(
-  opts: { dir: string; packageManager: string; install: boolean },
-  script: string,
-): void {
-  const docs = terminalLink("4mica.io/docs", "https://4mica.io/docs");
-  const lines = [`cd ${opts.dir}`];
-  if (!opts.install) lines.push(`${opts.packageManager} install`);
-  lines.push(`${opts.packageManager} run ${script}`);
-  lines.push("");
-  lines.push(`${dim("Demo mode needs no config. Going live?")} ${docs}`);
-  lines.push(`${dim("Env template:")} ${warn(join(opts.dir, ".env.example"))}`);
-  note(lines.join("\n"), "Next steps");
 }

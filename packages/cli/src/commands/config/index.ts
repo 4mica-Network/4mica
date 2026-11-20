@@ -1,0 +1,52 @@
+import { configPath } from "../../core/config-file.js";
+import type { Resolved } from "../../core/settings.js";
+import { NetworkCommand } from "../../network-command.js";
+import { table } from "../../ui/output.js";
+
+export default class Config extends NetworkCommand {
+  static summary = "show the settings in effect and where each comes from";
+  static description =
+    "A setting is taken from the first of these that has it: a flag, an " +
+    "environment variable, the file given by --env-file, the config file, " +
+    "the built-in default.";
+  static examples = [
+    "<%= config.bin %> <%= command.id %>",
+    "<%= config.bin %> <%= command.id %> set network base",
+    "<%= config.bin %> <%= command.id %> set asset USDC",
+  ];
+
+  async run() {
+    const { flags } = await this.parse(Config);
+    const settings = await this.settings(flags);
+    const effective: Record<string, Resolved | undefined> = {
+      network: settings.network,
+      "rpc-url": settings.rpcUrl,
+      "facilitator-url": settings.facilitatorUrl,
+      asset: settings.asset,
+    };
+    const row = (key: string, setting?: Resolved) => [
+      key,
+      setting?.value ?? "-",
+      setting?.source ?? "-",
+    ];
+    this.log(
+      table(
+        ["SETTING", "VALUE", "FROM"],
+        [
+          ...Object.entries(effective).map(([key, s]) => row(key, s)),
+          // Whether it is set, never what it is.
+          [
+            "wallet-key",
+            settings.key ? "set" : "-",
+            settings.key?.source ?? "-",
+          ],
+        ],
+      ),
+    );
+    return {
+      file: configPath(this.config.configDir),
+      settings: effective,
+      walletKey: { set: Boolean(settings.key), source: settings.key?.source },
+    };
+  }
+}

@@ -43,7 +43,7 @@ This is a pnpm + Turbo monorepo.
 │   └── dashboard            # Vite + React dashboard (manage agents, txns, whitelist)
 ├── packages
 │   ├── sdk                  # @4mica/sdk — universal x402 payment SDK
-│   ├── cli                  # @4mica/cli — the `4mica` scaffolding CLI
+│   ├── cli                  # @4mica/cli — the `4mica` CLI: scaffolding and wallet commands
 │   ├── ui                   # @4mica/ui — shared React component library
 │   ├── tailwind-config      # Shared Tailwind v4 preset + tokens
 │   ├── tsconfig             # Shared TypeScript configs
@@ -100,18 +100,25 @@ Build it, then run the compiled binary:
 
 ```bash
 pnpm --filter @4mica/cli build
-node packages/cli/dist/index.js            # interactive prompt flow
-node packages/cli/dist/index.js --help
+node packages/cli/bin/run.js               # lists the commands
+node packages/cli/bin/run.js init          # interactive prompt flow
+node packages/cli/bin/run.js deposit --help
 ```
 
 Or link it globally so you can use the real `4mica` command:
 
 ```bash
 cd packages/cli && pnpm link --global
-4mica                                       # interactive
-4mica init my-app --type seller --framework express --yes --no-install
+4mica init                                  # interactive
+4mica init my-app --template seller-express --yes --no-install
 # later: pnpm uninstall --global @4mica/cli
 ```
+
+The CLI is built on [oclif](https://oclif.io). Each file under
+`src/commands` is one command, and a folder is a topic
+(`src/commands/withdrawals/request.ts` is `4mica withdrawals request`).
+Commands that talk to a network extend `NetworkCommand`; they import
+`@4mica/sdk` inside `run()`, so `--help` and `init` never load viem.
 
 If you change CLI source, rebuild (`pnpm --filter @4mica/cli build`). The build
 regenerates `snapshot.json` (the frozen catalog + `@4mica/*` versions used to
@@ -125,14 +132,14 @@ scaffold **inside the repo** so `workspace:*` links the local packages:
 
 ```bash
 # Seller (terminal 1)
-node packages/cli/dist/index.js init examples/tmp-seller \
-  --type seller --framework express --no-install --no-run
+node packages/cli/bin/run.js init examples/tmp-seller \
+  --template seller-express --no-install
 pnpm install
 pnpm --filter tmp-seller dev
 
 # Buyer (terminal 2)
-node packages/cli/dist/index.js init examples/tmp-buyer \
-  --type buyer --framework express --no-install --no-run
+node packages/cli/bin/run.js init examples/tmp-buyer \
+  --template buyer-express --no-install
 pnpm install
 pnpm --filter tmp-buyer start
 ```
@@ -146,7 +153,7 @@ folders and running `pnpm install` again.
 ```bash
 pnpm --filter @4mica/dashboard dev          # → http://localhost:4173
 # or, via the CLI:
-node packages/cli/dist/index.js dashboard
+node packages/cli/bin/run.js dashboard --local
 ```
 
 The dashboard runs in **Sandbox mode** on in-memory mock data (no backend

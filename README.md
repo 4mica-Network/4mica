@@ -43,7 +43,7 @@ The site currently includes:
 │   └── dashboard           # Vite + React dashboard (agents, transactions, whitelist)
 ├── packages
 │   ├── sdk                 # @4mica/sdk — universal x402 payment SDK
-│   ├── cli                 # @4mica/cli — the `4mica` scaffolding CLI
+│   ├── cli                 # @4mica/cli — the `4mica` CLI: scaffolding and wallet commands
 │   ├── ui                  # Shared React component library
 │   ├── tailwind-config     # Shared Tailwind v4 preset and tokens
 │   ├── tsconfig            # Shared TypeScript configs

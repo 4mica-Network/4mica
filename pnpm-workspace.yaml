@@ -40,6 +40,7 @@ catalog:
   '@hookform/resolvers': ^5.2.2
   '@modelcontextprotocol/sdk': ^1.30.0
   '@noble/curves': ^2.2.0
+  '@oclif/core': ^5.1.12
   '@playwright/test': ^1.64.1
   '@prisma/adapter-pg': 7.9.1
   '@prisma/client': 7.9.1
