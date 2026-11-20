@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { packageRoot } from "./package-root.js";
 
 interface Snapshot {
   catalog: Record<string, string>;
@@ -12,9 +12,8 @@ let cache: Snapshot | null = null;
 
 async function loadSnapshot(): Promise<Snapshot> {
   if (cache) return cache;
-  const here = dirname(fileURLToPath(import.meta.url));
-  // dist/index.js → package root holds snapshot.json (shipped in "files").
-  const path = join(here, "..", "snapshot.json");
+  // Shipped in "files", next to dist/.
+  const path = join(packageRoot, "snapshot.json");
   try {
     cache = JSON.parse(await readFile(path, "utf8")) as Snapshot;
   } catch {

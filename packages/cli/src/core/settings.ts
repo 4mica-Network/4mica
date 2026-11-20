@@ -1,0 +1,148 @@
+import { readFile } from "node:fs/promises";
+import { parseEnv } from "node:util";
+import {
+  DEFAULT_NETWORK,
+  NETWORKS,
+  type NetworkInfo,
+  resolveNetwork,
+} from "@4mica/sdk/networks";
+import { configError, usageError } from "../errors.js";
+import type { ConfigFile } from "./config-file.js";
+
+/** In the order they win. */
+export type Source = "flag" | "env" | "env-file" | "config" | "default";
+
+export interface Resolved {
+  value: string;
+  source: Source;
+}
+
+export type Env = Record<string, string | undefined>;
+
+export interface SettingsInput {
+  flags: { network?: string; "rpc-url"?: string; asset?: string };
+  env: Env;
+  envFile?: Env;
+  config: ConfigFile;
+}
+
+export interface Settings {
+  /** Shorthand of a hosted network; unset for a core given by URL. */
+  network?: Resolved;
+  info?: NetworkInfo;
+  rpcUrl: Resolved;
+  facilitatorUrl?: Resolved;
+  asset?: Resolved;
+  /** Where the wallet key came from; the key itself stays in `sdkEnv`. */
+  key?: { source: Source };
+  /** Every `FOURMICA_*` variable in effect, for `FourMica.connect({ env })`. */
+  sdkEnv: Record<string, string>;
+}
+
+// A shell cannot export a name starting with a digit; the scaffolded `.env`
+// files still use the `4MICA_` spelling.
+const PREFIXES = ["FOURMICA_", "4MICA_"] as const;
+
+export function readEnv(env: Env, name: string): string | undefined {
+  const [preferred, legacy] = PREFIXES.map((prefix) => env[prefix + name]);
+  if (preferred && legacy && preferred !== legacy) {
+    throw configError(
+      `FOURMICA_${name} and 4MICA_${name} are both set, to different values`,
+      { code: "CONFLICTING_ENV", suggestions: ["unset one of them"] },
+    );
+  }
+  return preferred || legacy || undefined;
+}
+
+export async function loadEnvFile(path: string): Promise<Env> {
+  return parseEnv(await readFile(path, "utf8"));
+}
+
+function names(env: Env): string[] {
+  return Object.keys(env).flatMap((key) => {
+    const prefix = PREFIXES.find((p) => key.startsWith(p));
+    return prefix ? [key.slice(prefix.length)] : [];
+  });
+}
+
+function unknownNetwork(value: string, source: Source) {
+  const make = source === "flag" ? usageError : configError;
+  return make(`unknown network "${value}"`, {
+    code: "UNKNOWN_NETWORK",
+    suggestions: [`use one of: ${Object.keys(NETWORKS).join(", ")}`],
+  });
+}
+
+export function resolveSettings(input: SettingsInput): Settings {
+  const { flags, env, envFile = {}, config } = input;
+
+  const fromEnv = (name: string): Resolved | undefined => {
+    const value = readEnv(env, name);
+    if (value) return { value, source: "env" };
+    const filed = readEnv(envFile, name);
+    return filed ? { value: filed, source: "env-file" } : undefined;
+  };
+  const at = (value: string | undefined, source: Source) =>
+    value ? { value, source } : undefined;
+
+  // Within one source a network name beats a URL, as in the SDK.
+  const levels: [Resolved | undefined, Resolved | undefined][] = [
+    [at(flags.network, "flag"), at(flags["rpc-url"], "flag")],
+    [at(readEnv(env, "NETWORK"), "env"), at(readEnv(env, "RPC_URL"), "env")],
+    [
+      at(readEnv(envFile, "NETWORK"), "env-file"),
+      at(readEnv(envFile, "RPC_URL"), "env-file"),
+    ],
+    [at(config.network, "config"), at(config["rpc-url"], "config")],
+    [at(DEFAULT_NETWORK, "default"), undefined],
+  ];
+  const [network, url] = levels.find(([n, u]) => n ?? u) ?? [];
+
+  let settings: Pick<Settings, "network" | "info" | "rpcUrl">;
+  if (network) {
+    const hosted = resolveNetwork(network.value);
+    if (!hosted) throw unknownNetwork(network.value, network.source);
+    settings = {
+      network: { value: hosted.name, source: network.source },
+      info: hosted.info,
+      rpcUrl: { value: hosted.info.rpcUrl, source: network.source },
+    };
+  } else {
+    const custom = url as Resolved;
+    if (!URL.canParse(custom.value)) {
+      const make = custom.source === "flag" ? usageError : configError;
+      throw make(`the core URL "${custom.value}" is not a URL`, {
+        code: "BAD_RPC_URL",
+      });
+    }
+    settings = { rpcUrl: custom };
+  }
+
+  const hostedFacilitator = settings.info?.facilitatorUrl;
+  const facilitatorUrl =
+    fromEnv("FACILITATOR_URL") ??
+    at(config["facilitator-url"], "config") ??
+    at(hostedFacilitator, "default");
+
+  const sdkEnv: Record<string, string> = {};
+  for (const name of new Set([...names(env), ...names(envFile)])) {
+    const resolved = fromEnv(name);
+    if (resolved) sdkEnv[`FOURMICA_${name}`] = resolved.value;
+  }
+  // Passed to the SDK explicitly, so flags and the config file can win.
+  delete sdkEnv.FOURMICA_NETWORK;
+  delete sdkEnv.FOURMICA_RPC_URL;
+
+  const key = fromEnv("WALLET_PRIVATE_KEY");
+  return {
+    ...settings,
+    facilitatorUrl,
+    asset: at(flags.asset, "flag") ?? at(config.asset, "config"),
+    key: key && { source: key.source },
+    sdkEnv,
+  };
+}
+
+/** `"base-sepolia"`, or the URL of a core given directly. */
+export const networkName = (settings: Settings): string =>
+  settings.network?.value ?? settings.rpcUrl.value;

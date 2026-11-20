@@ -17,7 +17,10 @@ export function spinner(text: string): Ora {
   return ora({ text, color: "cyan" }).start();
 }
 
-/** Run an async step under a spinner, succeeding/failing with house colors. */
+/**
+ * Run an async step under a spinner. A failure only marks the step: the
+ * error is rethrown for the command to report once, with its code.
+ */
 export async function step<T>(
   text: string,
   fn: () => Promise<T>,
@@ -29,7 +32,7 @@ export async function step<T>(
     s.succeed(ok(doneText ?? text));
     return result;
   } catch (error) {
-    s.fail(err(`${text} — ${(error as Error).message}`));
+    s.fail(err(text));
     throw error;
   }
 }
