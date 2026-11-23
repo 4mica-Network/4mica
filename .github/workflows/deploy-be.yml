@@ -65,6 +65,9 @@ jobs:
             # unset to disable sending rather than fail boot.
             EMAIL_SERVICE_URL=${{ vars.EMAIL_SERVICE_URL }}
 
+            PLAYGROUND_URL=${{ vars.PLAYGROUND_URL }}
+            REVALIDATE_SECRET=${{ secrets.REVALIDATE_SECRET }}
+
             PUBLIC_API_URL=${{ vars.PUBLIC_API_URL }}
             APP_URL=${{ vars.APP_URL }}
 

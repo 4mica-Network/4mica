@@ -1,7 +1,6 @@
 import type { ResourceDescriptor } from "@/lib/descriptor";
 
-const PUBLIC_CACHE =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+export const DESCRIPTOR_PUBLIC_CACHE = "public, max-age=0, must-revalidate";
 const PRIVATE_CACHE = "private, no-store";
 
 export const descriptorResponse = (
@@ -11,7 +10,7 @@ export const descriptorResponse = (
   Response.json(descriptor, {
     headers: {
       "access-control-allow-origin": "*",
-      "cache-control": indexable ? PUBLIC_CACHE : PRIVATE_CACHE,
+      "cache-control": indexable ? DESCRIPTOR_PUBLIC_CACHE : PRIVATE_CACHE,
       "x-robots-tag": indexable ? "all" : "noindex",
     },
   });

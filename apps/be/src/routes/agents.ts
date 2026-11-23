@@ -8,6 +8,7 @@ import {
   unpublishAgentHandler,
   updateAgentHandler,
 } from "@controllers/agents/index";
+import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
@@ -54,6 +55,8 @@ const listQuerySchema = {
 
 export const agentRoutes: FastifyPluginCallback = (app, _opts, done) => {
   const base = guards(app);
+
+  app.addHook("onResponse", revalidateOnWrite);
 
   const strict = {
     onRequest: base.onRequest,
