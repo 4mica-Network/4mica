@@ -1,9 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
+import * as v from "valibot";
 import { profileTag } from "@/actions/shared";
-import { serverEnv } from "@/env";
+import { serverEnv } from "@/env.server";
 import { parseUsername } from "@/schema/params";
+import { RevalidateBodySchema } from "@/schema/revalidate";
+import { ownerTag, resourceTag } from "@/services/cache";
+import { prisma } from "@/services/db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +21,7 @@ export async function POST(request: NextRequest) {
   const { REVALIDATE_SECRET } = serverEnv();
 
   if (!REVALIDATE_SECRET) {
-    return NextResponse.json({ error: "not_configured" }, { status: 404 });
+    return new NextResponse(null, { status: 404 });
   }
 
   const header = request.headers.get("authorization") ?? "";
@@ -27,17 +31,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
-  const username = parseUsername(
-    (body as { username?: unknown } | null)?.username,
+  const parsed = v.safeParse(
+    RevalidateBodySchema,
+    await request.json().catch(() => null),
   );
 
-  if (!username) {
-    return NextResponse.json({ error: "invalid_username" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  revalidateTag(profileTag(username), "max");
-  revalidatePath(`/${username}`, "layout");
+  const { ownerId, resources = [] } = parsed.output;
+  const username = parseUsername(parsed.output.username);
+  const usernames = (parsed.output.usernames ?? [])
+    .map(parseUsername)
+    .filter((handle): handle is string => handle !== null);
 
-  return NextResponse.json({ revalidated: true, username });
+  if (!ownerId && !username && usernames.length === 0) {
+    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+  }
+
+  const owner = ownerId
+    ? await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, username: true },
+      })
+    : username
+      ? await prisma.user.findUnique({
+          where: { username },
+          select: { id: true, username: true },
+        })
+      : null;
+
+  const staleOwnerId = ownerId ?? owner?.id;
+  const handles = new Set(
+    [username, ...usernames, owner?.username].filter(
+      (handle): handle is string => Boolean(handle),
+    ),
+  );
+
+  if (staleOwnerId) {
+    revalidateTag(ownerTag(staleOwnerId), { expire: 0 });
+  }
+
+  for (const handle of handles) {
+    revalidateTag(profileTag(handle), { expire: 0 });
+    revalidatePath(`/${handle}`, "layout");
+  }
+
+  for (const { kind, id } of resources) {
+    revalidateTag(resourceTag(kind, id), { expire: 0 });
+  }
+
+  return NextResponse.json({ revalidated: true, usernames: [...handles] });
 }

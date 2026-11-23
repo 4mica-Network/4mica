@@ -1,14 +1,16 @@
 "use client";
 
 import { cn } from "@4mica/ui";
+import { writeClipboard } from "@4mica/ui/hooks";
 import {
   AnimatePresence,
-  motion,
+  m,
   type Transition,
   useReducedMotion,
 } from "framer-motion";
 import { Check } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
+import { CopyToast } from "@/components/CopyToast";
 
 const RESET_MS = 1600;
 
@@ -32,12 +34,7 @@ export const copyText = async (
   value: string,
   note: string,
 ): Promise<string | null> => {
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    return null;
-  }
-  return note;
+  return (await writeClipboard(value)) ? note : null;
 };
 
 export function ActionGroup({
@@ -92,7 +89,7 @@ export function ActionGroup({
       className={cn(
         "m-0 inline-flex min-w-0 items-center gap-0.5",
         md
-          ? "rounded-xl border border-overlay/10 bg-overlay/4 p-1"
+          ? "rounded-xl border border-overlay/10 bg-overlay/4 p-1 max-md:border-0 max-md:bg-transparent max-md:p-0"
           : "rounded-md border border-overlay/6 p-0.5",
         className,
       )}
@@ -102,14 +99,16 @@ export function ActionGroup({
         const isDone = done?.id === id;
 
         return (
-          <motion.button
+          <m.button
             aria-label={isDone ? done.note : (ariaLabel ?? text)}
             className={cn(
-              "relative inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
-              md ? "h-8 rounded-lg text-sm" : "h-6 rounded text-xs",
+              "relative inline-flex items-center gap-1.5 transition-colors",
+              md
+                ? "h-8 rounded-lg text-sm max-md:h-10 max-md:active:bg-overlay/6"
+                : "h-6 rounded text-xs",
               iconOnly
                 ? md
-                  ? "w-8 justify-center"
+                  ? "w-8 justify-center max-md:w-10"
                   : "px-1.5"
                 : md
                   ? "px-3"
@@ -125,7 +124,7 @@ export function ActionGroup({
             whileTap={reduceMotion ? undefined : { scale: 0.94 }}
           >
             <span className={cn("relative grid place-items-center", iconSize)}>
-              <motion.span
+              <m.span
                 animate={
                   isDone
                     ? { opacity: 0, scale: 0.5, rotate: 45 }
@@ -136,8 +135,8 @@ export function ActionGroup({
                 transition={isDone ? fade : pop}
               >
                 <Icon aria-hidden={true} className={iconSize} />
-              </motion.span>
-              <motion.span
+              </m.span>
+              <m.span
                 animate={
                   isDone
                     ? { opacity: 1, scale: 1, rotate: 0 }
@@ -151,28 +150,28 @@ export function ActionGroup({
                   aria-hidden="true"
                   className={cn(iconSize, "text-success")}
                 />
-              </motion.span>
+              </m.span>
             </span>
             {!iconOnly && text}
 
             <AnimatePresence>
               {isDone && (
-                <motion.span
+                <m.span
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   aria-hidden="true"
-                  className="pointer-events-none absolute -top-7 left-1/2 z-10 whitespace-nowrap rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm"
+                  className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink-strong px-2 py-1 font-medium text-surface text-xs shadow-sm max-md:hidden"
                   exit={{ opacity: 0, y: -2, scale: 0.96, transition: fade }}
                   initial={{ opacity: 0, y: 4, scale: 0.9 }}
-                  style={{ x: "-50%" }}
                   transition={pop}
                 >
                   {done.note}
-                </motion.span>
+                </m.span>
               )}
             </AnimatePresence>
-          </motion.button>
+          </m.button>
         );
       })}
+      <CopyToast note={done?.note ?? null} />
     </fieldset>
   );
 }

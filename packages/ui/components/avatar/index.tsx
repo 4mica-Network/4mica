@@ -18,8 +18,11 @@ const avatar = cva(
   },
 );
 
+const PIXELS = { xs: 32, sm: 36, md: 48, lg: 64, xl: 96 } as const;
+
 export interface AvatarProps extends VariantProps<typeof avatar> {
   src?: string | null;
+  priority?: boolean;
   name: string;
   fallback?: string;
   alt?: string;
@@ -32,9 +35,11 @@ export function Avatar({
   fallback,
   alt,
   size,
+  priority = false,
   className,
 }: AvatarProps) {
   const base = cn(avatar({ size }), className);
+  const pixels = PIXELS[size ?? "md"];
 
   if (src) {
     return (
@@ -42,7 +47,10 @@ export function Avatar({
         src={src}
         alt={alt ?? name}
         className={cn(base, "object-cover")}
-        loading="lazy"
+        width={pixels}
+        height={pixels}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
         decoding="async"
       />
     );

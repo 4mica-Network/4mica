@@ -4,6 +4,7 @@ import {
   syncPhoneVerificationHandler,
   verifyEmailHandler,
 } from "@controllers/verification/index";
+import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
@@ -44,6 +45,7 @@ export const verificationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     {
       onRequest: base.onRequest,
       preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      onResponse: revalidateOnWrite,
       schema: {
         tags: ["verification"],
         summary: "Spend a verification link as the signed-in user",
@@ -73,6 +75,7 @@ export const verificationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     {
       onRequest: base.onRequest,
       preHandler: [...base.preHandler, sensitiveRateLimit(app)],
+      onResponse: revalidateOnWrite,
       schema: {
         tags: ["verification"],
         summary: "Record a phone number Clerk has verified",

@@ -10,6 +10,7 @@ import {
   findUsernameOwner,
   getBusiness,
   getProfile,
+  getUsername,
   updateUser,
   upsertBusiness,
 } from "./repository";
@@ -43,7 +44,12 @@ const patchUserHandler =
     }
 
     try {
+      const previous =
+        "username" in parsed.data ? await getUsername(userId) : null;
       const updated = await updateUser(userId, parsed.data);
+      if (previous && previous !== updated.username) {
+        request.staleUsernames = [previous];
+      }
       if (request.user) {
         invalidateUser(request.user.clerkUserId);
       }

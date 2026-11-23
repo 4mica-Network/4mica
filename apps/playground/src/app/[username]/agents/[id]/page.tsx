@@ -3,6 +3,7 @@ import { BookText, CalendarDays, Globe, UserRound, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { CardShell } from "@/components/CardShell";
 import { CopyValue } from "@/components/CopyValue";
 import {
@@ -23,16 +24,18 @@ import {
 import { RevealLink } from "@/components/RevealLink";
 import { type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
-import { TrustSection } from "@/components/TrustSection";
+import { TopBar } from "@/components/TopBar";
+import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildAgentDescriptor } from "@/lib/descriptor";
 import { isSellable } from "@/lib/snippets/agent";
 import { links } from "@/services/links";
-import { getPayerState } from "@/services/payer";
+import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 import { bareHost } from "@/utils/bareHost";
 import { formatDate } from "@/utils/formatDate";
 import { agentPath, profilePath } from "@/utils/profileUrl";
@@ -60,6 +63,7 @@ export async function generateMetadata({
 }
 
 export default async function AgentPage({ params }: ProfileChildPageProps) {
+  preloadPayerState();
   const resolved = await resolveAgent(await params);
 
   if (!resolved) {
@@ -179,13 +183,15 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
     title: messages.flow.reviews,
     icon: "reviews",
     content: (
-      <TrustSection
-        id={agent.id}
-        kind="agent"
-        profile={profile}
-        publishedAt={agent.publishedAt}
-        resourceRef={agent.ref}
-      />
+      <Suspense fallback={<TrustSectionSkeleton />}>
+        <TrustSection
+          id={agent.id}
+          kind="agent"
+          profile={profile}
+          publishedAt={agent.publishedAt}
+          resourceRef={agent.ref}
+        />
+      </Suspense>
     ),
   };
 
@@ -200,13 +206,16 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
     <>
       <JsonLd descriptor={descriptor} />
 
-      <ProfileNav
-        className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
-        displayName={profile.name || profile.username}
-        username={profile.username}
-      />
-
       <CardShell
+        account={<TopBar />}
+        accountOnMobile={false}
+        nav={
+          <ProfileNav
+            displayName={profile.name || profile.username}
+            username={profile.username}
+          />
+        }
+        title={agent.name}
         actions={
           <ProfileActions
             label={messages.flow.actions}
@@ -248,7 +257,8 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
                   fallback={agent.ref}
                   name={agent.name}
                   size="md"
-                  src={agent.avatarUrl}
+                  src={sizedAvatarUrl(agent.avatarUrl, 96)}
+                  priority={true}
                 />
                 <div className="flex min-w-0 flex-col gap-1">
                   <h1 className="font-semibold text-ink-strong text-lg leading-tight">

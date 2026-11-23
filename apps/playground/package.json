@@ -29,7 +29,9 @@
     "@clerk/nextjs": "catalog:",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "@sentry/nextjs": "catalog:",
     "framer-motion": "catalog:",
+    "ioredis": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "react": "catalog:",
@@ -39,7 +41,8 @@
     "tailwindcss-animate": "catalog:",
     "valibot": "catalog:",
     "winston": "catalog:",
-    "winston-daily-rotate-file": "catalog:"
+    "winston-daily-rotate-file": "catalog:",
+    "winston-transport": "catalog:"
   },
   "devDependencies": {
     "@clerk/testing": "catalog:",

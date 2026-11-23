@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import type { PublicAgent } from "@/schema/agent";
 import type { PaymentNetwork } from "@/schema/params";
+import { cachedPublic, ownerTag } from "./cache";
 import { prisma } from "./db";
 
 /**
@@ -101,21 +102,33 @@ export const toPublicAgent = (row: AgentRow): PublicAgent => ({
  * deliberately absent here — that is the whole point of the tier. An owner
  * previewing their own profile sees everything.
  */
-export const listPublicAgents = cache(
-  async (ownerId: string, includeHidden = false): Promise<PublicAgent[]> => {
-    const rows = await prisma.agent.findMany({
-      where: {
-        ownerId,
-        deletedAt: null,
-        ...(includeHidden ? {} : { visibility: "PUBLIC" }),
-      },
-      select: AGENT_PUBLIC_SELECT,
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+const queryAgents = async (
+  ownerId: string,
+  includeHidden: boolean,
+): Promise<PublicAgent[]> => {
+  const rows = await prisma.agent.findMany({
+    where: {
+      ownerId,
+      deletedAt: null,
+      ...(includeHidden ? {} : { visibility: "PUBLIC" }),
+    },
+    select: AGENT_PUBLIC_SELECT,
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
 
-    return rows.map(toPublicAgent);
-  },
+  return rows.map(toPublicAgent);
+};
+
+const loadPublicAgents = cachedPublic(
+  "agents:list",
+  (ownerId: string) => queryAgents(ownerId, false),
+  (ownerId) => [ownerTag(ownerId)],
+);
+
+export const listPublicAgents = cache(
+  (ownerId: string, includeHidden = false): Promise<PublicAgent[]> =>
+    includeHidden ? queryAgents(ownerId, true) : loadPublicAgents(ownerId),
 );
 
 /**
@@ -126,24 +139,39 @@ export const listPublicAgents = cache(
  * conflating "may see hidden rows" with "may see the wallet address" is how a
  * future caller would leak the address.
  */
+const queryAgent = async (
+  ownerId: string,
+  idOrSlug: string,
+  isOwner: boolean,
+): Promise<PublicAgent | null> => {
+  const row = await prisma.agent.findFirst({
+    where: {
+      ownerId,
+      deletedAt: null,
+      ...(isOwner
+        ? {}
+        : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
+      OR: [{ slug: idOrSlug }, { id: idOrSlug }],
+    },
+    select: isOwner ? AGENT_OWNER_SELECT : AGENT_PUBLIC_SELECT,
+  });
+
+  return row ? toPublicAgent(row) : null;
+};
+
+const loadPublicAgent = cachedPublic(
+  "agents:one",
+  (ownerId: string, idOrSlug: string) => queryAgent(ownerId, idOrSlug, false),
+  (ownerId) => [ownerTag(ownerId)],
+);
+
 export const getPublicAgent = cache(
-  async (
+  (
     ownerId: string,
     idOrSlug: string,
     isOwner = false,
-  ): Promise<PublicAgent | null> => {
-    const row = await prisma.agent.findFirst({
-      where: {
-        ownerId,
-        deletedAt: null,
-        ...(isOwner
-          ? {}
-          : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
-        OR: [{ slug: idOrSlug }, { id: idOrSlug }],
-      },
-      select: isOwner ? AGENT_OWNER_SELECT : AGENT_PUBLIC_SELECT,
-    });
-
-    return row ? toPublicAgent(row) : null;
-  },
+  ): Promise<PublicAgent | null> =>
+    isOwner
+      ? queryAgent(ownerId, idOrSlug, true)
+      : loadPublicAgent(ownerId, idOrSlug),
 );

@@ -1,4 +1,5 @@
 import { DESCRIPTOR_SCHEMA } from "@/lib/descriptor";
+import { DESCRIPTOR_PUBLIC_CACHE } from "@/services/descriptor-response";
 import { listDirectory } from "@/services/directory";
 import { links } from "@/services/links";
 
@@ -21,8 +22,7 @@ export async function GET() {
     {
       headers: {
         "access-control-allow-origin": "*",
-        "cache-control":
-          "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+        "cache-control": DESCRIPTOR_PUBLIC_CACHE,
       },
     },
   );

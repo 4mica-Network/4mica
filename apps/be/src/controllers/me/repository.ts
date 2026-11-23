@@ -84,6 +84,15 @@ export const BUSINESS_SELECT = {
 export const getProfile = async (userId: string) =>
   prisma.user.findUnique({ where: { id: userId }, select: USER_SELECT });
 
+export const getUsername = async (userId: string): Promise<string | null> => {
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true },
+  });
+
+  return row?.username ?? null;
+};
+
 export const findUsernameOwner = async (username: string) =>
   prisma.user.findUnique({ where: { username }, select: { id: true } });
 

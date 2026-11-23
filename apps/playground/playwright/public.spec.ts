@@ -29,12 +29,12 @@ test("sign-in page renders and Clerk loads", async ({ page }) => {
   await page.goto("/sign-in");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "Welcome back" }),
+    page.getByRole("heading", { level: 1, name: "Sign in to 4Mica" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Continue with Google" }),
   ).toBeEnabled();
-  await expect(page).toHaveTitle(/Welcome back/);
+  await expect(page).toHaveTitle(/Sign in to 4Mica/);
 });
 
 test("sign-up page renders", async ({ page }) => {

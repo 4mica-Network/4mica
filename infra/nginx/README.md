@@ -41,6 +41,67 @@ block. Two flags cover the rest:
 | `--force` | You changed the proxy rules here on purpose. Overwrites, keeps the old copy as `.bak-<timestamp>`, and tells you to re-run certbot |
 | `--check` | Read-only, **needs no sudo**. Reports missing, un-symlinked or diverged configs and exits non-zero. `build-react-app.yml` runs this after each deploy and turns a non-zero result into a warning |
 
+## Merging `4mica.io.conf` by hand
+
+`4mica.io.conf` carries `server_tokens off`, an HSTS header and a public 404 for
+`/api/health`. A box that already ran certbot will not pick those up from
+`install.sh`; copy the three directives into the live
+`/etc/nginx/sites-available/4mica.io.conf` server block that holds
+`listen 443 ssl`, then `sudo nginx -t && sudo systemctl reload nginx`. While
+there, enable HTTP/2: `http2 on;` on nginx 1.25.1 or newer, otherwise append
+`http2` to the `listen 443 ssl` line.
+
+## Checking TLS from outside
+
+[`probe-tls.sh`](probe-tls.sh) `<host> [host...]` checks what certbot is meant
+to have set up on the live boxes, since this repo only holds the pre-certbot
+copy. For each host it requires:
+
+- `http://<host>/` to answer `301` or `308` with a `Location` on
+  `https://<host>/`, and
+- `https://<host>/` to send `Strict-Transport-Security` with `max-age` of at
+  least 180 days.
+
+It reports every failure as `::error::` and exits non-zero. Run it from
+outside the boxes, e.g. as a step after `build-react-app.yml`'s deploy:
+
+```yaml
+      - name: Confirm HTTPS redirect and HSTS
+        shell: bash
+        run: bash infra/nginx/probe-tls.sh 4mica.io www.4mica.io
+```
+
+## The edge container
+
+`apps/web/nginx.conf.template` (deployed by CI with apps/web, not installed
+here) also carries the cross-cutting edge policy for 4mica.io:
+
+- **Compression.** `gzip_proxied any` compresses whatever the apps leave
+  uncompressed; responses that already carry `Content-Encoding` are untouched.
+- **Shared cache.** `/p/_next/` (content-hashed chunks and the playground's
+  image optimizer) and `/api/og/` are cached in `/var/cache/nginx/playground`
+  for as long as the upstream `Cache-Control` allows. HTML is never cached: it
+  carries Clerk session state.
+- **`/p/` is narrowed to `/p/_next/`.** Any other `/p/<path>` is a 404, so the
+  prefix cannot become a second URL for every playground page.
+- **Rate limits.** `/api/og/`, `/api/revalidate` and the auth routes are limited
+  per client and answer `429` past their burst. Every other playground request
+  (profile pages, RSC prefetches, `/api/`) shares a 20 r/s budget, and
+  mutating methods, which is how server actions arrive, draw from a tighter
+  30 r/min one as well. They key on the real client
+  address, which the host nginx forwards in `X-Real-IP` and the edge trusts from
+  private ranges only.
+- **Refusals.** Dotfiles (except `/.well-known/`) and `*.map` return 404 before
+  reaching an upstream. So does `/api/health` for any client outside loopback
+  and the private ranges, as a second layer behind the host block's 404.
+- `/manifest.webmanifest` goes to apps/playground, which is the only app that
+  ships one.
+
+The host block in `4mica.io.conf` adds HSTS (no `includeSubDomains` until every
+subdomain is HTTPS-only) and answers `/api/health` with 404 publicly; the
+web deploy's `post_up` probes it on the edge port directly, which this block
+never sees.
+
 ## What goes where
 
 | Host | Box | Proxies to | Container |

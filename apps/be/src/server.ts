@@ -12,6 +12,7 @@ import {
 import { installShutdownHandlers, isAcceptingTraffic } from "./lifecycle/index";
 import { appLogger } from "./logger/index";
 import { genReqId, installHttpHardening } from "./plugins/http-hardening";
+import { registerPlaygroundRevalidation } from "./plugins/playground-revalidate";
 import { registerRateLimit } from "./plugins/rate-limit";
 import { type RouteRegistration, routes } from "./routes/index";
 import { closeCoreClient } from "./services/core";
@@ -78,6 +79,7 @@ export const initApp = async (
   });
 
   app.decorate("email", getEmailClient());
+  registerPlaygroundRevalidation(app);
 
   app.addHook("onClose", stopOnboardingDrip);
 

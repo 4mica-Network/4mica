@@ -7,6 +7,7 @@ import {
   listWalletsHandler,
   updateWalletHandler,
 } from "@controllers/wallets/index";
+import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
@@ -52,6 +53,8 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
     onRequest: base.onRequest,
     preHandler: [...base.preHandler, sensitiveRateLimit(app)],
   };
+
+  const publicWrite = { ...strict, onResponse: revalidateOnWrite };
 
   app.get(
     "/me/wallets",
@@ -139,7 +142,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.patch(
     "/me/wallets/:id",
     {
-      ...strict,
+      ...publicWrite,
       schema: {
         tags: ["wallets"],
         summary: "Update a wallet's label, description, role or status",
@@ -163,7 +166,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/wallets/:id",
     {
-      ...strict,
+      ...publicWrite,
       schema: {
         tags: ["wallets"],
         summary: "Remove a wallet",
@@ -183,7 +186,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/wallets/batch-delete",
     {
-      ...strict,
+      ...publicWrite,
       schema: {
         tags: ["wallets"],
         summary: "Remove up to 100 wallets at once",

@@ -50,12 +50,14 @@ export function NotFoundView({
   return (
     <main
       className={cn(
-        "flex w-full flex-col items-center justify-center",
+        "flex w-full flex-col items-center justify-center focus:outline-none",
         embedded
           ? "min-h-0 flex-1"
           : "h-dvh overflow-y-auto px-4 py-10 sm:px-6",
       )}
       data-fit-viewport={embedded ? true : undefined}
+      id="content"
+      tabIndex={-1}
     >
       <div className="flex w-full max-w-xl flex-col gap-8">
         <header className="flex flex-col items-center text-center">
@@ -72,7 +74,7 @@ export function NotFoundView({
                 <span className="text-brand">/{handle}</span>{" "}
                 {messages.notFound.handleLeadAfter}{" "}
                 <Link
-                  className="text-brand underline-offset-4 hover:underline"
+                  className="text-brand underline underline-offset-4"
                   href="/sign-up"
                 >
                   {messages.notFound.claimNow}
@@ -86,7 +88,7 @@ export function NotFoundView({
 
         {handle && (
           <Link
-            className="group flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4 transition-colors hover:bg-success/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50"
+            className="group flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4 transition-colors hover:bg-success/10"
             href="/sign-up"
           >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-success/10 text-success">
@@ -116,7 +118,7 @@ export function NotFoundView({
             {EXPLORE.map(({ href, icon: Icon, title, hint }) => (
               <li key={title}>
                 <a
-                  className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3.5 transition-colors hover:bg-overlay/4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40"
+                  className="group -mx-2 flex items-center gap-4 rounded-lg px-2 py-3.5 transition-colors hover:bg-overlay/4"
                   href={href}
                   {...(href.startsWith("http")
                     ? { target: "_blank", rel: "noreferrer noopener" }
