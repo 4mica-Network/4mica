@@ -84,6 +84,31 @@ describe("fetch", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("refuses a body on a GET before anything is sent", async () => {
+    const sent = vi.fn();
+    globalThis.fetch = sent;
+    for (const extra of [[], ["--dry-run"]]) {
+      const { error } = await runCommand(Fetch, [
+        URL_,
+        "-X",
+        "get",
+        "-d",
+        "{}",
+        ...extra,
+      ]);
+      expect(error).toMatchObject({ code: "BODY_NOT_ALLOWED" });
+      expect(error?.oclif?.exit).toBe(2);
+    }
+    expect(client.fetch).not.toHaveBeenCalled();
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("refuses a header http does not allow", async () => {
+    const { error } = await runCommand(Fetch, [URL_, "-H", "x-a: line\nbreak"]);
+    expect(error).toMatchObject({ code: "BAD_HEADER" });
+    expect(client.fetch).not.toHaveBeenCalled();
+  });
+
   it("refuses a malformed header before anything is sent", async () => {
     const { error } = await runCommand(Fetch, [URL_, "-H", "no-colon"]);
     expect(error).toMatchObject({ code: "BAD_HEADER" });
@@ -136,7 +161,56 @@ describe("fetch", () => {
     it("says so when a url asks for nothing", async () => {
       globalThis.fetch = vi.fn(async () => new Response("free"));
       const { json } = await runCommand(Fetch, [URL_, "-n", "--json"]);
-      expect(json).toEqual({ dryRun: true, status: 200, offers: [] });
+      expect(json).toMatchObject({ dryRun: true, status: 200, offers: [] });
+    });
+
+    it("keeps the answer of a url that carried the request out unpaid", async () => {
+      const sent = vi.fn(
+        async (_url: unknown, _init?: RequestInit) =>
+          new Response('{"order":7}', { status: 201 }),
+      );
+      globalThis.fetch = sent as typeof fetch;
+      const { json } = await runCommand(Fetch, [
+        URL_,
+        "-d",
+        '{"buy":1}',
+        "--dry-run",
+        "--json",
+      ]);
+      // The order was placed: the caller has to be able to see that.
+      expect(sent.mock.calls[0][1]).toMatchObject({
+        method: "POST",
+        body: '{"buy":1}',
+      });
+      expect(json).toMatchObject({
+        dryRun: true,
+        status: 201,
+        offers: [],
+        body: '{"order":7}',
+      });
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("writes that answer where the real request would", async () => {
+      globalThis.fetch = vi.fn(async () => new Response("free"));
+      const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+      await runCommand(Fetch, [URL_, "--dry-run"]);
+      expect(written).toHaveBeenCalledWith(Buffer.from("free"));
+      written.mockRestore();
+    });
+
+    it("exits 1 when the unpaid answer is an error other than 402", async () => {
+      globalThis.fetch = vi.fn(
+        async () => new Response("gone", { status: 404 }),
+      );
+      const { json } = await runCommand(Fetch, [URL_, "--dry-run", "--json"]);
+      expect(json).toMatchObject({ dryRun: true, status: 404, body: "gone" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("does not claim that nothing is sent", () => {
+      expect(Fetch.flags["dry-run"].summary).toContain("still sent");
+      expect(Fetch.flags["dry-run"].summary).not.toContain("without sending");
     });
   });
 });

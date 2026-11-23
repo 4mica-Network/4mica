@@ -5,8 +5,8 @@ import {
   withSetting,
   writeConfig,
 } from "../../core/config-file.js";
-import { listWallets, requireWalletName } from "../../core/wallets.js";
-import { usageError } from "../../errors.js";
+import { findWallet, requireWalletName } from "../../core/wallets.js";
+import { configError } from "../../errors.js";
 
 export default class WalletsUse extends BaseCommand {
   static summary = "make a wallet the one the cli uses";
@@ -25,11 +25,14 @@ export default class WalletsUse extends BaseCommand {
     const { args } = await this.parse(WalletsUse);
     const dir = this.config.configDir;
     const name = requireWalletName(args.name);
-    const wallet = (await listWallets(dir)).find((w) => w.name === name);
-    if (!wallet) {
-      throw usageError(`there is no wallet named ${name}`, {
-        code: "WALLET_NOT_FOUND",
-        suggestions: ["see the ones you have with `4mica wallets`"],
+    const wallet = await findWallet(dir, name);
+    if (!wallet.address) {
+      // Pointing `key-file` at it would fail every command that needs a key.
+      throw configError(`${wallet.path} is ${wallet.problem}`, {
+        code: "BAD_SIGNER",
+        suggestions: [
+          `delete it with \`4mica wallets remove ${name}\`, or put the key back in the file`,
+        ],
       });
     }
     await writeConfig(

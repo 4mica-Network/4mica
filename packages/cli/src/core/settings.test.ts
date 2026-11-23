@@ -228,6 +228,86 @@ describe("a mainnet named only by a .env that was found", () => {
     const envFile = { FOURMICA_NETWORK: "base-sepolia" };
     expect(check({ ...found, keyFile, envFile })).not.toThrow();
   });
+
+  describe("given by its core URL instead of its name", () => {
+    const mainnet = NETWORKS.base.rpcUrl;
+
+    it.each([
+      mainnet,
+      mainnet.replace(/\/$/, ""),
+      "https://BASE.API.4MICA.IO:443//",
+    ])("is refused all the same: %s", (url) => {
+      const envFile = { "4MICA_RPC_URL": url };
+      expect(exitOf(check({ ...found, keyFile, envFile }))).toBe(EXIT.config);
+      expect(check({ ...found, keyFile, envFile })).toThrow(
+        "/clone/.env selects base (mainnet, real funds)",
+      );
+    });
+
+    it("is still allowed for the wallet that same file holds", () => {
+      const envFile = {
+        FOURMICA_RPC_URL: mainnet,
+        FOURMICA_WALLET_PRIVATE_KEY: "0x2",
+      };
+      expect(check({ ...found, envFile })).not.toThrow();
+    });
+
+    it("is recognised wherever the URL comes from, for the confirmation", () => {
+      const settings = resolveSettings({
+        flags: { "rpc-url": mainnet },
+        env: {},
+        config: {},
+      });
+      expect(settings.network).toEqual({ value: "base", source: "flag" });
+      expect(settings.info?.testnet).toBe(false);
+      expect(settings.rpcUrl).toEqual({ value: mainnet, source: "flag" });
+      // Named on the command line: chosen.
+      expect(() => assertMainnetWasChosen(settings)).not.toThrow();
+    });
+
+    it("leaves a hosted testnet's URL alone", () => {
+      const envFile = { FOURMICA_RPC_URL: NETWORKS["base-sepolia"].rpcUrl };
+      expect(check({ ...found, keyFile, envFile })).not.toThrow();
+    });
+  });
+
+  describe("or a core nobody can vouch for", () => {
+    const proxy = { FOURMICA_RPC_URL: "https://core.example/" };
+
+    it("is refused for a wallet that comes from somewhere else", () => {
+      const run = check({ ...found, keyFile, envFile: proxy });
+      expect(exitOf(run)).toBe(EXIT.config);
+      expect(run).toThrow(
+        "/clone/.env selects the core at https://core.example/, which is not a known testnet",
+      );
+      expect(run).toThrow(expect.objectContaining({ code: "CORE_NOT_CHOSEN" }));
+    });
+
+    it("is allowed for the file's own wallet, or once it is named", () => {
+      const own = { ...proxy, FOURMICA_WALLET_PRIVATE_KEY: "0x2" };
+      expect(check({ ...found, envFile: own })).not.toThrow();
+      expect(
+        check({ ...found, keyFile, envFile: proxy, envFileFound: false }),
+      ).not.toThrow();
+      expect(
+        check({
+          ...found,
+          keyFile,
+          envFile: proxy,
+          flags: { "rpc-url": proxy.FOURMICA_RPC_URL },
+        }),
+      ).not.toThrow();
+    });
+
+    it.each([
+      "http://localhost:3000",
+      "http://127.0.0.1:3000/",
+      "http://[::1]:3000",
+    ])("leaves a core on this machine alone: %s", (url) => {
+      const envFile = { FOURMICA_RPC_URL: url };
+      expect(check({ ...found, keyFile, envFile })).not.toThrow();
+    });
+  });
 });
 
 describe("readEnv", () => {

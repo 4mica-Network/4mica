@@ -126,6 +126,10 @@ config directory. The key is never printed, and an existing wallet is never
 overwritten. Creating one sends nothing: it exists on a network once it is
 funded, and `wallets create` ends by saying how.
 
+A file in that directory that does not hold a key is listed as `unusable`
+next to the wallets that work. `wallets use` refuses it; `wallets remove`
+deletes it.
+
 ### A key you already have
 
 Give it in one of three ways:
@@ -171,8 +175,8 @@ become spendable; do not send it again.
 
 ### Trying it first
 
-`--dry-run` (`-n`) on `deposit` and the three `withdrawals` actions checks
-what the real command would and sends nothing:
+`--dry-run` (`-n`) on `deposit`, the three `withdrawals` actions and `cycles
+pay` and `cycles claim` checks what the real command would and sends nothing:
 
 ```
 $ 4mica deposit 5 --asset USDC --dry-run
@@ -216,6 +220,12 @@ stdout and what was paid to stderr. It does not ask before paying: `--max` is
 the consent, and defaults to 1 USDC a payment. `--pay-to <address>` limits
 who may be paid. It exits 1 when the final answer is an HTTP error.
 
+`fetch --dry-run` pays nothing, but it is not a dry run of the request: the
+request is sent once, unpaid, with its method, headers and `--data`, because
+that is how a url says what it charges. A url that charges nothing carries
+the request out, and its answer is printed as it would be without
+`--dry-run`.
+
 ### Cycles
 
 Payments are netted per asset and per cycle. When a cycle closes, whoever
@@ -224,7 +234,7 @@ owes pays once and whoever is owed collects once.
 ```bash
 4mica cycles                        # the open cycle for each asset
 4mica cycles checkpoint --asset USDC
-4mica cycles pay <cycle> --dry-run  # what this wallet owes, without paying
+4mica cycles pay <cycle> --dry-run  # what this wallet owes, and whether it can pay
 4mica cycles pay <cycle>
 4mica cycles claim <cycle>
 ```
@@ -267,6 +277,11 @@ shell, the command stops with `MAINNET_NOT_CHOSEN` until you name the network
 with `--network` or the file with `--env-file`, so that running a command
 inside someone else's project cannot move your wallet onto real funds.
 
+The same holds when that `.env` gives a core by `FOURMICA_RPC_URL`. A hosted
+network's own URL counts as its name, here and in the confirmation. Any other
+URL stops with `CORE_NOT_CHOSEN` unless it is a hosted testnet's or on this
+machine (`localhost`), since nothing else shows that it is not a mainnet.
+
 ```bash
 4mica config set network base
 4mica config set asset USDC     # then `4mica deposit 5` needs no --asset
@@ -285,14 +300,16 @@ A request that gets no response is given up on after 30 seconds;
   warnings and errors go to stderr. `--quiet` drops the progress.
 - **`--no-input`** makes sure no question is asked: a command that would need
   one fails and names the flag to pass. Without a terminal this is already
-  the case.
+  the case: questions are written to stderr and answered on stdin, and both
+  have to be one.
 - **`--json`** prints the result as one JSON document. For wallet commands
   the fields are the ones `@4mica/sdk` returns; amounts in base units are
   strings.
 - **Errors** carry a code. With `--json` they are printed as
   `{ "error": { "code", "message", "suggestions" } }`.
-- **`--no-color`** or `NO_COLOR=1` turns color off. Each of stdout and
-  stderr is also plain whenever it is not a terminal.
+- **`--no-color`**, `NO_COLOR=1` or `FORCE_COLOR=0` turns color off. Each of
+  stdout and stderr is also plain whenever it is not a terminal, unless
+  `--color` or `FORCE_COLOR=1` asks for it.
 - **Flags can go before or after the command:** `4mica --json balance` and
   `4mica balance --json` are the same.
 

@@ -6,8 +6,14 @@ export interface Wallet {
   name: string;
   /** The key file. */
   path: string;
-  address: string;
+  /** Unset when the file gives no key: see `problem`. */
+  address?: string;
+  /** Why the file gives no key. */
+  problem?: string;
 }
+
+/** A wallet whose key file was read. */
+export type UsableWallet = Wallet & { address: string };
 
 const EXTENSION = ".key";
 const NAME = /^[a-z0-9][a-z0-9_-]*$/;
@@ -52,7 +58,7 @@ export async function createWallet(
   name: string,
   /** A key to keep, for importing a wallet; a new one is made without it. */
   existing?: { key: string; from: string },
-): Promise<Wallet> {
+): Promise<UsableWallet> {
   const { generatePrivateKey } = await import("viem/accounts");
   const key = existing?.key ?? generatePrivateKey();
   // Checked before anything is written.
@@ -88,14 +94,37 @@ export async function listWallets(configDir: string): Promise<Wallet[]> {
       .sort()
       .map(async (file) => {
         const path = join(walletsDir(configDir), file);
-        const key = (await readFile(path, "utf8")).trim();
-        return {
-          name: file.slice(0, -EXTENSION.length),
-          path,
-          address: await addressFromKey(key, path),
-        };
+        const wallet = { name: file.slice(0, -EXTENSION.length), path };
+        // One file that cannot be used must not hide the others, or itself:
+        // it has to be listed to be removed.
+        try {
+          const key = (await readFile(path, "utf8")).trim();
+          return { ...wallet, address: await addressFromKey(key, path) };
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          return {
+            ...wallet,
+            problem:
+              code === "BAD_SIGNER"
+                ? "not a valid private key"
+                : `cannot be read (${code ?? (error as Error).message})`,
+          };
+        }
       }),
   );
+}
+
+/** The wallet called `name`, whether or not its key file can be used. */
+export async function findWallet(
+  configDir: string,
+  name: string,
+): Promise<Wallet> {
+  const wallet = (await listWallets(configDir)).find((w) => w.name === name);
+  if (wallet) return wallet;
+  throw usageError(`there is no wallet named ${name}`, {
+    code: "WALLET_NOT_FOUND",
+    suggestions: ["see the ones you have with `4mica wallets`"],
+  });
 }
 
 /** Deletes the key. Whatever the address holds is out of reach after this. */

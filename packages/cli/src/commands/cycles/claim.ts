@@ -1,8 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 import { explorerTx, formatAmount, listAssets } from "../../core/assets.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { previewCycleClaim, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
-import { networkName } from "../../core/settings.js";
 import { dryRun, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
 import { step } from "../../ui/log.js";
@@ -47,32 +47,28 @@ export default class CyclesClaim extends NetworkCommand {
       const builder = flags.creditor ? claim.creditor(flags.creditor) : claim;
       // Core's own figure: the caller never states the amount.
       const terms = await builder.action();
+      const assets = await listAssets(settings, client);
       const amount = await formatAmount(
-        await listAssets(settings, client),
+        assets,
         terms.assetAddress,
         terms.amount,
       );
 
       if (flags["dry-run"]) {
-        const preview = {
-          dryRun: true,
-          action: `claim ${amount} for cycle ${terms.cycleIdText}`,
-          network: networkName(settings),
-          wallet: client.address,
+        const preview = await previewCycleClaim(
+          settings,
+          client,
+          terms,
+          assets,
+          flags.gas as "auto" | "self",
+        );
+        this.log(renderPreview(preview));
+        return {
+          ...preview,
           participant: terms.participant,
           amount,
           amountRaw: terms.amount,
         };
-        this.log(
-          fields([
-            ["would", preview.action],
-            ["network", preview.network],
-            ["wallet", preview.wallet],
-            ["for", preview.participant],
-            ["ready", "yes, nothing was sent"],
-          ]),
-        );
-        return preview;
       }
 
       await confirmFunds(

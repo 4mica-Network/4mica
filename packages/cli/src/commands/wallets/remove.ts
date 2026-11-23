@@ -4,7 +4,7 @@ import { BaseCommand } from "../../base.js";
 import { readConfig, writeConfig } from "../../core/config-file.js";
 import { canPrompt } from "../../core/runtime.js";
 import {
-  listWallets,
+  findWallet,
   removeWallet,
   requireWalletName,
 } from "../../core/wallets.js";
@@ -39,13 +39,9 @@ export default class WalletsRemove extends BaseCommand {
     const { args, flags } = await this.parse(WalletsRemove);
     const dir = this.config.configDir;
     const name = requireWalletName(args.name);
-    const wallet = (await listWallets(dir)).find((w) => w.name === name);
-    if (!wallet) {
-      throw usageError(`there is no wallet named ${name}`, {
-        code: "WALLET_NOT_FOUND",
-        suggestions: ["see the ones you have with `4mica wallets`"],
-      });
-    }
+    const wallet = await findWallet(dir, name);
+    // A file with no usable key in it has no address to name.
+    const what = wallet.address ?? `${wallet.path}, which is ${wallet.problem}`;
 
     let typed = flags.confirm;
     if (typed === undefined) {
@@ -56,8 +52,10 @@ export default class WalletsRemove extends BaseCommand {
         });
       }
       process.stderr.write(
-        `${warn(`This deletes the only copy of the key for ${wallet.address}.`)}\n` +
-          "Anything that address holds stays there for good.\n",
+        wallet.address
+          ? `${warn(`This deletes the only copy of the key for ${wallet.address}.`)}\n` +
+              "Anything that address holds stays there for good.\n"
+          : `${warn(`This deletes ${what}.`)}\n`,
       );
       const rl = createInterface({
         input: process.stdin,
@@ -81,7 +79,7 @@ export default class WalletsRemove extends BaseCommand {
     const wasActive = active === wallet.path;
     if (wasActive) await writeConfig(dir, rest);
     this.note(
-      `deleted ${wallet.name} (${wallet.address})` +
+      `deleted ${wallet.name} (${what})` +
         (wasActive ? "; the cli has no wallet in use now" : ""),
     );
     return { ...wallet, removed: true, wasActive };

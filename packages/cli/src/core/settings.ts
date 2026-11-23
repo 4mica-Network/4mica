@@ -41,7 +41,10 @@ export interface SettingsInput {
 }
 
 export interface Settings {
-  /** Shorthand of a hosted network; unset for a core given by URL. */
+  /**
+   * Shorthand of a hosted network: named, or recognised from its core URL.
+   * Unset for any other core given by URL.
+   */
   network?: Resolved;
   info?: NetworkInfo;
   rpcUrl: Resolved;
@@ -113,6 +116,25 @@ function unknownNetwork(value: string, source: Source) {
   });
 }
 
+/** A core URL without the differences that do not change where it leads. */
+function coreKey(url: string): string {
+  const { origin, pathname } = new URL(url);
+  return origin + pathname.replace(/\/+$/, "");
+}
+
+/** The hosted network whose core this URL is, if it is one. */
+function hostedAt(
+  url: string,
+): { name: string; info: NetworkInfo } | undefined {
+  const key = coreKey(url);
+  const name = Object.keys(NETWORKS).find(
+    (n) => coreKey(NETWORKS[n].rpcUrl) === key,
+  );
+  return name === undefined ? undefined : { name, info: NETWORKS[name] };
+}
+
+const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])$/;
+
 export function resolveSettings(input: SettingsInput): Settings {
   const { flags, env, envFile = {}, config } = input;
 
@@ -155,7 +177,16 @@ export function resolveSettings(input: SettingsInput): Settings {
         code: "BAD_RPC_URL",
       });
     }
-    settings = { rpcUrl: custom };
+    // A hosted network reached by its URL is still that network: it gets
+    // the same mainnet warning and confirmation as when it is named.
+    const hosted = hostedAt(custom.value);
+    settings = hosted
+      ? {
+          network: { value: hosted.name, source: custom.source },
+          info: hosted.info,
+          rpcUrl: custom,
+        }
+      : { rpcUrl: custom };
   }
 
   const hostedFacilitator = settings.info?.facilitatorUrl;
@@ -204,19 +235,37 @@ export function resolveSettings(input: SettingsInput): Settings {
  * not a wallet it does not hold: running a command inside someone else's
  * project must not move the key kept in the config file, or exported in the
  * shell, onto real funds. Called before a wallet is used.
+ *
+ * A core the file gives by URL counts unless it is a hosted testnet or on
+ * this machine: nothing else about a URL shows that it is not a mainnet.
  */
 export function assertMainnetWasChosen(settings: Settings): void {
-  const { network, info, key, envFilePath } = settings;
-  if (network?.source !== "env-file" || info?.testnet !== false) return;
+  const { network, info, rpcUrl, key, envFilePath } = settings;
+  if (rpcUrl.source !== "env-file" || info?.testnet === true) return;
   if (!settings.envFileFound || key?.source === "env-file") return;
+  const stay = `to stay on a testnet: --network ${DEFAULT_TESTNET}`;
+  if (network) {
+    throw configError(
+      `${envFilePath} selects ${network.value} (mainnet, real funds), but ` +
+        "the wallet key does not come from that file",
+      {
+        code: "MAINNET_NOT_CHOSEN",
+        suggestions: [
+          `to use ${network.value}, say so: --network ${network.value}, or --env-file ${envFilePath}`,
+          stay,
+        ],
+      },
+    );
+  }
+  if (LOOPBACK.test(new URL(rpcUrl.value).hostname)) return;
   throw configError(
-    `${envFilePath} selects ${network.value} (mainnet, real funds), but ` +
-      "the wallet key does not come from that file",
+    `${envFilePath} selects the core at ${rpcUrl.value}, which is not a ` +
+      "known testnet, but the wallet key does not come from that file",
     {
-      code: "MAINNET_NOT_CHOSEN",
+      code: "CORE_NOT_CHOSEN",
       suggestions: [
-        `to use ${network.value}, say so: --network ${network.value}, or --env-file ${envFilePath}`,
-        `to stay on a testnet: --network ${DEFAULT_TESTNET}`,
+        `to use it, say so: --rpc-url ${rpcUrl.value}, or --env-file ${envFilePath}`,
+        stay,
       ],
     },
   );

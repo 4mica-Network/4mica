@@ -1,8 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 import { explorerTx, formatAmount, listAssets } from "../../core/assets.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { previewCyclePay, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
-import { networkName } from "../../core/settings.js";
 import { dryRun, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
 import { step } from "../../ui/log.js";
@@ -12,7 +12,8 @@ export default class CyclesPay extends NetworkCommand {
   static summary = "pay what this wallet owes for a closed cycle";
   static description =
     "Core works out one net amount per cycle. This pays it, with the proof " +
-    "the contract checks. --dry-run shows the amount without paying.";
+    "the contract checks. --dry-run shows the amount and whether this " +
+    "wallet can pay it, without paying.";
   static args = {
     cycle: Args.string({
       description: "the cycle, as `4mica cycles` names it",
@@ -42,32 +43,28 @@ export default class CyclesPay extends NetworkCommand {
       const builder = settlement.pay(args.cycle);
       // Core's own figure: the caller never states the amount.
       const terms = await builder.action();
+      const assets = await listAssets(settings, client);
       const amount = await formatAmount(
-        await listAssets(settings, client),
+        assets,
         terms.assetAddress,
         terms.amount,
       );
 
       if (flags["dry-run"]) {
-        const preview = {
-          dryRun: true,
-          action: `pay ${amount} for cycle ${terms.cycleIdText}`,
-          network: networkName(settings),
-          wallet: client.address,
+        const preview = await previewCyclePay(
+          settings,
+          client,
+          terms,
+          assets,
+          flags.gas as "auto" | "self",
+        );
+        this.log(renderPreview(preview));
+        return {
+          ...preview,
           participant: terms.participant,
           amount,
           amountRaw: terms.amount,
         };
-        this.log(
-          fields([
-            ["would", preview.action],
-            ["network", preview.network],
-            ["wallet", preview.wallet],
-            ["for", preview.participant],
-            ["ready", "yes, nothing was sent"],
-          ]),
-        );
-        return preview;
       }
 
       await confirmFunds(

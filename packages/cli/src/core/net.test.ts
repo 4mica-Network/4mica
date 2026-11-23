@@ -1,3 +1,5 @@
+import { once } from "node:events";
+import { type AddressInfo, createServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { toCliError } from "../errors.js";
 import { installRequestTimeout, lastTransportFailure } from "./net.js";
@@ -42,6 +44,48 @@ describe("installRequestTimeout", () => {
       origin: "http://127.0.0.1:3000",
       reason: "unreachable",
       detail: "ECONNREFUSED",
+    });
+  });
+
+  it("does not blame the host for a request that was never sent", async () => {
+    // What `fetch` throws for a GET with a body: also a TypeError.
+    const invalid: typeof fetch = async () => {
+      throw new TypeError("Request with GET/HEAD method cannot have body.");
+    };
+    const failure = await install(invalid, 30);
+    await expect(fetch("https://api.example.com/x")).rejects.toThrow(
+      "cannot have body",
+    );
+    expect(failure()).toBeUndefined();
+  });
+
+  describe("with Node's own fetch", () => {
+    it("records a refused connection", async () => {
+      // A port that was just in use, and is closed again.
+      const server = createServer().listen(0, "127.0.0.1");
+      await once(server, "listening");
+      const { port } = server.address() as AddressInfo;
+      server.close();
+      await once(server, "close");
+
+      const failure = await install(realFetch, 30);
+      const origin = `http://127.0.0.1:${port}`;
+      await expect(fetch(`${origin}/core/health`)).rejects.toThrow();
+      expect(failure()).toMatchObject({
+        origin,
+        reason: "unreachable",
+        detail: "ECONNREFUSED",
+      });
+    });
+
+    it("records nothing for a request it refuses to send", async () => {
+      const failure = await install(realFetch, 30);
+      const sent = fetch("http://127.0.0.1:9/x", { method: "GET", body: "{}" });
+      await expect(sent).rejects.toThrow(TypeError);
+      expect(failure()).toBeUndefined();
+      // So the command reports the real problem, not an unreachable host.
+      const error = await sent.catch((e: unknown) => e);
+      expect(toCliError(error, failure())).toBe(error);
     });
   });
 

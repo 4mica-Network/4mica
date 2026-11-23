@@ -1,9 +1,12 @@
-import { Command, Flags } from "@oclif/core";
+import { Command, Flags, type Interfaces } from "@oclif/core";
 import { lastTransportFailure } from "./core/net.js";
-import { readRuntimeFlags } from "./core/runtime.js";
+import { setRuntimeFlags } from "./core/runtime.js";
 import { errorJson, toCliError } from "./errors.js";
 import { note } from "./ui/log.js";
 import { toPlain } from "./ui/output.js";
+
+/** What oclif calls `FlagOutput` and `ArgOutput`, and does not export. */
+type Parsed = Record<string, unknown>;
 
 /**
  * Every command: `--json` prints what `run()` returns, and SDK errors are
@@ -30,9 +33,18 @@ export abstract class BaseCommand extends Command {
     }),
   };
 
-  public override async init(): Promise<void> {
-    await super.init();
-    readRuntimeFlags(this.argv);
+  /** Parses as oclif does, and keeps `--quiet` and `--no-input` for helpers. */
+  protected override async parse<
+    F extends Parsed,
+    B extends Parsed,
+    A extends Parsed,
+  >(
+    options?: Interfaces.Input<F, B, A>,
+    argv?: string[],
+  ): Promise<Interfaces.ParserOutput<F, B, A>> {
+    const parsed = await super.parse(options, argv);
+    setRuntimeFlags(parsed.flags);
+    return parsed;
   }
 
   protected override toSuccessJson(result: unknown): unknown {

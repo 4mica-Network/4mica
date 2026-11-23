@@ -38,8 +38,12 @@ export const INIT_NOTICE =
   "No command was given, so this runs `4mica init`, as it always has. A " +
   "later release will print help instead; write `4mica init` to scaffold.";
 
-/** Edit distance, for telling a mistyped command from a directory name. */
+/**
+ * Edit distance, for telling a mistyped command from a directory name. Two
+ * neighbouring letters swapped count as one slip, as they are at a keyboard.
+ */
 export function distance(a: string, b: string): number {
+  let before: number[] = [];
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
     const next = [i];
@@ -49,7 +53,11 @@ export function distance(a: string, b: string): number {
         next[j - 1] + 1,
         row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
       );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        next[j] = Math.min(next[j], before[j - 2] + 1);
+      }
     }
+    before = row;
     row = next;
   }
   return row[b.length];
@@ -69,7 +77,9 @@ const HELP_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
  * command and no word for it, so its flags and directory came first, as in
  * `4mica --yes` and `4mica my-app --no-install`. A word close to a real
  * command is left alone, so that a typo gets "did you mean" and not a
- * project named after it.
+ * project named after it. Close means one slip for a short command and two
+ * for a longer one: two slips from `dev` reach `demo` and `web`, which are
+ * directory names.
  */
 function meansInit(argv: string[], config: Commands): boolean {
   const [first] = argv;
@@ -77,7 +87,9 @@ function meansInit(argv: string[], config: Commands): boolean {
     // Nothing but flags: `hoistCommand` put any command in front of them.
     return first !== "--" && !argv.some((arg) => HELP_FLAGS.has(arg));
   }
-  return !firstWords(config).some((word) => distance(first, word) <= 2);
+  return !firstWords(config).some(
+    (word) => distance(first, word) <= (word.length <= 4 ? 1 : 2),
+  );
 }
 
 /**

@@ -4,7 +4,6 @@ import { readInput } from "../core/input.js";
 import { withSession } from "../core/session.js";
 import { networkName } from "../core/settings.js";
 import { usageError } from "../errors.js";
-import { dryRun } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
 import { waiting } from "../ui/log.js";
 import { table } from "../ui/output.js";
@@ -21,7 +20,13 @@ function headersFrom(lines: string[] = []): Headers {
         suggestions: ['write it as "name: value"'],
       });
     }
-    headers.append(line.slice(0, at).trim(), line.slice(at + 1).trim());
+    try {
+      headers.append(line.slice(0, at).trim(), line.slice(at + 1).trim());
+    } catch {
+      throw usageError(`"${line}" is not a header http allows`, {
+        code: "BAD_HEADER",
+      });
+    }
   }
   return headers;
 }
@@ -71,7 +76,11 @@ export default class Fetch extends NetworkCommand {
     "request, signs a payment within --max and repeats the request once. " +
     "The response body goes to stdout and what was paid to stderr.\n\n" +
     "It does not ask before paying: --max is the consent, and it defaults " +
-    "to 1 USDC per payment. Use --dry-run to see what a url charges.\n\n" +
+    "to 1 USDC per payment.\n\n" +
+    "--dry-run shows what a url charges and pays nothing. It still sends " +
+    "the request, once and unpaid: that is how a url says what it charges. " +
+    "A url that charges nothing answers it for real, and that answer is " +
+    "printed.\n\n" +
     "Exits 1 when the final answer is an HTTP error.";
   static args = {
     url: Args.string({ description: "the url to request", required: true }),
@@ -112,7 +121,12 @@ export default class Fetch extends NetworkCommand {
       multipleNonGreedy: true,
       summary: "only pay this address; repeat for more",
     }),
-    "dry-run": dryRun,
+    // Not the shared flag: this dry run cannot promise that nothing is sent.
+    "dry-run": Flags.boolean({
+      char: "n",
+      summary:
+        "show what the url charges and pay nothing; the request is still sent",
+    }),
   };
   static examples = [
     "<%= config.bin %> <%= command.id %> https://api.example.com/report",
@@ -127,8 +141,17 @@ export default class Fetch extends NetworkCommand {
       throw usageError(`"${args.url}" is not a url`, { code: "BAD_URL" });
     }
     const body = await bodyFrom(flags.data);
+    const method = (
+      flags.method ?? (body === undefined ? "GET" : "POST")
+    ).toUpperCase();
+    if (body !== undefined && (method === "GET" || method === "HEAD")) {
+      throw usageError(`a ${method} request cannot carry --data`, {
+        code: "BODY_NOT_ALLOWED",
+        suggestions: ["drop --data, or send it with -X POST"],
+      });
+    }
     const init: RequestInit = {
-      method: flags.method ?? (body === undefined ? "GET" : "POST"),
+      method,
       headers: headersFrom(flags.header),
       body,
     };
@@ -137,7 +160,20 @@ export default class Fetch extends NetworkCommand {
       const response = await waiting(`Asking ${args.url}`, () =>
         fetch(args.url, init),
       );
-      const offers = response.status === 402 ? await offersIn(response) : [];
+      if (response.status !== 402) {
+        // Not a price: the url carried the request out. Its answer is shown
+        // as it would be without --dry-run, not thrown away.
+        const status = response.status < 400 ? `HTTP ${response.status}: ` : "";
+        this.note(
+          `${status}this url did not ask for payment and answered the request itself`,
+        );
+        return {
+          dryRun: true,
+          offers: [],
+          ...(await this.deliver(response, flags.output)),
+        };
+      }
+      const offers = await offersIn(response);
       this.log(
         table(
           ["NETWORK", "ASSET", "BASE UNITS", "PAY TO"],
@@ -145,11 +181,9 @@ export default class Fetch extends NetworkCommand {
         ),
       );
       this.note(
-        response.status !== 402
-          ? `HTTP ${response.status}: this url does not ask for payment`
-          : offers.length === 0
-            ? "HTTP 402, but with no 4mica payment option"
-            : `HTTP 402: nothing was paid. You are on ${networkName(settings)}.`,
+        offers.length === 0
+          ? "HTTP 402, but with no 4mica payment option"
+          : `HTTP 402: nothing was paid. You are on ${networkName(settings)}.`,
       );
       return { dryRun: true, status: response.status, offers };
     }
@@ -161,33 +195,38 @@ export default class Fetch extends NetworkCommand {
           client.fetch(args.url, init),
         );
         const payment = client.paymentFor(response);
-        const bytes = Buffer.from(await response.arrayBuffer());
-
         if (payment) {
           this.note(
             `paid ${payment.amount} ${payment.asset.symbol} to ${payment.payTo}`,
           );
         }
-        if (response.status >= 400) {
-          this.note(`HTTP ${response.status} ${response.statusText}`.trim());
-          process.exitCode = 1;
-        }
-
-        if (flags.output) {
-          await writeFile(flags.output, bytes);
-          this.note(`${bytes.length} bytes written to ${flags.output}`);
-        } else if (!this.jsonEnabled()) {
-          process.stdout.write(bytes);
-        }
         return {
-          status: response.status,
-          headers: Object.fromEntries(response.headers),
-          body: flags.output ? undefined : bytes.toString("utf8"),
-          output: flags.output,
+          ...(await this.deliver(response, flags.output)),
           payment: payment ?? null,
         };
       },
       { perPayment: flags.max, payTo: flags["pay-to"] },
     );
+  }
+
+  /** The body to stdout or `--output`; exit code 1 for an HTTP error. */
+  private async deliver(response: Response, output?: string) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (response.status >= 400) {
+      this.note(`HTTP ${response.status} ${response.statusText}`.trim());
+      process.exitCode = 1;
+    }
+    if (output) {
+      await writeFile(output, bytes);
+      this.note(`${bytes.length} bytes written to ${output}`);
+    } else if (!this.jsonEnabled()) {
+      process.stdout.write(bytes);
+    }
+    return {
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: output ? undefined : bytes.toString("utf8"),
+      output,
+    };
   }
 }

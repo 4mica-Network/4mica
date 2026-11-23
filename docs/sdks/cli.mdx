@@ -82,7 +82,7 @@ Commands that send a transaction (`deposit`, the `withdrawals` actions, `cycles 
 - **`--yes`** skips the question. Without a terminal and without `--yes`, the command exits instead of waiting.
 - **On mainnet** the question asks you to type the network's name, not `y`.
 
-`fetch` is the exception: it does not ask. `--max` is the consent, and defaults to 1 USDC a payment. `fetch --dry-run` shows what a URL charges without paying.
+`fetch` is the exception: it does not ask. `--max` is the consent, and defaults to 1 USDC a payment. `fetch --dry-run` shows what a URL charges without paying. It still sends the request once, unpaid, and a URL that charges nothing answers it for real.
 
 After a deposit is mined, the CLI waits up to `--timeout` seconds for core to count it. If that runs out, the deposit is reported as `pending` and the command exits 0. Do not send it again.
 

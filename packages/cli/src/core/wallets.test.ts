@@ -1,8 +1,13 @@
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createWallet, listWallets, walletPath } from "./wallets.js";
+import {
+  createWallet,
+  findWallet,
+  listWallets,
+  walletPath,
+} from "./wallets.js";
 
 const tempDir = () => mkdtemp(join(tmpdir(), "4mica-cli-"));
 
@@ -43,6 +48,47 @@ describe("wallets", () => {
     const b = await createWallet(dir, "b");
     const a = await createWallet(dir, "a");
     expect(await listWallets(dir)).toEqual([a, b]);
+  });
+
+  it("lists a key file it cannot use, next to the ones it can", async () => {
+    const dir = await tempDir();
+    const good = await createWallet(dir, "good");
+    await writeFile(walletPath(dir, "old"), "0xabc");
+    await writeFile(walletPath(dir, "notes"), "remember to rotate\n");
+    // Reading a directory fails: a file the cli cannot read at all.
+    await mkdir(walletPath(dir, "folder"));
+
+    expect(await listWallets(dir)).toEqual([
+      {
+        name: "folder",
+        path: walletPath(dir, "folder"),
+        problem: "cannot be read (EISDIR)",
+      },
+      good,
+      {
+        name: "notes",
+        path: walletPath(dir, "notes"),
+        problem: "not a valid private key",
+      },
+      {
+        name: "old",
+        path: walletPath(dir, "old"),
+        problem: "not a valid private key",
+      },
+    ]);
+  });
+
+  it("finds a wallet by name, usable or not", async () => {
+    const dir = await tempDir();
+    const good = await createWallet(dir, "good");
+    await writeFile(walletPath(dir, "old"), "0xabc");
+    expect(await findWallet(dir, "good")).toEqual(good);
+    expect(await findWallet(dir, "old")).toMatchObject({
+      problem: "not a valid private key",
+    });
+    await expect(findWallet(dir, "ghost")).rejects.toMatchObject({
+      code: "WALLET_NOT_FOUND",
+    });
   });
 
   it.each([

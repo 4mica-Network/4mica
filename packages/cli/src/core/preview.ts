@@ -1,5 +1,6 @@
-import type { AmountSpec } from "@4mica/sdk/amounts";
+import type { AmountSpec, ResolvedToken } from "@4mica/sdk/amounts";
 import { fields } from "../ui/output.js";
+import { formatAmount } from "./assets.js";
 import type { withSession } from "./session.js";
 import { networkName, type Settings } from "./settings.js";
 
@@ -104,9 +105,7 @@ export async function previewDeposit(
       token: token.native ? "native" : token.address,
       "base units": raw.toString(),
       "wallet holds": `${formatUnits(held, token.decimals)} ${token.symbol}`,
-      gas: sponsored
-        ? "sponsored, if the facilitator accepts the request"
-        : `paid by this wallet (${formatUnits(native, 18)} ${nativeSymbol})`,
+      gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
     },
     problems,
   );
@@ -170,6 +169,128 @@ export async function previewPendingWithdrawal(
           "ready at": pending.readyAt.toISOString(),
         }
       : {},
+    problems,
+  );
+}
+
+/** What core says a cycle settles for: the part of its answer a preview reads. */
+interface CycleTerms {
+  cycleIdText: string;
+  assetAddress: string;
+  /** The contract that takes a debit, and so needs a token's allowance. */
+  contractAddress: string;
+  participant: string;
+  amount: bigint;
+}
+
+const SPONSORED = "sponsored, if the facilitator accepts the request";
+
+async function paidByWallet(native: bigint, nativeSymbol: string) {
+  const { formatUnits } = await import("@4mica/sdk/amounts");
+  return `paid by this wallet (${formatUnits(native, 18)} ${nativeSymbol})`;
+}
+
+/**
+ * What stops `cycles pay` before anything is signed: the wallet not holding
+ * the debit, and, where the wallet sends the transaction itself, no gas or
+ * no allowance for the token.
+ *
+ * shortcut: mirrors the routing in `packages/sdk/src/client/settlement.ts`
+ * (`PayBuilder.send`, `paySelfFunded`), which has no preview of its own.
+ */
+export async function previewCyclePay(
+  settings: Settings,
+  client: Client,
+  terms: CycleTerms,
+  assets: readonly ResolvedToken[],
+  gas: "auto" | "self",
+): Promise<Preview> {
+  const low = await client.lowLevel();
+  const nativeSymbol = settings.info?.nativeSymbol ?? "ETH";
+  const nativeDebit = /^0x0+$/.test(terms.assetAddress);
+  const gateway = await low.ctx.gateway();
+  const native = await gateway.nativeBalance();
+  const held = nativeDebit
+    ? native
+    : await gateway.erc20Balance(terms.assetAddress);
+  const sponsored =
+    !nativeDebit && gas === "auto" && low.settlement.isGaslessAvailable();
+  const amount = await formatAmount(assets, terms.assetAddress, terms.amount);
+  const holds = await formatAmount(assets, terms.assetAddress, held);
+
+  const problems: string[] = [];
+  if (held < terms.amount) {
+    problems.push(`the wallet holds ${holds}; this needs ${amount}`);
+  } else if (nativeDebit && held === terms.amount) {
+    problems.push(`paying all of it leaves no ${nativeSymbol} for gas`);
+  }
+  if (!sponsored && !nativeDebit) {
+    if (native === 0n) {
+      problems.push(
+        `the wallet pays for this transaction and holds no ${nativeSymbol}`,
+      );
+    }
+    // `--gas self` approves the amount itself, before it pays.
+    if (
+      gas === "auto" &&
+      (await gateway.erc20Allowance(
+        terms.assetAddress,
+        terms.contractAddress,
+      )) < terms.amount
+    ) {
+      problems.push(
+        "the wallet has not approved the token for this payment; " +
+          "--gas self approves it first",
+      );
+    }
+  }
+
+  return preview(
+    settings,
+    client,
+    `pay ${amount} for cycle ${terms.cycleIdText}`,
+    {
+      for: terms.participant,
+      "base units": terms.amount.toString(),
+      "wallet holds": holds,
+      gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
+    },
+    problems,
+  );
+}
+
+/**
+ * A claim moves nothing out of the wallet, so the one thing this wallet can
+ * lack is gas, when it sends the transaction itself.
+ */
+export async function previewCycleClaim(
+  settings: Settings,
+  client: Client,
+  terms: CycleTerms,
+  assets: readonly ResolvedToken[],
+  gas: "auto" | "self",
+): Promise<Preview> {
+  const low = await client.lowLevel();
+  const nativeSymbol = settings.info?.nativeSymbol ?? "ETH";
+  const native = await (await low.ctx.gateway()).nativeBalance();
+  const sponsored = gas === "auto" && low.settlement.isGaslessAvailable();
+  const amount = await formatAmount(assets, terms.assetAddress, terms.amount);
+
+  const problems: string[] = [];
+  if (!sponsored && native === 0n) {
+    problems.push(
+      `the wallet pays for this transaction and holds no ${nativeSymbol}`,
+    );
+  }
+  return preview(
+    settings,
+    client,
+    `claim ${amount} for cycle ${terms.cycleIdText}`,
+    {
+      for: terms.participant,
+      "base units": terms.amount.toString(),
+      gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
+    },
     problems,
   );
 }

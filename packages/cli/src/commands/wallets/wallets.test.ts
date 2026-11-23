@@ -93,6 +93,52 @@ describe("wallets", () => {
     expect(await run<Created[]>(Wallets, [])).toEqual([]);
   });
 
+  describe("with a key file that holds no key", () => {
+    const broken = () => join(home, "4mica", "wallets", "old.key");
+    beforeEach(async () => {
+      await run(WalletsCreate, ["buyer-1"]);
+      await writeFile(broken(), "0xabc");
+    });
+
+    it("still lists the others, and marks the one it cannot use", async () => {
+      const outcome = await runCommand(Wallets, ["--json"], home);
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.json).toMatchObject([
+        { name: "buyer-1", active: true, address: expect.any(String) },
+        { name: "old", active: false, problem: "not a valid private key" },
+      ]);
+      const { stdout } = await runCommand(Wallets, [], home);
+      expect(stdout).toContain("unusable: not a valid private key");
+    });
+
+    it("still switches between the others", async () => {
+      await run(WalletsCreate, ["buyer-2"]);
+      expect(await run(WalletsUse, ["buyer-2"])).toMatchObject({
+        name: "buyer-2",
+        active: true,
+      });
+    });
+
+    it("will not switch to it", async () => {
+      const { error } = await runCommand(WalletsUse, ["old"], home);
+      expect(error).toMatchObject({ code: "BAD_SIGNER" });
+      expect(error?.oclif?.exit).toBe(3);
+      const list = await run<Created[]>(Wallets, []);
+      expect(list.find((w) => w.active)?.name).toBe("buyer-1");
+    });
+
+    it("can delete it", async () => {
+      const removed = await run<{ removed: boolean; wasActive: boolean }>(
+        WalletsRemove,
+        ["old", "--confirm", "old"],
+      );
+      expect(removed).toMatchObject({ removed: true, wasActive: false });
+      expect((await run<Created[]>(Wallets, [])).map((w) => w.name)).toEqual([
+        "buyer-1",
+      ]);
+    });
+  });
+
   it("deletes a key only when its name is given twice", async () => {
     await run(WalletsCreate, ["doomed"]);
     for (const argv of [["doomed"], ["doomed", "--confirm", "other"]]) {

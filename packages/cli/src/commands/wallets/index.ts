@@ -26,9 +26,19 @@ export default class Wallets extends BaseCommand {
     this.log(
       table(
         ["NAME", "ADDRESS", "IN USE", "KEY FILE"],
-        wallets.map((w) => [w.name, w.address, w.active ? "yes" : "-", w.path]),
+        wallets.map((w) => [
+          w.name,
+          w.address ?? `unusable: ${w.problem}`,
+          w.active ? "yes" : "-",
+          w.path,
+        ]),
       ),
     );
+    if (wallets.some((w) => !w.address)) {
+      this.note(
+        "a key file that cannot be used can be deleted with `4mica wallets remove <name>`",
+      );
+    }
     if (wallets.length === 0) {
       this.note("no wallets yet; make one with `4mica wallets create`");
     }

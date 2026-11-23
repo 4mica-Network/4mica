@@ -15,6 +15,13 @@ export interface TransportFailure {
 
 let lastFailure: TransportFailure | undefined;
 
+/**
+ * What Node's `fetch` says when the connection failed, whatever the reason,
+ * which is in `cause`. Its other `TypeError`s are about the request itself,
+ * such as a GET with a body, and no host is to blame for those.
+ */
+const NO_ANSWER = "fetch failed";
+
 /** On a wrapper, the `fetch` it wraps: installing twice must not nest. */
 const WRAPS = Symbol("4mica.wraps");
 type Wrapped = typeof fetch & { [WRAPS]?: typeof fetch };
@@ -65,7 +72,7 @@ export function installRequestTimeout(timeoutSecs: number): void {
       const message = error instanceof Error ? error.message : String(error);
       if (timeout.aborted) {
         lastFailure = { origin, reason: "timeout", timeoutSecs, message };
-      } else if (error instanceof TypeError) {
+      } else if (error instanceof TypeError && error.message === NO_ANSWER) {
         const detail = (error.cause as { code?: unknown } | undefined)?.code;
         lastFailure = {
           origin,

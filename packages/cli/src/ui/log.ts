@@ -3,17 +3,30 @@ import picocolors from "picocolors";
 import { runtime } from "../core/runtime.js";
 
 /**
+ * Whether to color what is written to a stream. Turning color off wins over
+ * turning it on, a flag over a variable, and `FORCE_COLOR=0` (or `false`)
+ * means off, as it does to Node: the name alone does not force anything.
+ */
+export function wantsColor(
+  env: Record<string, string | undefined>,
+  argv: readonly string[],
+  isTTY: boolean,
+): boolean {
+  if (env.NO_COLOR || argv.includes("--no-color")) return false;
+  if (argv.includes("--color")) return true;
+  const forced = env.FORCE_COLOR;
+  if (forced) return forced !== "0" && forced !== "false";
+  return isTTY && env.TERM !== "dumb";
+}
+
+/**
  * Color is decided per stream: a terminal's stderr keeps its colors while
  * stdout is piped to `jq`, and a redirected stderr gets no escape codes.
  */
-function colorsFor(stream: NodeJS.WriteStream) {
-  const { env, argv } = process;
-  const off = Boolean(env.NO_COLOR) || argv.includes("--no-color");
-  const on = Boolean(env.FORCE_COLOR) || argv.includes("--color");
-  return picocolors.createColors(
-    !off && (on || (stream.isTTY === true && env.TERM !== "dumb")),
+const colorsFor = (stream: NodeJS.WriteStream) =>
+  picocolors.createColors(
+    wantsColor(process.env, process.argv, stream.isTTY === true),
   );
-}
 
 /** For results, on stdout. */
 export const out = colorsFor(process.stdout);

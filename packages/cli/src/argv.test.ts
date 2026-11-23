@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { hoistCommand, normalizeArgv } from "./argv.js";
+import { distance, hoistCommand, normalizeArgv } from "./argv.js";
 
 const config = {
   commands: [
     { id: "init", flags: { type: { type: "option" } } },
     { id: "status", flags: {} },
+    { id: "dev", flags: {} },
+    { id: "help", flags: {} },
     { id: "withdrawals:request", aliases: ["withdraw"], flags: {} },
     {
       id: "balance",
@@ -88,6 +90,16 @@ describe("normalizeArgv", () => {
         ["--yes", "my-app"],
         ["init", "my-app", "--yes"],
       ],
+      // Directory names two letters away from a short command.
+      [
+        ["demo", "--yes"],
+        ["init", "demo", "--yes"],
+      ],
+      [
+        ["web", "--no-install"],
+        ["init", "web", "--no-install"],
+      ],
+      [["shop"], ["init", "shop"]],
     ])("%j scaffolds, with or without a terminal", (argv, expected) => {
       const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
       expect(normalizeArgv(argv, config, false)).toEqual(expected);
@@ -108,11 +120,33 @@ describe("normalizeArgv", () => {
       // Typos: left for "did you mean", not turned into project names.
       [["statu"]],
       [["balanc", "--json"]],
+      [["staus"]],
+      // One slip from a short command, swapped letters included.
+      [["dve"]],
+      [["inti", "--yes"]],
+      [["hepl"]],
+      [["de"]],
     ])("%j is left to oclif", (argv) => {
       const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
       expect(normalizeArgv(argv, config, true)[0]).not.toBe("init");
       expect(stderr).not.toHaveBeenCalled();
       stderr.mockRestore();
     });
+  });
+});
+
+describe("distance", () => {
+  it.each([
+    ["status", "status", 0],
+    ["statu", "status", 1],
+    ["inti", "init", 1],
+    ["dve", "dev", 1],
+    ["demo", "dev", 2],
+    ["web", "dev", 2],
+    ["", "dev", 3],
+    ["withdrawl", "withdrawals", 2],
+  ])("%j to %j is %i", (a, b, expected) => {
+    expect(distance(a, b)).toBe(expected);
+    expect(distance(b, a)).toBe(expected);
   });
 });
