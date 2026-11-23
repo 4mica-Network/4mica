@@ -24,15 +24,27 @@ export const usageError = (message: string, options: ErrorOptions) =>
 export const configError = (message: string, options: ErrorOptions) =>
   new CliError(message, EXIT.config, options);
 
-export const noSigner = () =>
-  configError("no wallet key found", {
-    code: "NO_SIGNER",
-    suggestions: [
-      "make a new wallet with `4mica wallets create`",
-      "or use a key you have: --key-file <path>, kept with `4mica config set key-file <path>`",
-      "or keep it in a .env file here, as FOURMICA_WALLET_PRIVATE_KEY",
-    ],
-  });
+/**
+ * `envFile` is the .env that was read, if one was. Saying so matters: a
+ * command run from the wrong directory reads that directory's .env, and "no
+ * key found" alone does not show that it looked somewhere unexpected.
+ */
+export const noSigner = (envFile?: string) =>
+  configError(
+    envFile
+      ? `no wallet key found; ${envFile} was read and sets none`
+      : "no wallet key found, and there is no .env in this directory",
+    {
+      code: "NO_SIGNER",
+      suggestions: [
+        "make a new wallet with `4mica wallets create`",
+        "or use a key you have: --key-file <path>, kept with `4mica config set key-file <path>`",
+        envFile
+          ? "or run from the directory whose .env has FOURMICA_WALLET_PRIVATE_KEY, or name that file with --env-file"
+          : "or keep it in a .env file here, as FOURMICA_WALLET_PRIVATE_KEY",
+      ],
+    },
+  );
 
 const SUGGESTIONS: Record<string, string[]> = {
   AmbiguousTokenError: ["pass the token address to --asset"],
@@ -41,10 +53,6 @@ const SUGGESTIONS: Record<string, string[]> = {
   ],
   Erc20AllowanceRequiredError: [
     "rerun with --gas self: the wallet approves the amount, then sends",
-  ],
-  SpendLimitError: [
-    'allow more per payment with --max, such as --max "2 USDC"',
-    "or check who is being paid: --pay-to limits it to addresses you name",
   ],
   GracePeriodNotElapsedError: [
     "run `4mica withdrawals` to see when it can be finalized",
@@ -102,6 +110,42 @@ function transportError(t: TransportFailure): CliError {
  * name so that this module never has to load the SDK. An error that is
  * really a request nobody answered is reported as that, naming the host.
  */
+/**
+ * `fetch` declined to pay. The SDK's message ends "raise the limit in
+ * FourMica.connect({ spend })" whatever the reason, which is the wrong advice
+ * at a terminal, and no advice at all when the seller asks for a token the
+ * network does not take. Each reason gets its own code and next step.
+ */
+function spendLimitError(error: Error): CliError {
+  const limit = (error as { limit?: string }).limit;
+  const detail =
+    /spend limits \(\w+\): (.*); raise the limit in FourMica\.connect/s.exec(
+      error.message,
+    )?.[1] ?? error.message;
+  const unknownToken = /not an asset 4Mica accepts/.test(detail);
+  const [code, suggestions] =
+    limit === "payTo"
+      ? ["PAYEE_NOT_ALLOWED", ["add the payee with --pay-to, or drop --pay-to"]]
+      : limit === "assets" && unknownToken
+        ? [
+            "ASSET_NOT_ACCEPTED",
+            [
+              "the seller is asking for a token this network does not take; `4mica tokens` lists the ones it does",
+              "check that you and the seller are on the same network: `4mica whoami`",
+            ],
+          ]
+        : limit === "assets"
+          ? [
+              "ASSET_NOT_ALLOWED",
+              ['allow paying in it with --max, such as --max "1 USDT"'],
+            ]
+          : [
+              "OVER_SPEND_LIMIT",
+              ['allow more with --max, such as --max "2 USDC"'],
+            ];
+  return failure(`nothing was paid: ${detail}`, { code, suggestions });
+}
+
 export function toCliError(
   error: unknown,
   transport?: TransportFailure,
@@ -112,6 +156,7 @@ export function toCliError(
   }
   const lineage = ancestry(error);
   if (!lineage.includes("FourMicaError")) return error;
+  if (error.name === "SpendLimitError") return spendLimitError(error);
 
   const coreCode = (error as { code?: unknown }).code;
   const exit = lineage.includes("ConfigError")

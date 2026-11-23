@@ -8,7 +8,7 @@ const KEY = "FOURMICA_WALLET_PRIVATE_KEY";
 
 function requireKey(settings: Settings): string {
   const key = settings.sdkEnv[KEY];
-  if (!key) throw noSigner();
+  if (!key) throw noSigner(settings.envFilePath);
   return key;
 }
 

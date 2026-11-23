@@ -52,6 +52,64 @@ describe("toCliError", () => {
   });
 });
 
+describe("a payment fetch declined to make", () => {
+  class PaymentError extends FourMicaError {}
+  class SpendLimitError extends PaymentError {
+    constructor(
+      readonly limit: string,
+      detail: string,
+    ) {
+      super(
+        `payment for http://x/premium refused by the session's spend limits (${limit}): ` +
+          `${detail}; raise the limit in FourMica.connect({ spend }) to allow it`,
+      );
+    }
+  }
+  const told = (limit: string, detail: string) => {
+    const e = toCliError(new SpendLimitError(limit, detail)) as {
+      code: string;
+      message: string;
+      suggestions: string[];
+    };
+    return {
+      code: e.code,
+      message: e.message,
+      advice: e.suggestions.join(" "),
+    };
+  };
+
+  it("does not suggest a higher limit for a token the network does not take", () => {
+    const { code, message, advice } = told(
+      "assets",
+      "0xba50 is not an asset 4Mica accepts on eip155:84532",
+    );
+    expect(code).toBe("ASSET_NOT_ACCEPTED");
+    expect(message).toBe(
+      "nothing was paid: 0xba50 is not an asset 4Mica accepts on eip155:84532",
+    );
+    expect(advice).toContain("4mica tokens");
+    expect(advice).not.toContain("--max");
+  });
+
+  it("points at --max for a price over the limit, and for an unlisted asset", () => {
+    expect(
+      told("perPayment", "the seller asks 2 USDC, over the 1 USDC limit"),
+    ).toMatchObject({ code: "OVER_SPEND_LIMIT" });
+    const unlisted = told(
+      "assets",
+      "the seller asks for USDT, which no perPayment limit names",
+    );
+    expect(unlisted.code).toBe("ASSET_NOT_ALLOWED");
+    expect(unlisted.advice).toContain("--max");
+  });
+
+  it("points at --pay-to for a payee that was not named", () => {
+    expect(
+      told("payTo", "0xabc is not in the allowed payees").advice,
+    ).toContain("--pay-to");
+  });
+});
+
 describe("errorJson", () => {
   it("prints the same fields the terminal shows", () => {
     expect(
