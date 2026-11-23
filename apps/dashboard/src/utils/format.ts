@@ -1,13 +1,15 @@
+import { currentLocale } from "@/i18n/locale";
+
 const EMPTY = "—";
 
 export const formatDate = (iso: string | null): string =>
   iso
-    ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" })
+    ? new Date(iso).toLocaleDateString(currentLocale(), { dateStyle: "medium" })
     : EMPTY;
 
 export const formatDateTime = (iso: string | null): string =>
   iso
-    ? new Date(iso).toLocaleString(undefined, {
+    ? new Date(iso).toLocaleString(currentLocale(), {
         dateStyle: "medium",
         timeStyle: "short",
       })

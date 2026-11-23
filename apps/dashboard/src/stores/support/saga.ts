@@ -1,8 +1,11 @@
-import { HttpError } from "@4mica/http";
 import * as api from "@api/support";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
@@ -17,6 +20,7 @@ import {
   fetchSupportRequestsPending,
   fetchSupportRequestsSucceeded,
   replySupportRequestSucceeded,
+  setSupportPage,
   supportActionFailed,
   updateSupportRequestSucceeded,
 } from "./actions";
@@ -31,14 +35,12 @@ import type {
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 const toMessage = (error: unknown, fallback: string): string =>
-  error instanceof HttpError
-    ? messageOf(error, fallback, {
-        sessionExpired: t(
-          "store.support.sessionExpired",
-          "Your session has expired. Refresh the page and sign in again.",
-        ),
-      })
-    : fallback;
+  messageOf(error, fallback, {
+    sessionExpired: t(
+      "store.support.sessionExpired",
+      "Your session has expired. Refresh the page and sign in again.",
+    ),
+  });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
@@ -67,6 +69,12 @@ export function* fetchSupportRequests(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getSupportRequests>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setSupportPage(lastPage));
+      return;
+    }
 
     yield put(fetchSupportRequestsSucceeded(result));
   } catch (error) {
@@ -98,6 +106,7 @@ export function* fetchSupportRequest(action: {
           error,
           t("store.support.fetchOneFailed", "Couldn't load that request."),
         ),
+        isNotFound(error),
       ),
     );
   }
@@ -245,11 +254,13 @@ export function* batchDeleteSupportRequests(action: {
 
 export default [
   takeLatest(
-    actionTypes.FETCH_SUPPORT_REQUESTS_REQUESTED,
+    [
+      actionTypes.FETCH_SUPPORT_REQUESTS_REQUESTED,
+      actionTypes.SET_SUPPORT_FILTERS,
+      actionTypes.SET_SUPPORT_PAGE,
+    ],
     fetchSupportRequests,
   ),
-  takeLatest(actionTypes.SET_SUPPORT_FILTERS, fetchSupportRequests),
-  takeLatest(actionTypes.SET_SUPPORT_PAGE, fetchSupportRequests),
   takeLatest(actionTypes.FETCH_SUPPORT_REQUEST_REQUESTED, fetchSupportRequest),
   takeEvery(actionTypes.CREATE_SUPPORT_REQUEST_REQUESTED, createSupportRequest),
   takeEvery(actionTypes.UPDATE_SUPPORT_REQUEST_REQUESTED, updateSupportRequest),

@@ -1,4 +1,4 @@
-import { createWalletClient, custom, getAddress } from "viem";
+import { getAddress } from "viem";
 
 interface Eip1193Provider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -150,13 +150,10 @@ export const signMessage = async (
     throw new WalletAccountChangedError(selected);
   }
 
-  const client = createWalletClient({
-    account,
-    transport: custom(injected),
-  });
+  const { signWithInjectedWallet } = await import("./wallet-client");
 
   try {
-    return await client.signMessage({ account, message });
+    return await signWithInjectedWallet(injected, account, message);
   } catch (error) {
     if (isUserRejection(error)) {
       throw new WalletRejectedError();

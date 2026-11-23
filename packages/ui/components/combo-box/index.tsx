@@ -52,6 +52,9 @@ export const ComboBox = ({
   const generatedId = useId();
   const triggerId = id ?? `combo-${generatedId}`;
   const panelId = `${triggerId}-panel`;
+  const labelId = `${triggerId}-label`;
+  const valueId = `${triggerId}-value`;
+  const nameId = ariaLabelledBy ?? (label || ariaLabel ? labelId : undefined);
 
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (isOpenKey(event.key)) {
@@ -83,11 +86,18 @@ export const ComboBox = ({
     >
       {label && (
         <label
+          id={labelId}
           htmlFor={triggerId}
           className="mb-2 block font-medium text-ink-muted text-sm"
         >
           {label}
         </label>
+      )}
+
+      {!label && ariaLabel && !ariaLabelledBy && (
+        <span id={labelId} hidden>
+          {ariaLabel}
+        </span>
       )}
 
       <button
@@ -97,8 +107,7 @@ export const ComboBox = ({
         aria-haspopup="dialog"
         aria-expanded={visible}
         aria-controls={visible ? panelId : undefined}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
+        aria-labelledby={nameId ? `${nameId} ${valueId}` : undefined}
         aria-describedby={ariaDescribedBy}
         disabled={disabled}
         onClick={() => !disabled && setVisible(!visible)}
@@ -107,13 +116,14 @@ export const ComboBox = ({
           "flex w-full items-center rounded-lg border border-overlay/15 px-3 py-2.5 text-left text-ink-body text-sm outline-none transition",
           disabled
             ? "cursor-not-allowed opacity-50"
-            : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/40",
-          visible && "border-overlay/50 ring-1 ring-overlay/40",
+            : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/60",
+          visible && "border-overlay/50 ring-1 ring-overlay/60",
           className,
         )}
         {...(dataTestId ? { "data-testid": `${dataTestId}-trigger` } : {})}
       >
         <span
+          id={valueId}
           className={cn(
             "flex-1 select-none overflow-hidden text-ellipsis whitespace-nowrap",
             selectedValues.length > 0 ? "text-ink-body" : "text-ink-subtle",
@@ -137,11 +147,13 @@ export const ComboBox = ({
         placement="bottom"
         onClickOutside={() => setVisible(false)}
         autoFocus
-        id={panelId}
         matchAnchorWidth
         className="p-0"
       >
         <div
+          id={panelId}
+          role="dialog"
+          aria-labelledby={nameId ?? triggerId}
           className="flex flex-col gap-2.5 p-2.5 text-sm"
           {...(dataTestId ? { "data-testid": `${dataTestId}-panel` } : {})}
         >
@@ -156,7 +168,7 @@ export const ComboBox = ({
 
           <fieldset
             className="m-0 flex max-h-50 min-w-0 flex-col overflow-y-auto overflow-x-hidden border-0 p-0"
-            aria-labelledby={triggerId}
+            aria-labelledby={nameId ?? triggerId}
           >
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => (

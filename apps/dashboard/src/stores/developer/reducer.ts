@@ -1,18 +1,11 @@
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
-import type {
-  ApiKey,
-  DeveloperState,
-  RevealedSecret,
-  Webhook,
-  WebhookEvent,
-} from "./type";
+import type { ApiKey, DeveloperState, Webhook, WebhookEvent } from "./type";
 
 export const INITIAL_STATE: DeveloperState = {
   apiKeys: [],
   webhooks: [],
   events: [],
-  revealed: null,
   isLoading: false,
   hasLoaded: false,
   pending: {},
@@ -79,14 +72,10 @@ export default function developerReducer(
       };
 
     case actionTypes.CREATE_API_KEY_SUCCEEDED: {
-      const { apiKey, revealed } = action.payload as {
-        apiKey: ApiKey;
-        revealed: RevealedSecret;
-      };
+      const { apiKey } = action.payload as { apiKey: ApiKey };
       return {
         ...state,
         apiKeys: [apiKey, ...state.apiKeys],
-        revealed,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }
@@ -109,14 +98,10 @@ export default function developerReducer(
     }
 
     case actionTypes.CREATE_WEBHOOK_SUCCEEDED: {
-      const { webhook, revealed } = action.payload as {
-        webhook: Webhook;
-        revealed: RevealedSecret;
-      };
+      const { webhook } = action.payload as { webhook: Webhook };
       return {
         ...state,
         webhooks: [webhook, ...state.webhooks],
-        revealed,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }
@@ -129,14 +114,10 @@ export default function developerReducer(
       };
 
     case actionTypes.ROTATE_WEBHOOK_SECRET_SUCCEEDED: {
-      const { webhook, revealed } = action.payload as {
-        webhook: Webhook;
-        revealed: RevealedSecret;
-      };
+      const { webhook } = action.payload as { webhook: Webhook };
       return {
         ...state,
         webhooks: replaceById(state.webhooks, webhook),
-        revealed,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }
@@ -162,9 +143,6 @@ export default function developerReducer(
         validationIssues: payload?.issues ?? {},
       };
     }
-
-    case actionTypes.DISMISS_REVEALED_SECRET:
-      return { ...state, revealed: null };
 
     default:
       return state;

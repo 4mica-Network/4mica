@@ -3,14 +3,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   clearSupportIssues,
-  supportPendingKeys,
-  updateSupportRequest,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
   selectSupportIssues,
-} from "@stores/support/selector";
+  supportPendingKeys,
+  updateSupportRequest,
+} from "@stores/support";
 import type { SupportCategory, SupportRequest } from "@stores/support/type";
 import { blankToNull } from "@utils/format";
 import { useEffect, useId } from "react";
@@ -94,8 +92,10 @@ export function EditSupportRequestModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={Boolean(request)}
       onClose={onClose}
+      disableOverlayClose
       title={t("help.edit.title")}
       description={t("help.edit.description")}
       size="lg"

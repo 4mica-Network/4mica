@@ -23,6 +23,7 @@ export const INITIAL_STATE: PaymentState = {
   },
   summary: null,
   stats: null,
+  insightsFailed: false,
   isLoading: false,
   hasLoaded: false,
   error: null,
@@ -69,11 +70,19 @@ export default function paymentReducer(
           "Failed to load payments.",
       };
 
+    case actionTypes.FETCH_PAYMENT_SUMMARY_REQUESTED:
+    case actionTypes.FETCH_PAYMENT_STATS_REQUESTED:
+      return { ...state, insightsFailed: false };
+
     case actionTypes.FETCH_PAYMENT_SUMMARY_SUCCEEDED:
       return { ...state, summary: action.payload as PaymentSummary };
 
     case actionTypes.FETCH_PAYMENT_STATS_SUCCEEDED:
       return { ...state, stats: action.payload as PaymentStats };
+
+    case actionTypes.FETCH_PAYMENT_SUMMARY_FAILED:
+    case actionTypes.FETCH_PAYMENT_STATS_FAILED:
+      return { ...state, insightsFailed: true };
 
     case actionTypes.SET_PAYMENT_FILTERS: {
       const patch = action.payload as Partial<PaymentFilters>;

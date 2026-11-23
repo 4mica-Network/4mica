@@ -5,15 +5,13 @@ import {
   createFaq,
   deleteFaq,
   reorderFaqs,
-  trustPendingKeys,
-  updateFaq,
-} from "@stores/trust/actions";
-import {
   selectFaqs,
   selectIsTrustPending,
   selectTrustError,
   selectTrustIssues,
-} from "@stores/trust/selector";
+  trustPendingKeys,
+  updateFaq,
+} from "@stores/trust";
 import type { Faq } from "@stores/trust/type";
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import type { DragEvent } from "react";

@@ -1,0 +1,80 @@
+name: Dependency vulnerability scan
+
+on:
+  workflow_call:
+    inputs:
+      filters:
+        description: JSON array of pnpm filters whose production dependencies are checked
+        required: false
+        type: string
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/dependency-scan.yml
+      - .github/scripts/dependency-gate.mjs
+
+permissions:
+  contents: read
+
+env:
+  OSV_SCANNER_VERSION: v2.7.1
+  OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+  OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY: ${{ github.workspace }}/.osv-db
+  SEVERITY_THRESHOLD: "7.0"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        filter: ${{ fromJSON(inputs.filters || '["@4mica/dashboard...","@4mica/web...","@4mica/email..."]') }}
+    env:
+      SCAN_FILTER: ${{ matrix.filter }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+
+      - name: Download the npm advisory database
+        run: |
+          mkdir -p "$OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY/osv-scalibr/npm"
+          curl -fsSL -o "$OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY/osv-scalibr/npm/all.zip" \
+            https://osv-vulnerabilities.storage.googleapis.com/npm/all.zip
+
+      - name: Scan pnpm-lock.yaml offline
+        run: |
+          status=0
+          "$RUNNER_TEMP/osv-scanner" scan source --offline --format json \
+            -L pnpm-lock.yaml > "$RUNNER_TEMP/osv-scan.json" || status=$?
+          if [ "$status" -gt 1 ]; then
+            echo "::error::OSV-Scanner failed with exit code $status"
+            exit "$status"
+          fi
+
+      - name: Fail on high or critical advisories in production dependencies
+        run: |
+          pnpm --filter "$SCAN_FILTER" list --prod --depth Infinity --json \
+            > "$RUNNER_TEMP/closure.json"
+          node .github/scripts/dependency-gate.mjs \
+            "$RUNNER_TEMP/osv-scan.json" "$RUNNER_TEMP/closure.json"

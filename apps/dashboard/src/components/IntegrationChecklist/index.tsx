@@ -1,31 +1,33 @@
 import { Link } from "@4mica/ui";
-import { fetchAgents } from "@stores/agent/actions";
-import { fetchApiListings } from "@stores/apiListing/actions";
-import { fetchDeveloper } from "@stores/developer/actions";
+import { fetchAgents } from "@stores/agent";
+import { fetchApiListings } from "@stores/apiListing";
+import { fetchDeveloper } from "@stores/developer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchPaymentSummary } from "@stores/payment/actions";
+import { fetchPaymentSummary } from "@stores/payment";
 import { selectUser } from "@stores/user/selector";
-import { fetchWallets } from "@stores/wallet/actions";
+import { fetchWallets } from "@stores/wallet";
 import { useLocalStorageState } from "ahooks";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { ChevronDown, LifeBuoy, Rocket, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { links } from "@/lib/links";
 import { ChecklistItem } from "./ChecklistItem";
 import { useChecklist } from "./useChecklist";
 
 interface ChecklistPrefs {
-  collapsed: boolean;
+  collapsed?: boolean;
   dismissed: boolean;
   version?: number;
 }
 
 export const CHECKLIST_VERSION = 2;
 
+const COMPACT_QUERY = "(max-width: 767px), (max-height: 699px)";
+
 const DEFAULT_PREFS: ChecklistPrefs = {
-  collapsed: false,
   dismissed: false,
   version: CHECKLIST_VERSION,
 };
@@ -53,7 +55,9 @@ export function IntegrationChecklist() {
     { defaultValue: DEFAULT_PREFS },
   );
 
-  const { collapsed, dismissed } = prefs ?? DEFAULT_PREFS;
+  const compact = useMediaQuery(COMPACT_QUERY, false);
+  const { dismissed } = prefs ?? DEFAULT_PREFS;
+  const collapsed = prefs?.collapsed ?? compact;
 
   useEffect(() => {
     dispatch(fetchDeveloper());
@@ -68,7 +72,10 @@ export function IntegrationChecklist() {
   }
 
   return (
-    <div className="fixed right-6 bottom-6 z-40 w-[320px] max-w-[calc(100vw-3rem)]">
+    <aside
+      aria-label={t("checklist.title")}
+      className="fixed right-6 bottom-6 z-40 w-[320px] max-w-[calc(100vw-3rem)]"
+    >
       <div className="overflow-hidden rounded-lg border border-overlay/10 bg-surface shadow-lg">
         <div className="flex items-center gap-2 px-4 py-3">
           <Rocket className="h-4 w-4 shrink-0 text-brand" />
@@ -86,7 +93,7 @@ export function IntegrationChecklist() {
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-ink-strong text-sm">
+              <span className="block font-medium text-ink-strong text-sm">
                 {t("checklist.title")}
               </span>
               <span className="block text-ink-muted text-xs tabular-nums">
@@ -111,7 +118,7 @@ export function IntegrationChecklist() {
               })
             }
             aria-label={t("checklist.dismiss")}
-            className="shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong"
+            className="shrink-0 rounded-md p-1.5 text-ink-subtle transition-colors hover:text-ink-strong"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -119,7 +126,7 @@ export function IntegrationChecklist() {
 
         <AnimatePresence initial={false}>
           {!collapsed && (
-            <motion.div
+            <m.div
               key="body"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -142,19 +149,23 @@ export function IntegrationChecklist() {
                 <span className="flex items-center gap-3 text-xs">
                   <NavLink
                     to="/help"
-                    className="text-ink-body transition-colors hover:text-ink-strong"
+                    className="inline-flex min-h-6 items-center text-ink-body transition-colors hover:text-ink-strong"
                   >
                     {t("checklist.helpCenter")}
                   </NavLink>
-                  <Link href={links.mailto.support} variant="accent">
+                  <Link
+                    href={links.mailto.support}
+                    variant="accent"
+                    className="inline-flex min-h-6 items-center"
+                  >
                     {t("checklist.contactSupport")}
                   </Link>
                 </span>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </aside>
   );
 }

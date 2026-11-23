@@ -11,7 +11,7 @@ import {
 import { Link } from "react-router-dom";
 
 const ITEM_CLASS =
-  "flex items-center gap-2 px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/10";
+  "flex items-center gap-2 px-3 py-2 text-left text-sm outline-none transition-colors hover:bg-overlay/5 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-overlay/60";
 
 type Tone = "default" | "danger";
 

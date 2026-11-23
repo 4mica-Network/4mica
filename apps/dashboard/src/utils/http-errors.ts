@@ -1,4 +1,5 @@
-import { HttpError } from "@4mica/http";
+import { HttpError, HttpTimeoutError } from "@4mica/http";
+import i18n from "@i18n";
 
 interface ApiIssue {
   path?: unknown;
@@ -45,13 +46,36 @@ export const toIssueMap = (error: unknown): Record<string, string> => {
   return map;
 };
 
+export const isNotFound = (error: unknown): boolean =>
+  error instanceof HttpError && error.status === 404;
+
 export const toMessage = (
   error: unknown,
   fallback: string,
   { sessionExpired }: { sessionExpired?: string } = {},
 ): string => {
   if (!(error instanceof HttpError)) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return i18n.t("http.offline");
+    }
+    if (error instanceof HttpTimeoutError || error instanceof TypeError) {
+      return `${fallback} ${i18n.t("http.checkConnection")}`;
+    }
     return fallback;
+  }
+
+  const code = (error.body as { error?: unknown } | null)?.error;
+
+  if (error.status === 403 && code === "account_disabled") {
+    return i18n.t("http.accountDisabled");
+  }
+
+  if (error.status === 429) {
+    const seconds =
+      error.retryAfterMs === null ? null : Math.ceil(error.retryAfterMs / 1000);
+    return seconds && seconds > 0
+      ? i18n.t("http.rateLimitedFor", { count: seconds })
+      : i18n.t("http.rateLimited");
   }
 
   if (sessionExpired && (error.status === 401 || error.status === 403)) {

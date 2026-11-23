@@ -8,7 +8,6 @@ import { StepLead } from "./StepLead";
 
 export function buildApiIntegrationSteps(
   listing: PublicApiListing,
-  isOwner: boolean,
 ): FlowStep[] {
   const snippets = buildApiListingSnippets(listing);
 
@@ -17,13 +16,7 @@ export function buildApiIntegrationSteps(
       {
         id: "integration",
         title: messages.integration.heading,
-        content: (
-          <StepLead>
-            {isOwner
-              ? messages.integration.notPayableOwner
-              : messages.integration.notPayable}
-          </StepLead>
-        ),
+        content: <StepLead>{messages.integration.notPayable}</StepLead>,
       },
     ];
   }

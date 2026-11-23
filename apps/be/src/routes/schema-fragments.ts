@@ -971,8 +971,22 @@ export const resourceContextResponseSchema = {
   required: ["kind", "listing", "agent", "policy", "faqs"],
   properties: {
     kind: { type: "string", enum: ["listing", "agent"] },
-    listing: { ...apiListingResponseSchema, nullable: true },
-    agent: { ...agentResponseSchema, nullable: true },
+    listing: {
+      ...apiListingResponseSchema,
+      properties: {
+        ...apiListingResponseSchema.properties,
+        assetDecimals: { type: "integer", nullable: true },
+      },
+      nullable: true,
+    },
+    agent: {
+      ...agentResponseSchema,
+      properties: {
+        ...agentResponseSchema.properties,
+        assetDecimals: { type: "integer", nullable: true },
+      },
+      nullable: true,
+    },
     policy: policyResponseSchema.properties.policy,
     faqs: { type: "array", items: faqSchema },
   },

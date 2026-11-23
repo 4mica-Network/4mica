@@ -1,20 +1,19 @@
 import { formatPrice, PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Checkbox, cn, Spinner, Tag } from "@4mica/ui";
+import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   apiListingPendingKeys,
   publishApiListing,
-  toggleApiListingSelected,
-} from "@stores/apiListing/actions";
-import {
   selectIsApiListingPending,
   selectIsApiListingSelected,
-} from "@stores/apiListing/selector";
+  toggleApiListingSelected,
+} from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import { VISIBILITY_LABEL_KEYS, VISIBILITY_TAG_VARIANT } from "./constants";
 
 export function ApiListingRow({
@@ -58,7 +57,7 @@ export function ApiListingRow({
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
-          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline"
+          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline focus-visible:after:rounded-sm focus-visible:after:ring-2 focus-visible:after:ring-overlay/60 focus-visible:after:ring-inset"
           data-testid={`api-listing-name-${listing.id}`}
           to={`/apis/${listing.id}`}
         >
@@ -100,7 +99,7 @@ export function ApiListingRow({
         </div>
       </div>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
         <RowActionsMenu

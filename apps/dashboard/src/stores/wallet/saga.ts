@@ -1,13 +1,14 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/wallet";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   NoWalletError,
   signMessage,
+  WalletAccountChangedError,
   WalletRejectedError,
 } from "@/lib/wallet-signer";
 import {
@@ -19,6 +20,7 @@ import {
   fetchWalletsFailed,
   fetchWalletsPending,
   fetchWalletsSucceeded,
+  setWalletPage,
   updateWalletSucceeded,
   walletActionFailed,
 } from "./actions";
@@ -49,7 +51,13 @@ const toMessage = (error: unknown, fallback: string): string => {
       "You dismissed the signature request, so nothing was linked.",
     );
   }
-  return fallback;
+  if (error instanceof WalletAccountChangedError) {
+    return t(
+      "store.wallet.accountChanged",
+      "Your wallet switched to a different account. Switch back to the address you're linking, then try again.",
+    );
+  }
+  return messageOf(error, fallback);
 };
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
@@ -82,6 +90,12 @@ export function* fetchWallets(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getWallets>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setWalletPage(lastPage));
+      return;
+    }
 
     yield put(fetchWalletsSucceeded(result));
   } catch (error) {
@@ -224,10 +238,15 @@ export function* batchDeleteWallets(action: {
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_WALLETS_REQUESTED, fetchWallets),
+  takeLatest(
+    [
+      actionTypes.FETCH_WALLETS_REQUESTED,
+      actionTypes.SET_WALLET_FILTERS,
+      actionTypes.SET_WALLET_PAGE,
+    ],
+    fetchWallets,
+  ),
   takeLatest(actionTypes.FETCH_ACTIVE_WALLETS_REQUESTED, fetchActiveWallets),
-  takeLatest(actionTypes.SET_WALLET_FILTERS, fetchWallets),
-  takeLatest(actionTypes.SET_WALLET_PAGE, fetchWallets),
   takeEvery(actionTypes.CREATE_WALLET_REQUESTED, createWallet),
   takeEvery(actionTypes.UPDATE_WALLET_REQUESTED, updateWallet),
   takeEvery(actionTypes.DELETE_WALLET_REQUESTED, deleteWallet),

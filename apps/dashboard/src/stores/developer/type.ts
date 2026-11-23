@@ -44,11 +44,12 @@ export interface RevealedSecret {
   plaintext: string;
 }
 
+export type RevealSecret = (secret: RevealedSecret) => void;
+
 export type DeveloperState = {
   apiKeys: ApiKey[];
   webhooks: Webhook[];
   events: WebhookEvent[];
-  revealed: RevealedSecret | null;
   isLoading: boolean;
   hasLoaded: boolean;
   pending: Record<string, boolean>;

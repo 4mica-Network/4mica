@@ -1,4 +1,4 @@
-import { Client, ConfigBuilder, NETWORKS } from "@4mica/sdk";
+import { Client, ConfigBuilder, toCaip2 } from "@4mica/sdk";
 import { FourMicaEvmScheme } from "@4mica/x402/client";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
@@ -40,8 +40,7 @@ const connectFetch = async (): Promise<typeof fetch> => {
     throw new Error("4MICA_WALLET_PRIVATE_KEY is not set");
   }
   // x402 names networks by CAIP-2 id, such as eip155:84532.
-  const network = NETWORKS[process.env["4MICA_NETWORK"] ?? "base-sepolia"]
-    .caip2 as `${string}:${string}`;
+  const network = toCaip2(process.env["4MICA_NETWORK"] ?? "base-sepolia");
   const coreUrl = process.env["4MICA_RPC_URL"];
   const scheme = await FourMicaEvmScheme.create(
     privateKeyToAccount(privateKey as `0x${string}`),
@@ -54,6 +53,7 @@ const connectFetch = async (): Promise<typeof fetch> => {
   // refusals a payer can fix, such as core asking for a checkpoint.
   return wrapFetchWithPaymentFromConfig(fetch, {
     schemes: [{ network, client: scheme }],
+    spendControls: { allowedAssets: [{ network, asset: zeroAddress }] },
   });
 };
 

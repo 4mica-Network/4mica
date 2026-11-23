@@ -1,14 +1,12 @@
 import { isDecimalAmount, trimAmount } from "@4mica/rules";
-import { Button, cn, Spinner } from "@4mica/ui";
+import { Button, cn } from "@4mica/ui";
 import {
   resetCustomerUsage,
-  setCustomerPolicy,
-} from "@stores/customer/actions";
-import {
   selectCustomerIssues,
   selectIsCustomerPolicyPending,
   selectIsCustomerUsageResetPending,
-} from "@stores/customer/selector";
+  setCustomerPolicy,
+} from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { blankToNull } from "@utils/format";
@@ -18,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
 import { SectionCard, SectionFooter, SectionInset } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useDraft } from "@/hooks/useDraft";
 import {
   QUOTA_PERIOD_OPTIONS,

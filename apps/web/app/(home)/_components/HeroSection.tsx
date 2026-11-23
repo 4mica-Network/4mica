@@ -38,31 +38,13 @@ export default function HeroSection() {
     };
   }, [reduceMotion]);
 
-  const container = {
-    hidden: {},
-    show: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
-  };
-  const item = {
-    hidden: { opacity: 0, y: reduceMotion ? 0 : 18 },
-    show: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.55, ease: "easeOut" as const },
-    },
-  };
-
   return (
     <section className="section-gloss relative isolate flex min-h-svh flex-col overflow-hidden">
-      <motion.div
-        className="relative z-10 flex w-full flex-1 flex-col pt-28 pb-8 sm:pt-32 sm:pb-10"
-        variants={container}
-        initial="hidden"
-        animate="show"
-      >
+      <div className="relative z-10 flex w-full flex-1 flex-col pt-28 pb-8 sm:pt-32 sm:pb-10">
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center">
-          <motion.h1
-            variants={item}
-            className="select-none text-balance font-sans text-[clamp(2.25rem,10vw,2.75rem)] text-ink-strong leading-[1.04] tracking-[-0.025em] sm:text-5xl md:text-[3.5rem] lg:text-[clamp(3.5rem,6.1vw,5.5rem)]"
+          <h1
+            style={{ animationDelay: "0.05s" }}
+            className="hero-rise select-none text-balance font-sans text-[clamp(2.25rem,10vw,2.75rem)] text-ink-strong leading-[1.04] tracking-[-0.025em] sm:text-5xl md:text-[3.5rem] lg:text-[clamp(3.5rem,6.1vw,5.5rem)]"
           >
             <span className="sr-only">
               {titlePrefix} {rotatingWords[0]} {titleConnector} {titleLine2}
@@ -98,18 +80,18 @@ export default function HeroSection() {
                 {titleConnector} {titleLine2}
               </span>
             </span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            variants={item}
-            className="mt-8 max-w-xl select-none text-ink-body text-lg leading-relaxed md:text-xl"
+          <p
+            style={{ animationDelay: "0.17s" }}
+            className="hero-rise mt-8 max-w-xl select-none text-ink-body text-lg leading-relaxed md:text-xl"
           >
             {messages.home.hero.subtitle}
-          </motion.p>
+          </p>
 
-          <motion.div
-            variants={item}
-            className="mt-10 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
+          <div
+            style={{ animationDelay: "0.29s" }}
+            className="hero-rise mt-10 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
           >
             <a
               href={links.docs}
@@ -128,9 +110,9 @@ export default function HeroSection() {
                 {messages.common.actions.seeHowItWorks}
               </span>
             </a>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

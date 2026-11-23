@@ -10,6 +10,7 @@ const bannerActions = mirrorKeys([
   "DISMISS_BANNER_FAILED",
 
   "RECORD_BANNER_INTERACTION_REQUESTED",
+  "BANNER_VIEW_RECORDED",
 ] as const);
 
 export default bannerActions;

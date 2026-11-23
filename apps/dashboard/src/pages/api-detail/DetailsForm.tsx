@@ -5,17 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   apiListingPendingKeys,
   clearApiListingIssues,
-  updateApiListing,
-} from "@stores/apiListing/actions";
-import {
   selectApiListingError,
   selectApiListingIssues,
   selectIsApiListingPending,
-} from "@stores/apiListing/selector";
+  updateApiListing,
+} from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchActiveWallets } from "@stores/wallet/actions";
-import { selectSellerWallets } from "@stores/wallet/selector";
+import { fetchActiveWallets, selectSellerWallets } from "@stores/wallet";
 import { blankToNull } from "@utils/format";
 import { type ReactNode, useEffect, useMemo } from "react";
 import {
@@ -25,6 +22,7 @@ import {
   useWatch,
 } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { EditableCard } from "@/components/EditableCard";
 import {
   FieldRow,
@@ -178,7 +176,7 @@ function ListingCard({
 
 function WalletField() {
   const { t } = useTranslation();
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
   const walletId = useWatch({ name: "walletId" }) as string | undefined;
   const chosenWallet = wallets.find((wallet) => wallet.id === walletId);
 
@@ -214,7 +212,7 @@ function WalletField() {
 
 function ListingPriceField() {
   const { t } = useTranslation();
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
   const walletId = useWatch({ name: "walletId" }) as string | undefined;
   const chosenWallet = wallets.find((wallet) => wallet.id === walletId);
 

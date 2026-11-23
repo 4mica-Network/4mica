@@ -1,14 +1,17 @@
 import * as api from "@api/payment";
 import i18n from "@i18n";
-import { definedParams } from "@stores/utils";
+import { definedParams, pageBeyondEnd } from "@stores/utils";
 import { toMessage as messageOf } from "@utils/http-errors";
 import { call, put, select, takeLatest } from "redux-saga/effects";
 import {
+  fetchPaymentStatsFailed,
   fetchPaymentStatsSucceeded,
+  fetchPaymentSummaryFailed,
   fetchPaymentSummarySucceeded,
   fetchPaymentsFailed,
   fetchPaymentsPending,
   fetchPaymentsSucceeded,
+  setPaymentPage,
 } from "./actions";
 import actionTypes from "./actionTypes";
 import { selectPaymentState } from "./selector";
@@ -46,6 +49,12 @@ export function* fetchPayments(): Generator {
       }),
     )) as Awaited<ReturnType<typeof api.getPayments>>;
 
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setPaymentPage(lastPage));
+      return;
+    }
+
     yield put(fetchPaymentsSucceeded(result));
   } catch (error) {
     yield put(
@@ -65,7 +74,9 @@ export function* fetchPaymentSummary(): Generator {
       ReturnType<typeof api.getPaymentSummary>
     >;
     yield put(fetchPaymentSummarySucceeded(summary));
-  } catch {}
+  } catch {
+    yield put(fetchPaymentSummaryFailed());
+  }
 }
 
 export function* fetchPaymentStats(action: {
@@ -77,13 +88,20 @@ export function* fetchPaymentStats(action: {
       api.getPaymentStats(action.payload.months),
     )) as Awaited<ReturnType<typeof api.getPaymentStats>>;
     yield put(fetchPaymentStatsSucceeded(stats));
-  } catch {}
+  } catch {
+    yield put(fetchPaymentStatsFailed());
+  }
 }
 
 export default [
-  takeLatest(actionTypes.FETCH_PAYMENTS_REQUESTED, fetchPayments),
-  takeLatest(actionTypes.SET_PAYMENT_FILTERS, fetchPayments),
-  takeLatest(actionTypes.SET_PAYMENT_PAGE, fetchPayments),
+  takeLatest(
+    [
+      actionTypes.FETCH_PAYMENTS_REQUESTED,
+      actionTypes.SET_PAYMENT_FILTERS,
+      actionTypes.SET_PAYMENT_PAGE,
+    ],
+    fetchPayments,
+  ),
   takeLatest(actionTypes.FETCH_PAYMENT_SUMMARY_REQUESTED, fetchPaymentSummary),
   takeLatest(actionTypes.FETCH_PAYMENT_STATS_REQUESTED, fetchPaymentStats),
 ];

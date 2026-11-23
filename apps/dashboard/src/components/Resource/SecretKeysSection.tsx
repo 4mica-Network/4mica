@@ -1,4 +1,4 @@
-import { Button, Card, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, InputField, Tag } from "@4mica/ui";
 import type { ApiKey } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
@@ -9,14 +9,12 @@ import {
   resetResourceKeys,
   resourceKeyPendingKeys,
   revokeResourceKey,
-} from "@stores/resourceKey/actions";
-import {
   selectIsResourceKeyPending,
   selectResourceKeyError,
   selectResourceKeyIssues,
   selectResourceKeys,
   selectRevealedResourceKey,
-} from "@stores/resourceKey/selector";
+} from "@stores/resourceKey";
 import type { ResourceRef } from "@stores/shared/type";
 import { formatDate } from "@utils/format";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
@@ -25,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SettingsSection } from "@/components/layout";
 import { SecretRevealCard } from "@/components/RevealedSecret";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function SecretKeyRow({

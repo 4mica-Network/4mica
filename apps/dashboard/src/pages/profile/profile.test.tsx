@@ -14,6 +14,9 @@ const { notifySuccess, notifyError } = vi.hoisted(() => ({
 vi.mock("@/lib/notify", () => ({ notifySuccess, notifyError }));
 
 const { ProfileSettings } = await import("./index");
+const { captureVerifyToken, clearVerifyToken, readVerifyToken } = await import(
+  "@/lib/verifyToken"
+);
 const actionTypes = (await import("@stores/user/actionTypes")).default;
 
 const BASE_USER = {
@@ -76,6 +79,7 @@ describe("profile email verification", () => {
   beforeEach(() => {
     notifySuccess.mockReset();
     notifyError.mockReset();
+    clearVerifyToken();
   });
 
   it("offers a way to act while the address is unverified", async () => {
@@ -144,10 +148,15 @@ describe("profile email verification", () => {
   });
 
   it("asks before spending a link, so a page load alone verifies nothing", async () => {
-    const dispatched = renderPage(
-      { emailVerified: false },
-      { path: "/settings/profile?verifyToken=4mica_ev_good" },
+    window.history.replaceState(
+      null,
+      "",
+      "/settings/profile#verifyToken=4mica_ev_good",
     );
+    captureVerifyToken();
+    const dispatched = renderPage({ emailVerified: false });
+
+    expect(window.location.href).not.toContain("4mica_ev_good");
 
     expect(dispatched.map((a) => a.type)).not.toContain(
       actionTypes.CONFIRM_EMAIL_VERIFICATION_REQUESTED,
@@ -163,6 +172,7 @@ describe("profile email verification", () => {
         payload: "4mica_ev_good",
       }),
     );
+    expect(readVerifyToken()).toBeNull();
   });
 
   it("shows no confirmation prompt without a link token", () => {

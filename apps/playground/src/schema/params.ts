@@ -1,3 +1,4 @@
+import { isHttpsUrl } from "@4mica/rules";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MESSAGE,
@@ -5,6 +6,11 @@ import {
   USERNAME_PATTERN,
 } from "@4mica/url";
 import * as v from "valibot";
+
+export const HttpsUrlOrNullSchema = v.pipe(
+  v.nullable(v.string()),
+  v.transform((value) => (value && isHttpsUrl(value) ? value : null)),
+);
 
 export const UsernameParamSchema = v.pipe(
   v.string(),

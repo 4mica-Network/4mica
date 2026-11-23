@@ -1,15 +1,17 @@
 import * as api from "@api/banner";
 import i18n from "@i18n";
 import { toMessage } from "@utils/http-errors";
-import { call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError } from "@/lib/notify";
 import {
+  bannerViewRecorded,
   dismissBannerFailed,
   fetchBannersFailed,
   fetchBannersPending,
   fetchBannersSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
+import { selectViewedBannerIds } from "./selector";
 import type { Banner, BannerInteractionType } from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
@@ -50,6 +52,13 @@ export function* recordBannerInteraction(action: {
   type: string;
   payload: { id: string; interaction: BannerInteractionType };
 }): Generator {
+  if (action.payload.interaction === "VIEWED") {
+    const viewed = (yield select(selectViewedBannerIds)) as string[];
+    if (viewed.includes(action.payload.id)) {
+      return;
+    }
+    yield put(bannerViewRecorded(action.payload.id));
+  }
   try {
     yield call(() =>
       api.recordBannerInteraction(

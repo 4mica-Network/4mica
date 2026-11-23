@@ -57,3 +57,11 @@ export const setPaymentPage = (page: number) => ({
   type: actionTypes.SET_PAYMENT_PAGE,
   payload: { page },
 });
+
+export const fetchPaymentSummaryFailed = () => ({
+  type: actionTypes.FETCH_PAYMENT_SUMMARY_FAILED,
+});
+
+export const fetchPaymentStatsFailed = () => ({
+  type: actionTypes.FETCH_PAYMENT_STATS_FAILED,
+});

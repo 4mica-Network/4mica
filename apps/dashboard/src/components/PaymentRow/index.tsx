@@ -7,12 +7,16 @@ import {
 import { cn, Tag, Tooltip } from "@4mica/ui";
 import type { Payment } from "@stores/payment/type";
 import { formatDateTime } from "@utils/format";
+import { safeExternalUrl } from "@utils/safeUrl";
 import { ArrowDownLeft, ArrowUpRight, ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { STATUS_LABEL_KEYS, STATUS_TAG_VARIANT } from "./constants";
 
 export function PaymentRow({ payment }: { payment: Payment }) {
   const { t } = useTranslation();
+  const { hidden } = usePrivacy();
 
   const received = payment.direction === "received";
   const counterparty = received
@@ -23,6 +27,10 @@ export function PaymentRow({ payment }: { payment: Payment }) {
     payment.agentName ??
     payment.description ??
     t("payment.row.untitled");
+  const resourceUrl = safeExternalUrl(payment.resource);
+  const asset = payment.assetAddress
+    ? t("payment.row.erc20")
+    : t("payment.row.native");
 
   return (
     <div
@@ -52,9 +60,13 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           </span>
           <span className="shrink-0 text-ink-subtle text-xs">
             {received ? t("payment.row.from") : t("payment.row.to")}{" "}
-            <Tooltip title={counterparty} placement="bottom">
-              <span className="font-mono">{shortenAddress(counterparty)}</span>
-            </Tooltip>
+            <Masked>
+              <Tooltip title={counterparty} placement="bottom">
+                <span className="font-mono">
+                  {shortenAddress(counterparty)}
+                </span>
+              </Tooltip>
+            </Masked>
           </span>
         </div>
 
@@ -79,12 +91,12 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           <span className="text-ink-subtle text-xs">
             {formatDateTime(payment.settledAt ?? payment.createdAt)}
           </span>
-          {payment.resource && (
+          {resourceUrl && (
             <a
-              href={payment.resource}
+              href={resourceUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
+              className="inline-flex min-h-6 items-center gap-1 text-ink-subtle text-xs transition-colors hover:text-ink-body"
             >
               {t("payment.row.resource")}
               <ExternalLink className="h-3 w-3" />
@@ -106,18 +118,22 @@ export function PaymentRow({ payment }: { payment: Payment }) {
           data-testid={`payment-amount-${payment.id}`}
         >
           {received ? "+" : "−"}
-          {trimAmount(payment.amount)}
+          <Masked>{trimAmount(payment.amount)}</Masked>
         </span>
-        <a
-          href={explorerAddressUrl(payment.network, counterparty)}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-ink-subtle text-xs transition-colors hover:text-ink-body"
-        >
-          {payment.assetAddress
-            ? t("payment.row.erc20")
-            : t("payment.row.native")}
-        </a>
+        {hidden ? (
+          <span className="inline-flex min-h-6 items-center text-ink-subtle text-xs">
+            {asset}
+          </span>
+        ) : (
+          <a
+            href={explorerAddressUrl(payment.network, counterparty)}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex min-h-6 items-center text-ink-subtle text-xs transition-colors hover:text-ink-body"
+          >
+            {asset}
+          </a>
+        )}
       </div>
     </div>
   );

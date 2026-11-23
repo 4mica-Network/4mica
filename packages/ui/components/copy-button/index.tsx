@@ -31,7 +31,7 @@ export function CopyButton({
       aria-label={label}
       onClick={() => void copy(value)}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-2xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/40",
+        "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-2xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/60",
         copied
           ? "text-ink-strong"
           : "text-ink-subtle hover:bg-overlay/10 hover:text-ink-body",

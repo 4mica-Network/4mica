@@ -1,6 +1,8 @@
 import { Button, Tag } from "@4mica/ui";
-import { setCustomerStatus } from "@stores/customer/actions";
-import { selectIsCustomerStatusPending } from "@stores/customer/selector";
+import {
+  selectIsCustomerStatusPending,
+  setCustomerStatus,
+} from "@stores/customer";
 import type { Customer, CustomerStatus } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDateTime } from "@utils/format";

@@ -2,21 +2,35 @@ import { render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { setAuthTokenProvider, resolveAuthToken, useAuth, dispatch } =
-  vi.hoisted(() => {
-    let provider: (() => Promise<string | null>) | null = null;
-    return {
-      setAuthTokenProvider: vi.fn((next: typeof provider) => {
-        provider = next;
-      }),
-      resolveAuthToken: vi.fn(async () => (provider ? provider() : null)),
-      useAuth: vi.fn(),
-      dispatch: vi.fn(),
-    };
-  });
+const {
+  setAuthTokenProvider,
+  setUnauthorizedHandler,
+  resolveAuthToken,
+  useAuth,
+  signOut,
+  dispatch,
+} = vi.hoisted(() => {
+  let provider: (() => Promise<string | null>) | null = null;
+  return {
+    setAuthTokenProvider: vi.fn((next: typeof provider) => {
+      provider = next;
+    }),
+    setUnauthorizedHandler: vi.fn(),
+    resolveAuthToken: vi.fn(async () => (provider ? provider() : null)),
+    useAuth: vi.fn(),
+    signOut: vi.fn(async () => undefined),
+    dispatch: vi.fn(),
+  };
+});
 
-vi.mock("@api/client", () => ({ setAuthTokenProvider }));
-vi.mock("@clerk/clerk-react", () => ({ useAuth }));
+vi.mock("@api/client", () => ({
+  setAuthTokenProvider,
+  setUnauthorizedHandler,
+}));
+vi.mock("@clerk/clerk-react", () => ({
+  useAuth,
+  useClerk: () => ({ signOut }),
+}));
 vi.mock("@stores/hooks", () => ({ useAppDispatch: () => dispatch }));
 vi.mock("@stores/user/actions", () => ({
   fetchUser: () => ({ type: "FETCH_USER_REQUESTED" }),
@@ -42,6 +56,8 @@ function PageThatFetchesOnMount({
 describe("CurrentUserProvider", () => {
   beforeEach(() => {
     setAuthTokenProvider.mockClear();
+    setUnauthorizedHandler.mockClear();
+    signOut.mockClear();
     dispatch.mockClear();
     useAuth.mockReturnValue({
       isSignedIn: true,
@@ -75,5 +91,24 @@ describe("CurrentUserProvider", () => {
 
     expect(setAuthTokenProvider).toHaveBeenCalled();
     expect(container.querySelector("[data-testid='page']")).not.toBeNull();
+  });
+
+  it("signs out once, back to the current page, when the API rejects the session", () => {
+    window.history.replaceState(null, "", "/payments?page=2");
+
+    render(
+      <CurrentUserProvider>
+        <div />
+      </CurrentUserProvider>,
+    );
+
+    const handler = setUnauthorizedHandler.mock.calls.at(-1)?.[0] as () => void;
+    handler();
+    handler();
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledWith({
+      redirectUrl: `/sign-in?redirect_url=${encodeURIComponent("/payments?page=2")}`,
+    });
   });
 });

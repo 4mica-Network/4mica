@@ -1,3 +1,4 @@
+import type { ResourceRef } from "@stores/shared/type";
 export const REPORT_STATUS = {
   OPEN: "OPEN",
   ACKNOWLEDGED: "ACKNOWLEDGED",
@@ -101,6 +102,7 @@ export interface TrustSummary {
 }
 
 export interface TrustState {
+  resource: ResourceRef | null;
   policy: ResourcePolicy | null;
   faqs: Faq[];
   summary: TrustSummary | null;

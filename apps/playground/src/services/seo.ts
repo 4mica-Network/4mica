@@ -24,6 +24,12 @@ const clampDescription = (text: string): string => {
   return `${cut.slice(0, cut.lastIndexOf(" ")).trimEnd()}…`;
 };
 
+export const isIndexable = (
+  profile: Pick<PublicProfile, "allowSEOIndexing" | "isPublished">,
+  visibility = "PUBLIC",
+): boolean =>
+  profile.allowSEOIndexing && profile.isPublished && visibility === "PUBLIC";
+
 const robotsFor = (indexable: boolean): Metadata["robots"] =>
   indexable
     ? { index: true, follow: true }
@@ -95,7 +101,7 @@ export const buildProfileMetadata = (profile: PublicProfile): Metadata =>
       `${profile.name || profile.username} on 4Mica — agents and APIs for the agentic economy.`,
     path: `/${profile.username}`,
     username: profile.username,
-    indexable: profile.allowSEOIndexing && profile.isPublished,
+    indexable: isIndexable(profile),
     keywords: [profile.username, "4Mica", "agent", "API", "agentic economy"],
   });
 
@@ -112,10 +118,7 @@ export const buildAgentMetadata = (
     path: `/${profile.username}/agents/${agent.ref}`,
     descriptorPath: `/${profile.username}/agents/${agent.ref}/x402.json`,
     username: profile.username,
-    indexable:
-      profile.allowSEOIndexing &&
-      profile.isPublished &&
-      agent.visibility === "PUBLIC",
+    indexable: isIndexable(profile, agent.visibility),
   });
 
 export const buildApiListingMetadata = (
@@ -131,8 +134,5 @@ export const buildApiListingMetadata = (
     path: `/${profile.username}/api/${listing.ref}`,
     descriptorPath: `/${profile.username}/api/${listing.ref}/x402.json`,
     username: profile.username,
-    indexable:
-      profile.allowSEOIndexing &&
-      profile.isPublished &&
-      listing.visibility === "PUBLIC",
+    indexable: isIndexable(profile, listing.visibility),
   });

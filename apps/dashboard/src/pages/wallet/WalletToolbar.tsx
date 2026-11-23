@@ -1,17 +1,15 @@
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   clearWalletSelection,
-  setWalletFilters,
-  setWalletSelection,
-  walletPendingKeys,
-} from "@stores/wallet/actions";
-import {
   selectAreAllWalletsSelected,
   selectIsWalletPending,
   selectSelectedWalletIds,
   selectWalletFilters,
   selectWallets,
-} from "@stores/wallet/selector";
+  setWalletFilters,
+  setWalletSelection,
+  walletPendingKeys,
+} from "@stores/wallet";
 import type { PaymentNetwork, WalletStatus } from "@stores/wallet/type";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";

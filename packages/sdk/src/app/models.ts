@@ -26,6 +26,7 @@ export interface AppListing {
   network: AppNetwork | null;
   payToAddress: string | null;
   assetAddress: string | null;
+  assetDecimals: number | null;
   priceAmount: string | null;
   priceCurrency: string | null;
   x402Endpoint: string | null;
@@ -50,6 +51,7 @@ export interface AppAgent {
   walletId: string | null;
   payToAddress: string | null;
   assetAddress: string | null;
+  assetDecimals: number | null;
   priceAmount: string | null;
   priceCurrency: string | null;
   priceLabel: string | null;

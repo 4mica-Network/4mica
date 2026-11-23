@@ -1,4 +1,4 @@
-import { Spinner } from "@4mica/ui";
+import { Spinner } from "@/components/Spinner";
 
 export function PageSpinner() {
   return (

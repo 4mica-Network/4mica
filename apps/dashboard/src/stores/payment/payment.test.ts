@@ -229,11 +229,13 @@ describe("payment sagas", () => {
     expect(failure.payload.message).toContain("session");
   });
 
-  it("leaves the tiles empty when the summary fails", async () => {
+  it("leaves the tiles empty and reports the failure when the summary fails", async () => {
     getPaymentSummary.mockRejectedValue(new Error("nope"));
 
     const dispatched = await record(fetchPaymentSummary, paymentState());
 
-    expect(dispatched).toEqual([]);
+    expect(dispatched).toEqual([
+      { type: actionTypes.FETCH_PAYMENT_SUMMARY_FAILED },
+    ]);
   });
 });

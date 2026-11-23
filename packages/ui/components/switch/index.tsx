@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
 
 export interface SwitchColors {
@@ -32,7 +32,7 @@ const outer = cva(
     "duration-300",
     "outline-none",
     "focus-visible:ring-2",
-    "focus-visible:ring-overlay/40",
+    "focus-visible:ring-overlay/60",
     "focus-visible:ring-offset-2",
     "focus-visible:ring-offset-surface-deep",
   ],
@@ -93,6 +93,14 @@ export const Switch = ({
   useEffect(() => {
     setIsOn(initialState);
   }, [initialState]);
+
+  const wasDisabled = useRef(disabled);
+  useEffect(() => {
+    if (wasDisabled.current && !disabled) {
+      setIsOn(initialState);
+    }
+    wasDisabled.current = disabled;
+  }, [disabled, initialState]);
 
   const handleToggle = () => {
     if (disabled) {

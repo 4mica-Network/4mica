@@ -130,7 +130,10 @@ server {
 
   location = / { proxy_pass $mica_web; }
 
-  location ^~ /_next/  { proxy_pass $mica_web; }
+  location ^~ /_next/ {
+    location ~ \.map$ { return 404; }
+    proxy_pass $mica_web;
+  }
   location ^~ /assets/ { proxy_pass $mica_web; }
   location ^~ /bg/     { proxy_pass $mica_web; }
   location ^~ /og/     { proxy_pass $mica_web; }
@@ -170,6 +173,8 @@ server {
   # profile page loads unstyled with no server-side error. Strip /p here; Next
   # still serves the files at /_next internally.
   location ^~ /p/_next/ {
+    location ~ \.map$ { return 404; }
+
     rewrite ^/p(/.*)$ $1 break;
     proxy_pass $mica_playground;
 

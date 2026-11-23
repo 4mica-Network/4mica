@@ -36,4 +36,4 @@ pnpm --filter @4mica/example-buyer start  # pays and prints the 200
 1. `createAppClient()` takes `FOURMICA_API_KEY` and `api.resource()` returns the listing.
 2. `paymentMiddleware()` prices `GET /quote` from the listing's `payToAddress`, `assetAddress`, `network` and `priceAmount`.
 3. Before answering, `api.resolveCustomer()` applies the payer rules you set in the dashboard. A refused payer gets a 403 and is not charged.
-4. Once the facilitator settles the payment, `api.reportPayment()` records it, with the guarantee receipt 4mica core issued, so it shows under **Payments**.
+4. Once the facilitator settles the payment, `parseSettlement()` reads the payer, amount and guarantee receipt from it, and `api.reportPayment()` records them so the payment shows under **Payments**.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import en from "./en.json";
 import i18n from "./index";
+import { catalogue } from "./testCatalogues";
 
-const keys = en as Record<string, string>;
+const keys = catalogue("en");
 
 describe("translation catalogue", () => {
   it("has no key whose value is still the key", () => {

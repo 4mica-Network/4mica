@@ -5,6 +5,7 @@ import {
   createAppClient,
   DEFAULT_APP_BASE_URL,
   fromAppNetwork,
+  parseSettlement,
   paymentFromHeader,
   toAppNetwork,
   toDisplayAmount,
@@ -321,5 +322,51 @@ describe("toDisplayAmount", () => {
     expect(toDisplayAmount(0n, 18)).toBe("0");
     expect(toDisplayAmount(42n, 0)).toBe("42");
     expect(toDisplayAmount(-2500000n, 6)).toBe("-2.5");
+  });
+});
+
+describe("parseSettlement", () => {
+  const payload = PaymentRequestPayload.new({
+    userAddress: "0x3D8e1f5A7C9b2D4E6a8c0f2B4d6e8A1c3F5b7D09",
+    recipientAddress: "0x00000000000000000000000000000000000000Be",
+    cycleId: `0x${"11".repeat(32)}`,
+    reqId: 0xabcn,
+    amount: 1_500_000n,
+    timestamp: 1_700_000_000,
+  });
+  const settlement = (extra?: Record<string, unknown>) => ({
+    paymentPayload: {
+      payload: { payload: payload.toPayload(), signature: "0xsig" },
+    },
+    result: { extra },
+  });
+
+  it("reads the payment and its guarantee receipt as reportPayment takes them", () => {
+    expect(
+      parseSettlement(
+        settlement({ receipt: { receipt: "0xclaims", signature: "0xsig" } }),
+      ),
+    ).toEqual({
+      reqId: "0xabc",
+      payerAddress: "0x3D8e1f5A7C9b2D4E6a8c0f2B4d6e8A1c3F5b7D09",
+      amount: "1500000",
+      guaranteeClaims: "0xclaims",
+      guaranteeSignature: "0xsig",
+    });
+  });
+
+  it("leaves the receipt empty when the facilitator returned none", () => {
+    const parsed = parseSettlement(settlement());
+    expect(parsed.guaranteeClaims).toBeNull();
+    expect(parsed.guaranteeSignature).toBeNull();
+  });
+
+  it("rejects a payload without the payment fields", () => {
+    expect(() =>
+      parseSettlement({
+        paymentPayload: { payload: { payload: {} } },
+        result: {},
+      }),
+    ).toThrow(InvalidParamsError);
   });
 });

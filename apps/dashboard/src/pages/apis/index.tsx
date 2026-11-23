@@ -3,9 +3,6 @@ import {
   batchDeleteApiListings,
   deleteApiListing,
   fetchApiListings,
-  setApiListingPage,
-} from "@stores/apiListing/actions";
-import {
   selectApiListingError,
   selectApiListingFilters,
   selectApiListingLimit,
@@ -15,7 +12,8 @@ import {
   selectHasLoadedApiListings,
   selectIsApiListingsLoading,
   selectSelectedApiListingIds,
-} from "@stores/apiListing/selector";
+  setApiListingPage,
+} from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { ArrowUpRight, Blocks, Plus, TriangleAlert } from "lucide-react";

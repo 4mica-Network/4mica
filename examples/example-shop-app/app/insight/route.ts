@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       throw new Error(`${context.method} ${context.path} is not a paid route`);
     }
 
-    const paid = paymentFromHeader(context.paymentHeader ?? "", 0);
+    const paid = paymentFromHeader(context.paymentHeader ?? "", shop.decimals);
     const decision = await shop.api.resolveCustomer({
       payerAddress: paid.payerAddress,
       network: shop.network,

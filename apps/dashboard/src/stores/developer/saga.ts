@@ -1,5 +1,9 @@
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import {
+  refreshAfterWrite,
+  writeSucceededTypes,
+} from "@stores/refreshAfterWrite";
 import type { PendingMeta } from "@stores/utils";
 import { toIssueMap, toMessage } from "@utils/http-errors";
 import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
@@ -19,7 +23,7 @@ import {
   updateWebhookSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import type { WebhookStatus } from "./type";
+import type { RevealSecret, WebhookStatus } from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
@@ -38,7 +42,7 @@ export function* fetchDeveloper(): Generator {
     const [apiKeys, webhooks, events] = (yield all([
       call(api.getApiKeys),
       call(api.getWebhooks),
-      call(api.getWebhookEvents),
+      call(() => api.getWebhookEvents().catch(() => [])),
     ])) as [
       Awaited<ReturnType<typeof api.getApiKeys>>,
       Awaited<ReturnType<typeof api.getWebhooks>>,
@@ -61,23 +65,19 @@ export function* createApiKey(action: {
   type: string;
   payload: { name: string };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const created = (yield call(() =>
       api.createApiKey(action.payload),
     )) as Awaited<ReturnType<typeof api.createApiKey>>;
 
-    yield put(
-      createApiKeySucceeded(
-        created.apiKey,
-        {
-          kind: "apiKey",
-          id: created.apiKey.id,
-          plaintext: created.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(createApiKeySucceeded(created.apiKey, action.meta));
+    action.onReveal?.({
+      kind: "apiKey",
+      id: created.apiKey.id,
+      plaintext: created.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.keyCreated", "API key created"),
       content: t(
@@ -144,23 +144,19 @@ export function* createWebhook(action: {
   type: string;
   payload: { url: string; description?: string | null; events: string[] };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const created = (yield call(() =>
       api.createWebhook(action.payload),
     )) as Awaited<ReturnType<typeof api.createWebhook>>;
 
-    yield put(
-      createWebhookSucceeded(
-        created.webhook,
-        {
-          kind: "webhookSecret",
-          id: created.webhook.id,
-          plaintext: created.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(createWebhookSucceeded(created.webhook, action.meta));
+    action.onReveal?.({
+      kind: "webhookSecret",
+      id: created.webhook.id,
+      plaintext: created.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.webhookCreated", "Webhook created"),
       content: t(
@@ -200,23 +196,19 @@ export function* rotateWebhookSecret(action: {
   type: string;
   payload: { id: string };
   meta: PendingMeta;
+  onReveal?: RevealSecret;
 }): Generator {
   try {
     const rotated = (yield call(() =>
       api.rotateWebhookSecret(action.payload.id),
     )) as Awaited<ReturnType<typeof api.rotateWebhookSecret>>;
 
-    yield put(
-      rotateWebhookSecretSucceeded(
-        rotated.webhook,
-        {
-          kind: "webhookSecret",
-          id: rotated.webhook.id,
-          plaintext: rotated.plaintext,
-        },
-        action.meta,
-      ),
-    );
+    yield put(rotateWebhookSecretSucceeded(rotated.webhook, action.meta));
+    action.onReveal?.({
+      kind: "webhookSecret",
+      id: rotated.webhook.id,
+      plaintext: rotated.plaintext,
+    });
     notifySuccess({
       title: t("store.developer.secretRotated", "Signing secret rotated"),
       content: t(
@@ -243,6 +235,11 @@ export function* deleteWebhook(action: {
 }
 
 export default [
+  refreshAfterWrite({
+    fetchType: actionTypes.FETCH_DEVELOPER_REQUESTED,
+    writeTypes: writeSucceededTypes(actionTypes),
+    isLoading: (state) => state.developer.isLoading,
+  }),
   takeLatest(actionTypes.FETCH_DEVELOPER_REQUESTED, fetchDeveloper),
   takeEvery(actionTypes.CREATE_API_KEY_REQUESTED, createApiKey),
   takeEvery(actionTypes.RENAME_API_KEY_REQUESTED, renameApiKey),

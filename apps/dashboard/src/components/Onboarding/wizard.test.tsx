@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
+const { dispatch, usernameCheck, savingSections } = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  usernameCheck: { value: "", status: "idle" },
+  savingSections: {} as Record<string, boolean>,
+}));
 
 vi.mock("@stores/hooks", () => ({
   useAppDispatch: () => dispatch,
@@ -11,8 +15,8 @@ vi.mock("@stores/hooks", () => ({
         user: { name: "", username: "ada" },
         business: null,
         validationIssues: {},
-        usernameCheck: { status: "idle" },
-        savingSections: {},
+        usernameCheck,
+        savingSections,
         error: null,
       },
       config: { config: null },
@@ -37,6 +41,11 @@ const continueButton = () =>
 describe("Onboarding wizard", () => {
   beforeEach(() => {
     dispatch.mockClear();
+    usernameCheck.value = "";
+    usernameCheck.status = "idle";
+    for (const key of Object.keys(savingSections)) {
+      delete savingSections[key];
+    }
   });
 
   it("keeps Continue disabled until a name is typed", () => {
@@ -60,5 +69,29 @@ describe("Onboarding wizard", () => {
 
     fireEvent.change(nameField(), { target: { value: "Ada" } });
     expect(screen.queryByText("validation.minLength")).toBeNull();
+  });
+
+  it("waits for a new handle's own check, not an earlier handle's result", () => {
+    const { rerender } = render(<Wizard />);
+    fireEvent.change(nameField(), { target: { value: "Ada" } });
+    fireEvent.click(continueButton());
+    savingSections["onboarding.name"] = true;
+    rerender(<Wizard />);
+    savingSections["onboarding.name"] = false;
+    rerender(<Wizard />);
+
+    usernameCheck.value = "grace";
+    usernameCheck.status = "available";
+    const handle = document.getElementById(
+      "onboarding-username",
+    ) as HTMLInputElement;
+    fireEvent.change(handle, { target: { value: "gracie" } });
+
+    expect(continueButton()).toBeDisabled();
+
+    usernameCheck.value = "gracie";
+    rerender(<Wizard />);
+
+    expect(continueButton()).toBeEnabled();
   });
 });

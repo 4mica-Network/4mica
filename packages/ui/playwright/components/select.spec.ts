@@ -65,6 +65,8 @@ test("is fully keyboard operable", async ({ page }) => {
   await expect(page.getByTestId("select-selected")).toHaveText(
     "Due on receipt",
   );
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAccessibleName("Payment terms Due on receipt");
 });
 
 test("closes on Escape and on outside click", async ({ page }) => {
@@ -88,7 +90,7 @@ test("labels the listbox from the field label", async ({ page }) => {
   const trigger = page.getByRole("button", { name: "Payment terms" });
 
   await expect(page.getByTestId("select-selected")).toHaveText("Net 30");
-  await expect(trigger).toHaveAccessibleName("Payment terms");
+  await expect(trigger).toHaveAccessibleName("Payment terms Net 30");
 
   await page.getByTestId("select-label").click();
   const option = page.getByRole("option", { name: "Net 30" });

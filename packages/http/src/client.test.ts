@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpClient, HttpError, HttpMethod } from "./client";
-import { setAuthTokenProvider } from "./token";
+import { setAuthTokenProvider, setUnauthorizedHandler } from "./token";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -19,6 +19,7 @@ describe("HttpClient", () => {
 
   afterEach(() => {
     setAuthTokenProvider(null);
+    setUnauthorizedHandler(null);
     vi.unstubAllGlobals();
   });
 
@@ -102,5 +103,58 @@ describe("HttpClient", () => {
   it("returns undefined for 204 instead of throwing on an empty body", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     await expect(client.delete("/me")).resolves.toBeUndefined();
+  });
+
+  it("retries a 401 once with a refreshed token", async () => {
+    const provider = vi.fn(async (options?: { forceRefresh?: boolean }) =>
+      options?.forceRefresh ? "tok_fresh" : "tok_stale",
+    );
+    setAuthTokenProvider(provider);
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    fetchMock
+      .mockResolvedValueOnce(json({ error: "unauthorized" }, 401))
+      .mockResolvedValueOnce(json({ ok: true }));
+
+    await expect(client.post("/me/things", { a: 1 })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retried = fetchMock.mock.calls[1][1];
+    expect((retried.headers as Headers).get("authorization")).toBe(
+      "Bearer tok_fresh",
+    );
+    expect(retried.body).toBe(JSON.stringify({ a: 1 }));
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it("reports an unauthorized session when the fresh token is rejected too", async () => {
+    setAuthTokenProvider(async (options) =>
+      options?.forceRefresh ? "tok_fresh" : "tok_stale",
+    );
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    fetchMock.mockImplementation(async () => json({}, 401));
+
+    const error = await client.get("/me").catch((e: unknown) => e);
+
+    expect((error as HttpError).status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry or report a 401 on a request it did not authenticate", async () => {
+    setAuthTokenProvider(() => "tok");
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    fetchMock.mockImplementation(async () => json({}, 401));
+
+    await client
+      .request({ url: "/public", method: HttpMethod.GET, skipAuth: true })
+      .catch(() => undefined);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });

@@ -2,10 +2,12 @@ import { Button } from "@4mica/ui";
 import { safeRedirectPath } from "@4mica/url";
 import { useAuth, useSignIn } from "@clerk/clerk-react";
 import { isClerkAPIResponseError } from "@clerk/clerk-react/errors";
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { useTitle } from "ahooks";
+import { m } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, useSearchParams } from "react-router-dom";
+import { SLOW_LOAD_MS } from "@/auth/FullScreenLoader";
 import { links } from "@/lib/links";
 
 function GoogleIcon() {
@@ -33,19 +35,31 @@ function GoogleIcon() {
 
 export function SignInPage() {
   const { t } = useTranslation();
+  useTitle(t("auth.signIn.title"));
   const { isLoaded, signIn } = useSignIn();
   const { isSignedIn } = useAuth();
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
+    return () => clearTimeout(timer);
+  }, [isLoaded]);
 
   const redirectUrlComplete = safeRedirectPath(params.get("redirect_url"));
 
   const signInWithGoogle = async () => {
-    if (!isLoaded) {
+    if (!isLoaded || redirecting) {
       return;
     }
 
     setError(null);
+    setRedirecting(true);
 
     try {
       await signIn.authenticateWithRedirect({
@@ -54,6 +68,7 @@ export function SignInPage() {
         redirectUrlComplete,
       });
     } catch (err) {
+      setRedirecting(false);
       setError(
         isClerkAPIResponseError(err)
           ? (err.errors[0]?.longMessage ?? t("auth.signIn.error"))
@@ -67,11 +82,11 @@ export function SignInPage() {
   }
 
   return (
-    <motion.div
+    <m.main
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="flex min-h-screen w-full flex-col overflow-y-auto bg-surface-deep"
+      className="flex min-h-dvh w-full flex-col overflow-y-auto bg-surface-deep"
     >
       <div className="flex w-full flex-1 flex-col items-center justify-center gap-24 p-10">
         <div className="flex flex-col items-center">
@@ -85,6 +100,7 @@ export function SignInPage() {
               intent="soft"
               block
               disabled={!isLoaded}
+              loading={redirecting}
               onClick={() => void signInWithGoogle()}
               icon={<GoogleIcon />}
               className="h-12 gap-2 rounded-md bg-overlay/5 font-normal text-sm hover:bg-overlay/10"
@@ -98,11 +114,20 @@ export function SignInPage() {
               </p>
             )}
 
+            {!isLoaded && slow && (
+              <p
+                role="status"
+                className="mt-6 text-center text-ink-muted text-sm"
+              >
+                {t("loader.slow")}
+              </p>
+            )}
+
             <p className="mt-6 text-center text-ink-muted text-xs">
               {t("auth.signIn.help")}{" "}
               <a
                 href={links.mailto.support}
-                className="text-brand hover:underline hover:underline-offset-2"
+                className="text-brand underline underline-offset-2"
               >
                 {t("auth.signIn.contact")}
               </a>
@@ -116,12 +141,18 @@ export function SignInPage() {
           rel="noopener noreferrer"
           className="flex items-center gap-2 opacity-90 transition-opacity hover:opacity-100"
         >
-          <img src="/icon.png" alt="" className="h-6 w-auto" />
+          <img
+            src="/icon.png"
+            alt=""
+            width={33}
+            height={24}
+            className="h-6 w-auto"
+          />
           <span className="font-semibold text-ink-strong text-lg tracking-tight">
             {t("auth.signIn.brand")}
           </span>
         </a>
       </div>
-    </motion.div>
+    </m.main>
   );
 }

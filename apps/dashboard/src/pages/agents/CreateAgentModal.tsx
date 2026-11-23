@@ -1,22 +1,24 @@
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createAgent } from "@stores/agent/actions";
 import {
+  clearAgentIssues,
+  createAgent,
   selectAgentError,
   selectAgentIssues,
   selectIsAgentPending,
-} from "@stores/agent/selector";
+} from "@stores/agent";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchActiveWallets } from "@stores/wallet/actions";
 import {
+  fetchActiveWallets,
   selectPayerWallets,
   selectSellerWallets,
-} from "@stores/wallet/selector";
+} from "@stores/wallet";
 import { blankToNull } from "@utils/format";
 import { ArrowUpRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
@@ -47,8 +49,8 @@ export function CreateAgentModal({
   const isSaving = useAppSelector(selectIsAgentPending(PENDING_KEY));
   const error = useAppSelector(selectAgentError);
   const issues = useAppSelector(selectAgentIssues);
-  const sellerWallets = useAppSelector(selectSellerWallets);
-  const payerWallets = useAppSelector(selectPayerWallets);
+  const sellerWallets = useAppSelector(selectSellerWallets, shallowEqual);
+  const payerWallets = useAppSelector(selectPayerWallets, shallowEqual);
 
   const [step, setStep] = useState(0);
   useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
@@ -87,6 +89,7 @@ export function CreateAgentModal({
     }
     reset();
     setStep(0);
+    dispatch(clearAgentIssues());
     dispatch(fetchActiveWallets());
   }, [isOpen, reset, dispatch]);
 
@@ -164,6 +167,7 @@ export function CreateAgentModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("agent.create.title")}

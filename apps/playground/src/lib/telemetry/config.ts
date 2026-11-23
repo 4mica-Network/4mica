@@ -1,4 +1,3 @@
-import type { BrowserOptions } from "@sentry/nextjs";
 import {
   ALLOWED_HEADERS,
   safeScrubBreadcrumb,
@@ -6,7 +5,8 @@ import {
   safeScrubLog,
   safeScrubSpan,
   telemetryScrubbingIntegration,
-} from "./sentry";
+} from "@4mica/telemetry";
+import type { BrowserOptions } from "@sentry/nextjs";
 
 type SamplingContext = Parameters<
   NonNullable<BrowserOptions["tracesSampler"]>

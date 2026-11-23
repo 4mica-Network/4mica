@@ -92,6 +92,7 @@ export type SupportState = {
   current: SupportRequestDetail | null;
   isLoadingCurrent: boolean;
   currentError: string | null;
+  currentNotFound: boolean;
   pending: Record<string, boolean>;
   error: string | null;
   validationIssues: Record<string, string>;

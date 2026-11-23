@@ -36,3 +36,16 @@ export const definedParams = <T extends Record<string, unknown>>(
       ([, value]) => value !== "" && value !== undefined && value !== null,
     ),
   ) as { [K in keyof T]?: Exclude<T[K], "" | null | undefined> };
+
+export const pageBeyondEnd = (result: {
+  items: unknown[];
+  total: number;
+  page: number;
+  limit: number;
+}): number | null => {
+  if (result.items.length > 0 || result.total === 0 || result.page <= 1) {
+    return null;
+  }
+  const last = Math.max(1, Math.ceil(result.total / Math.max(1, result.limit)));
+  return last < result.page ? last : null;
+};

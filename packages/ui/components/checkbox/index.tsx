@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../lib/cn";
@@ -73,7 +73,8 @@ export const Checkbox = ({
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-overlay/40",
+        "flex w-full cursor-pointer items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-overlay/60",
+        !children && "relative after:absolute after:-inset-1",
         disabled && "cursor-not-allowed opacity-50",
         className,
       )}
@@ -85,7 +86,7 @@ export const Checkbox = ({
       >
         <AnimatePresence>
           {checked && (
-            <motion.span
+            <m.span
               key="check-icon"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -95,7 +96,7 @@ export const Checkbox = ({
               data-testid={`${prefix}-icon`}
             >
               <Check className="h-3 w-3" strokeWidth={3} />
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </span>

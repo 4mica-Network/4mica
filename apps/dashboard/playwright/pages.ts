@@ -3,19 +3,17 @@ export const ORG = "4Mica Workspace";
 export interface DashboardPage {
   path: string;
   heading: string;
-  level: 1 | 2;
-  titled: boolean;
 }
 
 export const APP_PAGES: DashboardPage[] = [
-  { path: "/", heading: "Overview", level: 1, titled: true },
-  { path: "/payments", heading: "Payments", level: 1, titled: false },
-  { path: "/payments/disputes", heading: "Disputes", level: 1, titled: true },
-  { path: "/wallet", heading: "Wallet", level: 1, titled: true },
-  { path: "/customers", heading: "Customers", level: 1, titled: true },
-  { path: "/agents", heading: "Agents", level: 1, titled: true },
-  { path: "/apis", heading: "APIs", level: 1, titled: true },
-  { path: "/help", heading: "Help", level: 1, titled: true },
+  { path: "/", heading: "Overview" },
+  { path: "/payments", heading: "Payments" },
+  { path: "/payments/disputes", heading: "Disputes" },
+  { path: "/wallet", heading: "Wallet" },
+  { path: "/customers", heading: "Customers" },
+  { path: "/agents", heading: "Agents" },
+  { path: "/apis", heading: "APIs" },
+  { path: "/help", heading: "Help" },
 ];
 
 export const SETTINGS_PAGES: DashboardPage[] = [
@@ -30,8 +28,6 @@ export const SETTINGS_PAGES: DashboardPage[] = [
 ].map((heading) => ({
   path: `/settings/${heading.toLowerCase()}`,
   heading,
-  level: 2,
-  titled: true,
 }));
 
 export const REDIRECTS: [string, string][] = [

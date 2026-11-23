@@ -1,11 +1,12 @@
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createCustomer } from "@stores/customer/actions";
 import {
+  clearCustomerIssues,
+  createCustomer,
   selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+} from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { blankToNull } from "@utils/format";
 import { type FormEvent, useEffect, useId, useState } from "react";
@@ -71,7 +72,8 @@ export function CreateCustomerModal({
     }
     reset();
     setStep(0);
-  }, [isOpen, reset]);
+    dispatch(clearCustomerIssues());
+  }, [isOpen, reset, dispatch]);
 
   useServerIssues(issues, setError);
 
@@ -145,6 +147,7 @@ export function CreateCustomerModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("customer.create.title")}

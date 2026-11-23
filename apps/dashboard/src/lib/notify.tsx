@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, Info, XCircle } from "lucide-react";
+import { AlertTriangle, Check, Info, type LucideIcon, X } from "lucide-react";
 import {
   type ToastContentProps,
   type ToastOptions,
@@ -25,6 +25,13 @@ type NotificationData = {
 
 type ActionNotificationProps = ToastContentProps<NotificationData>;
 
+const TONES: Record<NotificationType, { Icon: LucideIcon; tint: string }> = {
+  success: { Icon: Check, tint: "bg-success/10 text-success" },
+  warning: { Icon: AlertTriangle, tint: "bg-warning/10 text-warning" },
+  info: { Icon: Info, tint: "bg-overlay/5 text-ink-muted" },
+  error: { Icon: X, tint: "bg-danger/10 text-danger" },
+};
+
 const PRISMA_TO_UI = {
   TOP_LEFT: "topLeft",
   TOP_RIGHT: "topRight",
@@ -39,25 +46,7 @@ const UI_TO_TOAST: Record<PlacementCamel, ToastPosition> = {
   bottomRight: "bottom-right",
 };
 
-const POSITION_TO_CONTAINER: Partial<Record<ToastPosition, string>> = {
-  "top-left": "notify-top-left",
-  "top-right": "notify-top-right",
-  "top-center": "notify-top-center",
-  "bottom-left": "notify-bottom-left",
-  "bottom-right": "notify-bottom-right",
-  "bottom-center": "notify-bottom-center",
-};
-
-export const NOTIFY_CONTAINER_IDS = [
-  "notify-top-left",
-  "notify-top-right",
-  "notify-bottom-left",
-  "notify-bottom-right",
-] as const;
-
-const DEFAULT_CONTAINER_ID = "notify-bottom-right";
-
-function resolveToastPosition(
+export function toastPosition(
   placement?: NotificationPlacement,
   fallback: ToastPosition = "bottom-right",
 ): ToastPosition {
@@ -80,29 +69,19 @@ function notify({
   placement?: NotificationPlacement;
   options?: ToastOptions;
 }) {
-  const {
-    position: positionOverride,
-    containerId: containerIdOverride,
-    ...restOptions
-  } = options;
+  const { position: positionOverride, ...restOptions } = options;
 
-  const position = positionOverride ?? resolveToastPosition(placement);
-  const containerId =
-    containerIdOverride ??
-    POSITION_TO_CONTAINER[position] ??
-    DEFAULT_CONTAINER_ID;
+  const position =
+    positionOverride ?? (placement ? toastPosition(placement) : undefined);
 
   toast(
     (toastProps) => (
       <Notification {...toastProps} data={{ title, content, type }} />
     ),
     {
-      position,
+      ...(position ? { position } : {}),
       autoClose: 6000,
-      className: "w-[400px]",
-      ariaLabel: title,
       hideProgressBar: true,
-      containerId,
       ...restOptions,
     },
   );
@@ -123,21 +102,19 @@ export const notifyError = (props: NotifyProps) =>
 
 function Notification({ data }: ActionNotificationProps) {
   const { title, content, type } = data;
-
-  const iconMap = {
-    success: <CheckCircle className="h-4 w-4 text-success" />,
-    warning: <AlertTriangle className="h-4 w-4 text-warning" />,
-    info: <Info className="h-4 w-4 text-ink-muted" />,
-    error: <XCircle className="h-4 w-4 text-danger" />,
-  };
+  const { Icon, tint } = TONES[type];
 
   return (
-    <div className="flex w-full flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
-        <div className="shrink-0">{iconMap[type]}</div>
-        <span className="font-semibold text-ink-strong text-sm">{title}</span>
+    <div className="flex w-full min-w-0 items-start gap-3">
+      <span
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${tint}`}
+      >
+        <Icon aria-hidden="true" className="h-4 w-4" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1">
+        <span className="font-medium text-ink-strong text-sm">{title}</span>
+        {content && <p className="text-ink-muted text-sm">{content}</p>}
       </div>
-      {content && <p className="text-ink-muted text-sm">{content}</p>}
     </div>
   );
 }

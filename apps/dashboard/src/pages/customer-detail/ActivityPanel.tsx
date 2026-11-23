@@ -1,11 +1,11 @@
 import { EmptyState, Pagination } from "@4mica/ui";
-import { setCustomerActivityPage } from "@stores/customer/actions";
 import {
   selectCustomerActivity,
   selectCustomerActivityLimit,
   selectCustomerActivityPage,
   selectCustomerActivityTotal,
-} from "@stores/customer/selector";
+  setCustomerActivityPage,
+} from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { ArrowRightLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";

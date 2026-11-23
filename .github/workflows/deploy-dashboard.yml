@@ -16,7 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  scan:
+    uses: ./.github/workflows/dependency-scan.yml
+    with:
+      filters: '["@4mica/dashboard..."]'
+
   deploy:
+    needs: scan
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
@@ -46,3 +52,18 @@ jobs:
             VITE_API_URL=${{ vars.VITE_API_URL }}
             VITE_BASE_URL=${{ vars.VITE_BASE_URL }}
             VITE_APP_URL=${{ vars.VITE_APP_URL }}
+            VITE_SENTRY_DSN=${{ vars.DASHBOARD_SENTRY_DSN }}
+            VITE_SENTRY_ENVIRONMENT=${{ inputs.environment }}
+
+      - name: Confirm HTTPS redirect and HSTS
+        shell: bash
+        env:
+          APP_URL: ${{ vars.VITE_APP_URL || 'https://app.4mica.io' }}
+          API_URL: ${{ vars.VITE_API_URL || 'https://api.app.4mica.io' }}
+        run: |
+          hosts=()
+          for url in "$APP_URL" "$API_URL"; do
+            host="${url#*://}"
+            hosts+=("${host%%/*}")
+          done
+          bash infra/nginx/probe-tls.sh "${hosts[@]}"

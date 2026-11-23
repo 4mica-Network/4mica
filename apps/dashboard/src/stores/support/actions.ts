@@ -49,9 +49,12 @@ export const fetchSupportRequestSucceeded = (
   payload,
 });
 
-export const fetchSupportRequestFailed = (message: string) => ({
+export const fetchSupportRequestFailed = (
+  message: string,
+  notFound = false,
+) => ({
   type: actionTypes.FETCH_SUPPORT_REQUEST_FAILED,
-  payload: { message },
+  payload: { message, notFound },
 });
 
 export const resetSupportRequest = () => ({

@@ -10,8 +10,12 @@ import type {
 } from "@api/customer";
 import * as api from "@api/customer";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import {
   all,
   call,
@@ -25,6 +29,7 @@ import {
   batchDeleteCustomersSucceeded,
   createCustomerSucceeded,
   customerActionFailed,
+  customerActionSucceeded,
   customerIdentityChanged,
   deleteCustomerSucceeded,
   fetchCustomerActivity as fetchCustomerActivityAction,
@@ -40,6 +45,7 @@ import {
   fetchCustomersFailed,
   fetchCustomersPending,
   fetchCustomersSucceeded,
+  setCustomerPage,
   setCustomerPolicySucceeded,
   setCustomerStatusSucceeded,
   updateCustomerSucceeded,
@@ -57,6 +63,18 @@ const toMessage = (error: unknown, fallback: string): string =>
       "Your session has expired. Refresh the page and sign in again.",
     ),
   });
+
+function failLoad(error: unknown, fallback: string) {
+  notifyError({
+    title: t("store.customer.failedTitle", "Something went wrong"),
+    content: toMessage(error, fallback),
+  });
+}
+
+function* isShowing(id: string): Generator<unknown, boolean, unknown> {
+  const state = (yield select(selectCustomerState)) as CustomerState;
+  return state.detail.id === id;
+}
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   const message = toMessage(error, fallback);
@@ -89,6 +107,12 @@ export function* fetchCustomers(): Generator {
       }),
     )) as Awaited<ReturnType<typeof api.getCustomers>>;
 
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setCustomerPage(lastPage));
+      return;
+    }
+
     yield put(fetchCustomersSucceeded(result));
   } catch (error) {
     yield put(
@@ -113,23 +137,30 @@ export function* fetchCustomerDetail(action: {
 
     const [customer, overview] = (yield all([
       call(() => api.getCustomer(id)),
-      call(() => api.getCustomerOverview(id)),
+      call(() => api.getCustomerOverview(id).catch(() => null)),
     ])) as [
       Awaited<ReturnType<typeof api.getCustomer>>,
-      Awaited<ReturnType<typeof api.getCustomerOverview>>,
+      Awaited<ReturnType<typeof api.getCustomerOverview>> | null,
     ];
 
+    if (!(yield* isShowing(id))) {
+      return;
+    }
     yield put(fetchCustomerDetailSucceeded({ customer, overview }));
     yield put(fetchCustomerActivityAction(id));
     yield put(fetchCustomerCreditAction(id));
     yield put(fetchCustomerCouponsAction(id));
   } catch (error) {
+    if (!(yield* isShowing(id))) {
+      return;
+    }
     yield put(
       fetchCustomerDetailFailed(
         toMessage(
           error,
           t("store.customer.detailFailed", "Couldn't load that customer."),
         ),
+        isNotFound(error),
       ),
     );
   }
@@ -147,6 +178,9 @@ export function* fetchCustomerActivity(action: {
       api.getCustomerActivity(action.payload.id, { page, limit }),
     )) as Awaited<ReturnType<typeof api.getCustomerActivity>>;
 
+    if (!(yield* isShowing(action.payload.id))) {
+      return;
+    }
     yield put(fetchCustomerActivitySucceeded(result));
   } catch {}
 }
@@ -206,8 +240,13 @@ export function* fetchCustomerCoupons(action: {
       api.getCustomerCoupons(action.payload.id),
     )) as Awaited<ReturnType<typeof api.getCustomerCoupons>>;
 
+    if (!(yield* isShowing(action.payload.id))) {
+      return;
+    }
     yield put(fetchCustomerCouponsSucceeded(result.items));
-  } catch {}
+  } catch (error) {
+    failLoad(error, "Couldn't load this customer's coupons.");
+  }
 }
 
 export function* createCustomerCoupon(action: {
@@ -220,6 +259,7 @@ export function* createCustomerCoupon(action: {
       api.createCustomerCoupon(action.payload.id, action.payload.data),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
 
     notifySuccess({
@@ -248,6 +288,7 @@ export function* updateCustomerCoupon(action: {
       ),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
   } catch (error) {
     yield* fail(error, "Couldn't change that coupon.", action.meta);
@@ -264,6 +305,7 @@ export function* deleteCustomerCoupon(action: {
       api.deleteCustomerCoupon(action.payload.id, action.payload.couponId),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCouponsAction(action.payload.id));
 
     notifySuccess({
@@ -287,8 +329,12 @@ export function* fetchCustomerCredit(action: {
       api.getCustomerCredit(action.payload.id),
     )) as Awaited<ReturnType<typeof api.getCustomerCredit>>;
 
-    yield put(fetchCustomerCreditSucceeded(result));
-  } catch {}
+    if (yield* isShowing(action.payload.id)) {
+      yield put(fetchCustomerCreditSucceeded(result));
+    }
+  } catch (error) {
+    failLoad(error, "Couldn't load this customer's credit.");
+  }
 }
 
 export function* grantCustomerCredit(action: {
@@ -301,6 +347,7 @@ export function* grantCustomerCredit(action: {
       api.grantCustomerCredit(action.payload.id, action.payload.data),
     );
 
+    yield put(customerActionSucceeded(action.meta));
     yield put(fetchCustomerCreditAction(action.payload.id));
 
     notifySuccess({
@@ -325,7 +372,11 @@ export function* zeroCustomerCredit(action: {
       api.zeroCustomerCredit(action.payload.id),
     )) as Awaited<ReturnType<typeof api.zeroCustomerCredit>>;
 
-    yield put(fetchCustomerCreditSucceeded(result));
+    if (yield* isShowing(action.payload.id)) {
+      yield put(fetchCustomerCreditSucceeded(result));
+    }
+    yield put(customerActionSucceeded(action.meta));
+    yield put(fetchCustomerCreditAction(action.payload.id));
 
     notifySuccess({
       title: t("store.customer.creditZeroed", "Credit cleared"),
@@ -547,26 +598,33 @@ export function* removeCustomerIdentity(action: {
   }
 }
 
-export function* refetchActivity(action: {
-  type: string;
-  payload: { id: string };
-}): Generator {
-  yield* fetchCustomerActivity(action);
-}
-
 export default [
-  takeLatest(actionTypes.FETCH_CUSTOMERS_REQUESTED, fetchCustomers),
-  takeLatest(actionTypes.SET_CUSTOMER_FILTERS, fetchCustomers),
-  takeLatest(actionTypes.SET_CUSTOMER_PAGE, fetchCustomers),
+  takeLatest(
+    [
+      actionTypes.FETCH_CUSTOMERS_REQUESTED,
+      actionTypes.SET_CUSTOMER_FILTERS,
+      actionTypes.SET_CUSTOMER_PAGE,
+    ],
+    fetchCustomers,
+  ),
   takeLatest(actionTypes.FETCH_CUSTOMER_DETAIL_REQUESTED, fetchCustomerDetail),
   takeLatest(
-    actionTypes.FETCH_CUSTOMER_ACTIVITY_REQUESTED,
+    [
+      actionTypes.FETCH_CUSTOMER_ACTIVITY_REQUESTED,
+      actionTypes.SET_CUSTOMER_ACTIVITY_PAGE,
+    ],
     fetchCustomerActivity,
   ),
-  takeLatest(actionTypes.SET_CUSTOMER_ACTIVITY_PAGE, refetchActivity),
   takeEvery(actionTypes.CREATE_CUSTOMER_REQUESTED, createCustomer),
   takeEvery(actionTypes.UPDATE_CUSTOMER_REQUESTED, updateCustomer),
   takeLatest(actionTypes.FETCH_CUSTOMER_CREDIT_REQUESTED, fetchCustomerCredit),
+  takeLatest(
+    actionTypes.FETCH_CUSTOMER_COUPONS_REQUESTED,
+    fetchCustomerCoupons,
+  ),
+  takeEvery(actionTypes.CREATE_CUSTOMER_COUPON_REQUESTED, createCustomerCoupon),
+  takeEvery(actionTypes.UPDATE_CUSTOMER_COUPON_REQUESTED, updateCustomerCoupon),
+  takeEvery(actionTypes.DELETE_CUSTOMER_COUPON_REQUESTED, deleteCustomerCoupon),
   takeEvery(actionTypes.GRANT_CUSTOMER_CREDIT_REQUESTED, grantCustomerCredit),
   takeEvery(actionTypes.ZERO_CUSTOMER_CREDIT_REQUESTED, zeroCustomerCredit),
   takeEvery(actionTypes.SET_CUSTOMER_POLICY_REQUESTED, setCustomerPolicy),

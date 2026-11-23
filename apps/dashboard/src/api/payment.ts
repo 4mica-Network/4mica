@@ -1,15 +1,15 @@
 import { HttpMethod } from "@4mica/http";
 import type {
-  Payment,
   PaymentDirection,
-  PaymentListResponse,
   PaymentNetwork,
   PaymentSort,
   PaymentStats,
   PaymentStatus,
   PaymentSummary,
 } from "@stores/payment/type";
-import { httpClient } from "./client";
+import { httpClient, mapResponse } from "./client";
+
+const schema = () => import("./paymentSchema");
 
 export interface ListPaymentsParams
   extends Record<string, string | number | boolean | undefined> {
@@ -24,11 +24,14 @@ export interface ListPaymentsParams
 }
 
 export const getPayments = (params: ListPaymentsParams = {}) =>
-  httpClient.request<PaymentListResponse>({
-    url: "/me/payments",
-    method: HttpMethod.GET,
-    params,
-  });
+  mapResponse(
+    httpClient.request<unknown>({
+      url: "/me/payments",
+      method: HttpMethod.GET,
+      params,
+    }),
+    async (body) => (await schema()).parsePaymentList(body),
+  );
 
 export const getPaymentSummary = () =>
   httpClient.request<PaymentSummary>({
@@ -44,7 +47,10 @@ export const getPaymentStats = (months = 6) =>
   });
 
 export const getPayment = (id: string) =>
-  httpClient.request<Payment>({
-    url: `/me/payments/${encodeURIComponent(id)}`,
-    method: HttpMethod.GET,
-  });
+  mapResponse(
+    httpClient.request<unknown>({
+      url: `/me/payments/${encodeURIComponent(id)}`,
+      method: HttpMethod.GET,
+    }),
+    async (body) => (await schema()).parsePayment(body),
+  );

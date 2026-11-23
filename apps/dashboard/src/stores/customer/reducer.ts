@@ -15,6 +15,7 @@ import type {
 export const ACTIVITY_PAGE_SIZE = 10;
 
 const EMPTY_DETAIL: CustomerDetail = {
+  id: null,
   customer: null,
   overview: null,
   credit: null,
@@ -23,6 +24,8 @@ const EMPTY_DETAIL: CustomerDetail = {
   activity: { items: [], total: 0, page: 1, limit: ACTIVITY_PAGE_SIZE },
   isLoading: false,
   hasLoaded: false,
+  loadError: null,
+  notFound: false,
 };
 
 export const INITIAL_STATE: CustomerState = {
@@ -138,6 +141,13 @@ export default function customerReducer(
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
 
+    case actionTypes.FETCH_CUSTOMER_DETAIL_REQUESTED: {
+      const { id } = action.payload as { id: string };
+      return state.detail.id === id
+        ? state
+        : { ...state, detail: { ...EMPTY_DETAIL, id } };
+    }
+
     case actionTypes.FETCH_CUSTOMER_DETAIL_PENDING:
       return {
         ...state,
@@ -148,7 +158,7 @@ export default function customerReducer(
     case actionTypes.FETCH_CUSTOMER_DETAIL_SUCCEEDED: {
       const payload = action.payload as {
         customer: Customer;
-        overview: CustomerOverview;
+        overview: CustomerOverview | null;
       };
       return {
         ...state,
@@ -168,7 +178,17 @@ export default function customerReducer(
         error:
           (action.payload as { message?: string })?.message ??
           "Failed to load that customer.",
-        detail: { ...state.detail, isLoading: false, hasLoaded: true },
+        detail: {
+          ...state.detail,
+          isLoading: false,
+          hasLoaded: true,
+          loadError:
+            (action.payload as { message?: string })?.message ??
+            "Failed to load that customer.",
+          notFound: Boolean(
+            (action.payload as { notFound?: boolean })?.notFound,
+          ),
+        },
       };
 
     case actionTypes.FETCH_CUSTOMER_COUPONS_SUCCEEDED: {
@@ -253,6 +273,12 @@ export default function customerReducer(
 
     case actionTypes.CLEAR_CUSTOMER_SELECTION:
       return { ...state, selectedIds: [] };
+
+    case actionTypes.CUSTOMER_ACTION_SUCCEEDED:
+      return {
+        ...state,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
 
     case actionTypes.CUSTOMER_ACTION_FAILED: {
       const payload = action.payload as {

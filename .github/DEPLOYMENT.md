@@ -259,7 +259,7 @@ service deploys green but cannot reach its neighbours.
 | web + edge (Box A) | `SERVER_HOST` | `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `WEB_PORT`, `EDGE_PORT`, **`PLAYGROUND_UPSTREAM`** |
 | be | `BE_SERVER_HOST`, `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `BE_PORT`, `LOG_LEVEL`, `CORS_ORIGINS`, `EMAIL_SERVICE_URL`, `PLAYGROUND_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_AUTHORIZED_PARTIES`, `SHUTDOWN_*`, `RATE_LIMIT_*` |
 | email | `EMAIL_SERVER_HOST`, `RESEND_API_KEY` | `EMAIL_DRY_RUN`, `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, `EMAIL_REPLY_TO`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL` |
-| dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL` |
+| dashboard | `DASHBOARD_SERVER_HOST` | `DASHBOARD_PORT`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_URL`, `VITE_BASE_URL`, `VITE_APP_URL`, `DASHBOARD_SENTRY_DSN` (optional) |
 | playground (Box B) | `BE_SERVER_HOST` (same host as be), `POSTGRES_PASSWORD`, `CLERK_SECRET_KEY`, `REVALIDATE_SECRET` | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_DB`, `PLAYGROUND_PORT`, **`PLAYGROUND_BIND`**, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ASSET_PREFIX` (`/p`), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` |
 
 Values the single-box layout pins:
@@ -354,6 +354,30 @@ Values the single-box layout pins:
 - **Build-time vs runtime.** All `VITE_*` and `NEXT_PUBLIC_*` values are inlined
   during `docker build`. Changing one requires a rebuild, not a restart —
   `up -d --build` handles it, but a manual `docker compose restart` will not.
+- **The dashboard build refuses an untrusted `VITE_API_URL`.** It must be an
+  `https` origin on `4mica.io` or a subdomain; anything else fails
+  `docker build`. The same build renders the nginx security headers, whose CSP
+  names that origin and the Clerk host decoded from
+  `VITE_CLERK_PUBLISHABLE_KEY`, so a malformed key fails the build too.
+- **Dashboard Sentry is off until `DASHBOARD_SENTRY_DSN` is set.** The
+  variable becomes `VITE_SENTRY_DSN` at build time; with it unset the Sentry
+  chunk is never downloaded. With it set, the dashboard reports errors and
+  Core Web Vitals (LCP, CLS, INP) for a 10% sample of page loads through the
+  same scrubbers as the playground (`packages/telemetry`), and the build adds
+  the DSN's ingest origin to the CSP `connect-src`. Use a separate Sentry
+  project from the playground's `SENTRY_DSN`.
+- **The dashboard, web and email deploys are gated on a dependency scan.**
+  Each workflow runs `dependency-scan.yml` first: OSV-Scanner matches
+  `pnpm-lock.yaml` offline against the downloaded npm advisory database, and
+  any advisory at CVSS 7.0 or above in that app's production dependencies
+  stops the deploy. `be` and `playground` are not gated yet: `zod@3` (via
+  `@coinbase/cdp-sdk` and `abitype`) and `deepmerge-ts@7` (via `@prisma/config`)
+  have no fix within their major version.
+- **The dashboard deploy ends by probing HTTPS.** `infra/nginx/probe-tls.sh`
+  must see an HTTP→HTTPS redirect and an HSTS header on the app and API hosts,
+  the same check `build-react-app.yml` runs for `4mica.io`. The dashboard
+  container sends HSTS itself; the redirect is the one certbot adds to the
+  host nginx.
 
 ## Bootstrapping the server
 

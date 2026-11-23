@@ -96,7 +96,9 @@
         "VITE_CLERK_PUBLISHABLE_KEY",
         "VITE_API_URL",
         "VITE_BASE_URL",
-        "VITE_APP_URL"
+        "VITE_APP_URL",
+        "VITE_SENTRY_DSN",
+        "VITE_SENTRY_ENVIRONMENT"
       ]
     }
   }

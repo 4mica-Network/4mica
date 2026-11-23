@@ -69,6 +69,9 @@ const customerState = (over: Record<string, unknown> = {}) => ({
   customer: { ...INITIAL_STATE, ...over },
 });
 
+const showing = (id: string) =>
+  customerState({ detail: { ...INITIAL_STATE.detail, id } });
+
 const record = async <TArgs extends unknown[]>(
   saga: (...args: TArgs) => Generator,
   state: unknown,
@@ -184,10 +187,14 @@ describe("customer detail saga", () => {
   });
 
   it("loads the record and its totals together", async () => {
-    const dispatched = await record(fetchCustomerDetail, customerState(), {
-      type: "",
-      payload: { id: "customer_1" },
-    });
+    const dispatched = await record(
+      fetchCustomerDetail,
+      showing("customer_1"),
+      {
+        type: "",
+        payload: { id: "customer_1" },
+      },
+    );
 
     expect(getCustomer).toHaveBeenCalledWith("customer_1");
     expect(getCustomerOverview).toHaveBeenCalledWith("customer_1");
@@ -197,10 +204,14 @@ describe("customer detail saga", () => {
   });
 
   it("kicks off the activity fetch once the record is in", async () => {
-    const dispatched = await record(fetchCustomerDetail, customerState(), {
-      type: "",
-      payload: { id: "customer_1" },
-    });
+    const dispatched = await record(
+      fetchCustomerDetail,
+      showing("customer_1"),
+      {
+        type: "",
+        payload: { id: "customer_1" },
+      },
+    );
 
     expect(types(dispatched)).toContain(
       actionTypes.FETCH_CUSTOMER_ACTIVITY_REQUESTED,

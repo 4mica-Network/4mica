@@ -1,20 +1,19 @@
 import { formatPrice, PAYMENT_NETWORKS, shortenAddress } from "@4mica/rules";
-import { Checkbox, cn, Spinner, Tag } from "@4mica/ui";
+import { Checkbox, cn, Tag } from "@4mica/ui";
 import {
   agentPendingKeys,
   publishAgent,
-  toggleAgentSelected,
-} from "@stores/agent/actions";
-import {
   selectIsAgentPending,
   selectIsAgentSelected,
-} from "@stores/agent/selector";
+  toggleAgentSelected,
+} from "@stores/agent";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import {
   STATUS_LABEL_KEYS,
   STATUS_TAG_VARIANT,
@@ -62,7 +61,7 @@ export function AgentRow({
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
-          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline"
+          className="min-w-0 truncate font-semibold text-base text-ink-strong outline-none after:absolute after:inset-0 focus-visible:underline focus-visible:after:rounded-sm focus-visible:after:ring-2 focus-visible:after:ring-overlay/60 focus-visible:after:ring-inset"
           data-testid={`agent-name-${agent.id}`}
           to={`/agents/${agent.id}`}
         >
@@ -102,7 +101,7 @@ export function AgentRow({
         </div>
       </div>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
         <RowActionsMenu

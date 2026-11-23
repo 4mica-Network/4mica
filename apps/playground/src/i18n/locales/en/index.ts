@@ -218,6 +218,30 @@ export const en = {
       "The agent's wallet address is only shown to you, the owner.",
     inactiveAgent:
       "This agent cannot sign payments until it is active. The setup below still applies.",
+
+    sellerHeading: "Server setup",
+    sellerOpenDashboard: "Open in the dashboard",
+    sellerInstallTitle: "Install the server SDK",
+    sellerInstallLead:
+      "Add the 4Mica SDK and payment middleware to the server that answers this endpoint.",
+    sellerKeyTitle: "Add your secret key",
+    sellerKeyLead:
+      "Create a secret key under Secret keys for this resource in the dashboard, and put it in your server's .env file.",
+    sellerConnectTitle: "Load your terms",
+    sellerConnectLead:
+      "Start server.ts by reading this resource from the dashboard. Price, network and receiving wallet all come from there.",
+    sellerRecordTitle: "Record payments",
+    sellerRecordLead:
+      "Point the resource server at the 4Mica facilitator, and report each settled payment so it shows under Payments.",
+    sellerProtectTitle: "Protect your route",
+    sellerProtectLead:
+      "Add the payment middleware. Unpaid requests get a 402 with your terms; paid ones are verified before your handler runs.",
+    sellerHandleTitle: "Serve paid requests",
+    sellerHandleLead:
+      "Check the payer against your customer rules, then do the work and start listening.",
+    sellerTestTitle: "Check the paywall",
+    sellerTestLead:
+      "Call the route without paying. A 402 with your network and receiving wallet means buyers can pay you.",
   },
 
   flow: {
@@ -234,6 +258,12 @@ export const en = {
     reviews: "Reviews",
     support: "Support",
     actions: "Page actions",
+  },
+
+  view: {
+    label: "View as",
+    seller: "Server guide",
+    buyer: "Customer view",
   },
 
   ai: {
@@ -309,9 +339,7 @@ export const en = {
 
   owner: {
     previewTitle: "Only you can see this",
-    previewLead:
-      "Your profile is private. Publish it to make this page visible to everyone.",
-    publishAction: "Profile settings",
+    publishAction: "Publish",
     refreshAction: "Refresh",
     refreshed: "Refreshed",
     refreshFailed: "Could not refresh",

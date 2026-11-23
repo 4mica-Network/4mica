@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 
 const storeState = {
+  user: { user: null as { privacyMode: boolean } | null },
   customer: {
     pending: {} as Record<string, boolean>,
     validationIssues: {} as Record<string, string>,
@@ -24,6 +25,7 @@ vi.mock("@stores/hooks", () => ({
 }));
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -165,7 +167,7 @@ describe("IdentitiesPanel", () => {
       .getByTestId("customer-identity-remove-identity_1")
       .closest("div");
 
-    expect(actions?.className).toContain("lg:opacity-0");
+    expect(actions?.className).toContain("lg:pointer-fine:opacity-0");
     expect(actions?.className).toContain("lg:group-hover:opacity-100");
   });
 
@@ -728,7 +730,7 @@ describe("CouponsPanel", () => {
       .getByTestId("customer-coupon-remove-coupon_1")
       .closest("div");
 
-    expect(actions?.className).toContain("lg:opacity-0");
+    expect(actions?.className).toContain("lg:pointer-fine:opacity-0");
   });
 
   it("lists a coupon with its code and worth", () => {
@@ -1039,6 +1041,6 @@ describe("RemovePanel", () => {
       </MemoryRouter>,
     );
 
-    expect(navigate).toHaveBeenCalledWith("/customers");
+    expect(navigate).toHaveBeenCalledWith("/customers", { replace: true });
   });
 });

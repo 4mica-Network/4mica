@@ -20,7 +20,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  scan:
+    uses: ./.github/workflows/dependency-scan.yml
+    with:
+      filters: '["@4mica/web..."]'
+
   deploy:
+    needs: scan
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
