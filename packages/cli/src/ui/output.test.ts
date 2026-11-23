@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { fields, table, toPlain } from "./output.js";
 
@@ -13,6 +14,24 @@ describe("table", () => {
     expect(lines).toHaveLength(3);
     expect(lines[1]).toBe("USDC   25");
     expect(lines[2]).toBe("ETH    0.1");
+  });
+
+  it("lines up a column that mixes colored and plain cells", () => {
+    const green = (text: string) => `\u001b[32m${text}\u001b[39m`;
+    const lines = table(
+      ["CHECK", "STATE", "DETAIL"],
+      [
+        ["core", green("up"), "ok"],
+        ["facilitator", "none", "not hosted"],
+      ],
+    )
+      .split("\n")
+      .map(stripVTControlCharacters);
+    expect(lines).toEqual([
+      "CHECK        STATE  DETAIL",
+      "core         up     ok",
+      "facilitator  none   not hosted",
+    ]);
   });
 });
 

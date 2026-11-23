@@ -1,17 +1,23 @@
+import { stripVTControlCharacters } from "node:util";
 import { out } from "./log.js";
+
+/** The room a cell takes on screen: its color codes take none. */
+const width = (cell = "") => stripVTControlCharacters(cell).length;
 
 /**
  * One header row, one record per line, so the output survives `grep`.
- * Columns are padded before color is applied.
+ * A cell may arrive colored; columns are padded to what is seen.
  */
 export function table(headers: string[], rows: string[][]): string {
   const widths = headers.map((header, i) =>
-    Math.max(header.length, ...rows.map((row) => row[i]?.length ?? 0)),
+    Math.max(header.length, ...rows.map((row) => width(row[i]))),
   );
   const line = (cells: string[]) =>
     cells
       .map((cell, i) =>
-        i === cells.length - 1 ? cell : cell.padEnd(widths[i]),
+        i === cells.length - 1
+          ? cell
+          : cell + " ".repeat(widths[i] - width(cell)),
       )
       .join("  ")
       .trimEnd();

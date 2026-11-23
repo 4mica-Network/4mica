@@ -44,7 +44,9 @@ through `@4mica/sdk`.
 
 - Scaffolding is `4mica init`. `4mica` with no command still starts it in a
   terminal, with a notice that a later release will print help there instead;
-  without a terminal it prints help now. Use `npx @4mica/cli init`.
+  without a terminal it prints help now. The old forms with flags or a
+  directory (`4mica --yes`, `4mica my-app --no-install`) still scaffold too,
+  with the same notice. Use `npx @4mica/cli init`.
 - `init` takes `--template <id>` in place of `--type`, `--role` and
   `--framework`. The three old flags still work and print a deprecation
   warning.

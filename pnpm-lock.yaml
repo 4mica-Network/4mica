@@ -1361,6 +1361,9 @@ importers:
       '@4mica/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@4mica/url':
+        specifier: workspace:*
+        version: link:../url
       '@types/node':
         specifier: catalog:node24
         version: 24.12.4

@@ -83,8 +83,13 @@ function ancestry(error: Error): string[] {
   return names;
 }
 
-/** How a request that got no response shows up in an error message. */
-const TRANSPORT = /fetch failed|TimeoutError|timed out|aborted/i;
+/**
+ * Whether `error` is the failed request, or the SDK's report of it. The SDK
+ * puts the cause's message in its own; an error that does not is about
+ * something else, however much it sounds like a timeout.
+ */
+const isAbout = (error: Error, t: TransportFailure) =>
+  t.message !== "" && error.message.includes(t.message);
 
 function transportError(t: TransportFailure): CliError {
   if (t.reason === "timeout") {
@@ -105,11 +110,6 @@ function transportError(t: TransportFailure): CliError {
   });
 }
 
-/**
- * Gives SDK errors a code, an exit status and a next step. Matched by class
- * name so that this module never has to load the SDK. An error that is
- * really a request nobody answered is reported as that, naming the host.
- */
 /**
  * `fetch` declined to pay. The SDK's message ends "raise the limit in
  * FourMica.connect({ spend })" whatever the reason, which is the wrong advice
@@ -146,15 +146,42 @@ function spendLimitError(error: Error): CliError {
   return failure(`nothing was paid: ${detail}`, { code, suggestions });
 }
 
+/**
+ * The facilitator was asked to send a transaction and gave no usable answer,
+ * so it may have sent it. The SDK's message quotes the timeout or dropped
+ * connection behind it, which must not turn this into "try again".
+ */
+function outcomeUnknownError(
+  error: Error,
+  transport?: TransportFailure,
+): CliError {
+  const what = transport ? transportError(transport).message : error.message;
+  return failure(`${what}; this may or may not have gone through`, {
+    code: "OUTCOME_UNKNOWN",
+    suggestions: [
+      "do not run it again yet: a second attempt could send it twice",
+      "see whether it went through with `4mica balance`, `4mica withdrawals` or `4mica cycles`",
+    ],
+  });
+}
+
+/**
+ * Gives SDK errors a code, an exit status and a next step. Matched by class
+ * name so that this module never has to load the SDK. An error that is
+ * really a request nobody answered is reported as that, naming the host.
+ */
 export function toCliError(
   error: unknown,
   transport?: TransportFailure,
 ): unknown {
   if (!(error instanceof Error) || "oclif" in error) return error;
-  if (transport && TRANSPORT.test(`${error.name}: ${error.message}`)) {
-    return transportError(transport);
-  }
   const lineage = ancestry(error);
+  const unanswered =
+    transport && isAbout(error, transport) ? transport : undefined;
+  if (lineage.includes("OutcomeUnknownError")) {
+    return outcomeUnknownError(error, unanswered);
+  }
+  if (unanswered) return transportError(unanswered);
   if (!lineage.includes("FourMicaError")) return error;
   if (error.name === "SpendLimitError") return spendLimitError(error);
 

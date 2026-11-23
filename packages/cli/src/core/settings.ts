@@ -31,8 +31,12 @@ export interface SettingsInput {
   envFile?: Env;
   /** Path of `envFile`, for telling the user where a value came from. */
   envFilePath?: string;
+  /** The env file was found in the working directory, not named. */
+  envFileFound?: boolean;
   /** From `--key-file`, else from the config file's `key-file`. */
   keyFile?: KeyFile;
+  /** Why the config file's `key-file` could not be read. */
+  keyProblem?: Error;
   config: ConfigFile;
 }
 
@@ -48,10 +52,17 @@ export interface Settings {
    * key itself stays in `sdkEnv`.
    */
   key?: { source: Source; file?: string };
+  /**
+   * Why the config file's `key-file` gave no key. Kept, not thrown, until a
+   * command needs the wallet: `4mica tokens` does not.
+   */
+  keyProblem?: Error;
   /** Every `FOURMICA_*` variable in effect, for `FourMica.connect({ env })`. */
   sdkEnv: Record<string, string>;
   /** The env file that was read, if any. */
   envFilePath?: string;
+  /** It was found in the working directory, not named with `--env-file`. */
+  envFileFound?: boolean;
 }
 
 /** `flag`, `env`, `config`, `default`, or the path of the env file. */
@@ -181,9 +192,34 @@ export function resolveSettings(input: SettingsInput): Settings {
     facilitatorUrl,
     asset: at(flags.asset, "flag") ?? at(config.asset, "config"),
     key,
+    keyProblem: key ? undefined : input.keyProblem,
     sdkEnv,
     envFilePath: input.envFilePath,
+    envFileFound: input.envFileFound,
   };
+}
+
+/**
+ * A `.env` that was merely found may put its own wallet on a mainnet, but
+ * not a wallet it does not hold: running a command inside someone else's
+ * project must not move the key kept in the config file, or exported in the
+ * shell, onto real funds. Called before a wallet is used.
+ */
+export function assertMainnetWasChosen(settings: Settings): void {
+  const { network, info, key, envFilePath } = settings;
+  if (network?.source !== "env-file" || info?.testnet !== false) return;
+  if (!settings.envFileFound || key?.source === "env-file") return;
+  throw configError(
+    `${envFilePath} selects ${network.value} (mainnet, real funds), but ` +
+      "the wallet key does not come from that file",
+    {
+      code: "MAINNET_NOT_CHOSEN",
+      suggestions: [
+        `to use ${network.value}, say so: --network ${network.value}, or --env-file ${envFilePath}`,
+        `to stay on a testnet: --network ${DEFAULT_TESTNET}`,
+      ],
+    },
+  );
 }
 
 /** `"base-sepolia"`, or the URL of a core given directly. */

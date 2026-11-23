@@ -29,7 +29,7 @@ export default class WithdrawalsRequest extends NetworkCommand {
   async run() {
     const { args, flags } = await this.parse(WithdrawalsRequest);
     const settings = await this.settings(flags);
-    const amount = amountInput(args.amount, settings.asset?.value);
+    const amount = amountInput(args.amount, settings.asset);
     const label = `${amount.amount} ${amount.asset}`;
 
     return withSession(settings, async (client) => {

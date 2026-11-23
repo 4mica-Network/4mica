@@ -69,9 +69,13 @@ function connected(): Promise<Session> {
   return session;
 }
 
-/** Call once at the end of a run. */
+/**
+ * Call once at the end of a run. A connection that failed has nothing to
+ * close, and its error was already thrown to whoever asked for it.
+ */
 export async function closePayments(): Promise<void> {
-  await (await session)?.close();
+  const client = await session?.catch(() => undefined);
+  await client?.close();
 }
 
 /**

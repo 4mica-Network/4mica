@@ -90,6 +90,7 @@
   },
   "devDependencies": {
     "@4mica/tsconfig": "workspace:*",
+    "@4mica/url": "workspace:*",
     "@types/node": "catalog:node24",
     "publint": "catalog:",
     "tsup": "catalog:",

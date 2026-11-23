@@ -6,7 +6,9 @@ import { readConfig } from "./core/config-file.js";
 import { readKeyFile } from "./core/key-file.js";
 import { installRequestTimeout } from "./core/net.js";
 import {
+  type KeyFile,
   loadEnvFile,
+  readEnv,
   resolveSettings,
   type Settings,
 } from "./core/settings.js";
@@ -63,19 +65,36 @@ export abstract class NetworkCommand extends BaseCommand {
     const envFilePath =
       flags["env-file"] ?? (existsSync(local) ? local : undefined);
 
+    const envFile = envFilePath ? await loadEnvFile(envFilePath) : undefined;
     const config = await readConfig(this.config.configDir);
-    const keyFile = flags["key-file"]
-      ? await readKeyFile(flags["key-file"], "flag")
-      : config["key-file"]
-        ? await readKeyFile(config["key-file"], "config")
-        : undefined;
+
+    // The config file's key file is the last resort, so it is read only when
+    // nothing above it has a key, and a path that has gone stale fails the
+    // commands that need a wallet, not `4mica tokens`.
+    let keyFile: KeyFile | undefined;
+    let keyProblem: Error | undefined;
+    if (flags["key-file"]) {
+      keyFile = await readKeyFile(flags["key-file"], "flag");
+    } else if (
+      config["key-file"] &&
+      !readEnv(process.env, "WALLET_PRIVATE_KEY") &&
+      !readEnv(envFile ?? {}, "WALLET_PRIVATE_KEY")
+    ) {
+      try {
+        keyFile = await readKeyFile(config["key-file"], "config");
+      } catch (error) {
+        keyProblem = error as Error;
+      }
+    }
 
     return resolveSettings({
       flags,
       env: process.env,
-      envFile: envFilePath ? await loadEnvFile(envFilePath) : undefined,
+      envFile,
       envFilePath,
+      envFileFound: envFilePath !== undefined && !flags["env-file"],
       keyFile,
+      keyProblem,
       config,
     });
   }

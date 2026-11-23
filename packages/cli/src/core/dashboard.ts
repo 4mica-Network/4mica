@@ -3,11 +3,9 @@ import { join } from "node:path";
 import { execa } from "execa";
 import { failure } from "../errors.js";
 import { resolveRunContext } from "./context.js";
+import { DASHBOARD_URL } from "./links.js";
 import { detectPackageManager } from "./package-manager.js";
 import { openBrowser } from "./runner.js";
-
-/** The hosted dashboard. */
-export const DASHBOARD_URL = "https://app.4mica.io";
 
 // Vite's port for the dashboard (see apps/dashboard/vite.config.ts).
 const LOCAL_URL = "http://localhost:4173";

@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 import { BaseCommand } from "../base.js";
 import { resolveRunContext } from "../core/context.js";
-import { DASHBOARD_URL, runLocalDashboard } from "../core/dashboard.js";
+import { runLocalDashboard } from "../core/dashboard.js";
+import { DASHBOARD_URL } from "../core/links.js";
 import { openBrowser } from "../core/runner.js";
 
 export default class Dashboard extends BaseCommand {

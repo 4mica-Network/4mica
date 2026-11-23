@@ -1,14 +1,18 @@
 import type { FourMica, SpendLimits } from "@4mica/sdk";
 import { noSigner } from "../errors.js";
 import { waiting } from "../ui/log.js";
-import { networkName, type Settings } from "./settings.js";
+import {
+  assertMainnetWasChosen,
+  networkName,
+  type Settings,
+} from "./settings.js";
 import { addressFromKey } from "./wallets.js";
 
 const KEY = "FOURMICA_WALLET_PRIVATE_KEY";
 
 function requireKey(settings: Settings): string {
   const key = settings.sdkEnv[KEY];
-  if (!key) throw noSigner(settings.envFilePath);
+  if (!key) throw settings.keyProblem ?? noSigner(settings.envFilePath);
   return key;
 }
 
@@ -26,6 +30,7 @@ export async function connect(
   spend?: SpendLimits,
 ): Promise<FourMica> {
   requireKey(settings);
+  assertMainnetWasChosen(settings);
   const { FourMica } = await import("@4mica/sdk");
   return FourMica.connect({
     env: settings.sdkEnv,

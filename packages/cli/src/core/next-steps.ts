@@ -1,4 +1,5 @@
 import { ok, pc } from "../ui/log.js";
+import { FUNDING_DOCS } from "./links.js";
 
 /** One line of a checklist: something done, or the command that does it. */
 export interface Step {
@@ -17,9 +18,6 @@ export function renderSteps(steps: Step[]): string {
     )
     .join("\n");
 }
-
-/** Where the quickstart explains minting test tokens to a new wallet. */
-export const FUNDING_DOCS = "https://docs.4mica.io/getting-started/quickstart";
 
 /** From an empty wallet to spendable collateral. */
 export const fundingSteps = (address?: string): Step[] => [

@@ -1,18 +1,21 @@
 import { type AmountSpec, parseAmount } from "@4mica/sdk/amounts";
 import { usageError } from "../errors.js";
+import type { Resolved } from "./settings.js";
 
 /**
  * `5` with an asset from `--asset` or the config file, or the SDK's own
- * `"5 USDC"`. Naming the asset both ways is refused, not reconciled.
+ * `"5 USDC"`. Naming the asset both ways on the command line is refused, not
+ * reconciled; over a default from the config file, the one typed wins.
  */
-export function amountInput(arg: string, asset?: string): AmountSpec {
+export function amountInput(arg: string, given?: Resolved): AmountSpec {
   const parts = arg.trim().split(/\s+/);
-  if (parts.length === 2 && asset) {
+  if (parts.length === 2 && given?.source === "flag") {
     throw usageError(`the asset is given twice: "${arg}" and --asset`, {
       code: "ASSET_GIVEN_TWICE",
       suggestions: ["name it once"],
     });
   }
+  const asset = given?.value;
   if (parts.length === 1 && !asset) {
     throw usageError("no asset given", {
       code: "NO_ASSET",

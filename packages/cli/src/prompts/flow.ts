@@ -1,4 +1,5 @@
 import { cancel, confirm, isCancel, select, text } from "@clack/prompts";
+import { DOCS_URL } from "../core/links.js";
 import { toPackageName } from "../core/substitute.js";
 import type {
   AgentRole,
@@ -45,7 +46,7 @@ export async function runInitFlow(
       cancel(
         "No problem. In an existing app, `npm i @4mica/x402` to charge for " +
           "a route, or `npm i @4mica/sdk` to pay for one. " +
-          "Docs: https://docs.4mica.io",
+          `Docs: ${DOCS_URL}`,
         io,
       );
       process.exit(0);

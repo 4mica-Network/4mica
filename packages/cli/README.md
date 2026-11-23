@@ -50,7 +50,9 @@ SETTINGS
 and flags.
 
 `4mica` with no command still starts `4mica init` in a terminal, with a notice:
-a later release will print help there instead.
+a later release will print help there instead. The old forms with flags or a
+directory, `4mica --yes` and `4mica my-app`, still scaffold too, with the same
+notice.
 
 ## Scaffolding
 
@@ -259,6 +261,12 @@ The cli never reaches mainnet by default. Real funds move only after
 `--network base` or `4mica config set network base`, and the confirmation
 before sending then says `base (mainnet, real funds)`.
 
+A `.env` in the current directory can name a mainnet too, but only for the
+wallet key that same file holds. With a key from the config file or the
+shell, the command stops with `MAINNET_NOT_CHOSEN` until you name the network
+with `--network` or the file with `--env-file`, so that running a command
+inside someone else's project cannot move your wallet onto real funds.
+
 ```bash
 4mica config set network base
 4mica config set asset USDC     # then `4mica deposit 5` needs no --asset
@@ -291,7 +299,7 @@ A request that gets no response is given up on after 30 seconds;
 | Exit code | Meaning |
 | --- | --- |
 | 0 | done, including a deposit that is mined but still `pending` |
-| 1 | the operation failed: no response (`UNREACHABLE`, `TIMEOUT`), a refusal by core, a reverted transaction |
+| 1 | the operation failed: no response (`UNREACHABLE`, `TIMEOUT`), a refusal by core, a reverted transaction. `OUTCOME_UNKNOWN` means a sponsored transaction may have been sent: check `4mica balance` before running it again |
 | 2 | usage: an unknown command or flag, a bad value, or a confirmation that could not be asked for and no `--yes` |
 | 3 | configuration: no wallet key, an unknown network in the environment or config file |
 

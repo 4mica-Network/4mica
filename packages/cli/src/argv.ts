@@ -34,23 +34,68 @@ export function hoistCommand(argv: string[], config: Commands): string[] {
   return [...rest.slice(0, end), ...argv.slice(0, i), ...rest.slice(end)];
 }
 
-export const BARE_NOTICE =
-  "`4mica` with no command starts `4mica init`, as it always has. A later " +
-  "release will print help instead; run `4mica init` to scaffold.";
+export const INIT_NOTICE =
+  "No command was given, so this runs `4mica init`, as it always has. A " +
+  "later release will print help instead; write `4mica init` to scaffold.";
+
+/** Edit distance, for telling a mistyped command from a directory name. */
+export function distance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(
+        row[j] + 1,
+        next[j - 1] + 1,
+        row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    row = next;
+  }
+  return row[b.length];
+}
+
+/** The first word of every command, topic and alias. */
+function firstWords({ commands }: Commands): string[] {
+  return commands.flatMap((command) =>
+    [command.id, ...(command.aliases ?? [])].map((id) => id.split(":")[0]),
+  );
+}
+
+const HELP_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
+
+/**
+ * Whether this is the old way of scaffolding: until 0.3 there was one
+ * command and no word for it, so its flags and directory came first, as in
+ * `4mica --yes` and `4mica my-app --no-install`. A word close to a real
+ * command is left alone, so that a typo gets "did you mean" and not a
+ * project named after it.
+ */
+function meansInit(argv: string[], config: Commands): boolean {
+  const [first] = argv;
+  if (first.startsWith("-")) {
+    // Nothing but flags: `hoistCommand` put any command in front of them.
+    return first !== "--" && !argv.some((arg) => HELP_FLAGS.has(arg));
+  }
+  return !firstWords(config).some((word) => distance(first, word) <= 2);
+}
 
 /**
  * Until 0.3 a bare `4mica` scaffolded a project. That still works, with a
- * notice, for the people and docs that rely on it. Only in a terminal: with
- * no one to answer the prompts, help is the useful thing to print.
+ * notice, for the people and docs that rely on it. A bare `4mica` only in a
+ * terminal: with no one to answer the prompts, help is the useful thing to
+ * print. With flags or a directory it was already a script's way to
+ * scaffold, so those work anywhere.
  */
 export function normalizeArgv(
   argv: string[],
   config: Commands,
   interactive = process.stdin.isTTY === true && process.stderr.isTTY === true,
 ): string[] {
-  if (argv.length === 0 && interactive) {
-    process.stderr.write(`${BARE_NOTICE}\n\n`);
-    return ["init"];
+  const hoisted = hoistCommand(argv, config);
+  if (hoisted.length === 0 ? !interactive : !meansInit(hoisted, config)) {
+    return hoisted;
   }
-  return hoistCommand(argv, config);
+  process.stderr.write(`${INIT_NOTICE}\n\n`);
+  return ["init", ...hoisted];
 }

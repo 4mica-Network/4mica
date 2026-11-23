@@ -1,6 +1,7 @@
 import { configPath } from "../../core/config-file.js";
 import { origin, type Resolved } from "../../core/settings.js";
 import { NetworkCommand } from "../../network-command.js";
+import { warn } from "../../ui/log.js";
 import { table } from "../../ui/output.js";
 
 export default class Config extends NetworkCommand {
@@ -18,6 +19,8 @@ export default class Config extends NetworkCommand {
   async run() {
     const { flags } = await this.parse(Config);
     const settings = await this.settings(flags);
+    // Shown here rather than fatal: this is where a stale path gets fixed.
+    if (settings.keyProblem) this.note(warn(settings.keyProblem.message));
     const effective: Record<string, Resolved | undefined> = {
       network: settings.network,
       "rpc-url": settings.rpcUrl,

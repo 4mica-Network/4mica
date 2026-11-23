@@ -3,7 +3,11 @@ import { hoistCommand, normalizeArgv } from "./argv.js";
 
 const config = {
   commands: [
+    { id: "init", flags: { type: { type: "option" } } },
+    { id: "status", flags: {} },
+    { id: "withdrawals:request", aliases: ["withdraw"], flags: {} },
     {
+      id: "balance",
       flags: {
         network: { type: "option" },
         asset: { type: "option", char: "a" },
@@ -67,5 +71,48 @@ describe("normalizeArgv", () => {
 
   it("prints help on a bare invocation with no one to answer prompts", () => {
     expect(normalizeArgv([], config, false)).toEqual([]);
+  });
+
+  describe("the scaffolder's arguments with no command, as before 0.3", () => {
+    it.each([
+      [["--yes"], ["init", "--yes"]],
+      [
+        ["--type", "seller", "--yes"],
+        ["init", "--type", "seller", "--yes"],
+      ],
+      [
+        ["my-app", "--no-install"],
+        ["init", "my-app", "--no-install"],
+      ],
+      [
+        ["--yes", "my-app"],
+        ["init", "my-app", "--yes"],
+      ],
+    ])("%j scaffolds, with or without a terminal", (argv, expected) => {
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      expect(normalizeArgv(argv, config, false)).toEqual(expected);
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining("4mica init"),
+      );
+      stderr.mockRestore();
+    });
+
+    it.each([
+      [["--help"]],
+      [["-h"]],
+      [["--version"]],
+      [["--json", "--help"]],
+      [["status"]],
+      [["withdraw", "5"]],
+      [["withdrawals", "request", "5"]],
+      // Typos: left for "did you mean", not turned into project names.
+      [["statu"]],
+      [["balanc", "--json"]],
+    ])("%j is left to oclif", (argv) => {
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      expect(normalizeArgv(argv, config, true)[0]).not.toBe("init");
+      expect(stderr).not.toHaveBeenCalled();
+      stderr.mockRestore();
+    });
   });
 });

@@ -1,7 +1,12 @@
 import { NETWORKS } from "@4mica/sdk/networks";
 import { describe, expect, it } from "vitest";
 import { EXIT } from "../errors.js";
-import { DEFAULT_TESTNET, readEnv, resolveSettings } from "./settings.js";
+import {
+  assertMainnetWasChosen,
+  DEFAULT_TESTNET,
+  readEnv,
+  resolveSettings,
+} from "./settings.js";
 
 const exitOf = (run: () => unknown): number | undefined => {
   try {
@@ -169,6 +174,59 @@ describe("resolveSettings", () => {
     expect(
       resolveSettings({ flags: { asset: "ETH" }, env: {}, config }).asset,
     ).toEqual({ value: "ETH", source: "flag" });
+  });
+});
+
+describe("a mainnet named only by a .env that was found", () => {
+  const keyFile = {
+    path: "/keys/wallet",
+    source: "config" as const,
+    key: "0x1",
+  };
+  const found = {
+    flags: {},
+    env: {},
+    envFile: { FOURMICA_NETWORK: "base" },
+    envFilePath: "/clone/.env",
+    envFileFound: true,
+    config: {},
+  };
+  const check = (input: Parameters<typeof resolveSettings>[0]) => () =>
+    assertMainnetWasChosen(resolveSettings(input));
+
+  it("is refused for a wallet that comes from somewhere else", () => {
+    expect(exitOf(check({ ...found, keyFile }))).toBe(EXIT.config);
+    expect(
+      exitOf(
+        check({ ...found, env: { FOURMICA_WALLET_PRIVATE_KEY: "0xshell" } }),
+      ),
+    ).toBe(EXIT.config);
+    expect(check({ ...found, keyFile })).toThrow(
+      "/clone/.env selects base (mainnet, real funds)",
+    );
+  });
+
+  it("is allowed for the wallet that same file holds", () => {
+    const envFile = { ...found.envFile, FOURMICA_WALLET_PRIVATE_KEY: "0x2" };
+    expect(check({ ...found, envFile })).not.toThrow();
+  });
+
+  it("is allowed once the file or the network is named", () => {
+    expect(check({ ...found, keyFile, envFileFound: false })).not.toThrow();
+    expect(
+      check({ ...found, keyFile, flags: { network: "base" } }),
+    ).not.toThrow();
+    expect(
+      check({ ...found, keyFile, env: { FOURMICA_NETWORK: "base" } }),
+    ).not.toThrow();
+    expect(
+      check({ ...found, keyFile, envFile: {}, config: { network: "base" } }),
+    ).not.toThrow();
+  });
+
+  it("leaves a testnet from a found .env alone", () => {
+    const envFile = { FOURMICA_NETWORK: "base-sepolia" };
+    expect(check({ ...found, keyFile, envFile })).not.toThrow();
   });
 });
 

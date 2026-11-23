@@ -1,7 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { BaseCommand } from "../base.js";
 import { readConfig } from "../core/config-file.js";
-import { DASHBOARD_URL } from "../core/dashboard.js";
+import { DASHBOARD_URL } from "../core/links.js";
 import { openBrowser, runScript } from "../core/runner.js";
 import { canPrompt } from "../core/runtime.js";
 import { scaffold } from "../core/scaffold.js";

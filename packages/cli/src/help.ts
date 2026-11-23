@@ -1,4 +1,5 @@
 import { type Command, CommandHelp, Help } from "@oclif/core";
+import { DOCS_URL } from "./core/links.js";
 
 /** Root help lists commands by what the user is doing, not alphabetically. */
 const GROUPS: [string, string[]][] = [
@@ -13,8 +14,6 @@ const GROUPS: [string, string[]][] = [
   ["SETTINGS", ["config"]],
 ];
 const UNLISTED = new Set(["help"]);
-
-const DOCS_URL = "https://docs.4mica.io";
 
 /** Examples right after the usage line: they are what people read first. */
 class ExamplesFirst extends CommandHelp {
