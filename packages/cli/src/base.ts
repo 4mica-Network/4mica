@@ -25,11 +25,15 @@ export abstract class BaseCommand extends Command {
       helpGroup: "GLOBAL",
       summary: "never ask a question; fail if one is needed",
     }),
-    // The color helpers and oclif each read `--no-color` from argv
-    // themselves; declaring it only stops the parser from rejecting it.
+    // The color helpers and oclif each read these two from argv themselves;
+    // declaring them only stops the parser from rejecting them.
     "no-color": Flags.boolean({
       helpGroup: "GLOBAL",
       summary: "plain output; NO_COLOR=1 does the same",
+    }),
+    color: Flags.boolean({
+      helpGroup: "GLOBAL",
+      summary: "color even when piped; FORCE_COLOR=1 does the same",
     }),
   };
 

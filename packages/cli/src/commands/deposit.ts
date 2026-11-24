@@ -1,6 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { amountInput } from "../core/amount.js";
 import { confirmFunds } from "../core/confirm.js";
+import { MAX_TIMEOUT_SECS } from "../core/net.js";
 import { previewDeposit, renderPreview } from "../core/preview.js";
 import { withSession } from "../core/session.js";
 import { asset, dryRun, yes } from "../flags.js";
@@ -36,6 +37,7 @@ export default class Deposit extends NetworkCommand {
     timeout: Flags.integer({
       default: 60,
       helpValue: "<seconds>",
+      max: MAX_TIMEOUT_SECS,
       min: 1,
       summary: "how long to wait for core to count the deposit",
     }),

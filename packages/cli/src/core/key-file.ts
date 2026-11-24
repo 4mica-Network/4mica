@@ -4,6 +4,13 @@ import { configError, usageError } from "../errors.js";
 import { note, warn } from "../ui/log.js";
 import type { KeyFile } from "./settings.js";
 
+/** Why a key file gave no key, by Node's name for the failure. */
+const UNREADABLE: Record<string, (path: string) => string> = {
+  ENOENT: (path) => `there is no key file at ${path}`,
+  EISDIR: (path) => `${path} is a directory, not a key file`,
+  EACCES: (path) => `no permission to read ${path}`,
+};
+
 /**
  * Reads the wallet key from a file, or from stdin for `-`. A file is the
  * safest place the CLI can take a key from: unlike an exported variable it
@@ -29,10 +36,11 @@ export async function readKeyFile(
       content = await readFile(path, "utf8");
     }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const { code = "" } = error as NodeJS.ErrnoException;
+    if (!(code in UNREADABLE)) throw error;
     const make = source === "flag" ? usageError : configError;
-    throw make(`there is no key file at ${path}`, {
-      code: "KEY_FILE_NOT_FOUND",
+    throw make(UNREADABLE[code](path), {
+      code: code === "ENOENT" ? "KEY_FILE_NOT_FOUND" : "KEY_FILE_UNREADABLE",
       suggestions:
         source === "config"
           ? ["point it elsewhere with `4mica config set key-file <path>`"]

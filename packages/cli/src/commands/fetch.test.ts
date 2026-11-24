@@ -56,6 +56,37 @@ describe("fetch", () => {
     });
   });
 
+  it("returns a body that is not text as base64, and says so", async () => {
+    // The first bytes of a PNG: 0x89 is not utf8.
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    client.fetch.mockResolvedValue(new Response(png));
+    const { json } = await runCommand(Fetch, [URL_, "--json"]);
+    const { body, bodyEncoding } = json as Record<string, string>;
+    expect(bodyEncoding).toBe("base64");
+    expect(Buffer.from(body, "base64")).toEqual(png);
+
+    // Text is left as it is, and unmarked.
+    client.fetch.mockResolvedValue(new Response("café"));
+    const text = await runCommand(Fetch, [URL_, "--json"]);
+    expect(text.json).toMatchObject({ body: "café" });
+    expect(text.json).not.toHaveProperty("bodyEncoding");
+  });
+
+  it("refuses a --request-timeout no timer can hold", async () => {
+    const { error } = await runCommand(Fetch, [
+      URL_,
+      "--request-timeout",
+      "3000000",
+    ]);
+    expect(error?.oclif?.exit).toBe(2);
+    expect(client.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["--color", "--no-color"])("accepts %s", async (flag) => {
+    const { error } = await runCommand(Fetch, [URL_, "--json", flag]);
+    expect(error).toBeUndefined();
+  });
+
   it("builds the request the way curl would", async () => {
     await runCommand(Fetch, [
       URL_,

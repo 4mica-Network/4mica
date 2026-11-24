@@ -66,6 +66,11 @@ export interface Settings {
   envFilePath?: string;
   /** It was found in the working directory, not named with `--env-file`. */
   envFileFound?: boolean;
+  /**
+   * The variables taken from the env file that change where a wallet signs
+   * in and sends, such as `CONTRACT_ADDRESS`. Without the prefix.
+   */
+  redirects: string[];
 }
 
 /** `flag`, `env`, `config`, `default`, or the path of the env file. */
@@ -115,6 +120,19 @@ function unknownNetwork(value: string, source: Source) {
     suggestions: [`use one of: ${Object.keys(NETWORKS).join(", ")}`],
   });
 }
+
+/**
+ * Besides the core itself, everything that decides where a wallet signs in
+ * and where its transactions go: the contract, the chain it is reached
+ * through, the facilitator that sends for it, and who it is to core.
+ */
+const REDIRECTS = new Set([
+  "CONTRACT_ADDRESS",
+  "ETHEREUM_HTTP_RPC_URL",
+  "FACILITATOR_URL",
+  "AUTH_URL",
+  "BEARER_TOKEN",
+]);
 
 /** A core URL without the differences that do not change where it leads. */
 function coreKey(url: string): string {
@@ -196,9 +214,14 @@ export function resolveSettings(input: SettingsInput): Settings {
     at(hostedFacilitator, "default");
 
   const sdkEnv: Record<string, string> = {};
+  const redirects: string[] = [];
   for (const name of new Set([...names(env), ...names(envFile)])) {
     const resolved = fromEnv(name);
-    if (resolved) sdkEnv[`FOURMICA_${name}`] = resolved.value;
+    if (!resolved) continue;
+    sdkEnv[`FOURMICA_${name}`] = resolved.value;
+    if (resolved.source === "env-file" && REDIRECTS.has(name)) {
+      redirects.push(name);
+    }
   }
   // Passed to the SDK explicitly, so flags and the config file can win.
   delete sdkEnv.FOURMICA_NETWORK;
@@ -227,6 +250,7 @@ export function resolveSettings(input: SettingsInput): Settings {
     sdkEnv,
     envFilePath: input.envFilePath,
     envFileFound: input.envFileFound,
+    redirects,
   };
 }
 
@@ -238,16 +262,36 @@ export function resolveSettings(input: SettingsInput): Settings {
  *
  * A core the file gives by URL counts unless it is a hosted testnet or on
  * this machine: nothing else about a URL shows that it is not a mainnet.
+ *
+ * Nor may the file change where a mainnet the user did choose leads: its
+ * contract address would otherwise be what the wallet approves and deposits
+ * to, on the network named in the confirmation.
  */
 export function assertMainnetWasChosen(settings: Settings): void {
-  const { network, info, rpcUrl, key, envFilePath } = settings;
-  if (rpcUrl.source !== "env-file" || info?.testnet === true) return;
+  const { network, info, rpcUrl, key, envFilePath, redirects } = settings;
   if (!settings.envFileFound || key?.source === "env-file") return;
+  if (info?.testnet === true) return;
+  if (!network && LOOPBACK.test(new URL(rpcUrl.value).hostname)) return;
+
   const stay = `to stay on a testnet: --network ${DEFAULT_TESTNET}`;
+  const notTheirs = "but the wallet key does not come from that file";
+  if (rpcUrl.source !== "env-file") {
+    if (redirects.length === 0) return;
+    const set = redirects.map((name) => `FOURMICA_${name}`).join(", ");
+    const where = network
+      ? `${network.value} (mainnet, real funds)`
+      : `the core at ${rpcUrl.value}, which is not a known testnet`;
+    throw configError(`${envFilePath} sets ${set} for ${where}, ${notTheirs}`, {
+      code: "ENDPOINT_NOT_CHOSEN",
+      suggestions: [
+        `to use what it sets, name the file: --env-file ${envFilePath}`,
+        stay,
+      ],
+    });
+  }
   if (network) {
     throw configError(
-      `${envFilePath} selects ${network.value} (mainnet, real funds), but ` +
-        "the wallet key does not come from that file",
+      `${envFilePath} selects ${network.value} (mainnet, real funds), ${notTheirs}`,
       {
         code: "MAINNET_NOT_CHOSEN",
         suggestions: [
@@ -257,10 +301,9 @@ export function assertMainnetWasChosen(settings: Settings): void {
       },
     );
   }
-  if (LOOPBACK.test(new URL(rpcUrl.value).hostname)) return;
   throw configError(
     `${envFilePath} selects the core at ${rpcUrl.value}, which is not a ` +
-      "known testnet, but the wallet key does not come from that file",
+      `known testnet, ${notTheirs}`,
     {
       code: "CORE_NOT_CHOSEN",
       suggestions: [

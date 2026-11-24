@@ -2,6 +2,7 @@ import { Args, Flags } from "@oclif/core";
 import { BaseCommand } from "../base.js";
 import { readConfig } from "../core/config-file.js";
 import { DASHBOARD_URL } from "../core/links.js";
+import { detectPackageManager } from "../core/package-manager.js";
 import { openBrowser, runScript } from "../core/runner.js";
 import { canPrompt } from "../core/runtime.js";
 import { scaffold } from "../core/scaffold.js";
@@ -106,7 +107,8 @@ export default class Init extends BaseCommand {
       const filled = { ...TEMPLATES[DEFAULT_TEMPLATE], ...init };
       filled.agentRole ??= "seller";
       filled.framework ??= "express";
-      filled.packageManager ??= "pnpm";
+      // Whichever one launched this: `npx` on a machine without pnpm.
+      filled.packageManager ??= await detectPackageManager(process.cwd());
       filled.openDashboard ??= false;
       filled.run ??= false;
       filled.name ??=
@@ -116,8 +118,13 @@ export default class Init extends BaseCommand {
       Object.assign(init, filled);
     }
 
-    const { "key-file": keyFile } = await readConfig(this.config.configDir);
-    const project = await scaffold(init, Boolean(keyFile));
+    // Only for the checklist: a config file that cannot be read is not a
+    // reason to scaffold nothing.
+    const hasWallet = await readConfig(this.config.configDir).then(
+      (config) => Boolean(config["key-file"]),
+      () => false,
+    );
+    const project = await scaffold(init, hasWallet);
 
     // Before the dev server, which blocks.
     if (project.options.openDashboard) await openBrowser(DASHBOARD_URL);

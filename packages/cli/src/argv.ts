@@ -63,6 +63,28 @@ export function distance(a: string, b: string): number {
   return row[b.length];
 }
 
+/**
+ * The command a mistyped one was meant to be. oclif cannot tell where a
+ * command it does not know ends, so `typed` runs on into the arguments:
+ * `deposi 100`. Each command is compared with as many of the leading words
+ * as it has itself, and one that accounts for more of them wins, so that
+ * `withdrawals reqest` is `withdrawals request` and not `withdrawals`.
+ */
+export function nearestCommand(
+  typed: string[],
+  commands: string[],
+): string | undefined {
+  const [nearest] = commands
+    .map((command) => {
+      const words = command.split(" ").length;
+      const d = distance(typed.slice(0, words).join(" "), command);
+      return { command, words, d };
+    })
+    .filter(({ d }) => d <= 2)
+    .sort((x, y) => y.words - x.words || x.d - y.d);
+  return nearest?.command;
+}
+
 /** The first word of every command, topic and alias. */
 function firstWords({ commands }: Commands): string[] {
   return commands.flatMap((command) =>

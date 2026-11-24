@@ -1,3 +1,4 @@
+import { isUtf8 } from "node:buffer";
 import { writeFile } from "node:fs/promises";
 import { Args, Flags } from "@oclif/core";
 import { readInput } from "../core/input.js";
@@ -222,10 +223,14 @@ export default class Fetch extends NetworkCommand {
     } else if (!this.jsonEnabled()) {
       process.stdout.write(bytes);
     }
+    // JSON holds text. Bytes that are not text would be mangled as utf8, so
+    // they go in as base64, and `bodyEncoding` says so.
+    const encoding = isUtf8(bytes) ? "utf8" : "base64";
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers),
-      body: output ? undefined : bytes.toString("utf8"),
+      body: output ? undefined : bytes.toString(encoding),
+      bodyEncoding: output || encoding === "utf8" ? undefined : encoding,
       output,
     };
   }

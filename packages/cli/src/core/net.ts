@@ -5,6 +5,8 @@ export interface TransportFailure {
   /** Node's errno name, such as ECONNREFUSED, when there is one. */
   detail?: string;
   timeoutSecs: number;
+  /** It is the core or facilitator in use, not some other host. */
+  service: boolean;
   /**
    * The message of the error `fetch` threw. An error is about this request
    * only if it is that error or quotes it: the SDK recovers from some failed
@@ -12,6 +14,12 @@ export interface TransportFailure {
    */
   message: string;
 }
+
+/**
+ * The longest wait a timer holds. Past 2^31-1 ms Node fires it after 1 ms
+ * instead, which would fail every request at once.
+ */
+export const MAX_TIMEOUT_SECS = Math.floor((2 ** 31 - 1) / 1000);
 
 let lastFailure: TransportFailure | undefined;
 
@@ -34,14 +42,25 @@ export const lastTransportFailure = () => lastFailure;
  * and remembers which host did not answer. The SDK reports a dead connection as "fetch failed" with
  * no host, and waits on a stalled one for as long as Node will.
  *
+ * `services` are the core and facilitator in use, so that a failure can be
+ * told from one of a seller's server, which `fetch` also goes through here.
+ *
  * shortcut: this wraps the global `fetch` because the SDK takes no fetch or
  * timeout option for its core and chain requests. Move it into the SDK's
  * http layer once that exists.
  */
-export function installRequestTimeout(timeoutSecs: number): void {
+export function installRequestTimeout(
+  timeoutSecs: number,
+  services: (string | undefined)[] = [],
+): void {
   const current: Wrapped = globalThis.fetch;
   const original = current[WRAPS] ?? current;
   lastFailure = undefined;
+  const ours = new Set(
+    services.flatMap((url) =>
+      url && URL.canParse(url) ? [new URL(url).origin] : [],
+    ),
+  );
   const wrapper: Wrapped = async (input, init) => {
     // Not `AbortSignal.timeout`: that one cannot be called off, and would
     // cut short a response that is still arriving. The limit is on waiting
@@ -70,16 +89,20 @@ export function installRequestTimeout(timeoutSecs: number): void {
       const url = input instanceof Request ? input.url : String(input);
       const origin = URL.canParse(url) ? new URL(url).origin : url;
       const message = error instanceof Error ? error.message : String(error);
+      const failed = {
+        origin,
+        timeoutSecs,
+        service: ours.has(origin),
+        message,
+      };
       if (timeout.aborted) {
-        lastFailure = { origin, reason: "timeout", timeoutSecs, message };
+        lastFailure = { ...failed, reason: "timeout" };
       } else if (error instanceof TypeError && error.message === NO_ANSWER) {
         const detail = (error.cause as { code?: unknown } | undefined)?.code;
         lastFailure = {
-          origin,
+          ...failed,
           reason: "unreachable",
           detail: typeof detail === "string" ? detail : undefined,
-          timeoutSecs,
-          message,
         };
       }
       throw error;

@@ -30,8 +30,25 @@ describe("installRequestTimeout", () => {
       origin: "https://core.example",
       reason: "timeout",
       timeoutSecs: 0.02,
+      service: false,
       message: "The operation was aborted due to timeout",
     });
+  });
+
+  it("tells the core and facilitator in use from any other host", async () => {
+    const refused: typeof fetch = async () => {
+      throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+    };
+    globalThis.fetch = refused;
+    installRequestTimeout(30, [
+      "https://core.example/",
+      undefined,
+      "not a url",
+    ]);
+    await expect(fetch("https://core.example/core/health")).rejects.toThrow();
+    expect(lastTransportFailure()).toMatchObject({ service: true });
+    await expect(fetch("https://seller.example/report")).rejects.toThrow();
+    expect(lastTransportFailure()).toMatchObject({ service: false });
   });
 
   it("remembers a host that refused the connection", async () => {
@@ -124,6 +141,7 @@ describe("toCliError with a transport failure", () => {
     reason: "unreachable",
     detail: "ECONNREFUSED",
     timeoutSecs: 30,
+    service: true,
     message: "fetch failed",
   } as const;
   const timedOut = {
@@ -140,7 +158,27 @@ describe("toCliError with a transport failure", () => {
     expect(toCliError(sdk, failure)).toMatchObject({
       message: "could not reach http://127.0.0.1:3000 (ECONNREFUSED)",
       code: "UNREACHABLE",
+      suggestions: [
+        expect.stringContaining("4mica status"),
+        expect.stringContaining("4mica config"),
+      ],
     });
+  });
+
+  it("does not point at 4mica's services when a seller's url is down", () => {
+    const seller = {
+      ...failure,
+      origin: "https://seller.example",
+      service: false,
+    };
+    const told = toCliError(new TypeError("fetch failed"), seller) as {
+      message: string;
+      suggestions?: string[];
+    };
+    expect(told.message).toBe(
+      "could not reach https://seller.example (ECONNREFUSED)",
+    );
+    expect(told.suggestions).toBeUndefined();
   });
 
   it("reports a timeout with the limit that was hit", () => {

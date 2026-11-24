@@ -103,10 +103,13 @@ function transportError(t: TransportFailure): CliError {
   const why = t.detail ? ` (${t.detail})` : "";
   return failure(`could not reach ${t.origin}${why}`, {
     code: "UNREACHABLE",
-    suggestions: [
-      "see which services answer with `4mica status`",
-      "check the address in use with `4mica config`",
-    ],
+    // Both are about 4mica's own services, not a url given to `fetch`.
+    suggestions: t.service
+      ? [
+          "see which services answer with `4mica status`",
+          "check the address in use with `4mica config`",
+        ]
+      : undefined,
   });
 }
 

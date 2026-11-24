@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { distance, hoistCommand, normalizeArgv } from "./argv.js";
+import {
+  distance,
+  hoistCommand,
+  nearestCommand,
+  normalizeArgv,
+} from "./argv.js";
 
 const config = {
   commands: [
@@ -132,6 +137,38 @@ describe("normalizeArgv", () => {
       expect(stderr).not.toHaveBeenCalled();
       stderr.mockRestore();
     });
+  });
+});
+
+describe("nearestCommand", () => {
+  const commands = [
+    "balance",
+    "deposit",
+    "status",
+    "config",
+    "config set",
+    "config get",
+    "withdrawals",
+    "withdrawals request",
+    "guarantees verify",
+  ];
+
+  it.each([
+    [["statu"], "status"],
+    // oclif hands over the arguments as part of the command.
+    [["deposi", "100"], "deposit"],
+    [["withdrawals", "reqest", "5"], "withdrawals request"],
+    [["config", "sat", "network", "base"], "config set"],
+    // A topic that is not itself a command.
+    [["guarantees", "verfy", "receipt.json"], "guarantees verify"],
+    // A real command that takes no argument, given one.
+    [["balance", "now"], "balance"],
+  ])("%j is %s", (typed, expected) => {
+    expect(nearestCommand(typed, commands)).toBe(expected);
+  });
+
+  it("names nothing for a word that is near no command", () => {
+    expect(nearestCommand(["frobnicate", "100"], commands)).toBeUndefined();
   });
 });
 

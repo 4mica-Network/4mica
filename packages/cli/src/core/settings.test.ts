@@ -310,6 +310,97 @@ describe("a mainnet named only by a .env that was found", () => {
   });
 });
 
+describe("a found .env on a mainnet the user chose", () => {
+  const keyFile = {
+    path: "/keys/wallet",
+    source: "config" as const,
+    key: "0x1",
+  };
+  const chosen = {
+    flags: {},
+    env: {},
+    envFilePath: "/clone/.env",
+    envFileFound: true,
+    keyFile,
+    config: { network: "base" },
+  };
+  const check = (input: Parameters<typeof resolveSettings>[0]) => () =>
+    assertMainnetWasChosen(resolveSettings(input));
+
+  it.each([
+    "CONTRACT_ADDRESS",
+    "ETHEREUM_HTTP_RPC_URL",
+    "FACILITATOR_URL",
+    "AUTH_URL",
+    "BEARER_TOKEN",
+  ])("may not set %s for a wallet it does not hold", (name) => {
+    const run = check({ ...chosen, envFile: { [`FOURMICA_${name}`]: "0xA" } });
+    expect(exitOf(run)).toBe(EXIT.config);
+    expect(run).toThrow(
+      `/clone/.env sets FOURMICA_${name} for base (mainnet, real funds)`,
+    );
+    expect(run).toThrow(
+      expect.objectContaining({ code: "ENDPOINT_NOT_CHOSEN" }),
+    );
+  });
+
+  it("is refused in the scaffolded spelling, and on a core given by URL", () => {
+    const envFile = { "4MICA_CONTRACT_ADDRESS": "0xA" };
+    expect(exitOf(check({ ...chosen, envFile }))).toBe(EXIT.config);
+    expect(
+      check({
+        ...chosen,
+        envFile,
+        config: {},
+        flags: { "rpc-url": "https://core.example" },
+      }),
+    ).toThrow("for the core at https://core.example, which is not a known");
+  });
+
+  it("may set them for its own wallet, or once it is named", () => {
+    const envFile = { FOURMICA_CONTRACT_ADDRESS: "0xA" };
+    const own = { ...envFile, FOURMICA_WALLET_PRIVATE_KEY: "0x2" };
+    expect(
+      check({ ...chosen, keyFile: undefined, envFile: own }),
+    ).not.toThrow();
+    expect(check({ ...chosen, envFile, envFileFound: false })).not.toThrow();
+  });
+
+  it("is not the one setting what the shell sets", () => {
+    const env = { FOURMICA_CONTRACT_ADDRESS: "0xMine" };
+    const envFile = { FOURMICA_CONTRACT_ADDRESS: "0xA" };
+    const settings = resolveSettings({ ...chosen, env, envFile });
+    expect(settings.sdkEnv.FOURMICA_CONTRACT_ADDRESS).toBe("0xMine");
+    expect(() => assertMainnetWasChosen(settings)).not.toThrow();
+  });
+
+  it("may set them on a testnet, or for a core on this machine", () => {
+    const envFile = { FOURMICA_CONTRACT_ADDRESS: "0xA" };
+    expect(
+      check({ ...chosen, envFile, config: { network: "base-sepolia" } }),
+    ).not.toThrow();
+    expect(
+      check({
+        ...chosen,
+        envFile,
+        config: { "rpc-url": "http://localhost:3000" },
+      }),
+    ).not.toThrow();
+    expect(
+      check({
+        ...chosen,
+        config: {},
+        envFile: { ...envFile, FOURMICA_RPC_URL: "http://127.0.0.1:3000" },
+      }),
+    ).not.toThrow();
+  });
+
+  it("may set what does not change where the wallet leads", () => {
+    const envFile = { FOURMICA_AUTH_REFRESH_MARGIN_SECS: "30" };
+    expect(check({ ...chosen, envFile })).not.toThrow();
+  });
+});
+
 describe("readEnv", () => {
   it("refuses two spellings of one variable with different values", () => {
     expect(

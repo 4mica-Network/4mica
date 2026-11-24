@@ -46,6 +46,19 @@ describe("readKeyFile", () => {
     });
   });
 
+  it("says what is wrong with a directory, as the same kind of error", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "4mica-cli-"));
+    await expect(readKeyFile(dir, "flag")).rejects.toMatchObject({
+      code: "KEY_FILE_UNREADABLE",
+      message: `${dir} is a directory, not a key file`,
+      oclif: { exit: EXIT.usage },
+    });
+    await expect(readKeyFile(dir, "config")).rejects.toMatchObject({
+      code: "KEY_FILE_UNREADABLE",
+      oclif: { exit: EXIT.config },
+    });
+  });
+
   it("refuses an empty file", async () => {
     await expect(
       readKeyFile(await keyFile("  \n"), "flag"),

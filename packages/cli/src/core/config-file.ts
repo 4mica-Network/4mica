@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { NETWORKS, resolveNetwork } from "@4mica/sdk/networks";
@@ -98,9 +98,15 @@ export function normalizeSetting(key: ConfigKey, value: string): string {
   if (key === "key-file") {
     // Absolute, so that it means the same file from any directory.
     const path = resolve(trimmed);
-    if (!existsSync(path)) {
+    const found = statSync(path, { throwIfNoEntry: false });
+    if (!found) {
       throw usageError(`there is no file at ${path}`, {
         code: "KEY_FILE_NOT_FOUND",
+      });
+    }
+    if (found.isDirectory()) {
+      throw usageError(`${path} is a directory, not a key file`, {
+        code: "KEY_FILE_UNREADABLE",
       });
     }
     return path;

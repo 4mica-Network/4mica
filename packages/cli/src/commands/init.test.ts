@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scaffold } from "../core/scaffold.js";
 import { EXIT } from "../errors.js";
 import { runCommand } from "../test/run.js";
@@ -21,6 +24,8 @@ vi.mock("../core/runner.js", () => ({
   runScript: vi.fn(),
 }));
 
+// Whatever runs these tests is not what launched the cli.
+beforeEach(() => vi.stubEnv("npm_config_user_agent", undefined));
 afterEach(() => vi.clearAllMocks());
 
 // Vitest has no terminal on stdin, so every run here is one that cannot ask.
@@ -49,6 +54,28 @@ describe("init without a terminal", () => {
       },
       false,
     );
+  });
+
+  it("installs with the package manager that launched it", async () => {
+    vi.stubEnv("npm_config_user_agent", "npm/10.9.0 node/v22.11.0 linux x64");
+    await runCommand(Init, ["--template", "seller-express"]);
+    expect(scaffold).toHaveBeenCalledWith(
+      expect.objectContaining({ packageManager: "npm" }),
+      false,
+    );
+  });
+
+  it("scaffolds whatever state the config file is in", async () => {
+    const home = await mkdtemp(join(tmpdir(), "4mica-cli-"));
+    await mkdir(join(home, "4mica"), { recursive: true });
+    await writeFile(join(home, "4mica", "config.json"), "{ nope");
+    const { error } = await runCommand(
+      Init,
+      ["--template", "seller-express"],
+      home,
+    );
+    expect(error).toBeUndefined();
+    expect(scaffold).toHaveBeenCalledWith(expect.anything(), false);
   });
 
   it("scaffolds the default template with --yes", async () => {

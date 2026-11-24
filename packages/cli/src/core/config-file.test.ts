@@ -68,6 +68,13 @@ describe("withSetting", () => {
     expect(() => withSetting({}, "key-file", "missing")).toThrow(
       expect.objectContaining({ code: "KEY_FILE_NOT_FOUND" }),
     );
+    // A directory exists, and holds no key.
+    expect(() => withSetting({}, "key-file", ".")).toThrow(
+      expect.objectContaining({
+        code: "KEY_FILE_UNREADABLE",
+        oclif: { exit: EXIT.usage },
+      }),
+    );
     cwd.mockRestore();
   });
 

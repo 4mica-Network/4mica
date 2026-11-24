@@ -73,7 +73,7 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 - **Provider nesting** in `app/layout.tsx`: `ThemeProvider` (localStorage + a pre-paint script to avoid FOUC) wraps `GlobalNetworkBackground` and the page content.
 
 - **Reuse these single sources of truth** instead of hardcoding:
-  - Routes, links, emails → `@4mica/url` (`LinkConfig`; exports `routes` and `links`).
+  - Routes, links, emails → `@4mica/url` (`LinkConfig`; exports `routes` and `links`). The one exception is `packages/cli/src/core/links.ts`: `@4mica/url` is private and cannot be a dependency of the published CLI, so that file keeps its own copy and `links.test.ts` fails when the two disagree.
   - Design tokens / Tailwind preset → `@4mica/tailwind-config`.
 
 - **`packages/db` owns the database**: the Prisma schema plus a `prisma` client singleton exported from `@4mica/db`. This is **Prisma 7** — driver adapters are mandatory (`new PrismaClient()` alone is invalid), the connection URL lives in `packages/db/prisma.config.ts` rather than `schema.prisma`, and `.env` is not auto-loaded. The generated client is TypeScript source under `packages/db/src/generated/prisma` and is gitignored, so run `pnpm db:generate` after pulling a schema change (`turbo build` does it automatically). `apps/be` bundles `@4mica/db` into its output via tsup `noExternal`, while `@prisma/client` stays external — it can never be bundled.
@@ -89,6 +89,16 @@ Local env: `cp apps/web/.env.example apps/web/.env.local`, and `cp apps/be/.env.
 - **Data-driven content**: solutions/FAQs/team are typed TS data (e.g. `apps/web/i18n/locales/en/solutions.ts` with `getSolution(slug)`); dynamic routes use `generateStaticParams()`. SEO metadata is built from factories in `apps/web/seo/`.
 
 - **Tests**: Vitest (jsdom, v8 coverage), co-located `*.test.ts(x)`, global setup in `vitest.setup.ts`. Browser tests for `apps/dashboard` and `apps/playground` are Playwright, kept in each app's `playwright/` folder with the config at `playwright.config.ts`, run with `test:e2e` (never part of `test`, which the pre-commit hook runs). Both apps are Google-only Clerk apps, so the `setup` project signs in with `@clerk/testing` and needs `CLERK_SECRET_KEY`, `E2E_CLERK_USER_EMAIL` and a seed run with `SEED_CLERK_USER_ID` — see the "End-to-end tests" section of `apps/playground/README.md`. `packages/ui` has the same layout: its suite starts Storybook, reads `index.json`, renders every story and docs entry, and drives each component in `playwright/components/`. `apps/web` runs its suite against the static export (`pnpm build` then `serve out`, reusing anything already on port 3200 or `E2E_PORT`) on Chromium, Firefox, WebKit, a phone, and a tablet; the page list comes from `out/sitemap.xml`, and the fixtures fail a test on any console error, uncaught exception, or same-origin 4xx/5xx. The Playwright agent skill is checked in at `.agents/skills/playwright-cli/`.
+
+## Pull requests
+
+Feature branches merge into `dev`; `main` only accepts PRs from `dev` — the `Promotion source` job in `ci.yml` fails anything else, hotfix branches and a changesets PR opened on `main` included. Neither branch has an admin bypass. The rulesets are mirrored in `.github/rulesets/`.
+
+- **Into `dev`**: `.github/CODEOWNERS` decides who approves. Docs and copy (`*.md`, `*.mdx`, `docs/`, `apps/web/content/`) have no owner and merge on green CI; everything else needs one code owner who is not the author.
+- **Into `main`**: green CI only, because the review already happened on the way into `dev`. So `dev` must stay promotable — unfinished work stays on its feature branch, and something in `dev` that cannot ship is reverted from `dev`, not worked around.
+- **Hotfix**: PR into `dev`, promote `dev`, then dispatch only the affected service's deploy workflow. Only the service you dispatch is rebuilt, though it is built from all of `main`, shared packages included.
+- **Required checks** are the gate jobs `Checks`, `Facilitator CI` and `Python SDK CI`. The last two filter on changed paths in a `changes` job rather than a workflow-level `paths:` — do not move the filter back to `on:`. A workflow that never starts leaves its required check pending forever and blocks every unrelated PR.
+- **Emergency merge**: an admin sets the ruleset's enforcement to Disabled (Settings → Rules → Rulesets), merges, re-enables it, and says so on the PR.
 
 ## Deployment
 

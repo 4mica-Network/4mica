@@ -220,6 +220,10 @@ stdout and what was paid to stderr. It does not ask before paying: `--max` is
 the consent, and defaults to 1 USDC a payment. `--pay-to <address>` limits
 who may be paid. It exits 1 when the final answer is an HTTP error.
 
+With `--json` the response is in `body`. A response that is not text, such as
+an image, is there as base64 and `"bodyEncoding": "base64"` says so; `-o
+<file>` writes the bytes as they came.
+
 `fetch --dry-run` pays nothing, but it is not a dry run of the request: the
 request is sent once, unpaid, with its method, headers and `--data`, because
 that is how a url says what it charges. A url that charges nothing carries
@@ -281,6 +285,13 @@ The same holds when that `.env` gives a core by `FOURMICA_RPC_URL`. A hosted
 network's own URL counts as its name, here and in the confirmation. Any other
 URL stops with `CORE_NOT_CHOSEN` unless it is a hosted testnet's or on this
 machine (`localhost`), since nothing else shows that it is not a mainnet.
+
+Nor can that `.env` change where a mainnet you chose yourself leads. If it
+sets `FOURMICA_CONTRACT_ADDRESS`, `FOURMICA_ETHEREUM_HTTP_RPC_URL`,
+`FOURMICA_FACILITATOR_URL`, `FOURMICA_AUTH_URL` or `FOURMICA_BEARER_TOKEN`
+for a wallet key it does not hold, the command stops with
+`ENDPOINT_NOT_CHOSEN` until you name the file with `--env-file`. On a testnet
+or a core on this machine they apply as before.
 
 ```bash
 4mica config set network base

@@ -4,7 +4,7 @@ import { Flags } from "@oclif/core";
 import { BaseCommand } from "./base.js";
 import { readConfig } from "./core/config-file.js";
 import { readKeyFile } from "./core/key-file.js";
-import { installRequestTimeout } from "./core/net.js";
+import { installRequestTimeout, MAX_TIMEOUT_SECS } from "./core/net.js";
 import {
   type KeyFile,
   loadEnvFile,
@@ -44,6 +44,7 @@ export abstract class NetworkCommand extends BaseCommand {
       default: 30,
       helpGroup: "GLOBAL",
       helpValue: "<seconds>",
+      max: MAX_TIMEOUT_SECS,
       min: 1,
       summary: "give up on a request that gets no response",
     }),
@@ -57,8 +58,6 @@ export abstract class NetworkCommand extends BaseCommand {
     "request-timeout": number;
     asset?: string;
   }): Promise<Settings> {
-    installRequestTimeout(flags["request-timeout"]);
-
     // A project's own .env applies without being asked for, as it does for
     // the project's code. Only this directory: no walking up to a parent's.
     const local = join(process.cwd(), ".env");
@@ -87,7 +86,7 @@ export abstract class NetworkCommand extends BaseCommand {
       }
     }
 
-    return resolveSettings({
+    const settings = resolveSettings({
       flags,
       env: process.env,
       envFile,
@@ -97,5 +96,11 @@ export abstract class NetworkCommand extends BaseCommand {
       keyProblem,
       config,
     });
+    // Nothing above makes a request.
+    installRequestTimeout(flags["request-timeout"], [
+      settings.rpcUrl.value,
+      settings.facilitatorUrl?.value,
+    ]);
+    return settings;
   }
 }
