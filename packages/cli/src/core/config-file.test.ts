@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -39,6 +39,54 @@ describe("config file", () => {
       JSON.stringify({ network: "base", "wallet-key": "0xabc" }),
     );
     expect(await readConfig(dir)).toEqual({ network: "base" });
+  });
+
+  it("keeps keys a newer version wrote when it rewrites the file", async () => {
+    const dir = await tempDir();
+    await writeFile(
+      configPath(dir),
+      JSON.stringify({ asset: "USDC", future: "x" }),
+    );
+    await writeConfig(
+      dir,
+      withSetting(await readConfig(dir), "network", "base-sepolia"),
+    );
+    expect(JSON.parse(await readFile(configPath(dir), "utf8"))).toEqual({
+      asset: "USDC",
+      future: "x",
+      network: "base-sepolia",
+    });
+  });
+
+  it("drops everything on a reset", async () => {
+    const dir = await tempDir();
+    await writeFile(
+      configPath(dir),
+      JSON.stringify({ asset: "USDC", future: "x" }),
+    );
+    await writeConfig(dir, {}, { reset: true });
+    expect(JSON.parse(await readFile(configPath(dir), "utf8"))).toEqual({});
+  });
+
+  it("is readable by its owner only, and leaves no temporary file", async () => {
+    const dir = await tempDir();
+    await writeFile(configPath(dir), "{}", { mode: 0o644 });
+    await writeConfig(dir, { asset: "USDC" });
+    if (process.platform !== "win32") {
+      expect((await stat(configPath(dir))).mode & 0o777).toBe(0o600);
+    }
+    expect(await readdir(dir)).toEqual(["config.json"]);
+  });
+
+  it("leaves the old file whole when a write fails", async () => {
+    const dir = await tempDir();
+    await writeConfig(dir, { asset: "USDC" });
+    // A value JSON cannot hold fails the write half-way.
+    await expect(
+      writeConfig(dir, { asset: 1n as unknown as string }),
+    ).rejects.toThrow();
+    expect(await readConfig(dir)).toEqual({ asset: "USDC" });
+    expect(await readdir(dir)).toEqual(["config.json"]);
   });
 });
 
@@ -82,6 +130,7 @@ describe("withSetting", () => {
     ["network", "nope"],
     ["rpc-url", "not a url"],
     ["facilitator-url", "ftp://example.com"],
+    ["rpc-url", "http://core.example.com"],
     ["asset", "  "],
   ] as const)("refuses %s = %j as a usage error", (key, value) => {
     expect(() => withSetting({}, key, value)).toThrow(

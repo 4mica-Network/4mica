@@ -54,6 +54,9 @@ catalogs:
     '@oclif/core':
       specifier: ^5.1.12
       version: 5.1.12
+    '@oclif/plugin-autocomplete':
+      specifier: ^4.0.6
+      version: 4.0.6
     '@playwright/test':
       specifier: ^1.64.1
       version: 1.64.1
@@ -321,6 +324,9 @@ catalogs:
     typescript:
       specifier: ^5.9.0
       version: 5.9.3
+    undici:
+      specifier: ^7.27.0
+      version: 7.27.0
     valibot:
       specifier: ^1.4.2
       version: 1.4.2
@@ -1339,6 +1345,9 @@ importers:
       '@oclif/core':
         specifier: 'catalog:'
         version: 5.1.12
+      '@oclif/plugin-autocomplete':
+        specifier: 'catalog:'
+        version: 4.0.6
       execa:
         specifier: 'catalog:'
         version: 9.6.1
@@ -1351,9 +1360,9 @@ importers:
       picocolors:
         specifier: 'catalog:'
         version: 1.1.1
-      read-pkg:
+      undici:
         specifier: 'catalog:'
-        version: 10.1.0
+        version: 7.27.0
       viem:
         specifier: 'catalog:'
         version: 2.54.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.7)
@@ -3835,6 +3844,10 @@ packages:
 
   '@oclif/core@5.1.12':
     resolution: {integrity: sha512-t8W/ljOb9DIsFNXbfLU4UpZ8+C/X0QuvJOuQXQVCthiw5zSdwKnKoq7HmyBUJwwo28302eiN0rRj8vN9k1U1Mw==}
+    engines: {node: '>=22.0.0'}
+
+  '@oclif/plugin-autocomplete@4.0.6':
+    resolution: {integrity: sha512-TCdtU3jMG2OJPTIUu9a4qpG/CW6t0ymbk4/GdLfc/o2455AhdYJphIaIpNe772xFhcqceVDg1kWUB5lacDaw2w==}
     engines: {node: '>=22.0.0'}
 
   '@opentelemetry/api@1.10.0':
@@ -7873,6 +7886,11 @@ packages:
   effect@3.22.5:
     resolution: {integrity: sha512-AdIU4llI19BzhJ4xUBZix7kS8oiYSlCsJ61j3UM3UyJw9ecDrsrrweDFm/Ku1nHbJWMLoynK+1Me4it3Zkmjpw==}
 
+  ejs@3.1.10:
+    resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
+    engines: {node: '>=0.10.0'}
+    hasBin: true
+
   ejs@6.0.1:
     resolution: {integrity: sha512-UaaM14yby8U3k02ihS1Bmj5Kz2d7CCQM1scxpgs4Mhkq8F1wR2gl3+Ts4h5Ne4Mnt7M9m4Dw7jsuMr3+xO4vZA==}
     engines: {node: '>=0.12.18'}
@@ -8233,6 +8251,9 @@ packages:
 
   file-stream-rotator@0.6.1:
     resolution: {integrity: sha512-u+dBid4PvZw17PmDeRcNOtCP9CCK/9lRN2w+r1xIS7yOL9JFrIBKTvrYsxT4P0pGtThYTn++QS5ChHaUov3+zQ==}
+
+  filelist@1.0.6:
+    resolution: {integrity: sha512-5giy2PkLYY1cP39p17Ech+2xlpTRL9HLspOfEgm0L6CwBXBTgsK5ou0JtzYuepxkaQ/tvhCFIJ5uXo0OrM2DxA==}
 
   filesize@10.1.6:
     resolution: {integrity: sha512-sJslQKU2uM33qH5nqewAwVB2QgR6w1aMNsYUp3aN5rMRyXEwJGmZvaWzeJFNTOXWlHQyBFCWrdj3fV/fsTOX8w==}
@@ -8801,6 +8822,11 @@ packages:
 
   jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
+
+  jake@10.9.4:
+    resolution: {integrity: sha512-wpHYzhxiVQL+IV05BLE2Xn34zW1S223hvjtqk0+gsPrwd/8JNLXJgZZM/iPFsYc1xyphF+6M6EvdE5E9MBGkDA==}
+    engines: {node: '>=10'}
+    hasBin: true
 
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
@@ -9481,6 +9507,10 @@ packages:
 
   minimatch@3.1.5:
     resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
+
+  minimatch@5.1.9:
+    resolution: {integrity: sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw==}
+    engines: {node: '>=10'}
 
   minimatch@9.0.9:
     resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
@@ -14040,6 +14070,15 @@ snapshots:
       wordwrap: 1.0.0
       wrap-ansi: 7.0.0
       wsl-utils: 0.4.0
+
+  '@oclif/plugin-autocomplete@4.0.6':
+    dependencies:
+      '@oclif/core': 5.1.12
+      ansis: 3.17.0
+      debug: 4.4.3(supports-color@8.1.1)
+      ejs: 3.1.10
+    transitivePeerDependencies:
+      - supports-color
 
   '@opentelemetry/api@1.10.0': {}
 
@@ -19238,6 +19277,10 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
+  ejs@3.1.10:
+    dependencies:
+      jake: 10.9.4
+
   ejs@6.0.1: {}
 
   electron-to-chromium@1.5.386: {}
@@ -19800,6 +19843,10 @@ snapshots:
   file-stream-rotator@0.6.1:
     dependencies:
       moment: 2.31.0
+
+  filelist@1.0.6:
+    dependencies:
+      minimatch: 5.1.9
 
   filesize@10.1.6: {}
 
@@ -20380,6 +20427,12 @@ snapshots:
       '@isaacs/cliui': 8.0.2
     optionalDependencies:
       '@pkgjs/parseargs': 0.11.0
+
+  jake@10.9.4:
+    dependencies:
+      async: 3.2.6
+      filelist: 1.0.6
+      picocolors: 1.1.1
 
   jiti@2.6.1: {}
 
@@ -21299,6 +21352,10 @@ snapshots:
   minimatch@3.1.5:
     dependencies:
       brace-expansion: 1.1.21
+
+  minimatch@5.1.9:
+    dependencies:
+      brace-expansion: 2.1.1
 
   minimatch@9.0.9:
     dependencies:

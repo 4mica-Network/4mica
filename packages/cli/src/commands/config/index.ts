@@ -8,7 +8,7 @@ export default class Config extends NetworkCommand {
   static summary = "show the settings in effect and where each comes from";
   static description =
     "A setting is taken from the first of these that has it: a flag, an " +
-    "environment variable, the file given by --env-file, the config file, " +
+    "environment variable, the file given by --dotenv, the config file, " +
     "the built-in default.";
   static examples = [
     "<%= config.bin %> <%= command.id %>",

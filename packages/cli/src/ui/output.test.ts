@@ -1,6 +1,6 @@
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
-import { fields, table, toPlain } from "./output.js";
+import { fields, printable, table, toPlain } from "./output.js";
 
 describe("table", () => {
   it("prints one header row and one record per line, without trailing spaces", () => {
@@ -61,5 +61,46 @@ describe("toPlain", () => {
       nested: [{ raw: "1" }],
     });
     expect(() => JSON.stringify(plain)).not.toThrow();
+  });
+});
+
+describe("printable", () => {
+  it("removes escape sequences and control characters, keeping lines", () => {
+    expect(
+      printable(
+        "a\u001b[31mred\u001b[0m\u001b]0;title\u0007b\tc\nd\u0000\u009b",
+      ),
+    ).toBe("aredb\tc\nd");
+  });
+
+  it("is applied to table cells and fields, keeping the cli's own colors", () => {
+    const green = (text: string) => `\u001b[32m${text}\u001b[39m`;
+    const hostile = "x\u001b]0;pwned\u0007y";
+    const out = table(["A", "B"], [[green("up"), hostile]], { isTTY: false });
+    expect(out).toContain(green("up"));
+    expect(out).toContain("xy");
+    expect(out).not.toContain("pwned\u0007");
+    expect(fields([["k", hostile]])).toBe("k: xy");
+  });
+});
+
+describe("table in a narrow terminal", () => {
+  const rows = [
+    ["base-sepolia", "https://core.sepolia.example.com/a/very/long/path"],
+  ];
+
+  it("prints records as key: value lines when the rows would wrap", () => {
+    expect(table(["NAME", "CORE"], rows, { isTTY: true, columns: 40 })).toBe(
+      "name: base-sepolia\ncore: https://core.sepolia.example.com/a/very/long/path",
+    );
+  });
+
+  it("keeps the table in a wide terminal, and always in a pipe", () => {
+    expect(
+      table(["NAME", "CORE"], rows, { isTTY: true, columns: 200 }),
+    ).toContain("NAME");
+    expect(
+      table(["NAME", "CORE"], rows, { isTTY: false, columns: 40 }),
+    ).toContain("NAME");
   });
 });

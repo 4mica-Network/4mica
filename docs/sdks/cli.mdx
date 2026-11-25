@@ -24,6 +24,10 @@ npm install --global @4mica/cli
 
 </CodeGroup>
 
+`4mica autocomplete` prints the steps to turn on tab completion in bash, zsh or fish.
+
+To uninstall: `npm uninstall --global @4mica/cli`. Settings and wallet keys stay in `~/.config/4mica` (`%LOCALAPPDATA%\4mica` on Windows). Those keys are the only copies: withdraw or back them up before deleting that directory.
+
 ## From nothing to a paid request
 
 ```bash
@@ -57,7 +61,8 @@ The CLI uses the Base Sepolia testnet unless told otherwise. Real funds move onl
 | `payments` | Payments guaranteed to this wallet. |
 | `guarantees verify <file>` | Check that a guarantee receipt was signed by 4Mica. Needs no wallet. |
 | `networks`, `tokens`, `status` | Supported networks, accepted tokens, service and wallet health. |
-| `config`, `config set`, `config get`, `config unset` | Settings, and where each comes from. |
+| `config`, `config set`, `config get`, `config unset`, `config reset` | Settings, and where each comes from. `reset` keeps the wallet keys. |
+| `version` | The CLI's version, Node and platform, for a bug report. |
 
 `4mica help <command>` shows a command's examples and flags.
 
@@ -65,9 +70,9 @@ The CLI uses the Base Sepolia testnet unless told otherwise. Real funds move onl
 
 A wallet is a private key. The CLI takes it from the first of these that has one:
 
-1. `--key-file <path>`, a file holding only the key. `-` reads it from standard input.
-2. `FOURMICA_WALLET_PRIVATE_KEY`, exported in the shell.
-3. A `.env` file in the current directory, read automatically. `--env-file <path>` reads another file instead.
+1. `--key-file <path>`, a file holding only the key. `-` reads it from standard input; typed at a terminal, it is read without echo.
+2. `FOURMICA_WALLET_PRIVATE_KEY`, exported in the shell. Meant for CI and containers: an exported key is visible to every program the shell starts. In an interactive shell prefer a key file.
+3. A `.env` file in the current directory, read automatically. `--dotenv <path>` reads another file instead.
 4. The key file named in the config file. `wallets create` and `wallets use` set it.
 
 No flag takes the key itself, because flag values end up in shell history and in the process list. The key is never printed.
@@ -76,13 +81,14 @@ No flag takes the key itself, because flag values end up in shell history and in
 
 ## Sending money safely
 
-Commands that send a transaction (`deposit`, the `withdrawals` actions, `cycles pay`, `cycles claim`) show the network, wallet and amount, and ask before sending.
+Commands that sign (`deposit`, the `withdrawals` actions, `cycles pay`, `cycles claim`, `cycles checkpoint`) show what they are about to do (network, wallet, token and its address, amount in base units, how gas is paid, the contract) and ask before sending.
 
-- **`--dry-run`** (`-n`) checks that the command would work and sends nothing. It exits 1 when something blocks it.
+- **`--dry-run`** (`-n`) checks that the command would work and sends nothing. It exits 1 when something blocks it, and the real command then refuses with `NOT_READY` without asking.
 - **`--yes`** skips the question. Without a terminal and without `--yes`, the command exits instead of waiting.
-- **On mainnet** the question asks you to type the network's name, not `y`.
+- **On mainnet**, or a core given by URL that is not on this machine, the question asks you to type the network's name (or the core's host), not `y`.
+- **Once something is sent**, its transaction hash is printed straight away. A failure or Ctrl-C after that point is reported as `OUTCOME_UNKNOWN`, with where to check: the transaction may still land, so do not run the command again until `balance`, `withdrawals` or `cycles` shows what happened.
 
-`fetch` is the exception: it does not ask. `--max` is the consent, and defaults to 1 USDC a payment. `fetch --dry-run` shows what a URL charges without paying. It still sends the request once, unpaid, and a URL that charges nothing answers it for real.
+`fetch` does not ask: `--max` is the consent. On a testnet it defaults to 1 USDC a payment; anywhere that may be real funds it needs `--max`, or `--yes` to accept that default, and stops with `MAX_REQUIRED` before sending anything otherwise. A URL that charges nothing needs no wallet. `fetch --dry-run` shows what a URL charges without paying. It still sends the request once, unpaid, and a URL that charges nothing answers it for real.
 
 After a deposit is mined, the CLI waits up to `--timeout` seconds for core to count it. If that runs out, the deposit is reported as `pending` and the command exits 0. Do not send it again.
 
@@ -91,7 +97,8 @@ After a deposit is mined, the CLI waits up to `--timeout` seconds for core to co
 - **Standard output has the result and nothing else.** Progress, questions, warnings and errors go to standard error. `--quiet` drops the progress.
 - **`--json`** prints the result as one JSON document. Amounts in base units are strings.
 - **`--no-input`** guarantees no question is asked.
-- **Errors carry a code**, such as `NO_SIGNER`, `INSUFFICIENT_BALANCE`, `UNREACHABLE` or `CHECKPOINT_REQUIRED`. With `--json` they are printed as `{ "error": { "code", "message", "suggestions" } }`.
+- **Errors carry a code**, such as `NO_SIGNER`, `INSUFFICIENT_BALANCE`, `UNREACHABLE`, `OUTCOME_UNKNOWN` or `CHECKPOINT_REQUIRED`. With `--json` every failure, a mistyped command included, is printed on standard output as `{ "error": { "code", "message", "suggestions", "retryable", "details" } }`. `retryable` says whether running the same command again is safe.
+- **`--debug`** (or `DEBUG=4mica`) prints each request and the stack of a failure to standard error, never a header, body or key.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -99,9 +106,10 @@ After a deposit is mined, the CLI waits up to `--timeout` seconds for core to co
 | 1 | The operation failed: no response, a refusal by core, a reverted transaction, or a dry run that found a problem. |
 | 2 | Usage: an unknown command or flag, a bad value, or a confirmation that could not be asked for. |
 | 3 | Configuration: no wallet key, or an unknown network in the environment or config file. |
+| 130 | Cancelled: Ctrl-C, or a question answered no. |
 
 ```bash
-available=$(4mica balance USDC --json | jq -r .available)
+available=$(4mica balance USDC --json | jq -r '.[0].available')
 4mica deposit 5 --asset USDC --dry-run && 4mica deposit 5 --asset USDC --yes --json
 ```
 
@@ -113,3 +121,11 @@ Each setting comes from the first of: a flag, an environment variable, the proje
 4mica config set network base-sepolia
 4mica config set asset USDC      # then `4mica deposit 5` needs no --asset
 ```
+
+The environment variables are `FOURMICA_NETWORK`, `FOURMICA_RPC_URL`, `FOURMICA_FACILITATOR_URL`, `FOURMICA_ASSET`, `FOURMICA_WALLET_PRIVATE_KEY`, `FOURMICA_REQUEST_TIMEOUT` and `FOURMICA_DEBUG`. `--rpc-url` is a 4Mica core's address, not an Ethereum RPC endpoint, and must be `https` unless it is on this machine. Requests honour `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`.
+
+## Limits
+
+- Wallet keys are plain files readable by your user only. They are not encrypted, and there is no keychain or hardware wallet support yet.
+- One pending withdrawal per asset.
+- The CLI sends no telemetry and checks for no updates.

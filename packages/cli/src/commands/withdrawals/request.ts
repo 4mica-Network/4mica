@@ -1,6 +1,7 @@
 import { Args } from "@oclif/core";
 import { amountInput } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { beginSending } from "../../core/outcome.js";
 import { previewWithdrawalRequest, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
@@ -33,21 +34,16 @@ export default class WithdrawalsRequest extends NetworkCommand {
     const label = `${amount.amount} ${amount.asset}`;
 
     return withSession(settings, async (client) => {
+      const preview = await previewWithdrawalRequest(settings, client, amount);
       if (flags["dry-run"]) {
-        const preview = await previewWithdrawalRequest(
-          settings,
-          client,
-          amount,
-        );
         this.log(renderPreview(preview));
         return preview;
       }
 
-      await confirmFunds(
-        { action: `Request a withdrawal of ${label}`, address: client.address },
-        settings,
-        flags,
-      );
+      await confirmFunds(preview, settings, flags);
+      beginSending(`the withdrawal request for ${label}`, [
+        "4mica withdrawals",
+      ]);
       const result = await step(
         `Requesting a withdrawal of ${label}`,
         () => client.withdraw(amount),

@@ -1,5 +1,12 @@
 import { statSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { NETWORKS, resolveNetwork } from "@4mica/sdk/networks";
 import { configError, usageError } from "../errors.js";
@@ -29,7 +36,12 @@ export function requireConfigKey(key: string): ConfigKey {
   });
 }
 
-export async function readConfig(configDir: string): Promise<ConfigFile> {
+/**
+ * Everything in the file, including keys this version does not know: a
+ * newer CLI on the same machine may have written them, and rewriting the
+ * file must not drop them.
+ */
+async function readRaw(configDir: string): Promise<Record<string, unknown>> {
   const path = configPath(configDir);
   let text: string;
   try {
@@ -40,39 +52,84 @@ export async function readConfig(configDir: string): Promise<ConfigFile> {
   }
   try {
     const parsed: unknown = JSON.parse(text);
-    if (typeof parsed !== "object" || parsed === null) throw new Error();
-    const config: ConfigFile = {};
-    for (const key of CONFIG_KEYS) {
-      const value = (parsed as Record<string, unknown>)[key];
-      if (typeof value === "string" && value !== "") config[key] = value;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error();
     }
-    return config;
+    return parsed as Record<string, unknown>;
   } catch {
     throw configError(`${path} is not valid JSON`, {
       code: "BAD_CONFIG_FILE",
-      suggestions: ["fix the file, or delete it to start again"],
+      suggestions: [
+        `fix ${path}, or start again with \`4mica config reset\` (wallet keys are kept)`,
+      ],
     });
   }
 }
 
+export async function readConfig(configDir: string): Promise<ConfigFile> {
+  const raw = await readRaw(configDir);
+  const config: ConfigFile = {};
+  for (const key of CONFIG_KEYS) {
+    const value = raw[key];
+    if (typeof value === "string" && value !== "") config[key] = value;
+  }
+  return config;
+}
+
+/**
+ * Replaces the file in one step: written beside it, then renamed over it,
+ * so a crash or a second run at the same moment never leaves half a file.
+ * Settings this version does not know are carried over. Readable by the
+ * user only: it names where the wallet key is.
+ */
 export async function writeConfig(
   configDir: string,
   config: ConfigFile,
+  options: { reset?: boolean } = {},
 ): Promise<void> {
-  await mkdir(configDir, { recursive: true });
-  await writeFile(
-    configPath(configDir),
-    `${JSON.stringify(config, null, 2)}\n`,
-  );
+  await mkdir(configDir, { recursive: true, mode: 0o700 });
+  const raw = options.reset ? {} : await readRaw(configDir);
+  for (const key of CONFIG_KEYS) delete raw[key];
+  const path = configPath(configDir);
+  const temp = `${path}.${process.pid}.tmp`;
+  try {
+    await writeFile(
+      temp,
+      `${JSON.stringify({ ...raw, ...config }, null, 2)}\n`,
+      {
+        mode: 0o600,
+      },
+    );
+    await rename(temp, path);
+  } catch (error) {
+    await rm(temp, { force: true });
+    throw error;
+  }
+  // A file written before this version may still be 0644.
+  if (process.platform !== "win32") await chmod(path, 0o600);
 }
 
+/** https, or plain http to this machine, as for `--rpc-url`. */
 function requireUrl(key: ConfigKey, value: string): string {
-  if (!URL.canParse(value) || !/^https?:$/.test(new URL(value).protocol)) {
-    throw usageError(`${key} must be an http(s) URL, got "${value}"`, {
-      code: "BAD_SETTING",
-    });
+  const parsed = URL.canParse(value) ? new URL(value) : undefined;
+  const local =
+    parsed && /^(localhost|127(\.\d{1,3}){3}|\[::1\])$/.test(parsed.hostname);
+  if (
+    parsed?.protocol === "https:" ||
+    (parsed?.protocol === "http:" && local)
+  ) {
+    return value;
   }
-  return value;
+  throw usageError(
+    parsed?.protocol === "http:"
+      ? `${key} must use https unless it is on this machine, got "${value}"`
+      : `${key} must be an http(s) URL, got "${value}"`,
+    { code: "BAD_SETTING" },
+  );
 }
 
 /** The value as it is stored: networks by their shorthand. */

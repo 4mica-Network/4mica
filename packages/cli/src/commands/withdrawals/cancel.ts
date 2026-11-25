@@ -1,5 +1,6 @@
 import { requireAsset } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { beginSending } from "../../core/outcome.js";
 import { previewPendingWithdrawal, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
@@ -21,22 +22,22 @@ export default class WithdrawalsCancel extends NetworkCommand {
     const name = requireAsset(settings.asset?.value);
 
     return withSession(settings, async (client) => {
+      const preview = await previewPendingWithdrawal(
+        settings,
+        client,
+        name,
+        "cancel",
+      );
       if (flags["dry-run"]) {
-        const preview = await previewPendingWithdrawal(
-          settings,
-          client,
-          name,
-          "cancel",
-        );
         this.log(renderPreview(preview));
         return preview;
       }
 
-      await confirmFunds(
-        { action: `Cancel the withdrawal of ${name}`, address: client.address },
-        settings,
-        flags,
-      );
+      await confirmFunds(preview, settings, flags);
+      beginSending(`the withdrawal cancellation of ${name}`, [
+        "4mica withdrawals",
+        "4mica balance",
+      ]);
       const result = await step(
         `Cancelling the withdrawal of ${name}`,
         () => client.cancelWithdrawal(name),

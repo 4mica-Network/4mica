@@ -18,8 +18,48 @@ vi.mock("../core/session.js", () => ({
 }));
 
 const realFetch = globalThis.fetch;
+
+const SELLER = "0x00000000000000000000000000000000000005e1";
+const required = {
+  x402Version: 2,
+  accepts: [
+    { scheme: "exact", network: "eip155:8453", amount: "1", payTo: "0xA" },
+    {
+      scheme: "4mica-credit",
+      network: "eip155:84532",
+      asset: "0xToken",
+      amount: "100000",
+      payTo: SELLER,
+    },
+  ],
+};
+const b64 = (value: unknown) =>
+  Buffer.from(JSON.stringify(value)).toString("base64");
+const paymentRequired = () =>
+  new Response(null, {
+    status: 402,
+    headers: { "PAYMENT-REQUIRED": b64(required) },
+  });
+
+/** The url, unpaid, as the network would answer it. */
+const server = vi.fn<typeof fetch>();
+/** What the SDK sends when it pays: the request again, with the payment. */
+const paidRequest = (url: string, init?: RequestInit) =>
+  globalThis.fetch(url, {
+    ...init,
+    headers: {
+      "PAYMENT-SIGNATURE": b64({
+        x402Version: 2,
+        accepted: required.accepts[1],
+        payload: {},
+      }),
+    },
+  });
+
 beforeEach(() => {
   process.exitCode = undefined;
+  server.mockImplementation(async () => paymentRequired());
+  globalThis.fetch = server;
   client.fetch.mockResolvedValue(new Response('{"report":1}'));
   client.paymentFor.mockReturnValue(payment);
 });
@@ -37,14 +77,28 @@ describe("fetch", () => {
       "--max",
       "0.50 USDC",
       "--pay-to",
-      "0xSeller",
+      SELLER,
       "--json",
     ]);
     expect(withSession).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Function),
-      { perPayment: ["0.50 USDC"], payTo: ["0xSeller"] },
+      {
+        spend: { perPayment: ["0.50 USDC"], payTo: [SELLER] },
+        fetch: expect.any(Function),
+      },
     );
+  });
+
+  it("hands the SDK the 402 it has, so the url is not asked twice", async () => {
+    client.fetch.mockImplementation(async () => {
+      const [, , options] = vi.mocked(withSession).mock.calls[0];
+      const replayed = await (options?.fetch as typeof fetch)(URL_);
+      expect(replayed.status).toBe(402);
+      return new Response("ok");
+    });
+    await runCommand(Fetch, [URL_, "--json"]);
+    expect(server).toHaveBeenCalledOnce();
   });
 
   it("returns the body and what was paid", async () => {
@@ -52,8 +106,20 @@ describe("fetch", () => {
     expect(json).toMatchObject({
       status: 200,
       body: '{"report":1}',
-      payment: { amount: "0.1", amountRaw: "100000", payTo: "0xSeller" },
+      payment: {
+        amount: "0.1",
+        amountRaw: "100000",
+        payTo: "0xSeller",
+        settled: true,
+      },
     });
+  });
+
+  it("needs no wallet or core for a url that charges nothing", async () => {
+    server.mockImplementation(async () => new Response("free"));
+    const { json } = await runCommand(Fetch, [URL_, "--json"]);
+    expect(json).toMatchObject({ status: 200, body: "free", payment: null });
+    expect(withSession).not.toHaveBeenCalled();
   });
 
   it("returns a body that is not text as base64, and says so", async () => {
@@ -79,7 +145,8 @@ describe("fetch", () => {
       "3000000",
     ]);
     expect(error?.oclif?.exit).toBe(2);
-    expect(client.fetch).not.toHaveBeenCalled();
+    expect(error?.code).toBe("BAD_FLAG_VALUE");
+    expect(server).not.toHaveBeenCalled();
   });
 
   it.each(["--color", "--no-color"])("accepts %s", async (flag) => {
@@ -98,14 +165,18 @@ describe("fetch", () => {
       "x-trace: abc",
       "--json",
     ]);
-    const [url, init] = client.fetch.mock.calls[0];
-    expect(url).toBe(URL_);
-    expect(init.method).toBe("POST");
-    expect(init.body).toBe('{"q":1}');
-    expect(Object.fromEntries(init.headers)).toEqual({
-      "content-type": "application/json",
-      "x-trace": "abc",
-    });
+    for (const [url, init] of [
+      server.mock.calls[0],
+      client.fetch.mock.calls[0],
+    ]) {
+      expect(url).toBe(URL_);
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBe('{"q":1}');
+      expect(Object.fromEntries(init?.headers as Headers)).toEqual({
+        "content-type": "application/json",
+        "x-trace": "abc",
+      });
+    }
   });
 
   it("exits 1 when the paid-for answer is still an error", async () => {
@@ -113,6 +184,113 @@ describe("fetch", () => {
     const { json } = await runCommand(Fetch, [URL_, "--json"]);
     expect(json).toMatchObject({ status: 500, body: "nope" });
     expect(process.exitCode).toBe(1);
+  });
+
+  it("reports a payment sent for an answer that failed: the seller holds it", async () => {
+    client.paymentFor.mockReturnValue(undefined);
+    client.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      server.mockImplementation(
+        async () => new Response("boom", { status: 500 }),
+      );
+      return paidRequest(url, init);
+    });
+    const { json, stderr } = await runCommand(Fetch, [URL_, "--json"]);
+    expect(json).toMatchObject({
+      status: 500,
+      payment: { settled: false, payTo: SELLER, amountRaw: "100000" },
+    });
+    expect(stderr).toContain("may still redeem it");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("does not say try again when the paid answer is lost", async () => {
+    client.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      server.mockImplementation(async () => {
+        throw new TypeError("fetch failed", { cause: { code: "ECONNRESET" } });
+      });
+      return paidRequest(url, init);
+    });
+    const { json } = await runCommand(Fetch, [URL_, "--json"]);
+    const { error } = json as {
+      error: { code: string; message: string; suggestions: string[] };
+    };
+    expect(error.code).toBe("OUTCOME_UNKNOWN");
+    expect(error.message).toContain("the seller may redeem it");
+    expect(error.suggestions.join(" ")).not.toMatch(/try again/);
+  });
+
+  it("checks --output before anything is sent", async () => {
+    const { error } = await runCommand(Fetch, [
+      URL_,
+      "-o",
+      "/no/such/directory/report.json",
+    ]);
+    expect(error).toMatchObject({
+      code: "OUTPUT_NOT_WRITABLE",
+      oclif: { exit: 2 },
+    });
+    expect(server).not.toHaveBeenCalled();
+    expect(client.fetch).not.toHaveBeenCalled();
+  });
+
+  it("writes to stdout for -o -, and makes no file called -", async () => {
+    server.mockImplementation(async () => new Response("free"));
+    const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const { error } = await runCommand(Fetch, [URL_, "-o", "-"]);
+    expect(error).toBeUndefined();
+    expect(written).toHaveBeenCalledWith(Buffer.from("free"));
+    written.mockRestore();
+  });
+
+  it("refuses a --pay-to that is not an address, before anything is sent", async () => {
+    const { error } = await runCommand(Fetch, [URL_, "--pay-to", "nothex"]);
+    expect(error).toMatchObject({ code: "BAD_ADDRESS", oclif: { exit: 2 } });
+    expect(server).not.toHaveBeenCalled();
+  });
+
+  it("refuses a url that is not http(s)", async () => {
+    const { error } = await runCommand(Fetch, ["file:///etc/passwd"]);
+    expect(error).toMatchObject({ code: "BAD_URL" });
+    expect(server).not.toHaveBeenCalled();
+  });
+
+  describe("where it may be real funds", () => {
+    it("needs --max or --yes before anything is sent", async () => {
+      for (const where of [
+        ["--network", "base"],
+        ["--rpc-url", "https://core.example"],
+      ]) {
+        const { error } = await runCommand(Fetch, [URL_, ...where]);
+        expect(error).toMatchObject({
+          code: "MAX_REQUIRED",
+          oclif: { exit: 2 },
+        });
+      }
+      expect(server).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [["--max", "0.10 USDC"]],
+      [["--yes"]],
+      [["--dry-run"]],
+    ])("goes ahead with %j", async (consent) => {
+      const { error } = await runCommand(Fetch, [
+        URL_,
+        "--network",
+        "base",
+        "--json",
+        ...consent,
+      ]);
+      expect(error).toBeUndefined();
+      expect(server).toHaveBeenCalledOnce();
+    });
+
+    it("needs neither on a testnet, or a core on this machine", async () => {
+      for (const where of [[], ["--rpc-url", "http://127.0.0.1:3000"]]) {
+        const { error } = await runCommand(Fetch, [URL_, "--json", ...where]);
+        expect(error).toBeUndefined();
+      }
+    });
   });
 
   it("refuses a body on a GET before anything is sent", async () => {
@@ -147,20 +325,6 @@ describe("fetch", () => {
   });
 
   describe("--dry-run", () => {
-    const required = {
-      x402Version: 2,
-      accepts: [
-        { scheme: "exact", network: "eip155:8453", amount: "1", payTo: "0xA" },
-        {
-          scheme: "4mica-credit",
-          network: "eip155:84532",
-          asset: "0xToken",
-          amount: "100000",
-          payTo: "0xSeller",
-        },
-      ],
-    };
-
     it("shows what a url charges in 4mica credit, without a wallet", async () => {
       globalThis.fetch = vi.fn(
         async () =>
@@ -182,7 +346,7 @@ describe("fetch", () => {
             network: "eip155:84532",
             asset: "0xToken",
             amountRaw: "100000",
-            payTo: "0xSeller",
+            payTo: SELLER,
           },
         ],
       });
@@ -220,6 +384,14 @@ describe("fetch", () => {
         body: '{"order":7}',
       });
       expect(process.exitCode).toBeUndefined();
+    });
+
+    it("warns before it sends a request that is not a GET", async () => {
+      globalThis.fetch = vi.fn(async () => new Response("ok"));
+      const post = await runCommand(Fetch, [URL_, "-d", "{}", "-n"]);
+      expect(post.stderr).toContain("--dry-run still sends this POST once");
+      const get = await runCommand(Fetch, [URL_, "-n"]);
+      expect(get.stderr).not.toContain("still sends");
     });
 
     it("writes that answer where the real request would", async () => {

@@ -1,6 +1,7 @@
 import { cancel, confirm, isCancel, select, text } from "@clack/prompts";
 import { DOCS_URL } from "../core/links.js";
 import { toPackageName } from "../core/substitute.js";
+import { cancelled } from "../errors.js";
 import type {
   AgentRole,
   BuildType,
@@ -15,9 +16,9 @@ const io = { output: process.stderr };
 /** Flags already supplied on the command line (any subset of InitOptions). */
 export type PartialInit = Partial<InitOptions>;
 
+/** Ctrl-C or Escape at a prompt: exit 130, like every other cancel. */
 function bail(): never {
-  cancel("Scaffolding cancelled.", io);
-  process.exit(0);
+  throw cancelled("cancelled; nothing was created");
 }
 
 function unwrap<T>(value: T | symbol): T {
@@ -28,12 +29,13 @@ function unwrap<T>(value: T | symbol): T {
 /**
  * Fill any missing InitOptions interactively. Every prompt is skipped when the
  * corresponding flag was already provided, so flag mode and interactive mode
- * converge on the same resolved options.
+ * converge on the same resolved options. Undefined when the answer to
+ * "from scratch?" is no: a choice, not a cancel.
  */
 export async function runInitFlow(
   flags: PartialInit,
   defaultPm: PackageManager,
-): Promise<InitOptions> {
+): Promise<InitOptions | undefined> {
   if (flags.type === undefined) {
     const fromScratch = unwrap(
       await confirm({
@@ -49,7 +51,7 @@ export async function runInitFlow(
           `Docs: ${DOCS_URL}`,
         io,
       );
-      process.exit(0);
+      return undefined;
     }
   }
 

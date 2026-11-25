@@ -1,14 +1,14 @@
-import { createInterface } from "node:readline/promises";
 import { Args, Flags } from "@oclif/core";
 import { BaseCommand } from "../../base.js";
 import { readConfig, writeConfig } from "../../core/config-file.js";
+import { ask } from "../../core/confirm.js";
 import { canPrompt } from "../../core/runtime.js";
 import {
   findWallet,
   removeWallet,
   requireWalletName,
 } from "../../core/wallets.js";
-import { usageError } from "../../errors.js";
+import { cancelled, usageError } from "../../errors.js";
 import { warn } from "../../ui/log.js";
 
 export default class WalletsRemove extends BaseCommand {
@@ -57,19 +57,18 @@ export default class WalletsRemove extends BaseCommand {
               "Anything that address holds stays there for good.\n"
           : `${warn(`This deletes ${what}.`)}\n`,
       );
-      const rl = createInterface({
-        input: process.stdin,
-        output: process.stderr,
+      typed = await ask(`Type ${name} to delete it: `, {
+        cancelMessage: "cancelled; nothing was deleted",
       });
-      try {
-        typed = (await rl.question(`Type ${name} to delete it: `)).trim();
-      } finally {
-        rl.close();
+      if (typed !== name) {
+        throw cancelled("the name did not match; nothing was deleted");
       }
     }
     if (typed !== name) {
+      // `--confirm` with the wrong name is a mistake in the command line.
       throw usageError("the name did not match; nothing was deleted", {
-        code: "CANCELLED",
+        code: "NAME_MISMATCH",
+        suggestions: [`pass --confirm ${name}`],
       });
     }
 

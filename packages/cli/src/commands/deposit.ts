@@ -2,9 +2,10 @@ import { Args, Flags } from "@oclif/core";
 import { amountInput } from "../core/amount.js";
 import { confirmFunds } from "../core/confirm.js";
 import { MAX_TIMEOUT_SECS } from "../core/net.js";
+import { beginSending, sentTransactions } from "../core/outcome.js";
 import { previewDeposit, renderPreview } from "../core/preview.js";
 import { withSession } from "../core/session.js";
-import { asset, dryRun, yes } from "../flags.js";
+import { asset, dryRun, gas, yes } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
 import { spinner, step } from "../ui/log.js";
 import { fields } from "../ui/output.js";
@@ -24,11 +25,7 @@ export default class Deposit extends NetworkCommand {
   };
   static flags = {
     asset,
-    gas: Flags.string({
-      default: "auto",
-      options: ["auto", "self"],
-      summary: "auto uses a sponsored transaction when one is available",
-    }),
+    gas,
     wait: Flags.string({
       default: "spendable",
       options: ["spendable", "mined"],
@@ -39,7 +36,8 @@ export default class Deposit extends NetworkCommand {
       helpValue: "<seconds>",
       max: MAX_TIMEOUT_SECS,
       min: 1,
-      summary: "how long to wait for core to count the deposit",
+      summary:
+        "how long to wait for core to count the deposit, after the 60s the chain may take to mine it",
     }),
     "dry-run": dryRun,
     yes,
@@ -58,45 +56,27 @@ export default class Deposit extends NetworkCommand {
     const label = `${amount.amount} ${amount.asset}`;
 
     return withSession(settings, async (client) => {
+      // The same checks with or without --dry-run: the confirmation shows
+      // what the dry run would, and nothing is asked for that would fail.
+      const preview = await previewDeposit(settings, client, amount, flags.gas);
       if (flags["dry-run"]) {
-        const preview = await previewDeposit(
-          settings,
-          client,
-          amount,
-          flags.gas as "auto" | "self",
-        );
         this.log(renderPreview(preview));
         return preview;
       }
 
-      await confirmFunds(
-        {
-          action: `Deposit ${label}`,
-          address: client.address,
-          details: [
-            [
-              "gas",
-              flags.gas === "self"
-                ? "paid by this wallet"
-                : "sponsored if possible",
-            ],
-          ],
-        },
-        settings,
-        flags,
-      );
+      await confirmFunds(preview, settings, flags);
+      beginSending(`the deposit of ${label}`, ["4mica balance"]);
 
       // Mined first, so the hash is on screen before the longer wait starts.
       const mined = await step(
         `Depositing ${label}`,
-        () =>
-          client.deposit(amount, {
-            gas: flags.gas as "auto" | "self",
-            wait: "mined",
-          }),
+        () => client.deposit(amount, { gas: flags.gas, wait: "mined" }),
         `Deposit of ${label} mined`,
       );
-      this.note(`transaction: ${mined.explorerUrl ?? mined.txHash}`);
+      // A transaction the wallet sent itself was printed when it left.
+      if (!sentTransactions().includes(mined.txHash)) {
+        this.note(`transaction: ${mined.explorerUrl ?? mined.txHash}`);
+      }
 
       let result = mined;
       if (flags.wait === "spendable") {

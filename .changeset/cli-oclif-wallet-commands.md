@@ -24,15 +24,26 @@ The wallet key comes from a key file (`--key-file <path>`, or
 the current directory, or from an exported `FOURMICA_WALLET_PRIVATE_KEY`. No
 flag takes the key itself.
 
-`deposit`, the `withdrawals` actions, `cycles pay`, `cycles claim` and `fetch`
-take `--dry-run` (`-n`), which checks
-that the command would work and sends nothing. With no network named, the CLI
-uses the `base-sepolia` testnet; mainnet has to be asked for.
+`deposit`, the `withdrawals` actions and the `cycles` actions show what they
+will sign (token and its address, base units, gas, contract) and ask first;
+`--yes` skips the question and `--dry-run` (`-n`) checks that the command
+would work and sends nothing. With no network named, the CLI uses the
+`base-sepolia` testnet; mainnet has to be asked for, and on mainnet, or a
+core given by URL that is not on this machine, the confirmation wants the
+network's name typed. `fetch` pays without asking, within `--max`; where
+funds may be real it needs `--max` or `--yes`.
 
-Every command takes `--json`, `--quiet` and `--no-input`, writes its result to
-stdout and everything else to stderr, and reports errors with a code. Requests
-time out after 30 seconds (`--request-timeout`). Exit codes are 1 for a failed
-operation, 2 for a usage error and 3 for a configuration error.
+Once a transaction or payment has left, a failure or Ctrl-C is reported as
+`OUTCOME_UNKNOWN`, with the transaction hash and where to check, and never
+as "try again".
+
+Every command takes `--json`, `--quiet`, `--no-input` and `--debug`, writes
+its result to stdout and everything else to stderr, and reports every error
+with a code; under `--json` each failure is one JSON document on stdout.
+Requests time out after 30 seconds without an answer, or without more of one
+(`--request-timeout`), and go through `HTTPS_PROXY`/`HTTP_PROXY`. Exit codes
+are 1 for a failed operation, 2 for a usage error, 3 for a configuration
+error and 130 for a cancel. `4mica autocomplete` sets up shell completion.
 
 Scaffolded projects go live by configuration instead of a code edit: a seller
 when its `.env` sets `PAY_TO`, a buyer when it sets
@@ -43,10 +54,11 @@ through `@4mica/sdk`.
 **Changed**
 
 - Scaffolding is `4mica init`. `4mica` with no command still starts it in a
-  terminal, with a notice that a later release will print help there instead;
-  without a terminal it prints help now. The old forms with flags or a
-  directory (`4mica --yes`, `4mica my-app --no-install`) still scaffold too,
-  with the same notice. Use `npx @4mica/cli init`.
+  terminal, and init's flags with no command (`4mica --yes`) still scaffold,
+  each with a notice that 0.5.0 prints help instead; without a terminal a
+  bare `4mica` prints help now. A directory with no command
+  (`4mica my-app --no-install`) no longer scaffolds: an unknown word is an
+  unknown command, exit 2. Use `npx @4mica/cli init my-app`.
 - `init` takes `--template <id>` in place of `--type`, `--role` and
   `--framework`. The three old flags still work and print a deprecation
   warning.
@@ -57,6 +69,10 @@ through `@4mica/sdk`.
   off without saying so.
 - `init` without a terminal no longer reaches a prompt. It needs `--template`
   (or `--yes`) and fails with exit code 2 otherwise.
+- Cancelling `init` at a prompt exits 130, not 0. Answering no to "from
+  scratch?" still exits 0.
+- The package manager's install no longer sees an exported
+  `FOURMICA_WALLET_PRIVATE_KEY`, and a failed install says how to finish.
 - `dashboard` opens the hosted dashboard at app.4mica.io. `dashboard --local`
   starts the dev server from a checkout of the monorepo, which is what
   `dashboard` did before; outside the monorepo it printed a notice and exited

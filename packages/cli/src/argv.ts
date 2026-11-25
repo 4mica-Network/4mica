@@ -34,9 +34,12 @@ export function hoistCommand(argv: string[], config: Commands): string[] {
   return [...rest.slice(0, end), ...argv.slice(0, i), ...rest.slice(end)];
 }
 
+/** The release that drops the pre-0.3 forms. */
+export const LEGACY_INIT_REMOVED_IN = "0.5.0";
+
 export const INIT_NOTICE =
-  "No command was given, so this runs `4mica init`, as it always has. A " +
-  "later release will print help instead; write `4mica init` to scaffold.";
+  "No command was given, so this runs `4mica init`, as it always has. From " +
+  `${LEGACY_INIT_REMOVED_IN} this prints help instead; write \`4mica init\` to scaffold.`;
 
 /**
  * Edit distance, for telling a mistyped command from a directory name. Two
@@ -85,32 +88,25 @@ export function nearestCommand(
   return nearest?.command;
 }
 
-/** The first word of every command, topic and alias. */
-function firstWords({ commands }: Commands): string[] {
-  return commands.flatMap((command) =>
-    [command.id, ...(command.aliases ?? [])].map((id) => id.split(":")[0]),
-  );
-}
-
 const HELP_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
 
 /**
  * Whether this is the old way of scaffolding: until 0.3 there was one
- * command and no word for it, so its flags and directory came first, as in
- * `4mica --yes` and `4mica my-app --no-install`. A word close to a real
- * command is left alone, so that a typo gets "did you mean" and not a
- * project named after it. Close means one slip for a short command and two
- * for a longer one: two slips from `dev` reach `demo` and `web`, which are
- * directory names.
+ * command and no word for it, so its flags came first, as in `4mica --yes`.
+ * Those still scaffold, with a notice.
+ *
+ * A word is always a command, known or not: `4mica version` and `4mica
+ * my-app` are unknown commands, never a project, so that adding a command
+ * can never change what an old command line does. The not-found hook
+ * points at `4mica init <word>`.
  */
-function meansInit(argv: string[], config: Commands): boolean {
+function meansInit(argv: string[]): boolean {
   const [first] = argv;
-  if (first.startsWith("-")) {
-    // Nothing but flags: `hoistCommand` put any command in front of them.
-    return first !== "--" && !argv.some((arg) => HELP_FLAGS.has(arg));
-  }
-  return !firstWords(config).some(
-    (word) => distance(first, word) <= (word.length <= 4 ? 1 : 2),
+  // Nothing but flags: `hoistCommand` put any command in front of them.
+  return (
+    first.startsWith("-") &&
+    first !== "--" &&
+    !argv.some((arg) => HELP_FLAGS.has(arg))
   );
 }
 
@@ -118,8 +114,8 @@ function meansInit(argv: string[], config: Commands): boolean {
  * Until 0.3 a bare `4mica` scaffolded a project. That still works, with a
  * notice, for the people and docs that rely on it. A bare `4mica` only in a
  * terminal: with no one to answer the prompts, help is the useful thing to
- * print. With flags or a directory it was already a script's way to
- * scaffold, so those work anywhere.
+ * print. With init's flags it was already a script's way to scaffold, so
+ * those work anywhere.
  */
 export function normalizeArgv(
   argv: string[],
@@ -127,7 +123,7 @@ export function normalizeArgv(
   interactive = process.stdin.isTTY === true && process.stderr.isTTY === true,
 ): string[] {
   const hoisted = hoistCommand(argv, config);
-  if (hoisted.length === 0 ? !interactive : !meansInit(hoisted, config)) {
+  if (hoisted.length === 0 ? !interactive : !meansInit(hoisted)) {
     return hoisted;
   }
   process.stderr.write(`${INIT_NOTICE}\n\n`);

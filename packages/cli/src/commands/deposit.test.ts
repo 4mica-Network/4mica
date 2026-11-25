@@ -21,7 +21,28 @@ vi.mock("../core/session.js", () => ({
     use(client),
 }));
 
+const ready = {
+  dryRun: true as const,
+  action: "deposit 5 USDC",
+  network: "base-sepolia",
+  wallet: "0xWallet",
+  details: {
+    token: "USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e)",
+    baseUnits: "5000000",
+    gas: "sponsored, if the facilitator accepts the request",
+    contract: "0xC0ffee0000000000000000000000000000000000",
+  },
+  problems: [] as string[],
+  ready: true,
+};
+const previewDeposit = vi.fn();
+vi.mock("../core/preview.js", async (original) => ({
+  ...(await original<typeof import("../core/preview.js")>()),
+  previewDeposit: (...args: unknown[]) => previewDeposit(...args),
+}));
+
 beforeEach(() => {
+  previewDeposit.mockResolvedValue(ready);
   client.deposit.mockResolvedValue(mined);
   mined.spendable.mockResolvedValue({ ...mined, status: "spendable" });
   process.exitCode = undefined;
@@ -136,8 +157,102 @@ describe("deposit", () => {
       error: {
         code: "INSUFFICIENT_BALANCE",
         message: "the wallet holds 0 USDC but this needs 5",
+        suggestions: [
+          expect.stringContaining("4mica balance"),
+          expect.stringContaining("fund the wallet"),
+        ],
       },
     });
     expect(process.exitCode).toBe(EXIT.failure);
+  });
+
+  it("shows the token, its address and the contract before sending", async () => {
+    const { stderr } = await runCommand(Deposit, ["5", "-a", "USDC", "--yes"]);
+    expect(stderr).toContain("Deposit 5 USDC");
+    expect(stderr).toContain("network: base-sepolia (testnet)");
+    expect(stderr).toContain(
+      "token: USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e)",
+    );
+    expect(stderr).toContain("base units: 5000000");
+    expect(stderr).toContain(
+      "contract: 0xC0ffee0000000000000000000000000000000000",
+    );
+  });
+
+  it("does not ask for, or send, a deposit that would fail", async () => {
+    previewDeposit.mockResolvedValue({
+      ...ready,
+      problems: ["the wallet holds 1 USDC; this needs 5"],
+      ready: false,
+    });
+    const { error } = await runCommand(Deposit, ["5", "-a", "USDC", "--yes"]);
+    expect(error).toMatchObject({ code: "NOT_READY" });
+    expect(error?.message).toContain("the wallet holds 1 USDC");
+    expect(client.deposit).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing on a dry run, even with --yes", async () => {
+    const { json } = await runCommand(Deposit, [
+      "5",
+      "-a",
+      "USDC",
+      "--dry-run",
+      "--yes",
+      "--json",
+    ]);
+    expect(json).toMatchObject({ dryRun: true, ready: true });
+    expect(client.deposit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [["0", "-a", "USDC"]],
+    [["0.000", "-a", "USDC"]],
+    [["0 USDC"]],
+  ])("refuses a zero amount, %j, before connecting", async (argv) => {
+    const { error } = await runCommand(Deposit, [...argv, "--yes"]);
+    expect(error).toMatchObject({
+      code: "AMOUNT_ZERO",
+      oclif: { exit: EXIT.usage },
+    });
+    expect(previewDeposit).not.toHaveBeenCalled();
+  });
+
+  it("never says try again once the deposit may have been sent", async () => {
+    // viem's receipt wait timing out: below the SDK, after the broadcast.
+    client.deposit.mockRejectedValue(
+      new Error(
+        'Timed out while waiting for transaction with hash "0xfeed" to be confirmed.',
+      ),
+    );
+    const { json } = await runCommand(Deposit, [
+      "5",
+      "-a",
+      "USDC",
+      "--yes",
+      "--json",
+    ]);
+    const { error } = json as {
+      error: {
+        code: string;
+        message: string;
+        suggestions: string[];
+        retryable: boolean;
+      };
+    };
+    expect(error.code).toBe("OUTCOME_UNKNOWN");
+    expect(error.retryable).toBe(false);
+    expect(error.message).toContain("the deposit of 5 USDC");
+    expect(error.suggestions.join(" ")).not.toMatch(/try again/);
+    expect(error.suggestions.join(" ")).toContain("4mica balance");
+  });
+
+  it("keeps a revert definite: it says what happened", async () => {
+    class FourMicaError extends Error {}
+    class ContractError extends FourMicaError {
+      name = "RevertedOnChainError";
+    }
+    client.deposit.mockRejectedValue(new ContractError("reverted on chain"));
+    const { error } = await runCommand(Deposit, ["5", "-a", "USDC", "--yes"]);
+    expect(error).toMatchObject({ code: "REVERTED_ON_CHAIN" });
   });
 });

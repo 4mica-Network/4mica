@@ -73,6 +73,8 @@ describe("normalizeArgv", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     expect(normalizeArgv([], config, true)).toEqual(["init"]);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining("4mica init"));
+    // The notice says when the old form goes.
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("0.5.0"));
     stderr.mockRestore();
   });
 
@@ -87,24 +89,6 @@ describe("normalizeArgv", () => {
         ["--type", "seller", "--yes"],
         ["init", "--type", "seller", "--yes"],
       ],
-      [
-        ["my-app", "--no-install"],
-        ["init", "my-app", "--no-install"],
-      ],
-      [
-        ["--yes", "my-app"],
-        ["init", "my-app", "--yes"],
-      ],
-      // Directory names two letters away from a short command.
-      [
-        ["demo", "--yes"],
-        ["init", "demo", "--yes"],
-      ],
-      [
-        ["web", "--no-install"],
-        ["init", "web", "--no-install"],
-      ],
-      [["shop"], ["init", "shop"]],
     ])("%j scaffolds, with or without a terminal", (argv, expected) => {
       const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
       expect(normalizeArgv(argv, config, false)).toEqual(expected);
@@ -131,6 +115,16 @@ describe("normalizeArgv", () => {
       [["inti", "--yes"]],
       [["hepl"]],
       [["de"]],
+      // A word alone is a command, known or not: never a project.
+      [["shop"]],
+      [["version"]],
+      [["xyzzy"]],
+      [["xyzzy", "--json"]],
+      // Before 0.3 these scaffolded; a word is now always a command.
+      [["my-app", "--no-install"]],
+      [["--yes", "my-app"]],
+      [["demo", "--yes"]],
+      [["shop", "--template", "seller-express"]],
     ])("%j is left to oclif", (argv) => {
       const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
       expect(normalizeArgv(argv, config, true)[0]).not.toBe("init");

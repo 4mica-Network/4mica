@@ -65,3 +65,38 @@ describe("readKeyFile", () => {
     ).rejects.toMatchObject({ code: "BAD_SIGNER" });
   });
 });
+
+describe("readKeyFile, beyond the file itself", () => {
+  it("still warns about a key others can read with --quiet", async () => {
+    const { setRuntimeFlags } = await import("./runtime.js");
+    setRuntimeFlags({ quiet: true });
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const path = await keyFile("0xabc", 0o644);
+    await readKeyFile(path, "flag");
+    setRuntimeFlags({});
+    if (process.platform !== "win32") {
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining("readable by other users"),
+      );
+    }
+  });
+
+  it("does not wait on a terminal for a key with --no-input", async () => {
+    const { setRuntimeFlags } = await import("./runtime.js");
+    setRuntimeFlags({ "no-input": true });
+    const was = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      configurable: true,
+    });
+    await expect(readKeyFile("-", "flag")).rejects.toMatchObject({
+      code: "STDIN_REQUIRED",
+      oclif: { exit: EXIT.usage },
+    });
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: was,
+      configurable: true,
+    });
+    setRuntimeFlags({});
+  });
+});

@@ -12,6 +12,7 @@ export interface Preview {
   action: string;
   network: string;
   wallet: string;
+  /** camelCase keys, for `--json`; `detailLines` gives the words. */
   details: Record<string, string>;
   /** Empty when the real command would be sent. */
   problems: string[];
@@ -36,6 +37,14 @@ function preview(
   };
 }
 
+/** `baseUnits` → `base units`, as a person reads it. */
+export const label = (key: string): string =>
+  key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+
+/** The details as the terminal shows them. */
+export const detailLines = (p: Preview): [string, string][] =>
+  Object.entries(p.details).map(([key, value]) => [label(key), value]);
+
 /** Exit code 1 when something blocks it, so a script can branch on a dry run. */
 export function renderPreview(p: Preview): string {
   if (!p.ready) process.exitCode = 1;
@@ -43,7 +52,7 @@ export function renderPreview(p: Preview): string {
     ["would", p.action],
     ["network", p.network],
     ["wallet", p.wallet],
-    ...Object.entries(p.details),
+    ...detailLines(p),
     ["ready", p.ready ? "yes, nothing was sent" : "no"],
     ...p.problems.map((problem): [string, string] => ["problem", problem]),
   ]);
@@ -102,10 +111,11 @@ export async function previewDeposit(
     client,
     `deposit ${amount.amount} ${token.symbol}`,
     {
-      token: token.native ? "native" : token.address,
-      "base units": raw.toString(),
-      "wallet holds": `${formatUnits(held, token.decimals)} ${token.symbol}`,
+      token: `${token.symbol} (${token.native ? "native" : token.address})`,
+      baseUnits: raw.toString(),
+      walletHolds: `${formatUnits(held, token.decimals)} ${token.symbol}`,
       gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
+      contract: low.ctx.contractAddress,
     },
     problems,
   );
@@ -132,8 +142,10 @@ export async function previewWithdrawalRequest(
     client,
     `request a withdrawal of ${amount.amount} ${balance.asset.symbol}`,
     {
+      token: `${balance.asset.symbol} (${balance.asset.address})`,
       available: `${balance.available} ${balance.asset.symbol}`,
       locked: `${balance.locked} ${balance.asset.symbol}`,
+      contract: (await client.lowLevel()).ctx.contractAddress,
     },
     problems,
   );
@@ -164,9 +176,11 @@ export async function previewPendingWithdrawal(
     `${verb} the withdrawal of ${pending?.asset.symbol ?? asset}`,
     pending
       ? {
+          token: `${pending.asset.symbol} (${pending.asset.address})`,
           amount: `${pending.amount} ${pending.asset.symbol}`,
           requested: pending.requestedAt.toISOString(),
-          "ready at": pending.readyAt.toISOString(),
+          readyAt: pending.readyAt.toISOString(),
+          contract: (await client.lowLevel()).ctx.contractAddress,
         }
       : {},
     problems,
@@ -251,9 +265,11 @@ export async function previewCyclePay(
     `pay ${amount} for cycle ${terms.cycleIdText}`,
     {
       for: terms.participant,
-      "base units": terms.amount.toString(),
-      "wallet holds": holds,
+      token: terms.assetAddress,
+      baseUnits: terms.amount.toString(),
+      walletHolds: holds,
       gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
+      contract: terms.contractAddress,
     },
     problems,
   );
@@ -288,8 +304,10 @@ export async function previewCycleClaim(
     `claim ${amount} for cycle ${terms.cycleIdText}`,
     {
       for: terms.participant,
-      "base units": terms.amount.toString(),
+      token: terms.assetAddress,
+      baseUnits: terms.amount.toString(),
       gas: sponsored ? SPONSORED : await paidByWallet(native, nativeSymbol),
+      contract: terms.contractAddress,
     },
     problems,
   );

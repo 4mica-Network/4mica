@@ -18,6 +18,7 @@ function client(wallet: { usdc: bigint; eth: bigint; gasless: boolean }) {
       tokens: { supported: async () => ({ tokens: [USDC] }) },
       deposit: { isGaslessAvailable: () => wallet.gasless },
       ctx: {
+        contractAddress: "0xCore",
         gateway: async () => ({
           nativeBalance: async () => wallet.eth,
           erc20Balance: async () => wallet.usdc,
@@ -42,7 +43,11 @@ describe("previewDeposit", () => {
       action: "deposit 5 USDC",
       ready: true,
       problems: [],
-      details: { token: "0xToken", "base units": "5000000" },
+      details: {
+        token: "USDC (0xToken)",
+        baseUnits: "5000000",
+        contract: "0xCore",
+      },
     });
   });
 
@@ -108,6 +113,7 @@ describe("withdrawal previews", () => {
       address: "0xWallet",
       balance: async () => balance,
       withdrawals: async () => withdrawals,
+      lowLevel: async () => ({ ctx: { contractAddress: "0xCore" } }),
     }) as unknown as Client;
 
   it("checks a request against available collateral, not the total", async () => {

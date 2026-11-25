@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import { type AddressInfo, createServer } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { toCliError } from "../errors.js";
 import { installRequestTimeout, lastTransportFailure } from "./net.js";
 
@@ -26,7 +26,7 @@ describe("installRequestTimeout", () => {
       });
     const failure = await install(stalled, 0.02);
     await expect(fetch("https://core.example/core/tokens")).rejects.toThrow();
-    expect(failure()).toEqual({
+    expect(failure()).toMatchObject({
       origin: "https://core.example",
       reason: "timeout",
       timeoutSecs: 0.02,
@@ -106,25 +106,53 @@ describe("installRequestTimeout", () => {
     });
   });
 
-  it("does not cut off a response that is still arriving", async () => {
-    // Headers at once, the body after the limit has passed.
-    const slowBody: typeof fetch = async (_input, init) =>
+  /** A body sent in parts, `gap` ms apart; `stallAfter` parts, then nothing. */
+  const trickle =
+    (
+      parts: number,
+      gap: number,
+      stallAfter = Number.POSITIVE_INFINITY,
+    ): typeof fetch =>
+    async (_input, init) =>
       new Response(
         new ReadableStream({
-          start(controller) {
+          async start(controller) {
             init?.signal?.addEventListener("abort", () =>
               controller.error(init.signal?.reason),
             );
-            setTimeout(() => {
-              controller.enqueue(new TextEncoder().encode("the report"));
-              controller.close();
-            }, 80);
+            for (let i = 0; i < parts; i++) {
+              if (i >= stallAfter) return;
+              await new Promise((r) => setTimeout(r, gap));
+              controller.enqueue(new TextEncoder().encode(`part${i} `));
+            }
+            controller.close();
           },
         }),
       );
-    const failure = await install(slowBody, 0.02);
+
+  it("does not cut off a response that keeps arriving", async () => {
+    // Each part within the limit, the whole well past it.
+    const failure = await install(trickle(6, 15), 0.05);
     const response = await fetch("https://seller.example/report");
-    expect(await response.text()).toBe("the report");
+    expect(await response.text()).toBe("part0 part1 part2 part3 part4 part5 ");
+    expect(failure()).toBeUndefined();
+  });
+
+  it("gives up on a body that stops arriving", async () => {
+    // Headers and one part, then nothing: a half-open connection.
+    const failure = await install(trickle(3, 5, 1), 0.05);
+    const response = await fetch("https://core.example/core/tokens");
+    await expect(response.text()).rejects.toThrow(/timeout/);
+    expect(failure()).toMatchObject({
+      origin: "https://core.example",
+      reason: "timeout",
+    });
+  });
+
+  it("does not time out a body nobody reads", async () => {
+    const failure = await install(trickle(1, 5), 0.02);
+    await fetch("https://core.example/core/health");
+    await new Promise((r) => setTimeout(r, 60));
     expect(failure()).toBeUndefined();
   });
 
@@ -247,5 +275,97 @@ describe("installing twice", () => {
     installRequestTimeout(30);
     await fetch("https://core.example");
     expect(calls).toBe(1);
+  });
+});
+
+describe("what leaves through the wrapper", () => {
+  const HASH = `0x${"ab".repeat(32)}`;
+
+  it("prints a transaction's hash as soon as the chain has it", async () => {
+    const { resetOutcome, sentTransactions, anythingSent } = await import(
+      "./outcome.js"
+    );
+    resetOutcome();
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    globalThis.fetch = async () =>
+      Response.json({ jsonrpc: "2.0", id: 7, result: HASH });
+    installRequestTimeout(30);
+    const response = await fetch("https://rpc.example", {
+      method: "POST",
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 7,
+        method: "eth_sendRawTransaction",
+        params: ["0x02f8…"],
+      }),
+    });
+    // The caller still reads the answer itself.
+    expect(await response.json()).toMatchObject({ result: HASH });
+    expect(sentTransactions()).toEqual([HASH]);
+    expect(anythingSent()).toBe(true);
+    expect(stderr).toHaveBeenCalledWith(`transaction sent: ${HASH}\n`);
+    stderr.mockRestore();
+    resetOutcome();
+  });
+
+  it("knows a payment has gone to a seller once its header is sent", async () => {
+    const { resetOutcome, sentPayments } = await import("./outcome.js");
+    resetOutcome();
+    globalThis.fetch = async () => new Response("ok");
+    installRequestTimeout(30);
+    const accepted = {
+      network: "eip155:84532",
+      asset: "0xT",
+      amount: "5",
+      payTo: "0xS",
+    };
+    await fetch("https://seller.example/r", {
+      headers: {
+        "PAYMENT-SIGNATURE": Buffer.from(
+          JSON.stringify({ x402Version: 2, accepted, payload: {} }),
+        ).toString("base64"),
+      },
+    });
+    expect(sentPayments()).toEqual([
+      {
+        url: "https://seller.example/r",
+        network: "eip155:84532",
+        asset: "0xT",
+        amountRaw: "5",
+        payTo: "0xS",
+      },
+    ]);
+    resetOutcome();
+  });
+
+  it("writes debug lines with no query, header or body in them", async () => {
+    const { runtime } = await import("./runtime.js");
+    runtime.debug = true;
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    globalThis.fetch = async () => new Response("ok", { status: 201 });
+    installRequestTimeout(30);
+    await fetch("https://core.example/core/x?token=SECRET", {
+      method: "POST",
+      headers: { authorization: "Bearer SECRET" },
+      body: "SECRET",
+    });
+    runtime.debug = false;
+    const written = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+    stderr.mockRestore();
+    expect(written).toContain("POST https://core.example/core/x → 201");
+    expect(written).not.toContain("SECRET");
+  });
+});
+
+describe("routeThroughEnvProxy", () => {
+  it("does nothing without a proxy variable, or when Node already uses one", async () => {
+    const { routeThroughEnvProxy } = await import("./net.js");
+    expect(await routeThroughEnvProxy({})).toBe(false);
+    expect(
+      await routeThroughEnvProxy({
+        HTTPS_PROXY: "http://proxy:3128",
+        NODE_USE_ENV_PROXY: "1",
+      }),
+    ).toBe(false);
   });
 });

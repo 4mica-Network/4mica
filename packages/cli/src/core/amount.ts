@@ -25,9 +25,16 @@ export function amountInput(arg: string, given?: Resolved): AmountSpec {
       ],
     });
   }
-  return parts.length === 1
-    ? parseAmount({ amount: arg, asset: asset as string })
-    : parseAmount(arg);
+  const spec =
+    parts.length === 1
+      ? parseAmount({ amount: arg, asset: asset as string })
+      : parseAmount(arg);
+  if (/^0*\.?0*$/.test(spec.amount)) {
+    throw usageError(`the amount must be more than zero, got "${arg}"`, {
+      code: "AMOUNT_ZERO",
+    });
+  }
+  return spec;
 }
 
 export function requireAsset(asset?: string): string {

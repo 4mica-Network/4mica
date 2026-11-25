@@ -2,19 +2,29 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
+import { resetOutcome } from "../core/outcome.js";
 import { packageRoot } from "../core/package-root.js";
+import { setRuntimeFlags } from "../core/runtime.js";
 
 export interface Outcome {
   stdout: string;
+  /** Notes, summaries, warnings: everything written to stderr. */
+  stderr: string;
   /** Parsed stdout, when the command was run with `--json`. */
   json?: unknown;
-  error?: { code?: string; oclif?: { exit?: number }; message: string };
+  error?: {
+    code?: string;
+    oclif?: { exit?: number };
+    message: string;
+    suggestions?: string[];
+  };
 }
 
 /**
  * Runs a command class in-process, as `bin/run.js` would, against an empty
  * config directory and with no `FOURMICA_*` variables from the developer's
- * own shell.
+ * own shell. Each run starts from a fresh process's state: nothing sent,
+ * no flags, the real `fetch`.
  */
 export async function runCommand(
   command: { run(argv: string[], root: string): Promise<unknown> },
@@ -29,14 +39,31 @@ export async function runCommand(
   for (const key of Object.keys(process.env)) {
     if (/^(FOURMICA|4MICA)_/.test(key)) vi.stubEnv(key, undefined);
   }
+  for (const key of [
+    "DEBUG",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "http_proxy",
+    "https_proxy",
+  ]) {
+    vi.stubEnv(key, undefined);
+  }
+  resetOutcome();
+  setRuntimeFlags({});
+  const fetchBefore = globalThis.fetch;
   // oclif prints results through console.log.
   const lines: string[] = [];
   const write = vi.spyOn(console, "log").mockImplementation((...args) => {
     lines.push(args.join(" "));
   });
-  // Confirmation summaries and spinners; not what these tests are about.
-  const quiet = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-  const outcome: Outcome = { stdout: "" };
+  const errors: string[] = [];
+  const stderr = vi
+    .spyOn(process.stderr, "write")
+    .mockImplementation((chunk: unknown) => {
+      errors.push(String(chunk));
+      return true;
+    });
+  const outcome: Outcome = { stdout: "", stderr: "" };
   try {
     await command.run(argv, packageRoot);
   } catch (error) {
@@ -44,10 +71,12 @@ export async function runCommand(
   } finally {
     write.mockRestore();
     cwd.mockRestore();
-    quiet.mockRestore();
+    stderr.mockRestore();
     vi.unstubAllEnvs();
+    globalThis.fetch = fetchBefore;
   }
   outcome.stdout = lines.join("\n");
+  outcome.stderr = errors.join("");
   if (argv.includes("--json")) outcome.json = JSON.parse(outcome.stdout);
   return outcome;
 }

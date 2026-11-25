@@ -25,9 +25,16 @@ export async function walletAddress(settings: Settings): Promise<string> {
  * The SDK is imported here, on first use, so that commands which never
  * connect (`--help`, `init`, `networks`) do not pay for loading viem.
  */
+export interface SessionOptions {
+  /** Limits on what `client.fetch` may pay. */
+  spend?: SpendLimits;
+  /** The `fetch` that `client.fetch` sends through. */
+  fetch?: typeof fetch;
+}
+
 export async function connect(
   settings: Settings,
-  spend?: SpendLimits,
+  options: SessionOptions = {},
 ): Promise<FourMica> {
   requireKey(settings);
   assertMainnetWasChosen(settings);
@@ -38,19 +45,19 @@ export async function connect(
       ? { network: settings.network.value }
       : { rpcUrl: settings.rpcUrl.value }),
     facilitatorUrl: settings.facilitatorUrl?.value,
-    spend,
+    spend: options.spend,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
   });
 }
 
 export async function withSession<T>(
   settings: Settings,
   use: (client: FourMica) => Promise<T>,
-  /** Limits on what `client.fetch` may pay. */
-  spend?: SpendLimits,
+  options?: SessionOptions,
 ): Promise<T> {
   // Connecting logs in to core: a second or two with nothing else to show.
   const client = await waiting(`Connecting to ${networkName(settings)}`, () =>
-    connect(settings, spend),
+    connect(settings, options),
   );
   try {
     return await use(client);

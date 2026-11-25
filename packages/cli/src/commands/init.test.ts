@@ -108,6 +108,7 @@ describe("init without a terminal", () => {
       "--json",
     ]);
     expect(json).toEqual({
+      created: true,
       dir: "/tmp/project",
       name: "my-seller-express",
       template: "stub",
@@ -116,5 +117,37 @@ describe("init without a terminal", () => {
       runScript: "dev",
       nextSteps: [{ done: true, step: "project created", command: "project" }],
     });
+  });
+
+  it("takes the careful, spelled-out form: --no-run with --json", async () => {
+    const { json, error } = await runCommand(Init, [
+      "my app",
+      "--template",
+      "seller-express",
+      "--no-install",
+      "--no-run",
+      "--no-dashboard",
+      "--json",
+    ]);
+    expect(error).toBeUndefined();
+    expect(json).toMatchObject({ created: true });
+  });
+
+  it("refuses --run with --json: the server would hold the JSON back", async () => {
+    const { json } = await runCommand(Init, [
+      "--template",
+      "seller-express",
+      "--run",
+      "--json",
+    ]);
+    expect(json).toMatchObject({ error: { code: "RUN_WITH_JSON" } });
+    expect(process.exitCode).toBe(EXIT.usage);
+    process.exitCode = undefined;
+    expect(scaffold).not.toHaveBeenCalled();
+  });
+
+  it("exits 2 with a code for a template that does not exist", async () => {
+    const { error } = await runCommand(Init, ["--template", "bogus"]);
+    expect(error).toMatchObject({ code: "BAD_FLAG_VALUE", oclif: { exit: 2 } });
   });
 });

@@ -35,7 +35,8 @@
     "node": ">=22.0.0"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "oclif": {
     "bin": "4mica",
@@ -59,13 +60,20 @@
       "invalidArgsSpec": 2,
       "nonExistentFlag": 2,
       "requiredArgs": 2,
-      "unexpectedArgs": 2
+      "unexpectedArgs": 2,
+      "violatedFlagConstraint": 2
     },
     "topics": {
       "guarantees": {
         "description": "check guarantee receipts"
+      },
+      "config": {
+        "description": "show and change the cli's settings"
       }
-    }
+    },
+    "plugins": [
+      "@oclif/plugin-autocomplete"
+    ]
   },
   "scripts": {
     "prebuild": "node scripts/gen-snapshot.mjs",
@@ -74,18 +82,20 @@
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "check:exports": "publint --strict"
+    "test": "tsup --silent && vitest run",
+    "check:exports": "publint --strict",
+    "check:snapshot": "node scripts/gen-snapshot.mjs && git diff --exit-code -- snapshot.json"
   },
   "dependencies": {
     "@4mica/sdk": "workspace:^",
     "@clack/prompts": "catalog:",
     "@oclif/core": "catalog:",
+    "@oclif/plugin-autocomplete": "catalog:",
     "execa": "catalog:",
     "find-up": "catalog:",
     "ora": "catalog:",
     "picocolors": "catalog:",
-    "read-pkg": "catalog:",
+    "undici": "catalog:",
     "viem": "catalog:"
   },
   "devDependencies": {

@@ -1,9 +1,9 @@
-import { Args, Flags } from "@oclif/core";
 import { explorerTx, formatAmount, listAssets } from "../../core/assets.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { beginSending } from "../../core/outcome.js";
 import { previewCyclePay, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
-import { dryRun, yes } from "../../flags.js";
+import { cycleArg, dryRun, gas, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
 import { step } from "../../ui/log.js";
 import { fields } from "../../ui/output.js";
@@ -15,23 +15,16 @@ export default class CyclesPay extends NetworkCommand {
     "the contract checks. --dry-run shows the amount and whether this " +
     "wallet can pay it, without paying.";
   static args = {
-    cycle: Args.string({
-      description: "the cycle, as `4mica cycles` names it",
-      required: true,
-    }),
+    cycle: cycleArg,
   };
   static flags = {
-    gas: Flags.string({
-      default: "auto",
-      options: ["auto", "self"],
-      summary: "auto uses a sponsored transaction when one is available",
-    }),
+    gas,
     "dry-run": dryRun,
     yes,
   };
   static examples = [
-    "<%= config.bin %> <%= command.id %> <cycle> --dry-run",
-    "<%= config.bin %> <%= command.id %> <cycle> --yes --json",
+    "<%= config.bin %> <%= command.id %> 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:1767225600 --dry-run",
+    "<%= config.bin %> <%= command.id %> 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:1767225600 --yes --json",
   ];
 
   async run() {
@@ -40,7 +33,7 @@ export default class CyclesPay extends NetworkCommand {
 
     return withSession(settings, async (client) => {
       const { settlement } = await client.lowLevel();
-      const builder = settlement.pay(args.cycle);
+      const builder = settlement.pay(args.cycle as string);
       // Core's own figure: the caller never states the amount.
       const terms = await builder.action();
       const assets = await listAssets(settings, client);
@@ -50,14 +43,14 @@ export default class CyclesPay extends NetworkCommand {
         terms.amount,
       );
 
+      const preview = await previewCyclePay(
+        settings,
+        client,
+        terms,
+        assets,
+        flags.gas,
+      );
       if (flags["dry-run"]) {
-        const preview = await previewCyclePay(
-          settings,
-          client,
-          terms,
-          assets,
-          flags.gas as "auto" | "self",
-        );
         this.log(renderPreview(preview));
         return {
           ...preview,
@@ -67,15 +60,10 @@ export default class CyclesPay extends NetworkCommand {
         };
       }
 
-      await confirmFunds(
-        {
-          action: `Pay ${amount} for cycle ${terms.cycleIdText}`,
-          address: client.address,
-          details: [["for", terms.participant]],
-        },
-        settings,
-        flags,
-      );
+      await confirmFunds(preview, settings, flags);
+      beginSending(`the payment of ${amount} for cycle ${terms.cycleIdText}`, [
+        "4mica cycles",
+      ]);
       const receipt = await step(
         `Paying ${amount}`,
         async () => {

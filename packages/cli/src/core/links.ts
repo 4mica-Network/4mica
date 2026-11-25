@@ -13,5 +13,8 @@ export const DASHBOARD_URL = "https://app.4mica.io";
 
 export const DOCS_URL = "https://docs.4mica.io";
 
+/** The CLI's own page in the docs. */
+export const CLI_DOCS_URL = `${DOCS_URL}/sdks/cli`;
+
 /** Where the quickstart explains minting test tokens to a new wallet. */
 export const FUNDING_DOCS = `${DOCS_URL}/getting-started/quickstart`;

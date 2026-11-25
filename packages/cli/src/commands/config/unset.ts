@@ -21,7 +21,11 @@ export default class ConfigUnset extends BaseCommand {
     const dir = this.config.configDir;
     const { [key]: removed, ...rest } = await readConfig(dir);
     if (removed !== undefined) await writeConfig(dir, rest);
-    this.note(`${key} removed from ${configPath(dir)}`);
+    this.note(
+      removed === undefined
+        ? `${key} was not set in ${configPath(dir)}`
+        : `${key} removed from ${configPath(dir)}`,
+    );
     return { key, removed: removed !== undefined };
   }
 }

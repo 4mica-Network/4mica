@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { listAssets } from "../core/assets.js";
 import { connect } from "../core/session.js";
 import { networkName, type Settings } from "../core/settings.js";
@@ -58,14 +59,19 @@ async function readiness(settings: Settings): Promise<Readiness> {
   const client = await connect(settings);
   try {
     const gateway = await (await client.lowLevel()).ctx.gateway();
-    const holds: string[] = [];
-    for (const token of await listAssets(settings, client)) {
-      const raw = token.native
-        ? await gateway.nativeBalance()
-        : await gateway.erc20Balance(token.address);
-      if (raw > 0n)
-        holds.push(`${formatUnits(raw, token.decimals)} ${token.symbol}`);
-    }
+    const tokens = await listAssets(settings, client);
+    const held = await Promise.all(
+      tokens.map((token) =>
+        token.native
+          ? gateway.nativeBalance()
+          : gateway.erc20Balance(token.address),
+      ),
+    );
+    const holds = tokens.flatMap((token, i) =>
+      held[i] > 0n
+        ? [`${formatUnits(held[i], token.decimals)} ${token.symbol}`]
+        : [],
+    );
     const collateral = Object.values(await client.balance())
       .filter((b) => b.raw.available > 0n)
       .map((b) => `${b.available} ${b.asset.symbol}`);
@@ -75,12 +81,76 @@ async function readiness(settings: Settings): Promise<Readiness> {
   }
 }
 
+interface LocalCheck {
+  check: string;
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * What can be wrong on this machine, before any service is asked: the
+ * Node version, a key file others can read, a `.env` that redirects where
+ * the wallet signs in. None of them changes the exit code.
+ */
+async function localChecks(settings: Settings): Promise<LocalCheck[]> {
+  const checks: LocalCheck[] = [];
+  const major = Number(process.versions.node.split(".")[0]);
+  checks.push({
+    check: "node",
+    ok: major >= 22,
+    detail:
+      major >= 22
+        ? process.version
+        : `${process.version}; 22 or later is needed`,
+  });
+  const file = settings.key?.file;
+  if (file && file !== "stdin") {
+    const mode = await stat(file).then(
+      (s) => s.mode,
+      () => undefined,
+    );
+    const open =
+      mode !== undefined &&
+      process.platform !== "win32" &&
+      (mode & 0o077) !== 0;
+    checks.push({
+      check: "key file",
+      ok: mode !== undefined && !open,
+      detail:
+        mode === undefined
+          ? `${file} cannot be read`
+          : open
+            ? `${file} is readable by other users; run: chmod 600 ${file}`
+            : file,
+    });
+  } else if (settings.key) {
+    checks.push({
+      check: "key",
+      ok: true,
+      detail: `from ${settings.key.source === "env" ? "FOURMICA_WALLET_PRIVATE_KEY" : settings.key.source}`,
+    });
+  }
+  if (settings.envFilePath) {
+    checks.push({
+      check: ".env",
+      ok: settings.redirects.length === 0,
+      detail:
+        settings.redirects.length === 0
+          ? settings.envFilePath
+          : `${settings.envFilePath} sets ${settings.redirects.map((n) => `FOURMICA_${n}`).join(", ")}`,
+    });
+  }
+  return checks;
+}
+
 export default class Status extends NetworkCommand {
   static summary = "check core and facilitator health";
   static description =
     "Exits 1 when a service does not answer. With a wallet in use it also " +
-    "says whether the wallet is funded and has collateral; neither changes " +
-    "the exit code.";
+    "says whether the wallet is funded and has collateral. It checks this " +
+    "machine too: the Node version, a key file others can read, a .env " +
+    "that changes where the wallet signs in. None of those changes the exit " +
+    "code.";
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --network base --json",
@@ -143,6 +213,15 @@ export default class Status extends NetworkCommand {
         );
       }
     }
+    const local = await localChecks(settings);
+    for (const c of local) {
+      rows.push([
+        c.check,
+        "local",
+        c.ok ? out.green("ok") : out.yellow("check"),
+        c.detail,
+      ]);
+    }
     this.log(table(["CHECK", "WHERE", "STATE", "DETAIL"], rows));
 
     if (!core.up || facilitator?.up === false) process.exitCode = 1;
@@ -156,6 +235,7 @@ export default class Status extends NetworkCommand {
         schemes,
       },
       wallet,
+      local,
     };
   }
 }

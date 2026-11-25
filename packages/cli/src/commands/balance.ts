@@ -9,7 +9,8 @@ export default class BalanceCommand extends NetworkCommand {
   static summary = "show collateral: total, locked and available";
   static description =
     "Locked collateral backs guarantees that have not cleared yet. Only " +
-    "the available part can be spent or withdrawn.";
+    "the available part can be spent or withdrawn. With --json the result " +
+    "is always a list, one entry per asset, each naming its network.";
   static args = {
     asset: Args.string({
       description: "show one asset: a symbol, ETH, or a token address",
@@ -31,6 +32,7 @@ export default class BalanceCommand extends NetworkCommand {
       const balances: Balance[] = args.asset
         ? [result as Balance]
         : Object.values(result);
+      this.note(`network: ${networkName(settings)}`);
       this.log(
         table(
           ["ASSET", "TOTAL", "LOCKED", "AVAILABLE"],
@@ -40,7 +42,8 @@ export default class BalanceCommand extends NetworkCommand {
       if (balances.length === 0) {
         this.note(`no collateral on ${networkName(settings)} for this wallet`);
       }
-      return result;
+      const network = networkName(settings);
+      return balances.map((b) => ({ ...b, network }));
     });
   }
 }

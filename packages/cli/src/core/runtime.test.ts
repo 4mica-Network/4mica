@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { canPrompt, runtime, setRuntimeFlags } from "./runtime.js";
+import {
+  canPrompt,
+  debugFromEnv,
+  runtime,
+  setRuntimeFlags,
+} from "./runtime.js";
 
 const tty = (stdin: boolean, stderr: boolean) => {
   Object.defineProperty(process.stdin, "isTTY", {
@@ -44,8 +49,24 @@ describe("canPrompt", () => {
 describe("setRuntimeFlags", () => {
   it("takes the parsed flags, and forgets the last command's", () => {
     setRuntimeFlags({ quiet: true, "no-input": true });
-    expect(runtime).toEqual({ quiet: true, noInput: true });
+    expect(runtime).toMatchObject({ quiet: true, noInput: true });
     setRuntimeFlags({ yes: true });
-    expect(runtime).toEqual({ quiet: false, noInput: false });
+    expect(runtime).toMatchObject({ quiet: false, noInput: false });
+  });
+});
+
+describe("debugFromEnv", () => {
+  it.each([
+    [{ DEBUG: "4mica" }, true],
+    [{ DEBUG: "4mica*" }, true],
+    [{ DEBUG: "oclif:*,4mica:net" }, true],
+    [{ DEBUG: "*" }, true],
+    [{ DEBUG: "oclif:*" }, false],
+    [{ DEBUG: "4micax" }, false],
+    [{ FOURMICA_DEBUG: "1" }, true],
+    [{ FOURMICA_DEBUG: "0" }, false],
+    [{}, false],
+  ])("%j → %s", (env, expected) => {
+    expect(debugFromEnv(env)).toBe(expected);
   });
 });

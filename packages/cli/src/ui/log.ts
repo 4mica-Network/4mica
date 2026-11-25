@@ -12,7 +12,9 @@ export function wantsColor(
   argv: readonly string[],
   isTTY: boolean,
 ): boolean {
-  if (env.NO_COLOR || argv.includes("--no-color")) return false;
+  if (env.NO_COLOR || env.FOURMICA_NO_COLOR || argv.includes("--no-color")) {
+    return false;
+  }
   if (argv.includes("--color")) return true;
   const forced = env.FORCE_COLOR;
   if (forced) return forced !== "0" && forced !== "false";
@@ -40,9 +42,39 @@ export const ok = (s: string) => pc.green(s);
 export const warn = (s: string) => pc.yellow(s);
 export const err = (s: string) => pc.red(s);
 
+/** The spinner on screen, which a line written meanwhile must not tear. */
+let active: ReturnType<typeof ora> | undefined;
+
+/** A line on stderr, written around the spinner if one is turning. */
+function line(message: string): void {
+  if (active?.isSpinning) {
+    active.clear();
+    process.stderr.write(`${message}\n`);
+    active.render();
+  } else {
+    process.stderr.write(`${message}\n`);
+  }
+}
+
 /** A line of progress on stderr; `--quiet` drops it. */
 export function note(message: string): void {
-  if (!runtime.quiet) process.stderr.write(`${message}\n`);
+  if (!runtime.quiet) line(message);
+}
+
+/**
+ * Something the user must see even with `--quiet`: a key others can read, a
+ * transaction that has left. `--quiet` hides progress, not warnings.
+ */
+export function warning(message: string): void {
+  line(warn(message));
+}
+
+/**
+ * Diagnostics for `--debug` (or `DEBUG=4mica`): requests and stacks. Never
+ * pass it a header value, a body or a key.
+ */
+export function debug(message: string): void {
+  if (runtime.debug) line(dim(`[debug] ${message}`));
 }
 
 interface Progress {
@@ -68,11 +100,27 @@ export function spinner(text: string): Progress {
     return { succeed: line, warn: line, fail: line, clear() {} };
   }
   const s = ora({ text, color: "cyan", stream: process.stderr }).start();
+  active = s;
+  const done = () => {
+    if (active === s) active = undefined;
+  };
   return {
-    succeed: (t) => void s.succeed(ok(t)),
-    warn: (t) => void s.warn(warn(t)),
-    fail: (t) => void s.fail(err(t)),
-    clear: () => void s.stop(),
+    succeed(t) {
+      done();
+      s.succeed(ok(t));
+    },
+    warn(t) {
+      done();
+      s.warn(warn(t));
+    },
+    fail(t) {
+      done();
+      s.fail(err(t));
+    },
+    clear() {
+      done();
+      s.stop();
+    },
   };
 }
 

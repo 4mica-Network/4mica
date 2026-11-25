@@ -4,7 +4,12 @@ import { Flags } from "@oclif/core";
 import { BaseCommand } from "./base.js";
 import { readConfig } from "./core/config-file.js";
 import { readKeyFile } from "./core/key-file.js";
-import { installRequestTimeout, MAX_TIMEOUT_SECS } from "./core/net.js";
+import {
+  installRequestTimeout,
+  MAX_TIMEOUT_SECS,
+  routeThroughEnvProxy,
+} from "./core/net.js";
+import { setExplorer } from "./core/outcome.js";
 import {
   type KeyFile,
   loadEnvFile,
@@ -25,16 +30,20 @@ export abstract class NetworkCommand extends BaseCommand {
       summary: "network to use; FOURMICA_NETWORK does the same",
     }),
     "rpc-url": Flags.string({
+      aliases: ["core-url"],
       helpGroup: "GLOBAL",
       helpValue: "<url>",
-      summary: "core url of a network that is not in `4mica networks`",
+      summary:
+        "core url of a network that is not in `4mica networks` (not an Ethereum RPC endpoint)",
     }),
     "key-file": Flags.string({
       helpGroup: "GLOBAL",
       helpValue: "<path>",
       summary: "file holding the wallet key; - reads it from stdin",
     }),
-    "env-file": Flags.file({
+    // Not `--env-file`: Node reads that name from argv itself, before this
+    // code runs, and exits 9 when the file is missing.
+    dotenv: Flags.file({
       exists: true,
       helpGroup: "GLOBAL",
       helpValue: "<path>",
@@ -42,11 +51,13 @@ export abstract class NetworkCommand extends BaseCommand {
     }),
     "request-timeout": Flags.integer({
       default: 30,
+      env: "FOURMICA_REQUEST_TIMEOUT",
       helpGroup: "GLOBAL",
       helpValue: "<seconds>",
       max: MAX_TIMEOUT_SECS,
       min: 1,
-      summary: "give up on a request that gets no response",
+      summary:
+        "give up on a request that waits this long for an answer, or for more of one",
     }),
   };
 
@@ -54,15 +65,14 @@ export abstract class NetworkCommand extends BaseCommand {
     network?: string;
     "rpc-url"?: string;
     "key-file"?: string;
-    "env-file"?: string;
+    dotenv?: string;
     "request-timeout": number;
     asset?: string;
   }): Promise<Settings> {
     // A project's own .env applies without being asked for, as it does for
     // the project's code. Only this directory: no walking up to a parent's.
     const local = join(process.cwd(), ".env");
-    const envFilePath =
-      flags["env-file"] ?? (existsSync(local) ? local : undefined);
+    const envFilePath = flags.dotenv ?? (existsSync(local) ? local : undefined);
 
     const envFile = envFilePath ? await loadEnvFile(envFilePath) : undefined;
     const config = await readConfig(this.config.configDir);
@@ -91,16 +101,18 @@ export abstract class NetworkCommand extends BaseCommand {
       env: process.env,
       envFile,
       envFilePath,
-      envFileFound: envFilePath !== undefined && !flags["env-file"],
+      envFileFound: envFilePath !== undefined && !flags.dotenv,
       keyFile,
       keyProblem,
       config,
     });
     // Nothing above makes a request.
+    await routeThroughEnvProxy();
     installRequestTimeout(flags["request-timeout"], [
       settings.rpcUrl.value,
       settings.facilitatorUrl?.value,
     ]);
+    setExplorer(settings.info?.explorerUrl);
     return settings;
   }
 }

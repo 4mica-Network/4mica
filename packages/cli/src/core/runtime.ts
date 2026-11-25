@@ -2,12 +2,31 @@
  * Flags every command honours, kept here once the command has parsed them,
  * so that helpers far from the command can see them.
  */
-export const runtime = { quiet: false, noInput: false };
+export const runtime = {
+  quiet: false,
+  noInput: false,
+  debug: false,
+  /**
+   * A child process holds the terminal (`dev`, `init --run`): Ctrl-C is
+   * meant for it, and this process only waits for it to stop.
+   */
+  childInForeground: false,
+};
+
+/** `DEBUG=4mica`, as the `debug` package spells it, or `FOURMICA_DEBUG=1`. */
+export function debugFromEnv(env: Record<string, string | undefined>): boolean {
+  const flag = env.FOURMICA_DEBUG;
+  if (flag && flag !== "0" && flag !== "false") return true;
+  return (env.DEBUG ?? "")
+    .split(/[\s,]+/)
+    .some((name) => name === "*" || /^4mica(\*|:|$)/.test(name));
+}
 
 /** From the parsed flags, not from argv: `-qy` is quiet too. */
 export function setRuntimeFlags(flags: Record<string, unknown>): void {
   runtime.quiet = flags.quiet === true;
   runtime.noInput = flags["no-input"] === true;
+  runtime.debug = flags.debug === true || debugFromEnv(process.env);
 }
 
 /**

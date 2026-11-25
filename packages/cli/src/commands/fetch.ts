@@ -1,13 +1,18 @@
 import { isUtf8 } from "node:buffer";
-import { writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import { readInput } from "../core/input.js";
+import { sentPayments } from "../core/outcome.js";
 import { withSession } from "../core/session.js";
-import { networkName } from "../core/settings.js";
+import { isKnownSafe, networkName } from "../core/settings.js";
 import { usageError } from "../errors.js";
+import { address } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
 import { waiting } from "../ui/log.js";
-import { table } from "../ui/output.js";
+import { printable, table } from "../ui/output.js";
 
 const SCHEME = "4mica-credit";
 
@@ -63,11 +68,38 @@ async function offersIn(response: Response): Promise<Offer[]> {
   return required.accepts
     .filter((entry) => entry?.scheme === SCHEME)
     .map((entry) => ({
-      network: String(entry.network),
-      asset: String(entry.asset),
-      amountRaw: String(entry.amount ?? entry.maxAmountRequired),
-      payTo: String(entry.payTo),
+      network: printable(String(entry.network)),
+      asset: printable(String(entry.asset)),
+      amountRaw: printable(String(entry.amount ?? entry.maxAmountRequired)),
+      payTo: printable(String(entry.payTo)),
     }));
+}
+
+/**
+ * Where the body goes, proven before anything is sent: a paid answer must
+ * not be lost to a typo in a path. `-` and no `--output` mean stdout.
+ */
+async function outputTarget(output?: string): Promise<string | undefined> {
+  if (output === undefined || output === "-") return undefined;
+  const path = resolve(output);
+  const existing = await stat(path).catch(() => undefined);
+  if (existing?.isDirectory()) {
+    throw usageError(`--output ${output} is a directory`, {
+      code: "OUTPUT_NOT_WRITABLE",
+      suggestions: ["name a file in it"],
+    });
+  }
+  try {
+    await access(existing ? path : dirname(path), constants.W_OK);
+  } catch {
+    throw usageError(
+      existing
+        ? `--output ${output} cannot be written`
+        : `--output ${output}: the directory ${dirname(path)} does not exist or cannot be written`,
+      { code: "OUTPUT_NOT_WRITABLE" },
+    );
+  }
+  return output;
 }
 
 export default class Fetch extends NetworkCommand {
@@ -75,14 +107,19 @@ export default class Fetch extends NetworkCommand {
   static description =
     "Makes an HTTP request. If the answer is 402 with a 4mica payment " +
     "request, signs a payment within --max and repeats the request once. " +
-    "The response body goes to stdout and what was paid to stderr.\n\n" +
-    "It does not ask before paying: --max is the consent, and it defaults " +
-    "to 1 USDC per payment.\n\n" +
+    "The response body goes to stdout and what was paid to stderr. Core is " +
+    "only contacted, and a wallet only needed, when the url asks to be paid.\n\n" +
+    "It does not ask before paying: --max is the consent. On a testnet it " +
+    "defaults to 1 USDC per payment. Anywhere that may be real funds " +
+    "(a mainnet, or a core given by url) --max is required, or --yes to " +
+    "accept that default.\n\n" +
     "--dry-run shows what a url charges and pays nothing. It still sends " +
     "the request, once and unpaid: that is how a url says what it charges. " +
     "A url that charges nothing answers it for real, and that answer is " +
     "printed.\n\n" +
-    "Exits 1 when the final answer is an HTTP error.";
+    "Exits 1 when the final answer is an HTTP error. A payment that was sent " +
+    "for an answer that then failed is still reported, under payment, with " +
+    "settled: false: the seller holds it and may redeem it.";
   static args = {
     url: Args.string({ description: "the url to request", required: true }),
   };
@@ -107,7 +144,8 @@ export default class Fetch extends NetworkCommand {
     output: Flags.string({
       char: "o",
       helpValue: "<file>",
-      summary: "write the response body to a file instead of stdout",
+      summary:
+        "write the response body to a file instead of stdout; - is stdout",
     }),
     max: Flags.string({
       helpValue: '<"amount asset">',
@@ -116,11 +154,15 @@ export default class Fetch extends NetworkCommand {
       summary:
         'most to pay for the request, such as "0.50 USDC"; repeat per asset',
     }),
-    "pay-to": Flags.string({
-      helpValue: "<address>",
+    "pay-to": address({
       multiple: true,
       multipleNonGreedy: true,
       summary: "only pay this address; repeat for more",
+    }),
+    yes: Flags.boolean({
+      char: "y",
+      summary:
+        "on a network that may be real funds, pay up to 1 USDC without --max",
     }),
     // Not the shared flag: this dry run cannot promise that nothing is sent.
     "dry-run": Flags.boolean({
@@ -137,9 +179,33 @@ export default class Fetch extends NetworkCommand {
 
   async run() {
     const { args, flags } = await this.parse(Fetch);
+    if (
+      !URL.canParse(args.url) ||
+      !/^https?:$/.test(new URL(args.url).protocol)
+    ) {
+      throw usageError(`"${args.url}" is not an http(s) url`, {
+        code: "BAD_URL",
+      });
+    }
+    const output = await outputTarget(flags.output);
     const settings = await this.settings(flags);
-    if (!URL.canParse(args.url)) {
-      throw usageError(`"${args.url}" is not a url`, { code: "BAD_URL" });
+    if (
+      !flags["dry-run"] &&
+      !isKnownSafe(settings) &&
+      !flags.max &&
+      !flags.yes
+    ) {
+      throw usageError(
+        `${networkName(settings)} may be real funds: say how much this may pay`,
+        {
+          code: "MAX_REQUIRED",
+          suggestions: [
+            'pass --max, such as --max "0.50 USDC"',
+            "or --yes to allow up to 1 USDC per payment",
+            "or look first, paying nothing: --dry-run",
+          ],
+        },
+      );
     }
     const body = await bodyFrom(flags.data);
     const method = (
@@ -157,24 +223,32 @@ export default class Fetch extends NetworkCommand {
       body,
     };
 
-    if (flags["dry-run"]) {
-      const response = await waiting(`Asking ${args.url}`, () =>
-        fetch(args.url, init),
+    if (flags["dry-run"] && method !== "GET" && method !== "HEAD") {
+      this.warning(
+        `--dry-run still sends this ${method} once, unpaid: a url that charges nothing carries it out`,
       );
-      if (response.status !== 402) {
+    }
+    // Unpaid first, without core: most urls charge nothing, and those need
+    // no wallet and no sign-in.
+    const first = await waiting(`Requesting ${args.url}`, () =>
+      fetch(args.url, init),
+    );
+    const offers = first.status === 402 ? await offersIn(first.clone()) : [];
+
+    if (flags["dry-run"]) {
+      if (first.status !== 402) {
         // Not a price: the url carried the request out. Its answer is shown
         // as it would be without --dry-run, not thrown away.
-        const status = response.status < 400 ? `HTTP ${response.status}: ` : "";
+        const status = first.status < 400 ? `HTTP ${first.status}: ` : "";
         this.note(
           `${status}this url did not ask for payment and answered the request itself`,
         );
         return {
           dryRun: true,
           offers: [],
-          ...(await this.deliver(response, flags.output)),
+          ...(await this.deliver(first, output)),
         };
       }
-      const offers = await offersIn(response);
       this.log(
         table(
           ["NETWORK", "ASSET", "BASE UNITS", "PAY TO"],
@@ -186,27 +260,58 @@ export default class Fetch extends NetworkCommand {
           ? "HTTP 402, but with no 4mica payment option"
           : `HTTP 402: nothing was paid. You are on ${networkName(settings)}.`,
       );
-      return { dryRun: true, status: response.status, offers };
+      return { dryRun: true, status: first.status, offers };
     }
 
+    if (offers.length === 0) {
+      if (first.status === 402) {
+        this.note(
+          "HTTP 402, but with no 4mica payment option; nothing was paid",
+        );
+      }
+      return { ...(await this.deliver(first, output)), payment: null };
+    }
+
+    // The SDK sends the request itself and pays what it answers. It is
+    // handed the 402 already in hand, so the request is not sent twice.
+    let replay: Response | undefined = first;
+    const replaying: typeof fetch = async (input, requestInit) => {
+      const answer = replay;
+      replay = undefined;
+      return answer ?? fetch(input, requestInit);
+    };
     return withSession(
       settings,
       async (client) => {
-        const response = await waiting(`Requesting ${args.url}`, () =>
+        const response = await waiting(`Paying ${args.url}`, () =>
           client.fetch(args.url, init),
         );
-        const payment = client.paymentFor(response);
-        if (payment) {
+        const settled = client.paymentFor(response);
+        const [sent] = sentPayments();
+        if (settled) {
           this.note(
-            `paid ${payment.amount} ${payment.asset.symbol} to ${payment.payTo}`,
+            `paid ${settled.amount} ${settled.asset.symbol} to ${settled.payTo}`,
+          );
+        } else if (sent) {
+          // Signed and handed over, but the seller did not confirm taking
+          // it: it holds the payment, and may still redeem it.
+          this.warning(
+            `a payment${sent.amountRaw ? ` of ${sent.amountRaw} base units` : ""}` +
+              `${sent.payTo ? ` to ${sent.payTo}` : ""} was sent and not confirmed; ` +
+              "the seller may still redeem it. `4mica cycles` shows what is owed.",
           );
         }
-        return {
-          ...(await this.deliver(response, flags.output)),
-          payment: payment ?? null,
-        };
+        const payment = settled
+          ? { ...settled, settled: true }
+          : sent
+            ? { ...sent, settled: false }
+            : null;
+        return { ...(await this.deliver(response, output)), payment };
       },
-      { perPayment: flags.max, payTo: flags["pay-to"] },
+      {
+        spend: { perPayment: flags.max, payTo: flags["pay-to"] },
+        fetch: replaying,
+      },
     );
   }
 
@@ -217,9 +322,20 @@ export default class Fetch extends NetworkCommand {
       this.note(`HTTP ${response.status} ${response.statusText}`.trim());
       process.exitCode = 1;
     }
+    let written = output;
     if (output) {
-      await writeFile(output, bytes);
-      this.note(`${bytes.length} bytes written to ${output}`);
+      try {
+        await writeFile(output, bytes);
+        this.note(`${bytes.length} bytes written to ${output}`);
+      } catch (error) {
+        // Checked before the request, so this is rare; the answer may have
+        // been paid for, so it is kept somewhere rather than lost.
+        written = join(tmpdir(), `4mica-fetch-${Date.now()}.out`);
+        await writeFile(written, bytes);
+        this.warning(
+          `could not write ${output} (${(error as Error).message}); the body is in ${written}`,
+        );
+      }
     } else if (!this.jsonEnabled()) {
       process.stdout.write(bytes);
     }
@@ -229,9 +345,9 @@ export default class Fetch extends NetworkCommand {
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers),
-      body: output ? undefined : bytes.toString(encoding),
-      bodyEncoding: output || encoding === "utf8" ? undefined : encoding,
-      output,
+      body: written ? undefined : bytes.toString(encoding),
+      bodyEncoding: written || encoding === "utf8" ? undefined : encoding,
+      output: written,
     };
   }
 }

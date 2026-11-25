@@ -1,5 +1,6 @@
 import { requireAsset } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
+import { beginSending } from "../../core/outcome.js";
 import { previewPendingWithdrawal, renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
@@ -21,25 +22,22 @@ export default class WithdrawalsFinalize extends NetworkCommand {
     const name = requireAsset(settings.asset?.value);
 
     return withSession(settings, async (client) => {
+      const preview = await previewPendingWithdrawal(
+        settings,
+        client,
+        name,
+        "finalize",
+      );
       if (flags["dry-run"]) {
-        const preview = await previewPendingWithdrawal(
-          settings,
-          client,
-          name,
-          "finalize",
-        );
         this.log(renderPreview(preview));
         return preview;
       }
 
-      await confirmFunds(
-        {
-          action: `Finalize the withdrawal of ${name}`,
-          address: client.address,
-        },
-        settings,
-        flags,
-      );
+      await confirmFunds(preview, settings, flags);
+      beginSending(`the withdrawal payout of ${name}`, [
+        "4mica withdrawals",
+        "4mica balance",
+      ]);
       const result = await step(
         `Finalizing the withdrawal of ${name}`,
         () => client.finalizeWithdrawal(name),

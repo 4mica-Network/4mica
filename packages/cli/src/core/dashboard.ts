@@ -6,6 +6,7 @@ import { resolveRunContext } from "./context.js";
 import { DASHBOARD_URL } from "./links.js";
 import { detectPackageManager } from "./package-manager.js";
 import { openBrowser } from "./runner.js";
+import { runtime } from "./runtime.js";
 
 // Vite's port for the dashboard (see apps/dashboard/vite.config.ts).
 const LOCAL_URL = "http://localhost:4173";
@@ -42,7 +43,12 @@ export async function runLocalDashboard(opts: {
     pm === "yarn"
       ? ["workspace", "@4mica/dashboard", "dev"]
       : ["--filter", "@4mica/dashboard", "dev"];
+  runtime.childInForeground = true;
   const child = execa(pm, args, { cwd: monorepoRoot, stdio: "inherit" });
   if (opts.open) setTimeout(() => void openBrowser(LOCAL_URL), 2500);
-  await child;
+  try {
+    await child;
+  } finally {
+    runtime.childInForeground = false;
+  }
 }

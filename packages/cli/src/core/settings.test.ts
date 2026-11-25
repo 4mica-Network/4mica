@@ -4,6 +4,7 @@ import { EXIT } from "../errors.js";
 import {
   assertMainnetWasChosen,
   DEFAULT_TESTNET,
+  isKnownSafe,
   readEnv,
   resolveSettings,
 } from "./settings.js";
@@ -411,5 +412,92 @@ describe("readEnv", () => {
     expect(
       readEnv({ FOURMICA_NETWORK: "base", "4MICA_NETWORK": "base" }, "NETWORK"),
     ).toBe("base");
+  });
+});
+
+describe("a core given by url", () => {
+  const at = (url: string, source: "flag" | "env" = "flag") =>
+    resolveSettings({
+      flags: source === "flag" ? { "rpc-url": url } : {},
+      env: source === "env" ? { FOURMICA_RPC_URL: url } : {},
+      config: {},
+    });
+
+  it.each([
+    ["https://core.example"],
+    ["http://127.0.0.1:3000"],
+    ["http://localhost:3000"],
+    ["http://[::1]:3000"],
+  ])("takes %s", (url) => {
+    expect(at(url).rpcUrl.value).toBe(url);
+  });
+
+  it.each([
+    ["file:///etc/passwd"],
+    ["ftp://core.example"],
+    ["http://core.example"],
+    ["not a url"],
+  ])("refuses %s, from a flag as a usage error and from the environment as a config error", (url) => {
+    expect(() => at(url)).toThrow(
+      expect.objectContaining({
+        code: "BAD_RPC_URL",
+        oclif: { exit: EXIT.usage },
+      }),
+    );
+    expect(() => at(url, "env")).toThrow(
+      expect.objectContaining({
+        code: "BAD_RPC_URL",
+        oclif: { exit: EXIT.config },
+      }),
+    );
+  });
+
+  it("is treated as real funds unless it is a hosted testnet or on this machine", () => {
+    expect(isKnownSafe(at("https://core.example"))).toBe(false);
+    expect(isKnownSafe(at("http://127.0.0.1:3000"))).toBe(true);
+    expect(
+      isKnownSafe(resolveSettings({ flags: {}, env: {}, config: {} })),
+    ).toBe(true);
+    expect(
+      isKnownSafe(
+        resolveSettings({ flags: { network: "base" }, env: {}, config: {} }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("the asset", () => {
+  it("comes from FOURMICA_ASSET, below the flag and above the config file", () => {
+    const settings = (flags: { asset?: string }, env: Record<string, string>) =>
+      resolveSettings({ flags, env, config: { asset: "ETH" } }).asset;
+    expect(settings({}, {})).toEqual({ value: "ETH", source: "config" });
+    expect(settings({}, { FOURMICA_ASSET: "USDC" })).toEqual({
+      value: "USDC",
+      source: "env",
+    });
+    expect(settings({ asset: "USDT" }, { FOURMICA_ASSET: "USDC" })).toEqual({
+      value: "USDT",
+      source: "flag",
+    });
+  });
+});
+
+describe("the variable prefix", () => {
+  it("is FOURMICA_ in everything new projects are made from", async () => {
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { packageRoot } = await import("./package-root.js");
+    const root = join(packageRoot, "templates");
+    const legacy: string[] = [];
+    for (const entry of await readdir(root, {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile()) continue;
+      const path = join(entry.parentPath, entry.name);
+      if (/(^|[^A-Z])4MICA_/.test(await readFile(path, "utf8")))
+        legacy.push(path);
+    }
+    expect(legacy).toEqual([]);
   });
 });

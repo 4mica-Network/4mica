@@ -64,7 +64,7 @@ export interface Settings {
   sdkEnv: Record<string, string>;
   /** The env file that was read, if any. */
   envFilePath?: string;
-  /** It was found in the working directory, not named with `--env-file`. */
+  /** It was found in the working directory, not named with `--dotenv`. */
   envFileFound?: boolean;
   /**
    * The variables taken from the env file that change where a wallet signs
@@ -87,8 +87,9 @@ export const origin = (settings: Settings, resolved: Resolved): string =>
  */
 export const DEFAULT_TESTNET = "base-sepolia";
 
-// A shell cannot export a name starting with a digit; the scaffolded `.env`
-// files still use the `4MICA_` spelling.
+// A shell cannot export a name starting with a digit, so FOURMICA_ is the
+// spelling. Projects scaffolded before 0.3 have 4MICA_ in their `.env`,
+// which is still read; new ones are made with FOURMICA_ only.
 const PREFIXES = ["FOURMICA_", "4MICA_"] as const;
 
 export function readEnv(env: Env, name: string): string | undefined {
@@ -153,6 +154,54 @@ function hostedAt(
 
 const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])$/;
 
+/** On this machine, whatever the scheme. */
+export const isLoopback = (url: string): boolean =>
+  URL.canParse(url) && LOOPBACK.test(new URL(url).hostname);
+
+/**
+ * A core URL from any source: https, or plain http to this machine. A
+ * wallet signs in to core and sends it signed payments, which must not
+ * cross a network in clear text; `file:` and the like are not cores at all.
+ */
+export function requireCoreUrl(resolved: Resolved): void {
+  const { value, source } = resolved;
+  const make = source === "flag" ? usageError : configError;
+  const where =
+    source === "flag" ? "--rpc-url" : source === "default" ? "default" : source;
+  if (!URL.canParse(value)) {
+    throw make(`the core URL "${value}" (${where}) is not a URL`, {
+      code: "BAD_RPC_URL",
+    });
+  }
+  const { protocol } = new URL(value);
+  if (protocol === "https:" || (protocol === "http:" && isLoopback(value))) {
+    return;
+  }
+  throw make(
+    protocol === "http:"
+      ? `the core URL "${value}" (${where}) is plain http to another machine`
+      : `the core URL "${value}" (${where}) is not an http(s) URL`,
+    {
+      code: "BAD_RPC_URL",
+      suggestions: [
+        protocol === "http:"
+          ? "use https: the wallet signs in and sends payments over this connection"
+          : "give the core's https:// address; it is not an Ethereum RPC endpoint",
+      ],
+    },
+  );
+}
+
+/**
+ * Whether money sent here is known not to be real: a hosted testnet, or a
+ * core on this machine. Anything else gets the mainnet treatment, since
+ * nothing about a URL says which chain its core settles on.
+ */
+export function isKnownSafe(settings: Settings): boolean {
+  if (settings.info) return settings.info.testnet;
+  return isLoopback(settings.rpcUrl.value);
+}
+
 export function resolveSettings(input: SettingsInput): Settings {
   const { flags, env, envFile = {}, config } = input;
 
@@ -189,12 +238,7 @@ export function resolveSettings(input: SettingsInput): Settings {
     };
   } else {
     const custom = url as Resolved;
-    if (!URL.canParse(custom.value)) {
-      const make = custom.source === "flag" ? usageError : configError;
-      throw make(`the core URL "${custom.value}" is not a URL`, {
-        code: "BAD_RPC_URL",
-      });
-    }
+    requireCoreUrl(custom);
     // A hosted network reached by its URL is still that network: it gets
     // the same mainnet warning and confirmation as when it is named.
     const hosted = hostedAt(custom.value);
@@ -244,7 +288,8 @@ export function resolveSettings(input: SettingsInput): Settings {
   return {
     ...settings,
     facilitatorUrl,
-    asset: at(flags.asset, "flag") ?? at(config.asset, "config"),
+    asset:
+      at(flags.asset, "flag") ?? fromEnv("ASSET") ?? at(config.asset, "config"),
     key,
     keyProblem: key ? undefined : input.keyProblem,
     sdkEnv,
@@ -271,7 +316,7 @@ export function assertMainnetWasChosen(settings: Settings): void {
   const { network, info, rpcUrl, key, envFilePath, redirects } = settings;
   if (!settings.envFileFound || key?.source === "env-file") return;
   if (info?.testnet === true) return;
-  if (!network && LOOPBACK.test(new URL(rpcUrl.value).hostname)) return;
+  if (!network && isLoopback(rpcUrl.value)) return;
 
   const stay = `to stay on a testnet: --network ${DEFAULT_TESTNET}`;
   const notTheirs = "but the wallet key does not come from that file";
@@ -284,7 +329,7 @@ export function assertMainnetWasChosen(settings: Settings): void {
     throw configError(`${envFilePath} sets ${set} for ${where}, ${notTheirs}`, {
       code: "ENDPOINT_NOT_CHOSEN",
       suggestions: [
-        `to use what it sets, name the file: --env-file ${envFilePath}`,
+        `to use what it sets, name the file: --dotenv ${envFilePath}`,
         stay,
       ],
     });
@@ -295,7 +340,7 @@ export function assertMainnetWasChosen(settings: Settings): void {
       {
         code: "MAINNET_NOT_CHOSEN",
         suggestions: [
-          `to use ${network.value}, say so: --network ${network.value}, or --env-file ${envFilePath}`,
+          `to use ${network.value}, say so: --network ${network.value}, or --dotenv ${envFilePath}`,
           stay,
         ],
       },
@@ -307,7 +352,7 @@ export function assertMainnetWasChosen(settings: Settings): void {
     {
       code: "CORE_NOT_CHOSEN",
       suggestions: [
-        `to use it, say so: --rpc-url ${rpcUrl.value}, or --env-file ${envFilePath}`,
+        `to use it, say so: --rpc-url ${rpcUrl.value}, or --dotenv ${envFilePath}`,
         stay,
       ],
     },

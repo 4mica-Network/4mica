@@ -56,8 +56,8 @@ export default class Init extends BaseCommand {
     }),
     run: Flags.boolean({
       allowNo: true,
-      exclusive: ["json"],
-      summary: "start the project once it is scaffolded; asked when not given",
+      summary:
+        "start the project once it is scaffolded; asked when not given; not with --json",
     }),
     dashboard: Flags.boolean({
       allowNo: true,
@@ -79,6 +79,14 @@ export default class Init extends BaseCommand {
 
   async run() {
     const { args, flags } = await this.parse(Init);
+    // `--no-run --json` is the careful way to script it; only starting a
+    // server would leave the JSON waiting for it to stop.
+    if (flags.run && this.jsonEnabled()) {
+      throw usageError("--run cannot be combined with --json", {
+        code: "RUN_WITH_JSON",
+        suggestions: ["start it afterwards with `4mica dev` in the project"],
+      });
+    }
 
     const init: PartialInit = flags.template
       ? { ...TEMPLATES[flags.template] }
@@ -125,6 +133,7 @@ export default class Init extends BaseCommand {
       () => false,
     );
     const project = await scaffold(init, hasWallet);
+    if (!project) return { created: false };
 
     // Before the dev server, which blocks.
     if (project.options.openDashboard) await openBrowser(DASHBOARD_URL);
@@ -137,6 +146,6 @@ export default class Init extends BaseCommand {
     }
 
     const { options: _, ...result } = project;
-    return result;
+    return { created: true, ...result };
   }
 }

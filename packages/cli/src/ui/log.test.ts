@@ -21,6 +21,7 @@ describe("wantsColor", () => {
     [{ FORCE_COLOR: "1" }, ["--no-color"], true, false],
     [{ FORCE_COLOR: "0" }, ["--color"], false, true],
     [{}, ["--color"], false, true],
+    [{ FOURMICA_NO_COLOR: "1" }, [], true, false],
   ] as const)("%j %j, terminal: %s → %s", (env, argv, isTTY, expected) => {
     expect(wantsColor(env, argv, isTTY)).toBe(expected);
   });

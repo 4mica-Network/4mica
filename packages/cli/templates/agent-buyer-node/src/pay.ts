@@ -53,10 +53,7 @@ export type PaidResult<T> = {
 // Live once the wallet key is set: payments are then signed for real through
 // @4mica/sdk. Without it the payment is a hand-built stand-in that only a
 // demo seller accepts.
-const LIVE = Boolean(
-  process.env.FOURMICA_WALLET_PRIVATE_KEY ??
-    process.env["4MICA_WALLET_PRIVATE_KEY"],
-);
+const LIVE = Boolean(process.env.FOURMICA_WALLET_PRIVATE_KEY);
 
 type Session = Awaited<
   ReturnType<typeof import("@4mica/sdk").FourMica.connect>

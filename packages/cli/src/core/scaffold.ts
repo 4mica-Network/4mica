@@ -48,7 +48,7 @@ export async function scaffold(
   flags: PartialInit,
   /** Whether the cli already has a wallet to offer the project. */
   hasWallet = false,
-): Promise<Scaffolded> {
+): Promise<Scaffolded | undefined> {
   if (!runtime.quiet) intro(brand("4mica"), io);
 
   const context = await resolveRunContext();
@@ -57,6 +57,7 @@ export async function scaffold(
     flags.packageManager,
   );
   const opts = await runInitFlow(flags, defaultPm);
+  if (!opts) return undefined;
 
   const template = resolveTemplate(opts);
   const templateDir = join(context.templatesDir, template.dir);
@@ -96,11 +97,31 @@ export async function scaffold(
   await gitInit(targetDir);
 
   if (opts.install) {
-    await step(
-      `Installing dependencies with ${opts.packageManager}`,
-      () => install(opts.packageManager, targetDir),
-      "Dependencies installed",
-    );
+    try {
+      await step(
+        `Installing dependencies with ${opts.packageManager}`,
+        () => install(opts.packageManager, targetDir),
+        "Dependencies installed",
+      );
+    } catch (error) {
+      // The project is there; only the install is missing. Rerunning
+      // `init` would stop at DIRECTORY_EXISTS, so say how to finish.
+      const tail = (error as { stderr?: string }).stderr
+        ?.trim()
+        .split("\n")
+        .slice(-5)
+        .join("\n");
+      throw failure(
+        `${opts.dir} was created, but its dependencies were not installed` +
+          (tail ? `:\n${tail}` : ""),
+        {
+          code: "INSTALL_FAILED",
+          suggestions: [
+            `finish it with: cd ${JSON.stringify(opts.dir)} && ${opts.packageManager} install`,
+          ],
+        },
+      );
+    }
   }
 
   const nextSteps = stepsAfter(opts, template.runScript, hasWallet);
