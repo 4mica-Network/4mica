@@ -74,7 +74,7 @@ To integrate a hardware wallet, remote signer, or MPC wallet, pass a viem `Accou
 
 ### Coinbase CDP wallet
 
-Use `createCdpAccount` for a Coinbase CDP MPC wallet whose private key never leaves CDP. It returns a viem `Account`. This requires the optional `@coinbase/cdp-sdk` dependency.
+Use `createCdpAccount` for a Coinbase CDP MPC wallet whose private key never leaves CDP. It returns a viem `Account`. It needs `@coinbase/cdp-sdk`, an optional peer dependency that is not installed with `@4mica/sdk`: add it to your project with `npm install @coinbase/cdp-sdk`.
 
 ```ts
 import { createCdpAccount, FourMica } from "@4mica/sdk";
