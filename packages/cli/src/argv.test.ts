@@ -138,6 +138,7 @@ describe("nearestCommand", () => {
   const commands = [
     "balance",
     "deposit",
+    "dev",
     "status",
     "config",
     "config set",
@@ -157,6 +158,13 @@ describe("nearestCommand", () => {
     [["guarantees", "verfy", "receipt.json"], "guarantees verify"],
     // A real command that takes no argument, given one.
     [["balance", "now"], "balance"],
+    // The start of a command is that command, not a slip of a shorter one:
+    // `dep` is a letter from `dev`, and means `deposit`.
+    [["dep"], "deposit"],
+    [["dep", "5"], "deposit"],
+    [["withdrawals", "req", "5"], "withdrawals request"],
+    // Two letters could begin anything, so they are matched by distance.
+    [["de"], "dev"],
   ])("%j is %s", (typed, expected) => {
     expect(nearestCommand(typed, commands)).toBe(expected);
   });

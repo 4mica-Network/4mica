@@ -8,6 +8,7 @@ import Deposit from "./commands/deposit.js";
 import Whoami from "./commands/whoami.js";
 import { EXIT } from "./errors.js";
 import { runCommand } from "./test/run.js";
+import { pinJson } from "./test/shape.js";
 
 // A throwaway key: 32 bytes of 0x11.
 const KEY = `0x${"11".repeat(32)}`;
@@ -60,6 +61,7 @@ describe("a key-file in the config that no longer exists", () => {
     );
     expect(fromFlag.error).toBeUndefined();
     expect(fromFlag.json).toMatchObject({ key: { source: "flag" } });
+    pinJson("whoami", fromFlag.json);
   });
 });
 

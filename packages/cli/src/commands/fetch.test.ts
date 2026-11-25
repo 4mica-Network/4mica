@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withSession } from "../core/session.js";
 import { runCommand } from "../test/run.js";
+import { pinJson } from "../test/shape.js";
 import Fetch from "./fetch.js";
 
 const payment = {
@@ -103,6 +104,7 @@ describe("fetch", () => {
 
   it("returns the body and what was paid", async () => {
     const { json } = await runCommand(Fetch, [URL_, "--json"]);
+    pinJson("fetch", json, "paid");
     expect(json).toMatchObject({
       status: 200,
       body: '{"report":1}',
@@ -120,6 +122,7 @@ describe("fetch", () => {
     const { json } = await runCommand(Fetch, [URL_, "--json"]);
     expect(json).toMatchObject({ status: 200, body: "free", payment: null });
     expect(withSession).not.toHaveBeenCalled();
+    pinJson("fetch", json);
   });
 
   it("returns a body that is not text as base64, and says so", async () => {
@@ -235,11 +238,9 @@ describe("fetch", () => {
 
   it("writes to stdout for -o -, and makes no file called -", async () => {
     server.mockImplementation(async () => new Response("free"));
-    const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-    const { error } = await runCommand(Fetch, [URL_, "-o", "-"]);
+    const { error, stdout } = await runCommand(Fetch, [URL_, "-o", "-"]);
     expect(error).toBeUndefined();
-    expect(written).toHaveBeenCalledWith(Buffer.from("free"));
-    written.mockRestore();
+    expect(stdout).toBe("free");
   });
 
   it("refuses a --pay-to that is not an address, before anything is sent", async () => {
@@ -338,6 +339,7 @@ describe("fetch", () => {
           }),
       );
       const { json } = await runCommand(Fetch, [URL_, "--dry-run", "--json"]);
+      pinJson("fetch", json, "dry run");
       expect(json).toEqual({
         dryRun: true,
         status: 402,
@@ -396,10 +398,8 @@ describe("fetch", () => {
 
     it("writes that answer where the real request would", async () => {
       globalThis.fetch = vi.fn(async () => new Response("free"));
-      const written = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-      await runCommand(Fetch, [URL_, "--dry-run"]);
-      expect(written).toHaveBeenCalledWith(Buffer.from("free"));
-      written.mockRestore();
+      const { stdout } = await runCommand(Fetch, [URL_, "--dry-run"]);
+      expect(stdout).toBe("free");
     });
 
     it("exits 1 when the unpaid answer is an error other than 402", async () => {

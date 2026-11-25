@@ -51,11 +51,22 @@ export async function runCommand(
   resetOutcome();
   setRuntimeFlags({});
   const fetchBefore = globalThis.fetch;
-  // oclif prints results through console.log.
-  const lines: string[] = [];
+  // oclif prints results through console.log; `fetch` writes a response
+  // body straight to stdout. Both are kept, in the order they were written.
+  const printed: string[] = [];
   const write = vi.spyOn(console, "log").mockImplementation((...args) => {
-    lines.push(args.join(" "));
+    printed.push(`${args.join(" ")}\n`);
   });
+  const stdout = vi
+    .spyOn(process.stdout, "write")
+    .mockImplementation((chunk: unknown) => {
+      printed.push(
+        typeof chunk === "string"
+          ? chunk
+          : Buffer.from(chunk as Uint8Array).toString(),
+      );
+      return true;
+    });
   const errors: string[] = [];
   const stderr = vi
     .spyOn(process.stderr, "write")
@@ -70,12 +81,13 @@ export async function runCommand(
     outcome.error = error as Outcome["error"];
   } finally {
     write.mockRestore();
+    stdout.mockRestore();
     cwd.mockRestore();
     stderr.mockRestore();
     vi.unstubAllEnvs();
     globalThis.fetch = fetchBefore;
   }
-  outcome.stdout = lines.join("\n");
+  outcome.stdout = printed.join("").replace(/\n$/, "");
   outcome.stderr = errors.join("");
   if (argv.includes("--json")) outcome.json = JSON.parse(outcome.stdout);
   return outcome;

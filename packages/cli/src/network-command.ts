@@ -10,6 +10,7 @@ import {
   routeThroughEnvProxy,
 } from "./core/net.js";
 import { setExplorer } from "./core/outcome.js";
+import { type Preview, renderPreview } from "./core/preview.js";
 import {
   type KeyFile,
   loadEnvFile,
@@ -17,6 +18,7 @@ import {
   resolveSettings,
   type Settings,
 } from "./core/settings.js";
+import { EXIT } from "./errors.js";
 
 /** Commands that talk to a 4mica network. */
 export abstract class NetworkCommand extends BaseCommand {
@@ -60,6 +62,15 @@ export abstract class NetworkCommand extends BaseCommand {
         "give up on a request that waits this long for an answer, or for more of one",
     }),
   };
+
+  /**
+   * Prints what a dry run found. Exit code 1 when something blocks the real
+   * command, so a script can branch on a dry run.
+   */
+  protected showPreview(preview: Preview): void {
+    this.log(renderPreview(preview));
+    if (!preview.ready) this.exitStatus(EXIT.failure);
+  }
 
   protected async settings(flags: {
     network?: string;

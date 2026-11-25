@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import { listAssets } from "../core/assets.js";
 import { connect } from "../core/session.js";
 import { networkName, type Settings } from "../core/settings.js";
+import { EXIT } from "../errors.js";
 import { NetworkCommand } from "../network-command.js";
 import { out, waiting } from "../ui/log.js";
 import { table } from "../ui/output.js";
@@ -224,7 +225,7 @@ export default class Status extends NetworkCommand {
     }
     this.log(table(["CHECK", "WHERE", "STATE", "DETAIL"], rows));
 
-    if (!core.up || facilitator?.up === false) process.exitCode = 1;
+    if (!core.up || facilitator?.up === false) this.exitStatus(EXIT.failure);
     return {
       network: networkName(settings),
       core: { url: settings.rpcUrl.value, up: core.up, detail: core.detail },

@@ -1,7 +1,7 @@
 import { requireAsset } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
 import { beginSending } from "../../core/outcome.js";
-import { previewPendingWithdrawal, renderPreview } from "../../core/preview.js";
+import { previewPendingWithdrawal } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
 import { asset, dryRun, yes } from "../../flags.js";
@@ -29,7 +29,7 @@ export default class WithdrawalsCancel extends NetworkCommand {
         "cancel",
       );
       if (flags["dry-run"]) {
-        this.log(renderPreview(preview));
+        this.showPreview(preview);
         return preview;
       }
 

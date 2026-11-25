@@ -155,6 +155,15 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
+   * For a command that has a result to print and still did not succeed: a
+   * dry run that found a problem, a service that is down, an HTTP error. The
+   * one place the exit status is set without an error being thrown.
+   */
+  protected exitStatus(code: number): void {
+    process.exitCode = code;
+  }
+
+  /**
    * Progress and notes go to stderr, with or without `--json`: stdout holds
    * the result and nothing else. `--quiet` drops them.
    */

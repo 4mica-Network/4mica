@@ -3,6 +3,7 @@ import { FUNDING_DOCS } from "./core/links.js";
 import type { TransportFailure } from "./core/net.js";
 import {
   anythingSent,
+  broadcastLost,
   checkSuggestions,
   inFlightSummary,
 } from "./core/outcome.js";
@@ -260,9 +261,16 @@ function parseError(error: Error): CliError | undefined {
   const name = ancestry(error).find((n) => n in PARSE_CODES);
   const flagValue = FLAG_PARSE.exec(error.message);
   if (!name && !("parse" in error) && !flagValue) return undefined;
+  // Until 0.3 the flag was `--env-file`, which Node reads for itself.
+  const renamed =
+    name === "NonExistentFlagsError" && error.message.includes("--env-file");
   return usageError(cleanParseMessage(error.message), {
     code: name ? PARSE_CODES[name] : flagValue ? "BAD_FLAG_VALUE" : "USAGE",
-    suggestions: ["see the command's flags and examples with --help"],
+    suggestions: [
+      renamed
+        ? "the flag is --dotenv <path>; Node takes --env-file for itself"
+        : "see the command's flags and examples with --help",
+    ],
   });
 }
 
@@ -378,6 +386,10 @@ export function toCliError(
   }
   const sdk = lineage.includes("FourMicaError");
   if (anythingSent()) {
+    // A transaction was handed to the node and its answer never came. The
+    // SDK reports that as an ordinary failed write ("deposit failed: the
+    // request took too long"), which reads as "nothing happened".
+    if (broadcastLost()) return outcomeUnknownError(error, unanswered);
     const system = systemError(error);
     if (system?.code === "CANCELLED") return outcomeUnknownError(error);
     // A request that got no answer after something left, or an error from
@@ -412,11 +424,14 @@ export function toCliError(
     : lineage.includes("InvalidParamsError")
       ? EXIT.usage
       : EXIT.failure;
+  const code =
+    typeof coreCode === "string" ? coreCode : codeFromName(error.name);
   return new CliError(error.message, exit, {
-    code: typeof coreCode === "string" ? coreCode : codeFromName(error.name),
+    code,
     suggestions:
       SUGGESTIONS[error.name] ??
-      (coreCode === "RPC"
+      // Core answered, with an error it gave no code of its own.
+      (code === "RPC"
         ? ["see which services answer with `4mica status`"]
         : undefined),
     retryable: typeof retryable === "boolean" ? retryable : undefined,

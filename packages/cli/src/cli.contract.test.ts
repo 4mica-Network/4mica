@@ -7,7 +7,10 @@
  *
  * `pnpm test` builds first (see package.json), so `dist/` is current.
  */
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Config, Flags, Parser } from "@oclif/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -32,7 +35,63 @@ const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/;
 const ownCommands = () =>
   config.commands.filter((c) => c.pluginName === "@4mica/cli");
 
+/** Each command once: oclif also lists an alias (`withdraw`) as a command. */
+const namedCommands = () => {
+  const aliases = new Set(ownCommands().flatMap((c) => c.aliases ?? []));
+  return ownCommands().filter((c) => !aliases.has(c.id));
+};
+
+/** Every file under `dir` whose name ends in `suffix`. */
+function filesUnder(dir: string, suffix: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return filesUnder(path, suffix);
+    return path.endsWith(suffix) ? [path] : [];
+  });
+}
+
 describe("every command", () => {
+  it("has the fields of its --json output pinned by a test", () => {
+    // `pinJson` (test/shape.ts) names each snapshot `json shape: <command>`.
+    const pinned = new Set(
+      filesUnder(join(packageRoot, "src"), ".snap").flatMap((file) =>
+        [
+          ...readFileSync(file, "utf8").matchAll(
+            /json shape: ([a-z ]+?)(?: \(| \d)/g,
+          ),
+        ].map((match) => match[1]),
+      ),
+    );
+    const unpinned = namedCommands()
+      .filter((c) => c.enableJsonFlag)
+      .map((c) => c.id.replaceAll(":", " "))
+      .filter((id) => !pinned.has(id));
+    expect(unpinned).toEqual([]);
+  });
+
+  it("is in the manifest that ships, and no manifest is left in the checkout", () => {
+    const manifest = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [join(packageRoot, "scripts", "gen-manifest.mjs"), "--stdout"],
+        { encoding: "utf8" },
+      ),
+    ) as { commands: Record<string, { flags: Record<string, unknown> }> };
+    expect(Object.keys(manifest.commands).sort()).toEqual(
+      namedCommands()
+        .map((c) => c.id)
+        .sort(),
+    );
+    expect(Object.keys(manifest.commands.deposit.flags)).toContain("dry-run");
+    const pjson = JSON.parse(
+      readFileSync(join(packageRoot, "package.json"), "utf8"),
+    ) as { files: string[]; scripts: Record<string, string> };
+    expect(pjson.files).toContain("oclif.manifest.json");
+    expect(pjson.scripts.prepack).toContain("gen-manifest");
+    // A stale one would be believed over the command files.
+    expect(existsSync(join(packageRoot, "oclif.manifest.json"))).toBe(false);
+  });
+
   it("has a summary and at least one example", () => {
     const missing = ownCommands()
       .filter((c) => !c.summary || (c.examples ?? []).length === 0)
@@ -145,6 +204,39 @@ describe("exit codes, as the README's table gives them", () => {
   it("keeps a usage error short: no wall of help after it", async () => {
     const run = await spawnCli(["deposit"]);
     expect(run.stderr.trim().split("\n").length).toBeLessThanOrEqual(5);
+  });
+
+  it("points --env-file, the flag's old name, at --dotenv", async () => {
+    // Node reads `--env-file` for itself before the cli starts, so the
+    // file has to exist for the cli to get a say at all.
+    const home = await mkdtemp(join(tmpdir(), "4mica-spawn-"));
+    await writeFile(join(home, "some.env"), "");
+    const run = await spawnCli(["whoami", "--env-file", "some.env", "--json"], {
+      home,
+    });
+    expect(run.code).toBe(2);
+    expect(parseJson(run)).toMatchObject({
+      error: {
+        code: "UNKNOWN_FLAG",
+        suggestions: [expect.stringContaining("--dotenv <path>")],
+      },
+    });
+  });
+
+  it("refuses a facilitator url in clear text, wherever it was set", async () => {
+    const run = await spawnCli(["config", "--json"], {
+      env: { FOURMICA_FACILITATOR_URL: "http://pay.example" },
+    });
+    expect(run.code).toBe(3);
+    expect(parseJson(run)).toMatchObject({
+      error: { code: "BAD_FACILITATOR_URL" },
+    });
+  });
+
+  it("suggests the command a word begins, not one a letter away", async () => {
+    const run = await spawnCli(["dep"]);
+    expect(run.code).toBe(2);
+    expect(run.stderr).toContain("did you mean `4mica deposit`?");
   });
 
   it("never runs an unknown word as init, with or without --yes", async () => {
@@ -315,6 +407,11 @@ describe("color", () => {
       env: { NO_COLOR: undefined, FORCE_COLOR: "0" },
     });
     expect(on.stdout).toContain("\u001b[");
+    // Errors are printed by oclif, which reads only the environment.
+    const error = await spawnCli(["depost", "--color"], {
+      env: { NO_COLOR: undefined, FORCE_COLOR: "0" },
+    });
+    expect(error.stderr).toContain("\u001b[");
     for (const argv of [["networks"], ["balance", "--bogus"]]) {
       const off = await spawnCli([...argv, "--no-color"], {
         env: { NO_COLOR: undefined, FORCE_COLOR: "1" },

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runCommand } from "../../test/run.js";
+import { pinJson } from "../../test/shape.js";
 import WithdrawalsCancel from "./cancel.js";
 import WithdrawalsFinalize from "./finalize.js";
 import Withdrawals from "./index.js";
@@ -85,13 +86,32 @@ describe("withdrawals", () => {
       asset: "USDC",
     });
     expect(json).toMatchObject({ txHash: "0xsent" });
+    pinJson("withdrawals request", json);
   });
 
   it("finalizes and cancels by asset", async () => {
-    await runCommand(WithdrawalsFinalize, ["-a", "USDC", "--yes", "--json"]);
+    const finalized = await runCommand(WithdrawalsFinalize, [
+      "-a",
+      "USDC",
+      "--yes",
+      "--json",
+    ]);
     expect(client.finalizeWithdrawal).toHaveBeenCalledWith("USDC");
-    await runCommand(WithdrawalsCancel, ["-a", "USDC", "--yes", "--json"]);
+    pinJson("withdrawals finalize", finalized.json);
+    const cancelled = await runCommand(WithdrawalsCancel, [
+      "-a",
+      "USDC",
+      "--yes",
+      "--json",
+    ]);
     expect(client.cancelWithdrawal).toHaveBeenCalledWith("USDC");
+    pinJson("withdrawals cancel", cancelled.json);
+  });
+
+  it("lists what is pending", async () => {
+    const { json } = await runCommand(Withdrawals, ["--json"]);
+    expect(json).toMatchObject([{ amount: "2", ready: true }]);
+    pinJson("withdrawals", json);
   });
 
   it("does not finalize a withdrawal before its grace period ends", async () => {

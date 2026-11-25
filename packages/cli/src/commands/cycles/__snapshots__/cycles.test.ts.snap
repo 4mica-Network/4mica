@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cycles checkpoint > shows what it would sign on a dry run, and signs nothing > json shape: cycles checkpoint (dry run) 1`] = `
+{
+  "action": "string",
+  "details": {
+    "baseUnits": "string",
+    "newSinceLastCheckpoint": "string",
+    "payments": "string",
+    "token": "string",
+  },
+  "dryRun": "boolean",
+  "network": "string",
+  "problems": [],
+  "ready": "boolean",
+  "wallet": "string",
+}
+`;
+
+exports[`cycles checkpoint > signs the cycle it showed > json shape: cycles checkpoint 1`] = `
+{
+  "asset": "string",
+  "covered": "number",
+  "cumulativeGross": "string",
+  "cycle": "string",
+  "cycleIdText": "string",
+}
+`;
+
+exports[`cycles claim > claims for another address when asked > json shape: cycles claim 1`] = `
+{
+  "account": "string",
+  "amount": "string",
+  "amountRaw": "string",
+  "asset": "string",
+  "assetAddress": "string",
+  "cycle": "string",
+  "route": "string",
+  "txHash": "string",
+}
+`;
+
+exports[`cycles pay > pays, and reports the transaction > json shape: cycles pay 1`] = `
+{
+  "account": "string",
+  "amount": "string",
+  "amountRaw": "string",
+  "asset": "string",
+  "assetAddress": "string",
+  "cycle": "string",
+  "route": "string",
+  "txHash": "string",
+}
+`;
+
+exports[`cycles pay > shows core's amount on a dry run and sends nothing > json shape: cycles pay (dry run) 1`] = `
+{
+  "action": "string",
+  "amount": "string",
+  "amountRaw": "string",
+  "asset": "string",
+  "assetAddress": "string",
+  "details": {
+    "baseUnits": "string",
+    "contract": "string",
+    "for": "string",
+    "gas": "string",
+    "token": "string",
+    "walletHolds": "string",
+  },
+  "dryRun": "boolean",
+  "network": "string",
+  "participant": "string",
+  "problems": [],
+  "ready": "boolean",
+  "wallet": "string",
+}
+`;

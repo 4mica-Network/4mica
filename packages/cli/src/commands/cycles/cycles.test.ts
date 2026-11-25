@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runtime } from "../../core/runtime.js";
 import { runCommand } from "../../test/run.js";
+import { pinJson } from "../../test/shape.js";
 import CyclesCheckpoint from "./checkpoint.js";
 import CyclesClaim from "./claim.js";
 import CyclesPay from "./pay.js";
@@ -92,10 +93,12 @@ describe("cycles pay", () => {
       "--json",
     ]);
     expect(settlement.pay).toHaveBeenCalledWith(CYCLE);
+    pinJson("cycles pay", json, "dry run");
     expect(json).toMatchObject({
       dryRun: true,
       action: "pay 2.5 USDC for cycle 0xtoken:100",
-      amount: "2.5 USDC",
+      amount: "2.5",
+      asset: "USDC",
       amountRaw: "2500000",
       participant: "0xWallet",
       ready: true,
@@ -185,10 +188,12 @@ describe("cycles pay", () => {
   it("pays, and reports the transaction", async () => {
     const { json } = await runCommand(CyclesPay, [CYCLE, "--yes", "--json"]);
     expect(builder.send).toHaveBeenCalledOnce();
+    pinJson("cycles pay", json);
     expect(json).toMatchObject({
       txHash: "0xpaid",
       cycle: "0xtoken:100",
-      amount: "2.5 USDC",
+      amount: "2.5",
+      asset: "USDC",
     });
   });
 
@@ -233,7 +238,8 @@ describe("cycles claim", () => {
     expect(preview).toMatchObject({
       dryRun: true,
       action: "claim 2.5 USDC for cycle 0xtoken:100",
-      amount: "2.5 USDC",
+      amount: "2.5",
+      asset: "USDC",
       ready: true,
     });
     expect(builder.send).not.toHaveBeenCalled();
@@ -255,13 +261,14 @@ describe("cycles claim", () => {
   });
 
   it("claims for another address when asked", async () => {
-    await runCommand(CyclesClaim, [
+    const { json } = await runCommand(CyclesClaim, [
       CYCLE,
       "--creditor",
       OTHER,
       "--yes",
       "--json",
     ]);
+    pinJson("cycles claim", json);
     expect(settlement.claim).toHaveBeenCalledWith(CYCLE);
     expect(builder.creditor).toHaveBeenCalledWith(OTHER);
     expect(builder.send).toHaveBeenCalledOnce();
@@ -311,6 +318,7 @@ describe("cycles checkpoint", () => {
       action: "sign a checkpoint over 2 payments in cycle 0xtoken:100",
       details: { payments: "2", baseUnits: "1500000" },
     });
+    pinJson("cycles checkpoint", json, "dry run");
     expect(payment.checkpointCycle).not.toHaveBeenCalled();
   });
 
@@ -331,7 +339,13 @@ describe("cycles checkpoint", () => {
       "0xToken",
       batch.cycleId,
     );
-    expect(json).toMatchObject({ covered: 2, cumulativeGross: "1500000" });
+    expect(json).toMatchObject({
+      asset: "USDC",
+      cycle: "0xtoken:100",
+      covered: 2,
+      cumulativeGross: "1500000",
+    });
+    pinJson("cycles checkpoint", json);
   });
 
   it("has nothing to sign when no payment is new", async () => {

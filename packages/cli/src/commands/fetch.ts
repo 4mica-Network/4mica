@@ -1,14 +1,17 @@
 import { isUtf8 } from "node:buffer";
+import { once } from "node:events";
 import { constants } from "node:fs";
-import { access, stat, writeFile } from "node:fs/promises";
+import { access, type FileHandle, open, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { Readable, type Writable } from "node:stream";
+import type { ReadableStream } from "node:stream/web";
 import { Args, Flags } from "@oclif/core";
 import { readInput } from "../core/input.js";
 import { sentPayments } from "../core/outcome.js";
 import { withSession } from "../core/session.js";
 import { isKnownSafe, networkName } from "../core/settings.js";
-import { usageError } from "../errors.js";
+import { EXIT, usageError } from "../errors.js";
 import { address } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
 import { waiting } from "../ui/log.js";
@@ -315,39 +318,80 @@ export default class Fetch extends NetworkCommand {
     );
   }
 
-  /** The body to stdout or `--output`; exit code 1 for an HTTP error. */
+  /**
+   * The body to stdout or `--output`; exit code 1 for an HTTP error. It is
+   * passed on as it arrives, so a large download takes no more memory than
+   * a small one. Only `--json` to stdout reads it whole: the body is a field
+   * of the document.
+   */
   private async deliver(response: Response, output?: string) {
-    const bytes = Buffer.from(await response.arrayBuffer());
     if (response.status >= 400) {
       this.note(`HTTP ${response.status} ${response.statusText}`.trim());
-      process.exitCode = 1;
+      this.exitStatus(EXIT.failure);
     }
-    let written = output;
+    const head = {
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+    };
     if (output) {
+      let written = output;
+      let file: FileHandle;
       try {
-        await writeFile(output, bytes);
-        this.note(`${bytes.length} bytes written to ${output}`);
+        file = await open(output, "w");
       } catch (error) {
         // Checked before the request, so this is rare; the answer may have
         // been paid for, so it is kept somewhere rather than lost.
         written = join(tmpdir(), `4mica-fetch-${Date.now()}.out`);
-        await writeFile(written, bytes);
+        file = await open(written, "w");
         this.warning(
           `could not write ${output} (${(error as Error).message}); the body is in ${written}`,
         );
       }
-    } else if (!this.jsonEnabled()) {
-      process.stdout.write(bytes);
+      const bytes = await passOn(response, file.createWriteStream());
+      if (written === output) this.note(`${bytes} bytes written to ${output}`);
+      return { ...head, output: written };
+    }
+    if (!this.jsonEnabled()) {
+      await passOn(response, process.stdout, { end: false });
+      return head;
     }
     // JSON holds text. Bytes that are not text would be mangled as utf8, so
     // they go in as base64, and `bodyEncoding` says so.
+    const bytes = Buffer.from(await response.arrayBuffer());
     const encoding = isUtf8(bytes) ? "utf8" : "base64";
     return {
-      status: response.status,
-      headers: Object.fromEntries(response.headers),
-      body: written ? undefined : bytes.toString(encoding),
-      bodyEncoding: written || encoding === "utf8" ? undefined : encoding,
-      output: written,
+      ...head,
+      body: bytes.toString(encoding),
+      bodyEncoding: encoding === "utf8" ? undefined : encoding,
     };
   }
+}
+
+/**
+ * Writes a response's body to `sink` part by part, waiting when the sink is
+ * full, and returns how many bytes went. A reader that has gone away
+ * (`| head`) ends it quietly.
+ */
+async function passOn(
+  response: Response,
+  sink: Writable,
+  options: { end?: boolean } = {},
+): Promise<number> {
+  let bytes = 0;
+  try {
+    if (response.body) {
+      const body = Readable.fromWeb(response.body as ReadableStream);
+      for await (const part of body as AsyncIterable<Buffer>) {
+        bytes += part.byteLength;
+        if (!sink.write(part)) await once(sink, "drain");
+      }
+    }
+    if (options.end !== false) {
+      sink.end();
+      await once(sink, "finish");
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EPIPE") throw error;
+  }
+  return bytes;
 }

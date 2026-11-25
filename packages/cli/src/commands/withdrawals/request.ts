@@ -2,7 +2,7 @@ import { Args } from "@oclif/core";
 import { amountInput } from "../../core/amount.js";
 import { confirmFunds } from "../../core/confirm.js";
 import { beginSending } from "../../core/outcome.js";
-import { previewWithdrawalRequest, renderPreview } from "../../core/preview.js";
+import { previewWithdrawalRequest } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { withdrawalFields } from "../../core/withdrawal.js";
 import { asset, dryRun, yes } from "../../flags.js";
@@ -36,7 +36,7 @@ export default class WithdrawalsRequest extends NetworkCommand {
     return withSession(settings, async (client) => {
       const preview = await previewWithdrawalRequest(settings, client, amount);
       if (flags["dry-run"]) {
-        this.log(renderPreview(preview));
+        this.showPreview(preview);
         return preview;
       }
 

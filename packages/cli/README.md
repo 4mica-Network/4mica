@@ -269,7 +269,10 @@ payment was sent, the error is `OUTCOME_UNKNOWN`.
 A response that is not text, such as an image, is in `body` as base64 and
 `"bodyEncoding": "base64"` says so; `-o <file>` writes the bytes as they came,
 and `-o -` writes them to stdout. The `-o` path is checked before anything is
-sent, so a paid answer is never lost to a typo.
+sent, so a paid answer is never lost to a typo. The body is passed on as it
+arrives, so a large download takes no more memory than a small one; only
+`--json` without `-o` holds it whole, since the body is a field of the
+document.
 
 `fetch --dry-run` pays nothing, but it is not a dry run of the request: the
 request is sent once, unpaid, with its method, headers and `--data`, because
@@ -331,6 +334,8 @@ that changes where the wallet signs in.
 `--rpc-url` (also `--core-url`) is the address of a 4mica core, not an
 Ethereum RPC endpoint. It has to be `https`, or plain `http` to this machine
 (`localhost`, `127.0.0.1`): the wallet signs in and sends payments over it.
+The facilitator URL is held to the same rule wherever it is set, since the
+wallet sends it signed authorizations.
 
 The cli never reaches mainnet by default. Real funds move only after
 `--network base` or `4mica config set network base`, and the confirmation
@@ -384,9 +389,17 @@ except to the hosts `NO_PROXY` lists.
   one fails and names the flag to pass. Without a terminal this is already
   the case: questions are written to stderr and answered on stdin, and both
   have to be one.
-- **`--json`** prints the result as one JSON document. For wallet commands
-  the fields are the ones `@4mica/sdk` returns; amounts in base units are
-  strings. `balance` is always a list.
+- **`--json`** prints the result as one JSON document. Field names are
+  camelCase, also where the terminal shows another name: `config` prints
+  `rpc-url` and its JSON has `settings.rpcUrl`. An amount is a number in a
+  string with its unit beside it, never inside it: `"amount": "2.5"`,
+  `"asset": "USDC"`, and `"amountRaw": "2500000"` for the base units.
+  `balance` is always a list. Tests pin every command's fields, so a rename
+  cannot slip out unnoticed.
+- **The commands themselves are data too.** The published package has an
+  `oclif.manifest.json` beside its `package.json`: every command with its
+  arguments, flags, allowed values and help text, for a script or an agent
+  that would otherwise read `--help`.
 - **Errors** carry a code, always. With `--json` every failure, a typo in the
   command included, is one document on stdout:
   `{ "error": { "code", "message", "suggestions"?, "retryable"?, "details"? } }`.
@@ -410,6 +423,11 @@ except to the hosts `NO_PROXY` lists.
 | 2 | usage: an unknown command or flag, a bad value, or a confirmation that could not be asked for and no `--yes` |
 | 3 | configuration: no wallet key, an unknown network in the environment or config file |
 | 130 | cancelled: Ctrl-C, or a question answered no. If anything had been sent, stderr says what and how to check |
+
+One exit code is not the cli's. `--env-file` was this flag's name before 0.3,
+and Node reads that name itself, before the cli starts: with a file that does
+not exist, Node prints `node: <path>: not found` and exits 9. The flag is
+`--dotenv`.
 
 ```bash
 if ! 4mica status --network base >/dev/null; then echo "4mica is down"; fi
@@ -471,7 +489,7 @@ in a terminal, `4mica --yes`), and `init --type`, `--role` and `--framework`
 | --- | --- |
 | `FOURMICA_NETWORK` | network to use, like `--network` |
 | `FOURMICA_RPC_URL` | core URL, like `--rpc-url` |
-| `FOURMICA_FACILITATOR_URL` | facilitator URL |
+| `FOURMICA_FACILITATOR_URL` | facilitator URL; `https`, or `http` to this machine |
 | `FOURMICA_ASSET` | default asset, like `--asset` |
 | `FOURMICA_WALLET_PRIVATE_KEY` | the wallet key (see [A key you already have](#a-key-you-already-have)) |
 | `FOURMICA_REQUEST_TIMEOUT` | seconds, like `--request-timeout` |

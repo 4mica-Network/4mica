@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { runCommand } from "../../test/run.js";
+import { pinJson } from "../../test/shape.js";
 import WalletsCreate from "./create.js";
 import WalletsImport from "./import.js";
 import Wallets from "./index.js";
@@ -155,5 +156,23 @@ describe("wallets", () => {
     expect(removed.wasActive).toBe(true);
     expect(await run<Created[]>(Wallets, [])).toEqual([]);
     expect((await runCommand(Wallets, ["--json"], home)).error).toBeUndefined();
+  });
+});
+
+describe("what the wallet commands print with --json", () => {
+  it("keeps its fields", async () => {
+    pinJson("wallets create", await run(WalletsCreate, ["first"]));
+    const path = join(home, "kept.key");
+    await writeFile(path, `0x${"22".repeat(32)}`, { mode: 0o600 });
+    pinJson(
+      "wallets import",
+      await run(WalletsImport, ["second", "--key-file", path]),
+    );
+    pinJson("wallets use", await run(WalletsUse, ["second"]));
+    pinJson("wallets", await run(Wallets, []));
+    pinJson(
+      "wallets remove",
+      await run(WalletsRemove, ["second", "--confirm", "second"]),
+    );
   });
 });

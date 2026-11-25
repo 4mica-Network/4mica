@@ -159,19 +159,33 @@ export const isLoopback = (url: string): boolean =>
   URL.canParse(url) && LOOPBACK.test(new URL(url).hostname);
 
 /**
- * A core URL from any source: https, or plain http to this machine. A
- * wallet signs in to core and sends it signed payments, which must not
- * cross a network in clear text; `file:` and the like are not cores at all.
+ * The URL of a 4mica service, from any source: https, or plain http to this
+ * machine. A wallet signs in to core and sends it signed payments, and
+ * hands the facilitator signed authorizations to spend from it; none of
+ * that may cross a network in clear text. `file:` and the like are not
+ * services at all.
  */
-export function requireCoreUrl(resolved: Resolved): void {
+function requireServiceUrl(
+  resolved: Resolved,
+  service: {
+    name: string;
+    code: string;
+    flag?: string;
+    /** For plain http to another machine, and for any other scheme. */
+    hints: { http: string; scheme: string };
+  },
+): void {
   const { value, source } = resolved;
   const make = source === "flag" ? usageError : configError;
   const where =
-    source === "flag" ? "--rpc-url" : source === "default" ? "default" : source;
+    source === "flag" && service.flag
+      ? service.flag
+      : source === "default"
+        ? "default"
+        : source;
+  const what = `the ${service.name} URL "${value}" (${where})`;
   if (!URL.canParse(value)) {
-    throw make(`the core URL "${value}" (${where}) is not a URL`, {
-      code: "BAD_RPC_URL",
-    });
+    throw make(`${what} is not a URL`, { code: service.code });
   }
   const { protocol } = new URL(value);
   if (protocol === "https:" || (protocol === "http:" && isLoopback(value))) {
@@ -179,18 +193,38 @@ export function requireCoreUrl(resolved: Resolved): void {
   }
   throw make(
     protocol === "http:"
-      ? `the core URL "${value}" (${where}) is plain http to another machine`
-      : `the core URL "${value}" (${where}) is not an http(s) URL`,
+      ? `${what} is plain http to another machine`
+      : `${what} is not an http(s) URL`,
     {
-      code: "BAD_RPC_URL",
+      code: service.code,
       suggestions: [
-        protocol === "http:"
-          ? "use https: the wallet signs in and sends payments over this connection"
-          : "give the core's https:// address; it is not an Ethereum RPC endpoint",
+        protocol === "http:" ? service.hints.http : service.hints.scheme,
       ],
     },
   );
 }
+
+export const requireCoreUrl = (resolved: Resolved): void =>
+  requireServiceUrl(resolved, {
+    name: "core",
+    code: "BAD_RPC_URL",
+    flag: "--rpc-url",
+    hints: {
+      http: "use https: the wallet signs in and sends payments over this connection",
+      scheme:
+        "give the core's https:// address; it is not an Ethereum RPC endpoint",
+    },
+  });
+
+export const requireFacilitatorUrl = (resolved: Resolved): void =>
+  requireServiceUrl(resolved, {
+    name: "facilitator",
+    code: "BAD_FACILITATOR_URL",
+    hints: {
+      http: "use https: the wallet sends it signed authorizations to move its funds",
+      scheme: "give the facilitator's https:// address",
+    },
+  });
 
 /**
  * Whether money sent here is known not to be real: a hosted testnet, or a
@@ -256,6 +290,11 @@ export function resolveSettings(input: SettingsInput): Settings {
     fromEnv("FACILITATOR_URL") ??
     at(config["facilitator-url"], "config") ??
     at(hostedFacilitator, "default");
+  // A hosted network's own facilitator is https; one that was set is checked
+  // like the core URL, whichever of the three places set it.
+  if (facilitatorUrl && facilitatorUrl.source !== "default") {
+    requireFacilitatorUrl(facilitatorUrl);
+  }
 
   const sdkEnv: Record<string, string> = {};
   const redirects: string[] = [];

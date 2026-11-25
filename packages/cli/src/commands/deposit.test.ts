@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXIT } from "../errors.js";
 import { runCommand } from "../test/run.js";
+import { pinJson } from "../test/shape.js";
 import Deposit from "./deposit.js";
 
 const mined = {
@@ -94,6 +95,7 @@ describe("deposit", () => {
       "--json",
     ]);
     expect(error).toBeUndefined();
+    pinJson("deposit", json);
     expect(client.deposit).toHaveBeenCalledWith(
       { amount: "5", asset: "USDC" },
       { gas: "auto", wait: "mined" },
@@ -153,6 +155,7 @@ describe("deposit", () => {
       "--yes",
       "--json",
     ]);
+    pinJson("deposit", json, "an error");
     expect(json).toEqual({
       error: {
         code: "INSUFFICIENT_BALANCE",
@@ -201,6 +204,7 @@ describe("deposit", () => {
       "--json",
     ]);
     expect(json).toMatchObject({ dryRun: true, ready: true });
+    pinJson("deposit", json, "dry run");
     expect(client.deposit).not.toHaveBeenCalled();
   });
 

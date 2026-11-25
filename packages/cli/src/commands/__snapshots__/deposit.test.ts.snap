@@ -1,0 +1,47 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`deposit > gets the transaction mined first, then waits for core > json shape: deposit 1`] = `
+{
+  "amount": "string",
+  "amountRaw": "string",
+  "asset": {
+    "address": "string",
+    "decimals": "number",
+    "symbol": "string",
+  },
+  "explorerUrl": "string",
+  "network": "string",
+  "route": "string",
+  "status": "string",
+  "txHash": "string",
+}
+`;
+
+exports[`deposit > prints SDK failures as JSON with a code, and exits 1 > json shape: deposit (an error) 1`] = `
+{
+  "error": {
+    "code": "string",
+    "message": "string",
+    "suggestions": [
+      "string",
+    ],
+  },
+}
+`;
+
+exports[`deposit > sends nothing on a dry run, even with --yes > json shape: deposit (dry run) 1`] = `
+{
+  "action": "string",
+  "details": {
+    "baseUnits": "string",
+    "contract": "string",
+    "gas": "string",
+    "token": "string",
+  },
+  "dryRun": "boolean",
+  "network": "string",
+  "problems": [],
+  "ready": "boolean",
+  "wallet": "string",
+}
+`;

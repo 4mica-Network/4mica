@@ -45,5 +45,32 @@ export async function formatAmount(
     : `${raw} base units of ${address}`;
 }
 
+/**
+ * The same amount for `--json`: the number and its unit apart, so that a
+ * script never has to split "2.5 USDC". Neither is given for a token core
+ * no longer lists; `amountRaw` and `assetAddress` always are.
+ */
+export async function amountFields(
+  assets: readonly ResolvedToken[],
+  address: string,
+  raw: bigint,
+): Promise<{
+  amount?: string;
+  asset?: string;
+  assetAddress: string;
+  amountRaw: bigint;
+}> {
+  const { formatUnits } = await import("@4mica/sdk/amounts");
+  const token = assets.find(
+    (a) => a.address.toLowerCase() === address.toLowerCase(),
+  );
+  return {
+    amount: token && formatUnits(raw, token.decimals),
+    asset: token?.symbol,
+    assetAddress: address,
+    amountRaw: raw,
+  };
+}
+
 export const explorerTx = (settings: Settings, txHash: string) =>
   settings.info && `${settings.info.explorerUrl}/tx/${txHash}`;

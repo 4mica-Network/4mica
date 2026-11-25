@@ -3,6 +3,7 @@ import {
   anythingSent,
   beginSending,
   explorerLink,
+  recordLostBroadcast,
   recordPayment,
   recordTransaction,
   type SentPayment,
@@ -73,22 +74,35 @@ function broadcastIds(body: unknown): unknown[] {
   }
 }
 
-/** The hashes a JSON-RPC answer gives for the broadcasts with these ids. */
-async function hashesIn(response: Response, ids: unknown[]): Promise<string[]> {
+/**
+ * What a JSON-RPC answer says about the broadcasts with these ids: the
+ * hashes it gives, and how many of them it answered at all. A refusal
+ * (`error`) is an answer; a body that is not JSON-RPC answers nothing.
+ */
+async function broadcastAnswers(
+  response: Response,
+  ids: unknown[],
+): Promise<{ hashes: string[]; answered: number }> {
   try {
     const parsed: unknown = await response.json();
-    const answers = Array.isArray(parsed) ? parsed : [parsed];
-    return answers.flatMap((a) =>
-      typeof a === "object" &&
-      a !== null &&
-      ids.includes((a as { id?: unknown }).id) &&
-      typeof (a as { result?: unknown }).result === "string" &&
-      /^0x[0-9a-fA-F]{64}$/.test((a as { result: string }).result)
-        ? [(a as { result: string }).result]
-        : [],
+    const answers = (Array.isArray(parsed) ? parsed : [parsed]).filter(
+      (a): a is { id?: unknown; result?: unknown; error?: unknown } =>
+        typeof a === "object" &&
+        a !== null &&
+        ids.includes((a as { id?: unknown }).id),
     );
+    return {
+      hashes: answers.flatMap((a) =>
+        typeof a.result === "string" && /^0x[0-9a-fA-F]{64}$/.test(a.result)
+          ? [a.result]
+          : [],
+      ),
+      answered: answers.filter(
+        (a) => typeof a.result === "string" || a.error != null,
+      ).length,
+    };
   } catch {
-    return [];
+    return { hashes: [], answered: 0 };
   }
 }
 
@@ -227,6 +241,8 @@ export function installRequestTimeout(
     } catch (error) {
       clearTimeout(timer);
       fail(error, timeout.aborted);
+      // Sent, and the node's word on it never came: it may have taken it.
+      if (broadcasts.length > 0) recordLostBroadcast();
       throw error;
     }
     clearTimeout(timer);
@@ -235,10 +251,15 @@ export function installRequestTimeout(
     );
 
     if (broadcasts.length > 0) {
-      for (const hash of await hashesIn(response.clone(), broadcasts)) {
+      const { hashes, answered } = await broadcastAnswers(
+        response.clone(),
+        broadcasts,
+      );
+      for (const hash of hashes) {
         if (recordTransaction(hash))
           note(`transaction sent: ${explorerLink(hash)}`);
       }
+      if (answered < broadcasts.length) recordLostBroadcast();
     }
 
     if (!response.body) return response;

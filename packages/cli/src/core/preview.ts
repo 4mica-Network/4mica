@@ -45,9 +45,8 @@ export const label = (key: string): string =>
 export const detailLines = (p: Preview): [string, string][] =>
   Object.entries(p.details).map(([key, value]) => [label(key), value]);
 
-/** Exit code 1 when something blocks it, so a script can branch on a dry run. */
+/** The preview as text. `NetworkCommand.showPreview` prints it. */
 export function renderPreview(p: Preview): string {
-  if (!p.ready) process.exitCode = 1;
   return fields([
     ["would", p.action],
     ["network", p.network],

@@ -95,7 +95,8 @@ After a deposit is mined, the CLI waits up to `--timeout` seconds for core to co
 ## Scripting
 
 - **Standard output has the result and nothing else.** Progress, questions, warnings and errors go to standard error. `--quiet` drops the progress.
-- **`--json`** prints the result as one JSON document. Amounts in base units are strings.
+- **`--json`** prints the result as one JSON document. Field names are camelCase. An amount is a number in a string with its unit beside it, never inside it: `"amount": "2.5"`, `"asset": "USDC"`, and `"amountRaw"` for the base units.
+- **Commands are described as data too.** The package ships an `oclif.manifest.json` with every command, flag and allowed value.
 - **`--no-input`** guarantees no question is asked.
 - **Errors carry a code**, such as `NO_SIGNER`, `INSUFFICIENT_BALANCE`, `UNREACHABLE`, `OUTCOME_UNKNOWN` or `CHECKPOINT_REQUIRED`. With `--json` every failure, a mistyped command included, is printed on standard output as `{ "error": { "code", "message", "suggestions", "retryable", "details" } }`. `retryable` says whether running the same command again is safe.
 - **`--debug`** (or `DEBUG=4mica`) prints each request and the stack of a failure to standard error, never a header, body or key.

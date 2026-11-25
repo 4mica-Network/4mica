@@ -335,7 +335,9 @@ describe("a found .env on a mainnet the user chose", () => {
     "AUTH_URL",
     "BEARER_TOKEN",
   ])("may not set %s for a wallet it does not hold", (name) => {
-    const run = check({ ...chosen, envFile: { [`FOURMICA_${name}`]: "0xA" } });
+    // A URL where one is wanted: a value that is not one is refused sooner.
+    const value = name.endsWith("_URL") ? "https://elsewhere.example" : "0xA";
+    const run = check({ ...chosen, envFile: { [`FOURMICA_${name}`]: value } });
     expect(exitOf(run)).toBe(EXIT.config);
     expect(run).toThrow(
       `/clone/.env sets FOURMICA_${name} for base (mainnet, real funds)`,
@@ -450,6 +452,35 @@ describe("a core given by url", () => {
         oclif: { exit: EXIT.config },
       }),
     );
+  });
+
+  it.each([
+    ["env", { env: { FOURMICA_FACILITATOR_URL: "http://pay.example" } }],
+    [
+      "env-file",
+      { envFile: { FOURMICA_FACILITATOR_URL: "ftp://pay.example" } },
+    ],
+    ["config", { config: { "facilitator-url": "http://pay.example" } }],
+  ] as const)("holds a facilitator url from %s to the same rule", (_source, input) => {
+    expect(() =>
+      resolveSettings({ flags: {}, env: {}, config: {}, ...input }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "BAD_FACILITATOR_URL",
+        oclif: { exit: EXIT.config },
+      }),
+    );
+  });
+
+  it("takes a facilitator on this machine over http, and a hosted one as it is", () => {
+    const local = resolveSettings({
+      flags: {},
+      env: { FOURMICA_FACILITATOR_URL: "http://localhost:8080" },
+      config: {},
+    });
+    expect(local.facilitatorUrl?.value).toBe("http://localhost:8080");
+    const hosted = resolveSettings({ flags: {}, env: {}, config: {} });
+    expect(hosted.facilitatorUrl).toMatchObject({ source: "default" });
   });
 
   it("is treated as real funds unless it is a hosted testnet or on this machine", () => {

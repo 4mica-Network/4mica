@@ -3,7 +3,7 @@ import { amountInput } from "../core/amount.js";
 import { confirmFunds } from "../core/confirm.js";
 import { MAX_TIMEOUT_SECS } from "../core/net.js";
 import { beginSending, sentTransactions } from "../core/outcome.js";
-import { previewDeposit, renderPreview } from "../core/preview.js";
+import { previewDeposit } from "../core/preview.js";
 import { withSession } from "../core/session.js";
 import { asset, dryRun, gas, yes } from "../flags.js";
 import { NetworkCommand } from "../network-command.js";
@@ -60,7 +60,7 @@ export default class Deposit extends NetworkCommand {
       // what the dry run would, and nothing is asked for that would fail.
       const preview = await previewDeposit(settings, client, amount, flags.gas);
       if (flags["dry-run"]) {
-        this.log(renderPreview(preview));
+        this.showPreview(preview);
         return preview;
       }
 

@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`init without a terminal > prints where the project is with --json > json shape: init 1`] = `
+{
+  "created": "boolean",
+  "dir": "string",
+  "installed": "boolean",
+  "name": "string",
+  "nextSteps": [
+    {
+      "command": "string",
+      "done": "boolean",
+      "step": "string",
+    },
+  ],
+  "packageManager": "string",
+  "runScript": "string",
+  "template": "string",
+}
+`;

@@ -21,16 +21,25 @@ export default class Config extends NetworkCommand {
     const settings = await this.settings(flags);
     // Shown here rather than fatal: this is where a stale path gets fixed.
     if (settings.keyProblem) this.note(warn(settings.keyProblem.message));
-    const effective: Record<string, Resolved | undefined> = {
+    // In the table a setting goes by the name `config set` takes; in JSON
+    // by a camelCase key, like every other field the cli prints.
+    const effective = {
       network: settings.network,
-      "rpc-url": settings.rpcUrl,
-      "facilitator-url": settings.facilitatorUrl,
+      rpcUrl: settings.rpcUrl,
+      facilitatorUrl: settings.facilitatorUrl,
       asset: settings.asset,
-      "key-file":
+      keyFile:
         settings.key?.source === "flag" || settings.key?.source === "config"
           ? { value: settings.key.file as string, source: settings.key.source }
           : undefined,
     };
+    const named: [string, Resolved | undefined][] = [
+      ["network", effective.network],
+      ["rpc-url", effective.rpcUrl],
+      ["facilitator-url", effective.facilitatorUrl],
+      ["asset", effective.asset],
+      ["key-file", effective.keyFile],
+    ];
     const row = (key: string, setting?: Resolved) => [
       key,
       setting?.value ?? "-",
@@ -40,7 +49,7 @@ export default class Config extends NetworkCommand {
       table(
         ["SETTING", "VALUE", "FROM"],
         [
-          ...Object.entries(effective).map(([key, s]) => row(key, s)),
+          ...named.map(([key, s]) => row(key, s)),
           // Whether it is set, never what it is.
           [
             "wallet-key",

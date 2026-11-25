@@ -72,17 +72,36 @@ export function distance(a: string, b: string): number {
  * `deposi 100`. Each command is compared with as many of the leading words
  * as it has itself, and one that accounts for more of them wins, so that
  * `withdrawals reqest` is `withdrawals request` and not `withdrawals`.
+ *
+ * A command the typed words begin, from three letters on, is a better
+ * guess than one a letter away: `dep` is the start of `deposit`, not a
+ * slip of `dev`. It is only suggested, never run.
  */
 export function nearestCommand(
   typed: string[],
   commands: string[],
 ): string | undefined {
-  const [nearest] = commands
-    .map((command) => {
-      const words = command.split(" ").length;
-      const d = distance(typed.slice(0, words).join(" "), command);
-      return { command, words, d };
-    })
+  const candidates = commands.map((command) => {
+    const words = command.split(" ").length;
+    const start = typed.slice(0, words).join(" ");
+    return {
+      command,
+      words,
+      d: distance(start, command),
+      // Not the command itself followed by arguments: that is a typo
+      // further along, which the distance below finds.
+      begun:
+        typed.length >= words &&
+        start.length >= 3 &&
+        start !== command &&
+        command.startsWith(start),
+    };
+  });
+  const [begun] = candidates
+    .filter((c) => c.begun)
+    .sort((x, y) => y.words - x.words || x.command.length - y.command.length);
+  if (begun) return begun.command;
+  const [nearest] = candidates
     .filter(({ d }) => d <= 2)
     .sort((x, y) => y.words - x.words || x.d - y.d);
   return nearest?.command;

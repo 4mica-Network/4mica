@@ -308,6 +308,107 @@ describe("what leaves through the wrapper", () => {
     resetOutcome();
   });
 
+  describe("a broadcast the node never answered", () => {
+    const broadcast = (signal?: AbortSignal) =>
+      fetch("https://rpc.example", {
+        method: "POST",
+        signal,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 7,
+          method: "eth_sendRawTransaction",
+          params: ["0x02f8…"],
+        }),
+      });
+    // What the SDK makes of the failed write: its own typed error.
+    class FourMicaError extends Error {
+      name = "ContractError";
+    }
+    const failedWrite = () =>
+      new FourMicaError(
+        "depositStablecoin failed: The request took too long to respond.",
+      );
+
+    it("is an unknown outcome when the caller gave up waiting first", async () => {
+      const { resetOutcome, broadcastLost } = await import("./outcome.js");
+      resetOutcome();
+      // viem's own timeout: its signal aborts, well inside ours.
+      globalThis.fetch = (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        });
+      installRequestTimeout(30);
+      const viem = new AbortController();
+      const sent = broadcast(viem.signal);
+      viem.abort();
+      await expect(sent).rejects.toThrow();
+      expect(broadcastLost()).toBe(true);
+      // Nothing of ours timed out, so there is no failed request to blame.
+      expect(lastTransportFailure()).toBeUndefined();
+      const told = toCliError(failedWrite(), lastTransportFailure()) as {
+        code: string;
+        message: string;
+        suggestions: string[];
+      };
+      expect(told.code).toBe("OUTCOME_UNKNOWN");
+      expect(told.message).toContain("may already have been sent");
+      expect(told.suggestions.join(" ")).not.toMatch(/try again/);
+      resetOutcome();
+    });
+
+    it("is an unknown outcome when the answer is not the node's", async () => {
+      const { resetOutcome, broadcastLost } = await import("./outcome.js");
+      resetOutcome();
+      globalThis.fetch = async () =>
+        new Response("<html>bad gateway</html>", { status: 502 });
+      installRequestTimeout(30);
+      await broadcast();
+      expect(broadcastLost()).toBe(true);
+      resetOutcome();
+    });
+
+    it("is a definite failure when the node refused the transaction", async () => {
+      const { resetOutcome, broadcastLost } = await import("./outcome.js");
+      resetOutcome();
+      globalThis.fetch = async () =>
+        Response.json({
+          jsonrpc: "2.0",
+          id: 7,
+          error: { code: -32000, message: "insufficient funds for gas" },
+        });
+      installRequestTimeout(30);
+      await broadcast();
+      expect(broadcastLost()).toBe(false);
+      expect(toCliError(failedWrite())).toMatchObject({ code: "CONTRACT" });
+      resetOutcome();
+    });
+
+    it("is tracked by its hash once a later attempt gets one", async () => {
+      const { resetOutcome, broadcastLost, sentTransactions } = await import(
+        "./outcome.js"
+      );
+      resetOutcome();
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      let attempt = 0;
+      globalThis.fetch = async () => {
+        attempt += 1;
+        if (attempt === 1) throw new TypeError("fetch failed");
+        return Response.json({ jsonrpc: "2.0", id: 7, result: HASH });
+      };
+      installRequestTimeout(30);
+      await expect(broadcast()).rejects.toThrow("fetch failed");
+      expect(broadcastLost()).toBe(true);
+      // viem sends the same signed transaction again.
+      await broadcast();
+      expect(sentTransactions()).toEqual([HASH]);
+      expect(broadcastLost()).toBe(false);
+      stderr.mockRestore();
+      resetOutcome();
+    });
+  });
+
   it("knows a payment has gone to a seller once its header is sent", async () => {
     const { resetOutcome, sentPayments } = await import("./outcome.js");
     resetOutcome();

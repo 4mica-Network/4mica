@@ -3,7 +3,6 @@ import { requireAsset } from "../../core/amount.js";
 import { formatAmount, resolveAsset } from "../../core/assets.js";
 import { confirmFunds } from "../../core/confirm.js";
 import { beginSending } from "../../core/outcome.js";
-import { renderPreview } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { networkName } from "../../core/settings.js";
 import { asset, dryRun, requireCycleId, yes } from "../../flags.js";
@@ -79,7 +78,7 @@ export default class CyclesCheckpoint extends NetworkCommand {
         ready: true,
       };
       if (flags["dry-run"]) {
-        this.log(renderPreview(preview));
+        this.showPreview(preview);
         return preview;
       }
 
@@ -105,7 +104,8 @@ export default class CyclesCheckpoint extends NetworkCommand {
           ["total paid in this cycle", total],
         ]),
       );
-      return accepted;
+      // The same three fields as when there was nothing to confirm.
+      return { asset: token.symbol, cycle: accepted.cycleIdText, ...accepted };
     });
   }
 }

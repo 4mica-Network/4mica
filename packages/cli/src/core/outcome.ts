@@ -29,6 +29,8 @@ const state = {
   explorer: undefined as string | undefined,
   /** Where to look afterwards: commands such as `4mica balance`. */
   check: [] as string[],
+  /** A broadcast left, and the node's answer to it never arrived. */
+  broadcastLost: false,
 };
 
 /** For tests: a fresh process. */
@@ -38,7 +40,25 @@ export function resetOutcome(): void {
   state.payments = [];
   state.explorer = undefined;
   state.check = [];
+  state.broadcastLost = false;
 }
+
+/**
+ * A signed transaction was handed to the chain's node and no answer to it
+ * came back: the connection dropped, or the wait ran out. The node may have
+ * taken it. An answer, whether a hash or a refusal, is not this.
+ */
+export function recordLostBroadcast(): void {
+  state.broadcastLost = true;
+}
+
+/**
+ * Whether a broadcast went unanswered and no later attempt got a hash. Once
+ * a hash is known the transaction is tracked by it, and what happens next
+ * (a revert, a receipt that does not come) is reported for what it is.
+ */
+export const broadcastLost = (): boolean =>
+  state.broadcastLost && state.transactions.length === 0;
 
 /** The network's block explorer, for linking a transaction hash. */
 export function setExplorer(url: string | undefined): void {

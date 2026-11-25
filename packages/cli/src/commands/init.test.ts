@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scaffold } from "../core/scaffold.js";
 import { EXIT } from "../errors.js";
 import { runCommand } from "../test/run.js";
+import { pinJson } from "../test/shape.js";
 import Init from "./init.js";
 
 vi.mock("../core/scaffold.js", () => ({
@@ -107,6 +108,7 @@ describe("init without a terminal", () => {
       "seller-express",
       "--json",
     ]);
+    pinJson("init", json);
     expect(json).toEqual({
       created: true,
       dir: "/tmp/project",

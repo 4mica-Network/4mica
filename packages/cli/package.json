@@ -29,7 +29,8 @@
     "bin",
     "dist",
     "templates",
-    "snapshot.json"
+    "snapshot.json",
+    "oclif.manifest.json"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -83,6 +84,9 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "tsup --silent && vitest run",
+    "test:e2e": "tsup --silent && vitest run --config vitest.e2e.config.ts",
+    "prepack": "node scripts/gen-manifest.mjs",
+    "postpack": "node scripts/gen-manifest.mjs --clean",
     "check:exports": "publint --strict",
     "check:snapshot": "node scripts/gen-snapshot.mjs && git diff --exit-code -- snapshot.json"
   },

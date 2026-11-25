@@ -201,6 +201,15 @@ describe("errors that are not the SDK's", () => {
     expect(shape(status(403)).code).toBe("FORBIDDEN");
   });
 
+  it("points at `4mica status` for an error core gave no code", () => {
+    class Plain extends FourMicaError {}
+    Object.defineProperty(Plain, "name", { value: "RpcError" });
+    expect(shape(new Plain("500: boom"))).toMatchObject({
+      code: "RPC",
+      suggestions: ["see which services answer with `4mica status`"],
+    });
+  });
+
   it("strips escape sequences a server put in its message", () => {
     const hostile = new FourMicaError(
       "\u001b[31mRED\u001b[0m \u001b]0;pwned\u0007 msg\u0000",
@@ -242,6 +251,39 @@ describe("once something has been sent", () => {
     // The SDK's own word on what happened stands.
     expect(shape(new GracePeriodNotElapsedError("too early")).code).toBe(
       "GRACE_PERIOD_NOT_ELAPSED",
+    );
+    resetOutcome();
+  });
+
+  it("keeps a write the node never saw as the SDK reported it", async () => {
+    // Gas estimation failed: nothing was broadcast, so nothing is in doubt.
+    const { beginSending, resetOutcome } = await import("./core/outcome.js");
+    resetOutcome();
+    beginSending("the deposit of 5 USDC", ["4mica balance"]);
+    class ContractError extends FourMicaError {}
+    expect(
+      shape(new ContractError("depositStablecoin failed: execution reverted")),
+    ).toMatchObject({ code: "CONTRACT", exit: EXIT.failure });
+    resetOutcome();
+  });
+
+  it("does not call a write whose broadcast went unanswered a plain failure", async () => {
+    const { beginSending, recordLostBroadcast, resetOutcome } = await import(
+      "./core/outcome.js"
+    );
+    resetOutcome();
+    beginSending("the deposit of 5 USDC", ["4mica balance"]);
+    recordLostBroadcast();
+    class ContractError extends FourMicaError {}
+    const told = toCliError(
+      new ContractError(
+        "depositStablecoin failed: The request took too long to respond.",
+      ),
+    ) as { code: string; message: string; retryable: boolean };
+    expect(told.code).toBe("OUTCOME_UNKNOWN");
+    expect(told.retryable).toBe(false);
+    expect(told.message).toContain(
+      "the deposit of 5 USDC may already have been sent",
     );
     resetOutcome();
   });

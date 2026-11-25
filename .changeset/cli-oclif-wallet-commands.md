@@ -35,11 +35,15 @@ funds may be real it needs `--max` or `--yes`.
 
 Once a transaction or payment has left, a failure or Ctrl-C is reported as
 `OUTCOME_UNKNOWN`, with the transaction hash and where to check, and never
-as "try again".
+as "try again". That includes a transaction the wallet sent itself whose
+answer from the chain's node was lost.
 
 Every command takes `--json`, `--quiet`, `--no-input` and `--debug`, writes
 its result to stdout and everything else to stderr, and reports every error
 with a code; under `--json` each failure is one JSON document on stdout.
+JSON field names are camelCase and an amount never carries its unit
+(`"amount": "2.5"`, `"asset": "USDC"`, `"amountRaw": "2500000"`); the package
+ships an `oclif.manifest.json` describing every command and flag.
 Requests time out after 30 seconds without an answer, or without more of one
 (`--request-timeout`), and go through `HTTPS_PROXY`/`HTTP_PROXY`. Exit codes
 are 1 for a failed operation, 2 for a usage error, 3 for a configuration

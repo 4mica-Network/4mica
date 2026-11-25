@@ -124,6 +124,34 @@ If you change CLI source, rebuild (`pnpm --filter @4mica/cli build`). The build
 regenerates `snapshot.json` (the frozen catalog + `@4mica/*` versions used to
 rewrite scaffolded dependencies) via a `prebuild` step.
 
+### The CLI's tests
+
+`pnpm --filter @4mica/cli test` builds and runs everything that needs no
+network. Three kinds of test live under `packages/cli/src`:
+
+- `*.test.ts` beside a command runs it in-process with the SDK session
+  mocked (`src/test/run.ts`).
+- `cli.contract.test.ts` and `money.contract.test.ts` spawn the built binary
+  (`src/test/spawn.ts`): exit codes, streams, one JSON document under
+  `--json`, and a self-funded deposit against a stand-in core and chain node.
+- `pinJson(...)` (`src/test/shape.ts`) snapshots the field names and types of
+  a command's `--json` output. A command with `--json` and no pin fails the
+  contract test. When a change to the fields is intended, update the
+  snapshots with `pnpm --filter @4mica/cli exec vitest run -u` and say so in
+  the changeset: the fields are part of the CLI's interface.
+
+`pnpm --filter @4mica/cli test:e2e` is separate, and is not run by the
+pre-commit hook: it drives the binary against a real core and a local chain
+(deposit, balance, withdrawal request and cancel). Start a stack first, for
+example `make dev-up` in a checkout of `4mica-core`, which serves core on
+`:3000` over anvil. `E2E_CORE_URL`, `E2E_ASSET` and `E2E_KEY_FILE` point it
+elsewhere; without a core it skips, and `E2E_STRICT=1` makes that a failure.
+Only run it where the funds are not real.
+
+`oclif.manifest.json` is written when the package is packed (`prepack`) and
+removed afterwards. Do not commit one or leave one in the checkout: oclif
+reads it in place of the command files, so a stale one hides your changes.
+
 ### Testing a scaffolded project end-to-end
 
 A **standalone** scaffold rewrites deps to published semver (`^1.3.0`), so

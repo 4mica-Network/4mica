@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`config > names each setting in camelCase with --json, and by its own name in the table > json shape: config 1`] = `
+{
+  "file": "string",
+  "settings": {
+    "asset": {
+      "source": "string",
+      "value": "string",
+    },
+    "rpcUrl": {
+      "source": "string",
+      "value": "string",
+    },
+  },
+  "walletKey": {
+    "set": "boolean",
+  },
+}
+`;
+
+exports[`config > names each setting in camelCase with --json, and by its own name in the table > json shape: config set 1`] = `
+{
+  "key": "string",
+  "value": "string",
+}
+`;
+
+exports[`config reset > drops every setting and keeps the wallet keys > json shape: config reset 1`] = `
+{
+  "removed": [
+    "string",
+  ],
+}
+`;
+
+exports[`config unset > says what it removed, and when there was nothing to remove > json shape: config unset 1`] = `
+{
+  "key": "string",
+  "removed": "boolean",
+}
+`;

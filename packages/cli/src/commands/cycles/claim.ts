@@ -1,7 +1,12 @@
-import { explorerTx, formatAmount, listAssets } from "../../core/assets.js";
+import {
+  amountFields,
+  explorerTx,
+  formatAmount,
+  listAssets,
+} from "../../core/assets.js";
 import { confirmFunds } from "../../core/confirm.js";
 import { beginSending } from "../../core/outcome.js";
-import { previewCycleClaim, renderPreview } from "../../core/preview.js";
+import { previewCycleClaim } from "../../core/preview.js";
 import { withSession } from "../../core/session.js";
 import { address, cycleArg, dryRun, gas, yes } from "../../flags.js";
 import { NetworkCommand } from "../../network-command.js";
@@ -45,6 +50,12 @@ export default class CyclesClaim extends NetworkCommand {
         terms.assetAddress,
         terms.amount,
       );
+      // For --json: the number, its unit and the base units, each its own.
+      const money = await amountFields(
+        assets,
+        terms.assetAddress,
+        terms.amount,
+      );
 
       const preview = await previewCycleClaim(
         settings,
@@ -54,12 +65,11 @@ export default class CyclesClaim extends NetworkCommand {
         flags.gas,
       );
       if (flags["dry-run"]) {
-        this.log(renderPreview(preview));
+        this.showPreview(preview);
         return {
           ...preview,
           participant: terms.participant,
-          amount,
-          amountRaw: terms.amount,
+          ...money,
         };
       }
 
@@ -85,8 +95,7 @@ export default class CyclesClaim extends NetworkCommand {
       return {
         ...result,
         cycle: terms.cycleIdText,
-        amount,
-        amountRaw: terms.amount,
+        ...money,
       };
     });
   }
