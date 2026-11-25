@@ -152,12 +152,21 @@ describe("every command", () => {
   });
 
   it("answers --help offline, on stdout, ending with the docs", async () => {
-    const results = await Promise.all(
-      ownCommands().map(async (c) => ({
-        id: c.id,
-        run: await spawnCli([...c.id.split(":"), "--help"]),
-      })),
-    );
+    // A few at a time: thirty-odd processes started at once take longer
+    // than one is allowed on a small CI runner, and are killed mid-answer.
+    const results: { id: string; run: Awaited<ReturnType<typeof spawnCli>> }[] =
+      [];
+    const commands = ownCommands();
+    for (let i = 0; i < commands.length; i += 4) {
+      results.push(
+        ...(await Promise.all(
+          commands.slice(i, i + 4).map(async (c) => ({
+            id: c.id,
+            run: await spawnCli([...c.id.split(":"), "--help"]),
+          })),
+        )),
+      );
+    }
     for (const { id, run } of results) {
       expect.soft(run.code, id).toBe(0);
       expect.soft(run.stdout, id).toContain("USAGE");
@@ -165,7 +174,7 @@ describe("every command", () => {
       expect.soft(run.stdout, id).toContain(CLI_DOCS_URL);
       expect.soft(run.stderr, id).toBe("");
     }
-  }, 60_000);
+  }, 180_000);
 });
 
 describe("exit codes, as the README's table gives them", () => {
