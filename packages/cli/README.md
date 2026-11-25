@@ -51,7 +51,7 @@ NETWORK
 
 SETTINGS
   config        show the settings in effect and where each comes from
-  autocomplete  set up tab completion for bash, zsh or fish
+  autocomplete  set up tab completion for bash, zsh or PowerShell
   version       show the cli's version, and the Node and platform it runs on
 ```
 
