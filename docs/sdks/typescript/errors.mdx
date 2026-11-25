@@ -16,6 +16,7 @@ All SDK errors extend `FourMicaError`. Import the specific classes to branch on 
 | `PaymentError`           | The guarantee flow: `SigningError`, `AddressMismatchError`, the receipt errors below, and `UntrustedCheckpointBatchError`, … |
 | `ContractError`          | An on-chain call failed. Known reverts are typed: `AmountZeroError`, `InsufficientAvailableError`, `InsufficientLiquidityError`, `PoolInsolventError`, `DepositsDisabledError`, `StablecoinDepositsDisabledError`, `PausedError`, …, with `UnknownRevertError` as the fallthrough. |
 | `Erc20AllowanceRequiredError` | A self-funded token pull needs an allowance that is not in place. Call the matching `approve()` terminal and retry. |
+| `OutcomeUnknownError`    | Something was sent and no usable answer came back, so it may have gone through. Do not retry before checking. See [Unknown outcomes](#unknown-outcomes). |
 | `X402Error`              | An x402 flow error: bad scheme, invalid requirements, or settlement transport. |
 | `AuthError`              | Base class for all authentication errors.                    |
 | `AuthMissingConfigError` | `login()` was called but auth is not configured.             |
@@ -34,6 +35,38 @@ When core refuses with a stable code, the SDK throws a `CoreRefusalError` subcla
 | `FutureTimestampError`        | `FUTURE_TIMESTAMP`          | The payment is stamped later than core's clock.                      |
 | `StaleTimestampError`         | `STALE_TIMESTAMP`           | The payment is stamped before the active cycle opened.               |
 | `TimestampNotPastCutoffError` | `TIMESTAMP_NOT_PAST_CUTOFF` | The payment is stamped at or before the payer's latest checkpoint cutoff. |
+
+## Unknown outcomes
+
+A transaction that has left the wallet cannot be called back, and an answer that never arrives does not mean it failed. The SDK reports that case as `OutcomeUnknownError`, never as an ordinary failure, so that a retry loop does not send the same money twice.
+
+| Error | When it is thrown |
+| --- | --- |
+| `OutcomeUnknownError` | A sponsored action reached the facilitator and no usable answer came back. |
+| `TransactionOutcomeUnknownError` | A transaction the wallet sent itself. Extends `OutcomeUnknownError`, so one `instanceof` check covers both. |
+
+`TransactionOutcomeUnknownError` says how far the transaction got:
+
+- **`stage: "broadcast"`**: it was handed to the chain's node, and the node's answer never came: a timeout, a dropped connection, or a gateway's 5xx. The node may have taken it, and there is no hash.
+- **`stage: "receipt"`**: the node accepted it, as `txHash`, and its receipt was not seen in time. It may still be mined.
+
+A refusal is not an unknown outcome. A JSON-RPC error from the node, an HTTP 4xx, or a failure before the broadcast (a gas estimate, a nonce read) stays a `ContractError`: nothing was sent.
+
+```ts
+import { OutcomeUnknownError, TransactionOutcomeUnknownError } from "@4mica/sdk";
+
+try {
+  await client.deposit("5 USDC", { gas: "self" });
+} catch (error) {
+  if (error instanceof TransactionOutcomeUnknownError && error.txHash) {
+    // Sent as error.txHash: look it up before doing anything else.
+  } else if (error instanceof OutcomeUnknownError) {
+    // No hash. Check what it would have changed: client.balance().
+  } else {
+    throw error;
+  }
+}
+```
 
 ## Receipt errors
 

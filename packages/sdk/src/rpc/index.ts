@@ -16,9 +16,11 @@ import {
   CheckpointAcceptedResponse,
   CheckpointBatchResponse,
   ClearingParticipantProof,
+  ClearingPosition,
   type ClearingSettlementAction,
   ClearingSettlementActionResponse,
   CorePublicParameters,
+  PayerGuaranteesPage,
   PaymentRequest,
   RecipientPaymentInfo,
   type SignedCheckpoint,
@@ -304,6 +306,49 @@ export class RpcProxy {
       creditor,
       "claim_net_credit",
     );
+  }
+
+  /**
+   * The positions `participant` can still settle, across every cycle and
+   * asset, soonest payment deadline first: net debits that are unpaid and
+   * still payable, and net credits that are unclaimed. Paid, claimed,
+   * defaulted and flat positions are not listed.
+   */
+  async listParticipantPositions(
+    participant: string,
+  ): Promise<ClearingPosition[]> {
+    const raw = await this.get<Record<string, unknown>>(
+      `/core/participants/${participant}/positions`,
+    );
+    const positions = isRecord(raw) ? raw.positions : undefined;
+    return (Array.isArray(positions) ? positions : []).map((item) =>
+      ClearingPosition.fromRpc(item as Record<string, unknown>),
+    );
+  }
+
+  /**
+   * One page of the guarantees `payer` issued in a cycle, whatever their
+   * settlement status, in the order core stored them.
+   *
+   * @param cycleId - The cycle's on-chain `bytes32` id (`cycleId` on a
+   *   position or an active cycle), not its text id.
+   * @param page - `limit` defaults to 100 and is capped at 500 by core;
+   *   `after` is the `nextCursor` of the page before.
+   */
+  async listPayerGuarantees(
+    payer: string,
+    cycleId: string,
+    page: { limit?: number; after?: string } = {},
+  ): Promise<PayerGuaranteesPage> {
+    const query = new URLSearchParams({
+      cycle_id: normalizeBytes32Hex(cycleId),
+    });
+    if (page.limit !== undefined) query.set("limit", String(page.limit));
+    if (page.after !== undefined) query.set("after", page.after);
+    const raw = await this.get<Record<string, unknown>>(
+      `/core/payers/${payer}/guarantees?${query}`,
+    );
+    return PayerGuaranteesPage.fromRpc(raw);
   }
 
   async listRecipientPayments(

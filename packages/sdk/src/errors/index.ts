@@ -654,11 +654,44 @@ export class FacilitatorRejectedError extends SponsorshipError {
 export class SponsorshipTransportError extends SponsorshipError {}
 
 /**
- * The request reached the facilitator but no usable answer came back, so
- * whether it submitted a transaction is unknown. Do not blindly retry: the
- * first attempt may already have settled.
+ * Something was sent and no usable answer came back, so whether a
+ * transaction went through is unknown. Do not blindly retry: the first
+ * attempt may already have settled.
+ *
+ * Thrown as this class for a sponsored action the facilitator never
+ * answered, and as {@link TransactionOutcomeUnknownError} for a transaction
+ * the wallet sent itself. Catching this one covers both.
  */
 export class OutcomeUnknownError extends SponsorshipError {}
+
+/**
+ * A transaction the wallet signed and sent itself, whose fate is unknown.
+ *
+ * - `stage: "broadcast"`: it was handed to the chain's node and the node's
+ *   answer never came (a timeout, a dropped connection, a gateway error).
+ *   The node may have taken it, and there is no hash to look it up by.
+ * - `stage: "receipt"`: the node accepted it, as `txHash`, and its receipt
+ *   was not seen in time. It may still be mined.
+ *
+ * Either way a second attempt can send it twice. Check first: by `txHash`
+ * when there is one, otherwise by the state it would have changed.
+ *
+ * It extends {@link OutcomeUnknownError} so that one `instanceof` check
+ * covers every unknown outcome, sponsored or not.
+ */
+export class TransactionOutcomeUnknownError extends OutcomeUnknownError {
+  readonly stage: "broadcast" | "receipt";
+  readonly txHash?: string;
+
+  constructor(
+    message: string,
+    options: { stage: "broadcast" | "receipt"; txHash?: string },
+  ) {
+    super(message);
+    this.stage = options.stage;
+    this.txHash = options.txHash;
+  }
+}
 
 /**
  * Permit2 needs a one-time on-chain `approve(PERMIT2, ...)` the signer has not

@@ -92,6 +92,69 @@ export interface PendingWithdrawal {
   network: string;
 }
 
+/**
+ * A net position the wallet can still settle: a debit to pay or a credit to
+ * claim, for one asset in one settlement cycle. Within a cycle a wallet is
+ * a debtor or a creditor, never both.
+ */
+export interface Position {
+  /** The cycle, as `settlement.pay(...)` and `settlement.claim(...)` take it. */
+  cycle: string;
+  /** The cycle's on-chain `bytes32` id. */
+  cycleId: string;
+  asset: AssetRef;
+  /** A debtor pays `amount`; a creditor claims it. */
+  role: "debtor" | "creditor";
+  /** The net amount. */
+  amount: string;
+  /** What the wallet paid others in the cycle, before netting. */
+  grossOutgoing: string;
+  /** What others paid the wallet in the cycle, before netting. */
+  grossIncoming: string;
+  raw: { amount: bigint; grossOutgoing: bigint; grossIncoming: bigint };
+  /** A debit has to be paid by this time; the contract refuses it after. */
+  payBy: Date;
+  /**
+   * After this time an unpaid debit is taken from the debtor's collateral.
+   * A credit can be claimed once every debtor in the cycle has paid, and
+   * otherwise from this time on.
+   */
+  finalAt: Date;
+  /**
+   * Whether the cycle's commit is final on-chain. Until it is, a payment
+   * can revert and both times are core's estimate.
+   */
+  commitConfirmed: boolean;
+  /** CAIP-2 id. */
+  network: string;
+}
+
+export interface SettleOptions extends NetworkOption {
+  /** `"pay"` settles only what the wallet owes; `"claim"` only what it is owed. */
+  only?: "pay" | "claim";
+}
+
+/** What became of one position in a `settle()` call. */
+export interface SettleResult {
+  position: Position;
+  action: "pay" | "claim";
+  /**
+   * - `"settled"`: paid or claimed; `txHash` is the transaction.
+   * - `"skipped"`: not attempted; `reason` says why.
+   * - `"failed"`: refused or reverted; `error` says why. Nothing moved.
+   * - `"unknown"`: sent, and no answer came back (`error` is an
+   *   `OutcomeUnknownError`). Check before settling again: it may have
+   *   gone through.
+   */
+  status: "settled" | "skipped" | "failed" | "unknown";
+  txHash?: string;
+  /** How it reached the chain: a payment moves a token, so it names the scheme. */
+  route?: Route | TokenRoute;
+  explorerUrl?: string;
+  reason?: string;
+  error?: Error;
+}
+
 export interface PaymentRecord {
   protocol: string;
   network: string;

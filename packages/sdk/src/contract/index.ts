@@ -7,8 +7,10 @@ import {
   erc20Abi,
   getContract,
   type Hex,
+  HttpRequestError,
   http,
   parseGwei,
+  TimeoutError,
 } from "viem";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
 import { treasuryAbi } from "@/abi/treasury";
@@ -47,6 +49,7 @@ import {
   PoolInsolventError,
   RevertedOnChainError,
   StablecoinDepositsDisabledError,
+  TransactionOutcomeUnknownError,
   TransferFailedError,
   UnknownRevertError,
   UnsupportedAssetError,
@@ -178,12 +181,62 @@ function decodeRevert(error: unknown, context: string): ContractError | null {
   return null;
 }
 
+// The requests that put a signed transaction on the wire, as viem prints them
+// in the errors of the request that failed.
+const BROADCAST_REQUEST = /"method":"eth_send(Raw)?Transaction"/;
+
+/**
+ * The transport failure behind a write whose broadcast was already on the
+ * wire: the request that carried the signed transaction got no answer, or
+ * one that was not the node's (a gateway's 5xx). Nothing earlier counts: a
+ * failed gas estimate or nonce read means the transaction was never sent.
+ * Nor does a refusal: a JSON-RPC error, or an HTTP 4xx, is the node (or its
+ * gatekeeper) saying no.
+ */
+function lostBroadcast(error: unknown): BaseError | null {
+  if (!(error instanceof BaseError)) return null;
+  const transport = error.walk(
+    (err) => err instanceof HttpRequestError || err instanceof TimeoutError,
+  );
+  if (transport instanceof HttpRequestError) {
+    if (transport.status !== undefined && transport.status < 500) return null;
+  } else if (!(transport instanceof TimeoutError)) {
+    return null;
+  }
+  const request = (transport.metaMessages ?? []).join("\n");
+  return BROADCAST_REQUEST.test(request) ? transport : null;
+}
+
+/** `depositStablecoin failed` names the call; this is the call. */
+const operationOf = (context: string): string =>
+  context.replace(/ failed\b.*$/, "");
+
 /**
  * Extract a human-readable message from a viem contract error, mapping known
- * custom errors to their typed exceptions.
+ * custom errors to their typed exceptions. A write whose broadcast went
+ * unanswered is not a failed write: it comes back as
+ * {@link TransactionOutcomeUnknownError}.
  */
-function wrapViemError(error: unknown, context: string): ContractError {
-  if (error instanceof ContractError) return error;
+function wrapViemError(
+  error: unknown,
+  context: string,
+): ContractError | TransactionOutcomeUnknownError {
+  // Already said what it is: a typed revert, or the unknown outcome of a
+  // receipt wait that ran inside the caller's `try`.
+  if (
+    error instanceof ContractError ||
+    error instanceof TransactionOutcomeUnknownError
+  ) {
+    return error;
+  }
+  const lost = lostBroadcast(error);
+  if (lost) {
+    return new TransactionOutcomeUnknownError(
+      `${operationOf(context)}: the transaction was sent and the node's ` +
+        `answer never came (${lost.shortMessage}); it may or may not have been accepted`,
+      { stage: "broadcast" },
+    );
+  }
   const decoded = decodeRevert(error, context);
   if (decoded) return decoded;
   if (error instanceof Error) {
@@ -326,15 +379,37 @@ export class ContractGateway {
     };
   }
 
-  /** Wait for the receipt and refuse a mined-but-reverted transaction. */
+  /**
+   * Wait for the receipt and refuse a mined-but-reverted transaction. The
+   * transaction is out by now, so a receipt that does not come (the wait
+   * ran out, the node stopped answering) is an unknown outcome, never a
+   * failure: it carries the hash to look the transaction up by.
+   */
   private async waitChecked(
     hash: Hex,
     receiptOptions: { timeout?: number; pollingInterval?: number },
   ) {
-    const receipt = await this.publicClient.waitForTransactionReceipt({
-      hash,
-      ...receiptOptions,
-    });
+    let receipt: Awaited<
+      ReturnType<TPublicClient["waitForTransactionReceipt"]>
+    >;
+    try {
+      receipt = await this.publicClient.waitForTransactionReceipt({
+        hash,
+        ...receiptOptions,
+      });
+    } catch (error) {
+      const reason =
+        error instanceof BaseError
+          ? error.shortMessage
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      throw new TransactionOutcomeUnknownError(
+        `transaction ${hash} was sent, but its receipt was not seen ` +
+          `(${reason}); it may still be mined`,
+        { stage: "receipt", txHash: hash },
+      );
+    }
     if (receipt.status !== "success") {
       throw new RevertedOnChainError(hash);
     }
@@ -422,10 +497,14 @@ export class ContractGateway {
     try {
       txReceipt = await sendApprove(targetAllowance);
     } catch (error) {
+      // The approval may be out: sending a reset and another approval on top
+      // of it would be two or three transactions where one was meant.
+      const wrapped = wrapViemError(error, "ERC20 approve failed");
+      if (wrapped instanceof TransactionOutcomeUnknownError) throw wrapped;
       // Some ERC20s (e.g. USDT) require resetting allowance to zero before
       // setting a new non-zero value.
       if (targetAllowance === 0n) {
-        throw wrapViemError(error, "ERC20 approve failed");
+        throw wrapped;
       }
       try {
         await sendApprove(0n);

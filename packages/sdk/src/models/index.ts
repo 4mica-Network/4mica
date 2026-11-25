@@ -916,6 +916,155 @@ export class AssetBalanceInfo {
   }
 }
 
+/**
+ * A net position its participant can still settle with the ClearingHouse:
+ * a debit to pay, or a credit to claim.
+ */
+export class ClearingPosition {
+  constructor(
+    /** On-chain `bytes32` cycle identifier. */
+    public cycleId: string,
+    /**
+     * Core's cycle identifier (`{asset}:{period_start}`), the one
+     * `settlement.pay(...)` and `settlement.claim(...)` take.
+     */
+    public cycleIdText: string,
+    public assetAddress: string,
+    public role: ClearingParticipantRole,
+    /** What a net debtor owes, or a net creditor is owed. */
+    public amount: bigint,
+    /** Sum of the guarantees the participant issued in the cycle, before netting. */
+    public grossOutgoing: bigint,
+    /** Sum of the guarantees issued to the participant in the cycle, before netting. */
+    public grossIncoming: bigint,
+    /**
+     * Unix seconds on the chain's clock. The ClearingHouse refuses a net
+     * debtor's payment after it.
+     */
+    public paymentSubmissionDeadline: number,
+    /**
+     * Unix seconds on the chain's clock. Once past it, an unpaid net debit is
+     * taken from the debtor's collateral. A net credit can be claimed as soon
+     * as every debtor in the cycle has paid, and otherwise once that
+     * collateral has been taken.
+     */
+    public paymentFinalityDeadline: number,
+    /**
+     * Whether core has seen the cycle's commit finalized on-chain. Until then
+     * a payment can revert, and both deadlines are core's own estimate.
+     */
+    public commitConfirmed: boolean,
+  ) {}
+
+  static fromRpc(raw: Record<string, unknown>): ClearingPosition {
+    try {
+      const u256 = (...keys: string[]) =>
+        parseU256((getAny(raw, ...keys) ?? 0) as number | bigint | string);
+      return new ClearingPosition(
+        normalizeBytes32Hex(String(getAny(raw, "cycle_id", "cycleId"))),
+        String(getAny(raw, "cycle_id_text", "cycleIdText")),
+        normalizeAddress(String(getAny(raw, "asset_address", "assetAddress"))),
+        String(getAny(raw, "role")) as ClearingParticipantRole,
+        u256("amount"),
+        u256("gross_outgoing", "grossOutgoing"),
+        u256("gross_incoming", "grossIncoming"),
+        Number(
+          getAny(
+            raw,
+            "payment_submission_deadline",
+            "paymentSubmissionDeadline",
+          ) ?? 0,
+        ),
+        Number(
+          getAny(raw, "payment_finality_deadline", "paymentFinalityDeadline") ??
+            0,
+        ),
+        Boolean(getAny(raw, "commit_confirmed", "commitConfirmed")),
+      );
+    } catch (err) {
+      if (err instanceof InvalidParamsError) throw err;
+      throw new InvalidParamsError(`invalid clearing position: ${String(err)}`);
+    }
+  }
+}
+
+/** Where a guarantee stands in its cycle's settlement. */
+export type GuaranteeStatus =
+  | "ISSUED"
+  /** Waiting on the validator the payer and recipient agreed on; not payable yet. */
+  | "PENDING_VALIDATION"
+  /** Payable, and counted in the payer's position once the cycle is netted. */
+  | "FINALIZED_PAYABLE"
+  | "DISPUTED"
+  | "CANCELLED"
+  /** Counted in the payer's net position for the cycle. */
+  | "NETTED"
+  /** The payer paid its net debit for the cycle, or had none. */
+  | "SETTLED"
+  /** The payer did not pay, and its net debit was taken from its collateral. */
+  | "DEFAULT_REMUNERATED";
+
+/** One guarantee a payer issued. */
+export class PayerGuaranteeInfo {
+  constructor(
+    public guaranteeId: string,
+    public recipient: string,
+    public reqId: bigint,
+    public amount: bigint,
+    /** The timestamp the payer signed the request with, unix seconds. */
+    public timestamp: number,
+    /** A status this SDK predates is passed through as core sent it. */
+    public status: GuaranteeStatus,
+  ) {}
+
+  static fromRpc(raw: Record<string, unknown>): PayerGuaranteeInfo {
+    return new PayerGuaranteeInfo(
+      String(getAny(raw, "guarantee_id", "guaranteeId") ?? ""),
+      normalizeAddress(String(getAny(raw, "recipient"))),
+      parseU256(
+        (getAny(raw, "req_id", "reqId") ?? 0) as number | bigint | string,
+      ),
+      parseU256((getAny(raw, "amount") ?? 0) as number | bigint | string),
+      Number(getAny(raw, "timestamp") ?? 0),
+      String(getAny(raw, "status")) as GuaranteeStatus,
+    );
+  }
+}
+
+/** One page of the guarantees a payer issued in a cycle, in the order core stored them. */
+export class PayerGuaranteesPage {
+  constructor(
+    /** On-chain `bytes32` cycle identifier. */
+    public cycleId: string,
+    public cycleIdText: string,
+    public assetAddress: string,
+    public payer: string,
+    public guarantees: PayerGuaranteeInfo[],
+    /** Pass back as `after` for the next page. Absent on the last one. */
+    public nextCursor?: string,
+  ) {}
+
+  static fromRpc(raw: Record<string, unknown>): PayerGuaranteesPage {
+    try {
+      const list = getAny(raw, "guarantees");
+      const cursor = getAny(raw, "next_cursor", "nextCursor");
+      return new PayerGuaranteesPage(
+        normalizeBytes32Hex(String(getAny(raw, "cycle_id", "cycleId"))),
+        String(getAny(raw, "cycle_id_text", "cycleIdText")),
+        normalizeAddress(String(getAny(raw, "asset_address", "assetAddress"))),
+        normalizeAddress(String(getAny(raw, "payer"))),
+        (Array.isArray(list) ? list : []).map((item) =>
+          PayerGuaranteeInfo.fromRpc(item as Record<string, unknown>),
+        ),
+        typeof cursor === "string" && cursor !== "" ? cursor : undefined,
+      );
+    } catch (err) {
+      if (err instanceof InvalidParamsError) throw err;
+      throw new InvalidParamsError(`invalid guarantee list: ${String(err)}`);
+    }
+  }
+}
+
 export class RecipientPaymentInfo {
   constructor(
     public userAddress: string,

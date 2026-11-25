@@ -16,11 +16,15 @@ import type {
   NetworkOption,
   PaymentRecord,
   PendingWithdrawal,
+  Position,
+  SettleOptions,
+  SettleResult,
   WithdrawResult,
 } from "@/facade/models";
 import type { PaymentProtocol } from "@/facade/protocols/types";
 import { x402Protocol } from "@/facade/protocols/x402";
 import { assetRef, NetworkSession } from "@/facade/session";
+import { openPositions, settleAll } from "@/facade/settle";
 import {
   cancelWithdrawal,
   finalizeWithdrawal,
@@ -249,6 +253,29 @@ export class FourMica {
 
   async withdrawals(options: NetworkOption = {}): Promise<PendingWithdrawal[]> {
     return pendingWithdrawals(await this.session(options.network));
+  }
+
+  /**
+   * What the wallet still owes and is still owed: one entry per asset and
+   * settlement cycle, soonest deadline first. Paid, claimed and defaulted
+   * positions are not listed.
+   */
+  async positions(options: NetworkOption = {}): Promise<Position[]> {
+    return openPositions(await this.session(options.network));
+  }
+
+  /**
+   * Pays every open debit and claims every open credit, gaslessly where
+   * possible. One that fails does not stop the others: read each result's
+   * `status`. A debit left unpaid past its deadline is taken from the
+   * wallet's collateral, so this is the call to run after a cycle closes.
+   *
+   * A credit is claimable only once its cycle is funded; until then its
+   * claim comes back `"failed"`. With no facilitator configured the wallet
+   * sends the transactions itself and pays their gas, a failed one included.
+   */
+  async settle(options: SettleOptions = {}): Promise<SettleResult[]> {
+    return settleAll(await this.session(options.network), options);
   }
 
   /**

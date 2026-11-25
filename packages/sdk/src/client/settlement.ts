@@ -45,7 +45,11 @@ import {
   OutcomeUnknownError,
   Permit2AllowanceRequiredError,
 } from "@/errors";
-import { type ClearingSettlementActionResponse, ZERO_ADDRESS } from "@/models";
+import {
+  type ClearingPosition,
+  type ClearingSettlementActionResponse,
+  ZERO_ADDRESS,
+} from "@/models";
 import { normalizeAddress } from "@/utils";
 
 export class SettlementClient {
@@ -54,6 +58,15 @@ export class SettlementClient {
   /** Whether the gasless route is available at all. */
   isGaslessAvailable(): boolean {
     return this.ctx.facilitator.isConfigured();
+  }
+
+  /**
+   * The signer's open positions, across every cycle and asset, soonest
+   * payment deadline first: what {@link pay} and {@link claim} still have to
+   * do. Pass a position's `cycleIdText` to either.
+   */
+  async positions(): Promise<ClearingPosition[]> {
+    return this.ctx.rpc.listParticipantPositions(this.ctx.signerAddress);
   }
 
   /**

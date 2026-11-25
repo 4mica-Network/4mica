@@ -84,6 +84,38 @@ const guarantee = await client.payment.verifyGuarantee(receipt);
 
 The debtor pays what they owe; the creditor claims what they are owed. Terms always come from core's prepared action — the caller only names which cycle.
 
+### Everything at once
+
+`client.settle()` on a `FourMica` session asks core which positions are open, pays each debit and claims each credit, and returns one result per position. A position that fails does not stop the others.
+
+```ts
+await using client = await FourMica.connect();
+
+for (const result of await client.settle()) {
+  const { position, action, status } = result;
+  console.log(action, position.amount, position.asset.symbol, status);
+  if (status === "unknown") {
+    // Sent, and no answer came back. It may have gone through:
+    // look before settling again.
+  }
+}
+```
+
+| `status` | Meaning |
+| --- | --- |
+| `"settled"` | Paid or claimed. `txHash` is the transaction. |
+| `"skipped"` | Not attempted; `reason` says why. A position is skipped until its cycle's commit is confirmed on-chain. |
+| `"failed"` | Refused or reverted; `error` is the typed error. Nothing moved. A credit whose cycle is not funded yet fails this way, and can be claimed later. |
+| `"unknown"` | Sent, and no answer came back; `error` is an `OutcomeUnknownError`. Check before running it again. |
+
+`client.settle({ only: "pay" })` settles only what the wallet owes, and `{ only: "claim" }` only what it is owed. Pay first if you settle in two steps: an unpaid debit is taken from the wallet's collateral once its deadline passes.
+
+`client.positions()` lists the same positions without settling anything: `role` (`"debtor"` or `"creditor"`), `amount`, `asset`, `payBy`, `finalAt`, and `cycle`, the id the calls below take.
+
+### One cycle
+
+The same calls on the session's `Client` (`await client.lowLevel()`) settle one cycle, and choose its route. `settlement.positions()` returns the open positions as core reports them; pass a position's `cycleIdText` as `cycleId`.
+
 ```ts
 // Debtor: pay the committed net debit
 await client.settlement.pay(cycleId).send();
@@ -99,6 +131,17 @@ await client.settlement.claim(cycleId).creditor(creditorAddress).send();
 
 // Inspect the prepared terms without sending anything
 const action = await client.settlement.pay(cycleId).action();
+```
+
+To see what a cycle's debit is made of, `client.payment.listIssued(position.cycleId)` lists the guarantees the wallet issued in it: recipient, request id, amount and status. It returns one page; pass its `nextCursor` back as `after` for the next.
+
+```ts
+let page = await client.payment.listIssued(position.cycleId);
+while (page.nextCursor) {
+  page = await client.payment.listIssued(position.cycleId, {
+    after: page.nextCursor,
+  });
+}
 ```
 
 ## Gasless routes

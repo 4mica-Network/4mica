@@ -215,6 +215,11 @@ await client.settlement.pay(cycleId).send();
 await client.settlement.claim(cycleId).send();
 ```
 
+`client.settlement.positions()` lists the cycles the signer can still settle, so `cycleId` does
+not have to be known in advance: pass a position's `cycleIdText`. On a `FourMica` session,
+`client.settle()` does all of it in one call, paying every open debit and claiming every open
+credit, and `client.positions()` shows what it would act on.
+
 ### Gasless routes
 
 With a `facilitatorUrl` configured, deposits, withdrawals, and settlement run gaslessly: the
