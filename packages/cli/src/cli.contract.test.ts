@@ -13,7 +13,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Config, Flags, Parser } from "@oclif/core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CLI_DOCS_URL } from "./core/links.js";
 import { packageRoot } from "./core/package-root.js";
 import {
@@ -22,6 +22,11 @@ import {
   parseJson,
   spawnCli,
 } from "./test/spawn.js";
+
+// Every test here starts the real binary, once or several times: quick on a
+// laptop, seconds each on a shared CI runner. Vitest's five seconds is for
+// tests that run in-process.
+vi.setConfig({ testTimeout: 60_000 });
 
 let config: Config;
 beforeAll(async () => {
@@ -368,9 +373,10 @@ describe("networks that misbehave", () => {
   }, 20_000);
 
   it("ends on Ctrl-C with exit 130 and one line", async () => {
+    // Interrupted once its request is with the server, which never answers.
     const core = await mockServer(() => {});
     const run = await spawnCli(["tokens", "--rpc-url", core.url], {
-      interruptAfter: 1500,
+      interruptWhen: core.requested,
     });
     await core.close();
     expect(run.code).toBe(130);

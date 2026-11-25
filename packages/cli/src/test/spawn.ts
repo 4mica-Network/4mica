@@ -27,8 +27,12 @@ export interface SpawnOptions {
   env?: Record<string, string | undefined>;
   /** Reuse a home, when one run should see another's files. */
   home?: string;
-  /** Interrupt it this many ms after it starts. */
-  interruptAfter?: number;
+  /**
+   * Send it Ctrl-C at a moment the test names: when a promise resolves
+   * (a server saw its request), or when its stderr matches. Never after a
+   * delay: how long a command takes to get somewhere depends on the machine.
+   */
+  interruptWhen?: Promise<unknown> | RegExp;
   timeout?: number;
 }
 
@@ -66,8 +70,15 @@ export async function spawnCli(
     stdin: "ignore",
     timeout: options.timeout ?? 20_000,
   });
-  if (options.interruptAfter !== undefined) {
-    setTimeout(() => child.kill("SIGINT"), options.interruptAfter);
+  const { interruptWhen } = options;
+  if (interruptWhen instanceof RegExp) {
+    let seen = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      seen += chunk.toString();
+      if (interruptWhen.test(seen)) child.kill("SIGINT");
+    });
+  } else if (interruptWhen) {
+    void interruptWhen.then(() => child.kill("SIGINT"));
   }
   const result = await child;
   return {
@@ -83,6 +94,8 @@ export async function spawnCli(
 export interface MockServer {
   url: string;
   requests: { method: string; url: string }[];
+  /** Resolves when the first request arrives. */
+  requested: Promise<void>;
   close(): Promise<void>;
 }
 
@@ -90,8 +103,13 @@ export async function mockServer(
   handle: (req: IncomingMessage, res: ServerResponse) => void,
 ): Promise<MockServer> {
   const requests: MockServer["requests"] = [];
+  let arrived = () => {};
+  const requested = new Promise<void>((resolve) => {
+    arrived = resolve;
+  });
   const server: Server = createServer((req, res) => {
     requests.push({ method: req.method ?? "", url: req.url ?? "" });
+    arrived();
     handle(req, res);
   });
   server.listen(0, "127.0.0.1");
@@ -100,6 +118,7 @@ export async function mockServer(
   return {
     url: `http://127.0.0.1:${port}`,
     requests,
+    requested,
     close: () =>
       new Promise((resolve) => {
         server.closeAllConnections();

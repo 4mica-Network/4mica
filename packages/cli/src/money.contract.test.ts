@@ -12,13 +12,26 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   type MockServer,
   mockServer,
   parseJson,
   spawnCli,
 } from "./test/spawn.js";
+
+// Every test here starts the real binary, which loads the SDK and viem: a
+// second on a laptop, several on a shared CI runner. Vitest's five seconds
+// is for tests that run in-process.
+vi.setConfig({ testTimeout: 60_000 });
 
 const CHAIN_ID = 1337;
 // anvil's account #0: a key everyone knows, on a chain that does not exist.
@@ -190,7 +203,7 @@ describe("a deposit the wallet sends itself", () => {
 
   it("prints the hash as soon as the node gives one, before any receipt", async () => {
     onBroadcast = "accept";
-    // No receipt ever comes: interrupt once the hash is out.
+    // No receipt ever comes: interrupt as soon as the hash is on screen.
     const run = await spawnCli(
       [
         "deposit",
@@ -210,7 +223,7 @@ describe("a deposit the wallet sends itself", () => {
           FOURMICA_BEARER_TOKEN: "test-token",
           FOURMICA_ETHEREUM_HTTP_RPC_URL: chain.url,
         },
-        interruptAfter: 4000,
+        interruptWhen: /transaction sent/,
         timeout: 60_000,
       },
     );
