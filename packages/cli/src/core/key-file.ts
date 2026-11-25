@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 import { configError, usageError } from "../errors.js";
 import { warning } from "../ui/log.js";
-import { ask } from "./confirm.js";
+import { askSecret } from "./confirm.js";
 import { canPrompt, runtime } from "./runtime.js";
 import type { KeyFile } from "./settings.js";
 
@@ -15,8 +15,8 @@ const UNREADABLE: Record<string, (path: string) => string> = {
 
 /**
  * `-`: piped in (`op read … | 4mica … --key-file -`), or typed at a
- * terminal, where it is read without echo so that it never reaches the
- * screen or the scrollback.
+ * terminal, where it is masked so that it never reaches the screen or the
+ * scrollback.
  */
 async function keyFromStdin(): Promise<string> {
   if (process.stdin.isTTY !== true) return text(process.stdin);
@@ -33,8 +33,7 @@ async function keyFromStdin(): Promise<string> {
       },
     );
   }
-  return ask("Wallet key (input hidden): ", {
-    hidden: true,
+  return askSecret("Wallet key", {
     cancelMessage: "cancelled; no key was read",
   });
 }

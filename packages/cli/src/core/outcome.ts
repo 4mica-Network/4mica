@@ -47,6 +47,10 @@ export function resetOutcome(): void {
  * A signed transaction was handed to the chain's node and no answer to it
  * came back: the connection dropped, or the wait ran out. The node may have
  * taken it. An answer, whether a hash or a refusal, is not this.
+ *
+ * shortcut: this, `broadcastLost` and their use in `toCliError` stand in
+ * for the SDK, which reports a lost broadcast as a failed write. They go
+ * once it raises an unknown-outcome error of its own for it.
  */
 export function recordLostBroadcast(): void {
   state.broadcastLost = true;

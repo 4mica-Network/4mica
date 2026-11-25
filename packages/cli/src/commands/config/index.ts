@@ -23,14 +23,16 @@ export default class Config extends NetworkCommand {
     if (settings.keyProblem) this.note(warn(settings.keyProblem.message));
     // In the table a setting goes by the name `config set` takes; in JSON
     // by a camelCase key, like every other field the cli prints.
+    const { key } = settings;
     const effective = {
       network: settings.network,
       rpcUrl: settings.rpcUrl,
       facilitatorUrl: settings.facilitatorUrl,
       asset: settings.asset,
+      // Only a key file the user named: a .env that holds a key is not one.
       keyFile:
-        settings.key?.source === "flag" || settings.key?.source === "config"
-          ? { value: settings.key.file as string, source: settings.key.source }
+        key?.file && (key.source === "flag" || key.source === "config")
+          ? { value: key.file, source: key.source }
           : undefined,
     };
     const named: [string, Resolved | undefined][] = [

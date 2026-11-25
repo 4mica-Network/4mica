@@ -9,32 +9,17 @@ import { isKnownSafe, networkName, type Settings } from "./settings.js";
 /**
  * One question on stderr, answered on stdin. Ctrl-C at the prompt is a
  * cancel (exit 130), not a crash: readline reports it as an `AbortError`.
- * `hidden` reads without echo, for a secret.
+ * Not for a secret: what is typed is echoed. `askSecret` is for those.
  */
 export async function ask(
   question: string,
-  options: { hidden?: boolean; cancelMessage?: string } = {},
+  options: { cancelMessage?: string } = {},
 ): Promise<string> {
   const rl = createInterface({
     input: process.stdin,
     output: process.stderr,
     terminal: true,
   });
-  if (options.hidden) {
-    // Echo nothing typed after the question itself.
-    const internal = rl as unknown as {
-      _writeToOutput?: (text: string) => void;
-    };
-    let asked = false;
-    internal._writeToOutput = (text: string) => {
-      if (!asked) {
-        asked = true;
-        process.stderr.write(text);
-      } else if (text.includes("\n")) {
-        process.stderr.write("\n");
-      }
-    };
-  }
   const abort = new AbortController();
   rl.on("SIGINT", () => abort.abort());
   try {
@@ -49,6 +34,24 @@ export async function ask(
   } finally {
     rl.close();
   }
+}
+
+/**
+ * A secret, typed at a terminal and shown only as a mask, so that it never
+ * reaches the screen or the scrollback. Ctrl-C or Escape is a cancel.
+ * The prompt library is loaded here, where one is actually shown.
+ */
+export async function askSecret(
+  question: string,
+  options: { cancelMessage?: string } = {},
+): Promise<string> {
+  const { isCancel, password } = await import("@clack/prompts");
+  const answer = await password({
+    message: question,
+    output: process.stderr,
+  });
+  if (isCancel(answer)) throw cancelled(options.cancelMessage);
+  return answer.trim();
 }
 
 /**

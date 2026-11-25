@@ -38,7 +38,7 @@ export default class CyclesPay extends NetworkCommand {
 
     return withSession(settings, async (client) => {
       const { settlement } = await client.lowLevel();
-      const builder = settlement.pay(args.cycle as string);
+      const builder = settlement.pay(args.cycle);
       // Core's own figure: the caller never states the amount.
       const terms = await builder.action();
       const assets = await listAssets(settings, client);

@@ -155,7 +155,7 @@ Give it in one of three ways:
   ```
   `--key-file -` reads the key from stdin, for a secret manager:
   `op read op://vault/4mica/key | 4mica balance --key-file -`.
-  Typed at a terminal instead of piped, it is read without echo.
+  Typed at a terminal instead of piped, it is masked as you type.
 - **A `.env` file in the current directory**, setting
   `FOURMICA_WALLET_PRIVATE_KEY`. It is read automatically, so inside a
   scaffolded project `4mica balance` works as it is; the `4MICA_` spelling

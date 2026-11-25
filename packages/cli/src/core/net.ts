@@ -155,6 +155,11 @@ function describe(url: string): string {
  * shortcut: this wraps the global `fetch` because the SDK takes no fetch or
  * timeout option for its core and chain requests. Move it into the SDK's
  * http layer once that exists.
+ *
+ * shortcut: the transaction hash and the payment are read off the wire here
+ * because the SDK says nothing while a send is in progress: it returns the
+ * hash only with the receipt, and a payment only once the seller confirms
+ * it. A progress callback on its sends would replace both.
  */
 export function installRequestTimeout(
   timeoutSecs: number,

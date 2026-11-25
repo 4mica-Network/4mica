@@ -40,7 +40,7 @@ export default class CyclesClaim extends NetworkCommand {
 
     return withSession(settings, async (client) => {
       const { settlement } = await client.lowLevel();
-      const claim = settlement.claim(args.cycle as string);
+      const claim = settlement.claim(args.cycle);
       const builder = flags.creditor ? claim.creditor(flags.creditor) : claim;
       // Core's own figure: the caller never states the amount.
       const terms = await builder.action();

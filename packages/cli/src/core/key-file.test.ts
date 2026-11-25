@@ -5,6 +5,33 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EXIT } from "../errors.js";
 import { readKeyFile } from "./key-file.js";
 
+// What the prompt library would answer; a symbol stands for Ctrl-C.
+const CANCEL = Symbol("cancel");
+const typed = vi.fn<(options: { message: string }) => Promise<unknown>>();
+vi.mock("@clack/prompts", () => ({
+  password: (options: { message: string }) => typed(options),
+  isCancel: (value: unknown) => value === CANCEL,
+}));
+
+/** Runs `fn` as if stdin and stderr were, or were not, a terminal. */
+async function atTerminal<T>(fn: () => Promise<T>): Promise<T> {
+  const streams = [process.stdin, process.stderr] as const;
+  const before = streams.map((stream) => stream.isTTY);
+  for (const stream of streams) {
+    Object.defineProperty(stream, "isTTY", { value: true, configurable: true });
+  }
+  try {
+    return await fn();
+  } finally {
+    streams.forEach((stream, i) => {
+      Object.defineProperty(stream, "isTTY", {
+        value: before[i],
+        configurable: true,
+      });
+    });
+  }
+}
+
 const keyFile = async (content: string, mode = 0o600) => {
   const path = join(await mkdtemp(join(tmpdir(), "4mica-cli-")), "key");
   await writeFile(path, content);
@@ -98,5 +125,28 @@ describe("readKeyFile, beyond the file itself", () => {
       configurable: true,
     });
     setRuntimeFlags({});
+  });
+
+  it("asks for a typed key through a masked prompt, never an echoing one", async () => {
+    typed.mockResolvedValueOnce(` 0x${"11".repeat(32)}\n`);
+    const read = await atTerminal(() => readKeyFile("-", "flag"));
+    expect(read).toMatchObject({ key: `0x${"11".repeat(32)}` });
+    expect(typed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Wallet key",
+        output: process.stderr,
+      }),
+    );
+  });
+
+  it("is a cancel, exit 130, when the prompt is left with Ctrl-C", async () => {
+    typed.mockResolvedValueOnce(CANCEL);
+    await expect(
+      atTerminal(() => readKeyFile("-", "flag")),
+    ).rejects.toMatchObject({
+      code: "CANCELLED",
+      message: "cancelled; no key was read",
+      oclif: { exit: EXIT.cancelled },
+    });
   });
 });

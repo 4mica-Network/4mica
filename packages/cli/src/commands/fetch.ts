@@ -54,7 +54,14 @@ interface Offer {
   payTo: string;
 }
 
-/** What a 402 asks for in 4mica credit: in a header (x402 v2) or the body. */
+/**
+ * What a 402 asks for in 4mica credit: in a header (x402 v2) or the body.
+ *
+ * shortcut: mirrors how the SDK reads a 402
+ * (`packages/sdk/src/facade/protocols/x402.ts`), which it does not export.
+ * Unlike the SDK it lists an offer it cannot fully parse; nothing is paid
+ * on the strength of it, since the SDK reads the 402 again before paying.
+ */
 async function offersIn(response: Response): Promise<Offer[]> {
   const header = response.headers.get("PAYMENT-REQUIRED");
   let required: { accepts?: unknown };
@@ -277,6 +284,11 @@ export default class Fetch extends NetworkCommand {
 
     // The SDK sends the request itself and pays what it answers. It is
     // handed the 402 already in hand, so the request is not sent twice.
+    //
+    // shortcut: the SDK's `fetch` cannot be given a 402 that was already
+    // received, so its `fetch` option is passed one that answers the first
+    // call with it. An SDK that connects to core only when a url asks to be
+    // paid would let it send the request itself, from the start.
     let replay: Response | undefined = first;
     const replaying: typeof fetch = async (input, requestInit) => {
       const answer = replay;

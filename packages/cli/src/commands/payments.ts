@@ -41,7 +41,8 @@ export default class Payments extends NetworkCommand {
               : p.verified
                 ? "verified"
                 : "pending",
-          createdAt: new Date(p.createdAt * 1000),
+          // Core stamps these in milliseconds, unlike its other times.
+          createdAt: new Date(p.createdAt),
           txHash: p.txHash,
         }))
         .filter((p) => !flags.state || p.state === flags.state)

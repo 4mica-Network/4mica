@@ -61,6 +61,5 @@ export function requireCycleId(value: string): string {
 
 export const cycleArg = Args.custom<string>({
   description: "the cycle, as `4mica cycles` names it (0x…:<start>)",
-  required: true,
   parse: async (value) => requireCycleId(value),
-})();
+})({ required: true });

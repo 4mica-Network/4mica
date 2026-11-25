@@ -176,10 +176,10 @@ export default class Status extends NetworkCommand {
     const state = (p: Probe) => (p.up ? out.green("up") : out.red("down"));
     const rows = [["core", settings.rpcUrl.value, state(core), core.detail]];
     rows.push(
-      facilitator
+      facilitatorUrl && facilitator
         ? [
             "facilitator",
-            facilitatorUrl as string,
+            facilitatorUrl,
             state(facilitator),
             facilitator.up ? schemes.join(", ") : facilitator.detail,
           ]

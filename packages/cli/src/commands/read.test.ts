@@ -43,7 +43,7 @@ const received = [
     verified: true,
     finalized: false,
     failed: false,
-    createdAt: 1_767_225_600,
+    createdAt: 1_767_225_600_000,
     txHash: "0xolder",
   },
   {
@@ -52,7 +52,7 @@ const received = [
     verified: true,
     finalized: true,
     failed: false,
-    createdAt: 1_767_229_200,
+    createdAt: 1_767_229_200_000,
     txHash: "0xnewer",
   },
 ];
@@ -229,7 +229,12 @@ describe("payments", () => {
       "0xolder",
     ]);
     expect(payments).toMatchObject([
-      { state: "finalized", amountRaw: "250000" },
+      // Core's time is in milliseconds: this is 2026, not the year 57983.
+      {
+        state: "finalized",
+        amountRaw: "250000",
+        createdAt: "2026-01-01T01:00:00.000Z",
+      },
       { state: "verified", amountRaw: "100000" },
     ]);
     pinJson("payments", payments);

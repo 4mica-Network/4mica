@@ -70,7 +70,7 @@ The CLI uses the Base Sepolia testnet unless told otherwise. Real funds move onl
 
 A wallet is a private key. The CLI takes it from the first of these that has one:
 
-1. `--key-file <path>`, a file holding only the key. `-` reads it from standard input; typed at a terminal, it is read without echo.
+1. `--key-file <path>`, a file holding only the key. `-` reads it from standard input; typed at a terminal, it is masked as you type.
 2. `FOURMICA_WALLET_PRIVATE_KEY`, exported in the shell. Meant for CI and containers: an exported key is visible to every program the shell starts. In an interactive shell prefer a key file.
 3. A `.env` file in the current directory, read automatically. `--dotenv <path>` reads another file instead.
 4. The key file named in the config file. `wallets create` and `wallets use` set it.
