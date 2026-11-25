@@ -23,7 +23,14 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import {
@@ -41,12 +48,16 @@ import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
 import { links } from "@/lib/links";
 import { chainDefinition, NETWORK_OPTIONS } from "@/lib/networks";
 import {
-  connectWallet,
-  currentAccount,
+  connectAccounts,
+  currentAccounts,
   currentChainId,
+  detectedWallets,
   hasInjectedWallet,
+  NoAccountsError,
   NoWalletError,
   requestAccountSwitch,
+  selectWallet,
+  subscribeWallets,
   switchChain,
   WalletRejectedError,
   watchWallet,
@@ -63,7 +74,31 @@ const PENDING_KEY = "createWallet";
 const TOTAL_STEPS = CREATE_STEP_FIELDS.length;
 const ISSUE_STEPS: Record<string, number> = { signature: 0, nonce: 0 };
 
+const INSTALL_LINKS = [
+  { name: "MetaMask", href: "https://metamask.io/download" },
+  { name: "Rabby", href: "https://rabby.io" },
+];
+
 const suggestedLabel = (address: string) => `Wallet ${shortenAddress(address)}`;
+
+function InstallLinks() {
+  return (
+    <>
+      {INSTALL_LINKS.map((link) => (
+        <a
+          key={link.name}
+          href={link.href}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="flex items-center gap-1 text-brand text-xs hover:underline"
+        >
+          {link.name}
+          <ArrowUpRight className="h-3 w-3" />
+        </a>
+      ))}
+    </>
+  );
+}
 
 export function CreateWalletModal({
   isOpen,
@@ -86,6 +121,10 @@ export function CreateWalletModal({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [walletChainId, setWalletChainId] = useState<number | null>(null);
+  const [walletId, setWalletId] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [isSameAccount, setIsSameAccount] = useState(false);
+  const wallets = useSyncExternalStore(subscribeWallets, detectedWallets);
 
   const form = useForm<CreateWalletValues>({
     resolver: zodResolver(createWalletSchema),
@@ -99,7 +138,15 @@ export function CreateWalletModal({
     },
   });
 
-  const { handleSubmit, setValue, trigger, reset, setError, control } = form;
+  const {
+    handleSubmit,
+    setValue,
+    getValues,
+    trigger,
+    reset,
+    setError,
+    control,
+  } = form;
   const [address, network, label] = useWatch({
     control,
     name: ["address", "network", "label"],
@@ -130,19 +177,25 @@ export function CreateWalletModal({
     setStep(0);
     setConnectError(null);
     setWalletChainId(null);
+    setWalletId(null);
+    setAccounts([]);
+    setIsSameAccount(false);
+    selectWallet(null);
     setIsConnecting(false);
     setIsSwitching(false);
     dispatch(clearWalletIssues());
 
     void (async () => {
-      const [account, chainId] = await Promise.all([
-        currentAccount(),
+      const [shared, chainId] = await Promise.all([
+        currentAccounts(),
         currentChainId(),
       ]);
       if (session.current !== opened) {
         return;
       }
+      const [account] = shared;
       if (account) {
+        setAccounts(shared);
         adopt(account, chainId);
       } else {
         setWalletChainId(chainId);
@@ -161,16 +214,25 @@ export function CreateWalletModal({
       return;
     }
     return watchWallet({
-      onAccountsChanged: (accounts) => {
-        const [next] = accounts ?? [];
-        if (next) {
-          const current = session.current;
-          void currentChainId().then((chainId) => {
-            if (session.current === current) {
-              adopt(next, chainId);
-            }
-          });
-        } else {
+      onAccountsChanged: (shared) => {
+        const [next] = shared;
+        setIsSameAccount(false);
+        setAccounts((previous) => {
+          // Keep an account the user picked here unless the wallet itself
+          // moved to a different one or stopped sharing it.
+          const walletMoved = previous[0] !== next;
+          const stillShared = shared.includes(getValues("address"));
+          if (next && (walletMoved || !stillShared)) {
+            const current = session.current;
+            void currentChainId().then((chainId) => {
+              if (session.current === current) {
+                adopt(next, chainId);
+              }
+            });
+          }
+          return shared;
+        });
+        if (!next) {
           setValue("address", "", { shouldValidate: false });
           setWalletChainId(null);
         }
@@ -185,17 +247,21 @@ export function CreateWalletModal({
         }
       },
     });
-  }, [isOpen, adopt, setValue]);
+    // walletId: re-subscribe to the provider the user just picked.
+  }, [isOpen, adopt, setValue, getValues, walletId]);
 
-  const handleConnect = async () => {
+  const handleConnect = async (id: string | null) => {
     const current = session.current;
     setConnectError(null);
     setIsConnecting(true);
+    selectWallet(id);
+    setWalletId(id);
     try {
-      const address = await connectWallet();
+      const shared = await connectAccounts();
       const chainId = await currentChainId();
       if (session.current === current) {
-        adopt(address, chainId);
+        setAccounts(shared);
+        adopt(shared[0], chainId);
       }
     } catch (cause) {
       if (session.current !== current) {
@@ -203,6 +269,8 @@ export function CreateWalletModal({
       }
       if (cause instanceof NoWalletError) {
         setConnectError(t("wallet.create.verify.noWallet"));
+      } else if (cause instanceof NoAccountsError) {
+        setConnectError(t("wallet.create.verify.noAccounts"));
       } else if (cause instanceof WalletRejectedError) {
         setConnectError(t("wallet.create.verify.rejected"));
       } else {
@@ -218,12 +286,21 @@ export function CreateWalletModal({
   const handleSwitchAccount = async () => {
     const current = session.current;
     setConnectError(null);
+    setIsSameAccount(false);
     setIsConnecting(true);
     try {
-      const address = await requestAccountSwitch();
+      const shared = await requestAccountSwitch();
       const chainId = await currentChainId();
       if (session.current === current) {
-        adopt(address, chainId);
+        // Wallets list the account they had selected first, so the one just
+        // added is whichever differs from what is already shown.
+        const next = shared.find((account) => account !== address);
+        setAccounts(shared);
+        if (next) {
+          adopt(next, chainId);
+        } else {
+          setIsSameAccount(true);
+        }
       }
     } catch (cause) {
       if (session.current !== current) {
@@ -441,6 +518,52 @@ export function CreateWalletModal({
                   </button>
                 </div>
 
+                {isSameAccount && (
+                  <p
+                    className="text-ink-muted text-xs"
+                    role="status"
+                    data-testid="create-wallet-same-account"
+                  >
+                    {t("wallet.create.verify.sameAccount")}
+                  </p>
+                )}
+
+                {accounts.length > 1 && (
+                  <div className="flex flex-col gap-2">
+                    <p
+                      id={`${formId}-accounts-label`}
+                      className="text-ink-subtle text-xs"
+                    >
+                      {t("wallet.create.connect.accountsLabel")}
+                    </p>
+                    <fieldset
+                      aria-labelledby={`${formId}-accounts-label`}
+                      className="m-0 flex min-w-0 flex-wrap gap-2 border-0 p-0"
+                    >
+                      {accounts.map((account) => (
+                        <Button
+                          key={account}
+                          type="button"
+                          intent={account === address ? "soft" : "outline"}
+                          size="sm"
+                          className="btn-no-lift"
+                          aria-pressed={account === address}
+                          title={account}
+                          onClick={() => {
+                            setIsSameAccount(false);
+                            adopt(account, walletChainId);
+                          }}
+                          data-testid={`create-wallet-account-${account}`}
+                        >
+                          <span className="font-mono text-xs">
+                            {shortenAddress(account)}
+                          </span>
+                        </Button>
+                      ))}
+                    </fieldset>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-ink-subtle text-xs">
                     {t("wallet.create.connect.networkLabel")}
@@ -509,48 +632,51 @@ export function CreateWalletModal({
                 )}
               </div>
             ) : hasInjectedWallet() ? (
-              <Button
-                type="button"
-                intent="outline"
-                size="md"
-                block
-                onClick={handleConnect}
-                disabled={isConnecting}
-                data-testid="create-wallet-connect"
-              >
-                <span className="flex items-center justify-center gap-2 text-sm">
-                  {isConnecting ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <WalletIcon className="h-4 w-4" />
-                  )}
-                  {t("wallet.create.verify.connect")}
-                </span>
-              </Button>
+              <div className="flex flex-col gap-2">
+                {(wallets.length > 0 ? wallets : [null]).map((wallet) => (
+                  <Button
+                    key={wallet?.id ?? "injected"}
+                    type="button"
+                    intent="invert"
+                    size="md"
+                    block
+                    className="btn-no-lift"
+                    onClick={() => handleConnect(wallet?.id ?? null)}
+                    disabled={isConnecting}
+                    data-testid="create-wallet-connect"
+                  >
+                    <span className="flex items-center justify-center gap-2 text-sm">
+                      {isConnecting && walletId === (wallet?.id ?? null) ? (
+                        <Spinner size="sm" />
+                      ) : wallet?.icon ? (
+                        <img
+                          src={wallet.icon}
+                          alt=""
+                          className="h-4 w-4 rounded-sm"
+                        />
+                      ) : (
+                        <WalletIcon className="h-4 w-4" />
+                      )}
+                      {wallet
+                        ? t("wallet.create.verify.connectNamed", {
+                            wallet: wallet.name,
+                          })
+                        : t("wallet.create.verify.connect")}
+                    </span>
+                  </Button>
+                ))}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ink-subtle text-xs">
+                  <span>{t("wallet.create.verify.getWallet")}</span>
+                  <InstallLinks />
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col gap-2 rounded-lg border border-overlay/10 border-dashed px-4 py-4 text-center">
                 <p className="text-ink-body text-sm">
                   {t("wallet.create.verify.noWallet")}
                 </p>
                 <div className="flex justify-center gap-4">
-                  <a
-                    href="https://metamask.io/download"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center gap-1 text-brand text-xs hover:underline"
-                  >
-                    MetaMask
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                  <a
-                    href="https://rabby.io"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center gap-1 text-brand text-xs hover:underline"
-                  >
-                    Rabby
-                    <ArrowUpRight className="h-3 w-3" />
-                  </a>
+                  <InstallLinks />
                 </div>
               </div>
             )}

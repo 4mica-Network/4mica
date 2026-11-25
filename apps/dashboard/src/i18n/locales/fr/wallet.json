@@ -89,5 +89,10 @@
   "wallet.errorState.title": "Impossible de charger vos portefeuilles",
   "wallet.errorState.retry": "Réessayer",
   "store.wallet.sessionExpired": "Votre session a expiré. Actualisez la page et reconnectez-vous.",
-  "wallet.create.connect.networkPrompt": "Un portefeuille est identifié par son adresse et son réseau : une même adresse peut donc être ajoutée une fois par réseau. Choisissez le réseau de celui-ci."
+  "wallet.create.connect.networkPrompt": "Un portefeuille est identifié par son adresse et son réseau : une même adresse peut donc être ajoutée une fois par réseau. Choisissez le réseau de celui-ci.",
+  "wallet.create.verify.connectNamed": "Connecter {{wallet}}",
+  "wallet.create.verify.noAccounts": "Votre portefeuille n’a partagé aucun compte. Déverrouillez-le ou terminez sa configuration, puis réessayez.",
+  "wallet.create.verify.getWallet": "Pas encore de portefeuille ? Installez-en un, puis rechargez cette page :",
+  "wallet.create.connect.accountsLabel": "Comptes que votre portefeuille a partagés avec 4Mica",
+  "wallet.create.verify.sameAccount": "Votre portefeuille est toujours sur ce compte. Choisissez un autre compte dans l’extension de votre portefeuille et il sera mis à jour ici."
 }

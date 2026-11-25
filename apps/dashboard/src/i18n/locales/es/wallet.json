@@ -89,5 +89,10 @@
   "wallet.errorState.title": "No se pudieron cargar sus billeteras",
   "wallet.errorState.retry": "Intentar de nuevo",
   "store.wallet.sessionExpired": "Su sesión ha caducado. Actualice la página e inicie sesión de nuevo.",
-  "wallet.create.connect.networkPrompt": "Una billetera se identifica por su dirección y su red, así que la misma dirección se puede añadir una vez por red. Elija la red para esta."
+  "wallet.create.connect.networkPrompt": "Una billetera se identifica por su dirección y su red, así que la misma dirección se puede añadir una vez por red. Elija la red para esta.",
+  "wallet.create.verify.connectNamed": "Conectar {{wallet}}",
+  "wallet.create.verify.noAccounts": "Su billetera no compartió ninguna cuenta. Desbloquéela o termine de configurarla y vuelva a intentarlo.",
+  "wallet.create.verify.getWallet": "¿Aún no tiene billetera? Instale una y recargue esta página:",
+  "wallet.create.connect.accountsLabel": "Cuentas que su billetera compartió con 4Mica",
+  "wallet.create.verify.sameAccount": "Su billetera sigue en esta cuenta. Elija otra cuenta en la extensión de su billetera y se actualizará aquí."
 }

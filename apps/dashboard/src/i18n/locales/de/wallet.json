@@ -89,5 +89,10 @@
   "wallet.errorState.title": "Ihre Wallets konnten nicht geladen werden",
   "wallet.errorState.retry": "Erneut versuchen",
   "store.wallet.sessionExpired": "Ihre Sitzung ist abgelaufen. Aktualisieren Sie die Seite und melden Sie sich erneut an.",
-  "wallet.create.connect.networkPrompt": "Eine Wallet wird durch ihre Adresse und ihr Netzwerk identifiziert, daher kann dieselbe Adresse einmal pro Netzwerk hinzugefügt werden. Wählen Sie das Netzwerk für diese Wallet."
+  "wallet.create.connect.networkPrompt": "Eine Wallet wird durch ihre Adresse und ihr Netzwerk identifiziert, daher kann dieselbe Adresse einmal pro Netzwerk hinzugefügt werden. Wählen Sie das Netzwerk für diese Wallet.",
+  "wallet.create.verify.connectNamed": "{{wallet}} verbinden",
+  "wallet.create.verify.noAccounts": "Ihre Wallet hat kein Konto freigegeben. Entsperren Sie sie oder schließen Sie die Einrichtung ab und versuchen Sie es erneut.",
+  "wallet.create.verify.getWallet": "Noch keine Wallet? Installieren Sie eine und laden Sie diese Seite neu:",
+  "wallet.create.connect.accountsLabel": "Konten, die Ihre Wallet mit 4Mica geteilt hat",
+  "wallet.create.verify.sameAccount": "Ihre Wallet verwendet weiterhin dieses Konto. Wählen Sie in Ihrer Wallet-Erweiterung ein anderes Konto, dann wird es hier aktualisiert."
 }

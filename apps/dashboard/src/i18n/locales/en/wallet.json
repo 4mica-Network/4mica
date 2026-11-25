@@ -89,5 +89,10 @@
   "wallet.errorState.title": "Couldn't load your wallets",
   "wallet.errorState.retry": "Try again",
   "store.wallet.sessionExpired": "Your session has expired. Refresh the page and sign in again.",
-  "wallet.create.connect.networkPrompt": "A wallet is identified by its address and network, so the same address can be added once per network. Pick the network for this one."
+  "wallet.create.connect.networkPrompt": "A wallet is identified by its address and network, so the same address can be added once per network. Pick the network for this one.",
+  "wallet.create.verify.connectNamed": "Connect {{wallet}}",
+  "wallet.create.verify.noAccounts": "Your wallet didn't share an account. Unlock it or finish setting it up, then try again.",
+  "wallet.create.verify.getWallet": "No wallet yet? Install one, then reload this page:",
+  "wallet.create.connect.accountsLabel": "Accounts your wallet shared with 4Mica",
+  "wallet.create.verify.sameAccount": "Your wallet is still on this account. Choose another account in your wallet extension and it will update here."
 }
