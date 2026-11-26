@@ -3,9 +3,10 @@ import { FUNDING_DOCS } from "./core/links.js";
 import type { TransportFailure } from "./core/net.js";
 import {
   anythingSent,
-  broadcastLost,
   checkSuggestions,
+  explorerLink,
   inFlightSummary,
+  sending,
 } from "./core/outcome.js";
 import { printable, toPlain } from "./ui/output.js";
 
@@ -241,6 +242,27 @@ function outcomeUnknownError(
   );
 }
 
+/**
+ * The SDK's report of a transaction the wallet sent itself and lost track
+ * of. `stage` says where: the node never answered the broadcast, or took it
+ * and its receipt did not come. Said in the command's terms ("the deposit of
+ * 5 USDC") with a link to follow; the SDK's own wording is in the `--debug`
+ * trace.
+ */
+function transactionInDoubt(error: Error): CliError {
+  const { stage, txHash } = error as { stage?: unknown; txHash?: unknown };
+  const what = sending() ?? "a transaction";
+  const message =
+    stage === "receipt" && typeof txHash === "string"
+      ? `${what} was sent as ${explorerLink(txHash)}, and its receipt was not seen in time; it may still be mined`
+      : `${what} was sent, and the chain's node gave no usable answer; it may or may not have been accepted`;
+  return failure(message, {
+    code: "OUTCOME_UNKNOWN",
+    retryable: false,
+    suggestions: checkSuggestions(),
+  });
+}
+
 /** oclif's parse errors, by class name: what the user typed wrong. */
 const PARSE_CODES: Record<string, string> = {
   ArgInvalidOptionError: "BAD_ARG_VALUE",
@@ -381,21 +403,19 @@ export function toCliError(
   const lineage = ancestry(error);
   const unanswered =
     transport && isAbout(error, transport) ? transport : undefined;
+  if (lineage.includes("TransactionOutcomeUnknownError")) {
+    return transactionInDoubt(error);
+  }
   if (lineage.includes("OutcomeUnknownError")) {
     return outcomeUnknownError(error, unanswered);
   }
   const sdk = lineage.includes("FourMicaError");
   if (anythingSent()) {
-    // A transaction was handed to the node and its answer never came. The
-    // SDK reports that as an ordinary failed write ("deposit failed: the
-    // request took too long"), which reads as "nothing happened".
-    if (broadcastLost()) return outcomeUnknownError(error, unanswered);
     const system = systemError(error);
     if (system?.code === "CANCELLED") return outcomeUnknownError(error);
-    // A request that got no answer after something left, or an error from
-    // below the SDK (viem's receipt wait timing out, say): either way the
-    // transaction may be out. The SDK's own typed errors, such as a revert,
-    // say what happened, and stay definite.
+    // A request that got no answer after something left, or an error that
+    // is not the SDK's own: either way it may be out. The SDK's typed
+    // errors, such as a revert, say what happened, and stay definite.
     if (unanswered || (!sdk && !system)) {
       return outcomeUnknownError(error, unanswered);
     }

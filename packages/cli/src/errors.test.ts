@@ -267,25 +267,68 @@ describe("once something has been sent", () => {
     resetOutcome();
   });
 
-  it("does not call a write whose broadcast went unanswered a plain failure", async () => {
-    const { beginSending, recordLostBroadcast, resetOutcome } = await import(
-      "./core/outcome.js"
-    );
-    resetOutcome();
-    beginSending("the deposit of 5 USDC", ["4mica balance"]);
-    recordLostBroadcast();
-    class ContractError extends FourMicaError {}
-    const told = toCliError(
-      new ContractError(
-        "depositStablecoin failed: The request took too long to respond.",
-      ),
-    ) as { code: string; message: string; retryable: boolean };
-    expect(told.code).toBe("OUTCOME_UNKNOWN");
-    expect(told.retryable).toBe(false);
-    expect(told.message).toContain(
-      "the deposit of 5 USDC may already have been sent",
-    );
-    resetOutcome();
+  describe("a transaction the SDK lost track of", () => {
+    // The SDK's class, with its lineage: one of its unknown outcomes.
+    class SponsorshipError extends FourMicaError {}
+    class OutcomeUnknownError extends SponsorshipError {}
+    class TransactionOutcomeUnknownError extends OutcomeUnknownError {
+      constructor(
+        message: string,
+        readonly stage: "broadcast" | "receipt",
+        readonly txHash?: string,
+      ) {
+        super(message);
+      }
+    }
+    const HASH = `0x${"ab".repeat(32)}`;
+    const told = (error: Error) =>
+      toCliError(error) as {
+        code: string;
+        message: string;
+        retryable: boolean;
+        suggestions: string[];
+      };
+
+    it("says a broadcast nobody answered may have been accepted", async () => {
+      const { beginSending, resetOutcome } = await import("./core/outcome.js");
+      resetOutcome();
+      beginSending("the deposit of 5 USDC", ["4mica balance"]);
+      const error = told(
+        new TransactionOutcomeUnknownError(
+          "depositStablecoin: the transaction was sent and no usable answer came back (HTTP request failed.); it may or may not have been accepted",
+          "broadcast",
+        ),
+      );
+      expect(error.code).toBe("OUTCOME_UNKNOWN");
+      expect(error.retryable).toBe(false);
+      // Once, in the command's words, not the SDK's call name.
+      expect(error.message).toBe(
+        "the deposit of 5 USDC was sent, and the chain's node gave no usable answer; it may or may not have been accepted",
+      );
+      expect(error.suggestions.join(" ")).toContain("4mica balance");
+      resetOutcome();
+    });
+
+    it("links the transaction whose receipt did not come", async () => {
+      const { beginSending, resetOutcome, setExplorer } = await import(
+        "./core/outcome.js"
+      );
+      resetOutcome();
+      setExplorer("https://scan.example");
+      beginSending("the deposit of 5 USDC", ["4mica balance"]);
+      const error = told(
+        new TransactionOutcomeUnknownError(
+          `transaction ${HASH} was sent, but its receipt was not seen (Timed out); it may still be mined`,
+          "receipt",
+          HASH,
+        ),
+      );
+      expect(error.code).toBe("OUTCOME_UNKNOWN");
+      expect(error.message).toBe(
+        `the deposit of 5 USDC was sent as https://scan.example/tx/${HASH}, and its receipt was not seen in time; it may still be mined`,
+      );
+      resetOutcome();
+    });
   });
 
   it("never reports a timeout after a send as try again", async () => {

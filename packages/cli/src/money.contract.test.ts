@@ -185,7 +185,9 @@ describe("a deposit the wallet sends itself", () => {
     expect(run.code).toBe(1);
     const { error } = parseJson(run) as Failure;
     expect(error.code).toBe("OUTCOME_UNKNOWN");
-    expect(error.message).toContain("may already have been sent");
+    expect(error.message).toBe(
+      "the deposit of 0.01 ETH was sent, and the chain's node gave no usable answer; it may or may not have been accepted",
+    );
     const advice = (error.suggestions ?? []).join(" ");
     expect(advice).toContain("do not run it again yet");
     expect(advice).toContain("4mica balance");
