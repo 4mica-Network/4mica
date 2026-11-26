@@ -263,7 +263,92 @@ def test_default_scheme_fails_when_a_core_the_caller_named_is_down(monkeypatch):
         )
 
 
-def test_the_given_key_and_core_win_over_the_environment(monkeypatch):
+KEY = "0x" + "11" * 32
+
+# What a FourMica session in the same process, on Base mainnet, is set up with.
+MAINNET_ENV = {
+    "FOURMICA_NETWORK": "base",
+    "FOURMICA_WALLET_PRIVATE_KEY": "0x" + "22" * 32,
+    "FOURMICA_BEARER_TOKEN": "mainnet-token",
+    "FOURMICA_CONTRACT_ADDRESS": "0x" + "c0" * 20,
+    "FOURMICA_ETHEREUM_HTTP_RPC_URL": "https://mainnet.rpc.example",
+    "FOURMICA_FACILITATOR_URL": "https://facilitator.example",
+    "FOURMICA_AUTH_URL": "https://auth.example",
+}
+
+
+def _environment(monkeypatch, values):
+    import os
+
+    for name in list(os.environ):
+        if name.startswith(("FOURMICA_", "4MICA_")):
+            monkeypatch.delenv(name)
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+
+def test_a_payer_takes_nothing_from_an_environment_that_describes_another_core(
+    monkeypatch,
+):
+    _environment(monkeypatch, MAINNET_ENV)
+    cfg = FourMicaEvmScheme(KEY)._config(SEPOLIA_CORE)
+
+    assert cfg.rpc_url == SEPOLIA_CORE
+    assert cfg.wallet_private_key == KEY
+    # Mainnet's contract, chain RPC and facilitator are not Sepolia's, and its
+    # bearer token is not sent to Sepolia's core, nor Sepolia's sign-in to
+    # mainnet's auth URL.
+    assert cfg.contract_address is None
+    assert cfg.ethereum_http_rpc_url is None
+    assert cfg.facilitator_url is None
+    assert cfg.bearer_token is None
+    assert cfg.auth.auth_url == SEPOLIA_CORE
+
+
+def test_the_payer_for_the_core_the_environment_describes_takes_its_settings(
+    monkeypatch,
+):
+    _environment(monkeypatch, MAINNET_ENV)
+    cfg = FourMicaEvmScheme(KEY)._config(MAINNET_CORE)
+
+    assert cfg.rpc_url == MAINNET_CORE
+    # The key the scheme was given still wins.
+    assert cfg.wallet_private_key == KEY
+    assert cfg.bearer_token == "mainnet-token"
+    assert cfg.contract_address.lower() == "0x" + "c0" * 20
+    assert cfg.ethereum_http_rpc_url == "https://mainnet.rpc.example"
+    assert cfg.facilitator_url == "https://facilitator.example"
+
+
+def test_an_environment_naming_no_core_describes_the_default_one(monkeypatch):
+    from fourmica_sdk import ConfigBuilder
+
+    _environment(monkeypatch, {"FOURMICA_BEARER_TOKEN": "token"})
+    default_core = ConfigBuilder().wallet_private_key(KEY).build().rpc_url
+    other_core = MAINNET_CORE if default_core.rstrip("/") == SEPOLIA_CORE else SEPOLIA_CORE
+    scheme = FourMicaEvmScheme(KEY)
+
+    assert scheme._config(default_core).bearer_token == "token"
+    assert scheme._config(other_core).bearer_token is None
+
+
+def test_a_self_hosted_core_takes_the_settings_of_the_rpc_url_that_names_it(
+    monkeypatch,
+):
+    local = "http://localhost:3000"
+    _environment(
+        monkeypatch,
+        {"FOURMICA_RPC_URL": local, "FOURMICA_CONTRACT_ADDRESS": "0x" + "c0" * 20},
+    )
+    scheme = FourMicaEvmScheme(KEY, core_urls={"eip155:31337": local})
+
+    assert scheme._config(local).contract_address.lower() == "0x" + "c0" * 20
+    # The same core, written with a trailing slash.
+    assert scheme._config(local + "/").contract_address is not None
+    assert scheme._config(SEPOLIA_CORE).contract_address is None
+
+
+def test_each_payer_connects_with_its_own_core_and_the_given_key(monkeypatch):
     import asyncio
     from types import SimpleNamespace
 
@@ -277,16 +362,13 @@ def test_the_given_key_and_core_win_over_the_environment(monkeypatch):
 
     monkeypatch.setattr(client_scheme.FourMicaClient, "connect", connect)
     monkeypatch.setattr(client_scheme.X402Flow, "from_client", lambda client: StubFlow())
-    # What a FourMica session in the same process would be configured with.
-    monkeypatch.setenv("FOURMICA_NETWORK", "base")
-    monkeypatch.setenv("FOURMICA_WALLET_PRIVATE_KEY", "0x" + "22" * 32)
-    monkeypatch.setenv("FOURMICA_BEARER_TOKEN", "from-env")
+    _environment(monkeypatch, MAINNET_ENV)
 
-    scheme = FourMicaEvmScheme("0x" + "11" * 32)
+    scheme = FourMicaEvmScheme(KEY)
     asyncio.run(scheme._connect(SEPOLIA_CORE))
+    asyncio.run(scheme._connect(MAINNET_CORE))
 
-    (cfg,) = configs
-    assert cfg.rpc_url == SEPOLIA_CORE
-    assert cfg.wallet_private_key == "0x" + "11" * 32
-    # Settings the scheme takes no argument for still come from the environment.
-    assert cfg.bearer_token == "from-env"
+    sepolia, mainnet = configs
+    assert (sepolia.rpc_url, mainnet.rpc_url) == (SEPOLIA_CORE, MAINNET_CORE)
+    assert sepolia.wallet_private_key == mainnet.wallet_private_key == KEY
+    assert (sepolia.bearer_token, mainnet.bearer_token) == (None, "mainnet-token")

@@ -14,6 +14,7 @@ from fourmica_sdk import (
     Client as FourMicaClient,
 )
 from fourmica_sdk import (
+    Config,
     ConfigBuilder,
     X402Flow,
     X402PaymentRequired,
@@ -164,20 +165,23 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
         # signed payment. Sync, so both x402Client and x402ClientSync run it.
         self.scheme_hooks = {"on_payment_response": self._on_payment_response}
 
+    def _config(self, rpc_url: str) -> Config:
+        """The key this scheme was given, on the core at *rpc_url*.
+
+        ``FOURMICA_*`` describe one core: the contract address, Ethereum RPC,
+        facilitator, auth URL and bearer token there are that core's. The
+        payer for that core takes them. Every other payer takes nothing from
+        the environment, or it would sign against another network's contract
+        and send that core's bearer token to this one."""
+        described = ConfigBuilder().from_env().wallet_private_key(self._private_key)
+        if described.build().rpc_url.rstrip("/") == rpc_url.rstrip("/"):
+            return described.rpc_url(rpc_url).build()
+        return ConfigBuilder().wallet_private_key(self._private_key).rpc_url(rpc_url).build()
+
     async def _connect(self, rpc_url: str) -> _Payer:
         _ensure_ssl_certs()
         _patch_web3_ssl_context()
-        # The environment first, so the key and the core this scheme was given
-        # win over FOURMICA_WALLET_PRIVATE_KEY, FOURMICA_NETWORK and
-        # FOURMICA_RPC_URL: each network's payer must sign against its own core.
-        cfg = (
-            ConfigBuilder()
-            .from_env()
-            .wallet_private_key(self._private_key)
-            .rpc_url(rpc_url)
-            .build()
-        )
-        client = await FourMicaClient.connect(cfg)
+        client = await FourMicaClient.connect(self._config(rpc_url))
         return _Payer(flow=X402Flow.from_client(client), payment=client.payment)
 
     async def _get_payer_async(self, rpc_url: str) -> _Payer:

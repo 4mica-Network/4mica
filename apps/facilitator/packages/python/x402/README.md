@@ -91,6 +91,12 @@ To pay on a self-hosted core, name it per network:
 `FourMicaEvmScheme("0xYourPrivateKey", core_urls={"eip155:84532": "http://localhost:3000"})`.
 A seller that advertises `extra.rpcUrl` in its requirements still takes precedence.
 
+The key and the core are the ones you pass. `FOURMICA_*` variables describe one
+core (`FOURMICA_NETWORK` or `FOURMICA_RPC_URL`, the default network when neither is
+set), and only the payer for that core takes the rest of them: the contract address,
+Ethereum RPC, facilitator, auth URL and bearer token. Payers for other networks take
+nothing from the environment.
+
 ## Refusals
 
 When the facilitator refuses a settlement, the seller answers `402` with the
