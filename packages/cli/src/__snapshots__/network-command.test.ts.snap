@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a key-file in the config that no longer exists > is not read when a key comes from a .env or --key-file > json shape: whoami 1`] = `
+{
+  "address": "string",
+  "facilitatorUrl": {
+    "source": "string",
+    "value": "string",
+  },
+  "key": {
+    "file": "string",
+    "source": "string",
+  },
+  "network": {
+    "source": "string",
+    "value": "string",
+  },
+  "rpcUrl": {
+    "source": "string",
+    "value": "string",
+  },
+}
+`;

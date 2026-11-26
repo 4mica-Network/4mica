@@ -1,0 +1,167 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`balance > shows every asset, and names the network > json shape: balance 1`] = `
+[
+  {
+    "asset": {
+      "address": "string",
+      "decimals": "number",
+      "symbol": "string",
+    },
+    "available": "string",
+    "locked": "string",
+    "network": "string",
+    "raw": {
+      "available": "string",
+      "locked": "string",
+      "total": "string",
+    },
+    "total": "string",
+  },
+]
+`;
+
+exports[`config get > prints a setting that is in the file > json shape: config get 1`] = `
+{
+  "key": "string",
+  "value": "string",
+}
+`;
+
+exports[`cycles > shows the open cycle of each asset and what is unconfirmed > json shape: cycles 1`] = `
+[
+  {
+    "asset": "string",
+    "assetAddress": "string",
+    "cycle": "string",
+    "cycleId": "string",
+    "periodEnd": "string",
+    "periodStart": "string",
+    "unconfirmed": "number",
+    "unconfirmedLimit": "number",
+  },
+]
+`;
+
+exports[`dashboard > prints the address, and opens nothing with --no-open > json shape: dashboard 1`] = `
+{
+  "url": "string",
+}
+`;
+
+exports[`guarantees verify > accepts a receipt the network's signer signed, without a wallet > json shape: guarantees verify 1`] = `
+{
+  "amountRaw": "string",
+  "asset": "string",
+  "cycleId": "string",
+  "genuine": "boolean",
+  "payer": "string",
+  "recipient": "string",
+  "reqId": "string",
+  "signer": "string",
+  "timestamp": "string",
+}
+`;
+
+exports[`networks > lists every network and says which is the default > json shape: networks 1`] = `
+[
+  {
+    "caip2": "string",
+    "chainId": "number",
+    "default": "boolean",
+    "explorerUrl": "string",
+    "label": "string",
+    "name": "string",
+    "nativeSymbol": "string",
+    "rpcUrl": "string",
+    "testnet": "boolean",
+  },
+]
+`;
+
+exports[`payments > lists what the wallet was paid, newest first > json shape: payments 1`] = `
+[
+  {
+    "amountRaw": "string",
+    "createdAt": "string",
+    "from": "string",
+    "state": "string",
+    "txHash": "string",
+  },
+]
+`;
+
+exports[`status > reports core and the facilitator up, and what the facilitator takes > json shape: status 1`] = `
+{
+  "core": {
+    "detail": "string",
+    "up": "boolean",
+    "url": "string",
+  },
+  "facilitator": {
+    "detail": "string",
+    "schemes": [
+      "string",
+    ],
+    "up": "boolean",
+    "url": "string",
+  },
+  "local": [
+    {
+      "check": "string",
+      "detail": "string",
+      "ok": "boolean",
+    },
+  ],
+  "network": "string",
+}
+`;
+
+exports[`status > says whether the wallet in use is funded and has collateral > json shape: status (with a wallet) 1`] = `
+{
+  "core": {
+    "detail": "string",
+    "up": "boolean",
+    "url": "string",
+  },
+  "facilitator": {
+    "detail": "string",
+    "schemes": [
+      "string",
+    ],
+    "up": "boolean",
+    "url": "string",
+  },
+  "local": [
+    {
+      "check": "string",
+      "detail": "string",
+      "ok": "boolean",
+    },
+  ],
+  "network": "string",
+  "wallet": {
+    "address": "string",
+    "collateral": [
+      "string",
+    ],
+    "holds": [
+      "string",
+    ],
+  },
+}
+`;
+
+exports[`tokens > lists what core accepts, without a wallet > json shape: tokens 1`] = `
+{
+  "chainId": "number",
+  "network": "string",
+  "tokens": [
+    {
+      "address": "string",
+      "decimals": "number",
+      "symbol": "string",
+    },
+  ],
+}
+`;

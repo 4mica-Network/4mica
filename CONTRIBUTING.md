@@ -43,7 +43,7 @@ This is a pnpm + Turbo monorepo.
 │   └── dashboard            # Vite + React dashboard (manage agents, txns, whitelist)
 ├── packages
 │   ├── sdk                  # @4mica/sdk — universal x402 payment SDK
-│   ├── cli                  # @4mica/cli — the `4mica` scaffolding CLI
+│   ├── cli                  # @4mica/cli — the `4mica` CLI: scaffolding and wallet commands
 │   ├── ui                   # @4mica/ui — shared React component library
 │   ├── tailwind-config      # Shared Tailwind v4 preset + tokens
 │   ├── tsconfig             # Shared TypeScript configs
@@ -100,22 +100,57 @@ Build it, then run the compiled binary:
 
 ```bash
 pnpm --filter @4mica/cli build
-node packages/cli/dist/index.js            # interactive prompt flow
-node packages/cli/dist/index.js --help
+node packages/cli/bin/run.js --help        # lists the commands
+node packages/cli/bin/run.js init          # interactive prompt flow
+node packages/cli/bin/run.js deposit --help
 ```
 
 Or link it globally so you can use the real `4mica` command:
 
 ```bash
 cd packages/cli && pnpm link --global
-4mica                                       # interactive
-4mica init my-app --type seller --framework express --yes --no-install
+4mica init                                  # interactive
+4mica init my-app --template seller-express --yes --no-install
 # later: pnpm uninstall --global @4mica/cli
 ```
+
+The CLI is built on [oclif](https://oclif.io). Each file under
+`src/commands` is one command, and a folder is a topic
+(`src/commands/withdrawals/request.ts` is `4mica withdrawals request`).
+Commands that talk to a network extend `NetworkCommand`; they import
+`@4mica/sdk` inside `run()`, so `--help` and `init` never load viem.
 
 If you change CLI source, rebuild (`pnpm --filter @4mica/cli build`). The build
 regenerates `snapshot.json` (the frozen catalog + `@4mica/*` versions used to
 rewrite scaffolded dependencies) via a `prebuild` step.
+
+### The CLI's tests
+
+`pnpm --filter @4mica/cli test` builds and runs everything that needs no
+network. Three kinds of test live under `packages/cli/src`:
+
+- `*.test.ts` beside a command runs it in-process with the SDK session
+  mocked (`src/test/run.ts`).
+- `cli.contract.test.ts` and `money.contract.test.ts` spawn the built binary
+  (`src/test/spawn.ts`): exit codes, streams, one JSON document under
+  `--json`, and a self-funded deposit against a stand-in core and chain node.
+- `pinJson(...)` (`src/test/shape.ts`) snapshots the field names and types of
+  a command's `--json` output. A command with `--json` and no pin fails the
+  contract test. When a change to the fields is intended, update the
+  snapshots with `pnpm --filter @4mica/cli exec vitest run -u` and say so in
+  the changeset: the fields are part of the CLI's interface.
+
+`pnpm --filter @4mica/cli test:e2e` is separate, and is not run by the
+pre-commit hook: it drives the binary against a real core and a local chain
+(deposit, balance, withdrawal request and cancel). Start a stack first, for
+example `make dev-up` in a checkout of `4mica-core`, which serves core on
+`:3000` over anvil. `E2E_CORE_URL`, `E2E_ASSET` and `E2E_KEY_FILE` point it
+elsewhere; without a core it skips, and `E2E_STRICT=1` makes that a failure.
+Only run it where the funds are not real.
+
+`oclif.manifest.json` is written when the package is packed (`prepack`) and
+removed afterwards. Do not commit one or leave one in the checkout: oclif
+reads it in place of the command files, so a stale one hides your changes.
 
 ### Testing a scaffolded project end-to-end
 
@@ -125,14 +160,14 @@ scaffold **inside the repo** so `workspace:*` links the local packages:
 
 ```bash
 # Seller (terminal 1)
-node packages/cli/dist/index.js init examples/tmp-seller \
-  --type seller --framework express --no-install --no-run
+node packages/cli/bin/run.js init examples/tmp-seller \
+  --template seller-express --no-install
 pnpm install
 pnpm --filter tmp-seller dev
 
 # Buyer (terminal 2)
-node packages/cli/dist/index.js init examples/tmp-buyer \
-  --type buyer --framework express --no-install --no-run
+node packages/cli/bin/run.js init examples/tmp-buyer \
+  --template buyer-express --no-install
 pnpm install
 pnpm --filter tmp-buyer start
 ```
@@ -146,7 +181,7 @@ folders and running `pnpm install` again.
 ```bash
 pnpm --filter @4mica/dashboard dev          # → http://localhost:4173
 # or, via the CLI:
-node packages/cli/dist/index.js dashboard
+node packages/cli/bin/run.js dashboard --local
 ```
 
 The dashboard runs in **Sandbox mode** on in-memory mock data (no backend

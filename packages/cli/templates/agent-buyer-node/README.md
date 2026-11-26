@@ -16,10 +16,22 @@ runs with **zero credentials**.
 
 ## Go live
 
-Copy `.env.example` → `.env`, fill in your `4MICA_*` credentials, and replace the
-demo header with `@x402/fetch`'s `wrapFetchWithPaymentFromConfig` and the
-`FourMicaEvmScheme` from `@4mica/x402/client`: the wrapped `fetch` pays a `402`
-and retries for you. Set `ANTHROPIC_API_KEY` to power the agent with Claude.
+Create a `.env` file here with the key of the wallet that pays:
+
+```bash
+FOURMICA_WALLET_PRIVATE_KEY=0x...
+```
+
+With the key set, payments are signed for real through `@4mica/sdk`: its
+`fetch` answers a `402` by paying, within 1 USDC a payment, and repeats the
+request. No code changes. The wallet needs collateral first:
+
+```bash
+4mica wallets create
+4mica deposit 10 --asset USDC
+```
+
+Set `ANTHROPIC_API_KEY` in the same file to power the agent with Claude.
 
 ## Manage agents & transactions
 

@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        filter: ${{ fromJSON(inputs.filters || '["@4mica/dashboard...","@4mica/web...","@4mica/email..."]') }}
+        filter: ${{ fromJSON(inputs.filters || '["@4mica/dashboard...","@4mica/web...","@4mica/email...","@4mica/cli..."]') }}
     env:
       SCAN_FILTER: ${{ matrix.filter }}
     steps:

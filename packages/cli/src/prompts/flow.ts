@@ -1,5 +1,7 @@
 import { cancel, confirm, isCancel, select, text } from "@clack/prompts";
+import { DOCS_URL } from "../core/links.js";
 import { toPackageName } from "../core/substitute.js";
+import { cancelled } from "../errors.js";
 import type {
   AgentRole,
   BuildType,
@@ -8,12 +10,15 @@ import type {
   PackageManager,
 } from "../types.js";
 
+// stdout is kept for the command's result.
+const io = { output: process.stderr };
+
 /** Flags already supplied on the command line (any subset of InitOptions). */
 export type PartialInit = Partial<InitOptions>;
 
+/** Ctrl-C or Escape at a prompt: exit 130, like every other cancel. */
 function bail(): never {
-  cancel("Scaffolding cancelled.");
-  process.exit(0);
+  throw cancelled("cancelled; nothing was created");
 }
 
 function unwrap<T>(value: T | symbol): T {
@@ -24,26 +29,29 @@ function unwrap<T>(value: T | symbol): T {
 /**
  * Fill any missing InitOptions interactively. Every prompt is skipped when the
  * corresponding flag was already provided, so flag mode and interactive mode
- * converge on the same resolved options.
+ * converge on the same resolved options. Undefined when the answer to
+ * "from scratch?" is no: a choice, not a cancel.
  */
 export async function runInitFlow(
   flags: PartialInit,
   defaultPm: PackageManager,
-): Promise<InitOptions> {
+): Promise<InitOptions | undefined> {
   if (flags.type === undefined) {
     const fromScratch = unwrap(
       await confirm({
+        ...io,
         message: "Generate a new 4Mica project from scratch?",
         initialValue: true,
       }),
     );
     if (!fromScratch) {
       cancel(
-        "No problem — add 4Mica to an existing app with " +
-          "`npm i @4mica/sdk @4mica/sdk-node`, then wrap a route with a " +
-          "paywall. Docs: https://4mica.io/docs",
+        "No problem. In an existing app, `npm i @4mica/x402` to charge for " +
+          "a route, or `npm i @4mica/sdk` to pay for one. " +
+          `Docs: ${DOCS_URL}`,
+        io,
       );
-      process.exit(0);
+      return undefined;
     }
   }
 
@@ -51,6 +59,7 @@ export async function runInitFlow(
     flags.type ??
     unwrap(
       await select({
+        ...io,
         message: "What are you building?",
         options: [
           {
@@ -72,6 +81,7 @@ export async function runInitFlow(
     if (flags.agentRole === undefined) {
       agentRole = unwrap(
         await select({
+          ...io,
           message: "Which side does your agent play?",
           options: [
             {
@@ -97,6 +107,7 @@ export async function runInitFlow(
     toPackageName(
       unwrap(
         await text({
+          ...io,
           message: "Project name?",
           placeholder: defaultName,
           defaultValue: defaultName,
@@ -108,6 +119,7 @@ export async function runInitFlow(
     flags.packageManager ??
     unwrap(
       await select({
+        ...io,
         message: "Install with which package manager?",
         initialValue: defaultPm,
         options: [
@@ -123,10 +135,23 @@ export async function runInitFlow(
     flags.openDashboard ??
     unwrap(
       await confirm({
+        ...io,
         message: "Open the 4Mica dashboard to manage agents & transactions?",
         initialValue: true,
       }),
     );
+
+  const install = flags.install ?? true;
+  const run =
+    flags.run ??
+    (install &&
+      unwrap(
+        await confirm({
+          ...io,
+          message: "Start it now?",
+          initialValue: true,
+        }),
+      ));
 
   return {
     dir: flags.dir ?? name,
@@ -135,8 +160,8 @@ export async function runInitFlow(
     framework,
     agentRole,
     packageManager,
-    install: flags.install ?? true,
-    run: flags.run ?? true,
+    install,
+    run,
     openDashboard,
   };
 }

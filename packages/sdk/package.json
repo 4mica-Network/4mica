@@ -92,16 +92,23 @@
     "@quillai-network/wachai-validation-sdk": "catalog:",
     "viem": "catalog:"
   },
-  "optionalDependencies": {
+  "peerDependencies": {
     "@coinbase/cdp-sdk": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@coinbase/cdp-sdk": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@4mica/tsconfig": "workspace:*",
     "@arethetypeswrong/cli": "catalog:",
+    "@coinbase/cdp-sdk": "catalog:",
     "@types/node": "catalog:node24",
     "publint": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:typescript-latest",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:zod4"
   }
 }

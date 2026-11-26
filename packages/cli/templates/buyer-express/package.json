@@ -7,8 +7,7 @@
     "start": "tsx src/buyer.ts"
   },
   "dependencies": {
-    "@4mica/x402": "workspace:*",
-    "@x402/fetch": "catalog:"
+    "@4mica/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:node24",

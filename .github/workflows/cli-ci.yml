@@ -1,0 +1,137 @@
+name: CLI CI
+
+# No `paths:` filter here on purpose: a workflow that never starts leaves a
+# required check pending forever, should this one ever be made required.
+# The path filter lives in the `changes` job instead.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - name: Match changed files
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          # The CLI, what it is built from, and what pins its dependencies.
+          PATHS: '^(packages/cli/|packages/sdk/|packages/url/|packages/tsconfig/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|biome\.json$|\.github/workflows/cli-ci\.yml$)'
+        run: |
+          # A manual run has no PR to diff, so it runs everything.
+          if [ -z "$PR" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Assigned first so a failed API call fails the job instead of
+          # reading as "nothing changed".
+          files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          if printf '%s\n' "$files" | grep -qE "$PATHS"; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Lint, types, the unit tests and the spawned-binary contract suite, on
+  # the lowest Node `engines` allows and the one releases are built with.
+  test:
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, node: 22 }
+          - { os: ubuntu-latest, node: 24 }
+          - { os: macos-latest, node: 22 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec biome check packages/cli
+
+      # Builds @4mica/sdk first: the CLI typechecks against its dist/.
+      - name: Build
+        run: pnpm turbo run build --filter=@4mica/cli...
+
+      # The build regenerates snapshot.json from the catalog; a difference
+      # means a catalog change was committed without it.
+      - name: Snapshot is current
+        run: git diff --exit-code -- packages/cli/snapshot.json
+
+      - name: Typecheck
+        run: pnpm --filter @4mica/cli typecheck
+
+      - name: Test
+        run: pnpm --filter @4mica/cli test
+
+      - name: Package exports
+        run: pnpm --filter @4mica/cli check:exports
+
+  # Windows: the built binary starts, answers, and finds its files. The
+  # full suite leans on POSIX file modes and signals.
+  smoke-windows:
+    name: Smoke (windows-latest)
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm turbo run build --filter=@4mica/cli...
+
+      - name: Run the binary
+        working-directory: packages/cli
+        shell: bash
+        run: |
+          set -e
+          node bin/run.js --version
+          node bin/run.js --help > /dev/null
+          node bin/run.js networks --json > /dev/null
+          node bin/run.js deposit --help > /dev/null
+          # A usage error is exit 2, as on every other platform.
+          status=0; node bin/run.js depost --json > /dev/null || status=$?
+          test "$status" -eq 2

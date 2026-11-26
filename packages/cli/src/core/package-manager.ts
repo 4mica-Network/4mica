@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { findUp } from "find-up";
 import type { PackageManager } from "../types.js";
 
@@ -23,8 +24,7 @@ function fromUserAgent(): PackageManager | undefined {
 async function fromLockfile(cwd: string): Promise<PackageManager | undefined> {
   const found = await findUp(Object.keys(LOCKFILES), { cwd });
   if (!found) return undefined;
-  const file = found.slice(found.lastIndexOf("/") + 1);
-  return LOCKFILES[file];
+  return LOCKFILES[basename(found)];
 }
 
 /**

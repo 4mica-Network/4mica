@@ -1,3 +1,4 @@
+import "./env";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +18,11 @@ function resolveSellerUrl() {
 }
 
 const SELLER_URL = resolveSellerUrl();
+
+// Live once the wallet key is set: payments are then signed for real through
+// @4mica/sdk. Without it the payment is a hand-built stand-in that only a
+// demo seller accepts.
+const LIVE = Boolean(process.env.FOURMICA_WALLET_PRIVATE_KEY);
 
 type X402PaymentRequired = {
   x402Version: number;
@@ -62,7 +68,40 @@ function demoPaymentHeader(required: X402PaymentRequired) {
   return Buffer.from(JSON.stringify(envelope)).toString("base64");
 }
 
+/**
+ * `client.fetch` answers a 402 by signing a payment within the spend limit
+ * (1 USDC a payment unless `spend` says otherwise) and repeating the request.
+ */
+async function payLive() {
+  const { FourMica } = await import("@4mica/sdk");
+  const client = await FourMica.connect();
+  try {
+    console.log(`[buyer] paying as ${client.address} on ${client.network}`);
+    const paid = await client.fetch(SELLER_URL);
+    const payment = client.paymentFor(paid);
+    console.log(`[buyer] GET ${SELLER_URL} → ${paid.status}`);
+    if (payment) {
+      console.log(
+        `[buyer] paid ${payment.amount} ${payment.asset.symbol} to ${payment.payTo}`,
+      );
+    }
+    console.log("[buyer] body:", await paid.text());
+    if (paid.status === 402) {
+      // Signed and sent, but not accepted: most often there is no collateral.
+      console.log(
+        "[buyer] the payment was not accepted. Check `4mica balance`: " +
+          "the wallet needs deposited collateral to pay from.",
+      );
+      process.exitCode = 1;
+    }
+  } finally {
+    await client.close();
+  }
+}
+
 async function main() {
+  if (LIVE) return payLive();
+  console.log("[buyer] demo mode. Set the wallet key in .env to pay for real.");
   const first = await fetch(SELLER_URL);
   console.log(`[buyer] GET ${SELLER_URL} → ${first.status}`);
   if (first.status !== 402) {

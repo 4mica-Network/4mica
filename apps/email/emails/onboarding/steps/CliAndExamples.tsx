@@ -15,12 +15,12 @@ export const CliAndExamples = ({
 }: TemplateProps<"onboarding-cli-and-examples">) => (
   <Layout
     footerNote={unsubscribeNote(unsubscribeUrl)}
-    preview="npx @4mica/cli, plus two agents that pay each other"
+    preview="npx @4mica/cli init, plus two agents that pay each other"
   >
     <Heading style={styles.heading}>The CLI and the examples</Heading>
 
     <Text style={styles.paragraph}>
-      {userName}, <code>npx @4mica/cli</code> scaffolds a buyer or seller
+      {userName}, <code>npx @4mica/cli init</code> scaffolds a buyer or seller
       project for your framework and runs it. Everything runs in demo mode
       against a mock verifier, so you need no credentials to see it work.
     </Text>

@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`fetch > --dry-run > shows what a url charges in 4mica credit, without a wallet > json shape: fetch (dry run) 1`] = `
+{
+  "dryRun": "boolean",
+  "offers": [
+    {
+      "amountRaw": "string",
+      "asset": "string",
+      "network": "string",
+      "payTo": "string",
+    },
+  ],
+  "status": "number",
+}
+`;
+
+exports[`fetch > needs no wallet or core for a url that charges nothing > json shape: fetch 1`] = `
+{
+  "body": "string",
+  "headers": {
+    "content-type": "string",
+  },
+  "payment": "null",
+  "status": "number",
+}
+`;
+
+exports[`fetch > returns the body and what was paid > json shape: fetch (paid) 1`] = `
+{
+  "body": "string",
+  "headers": {
+    "content-type": "string",
+  },
+  "payment": {
+    "amount": "string",
+    "amountRaw": "string",
+    "asset": {
+      "address": "string",
+      "decimals": "number",
+      "symbol": "string",
+    },
+    "network": "string",
+    "payTo": "string",
+    "protocol": "string",
+    "settled": "boolean",
+  },
+  "status": "number",
+}
+`;
