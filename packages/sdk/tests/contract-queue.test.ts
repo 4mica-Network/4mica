@@ -6,6 +6,10 @@ const CYCLE_ID = `0x${"aa".repeat(32)}` as const;
 const PROOF = [`0x${"dd".repeat(32)}`] as const;
 
 type ClearingHouseMock = {
+  simulate: {
+    claimNetCreditFor: ReturnType<typeof vi.fn>;
+    payNetDebit: ReturnType<typeof vi.fn>;
+  };
   write: {
     claimNetCreditFor: ReturnType<typeof vi.fn>;
     payNetDebit: ReturnType<typeof vi.fn>;
@@ -34,6 +38,10 @@ function createGateway(opts?: {
   };
   const contract = { address: DUMMY_ADDRESS, write: {} };
   const clearingHouse: ClearingHouseMock = {
+    simulate: {
+      claimNetCreditFor: vi.fn(async () => ({ result: undefined })),
+      payNetDebit: vi.fn(async () => ({ result: undefined })),
+    },
     write: {
       claimNetCreditFor: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),
       payNetDebit: vi.fn(opts?.writeImpl ?? (async () => "0xhash")),

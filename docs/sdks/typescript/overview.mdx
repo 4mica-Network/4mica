@@ -76,6 +76,8 @@ const response = await client.fetch("https://api.example.com/data");
 | `client.withdrawals()` | Pending withdrawal requests, each with `readyAt`. |
 | `client.finalizeWithdrawal("USDC")` | Pays out a requested withdrawal once its grace period has ended. |
 | `client.cancelWithdrawal("USDC")` | Cancels a requested withdrawal. |
+| `client.positions()` | What the wallet still owes and is still owed: one entry per asset and settlement cycle, with its deadlines. |
+| `client.settle(options?)` | Pays every open debit and claims every open credit. Returns one result per position. |
 | `await client.lowLevel(network?)` | The underlying `Client`, for anything the facade does not cover. |
 | `client.close()` | Closes the session. `await using` calls it for you. |
 | `client.address` / `client.network` | The signer address, and the session's network. |
