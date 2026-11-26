@@ -25,8 +25,12 @@ class SpendLimits:
 
     per_payment: Union[str, Sequence[str]] = "1 USDC"
     total: Union[str, Sequence[str], None] = None
-    """Counted in memory by this session only; processes sharing a wallet each
-    get their own."""
+    """Each entry is one budget for the whole session, shared by every
+    network it pays on: ``"5 USDC"`` is 5 USDC in all, not 5 on each. Once
+    set, a payment is only allowed in an asset an entry names. Every payment
+    sent to a seller counts, whether or not the seller took it. Counted in
+    memory by this session only; processes sharing a wallet each get their
+    own."""
     pay_to: Union[str, Sequence[str], None] = None
     """When set, the only payees the session pays."""
 

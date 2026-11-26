@@ -51,72 +51,77 @@ async def deposit(
     def show(units: int) -> str:
         return format_units(units, token.decimals)
 
-    # Before any signature prompt.
-    held = None
-    if gateway is not None:
-        held = await (
-            gateway.native_balance()
-            if token.native
-            else gateway.erc20_balance(token.address)
-        )
-        if held < amount:
-            raise InsufficientBalanceError(token.symbol, show(amount), show(held))
-
-    # Read even for wait="mined": spendable() on the result measures from it.
-    baseline = await _core_total(session, token.address)
-
-    async def self_funded() -> DepositReceipt:
-        if gateway is not None and await gateway.native_balance() == 0:
-            raise GasRequiredError(
-                f"depositing {token.symbol} as the wallet's own transaction needs "
-                f"{session.native_symbol} for gas, and the wallet holds none"
+    # Core reports what the wallet holds, not which deposit it has counted,
+    # so "spendable" is read off the total. One deposit of an asset at a
+    # time: started together, two would measure from the same total, and
+    # crediting either would pass for both.
+    async with session.deposit_lock(token.address):
+        # Before any signature prompt.
+        held = None
+        if gateway is not None:
+            held = await (
+                gateway.native_balance()
+                if token.native
+                else gateway.erc20_balance(token.address)
             )
-        builder = client.deposit.of(asset, amount).self_funded()
-        await builder.approve()
-        return await builder.send()
+            if held < amount:
+                raise InsufficientBalanceError(token.symbol, show(amount), show(held))
 
-    if token.native:
-        if held == amount:
-            raise GasRequiredError(
-                f"depositing all {show(amount)} {token.symbol} leaves nothing for "
-                "gas; a native deposit cannot be gasless"
-            )
-        receipt = await client.deposit.of(asset, amount).self_funded().send()
-    elif gas == "self" or not client.deposit.is_gasless_available():
-        # With no facilitator the low-level send() is the wallet's own
-        # transaction, and does not approve the token first.
-        receipt = await self_funded()
-    else:
-        try:
-            receipt = await client.deposit.of(asset, amount).send()
-        except (
-            Erc20AllowanceRequiredError,
-            # The facilitator sponsors nothing, or was never reached. Neither
-            # sent a transaction, so the wallet's own cannot double it up.
-            FacilitatorNotConfiguredError,
-            SponsorshipTransportError,
-        ):
+        # Read even for wait="mined": spendable() on the result measures from it.
+        baseline = await _core_total(session, token.address)
+
+        async def self_funded() -> DepositReceipt:
+            if gateway is not None and await gateway.native_balance() == 0:
+                raise GasRequiredError(
+                    f"depositing {token.symbol} as the wallet's own transaction needs "
+                    f"{session.native_symbol} for gas, and the wallet holds none"
+                )
+            builder = client.deposit.of(asset, amount).self_funded()
+            await builder.approve()
+            return await builder.send()
+
+        if token.native:
+            if held == amount:
+                raise GasRequiredError(
+                    f"depositing all {show(amount)} {token.symbol} leaves nothing for "
+                    "gas; a native deposit cannot be gasless"
+                )
+            receipt = await client.deposit.of(asset, amount).self_funded().send()
+        elif gas == "self" or not client.deposit.is_gasless_available():
+            # With no facilitator the low-level send() is the wallet's own
+            # transaction, and does not approve the token first.
             receipt = await self_funded()
+        else:
+            try:
+                receipt = await client.deposit.of(asset, amount).send()
+            except (
+                Erc20AllowanceRequiredError,
+                # The facilitator sponsors nothing, or was never reached. Neither
+                # sent a transaction, so the wallet's own cannot double it up.
+                FacilitatorNotConfiguredError,
+                SponsorshipTransportError,
+            ):
+                receipt = await self_funded()
 
-    def result(status: DepositStatus) -> DepositResult:
-        return DepositResult(
-            status=status,
-            tx_hash=receipt.tx_hash,
-            route=receipt.route,
-            amount=show(amount),
-            amount_raw=amount,
-            asset=asset_ref(token),
-            network=session.caip2,
-            explorer_url=session.explorer_tx(receipt.tx_hash),
-            _wait=counted,
-        )
+        def result(status: DepositStatus) -> DepositResult:
+            return DepositResult(
+                status=status,
+                tx_hash=receipt.tx_hash,
+                route=receipt.route,
+                amount=show(amount),
+                amount_raw=amount,
+                asset=asset_ref(token),
+                network=session.caip2,
+                explorer_url=session.explorer_tx(receipt.tx_hash),
+                _wait=counted,
+            )
 
-    async def counted(timeout: float) -> DepositResult:
-        target = baseline + amount
-        seen = await _until_counted(session, token.address, target, timeout)
-        return result("spendable" if seen else "pending")
+        async def counted(timeout: float) -> DepositResult:
+            target = baseline + amount
+            seen = await _until_counted(session, token.address, target, timeout)
+            return result("spendable" if seen else "pending")
 
-    return result("mined") if wait == "mined" else await counted(timeout_secs)
+        return result("mined") if wait == "mined" else await counted(timeout_secs)
 
 
 async def _core_total(session: NetworkSession, asset: str) -> int:
@@ -128,8 +133,9 @@ async def _until_counted(
     session: NetworkSession, asset: str, target: int, timeout_secs: float
 ) -> bool:
     """The money has moved by now, so poll errors are retried and running out
-    of time returns ``False``. Comparing totals can race with other activity
-    on the wallet; that only moves when the wait ends."""
+    of time returns ``False``. The total is all there is to go on: a deposit
+    to the same account from outside this session, landing in the same
+    moments, is counted as this one."""
 
     async def poll() -> bool:
         delay = _FIRST_POLL_SECS

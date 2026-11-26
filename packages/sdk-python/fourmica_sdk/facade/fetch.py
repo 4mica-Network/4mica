@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import (
     Any,
     Callable,
-    Dict,
     Iterable,
     List,
     Optional,
@@ -34,8 +34,9 @@ def _as_list(value: Union[str, Sequence[str], None]) -> List[str]:
 
 @dataclass(frozen=True)
 class Reservation:
-    key: str
-    amount: int
+    budget: Optional[int]
+    """Index of the ``total`` entry counted against; ``None`` with no total."""
+    units: Fraction
     asset: AssetRef
 
 
@@ -52,9 +53,11 @@ class SpendLimiter:
             if limits.pay_to is None
             else {payee.lower() for payee in _as_list(limits.pay_to)}
         )
-        self._spent: Dict[str, int] = {}
         for spec in (*self._per_payment, *self._total):
             parse_amount(spec)
+        # One count per ``total`` entry, in whole units: the entry is one
+        # budget on every network, whatever the asset's decimals are there.
+        self._spent: List[Fraction] = [Fraction(0)] * len(self._total)
 
     async def reserve(
         self, session: NetworkSession, terms: PaymentTerms, url: str
@@ -73,10 +76,12 @@ class SpendLimiter:
                 f"{terms.asset} is not an asset 4Mica accepts on {session.caip2}",
             )
         asset = asset_ref(token)
+        scale = 10**asset.decimals
 
-        def show(amount: int) -> str:
-            return f"{format_units(amount, asset.decimals)} {asset.symbol}"
+        def show(units: Fraction) -> str:
+            return f"{format_units(int(units * scale), asset.decimals)} {asset.symbol}"
 
+        asked = Fraction(terms.amount, scale)
         per_payment = await self._limit_for(session, self._per_payment, asset)
         if per_payment is None:
             raise SpendLimitError(
@@ -84,40 +89,78 @@ class SpendLimiter:
                 url,
                 f"the seller asks for {asset.symbol}, which no per_payment limit names",
             )
-        if terms.amount > per_payment:
+        _, cap = per_payment
+        if asked > cap:
             raise SpendLimitError(
                 "per_payment",
                 url,
-                f"the seller asks {show(terms.amount)}, over the "
-                f"{show(per_payment)} per-payment limit",
+                f"the seller asks {show(asked)}, over the "
+                f"{show(cap)} per-payment limit",
             )
 
+        if not self._total:
+            return Reservation(budget=None, units=asked, asset=asset)
         total = await self._limit_for(session, self._total, asset)
+        if total is None:
+            # A total that names some assets caps the session; leaving the
+            # rest uncapped would make it a limit that is easy to walk around.
+            raise SpendLimitError(
+                "assets",
+                url,
+                f"the seller asks for {asset.symbol}, which no total limit names",
+            )
         # No await from here to the write, or concurrent payments could overshoot.
-        key = f"{session.caip2}:{asset.address.lower()}"
-        spent = self._spent.get(key, 0)
-        if total is not None and spent + terms.amount > total:
+        budget, limit = total
+        spent = self._spent[budget]
+        if spent + asked > limit:
             raise SpendLimitError(
                 "total",
                 url,
-                f"{show(spent)} spent so far; {show(terms.amount)} more would "
-                f"pass the {show(total)} session limit",
+                f"{show(spent)} spent so far; {show(asked)} more would "
+                f"pass the {show(limit)} session limit",
             )
-        self._spent[key] = spent + terms.amount
-        return Reservation(key=key, amount=terms.amount, asset=asset)
+        self._spent[budget] = spent + asked
+        return Reservation(budget=budget, units=asked, asset=asset)
 
     def release(self, reservation: Reservation) -> None:
-        self._spent[reservation.key] -= reservation.amount
+        if reservation.budget is not None:
+            self._spent[reservation.budget] -= reservation.units
 
     async def _limit_for(
         self, session: NetworkSession, specs: Sequence[str], asset: AssetRef
-    ) -> Optional[int]:
-        for spec in specs:
+    ) -> Optional[Tuple[int, Fraction]]:
+        """The first entry of *specs* that names *asset* on this network: its
+        index, and its amount in whole units."""
+        for index, spec in enumerate(specs):
             parsed = parse_amount(spec)
             token = await session.try_token(parsed.asset)
             if token and token.address.lower() == asset.address.lower():
-                return to_base_units(parsed.amount, token.decimals)
+                units = to_base_units(parsed.amount, token.decimals)
+                return index, Fraction(units, 10**token.decimals)
         return None
+
+
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _port(url: httpx.URL) -> Optional[int]:
+    return url.port or _DEFAULT_PORTS.get(url.scheme)
+
+
+def _same_party(asked: httpx.URL, answered: httpx.URL) -> bool:
+    """Whether a redirect stayed with the origin the caller named. The same
+    host moving from http to https counts, as it does when httpx decides
+    whether to forward credentials."""
+    if asked.host != answered.host:
+        return False
+    if asked.scheme == answered.scheme:
+        return _port(asked) == _port(answered)
+    return (asked.scheme, _port(asked), answered.scheme, _port(answered)) == (
+        "http",
+        80,
+        "https",
+        443,
+    )
 
 
 @dataclass
@@ -139,11 +182,19 @@ async def paying_fetch(
         if name in kwargs
     }
     request = ctx.http.build_request(method, url, **kwargs)
-    # Read once, so the retry carries the same bytes whatever the body was
+    # Read once, so a resend carries the same bytes whatever the body was
     # built from: a file or a generator would be spent by the first send.
-    body = await request.aread()
+    await request.aread()
     response = await ctx.http.send(request, **send_options)
     if response.status_code != 402:
+        return response
+
+    # After a redirect the 402 answers a different request than the caller
+    # made: another URL, and after a 303 another method with no body. That
+    # request is the one paid for. A redirect to another origin is not paid
+    # at all: the caller never named that party.
+    challenged = response.request
+    if not _same_party(request.url, challenged.url):
         return response
 
     options: List[Tuple[PaymentProtocol, PaymentTerms, NetworkSession]] = []
@@ -155,39 +206,42 @@ async def paying_fetch(
     if not options:
         return response
 
+    body = await challenged.aread()
     refusals: List[SpendLimitError] = []
     for protocol, terms, session in options:
         try:
-            reservation = await ctx.limiter.reserve(session, terms, str(request.url))
+            reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
         except SpendLimitError as refusal:
             refusals.append(refusal)
             continue
 
-        headers = request.headers.copy()
+        headers = challenged.headers.copy()
+        # The body goes out as bytes with a length, whatever it was read from.
+        headers.pop("transfer-encoding", None)
         try:
             headers.update(await protocol.pay(terms, session.client, ctx.http))
         except BaseException:
             # Nothing has left this process.
             ctx.limiter.release(reservation)
             raise
-        # Retried once; a second 402 goes back to the caller. If this raises
-        # the amount stays reserved: the seller may hold the payment and
+        # Retried once, and never across a redirect, which would hand the
+        # payment to wherever it points. From here the amount stays reserved
+        # whatever comes back, an error or a second 402 included: the seller
+        # holds a signed payment, and no answer of its own proves it cannot
         # redeem it.
         paid = await ctx.http.send(
             httpx.Request(
-                request.method,
-                request.url,
+                challenged.method,
+                challenged.url,
                 headers=headers,
                 content=body,
-                extensions=request.extensions,
+                extensions=challenged.extensions,
             ),
-            **send_options,
+            **{**send_options, "follow_redirects": False},
         )
         if paid.status_code == 402:
-            ctx.limiter.release(reservation)
             return paid
         # A seller that says nothing is taken to charge for what it delivered.
-        # The amount stays reserved either way: the payment is in its hands.
         settled = protocol.settled(paid)
         if paid.is_success if settled is None else settled:
             ctx.record(

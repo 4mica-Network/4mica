@@ -160,8 +160,9 @@ class ClaimReceipt:
 def base_units(value: Union[int, str]) -> int:
     """A whole number of base units, from an int or a decimal or 0x-hex
     string. A float is refused: truncating ``1.9`` to ``1`` would move the
-    wrong amount without saying so."""
-    if isinstance(value, int):
+    wrong amount without saying so. So is a bool, which Python counts as an
+    int: ``True`` would be one base unit."""
+    if isinstance(value, int) and not isinstance(value, bool):
         return value
     if isinstance(value, str):
         try:

@@ -22,14 +22,26 @@
   - `deposit("5 USDC")` resolves the asset against core's token list, checks
     the wallet before anything is signed, goes gasless where it can, and
     returns once core counts the deposit. Running out of time returns
-    `status="pending"` instead of raising.
+    `status="pending"` instead of raising. "Counted" is read off the
+    account's collateral total, so deposits of one asset through a session
+    run one after another: started together, two would both be confirmed by
+    core counting either.
   - `balance()`, `withdraw()`, `withdrawals()`, `finalize_withdrawal()` and
-    `cancel_withdrawal()`.
+    `cancel_withdrawal()`. The last two take a token address for an asset
+    core no longer lists, so every request `withdrawals()` reports can be
+    finalized or cancelled.
   - `fetch(url, method=, **kwargs)` sends an `httpx` request, pays a
     `4mica-credit` x402 challenge within the session's `SpendLimits`
     (default: at most 1 USDC per payment) and retries once.
     `payment_for(response)` reports what was paid. A payment over a limit
     raises `SpendLimitError` before anything is signed.
+  - `SpendLimits.total` is one budget per entry for the whole session,
+    shared by every network it pays on, and once set refuses an asset no
+    entry names. A payment sent to a seller stays counted whatever comes
+    back, a second 402 included.
+  - After a redirect, `fetch` pays the request that was answered 402, not
+    the one it started with, and only on the origin it was asked for. The
+    paid retry follows no redirect, so the payment is never forwarded.
 - `fourmica_sdk.amounts`: `parse_amount`, `to_base_units`, `format_units` and
   `resolve_token`, pinned to the same `amounts.vectors.json` as the
   TypeScript SDK.
@@ -82,7 +94,10 @@
 - Self-funded transactions are sent one at a time, so two started together
   no longer share a nonce.
 - `deposit.of()` and `withdraw.request()` refuse a float amount instead of
-  truncating it.
+  truncating it, and a bool instead of reading `True` as one base unit.
+- A 65-byte signature from a remote signer that cannot be one (`r` or `s`
+  outside the curve order, or `v` other than 0, 1, 27 or 28) raises
+  `SigningError`. An `s` above the order used to escape as `OverflowError`.
 - A `wallet_private_key` and an `evm_signer` for two different accounts are
   refused at connect: payments were signed by one and transactions sent by
   the other.

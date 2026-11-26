@@ -12,6 +12,7 @@ from fourmica_sdk.errors import (
     ClientError,
     GracePeriodNotElapsedError,
     NoWithdrawalRequestedError,
+    TokenNotSupportedError,
 )
 from fourmica_sdk.facade.withdraw import (
     cancel_withdrawal,
@@ -113,6 +114,48 @@ async def test_finalizes_once_the_grace_period_has_ended():
     result = await finalize_withdrawal(fake_session(client), "USDC")
     assert asked(client.withdraw.finalize) == [(USDC,)]
     assert result.tx_hash == TX_HASH
+
+
+async def test_a_delisted_asset_is_cancelled_and_finalized_by_its_address():
+    """What `withdrawals()` reports can be acted on: core no longer lists the
+    asset, so its address stands in for it."""
+    now = int(time.time())
+    delisted = "0x" + "9a" * 20
+    client = FakeClient(positions=[position(delisted, 42, now - GRACE - 1)])
+    session = fake_session(client)
+    (reported,) = await pending_withdrawals(session)
+
+    result = await finalize_withdrawal(session, reported.asset.address)
+    assert [address.lower() for (address,) in asked(client.withdraw.finalize)] == [
+        delisted
+    ]
+    assert result.asset.address.lower() == delisted
+    assert result.asset.decimals == 0
+
+    await cancel_withdrawal(session, delisted.upper().replace("0X", "0x"))
+    assert [address.lower() for (address,) in asked(client.withdraw.cancel)] == [
+        delisted
+    ]
+
+
+async def test_a_delisted_asset_still_waits_out_the_grace_period():
+    now = int(time.time())
+    delisted = "0x" + "9a" * 20
+    client = FakeClient(positions=[position(delisted, 42, now - 60)])
+    with pytest.raises(GracePeriodNotElapsedError, match="(?i)42 0x9a9a"):
+        await finalize_withdrawal(fake_session(client), delisted)
+    client.withdraw.finalize.assert_not_called()
+
+
+@pytest.mark.parametrize("asset", ["DAI", "0x1234", "0x" + "zz" * 20])
+async def test_only_an_address_stands_in_for_an_asset_core_does_not_list(asset):
+    client = FakeClient()
+    session = fake_session(client)
+    for step in (cancel_withdrawal, finalize_withdrawal):
+        with pytest.raises(TokenNotSupportedError):
+            await step(session, asset)
+    client.withdraw.cancel.assert_not_called()
+    client.withdraw.finalize.assert_not_called()
 
 
 async def test_a_remote_signer_finalizes_without_the_chain_check():

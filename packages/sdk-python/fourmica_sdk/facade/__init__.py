@@ -252,7 +252,14 @@ class FourMica:
         """Deposits collateral, gasless where it can, and waits for core to
         count it. ``gas="self"`` sends the wallet's own transaction;
         ``wait="mined"`` returns without waiting for core. Running out of
-        time is not an error: the result says ``"pending"``."""
+        time is not an error: the result says ``"pending"``.
+
+        ``"spendable"`` is inferred from the account's collateral at core
+        having grown by the amount; core does not say which deposit it
+        counted. Deposits of one asset through this session run one after
+        another, so each is measured from the one before. A deposit to the
+        same account from elsewhere at the same time can be taken for this
+        one."""
         session = await self._session(network)
         return await _deposit(session, amount, gas, wait, timeout_secs)
 
@@ -322,7 +329,12 @@ class FourMica:
         ``httpx.AsyncClient.request``. Pays a 4Mica 402 on a network this
         session has open, within the spend limits, and retries once; anything
         else comes back untouched. The body is read into memory once and sent
-        again unchanged on the retry."""
+        again unchanged on the retry.
+
+        With ``follow_redirects``, the request paid for is the one that was
+        answered 402, at the URL the redirect led to. A 402 from another
+        origin than *url* is not paid, and the paid retry follows no
+        redirect: its answer comes back as it is."""
         await self._session()
         open_sessions = dict(self._sessions)
         return await paying_fetch(

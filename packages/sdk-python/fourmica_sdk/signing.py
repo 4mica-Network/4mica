@@ -146,9 +146,10 @@ def _normalize_signature(signature: Union[str, bytes]) -> str:
     """0x-prefixed hex, in the one form core and the facilitator accept for a
     payer's signature: ``v`` of 27 or 28 and a low ``s``. A local key already
     signs that way; a remote signer may answer with ``v`` of 0 or 1, or the
-    other ``s``, which is the same signature written differently. Anything
-    that is not a 65-byte signature is passed through for the server to
-    refuse."""
+    other ``s``, which is the same signature written differently. 65 bytes
+    that cannot be a signature at all, with ``r`` or ``s`` outside the curve
+    order or any other ``v``, raise :class:`SigningError`. Anything that is
+    not 65 bytes is passed through for the server to refuse."""
     sig = signature.hex() if isinstance(signature, bytes) else str(signature)
     if not sig.startswith("0x"):
         sig = "0x" + sig
@@ -159,9 +160,17 @@ def _normalize_signature(signature: Union[str, bytes]) -> str:
     if len(raw) != 65:
         return sig
     r, s, v = raw[:32], int.from_bytes(raw[32:64], "big"), raw[64]
+    if not 0 < int.from_bytes(r, "big") < _SECP256K1_ORDER:
+        raise SigningError("the signer returned a signature with r out of range")
+    if not 0 < s < _SECP256K1_ORDER:
+        raise SigningError("the signer returned a signature with s out of range")
     if v in (0, 1):
         v += 27
-    if v in (27, 28) and s > _SECP256K1_ORDER // 2:
+    if v not in (27, 28):
+        raise SigningError(
+            f"the signer returned a signature with v of {v}; expected 0, 1, 27 or 28"
+        )
+    if s > _SECP256K1_ORDER // 2:
         s = _SECP256K1_ORDER - s
         v = 55 - v
     return "0x" + (r + s.to_bytes(32, "big") + bytes([v])).hex()

@@ -37,12 +37,14 @@ from fourmica_sdk.errors import (
     FacilitatorRejectedError,
     InvalidParamsError,
     OutcomeUnknownError,
+    SigningError,
     SponsorshipTransportError,
 )
 from fourmica_sdk.rpc import RpcProxy
 from fourmica_sdk.signing import (
     _SECP256K1_ORDER,
     LocalAccountSigner,
+    PayerSigner,
     _normalize_signature,
 )
 from fourmica_sdk.x402 import PaymentRequirementsV2
@@ -92,6 +94,39 @@ def test_a_high_s_signature_is_rewritten_as_its_low_s_twin():
 def test_what_is_not_a_65_byte_signature_is_left_for_the_server_to_refuse():
     assert _normalize_signature("0xabcd") == "0xabcd"
     assert _normalize_signature("not hex") == "0xnot hex"
+
+
+@pytest.mark.parametrize(
+    "r, s, v",
+    [
+        (1, _SECP256K1_ORDER, 27),
+        # Above the order, where rewriting s as its twin would go negative.
+        (1, _SECP256K1_ORDER + 1, 27),
+        (1, 2**256 - 1, 28),
+        (1, 0, 27),
+        (0, 1, 27),
+        (_SECP256K1_ORDER, 1, 27),
+        (1, 1, 2),
+        (1, 1, 29),
+        # An EIP-155 transaction v is not a message signature's.
+        (1, 1, 37),
+    ],
+)
+def test_65_bytes_that_cannot_be_a_signature_are_a_signing_error(r, s, v):
+    with pytest.raises(SigningError, match="signer returned a signature"):
+        _normalize_signature(assemble(r, s, v))
+
+
+async def test_a_malformed_remote_signature_fails_the_payment_as_a_signing_error():
+    class BrokenSigner:
+        address = TEST_ADDRESS
+
+        async def sign_hash(self, message_hash):
+            return assemble(1, _SECP256K1_ORDER + 1, 27)
+
+    signer = PayerSigner(BrokenSigner())
+    with pytest.raises(SigningError, match="s out of range"):
+        await signer._sign(lambda: DIGEST)
 
 
 # --- x402: what a seller advertised is what it gets back ----------------------
@@ -290,6 +325,7 @@ def test_base_unit_amounts_are_never_truncated():
     assert base_units(5) == 5
     assert base_units("5") == 5
     assert base_units("0xf4240") == 1_000_000
-    for value in (1.9, None, "1.9", "five"):
+    # A bool is an int to Python: True would deposit one base unit.
+    for value in (1.9, None, "1.9", "five", True, False):
         with pytest.raises(InvalidParamsError):
             base_units(value)

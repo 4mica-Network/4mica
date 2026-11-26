@@ -46,7 +46,7 @@ TypeScript SDK.
 | `await client.fetch(url, method="GET", **kwargs)` | An `httpx` request that pays a 4Mica 402 within the spend limits and retries once. `client.payment_for(response)` says what was paid. |
 | `await client.withdraw("2 USDC")` | Requests a withdrawal. |
 | `await client.withdrawals()` | Pending requests, and when each can be finalized. |
-| `await client.finalize_withdrawal("USDC")` / `cancel_withdrawal("USDC")` | Pays out a request after the grace period, or cancels it. |
+| `await client.finalize_withdrawal("USDC")` / `cancel_withdrawal("USDC")` | Pays out a request after the grace period, or cancels it. Takes the token address for an asset core no longer lists. |
 | `await client.low_level()` | The `Client` underneath, for anything else. |
 
 Every call that touches a network takes `network=` to use another one; the
@@ -68,6 +68,13 @@ rounded.
 the money has moved, so running out of `timeout_secs` (default 60) returns
 `status="pending"`; `await result.spendable()` waits again.
 
+`"spendable"` is inferred from the balance. Core reports the collateral an
+account holds, not which deposit it has counted, so the deposit is taken as
+counted once the total has grown by its amount. Deposits of one asset through
+the same session run one after another, so each is measured from the one
+before. A deposit to the same account from somewhere else at the same time
+(another process, the dashboard) can be taken for this one.
+
 **`fetch` only pays within its limits.** By default that is at most 1 USDC per
 payment, and nothing in any other asset:
 
@@ -78,7 +85,7 @@ client = await FourMica.connect(
     private_key="0x...",
     spend=SpendLimits(
         per_payment=["0.10 USDC", "0.10 USDT"],  # the assets it may pay in
-        total="5 USDC",  # for this session, counted in memory
+        total=["5 USDC", "5 USDT"],  # for this session, on all networks together
         pay_to=["0xSeller..."],  # optional: the only payees
     ),
 )
@@ -87,15 +94,29 @@ client = await FourMica.connect(
 A payment over a limit raises `SpendLimitError` before anything is signed. A
 402 that is not a `4mica-credit` offer on a network the session has open comes
 back untouched. The request body is read into memory once, so the retry sends
-the same bytes even for a file or a generator. Redirects are not followed
-unless the `http_client` you pass follows them.
+the same bytes even for a file or a generator.
 
-`total` counts every payment the session sends. One that was never sent
-because signing failed, or that the seller refused with another 402, is
-released again. One that was sent stays counted even if the request then
-fails, because the seller may still redeem it. The count is kept in memory by
-this session: a new `connect` starts from zero, and across processes sharing a
-wallet the hard limit is the collateral deposited.
+**Each `total` entry is one budget for the whole session.** `"5 USDC"` is
+5 USDC across every network the session pays on, not 5 on each. Once `total`
+is set, an asset none of its entries names is refused, even if `per_payment`
+allows it: a total that capped only some assets would leave the rest
+unlimited. A misspelled entry names nothing, so it refuses that asset too.
+
+`total` counts every payment the session sends to a seller. One that was
+never sent because signing failed is released again. One that was sent stays
+counted whatever the seller answers, an error or another 402 included: it
+holds a signed payment, and its answer does not prove it cannot redeem it. The
+count is kept in memory by this session: a new `connect` starts from zero, and
+across processes sharing a wallet the hard limit is the collateral deposited.
+
+**Redirects** are not followed unless you pass `follow_redirects=True` or an
+`http_client` that follows them. When they are, the request paid for is the
+one that was answered 402: the URL the redirect led to, and after a 303 a
+`GET` with no body, never the original `POST` again. A 402 from another origin
+than the URL you asked for is not paid and comes back untouched; fetch that
+URL directly to pay it. The same host moving from `http` to `https` is not
+another origin. The paid retry itself follows no redirect, so the payment is
+never forwarded: a redirect in answer to it comes back as the response.
 
 **A remote signer** (`signer=`, such as the CDP backend) signs payments and
 gasless deposits and withdrawals, but cannot send a transaction or read the

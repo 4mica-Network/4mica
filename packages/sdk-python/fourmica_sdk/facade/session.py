@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from ..amounts import ResolvedToken, Token, TokenLike, is_native_asset, resolve_token
 from ..client import Client
@@ -25,6 +25,7 @@ class NetworkSession:
         self.client = client
         self._tokens: Optional[List[SupportedTokenInfo]] = None
         self._tokens_lock = asyncio.Lock()
+        self._deposit_locks: Dict[str, asyncio.Lock] = {}
 
     @property
     def native_symbol(self) -> str:
@@ -48,6 +49,10 @@ class NetworkSession:
             return await self.token(value)
         except TokenNotSupportedError:
             return None
+
+    def deposit_lock(self, asset: str) -> asyncio.Lock:
+        """Held while a deposit of *asset* is sent and waited for."""
+        return self._deposit_locks.setdefault(asset.lower(), asyncio.Lock())
 
     async def chain(self) -> Optional[ContractGateway]:
         """The chain gateway, or ``None`` for a remote signer: it has no local

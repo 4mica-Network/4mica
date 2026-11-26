@@ -1,5 +1,6 @@
 import asyncio
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -249,3 +250,60 @@ async def test_a_remote_signer_deposits_gaslessly_without_reading_the_wallet():
     assert result.status == "spendable"
     client.ctx.gateway.assert_not_awaited()
     client.builder.send.assert_awaited_once()
+
+
+async def test_two_deposits_at_once_are_not_both_confirmed_by_one_credit():
+    """Both would read the same total and wait for the same target, so core
+    counting either one would pass for both. Here it counts only the first."""
+    core = {"total": 10_000_000, "sent": 0}
+    client = FakeClient()
+
+    async def balance(asset):
+        return SimpleNamespace(total=core["total"], locked=0)
+
+    async def send():
+        await asyncio.sleep(0)
+        core["sent"] += 1
+        if core["sent"] == 1:
+            core["total"] += 5_000_000
+        return await sent()
+
+    sent = client.builder.send
+    client.builder.send = AsyncMock(side_effect=send)
+    client.account.asset_balance = AsyncMock(side_effect=balance)
+    session = fake_session(client)
+
+    first, second = await asyncio.gather(
+        deposit(session, "5 USDC"),
+        deposit(session, "5 USDC", timeout_secs=0.05),
+    )
+    assert core["sent"] == 2
+    assert (first.status, second.status) == ("spendable", "pending")
+
+    # Once core counts the second, waiting again says so.
+    core["total"] += 5_000_000
+    assert (await second.spendable()).status == "spendable"
+
+
+async def test_a_failed_deposit_does_not_hold_up_the_next():
+    # Each deposit reads the total once before sending.
+    client = FakeClient(totals=[0, 0, 5_000_000])
+    session = fake_session(client)
+    sent = client.builder.send
+    client.builder.send = AsyncMock(side_effect=OutcomeUnknownError("lost"))
+    with pytest.raises(OutcomeUnknownError):
+        await deposit(session, "5 USDC")
+    client.builder.send = sent
+    assert (await deposit(session, "5 USDC")).status == "spendable"
+
+
+async def test_deposits_of_different_assets_do_not_wait_for_each_other():
+    client = FakeClient(totals=[0])
+    session = fake_session(client)
+    slow = asyncio.create_task(deposit(session, "5 USDC", timeout_secs=30))
+    await asyncio.sleep(0.01)
+    # USDC is still waiting for core; USDT goes straight through.
+    result = await asyncio.wait_for(deposit(session, "5 USDT", wait="mined"), 1)
+    assert result.status == "mined"
+    assert not slow.done()
+    slow.cancel()

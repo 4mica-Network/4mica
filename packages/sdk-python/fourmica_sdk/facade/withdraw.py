@@ -4,26 +4,40 @@ import asyncio
 from datetime import datetime, timezone
 from typing import List
 
-from ..amounts import (
-    AmountInput,
-    ResolvedToken,
-    Token,
-    format_units,
-    parse_amount,
-    to_base_units,
-)
+from ..amounts import AmountInput, Token, format_units, parse_amount, to_base_units
 from ..client.model import Asset, WithdrawReceipt
 from ..errors import (
     AmountZeroError,
     GracePeriodNotElapsedError,
     NoWithdrawalRequestedError,
 )
+from ..utils import ValidationError, parse_address
 from .models import PendingWithdrawal, WithdrawResult
 from .session import NetworkSession, asset_ref
 
 
+def _unlisted(address: str) -> Token:
+    """An asset core no longer lists: known by its address, in base units."""
+    return Token(symbol=address, address=address, decimals=0)
+
+
+async def _requested_asset(session: NetworkSession, asset: str) -> Token:
+    """The asset of a withdrawal already requested. Core can stop listing an
+    asset while collateral in it is still on its way out, so an address it
+    does not list is taken as it is, the way :func:`pending_withdrawals`
+    reports it; the contract has the last word. A symbol must be listed."""
+    listed = await session.try_token(asset)
+    if listed is not None:
+        return listed
+    try:
+        return _unlisted(parse_address(asset, "asset"))
+    except ValidationError:
+        # Raises, naming the assets that are listed.
+        return await session.token(asset)
+
+
 def _result(
-    session: NetworkSession, token: ResolvedToken, receipt: WithdrawReceipt
+    session: NetworkSession, token: Token, receipt: WithdrawReceipt
 ) -> WithdrawResult:
     return WithdrawResult(
         tx_hash=receipt.tx_hash,
@@ -49,7 +63,7 @@ async def request_withdrawal(
 
 
 async def cancel_withdrawal(session: NetworkSession, asset: str) -> WithdrawResult:
-    token = await session.token(asset)
+    token = await _requested_asset(session, asset)
     receipt = await session.client.withdraw.cancel(Asset.coerce(token.address)).send()
     return _result(session, token, receipt)
 
@@ -57,7 +71,7 @@ async def cancel_withdrawal(session: NetworkSession, asset: str) -> WithdrawResu
 async def finalize_withdrawal(session: NetworkSession, asset: str) -> WithdrawResult:
     """Checked against the chain first, so an early call says when instead of
     reverting. A remote signer has no chain access and skips the check."""
-    token = await session.token(asset)
+    token = await _requested_asset(session, asset)
     if await session.chain() is not None:
         pending = next(
             (
@@ -93,11 +107,7 @@ async def pending_withdrawals(session: NetworkSession) -> List[PendingWithdrawal
             continue
         # A delisted asset is still reported, in base units.
         listed = await session.try_token(position.asset)
-        asset = (
-            asset_ref(listed)
-            if listed
-            else Token(symbol=position.asset, address=position.asset, decimals=0)
-        )
+        asset = asset_ref(listed) if listed else _unlisted(position.asset)
         requested = position.withdrawal_request_timestamp
         ready_at = datetime.fromtimestamp(requested + grace, timezone.utc)
         pending.append(
