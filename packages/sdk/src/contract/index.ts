@@ -9,7 +9,9 @@ import {
   type Hex,
   HttpRequestError,
   http,
+  InternalRpcError,
   parseGwei,
+  RpcRequestError,
   TimeoutError,
 } from "viem";
 import { clearingHouseAbi } from "@/abi/clearinghouse";
@@ -186,25 +188,36 @@ function decodeRevert(error: unknown, context: string): ContractError | null {
 const BROADCAST_REQUEST = /"method":"eth_send(Raw)?Transaction"/;
 
 /**
- * The transport failure behind a write whose broadcast was already on the
- * wire: the request that carried the signed transaction got no answer, or
- * one that was not the node's (a gateway's 5xx). Nothing earlier counts: a
- * failed gas estimate or nonce read means the transaction was never sent.
- * Nor does a refusal: a JSON-RPC error, or an HTTP 4xx, is the node (or its
+ * What went wrong with a write whose broadcast was already on the wire: the
+ * request that carried the signed transaction got no answer, or one that
+ * says nothing about the transaction (a gateway's 5xx, an HTTP 408, a
+ * JSON-RPC internal error). Nothing earlier counts: a failed gas estimate or
+ * nonce read means the transaction was never sent. Nor does a refusal: any
+ * other JSON-RPC error, or any other HTTP 4xx, is the node (or its
  * gatekeeper) saying no.
  */
 function lostBroadcast(error: unknown): BaseError | null {
   if (!(error instanceof BaseError)) return null;
-  const transport = error.walk(
-    (err) => err instanceof HttpRequestError || err instanceof TimeoutError,
+  const lost = error.walk(
+    (err) =>
+      err instanceof HttpRequestError ||
+      err instanceof TimeoutError ||
+      err instanceof RpcRequestError,
   );
-  if (transport instanceof HttpRequestError) {
-    if (transport.status !== undefined && transport.status < 500) return null;
-  } else if (!(transport instanceof TimeoutError)) {
+  if (lost instanceof HttpRequestError) {
+    // 408 is the one 4xx that is not a refusal: whoever sent it gave up
+    // waiting, which says nothing of what the node did with the request.
+    const { status } = lost;
+    if (status !== undefined && status < 500 && status !== 408) return null;
+  } else if (lost instanceof RpcRequestError) {
+    // "Internal error" is what a node, or the provider in front of it,
+    // answers when it failed at its own work, an upstream timeout included.
+    if (lost.code !== InternalRpcError.code) return null;
+  } else if (!(lost instanceof TimeoutError)) {
     return null;
   }
-  const request = (transport.metaMessages ?? []).join("\n");
-  return BROADCAST_REQUEST.test(request) ? transport : null;
+  const request = (lost.metaMessages ?? []).join("\n");
+  return BROADCAST_REQUEST.test(request) ? lost : null;
 }
 
 /** `depositStablecoin failed` names the call; this is the call. */
@@ -232,8 +245,8 @@ function wrapViemError(
   const lost = lostBroadcast(error);
   if (lost) {
     return new TransactionOutcomeUnknownError(
-      `${operationOf(context)}: the transaction was sent and the node's ` +
-        `answer never came (${lost.shortMessage}); it may or may not have been accepted`,
+      `${operationOf(context)}: the transaction was sent and no usable ` +
+        `answer came back (${lost.shortMessage}); it may or may not have been accepted`,
       { stage: "broadcast" },
     );
   }
@@ -853,15 +866,25 @@ export class ContractGateway {
   ) {
     const { gas, receipt } = this.splitWaitOptions(waitOptions);
     const ch = this.clearingHouse(contractAddress);
+    const args = [cycleId, netDebit, proof] as const;
+    const gasLimit = gas ?? DEFAULT_CLEARING_GAS_LIMIT;
     let hash: Hex;
     try {
-      hash = await this.enqueueTx(() =>
-        ch.write.payNetDebit([cycleId, netDebit, proof], {
+      hash = await this.enqueueTx(async () => {
+        // The gas limit is fixed, so viem estimates nothing and a payment
+        // that would revert would be mined and paid for. Run it first: a
+        // revert here costs nothing and comes back typed.
+        await ch.simulate.payNetDebit(args, {
+          account: this.walletClient.account?.address,
           value: payableValue,
-          gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
+          gas: gasLimit,
+        });
+        return ch.write.payNetDebit(args, {
+          value: payableValue,
+          gas: gasLimit,
           ...this.defaultFeeParams(),
-        }),
-      );
+        });
+      });
     } catch (error) {
       throw wrapViemError(error, "payNetDebit failed");
     }
@@ -884,17 +907,27 @@ export class ContractGateway {
   ) {
     const { gas, receipt } = this.splitWaitOptions(waitOptions);
     const ch = this.clearingHouse(contractAddress);
+    const args = [
+      normalizeAddress(creditor) as Hex,
+      cycleId,
+      netCredit,
+      proof,
+    ] as const;
+    const gasLimit = gas ?? DEFAULT_CLEARING_GAS_LIMIT;
     let hash: Hex;
     try {
-      hash = await this.enqueueTx(() =>
-        ch.write.claimNetCreditFor(
-          [normalizeAddress(creditor) as Hex, cycleId, netCredit, proof],
-          {
-            gas: gas ?? DEFAULT_CLEARING_GAS_LIMIT,
-            ...this.defaultFeeParams(),
-          },
-        ),
-      );
+      hash = await this.enqueueTx(async () => {
+        // As in `payNetDebit`: a claim on a cycle that is not funded yet is
+        // refused here, before it can be mined as a revert.
+        await ch.simulate.claimNetCreditFor(args, {
+          account: this.walletClient.account?.address,
+          gas: gasLimit,
+        });
+        return ch.write.claimNetCreditFor(args, {
+          gas: gasLimit,
+          ...this.defaultFeeParams(),
+        });
+      });
     } catch (error) {
       throw wrapViemError(error, "claimNetCreditFor failed");
     }

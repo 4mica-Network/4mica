@@ -47,10 +47,10 @@ A transaction that has left the wallet cannot be called back, and an answer that
 
 `TransactionOutcomeUnknownError` says how far the transaction got:
 
-- **`stage: "broadcast"`**: it was handed to the chain's node, and the node's answer never came: a timeout, a dropped connection, or a gateway's 5xx. The node may have taken it, and there is no hash.
+- **`stage: "broadcast"`**: it was handed to the chain's node, and no usable answer came back: a timeout, a dropped connection, a gateway's 5xx, an HTTP 408, or a JSON-RPC internal error (`-32603`). The node may have taken it, and there is no hash.
 - **`stage: "receipt"`**: the node accepted it, as `txHash`, and its receipt was not seen in time. It may still be mined.
 
-A refusal is not an unknown outcome. A JSON-RPC error from the node, an HTTP 4xx, or a failure before the broadcast (a gas estimate, a nonce read) stays a `ContractError`: nothing was sent.
+A refusal is not an unknown outcome. Any other JSON-RPC error from the node, any other HTTP 4xx, or a failure before the broadcast (a gas estimate, a nonce read, the run a cycle payment or claim gets before it is sent) stays a `ContractError`: nothing was sent.
 
 ```ts
 import { OutcomeUnknownError, TransactionOutcomeUnknownError } from "@4mica/sdk";

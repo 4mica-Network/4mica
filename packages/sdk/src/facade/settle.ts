@@ -1,5 +1,10 @@
 import { formatUnits } from "@/amounts";
-import { OutcomeUnknownError } from "@/errors";
+import type { PayReceipt } from "@/client/model";
+import {
+  Erc20AllowanceRequiredError,
+  GasRequiredError,
+  OutcomeUnknownError,
+} from "@/errors";
 import type { Position, SettleOptions, SettleResult } from "@/facade/models";
 import { assetRef, type NetworkSession } from "@/facade/session";
 import type { ClearingPosition } from "@/models";
@@ -47,6 +52,34 @@ export async function openPositions(
 }
 
 /**
+ * Pays one debit. The gasless routes need no allowance; the wallet's own
+ * transaction does, so when a payment falls to it and the ClearingHouse may
+ * not pull the token yet, the exact amount is approved and the payment sent
+ * again, as a deposit does.
+ */
+async function payDebit(
+  session: NetworkSession,
+  position: Position,
+): Promise<PayReceipt> {
+  const pay = session.client.settlement.pay(position.cycle);
+  try {
+    return await pay.send();
+  } catch (err) {
+    if (!(err instanceof Erc20AllowanceRequiredError)) throw err;
+    const gateway = await session.client.ctx.gateway();
+    if ((await gateway.nativeBalance()) === 0n) {
+      throw new GasRequiredError(
+        `paying ${position.amount} ${position.asset.symbol} as the wallet's ` +
+          `own transaction needs ${session.nativeSymbol} for gas, and the ` +
+          "wallet holds none",
+      );
+    }
+    await pay.selfFunded().approve();
+    return pay.selfFunded().send();
+  }
+}
+
+/**
  * Pays every open debit and claims every open credit, one at a time and in
  * the order core lists them (soonest deadline first). One that fails does
  * not stop the rest: each position gets its own result.
@@ -75,7 +108,7 @@ export async function settleAll(
     try {
       const receipt =
         action === "pay"
-          ? await settlement.pay(position.cycle).send()
+          ? await payDebit(session, position)
           : await settlement.claim(position.cycle).send();
       results.push({
         position,

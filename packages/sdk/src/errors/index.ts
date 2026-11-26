@@ -667,9 +667,10 @@ export class OutcomeUnknownError extends SponsorshipError {}
 /**
  * A transaction the wallet signed and sent itself, whose fate is unknown.
  *
- * - `stage: "broadcast"`: it was handed to the chain's node and the node's
- *   answer never came (a timeout, a dropped connection, a gateway error).
- *   The node may have taken it, and there is no hash to look it up by.
+ * - `stage: "broadcast"`: it was handed to the chain's node and no usable
+ *   answer came back (a timeout, a dropped connection, a gateway error, a
+ *   JSON-RPC internal error). The node may have taken it, and there is no
+ *   hash to look it up by.
  * - `stage: "receipt"`: the node accepted it, as `txHash`, and its receipt
  *   was not seen in time. It may still be mined.
  *

@@ -77,6 +77,39 @@ describe("listParticipantPositions", () => {
     ).rejects.toBeInstanceOf(InvalidParamsError);
   });
 
+  it.each([
+    ["a role it does not know", { role: "FLAT" }, /unknown role FLAT/],
+    ["no role", { role: undefined }, /missing role/],
+    ["no amount", { amount: undefined }, /missing amount/],
+    [
+      "no payment deadline",
+      { payment_submission_deadline: undefined },
+      /missing payment_submission_deadline/,
+    ],
+    [
+      "a finality deadline of zero",
+      { payment_finality_deadline: 0 },
+      /payment_finality_deadline is not a time/,
+    ],
+    [
+      "no word on the commit",
+      { commit_confirmed: undefined },
+      /missing commit_confirmed/,
+    ],
+  ])("refuses a position with %s", async (_what, override, message) => {
+    const core = new MockCore({
+      [`GET ${path}`]: () => ok({ positions: [{ ...debit, ...override }] }),
+    });
+    const refusal = await proxy(core)
+      .listParticipantPositions(PAYER.address)
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    expect(refusal).toBeInstanceOf(InvalidParamsError);
+    expect((refusal as Error).message).toMatch(message);
+  });
+
   it("passes core's refusal on, as when asking for another wallet's", async () => {
     const core = new MockCore({
       [`GET ${path}`]: () => ({

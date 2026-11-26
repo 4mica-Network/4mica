@@ -958,28 +958,51 @@ export class ClearingPosition {
 
   static fromRpc(raw: Record<string, unknown>): ClearingPosition {
     try {
+      // Every field decides what is paid or claimed, and by when: one that
+      // is missing is refused, not filled in.
+      const required = (...keys: string[]): unknown => {
+        const value = getAny(raw, ...keys);
+        if (value === undefined || value === null) {
+          throw new InvalidParamsError(
+            `invalid clearing position: missing ${keys[0]}`,
+          );
+        }
+        return value;
+      };
       const u256 = (...keys: string[]) =>
-        parseU256((getAny(raw, ...keys) ?? 0) as number | bigint | string);
+        parseU256(required(...keys) as number | bigint | string);
+      const unixSeconds = (...keys: string[]): number => {
+        const value = Number(required(...keys));
+        if (!Number.isSafeInteger(value) || value <= 0) {
+          throw new InvalidParamsError(
+            `invalid clearing position: ${keys[0]} is not a time`,
+          );
+        }
+        return value;
+      };
+      const role = String(required("role"));
+      if (role !== "NET_DEBTOR" && role !== "NET_CREDITOR") {
+        throw new InvalidParamsError(
+          `invalid clearing position: unknown role ${role}`,
+        );
+      }
+      const commitConfirmed = required("commit_confirmed", "commitConfirmed");
+      if (typeof commitConfirmed !== "boolean") {
+        throw new InvalidParamsError(
+          "invalid clearing position: commit_confirmed is not a boolean",
+        );
+      }
       return new ClearingPosition(
-        normalizeBytes32Hex(String(getAny(raw, "cycle_id", "cycleId"))),
-        String(getAny(raw, "cycle_id_text", "cycleIdText")),
-        normalizeAddress(String(getAny(raw, "asset_address", "assetAddress"))),
-        String(getAny(raw, "role")) as ClearingParticipantRole,
+        normalizeBytes32Hex(String(required("cycle_id", "cycleId"))),
+        String(required("cycle_id_text", "cycleIdText")),
+        normalizeAddress(String(required("asset_address", "assetAddress"))),
+        role,
         u256("amount"),
         u256("gross_outgoing", "grossOutgoing"),
         u256("gross_incoming", "grossIncoming"),
-        Number(
-          getAny(
-            raw,
-            "payment_submission_deadline",
-            "paymentSubmissionDeadline",
-          ) ?? 0,
-        ),
-        Number(
-          getAny(raw, "payment_finality_deadline", "paymentFinalityDeadline") ??
-            0,
-        ),
-        Boolean(getAny(raw, "commit_confirmed", "commitConfirmed")),
+        unixSeconds("payment_submission_deadline", "paymentSubmissionDeadline"),
+        unixSeconds("payment_finality_deadline", "paymentFinalityDeadline"),
+        commitConfirmed,
       );
     } catch (err) {
       if (err instanceof InvalidParamsError) throw err;

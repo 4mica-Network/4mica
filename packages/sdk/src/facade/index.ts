@@ -271,8 +271,10 @@ export class FourMica {
    * wallet's collateral, so this is the call to run after a cycle closes.
    *
    * A credit is claimable only once its cycle is funded; until then its
-   * claim comes back `"failed"`. With no facilitator configured the wallet
-   * sends the transactions itself and pays their gas, a failed one included.
+   * claim comes back `"failed"`, before anything is sent. With no
+   * facilitator configured the wallet sends the transactions itself and
+   * pays their gas: for a token debit that is an approval of the exact
+   * amount, when the ClearingHouse lacks one, and then the payment.
    */
   async settle(options: SettleOptions = {}): Promise<SettleResult[]> {
     return settleAll(await this.session(options.network), options);

@@ -13,15 +13,23 @@ They now throw `TransactionOutcomeUnknownError`, which extends
 `OutcomeUnknownError`, so one `instanceof OutcomeUnknownError` check covers a
 sponsored action and a self-funded one:
 
-- `stage: "broadcast"`: handed to the node, and its answer never came (a
-  timeout, a dropped connection, a gateway's 5xx). There is no hash.
+- `stage: "broadcast"`: handed to the node, and no usable answer came back (a
+  timeout, a dropped connection, a gateway's 5xx, an HTTP 408, a JSON-RPC
+  internal error). There is no hash.
 - `stage: "receipt"`: accepted by the node, as `txHash`, and its receipt was
   not seen in time.
 
-A refusal is still a `ContractError`: a JSON-RPC error from the node, an HTTP
-4xx, or a failure before the broadcast means nothing was sent.
+A refusal is still a `ContractError`: any other JSON-RPC error from the node,
+any other HTTP 4xx, or a failure before the broadcast means nothing was sent.
 `approveErc20` no longer follows an approval that may be out with a reset and
 a second approval.
+
+**A cycle payment or claim that would revert is no longer sent.** Both carry
+a fixed gas limit, so nothing estimated them, and a claim on a cycle that was
+not funded yet was mined as a revert at the wallet's expense. The wallet's
+own `payNetDebit` and `claimNetCreditFor` are now run against the chain
+first, and a revert comes back as its typed `ContractError` with nothing
+sent.
 
 If you matched these cases as `ContractError`, or by viem's
 `WaitForTransactionReceiptTimeoutError`, match `OutcomeUnknownError` instead.
@@ -35,7 +43,9 @@ If you matched these cases as `ContractError`, or by viem's
 - `client.settle()` pays every open debit and claims every open credit, and
   returns one result per position (`"settled"`, `"skipped"`, `"failed"` or
   `"unknown"`). One that fails does not stop the others. `{ only: "pay" }` or
-  `{ only: "claim" }` settles one side.
+  `{ only: "claim" }` settles one side. A debit the wallet pays with its own
+  transaction is approved first when the ClearingHouse may not pull the token
+  yet, as a deposit is.
 - On the low-level `Client`: `settlement.positions()`, and
   `payment.listIssued(cycleId, { limit, after })` for the guarantees the
   wallet issued in a cycle, a page at a time.

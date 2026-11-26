@@ -3,11 +3,13 @@
  * node goes quiet. The gateway and viem are real; only the node is a stub,
  * so the errors are the ones viem actually raises.
  */
-import type { Hex } from "viem";
+import { encodeErrorResult, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearingHouseAbi } from "@/abi/clearinghouse";
 import { ContractGateway } from "@/contract";
 import {
+  ClaimExceedsFundedLiquidityError,
   ContractError,
   OutcomeUnknownError,
   RevertedOnChainError,
@@ -110,10 +112,13 @@ describe("a broadcast the node never answers", () => {
     expect(error).not.toBeInstanceOf(ContractError);
     expect(error).toMatchObject({ stage: "broadcast", txHash: undefined });
     expect((error as Error).message).toMatch(
-      /^deposit: the transaction was sent and the node's answer never came/,
+      /^deposit: the transaction was sent and no usable answer came back/,
     );
-    // viem retried the same signed transaction; nothing new was signed.
+    // One signed transaction went out, and it was not sent again.
     expect(rpc.broadcasts()).toHaveLength(1);
+    expect(
+      rpc.calls.filter((c) => c.method === "eth_sendRawTransaction"),
+    ).toHaveLength(1);
   });
 
   it("is an unknown outcome when a gateway answers in the node's place", async () => {
@@ -125,6 +130,49 @@ describe("a broadcast the node never answers", () => {
       name: "TransactionOutcomeUnknownError",
       stage: "broadcast",
     });
+  });
+
+  it("is an unknown outcome when whoever was asked gave up waiting (HTTP 408)", async () => {
+    node({
+      eth_sendRawTransaction: () =>
+        new Response("request timeout", { status: 408 }),
+    });
+    await expect((await gateway()).deposit(10n ** 16n)).rejects.toMatchObject({
+      name: "TransactionOutcomeUnknownError",
+      stage: "broadcast",
+    });
+  });
+
+  it("is an unknown outcome when the node answers with an internal error", async () => {
+    // -32603 is the node, or the provider in front of it, failing at its own
+    // work: an upstream timeout comes back this way, and says nothing of the
+    // transaction.
+    node({
+      eth_sendRawTransaction: () => ({
+        error: { code: -32603, message: "upstream request timeout" },
+      }),
+    });
+    const error = await (await gateway()).deposit(10n ** 16n).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(TransactionOutcomeUnknownError);
+    expect(error).toMatchObject({ stage: "broadcast", txHash: undefined });
+  });
+
+  it("stays a failed write when an internal error came before the broadcast", async () => {
+    const rpc = node({
+      eth_estimateGas: () => ({
+        error: { code: -32603, message: "internal error" },
+      }),
+    });
+    const error = await (await gateway()).deposit(10n ** 16n).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ContractError);
+    expect(error).not.toBeInstanceOf(OutcomeUnknownError);
+    expect(rpc.broadcasts()).toEqual([]);
   });
 
   it("stays a failed write when the node refuses the transaction", async () => {
@@ -198,6 +246,92 @@ describe("a transaction the node accepted", () => {
       pollingInterval: 50,
     });
     expect(mined.transactionHash).toBe(HASH);
+  });
+});
+
+describe("a clearing call that would revert", () => {
+  // Both clearing calls carry a fixed gas limit, so viem estimates nothing:
+  // without a run against the chain first, a revert is mined and paid for.
+  const CLEARING_HOUSE = "0x00000000000000000000000000000000c1ea4196";
+  const CYCLE = `0x${"aa".repeat(32)}` as Hex;
+  const PROOF = [`0x${"dd".repeat(32)}`] as Hex[];
+  const unfunded = () => ({
+    error: {
+      code: 3,
+      message: "execution reverted",
+      data: encodeErrorResult({
+        abi: clearingHouseAbi,
+        errorName: "ClaimExceedsFundedLiquidity",
+        args: [2_500_000n, 1n],
+      }),
+    },
+  });
+
+  it("is refused with its typed revert, and never sent, for a claim", async () => {
+    const rpc = node({ eth_call: unfunded });
+    const error = await (await gateway())
+      .claimNetCreditFor(
+        CLEARING_HOUSE,
+        SIGNER.address,
+        CYCLE,
+        2_500_000n,
+        PROOF,
+      )
+      .then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    expect(error).toBeInstanceOf(ClaimExceedsFundedLiquidityError);
+    expect(rpc.broadcasts()).toEqual([]);
+  });
+
+  it("is refused, and never sent, for a payment", async () => {
+    const rpc = node({ eth_call: unfunded });
+    await expect(
+      (await gateway()).payNetDebit(CLEARING_HOUSE, CYCLE, 7n, PROOF, 7n),
+    ).rejects.toBeInstanceOf(ContractError);
+    expect(rpc.broadcasts()).toEqual([]);
+  });
+
+  it("is a failed write, not an unknown outcome, when the run itself gets no answer", async () => {
+    const rpc = node({ eth_call: dropped });
+    const error = await (await gateway())
+      .claimNetCreditFor(CLEARING_HOUSE, SIGNER.address, CYCLE, 1n, PROOF)
+      .then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    expect(error).toBeInstanceOf(ContractError);
+    expect(error).not.toBeInstanceOf(OutcomeUnknownError);
+    expect(rpc.broadcasts()).toEqual([]);
+  });
+
+  it("is sent once the run passes, as the wallet and with the payment's value", async () => {
+    const rpc = node({
+      eth_call: () => ({ result: "0x" }),
+      eth_getTransactionReceipt: () => ({ result: receipt("0x1") }),
+    });
+    const mined = await (await gateway()).payNetDebit(
+      CLEARING_HOUSE,
+      CYCLE,
+      7n,
+      PROOF,
+      7n,
+      { timeout: 2_000, pollingInterval: 50 },
+    );
+    expect(mined.transactionHash).toBe(HASH);
+    const run = rpc.calls.find((c) => c.method === "eth_call");
+    expect(run?.params[0]).toMatchObject({
+      from: SIGNER.address,
+      to: CLEARING_HOUSE,
+      value: "0x7",
+    });
+    expect(rpc.broadcasts()).toHaveLength(1);
+    // The run comes before the broadcast.
+    const methods = rpc.calls.map((c) => c.method);
+    expect(methods.indexOf("eth_call")).toBeLessThan(
+      methods.indexOf("eth_sendRawTransaction"),
+    );
   });
 });
 

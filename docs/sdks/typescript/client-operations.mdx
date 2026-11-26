@@ -105,8 +105,10 @@ for (const result of await client.settle()) {
 | --- | --- |
 | `"settled"` | Paid or claimed. `txHash` is the transaction. |
 | `"skipped"` | Not attempted; `reason` says why. A position is skipped until its cycle's commit is confirmed on-chain. |
-| `"failed"` | Refused or reverted; `error` is the typed error. Nothing moved. A credit whose cycle is not funded yet fails this way, and can be claimed later. |
+| `"failed"` | Refused or reverted; `error` is the typed error. Nothing moved. A credit whose cycle is not funded yet fails this way, before anything is sent, and can be claimed later. |
 | `"unknown"` | Sent, and no answer came back; `error` is an `OutcomeUnknownError`. Check before running it again. |
+
+A debit is paid gaslessly where a facilitator can relay it. Otherwise the wallet sends its own transaction, and for a token the ClearingHouse may not pull yet, an approval for the exact amount before it: two transactions, both paid for in the network's native asset.
 
 `client.settle({ only: "pay" })` settles only what the wallet owes, and `{ only: "claim" }` only what it is owed. Pay first if you settle in two steps: an unpaid debit is taken from the wallet's collateral once its deadline passes.
 
