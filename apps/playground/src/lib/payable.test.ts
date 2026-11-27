@@ -90,25 +90,61 @@ describe("agentGaps", () => {
   });
 });
 
-const nullableFields = <T extends object>(row: T): (keyof T & string)[] =>
-  (Object.keys(row) as (keyof T & string)[]).filter(
-    (key) => row[key] !== null && typeof row[key] !== "object",
-  );
+type Row = Record<string, unknown>;
 
-describe("the database filter matches the in-memory rule", () => {
-  it.each(
-    nullableFields(listing()),
-  )("listing.%s is required by both or by neither", (field) => {
-    const blanked = listing({ [field]: null } as Partial<PublicApiListing>);
-
-    expect(listingGaps(blanked).length > 0).toBe(field in PAYABLE_LISTING);
+const satisfies = (where: Row, row: Row): boolean =>
+  Object.entries(where).every(([field, condition]) => {
+    expect(condition, `${field} must be filtered as { not: null }`).toEqual({
+      not: null,
+    });
+    return row[field] !== null;
   });
 
-  it.each(
-    nullableFields(agent()),
-  )("agent.%s is required by both or by neither", (field) => {
-    const blanked = agent({ [field]: null } as Partial<PublicAgent>);
+const subsets = <T>(items: T[]): T[][] =>
+  Array.from({ length: 2 ** items.length }, (_, mask) =>
+    items.filter((_, bit) => mask & (1 << bit)),
+  );
 
-    expect(agentGaps(blanked).length > 0).toBe(field in PAYABLE_AGENT);
+const rulesAgree = <T extends Row>(
+  complete: T,
+  where: Row,
+  gaps: (row: T) => unknown[],
+) => {
+  const blank = (fields: string[]): T => ({
+    ...complete,
+    ...Object.fromEntries(fields.map((field) => [field, null])),
+  });
+  const required = Object.keys(complete).filter(
+    (field) =>
+      field in where ||
+      (complete[field] !== null && gaps(blank([field])).length > 0),
+  );
+  const cases = subsets(required);
+
+  for (const missing of cases) {
+    const row = blank(missing);
+    expect(satisfies(where, row), `missing ${missing.join(", ")}`).toBe(
+      gaps(row).length === 0,
+    );
+  }
+
+  return cases.length;
+};
+
+describe("the database filter matches the in-memory rule", () => {
+  it("agrees on every combination of listing fields", () => {
+    expect(
+      rulesAgree(listing() as unknown as Row, PAYABLE_LISTING, (row) =>
+        listingGaps(row as unknown as PublicApiListing),
+      ),
+    ).toBe(16);
+  });
+
+  it("agrees on every combination of agent fields", () => {
+    expect(
+      rulesAgree(agent() as unknown as Row, PAYABLE_AGENT, (row) =>
+        agentGaps(row as unknown as PublicAgent),
+      ),
+    ).toBe(8);
   });
 });
