@@ -2,6 +2,7 @@ import { Tag } from "@4mica/ui";
 import { ListRow } from "@/components/ListRow";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
+import { agentGaps } from "@/lib/payable";
 import type { PublicAgent } from "@/types";
 import { agentPath } from "@/utils/profileUrl";
 
@@ -34,7 +35,12 @@ export function AgentRow({ agent, username, isOwner }: AgentRowProps) {
           <Tag size="sm" variant={STATUS_VARIANT[agent.status]}>
             {STATUS_LABEL[agent.status]}
           </Tag>
-          {isOwner && <VisibilityTag visibility={agent.visibility} />}
+          {isOwner && (
+            <VisibilityTag
+              complete={agentGaps(agent).length === 0}
+              visibility={agent.visibility}
+            />
+          )}
         </>
       }
     />

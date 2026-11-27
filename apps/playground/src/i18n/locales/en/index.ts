@@ -191,8 +191,6 @@ export const en = {
     nativeAsset: "Native asset",
     erc20: "ERC-20",
     notPayable: "This API is not accepting 4Mica payments yet.",
-    notPayableOwner:
-      "Add a network and a receiving address to this listing to show integration instructions here.",
 
     // Agent
     agentBuyerHeading: "Call this agent",
@@ -202,8 +200,6 @@ export const en = {
     agentCallLead:
       "Wrap the fetch you already use, then post your prompt to the agent's endpoint.",
     agentNotSellable: "This agent is not accepting 4Mica payments yet.",
-    agentNotSellableOwner:
-      "Add a receiving wallet and an endpoint URL to this agent to show payment instructions here.",
 
     agentRunHeading: "Run this agent",
     agentLead:
@@ -220,6 +216,15 @@ export const en = {
       "This agent cannot sign payments until it is active. The setup below still applies.",
 
     sellerHeading: "Server setup",
+    sellerIncompleteTitle: "Finish setting up",
+    sellerIncompleteLead:
+      "Customers can't open or pay for this {{kind}} yet, whatever its visibility. Once it has these, its visibility decides who can see it:",
+    sellerIncompleteKind: { listing: "API", agent: "agent" },
+    sellerGap: {
+      wallet: "A receiving wallet, so payments have somewhere to go",
+      endpoint: "An endpoint URL, so customers know where to send requests",
+      price: "A price per request",
+    },
     sellerOpenDashboard: "Open in the dashboard",
     sellerInstallTitle: "Install the server SDK",
     sellerInstallLead:
@@ -335,6 +340,9 @@ export const en = {
     private: "Private",
     unlistedHint: "Reachable by direct link, hidden from your profile.",
     privateHint: "Only visible to you.",
+    incomplete: "Incomplete",
+    incompleteHint:
+      "Hidden from customers until it has a receiving wallet, an endpoint URL and a price, whatever its visibility.",
   },
 
   owner: {

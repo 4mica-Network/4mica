@@ -28,10 +28,12 @@ const listing = (
 });
 
 describe("isPayable", () => {
-  it("requires both a network and a recipient", () => {
+  it("requires a network, a recipient, an endpoint and a price", () => {
     expect(isPayable(listing())).toBe(true);
     expect(isPayable(listing({ network: null }))).toBe(false);
     expect(isPayable(listing({ payToAddress: null }))).toBe(false);
+    expect(isPayable(listing({ url: null }))).toBe(false);
+    expect(isPayable(listing({ priceAmount: null }))).toBe(false);
   });
 });
 
@@ -82,11 +84,8 @@ describe("buildApiListingSnippets", () => {
     expect(snippets?.python).toContain("session.post(");
   });
 
-  it("falls back to a marked placeholder when the URL is unset", () => {
-    const snippets = buildApiListingSnippets(listing({ url: null }));
-
-    expect(snippets?.typescript).toContain("https://api.example.com");
-    expect(snippets?.typescript).not.toContain("undefined");
+  it("returns null rather than inventing an endpoint", () => {
+    expect(buildApiListingSnippets(listing({ url: null }))).toBeNull();
   });
 
   it("never leaks a nullish interpolation", () => {
@@ -127,18 +126,16 @@ describe("buildApiListingSnippets", () => {
     expect(snippets?.curl).not.toContain('"maxAmountRequired": "$0.01"');
   });
 
-  it("omits the wire amount when only a display label was published", () => {
-    const snippets = buildApiListingSnippets(
-      listing({
-        priceAmount: null,
-        priceCurrency: null,
-        priceLabel: "Usage-based",
-      }),
-    );
-
-    expect(snippets?.curl).not.toContain("maxAmountRequired");
-    // The label still reaches the human-readable comment.
-    expect(snippets?.typescript).toContain("Usage-based per call");
+  it("returns null when only a display label was published", () => {
+    expect(
+      buildApiListingSnippets(
+        listing({
+          priceAmount: null,
+          priceCurrency: null,
+          priceLabel: "Usage-based",
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("advertises the tab-free requirements", () => {

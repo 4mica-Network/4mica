@@ -30,7 +30,7 @@ import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildApiListingHandoff, buildSellerHandoff } from "@/lib/ai-handoff";
 import { buildApiListingDescriptor } from "@/lib/descriptor";
-import { isPayable } from "@/lib/snippets/api-listing";
+import { listingGaps } from "@/lib/payable";
 import { buildSellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
 import { getPayerState, preloadPayerState } from "@/services/payer";
@@ -69,8 +69,9 @@ export default async function ApiListingPage({
 
   const pageUrl = `${links.website}${apiListingPath(profile.username, listing.ref)}`;
   const dashboardUrl = `${links.app}/apis/${listing.id}`;
+  const gaps = listingGaps(listing);
   const sellerSnippets =
-    view === "seller" && isPayable(listing)
+    view === "seller" && gaps.length === 0
       ? buildSellerSnippets({ kind: "listing", ...listing })
       : null;
   const handoff =
@@ -190,11 +191,11 @@ export default async function ApiListingPage({
     view === "seller"
       ? {
           label: messages.integration.sellerHeading,
-          steps: buildSellerSteps(
-            sellerSnippets,
+          steps: buildSellerSteps(sellerSnippets, {
+            kind: "listing",
             dashboardUrl,
-            messages.integration.notPayableOwner,
-          ),
+            gaps,
+          }),
         }
       : {
           label: messages.flow.integrate,
@@ -285,7 +286,10 @@ export default async function ApiListingPage({
                     {listing.name}
                   </h1>
                   {profile.isOwner && (
-                    <VisibilityTag visibility={listing.visibility} />
+                    <VisibilityTag
+                      complete={gaps.length === 0}
+                      visibility={listing.visibility}
+                    />
                   )}
                 </div>
 

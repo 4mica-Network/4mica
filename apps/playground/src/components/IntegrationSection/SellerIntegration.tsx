@@ -1,24 +1,39 @@
 import { CodeBlock } from "@/components/CodeBlock";
 import { RevealLink } from "@/components/RevealLink";
 import type { FlowStep } from "@/components/StepFlow";
-import { messages } from "@/i18n";
+import { messages, t } from "@/i18n";
+import type { SetupGap } from "@/lib/payable";
 import type { SellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
 import { StepLead } from "./StepLead";
 
+export interface SellerSetup {
+  kind: "listing" | "agent";
+  dashboardUrl: string;
+  gaps: SetupGap[];
+}
+
 export function buildSellerSteps(
   snippets: SellerSnippets | null,
-  dashboardUrl: string,
-  notReady: string,
+  { kind, dashboardUrl, gaps }: SellerSetup,
 ): FlowStep[] {
-  if (!snippets) {
+  if (!snippets || gaps.length > 0) {
     return [
       {
-        id: "seller",
-        title: messages.integration.sellerProtectTitle,
+        id: "seller-setup",
+        title: messages.integration.sellerIncompleteTitle,
         content: (
           <>
-            <StepLead>{notReady}</StepLead>
+            <StepLead>
+              {t(messages.integration.sellerIncompleteLead, {
+                kind: messages.integration.sellerIncompleteKind[kind],
+              })}
+            </StepLead>
+            <ul className="flex list-disc flex-col gap-1.5 pl-5 text-ink-body text-sm leading-relaxed">
+              {gaps.map((gap) => (
+                <li key={gap}>{messages.integration.sellerGap[gap]}</li>
+              ))}
+            </ul>
             <RevealLink external href={dashboardUrl}>
               {messages.integration.sellerOpenDashboard}
             </RevealLink>

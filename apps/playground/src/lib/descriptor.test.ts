@@ -129,10 +129,10 @@ describe("buildApiListingDescriptor", () => {
     expect(result.integration).toBeNull();
   });
 
-  it("is not invocable without a url", () => {
+  it("is neither payable nor invocable without a url", () => {
     const result = buildApiListingDescriptor(listing({ url: null }), profile());
 
-    expect(result.payable).toBe(true);
+    expect(result.payable).toBe(false);
     expect(result.invocable).toBe(false);
     expect(result.resource).toBeNull();
   });

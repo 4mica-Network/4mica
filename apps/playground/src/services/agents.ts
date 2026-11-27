@@ -5,6 +5,7 @@ import type { PublicAgent } from "@/schema/agent";
 import type { PaymentNetwork } from "@/schema/params";
 import { cachedPublic, ownerTag } from "./cache";
 import { prisma } from "./db";
+import { PAYABLE_AGENT } from "./payable";
 
 /**
  * Note what is NOT selected: `walletAddress` and `creditLimit`. A credit limit
@@ -110,7 +111,7 @@ const queryAgents = async (
     where: {
       ownerId,
       deletedAt: null,
-      ...(includeHidden ? {} : { visibility: "PUBLIC" }),
+      ...(includeHidden ? {} : { visibility: "PUBLIC", ...PAYABLE_AGENT }),
     },
     select: AGENT_PUBLIC_SELECT,
     orderBy: { createdAt: "desc" },
@@ -150,7 +151,10 @@ const queryAgent = async (
       deletedAt: null,
       ...(isOwner
         ? {}
-        : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
+        : {
+            visibility: { in: ["PUBLIC", "UNLISTED"] as const },
+            ...PAYABLE_AGENT,
+          }),
       OR: [{ slug: idOrSlug }, { id: idOrSlug }],
     },
     select: isOwner ? AGENT_OWNER_SELECT : AGENT_PUBLIC_SELECT,

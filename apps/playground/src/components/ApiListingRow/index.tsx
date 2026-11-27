@@ -1,6 +1,7 @@
 import { Tag } from "@4mica/ui";
 import { ListRow } from "@/components/ListRow";
 import { VisibilityTag } from "@/components/VisibilityTag";
+import { listingGaps } from "@/lib/payable";
 import type { PublicApiListing } from "@/types";
 import { apiListingPath } from "@/utils/profileUrl";
 
@@ -37,7 +38,12 @@ export function ApiListingRow({
               {tag}
             </Tag>
           ))}
-          {isOwner && <VisibilityTag visibility={listing.visibility} />}
+          {isOwner && (
+            <VisibilityTag
+              complete={listingGaps(listing).length === 0}
+              visibility={listing.visibility}
+            />
+          )}
         </>
       }
     />

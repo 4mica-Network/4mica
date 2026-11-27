@@ -33,6 +33,7 @@ import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
 import { buildAgentHandoff, buildSellerHandoff } from "@/lib/ai-handoff";
 import { buildAgentDescriptor } from "@/lib/descriptor";
+import { agentGaps } from "@/lib/payable";
 import { isSellable } from "@/lib/snippets/agent";
 import { buildSellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
@@ -85,6 +86,7 @@ export default async function AgentPage({
 
   const pageUrl = `${links.website}${agentPath(profile.username, agent.ref)}`;
   const dashboardUrl = `${links.app}/agents/${agent.id}`;
+  const gaps = agentGaps(agent);
   const sellerSnippets =
     view === "seller" && isSellable(agent)
       ? buildSellerSnippets({
@@ -208,11 +210,11 @@ export default async function AgentPage({
             icon: "integrate",
             numbered: true,
             collapsible: true,
-            steps: buildSellerSteps(
-              sellerSnippets,
+            steps: buildSellerSteps(sellerSnippets, {
+              kind: "agent",
               dashboardUrl,
-              messages.integration.agentNotSellableOwner,
-            ),
+              gaps,
+            }),
           },
           {
             id: "run",
@@ -324,7 +326,10 @@ export default async function AgentPage({
                       {STATUS_LABEL[agent.status]}
                     </Tag>
                     {profile.isOwner && (
-                      <VisibilityTag visibility={agent.visibility} />
+                      <VisibilityTag
+                        complete={gaps.length === 0}
+                        visibility={agent.visibility}
+                      />
                     )}
                   </div>
                 </div>
