@@ -16,6 +16,7 @@ export const INITIAL_STATE: DeveloperState = {
   cliSessionsLoading: false,
   cliSessionsLoaded: false,
   cliSessionsError: null,
+  cliSessionsVersion: 0,
   isLoading: false,
   hasLoaded: false,
   pending: {},
@@ -147,7 +148,13 @@ export default function developerReducer(
       return { ...state, cliSessionsLoading: true, cliSessionsError: null };
 
     case actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED: {
-      const { sessions } = action.payload as { sessions: CliSession[] };
+      const { sessions, version } = action.payload as {
+        sessions: CliSession[];
+        version: number;
+      };
+      if (version !== state.cliSessionsVersion) {
+        return state;
+      }
       return {
         ...state,
         cliSessions: sessions,
@@ -171,6 +178,7 @@ export default function developerReducer(
       return {
         ...state,
         cliSessions: [session, ...state.cliSessions],
+        cliSessionsVersion: state.cliSessionsVersion + 1,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }
@@ -180,6 +188,7 @@ export default function developerReducer(
       return {
         ...state,
         cliSessions: state.cliSessions.filter((session) => session.id !== id),
+        cliSessionsVersion: state.cliSessionsVersion + 1,
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }

@@ -175,9 +175,12 @@ export const fetchCliSessionsPending = () => ({
   type: actionTypes.FETCH_CLI_SESSIONS_PENDING,
 });
 
-export const fetchCliSessionsSucceeded = (sessions: CliSession[]) => ({
+export const fetchCliSessionsSucceeded = (
+  sessions: CliSession[],
+  version: number,
+) => ({
   type: actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED,
-  payload: { sessions },
+  payload: { sessions, version },
 });
 
 export const fetchCliSessionsFailed = (message: string) => ({

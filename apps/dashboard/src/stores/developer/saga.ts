@@ -1,13 +1,21 @@
 import * as cliApi from "@api/cli";
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import type { RootState } from "@stores/index";
 import {
   refreshAfterWrite,
   writeSucceededTypes,
 } from "@stores/refreshAfterWrite";
 import type { PendingMeta } from "@stores/utils";
 import { toIssueMap, toMessage } from "@utils/http-errors";
-import { all, call, put, takeEvery, takeLatest } from "redux-saga/effects";
+import {
+  all,
+  call,
+  put,
+  select,
+  takeEvery,
+  takeLatest,
+} from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
   createApiKeySucceeded,
@@ -16,6 +24,7 @@ import {
   deleteApiKeySucceeded,
   deleteWebhookSucceeded,
   developerActionFailed,
+  fetchCliSessions as fetchCliSessionsAgain,
   fetchCliSessionsFailed,
   fetchCliSessionsPending,
   fetchCliSessionsSucceeded,
@@ -240,13 +249,22 @@ export function* deleteWebhook(action: {
   }
 }
 
+const cliSessionsVersion = (state: RootState) =>
+  state.developer.cliSessionsVersion;
+
 export function* fetchCliSessions(): Generator {
   try {
     yield put(fetchCliSessionsPending());
+    const before = (yield select(cliSessionsVersion)) as number;
     const sessions = (yield call(cliApi.getCliSessions)) as Awaited<
       ReturnType<typeof cliApi.getCliSessions>
     >;
-    yield put(fetchCliSessionsSucceeded(sessions));
+    const after = (yield select(cliSessionsVersion)) as number;
+    if (after !== before) {
+      yield put(fetchCliSessionsAgain());
+      return;
+    }
+    yield put(fetchCliSessionsSucceeded(sessions, before));
   } catch (error) {
     yield put(
       fetchCliSessionsFailed(

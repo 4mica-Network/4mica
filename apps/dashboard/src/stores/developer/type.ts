@@ -80,6 +80,7 @@ export type DeveloperState = {
   cliSessionsLoading: boolean;
   cliSessionsLoaded: boolean;
   cliSessionsError: string | null;
+  cliSessionsVersion: number;
   isLoading: boolean;
   hasLoaded: boolean;
   pending: Record<string, boolean>;

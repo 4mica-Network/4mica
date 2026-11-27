@@ -46,6 +46,13 @@ const CHOOSABLE: { scope: CliScope; key: string }[] = [
 
 const DEFAULT_SCOPES: CliScope[] = ["wallets:read"];
 
+const SCOPE_LABELS: Record<string, string> = {
+  "account:read": "developer.cli.authorize.scope.accountRead",
+  "wallets:read": "developer.cli.authorize.scope.walletsRead",
+  "wallets:link": "developer.cli.authorize.scope.walletsLink",
+  "wallets:unlink": "developer.cli.authorize.scope.walletsUnlink",
+};
+
 function CliSessionRow({ session }: { session: CliSession }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -71,6 +78,14 @@ function CliSessionRow({ session }: { session: CliSession }) {
         </div>
         <p className="mt-0.5 font-mono text-ink-muted text-xs">
           {session.prefix}…{session.last4}
+        </p>
+        <p className="mt-0.5 text-ink-muted text-xs">
+          {t("developer.cli.permissions")}:{" "}
+          {session.scopes
+            .map((scope) =>
+              SCOPE_LABELS[scope] ? t(SCOPE_LABELS[scope]) : scope,
+            )
+            .join(", ")}
         </p>
         <p className="mt-0.5 text-ink-subtle text-xs">
           {t("developer.cli.created")} {formatDate(session.createdAt)} ·{" "}
