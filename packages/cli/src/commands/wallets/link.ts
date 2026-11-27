@@ -11,7 +11,6 @@ import {
   apiError,
   request,
   requireScopes,
-  requireSession,
   whoAmI,
 } from "../../core/platform.js";
 import { walletAddress, walletKey } from "../../core/session.js";
@@ -50,7 +49,7 @@ export default class WalletsLink extends NetworkCommand {
   async run() {
     const { flags } = await this.parse(WalletsLink);
     const settings = await this.settings(flags);
-    const { platform, token } = await requireSession(this.config.configDir);
+    const { platform, token } = await this.accountSession(settings);
     const address = await walletAddress(settings);
     const network = platformNetwork(settings);
 

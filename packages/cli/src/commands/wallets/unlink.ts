@@ -4,12 +4,7 @@ import {
   listLinkedWallets,
   platformNetwork,
 } from "../../core/linked-wallets.js";
-import {
-  api,
-  requireScopes,
-  requireSession,
-  whoAmI,
-} from "../../core/platform.js";
+import { api, requireScopes, whoAmI } from "../../core/platform.js";
 import { canPrompt } from "../../core/runtime.js";
 import { walletAddress } from "../../core/session.js";
 import { cancelled, failure, usageError } from "../../errors.js";
@@ -43,7 +38,7 @@ export default class WalletsUnlink extends NetworkCommand {
   async run() {
     const { args, flags } = await this.parse(WalletsUnlink);
     const settings = await this.settings(flags);
-    const { platform, token } = await requireSession(this.config.configDir);
+    const { platform, token } = await this.accountSession(settings);
     const network = platformNetwork(settings);
     const address = args.address
       ? requireAddress(args.address, "the address")

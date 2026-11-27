@@ -63,15 +63,23 @@ export async function readStoredSession(
   };
 }
 
-export const storeUnavailable = (reason: string) =>
+export const storeUnavailable = (
+  reason: string,
+  suggestions: string[] = ["or set FOURMICA_TOKEN for this command"],
+) =>
   configError(`the saved sign-in could not be read: ${reason}`, {
     code: "CREDENTIAL_STORE_UNAVAILABLE",
     retryable: true,
     suggestions: [
       "unlock the keychain, or approve the cli's access to it, and try again",
-      "or set FOURMICA_TOKEN for this command",
+      ...suggestions,
     ],
   });
+
+/** For a saved sign-in that cannot be read, and so cannot be revoked. */
+export const FORGET_ADVICE =
+  "or, to give up on it, run `4mica auth logout --forget` and revoke it " +
+  "under Settings → Developer → CLI sessions";
 
 export async function loadStoredSession(
   configDir: string,

@@ -5,9 +5,11 @@ import {
   withCredentialLock,
 } from "../../core/credentials.js";
 import {
+  FORGET_ADVICE,
   type Platform,
   readStoredSession,
   request,
+  storeUnavailable,
   whoAmI,
 } from "../../core/platform.js";
 import { readEnv } from "../../core/settings.js";
@@ -27,10 +29,15 @@ export default class AuthLogout extends PlatformCommand {
       summary:
         "revoke the token on the platform even if it came from the dashboard",
     }),
+    forget: Flags.boolean({
+      summary:
+        "sign out here even if the saved token cannot be read, leaving it valid",
+    }),
   };
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --revoke",
+    "<%= config.bin %> <%= command.id %> --forget",
   ];
 
   async run() {
@@ -45,8 +52,13 @@ export default class AuthLogout extends PlatformCommand {
       async (assertHeld): Promise<Outcome> => {
         const found = await readStoredSession(dir);
         if (found.status === "missing") return "none";
-        // A token that cannot be read cannot be revoked, but signing out
-        // here must still work: forget it, and say what is left to do.
+        // A token that cannot be read cannot be revoked. A locked keychain
+        // is usually only locked for now, and forgetting the entry would
+        // leave the token valid with nothing pointing at it, so that takes
+        // --forget.
+        if (found.status === "unavailable" && !flags.forget) {
+          throw storeUnavailable(found.reason, [FORGET_ADVICE]);
+        }
         const result =
           found.status === "unavailable"
             ? "unreadable"

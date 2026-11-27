@@ -12,9 +12,11 @@ import {
   accountLabel,
   api,
   badResponse,
+  FORGET_ADVICE,
   type Platform,
   readStoredSession,
   request,
+  storeUnavailable,
   TOKEN_PREFIX,
   type WhoAmI,
   whoAmI,
@@ -89,6 +91,11 @@ export default class AuthLogin extends PlatformCommand {
     const platform = await this.platform(flags);
     const dir = this.config.configDir;
 
+    // Signing in replaces the saved sign-in, and revokes it if the browser
+    // made it. One that cannot be read cannot be revoked, so say so before
+    // anyone approves a new one, rather than leave it valid and unpointed-to.
+    await requireReadable(dir);
+
     let minted = false;
     const token = flags["with-token"]
       ? requireToken(await readInput("-"))
@@ -104,7 +111,7 @@ export default class AuthLogin extends PlatformCommand {
         platform.origin,
         async (assertHeld) => {
           const me = await whoAmI(platform, token);
-          const before = await readStoredSession(dir);
+          const before = await requireReadable(dir);
           await assertHeld();
           const saved = await saveToken(dir, platform.origin, token, {
             kind: me.session.kind,
@@ -247,6 +254,14 @@ export default class AuthLogin extends PlatformCommand {
       waiting.clear();
     }
   }
+}
+
+async function requireReadable(dir: string) {
+  const before = await readStoredSession(dir);
+  if (before.status === "unavailable") {
+    throw storeUnavailable(before.reason, [FORGET_ADVICE]);
+  }
+  return before;
 }
 
 const revokeToken = (platform: Platform, token: string): Promise<boolean> =>

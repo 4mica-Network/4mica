@@ -58,6 +58,27 @@ const tokenFile = () =>
 
 const signIn = () => run(AuthLogin, ["--json", "--name", "ada-laptop"]);
 
+/**
+ * A sign-in whose token is in the system keychain. The tests run with
+ * FOURMICA_CREDENTIAL_STORE=file, so the cli can see the entry but not read
+ * the token, as with a locked keychain.
+ */
+const saveUnreadableSignIn = async () => {
+  await withCredentialLock(
+    configDir(),
+    new URL(platform.url).origin,
+    async () => {},
+  );
+  await writeFile(
+    tokenFile(),
+    JSON.stringify({
+      origin: new URL(platform.url).origin,
+      storage: "keychain",
+      kind: "DEVICE",
+    }),
+  );
+};
+
 describe("auth login", () => {
   it("shows a code, waits for approval, and keeps the token it is given", async () => {
     platform.polls.push("authorization_pending");
@@ -236,6 +257,41 @@ describe("auth login", () => {
     expect(error?.suggestions?.[0]).toContain("CLI sessions");
   });
 
+  it("will not replace a sign-in it cannot read, before any code is made", async () => {
+    await saveUnreadableSignIn();
+    readInput.mockResolvedValue("4mica_cli_shared");
+
+    for (const argv of [[], ["--with-token"]]) {
+      const { error } = await run(AuthLogin, argv);
+      expect(error).toMatchObject({ code: "CREDENTIAL_STORE_UNAVAILABLE" });
+      expect(error?.suggestions?.join("\n")).toContain(
+        "4mica auth logout --forget",
+      );
+    }
+    expect(platform.requests).toEqual([]);
+    expect(openBrowser).not.toHaveBeenCalled();
+    expect(readInput).not.toHaveBeenCalled();
+    expect(await readFile(tokenFile(), "utf8")).toContain("keychain");
+  });
+
+  it("signs in after the unreadable sign-in is forgotten", async () => {
+    await saveUnreadableSignIn();
+    await run(AuthLogout, ["--forget"]);
+    const { error } = await signIn();
+
+    expect(error).toBeUndefined();
+    expect(await readFile(tokenFile(), "utf8")).toContain(GRANTED);
+  });
+
+  it("revokes the new browser session if the old sign-in turns unreadable meanwhile", async () => {
+    openBrowser.mockImplementationOnce(saveUnreadableSignIn);
+    const { error } = await run(AuthLogin);
+
+    expect(error).toMatchObject({ code: "CREDENTIAL_STORE_UNAVAILABLE" });
+    expect(platform.tokens.has(GRANTED)).toBe(false);
+    expect(await readFile(tokenFile(), "utf8")).not.toContain(GRANTED);
+  });
+
   it("will not send a token to a platform over plain http", async () => {
     const { error } = await run(AuthLogin, [], {
       FOURMICA_API_URL: "http://platform.example",
@@ -330,28 +386,44 @@ describe("auth logout", () => {
     expect(platform.tokens.has("4mica_cli_shared")).toBe(false);
   });
 
-  it("forgets a token it cannot read, and says it was not revoked", async () => {
-    await withCredentialLock(
-      configDir(),
-      new URL(platform.url).origin,
-      async () => {},
+  it("keeps a sign-in it cannot read, so it can be revoked once readable", async () => {
+    await saveUnreadableSignIn();
+    const { error, stderr } = await run(AuthLogout);
+
+    expect(error).toMatchObject({ code: "CREDENTIAL_STORE_UNAVAILABLE" });
+    expect(error?.suggestions?.join("\n")).toContain(
+      "4mica auth logout --forget",
     );
-    await writeFile(
-      tokenFile(),
-      JSON.stringify({
-        origin: new URL(platform.url).origin,
-        storage: "keychain",
-        kind: "DEVICE",
-      }),
-    );
-    const { error, json, stderr } = await run(AuthLogout, ["--json"]);
+    expect(stderr).not.toContain("nothing to do");
+    expect(await readFile(tokenFile(), "utf8")).toContain("keychain");
+    expect(platform.requests).toEqual([]);
+  });
+
+  it("forgets a sign-in it cannot read with --forget, and says it is still valid", async () => {
+    await saveUnreadableSignIn();
+    const { error, json, stderr } = await run(AuthLogout, [
+      "--forget",
+      "--json",
+    ]);
 
     expect(error).toBeUndefined();
     expect(json).toMatchObject({ loggedOut: true, revoked: false });
-    expect(stderr).not.toContain("nothing to do");
     expect(stderr).toContain("could not be read");
     expect(stderr).toContain("revoke it in the dashboard");
     await expect(readFile(tokenFile())).rejects.toThrow();
+    expect(platform.requests).toEqual([]);
+
+    const again = await run(AuthLogout);
+    expect(again.error).toBeUndefined();
+    expect(again.stderr).toContain("nothing to do");
+  });
+
+  it("revokes as usual with --forget when the token can be read", async () => {
+    await signIn();
+    const { json } = await run(AuthLogout, ["--forget", "--json"]);
+
+    expect(json).toMatchObject({ loggedOut: true, revoked: true });
+    expect(platform.tokens.has(GRANTED)).toBe(false);
   });
 
   it("forgets the token even when the platform cannot be reached", async () => {
@@ -478,6 +550,39 @@ describe("wallets link", () => {
     expect(error).toMatchObject({ code: "WALLET_ALREADY_LINKED" });
   });
 
+  it("refuses an env file that would choose the account", async () => {
+    await signIn();
+    await create("buyer-1");
+    const dotenv = join(home, "project.env");
+    platform.requests.length = 0;
+
+    await writeFile(dotenv, `FOURMICA_API_URL=${platform.url}\n`);
+    const url = await run(WalletsLink, ["--dotenv", dotenv], {
+      FOURMICA_API_URL: "",
+    });
+    expect(url.error).toMatchObject({ code: "PLATFORM_ENV_IN_FILE" });
+    expect(url.error?.message).toContain("FOURMICA_API_URL");
+
+    await writeFile(join(home, ".env"), "FOURMICA_TOKEN=4mica_cli_from-file\n");
+    const token = await run(WalletsLink);
+    expect(token.error).toMatchObject({ code: "PLATFORM_ENV_IN_FILE" });
+    expect(token.stdout + token.stderr).not.toContain("from-file");
+    expect(JSON.stringify(token.error)).not.toContain("from-file");
+
+    expect(platform.requests).toEqual([]);
+    expect(platform.wallets).toEqual([]);
+  });
+
+  it("takes an env file whose account variables the environment also sets", async () => {
+    await signIn();
+    await create("buyer-1");
+    await writeFile(join(home, ".env"), `FOURMICA_API_URL=${platform.url}\n`);
+    const { error } = await run(WalletsLink);
+
+    expect(error).toBeUndefined();
+    expect(platform.wallets).toHaveLength(1);
+  });
+
   it("cannot link on a core that is not a hosted network", async () => {
     await signIn();
     await create("buyer-1");
@@ -534,6 +639,19 @@ describe("wallets unlink", () => {
     expect(error).toMatchObject({ code: "INSUFFICIENT_SCOPE" });
     expect(error?.suggestions?.[0]).toContain("FOURMICA_TOKEN");
     expect(error?.suggestions?.[1]).toContain("unset FOURMICA_TOKEN");
+  });
+
+  it("refuses an env file that would choose the account", async () => {
+    await signIn();
+    await writeFile(join(home, ".env"), "FOURMICA_TOKEN=4mica_cli_from-file\n");
+    platform.requests.length = 0;
+    const { error } = await run(WalletsUnlink, [
+      "0x000000000000000000000000000000000000dEaD",
+      "--yes",
+    ]);
+
+    expect(error).toMatchObject({ code: "PLATFORM_ENV_IN_FILE" });
+    expect(platform.requests).toEqual([]);
   });
 
   it("says so when the wallet is not linked", async () => {
