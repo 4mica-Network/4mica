@@ -25,8 +25,9 @@ class SpendLimits:
     per_payment: str | Sequence[str] = "1 USDC"
     total: str | Sequence[str] | None = None
     """One budget per entry for the whole session, across networks: ``"5 USDC"``
-    is 5 in all. Once set, only assets an entry names can be paid. Counts
-    every payment sent, taken or not, in this process only."""
+    is 5 in all. Once set, only assets an entry names can be paid, so an empty
+    list permits nothing. Counts every payment sent, taken or not, in this
+    process only."""
     pay_to: str | Sequence[str] | None = None
     """When set, the only payees the session pays."""
 

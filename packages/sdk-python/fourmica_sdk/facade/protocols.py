@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import secrets
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -47,7 +48,8 @@ class PaymentProtocol(Protocol):
     async def pay(
         self, terms: PaymentTerms, client: Client, http: httpx.AsyncClient
     ) -> dict[str, str]:
-        """Headers to retry with."""
+        """Headers to retry with. Paying the same *terms* again signs for the
+        same payment, so the seller can redeem at most one of them."""
         ...
 
     def settled(self, response: httpx.Response) -> bool | None:
@@ -164,6 +166,8 @@ class X402Protocol:
                         offer=(
                             _signable(required, requirements),
                             requirements,
+                            # Core issues one guarantee per request id.
+                            int.from_bytes(secrets.token_bytes(32), "big"),
                         ),
                     )
                 )
@@ -174,12 +178,14 @@ class X402Protocol:
     async def pay(
         self, terms: PaymentTerms, client: Client, http: httpx.AsyncClient
     ) -> dict[str, str]:
-        payment_required, requirements = terms.offer
+        payment_required, requirements, req_id = terms.offer
         flow = X402Flow(client, http)
         if payment_required is not None:
-            signed = await flow.sign_payment_v2(payment_required, requirements)
+            signed = await flow.sign_payment_v2(
+                payment_required, requirements, req_id=req_id
+            )
             return {"PAYMENT-SIGNATURE": signed.header}
-        signed = await flow.sign_payment(requirements)
+        signed = await flow.sign_payment(requirements, req_id=req_id)
         return {"X-PAYMENT": signed.header}
 
     def settled(self, response: httpx.Response) -> bool | None:

@@ -102,7 +102,8 @@ the same bytes even for a file or a generator.
 5 USDC across every network the session pays on, not 5 on each. Once `total`
 is set, an asset none of its entries names is refused, even if `per_payment`
 allows it: a total that capped only some assets would leave the rest
-unlimited. A misspelled entry names nothing, so it refuses that asset too.
+unlimited. A misspelled entry names nothing, so it refuses that asset too, and
+an empty list (`total=[]`) refuses every asset; only `None` means no total.
 
 `total` counts every payment the session sends to a seller. One that was
 never sent because signing failed is released again. One that was sent stays
@@ -114,8 +115,9 @@ across processes sharing a wallet the hard limit is the collateral deposited.
 **A refusal to checkpoint.** Core holds a payer to so many guarantees no
 checkpoint covers (see [Checkpoints](#checkpoints)). When the seller refuses
 the payment for that, `fetch` signs the checkpoint core asks for and pays once
-more. Both payments count towards `total`. A second refusal comes back as the
-response.
+more, under the refused payment's request id. Core issues one guarantee per
+request id, so the seller can redeem one of the two however it plays them, and
+`total` counts one. A second refusal comes back as the response.
 
 **Redirects** are not followed unless you pass `follow_redirects=True` or an
 `http_client` that follows them. When they are, the request paid for is the

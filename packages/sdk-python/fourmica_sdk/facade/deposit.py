@@ -111,6 +111,12 @@ async def deposit(
             )
 
         async def counted(timeout: float) -> DepositResult:
+            # Inferred from the balance: core reports the collateral held, not
+            # which deposit it counted. Another deposit of this asset counted
+            # meanwhile (one from another process, or one this session started
+            # after the lock was released on "mined" or a timeout) can be taken
+            # for this one. Swap for a per-transaction acknowledgement once
+            # core exposes one.
             target = baseline + amount
             seen = await _until_counted(session, token.address, target, timeout)
             return result("spendable" if seen else "pending")

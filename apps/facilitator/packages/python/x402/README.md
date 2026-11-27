@@ -89,7 +89,13 @@ print(resp.status_code, resp.text)
 
 To pay on a self-hosted core, name it per network:
 `FourMicaEvmScheme("0xYourPrivateKey", core_urls={"eip155:84532": "http://localhost:3000"})`.
-A seller that advertises `extra.rpcUrl` in its requirements still takes precedence.
+A `core_urls` entry takes precedence over the `extra.rpcUrl` a seller advertises in
+its requirements, which in turn takes precedence over the hosted core.
+
+When a payment is refused for something the payer can fix (core wants a
+checkpoint, or the payment carried a stale cycle or clock), the scheme fixes it and
+x402 retries once. The retry is signed under the refused payment's request id, and
+core issues one guarantee per request id, so the seller can redeem only one of the two.
 
 The key and the core are the ones you pass. `FOURMICA_*` variables describe one
 core (`FOURMICA_NETWORK` or `FOURMICA_RPC_URL`, the default network when neither is

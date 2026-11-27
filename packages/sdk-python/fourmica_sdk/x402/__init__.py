@@ -75,11 +75,20 @@ class X402Flow:
         return cls(client)
 
     async def sign_payment(
-        self, payment_requirements: PaymentRequirementsV1
+        self,
+        payment_requirements: PaymentRequirementsV1,
+        *,
+        req_id: int | None = None,
     ) -> X402SignedPayment:
-        """x402 v1. The base64 ``header`` goes in ``X-PAYMENT``."""
+        """x402 v1. The base64 ``header`` goes in ``X-PAYMENT``.
+
+        Pass the *req_id* of a refused payment when signing again for the same
+        request: core issues one guarantee per request id, so the seller can
+        redeem at most one of the two."""
         self._validate_scheme(payment_requirements.scheme)
-        request = await self._sign(await self._build_payment(payment_requirements))
+        request = await self._sign(
+            await self._build_payment(payment_requirements, req_id)
+        )
         envelope = {
             "x402Version": X402_V1,
             "scheme": payment_requirements.scheme,
@@ -92,13 +101,16 @@ class X402Flow:
         self,
         payment_required: X402PaymentRequired,
         accepted: PaymentRequirementsV2,
+        *,
+        req_id: int | None = None,
     ) -> X402SignedPayment:
-        """x402 v2. The base64 ``header`` goes in ``PAYMENT-SIGNATURE``."""
+        """x402 v2. The base64 ``header`` goes in ``PAYMENT-SIGNATURE``.
+        *req_id* is as for ``sign_payment``."""
         self._validate_scheme(accepted.scheme)
         if payment_required.x402_version != X402_V2:
             raise X402Error("expected x402 version 2")
 
-        request = await self._sign(await self._build_payment(accepted))
+        request = await self._sign(await self._build_payment(accepted, req_id))
         envelope: dict[str, Any] = {
             "x402Version": X402_V2,
             "accepted": accepted.to_payload(),
@@ -159,7 +171,9 @@ class X402Flow:
         except Exception as exc:
             raise X402Error(f"failed to sign payment: {exc}") from exc
 
-    async def _build_payment(self, requirements: Requirements) -> PaymentRequestPayload:
+    async def _build_payment(
+        self, requirements: Requirements, req_id: int | None
+    ) -> PaymentRequestPayload:
         try:
             recipient = parse_address(requirements.pay_to, "payTo")
             amount = parse_u256(requirements.amount)
@@ -176,7 +190,9 @@ class X402Flow:
             raise X402Error(f"failed to build payment: {exc}") from exc
         # Echo the advertised spelling: sellers may compare it as a string.
         payload = dataclasses.replace(
-            payload, recipient_address=requirements.pay_to.strip()
+            payload,
+            recipient_address=requirements.pay_to.strip(),
+            req_id=payload.req_id if req_id is None else req_id,
         )
 
         if extra.validation is None:

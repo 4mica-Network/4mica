@@ -36,18 +36,25 @@ class StubSigned:
         self.payload = StubRequest(wire)
 
 
+def _wire(req_id, version):
+    return {"payload": {"version": "v1", "req_id": hex(req_id)}, "signature": "0x", "v": version}
+
+
 class StubFlow:
     def __init__(self):
         self.last_payment_required = None
         self.last_accepted = None
+        self.req_ids = []
 
-    async def sign_payment_v2(self, payment_required, accepted):
+    async def sign_payment_v2(self, payment_required, accepted, *, req_id=None):
         self.last_payment_required = payment_required
         self.last_accepted = accepted
-        return StubSigned({"claims": {"version": "v1", "req_id": "0x1"}, "v": 2})
+        self.req_ids.append(req_id)
+        return StubSigned(_wire(req_id or 1, 2))
 
-    async def sign_payment(self, requirements):
-        return StubSigned({"claims": {"version": "v1", "req_id": "0x2"}, "v": 1})
+    async def sign_payment(self, requirements, *, req_id=None):
+        self.req_ids.append(req_id)
+        return StubSigned(_wire(req_id or 2, 1))
 
 
 class StubPayment:
@@ -103,7 +110,7 @@ def test_create_payment_payload_v2():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 2
-    assert payload["claims"]["req_id"] == "0x1"
+    assert payload["payload"]["req_id"] == "0x1"
     flow = scheme._payers["https://custom.rpc.example"].flow
     assert flow.last_payment_required.resource.url == "https://api.example.com/premium"
     assert flow.last_payment_required.resource.description == "Premium dataset"
@@ -128,10 +135,10 @@ def test_create_payment_payload_v1():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 1
-    assert payload["claims"]["req_id"] == "0x2"
+    assert payload["payload"]["req_id"] == "0x2"
 
 
-def test_pays_on_the_payers_core_override_unless_the_seller_names_one():
+def test_the_payers_own_core_wins_over_the_one_the_seller_names():
     scheme = StubScheme("0x" + "1" * 64, core_urls={"eip155:31337": "http://localhost:3000/"})
     req = PaymentRequirements(
         scheme="4mica-credit",
@@ -140,15 +147,31 @@ def test_pays_on_the_payers_core_override_unless_the_seller_names_one():
         amount="1",
         pay_to="0xdef",
         max_timeout_seconds=60,
-        extra={},
+        extra={"rpcUrl": "https://seller.core.example/"},
     )
 
     scheme.create_payment_payload(req)
-    scheme.create_payment_payload(
-        req.model_copy(update={"extra": {"rpcUrl": "https://seller.core.example/"}})
+    scheme.create_payment_payload(req.model_copy(update={"extra": {}}))
+
+    assert scheme.connected == ["http://localhost:3000/"]
+
+
+def test_the_core_the_seller_names_wins_over_the_hosted_one():
+    scheme = StubScheme("0x" + "1" * 64)
+    req = PaymentRequirements(
+        scheme="4mica-credit",
+        network="eip155:84532",
+        asset="0xabc",
+        amount="1",
+        pay_to="0xdef",
+        max_timeout_seconds=60,
+        extra={"rpcUrl": "https://seller.core.example/"},
     )
 
-    assert scheme.connected == ["http://localhost:3000/", "https://seller.core.example/"]
+    scheme.create_payment_payload(req)
+    scheme.create_payment_payload(req.model_copy(update={"extra": {}}))
+
+    assert scheme.connected == ["https://seller.core.example/", SEPOLIA_CORE]
 
 
 def test_create_payment_payload_v2_rejects_unknown_network_without_rpc():
@@ -169,9 +192,9 @@ def test_create_payment_payload_v2_rejects_unknown_network_without_rpc():
 
 def _paid(scheme, requirements):
     """Pays *requirements* once, so the scheme is connected to its core."""
-    scheme.create_payment_payload(requirements)
+    payload = scheme.create_payment_payload(requirements)
     return PaymentResponseContext(
-        payment_payload=PaymentPayload(x402_version=2, accepted=requirements, payload={}),
+        payment_payload=PaymentPayload(x402_version=2, accepted=requirements, payload=payload),
         requirements=requirements,
     )
 
@@ -205,6 +228,52 @@ def test_recovers_by_checkpointing_when_core_wants_one():
 
     assert isinstance(on_payment_response(ctx), RecoveredResponseResult)
     assert scheme.payment.calls == [("checkpoint_active_cycle", BASE_SEPOLIA.asset)]
+
+
+def _flow(scheme):
+    (payer,) = scheme._payers.values()
+    return payer.flow
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["invalid_4mica_credit_checkpoint_required", "invalid_4mica_credit_future_timestamp"],
+)
+def test_the_payment_signed_after_a_recovery_reuses_the_refused_ones_request_id(reason):
+    # Both refused payments become redeemable later, once checkpointed or once
+    # their timestamp passes; core issues one guarantee per request id.
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    refused = int(ctx.payment_payload.payload["payload"]["req_id"], 16)
+    ctx.settle_response = _refusal(reason)
+
+    assert isinstance(scheme.scheme_hooks["on_payment_response"](ctx), RecoveredResponseResult)
+    retry = scheme.create_payment_payload(BASE_SEPOLIA.model_copy())
+    scheme.create_payment_payload(BASE_SEPOLIA)
+
+    assert int(retry["payload"]["req_id"], 16) == refused
+    # Once: the next payment for the same terms is a new one.
+    assert _flow(scheme).req_ids == [None, refused, None]
+
+
+def test_a_retry_request_id_is_only_reused_for_the_same_requirements():
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    ctx.settle_response = _refusal("invalid_4mica_credit_checkpoint_required")
+    scheme.scheme_hooks["on_payment_response"](ctx)
+
+    scheme.create_payment_payload(BASE_SEPOLIA.model_copy(update={"amount": "2000"}))
+
+    assert _flow(scheme).req_ids == [None, None]
+
+
+def test_does_not_retry_a_refused_payment_whose_request_id_it_cannot_read():
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    ctx.payment_payload = PaymentPayload(x402_version=2, accepted=BASE_SEPOLIA, payload={})
+    ctx.settle_response = _refusal("invalid_4mica_credit_checkpoint_required")
+
+    assert scheme.scheme_hooks["on_payment_response"](ctx) is None
 
 
 def test_leaves_success_and_unrecoverable_refusals_alone():

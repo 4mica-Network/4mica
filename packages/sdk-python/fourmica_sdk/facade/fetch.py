@@ -37,6 +37,7 @@ class SpendLimiter:
         limits = limits or SpendLimits()
         self._per_payment = _as_list(limits.per_payment)
         self._total = _as_list(limits.total)
+        self._total_unset = limits.total is None
         self._pay_to = (
             None
             if limits.pay_to is None
@@ -84,7 +85,8 @@ class SpendLimiter:
                 f"{show(cap)} per-payment limit",
             )
 
-        if not self._total:
+        # An empty list names no asset, so it permits nothing.
+        if self._total_unset:
             return Reservation(budget=None, units=asked, asset=asset)
         total = await self._limit_for(session, self._total, asset)
         if total is None:
@@ -184,16 +186,24 @@ async def paying_fetch(
     body = await challenged.aread()
 
     async def pay_and_send(
-        protocol: PaymentProtocol, terms: PaymentTerms, session: NetworkSession
+        protocol: PaymentProtocol,
+        terms: PaymentTerms,
+        session: NetworkSession,
+        reservation: Reservation | None = None,
     ) -> tuple[httpx.Response, Reservation]:
-        reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
+        """*reservation* is the one a payment for the same *terms* holds: paying
+        them again signs the same payment, so the seller can redeem one."""
+        again = reservation is not None
+        if reservation is None:
+            reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
         headers = challenged.headers.copy()
         headers.pop("transfer-encoding", None)
         try:
             headers.update(await protocol.pay(terms, session.client, ctx.http))
         except BaseException:
-            # Nothing has left this process.
-            ctx.limiter.release(reservation)
+            # Nothing has left this process, unless this is the second time.
+            if not again:
+                ctx.limiter.release(reservation)
             raise
         # No redirects: they would hand the payment to wherever they point.
         # Stays reserved whatever comes back: the seller holds a signed payment.
@@ -220,7 +230,9 @@ async def paying_fetch(
             paid, terms, session.client
         ):
             # Once: a seller refusing again is not something paying fixes.
-            paid, reservation = await pay_and_send(protocol, terms, session)
+            paid, reservation = await pay_and_send(
+                protocol, terms, session, reservation
+            )
         if paid.status_code == HTTPStatus.PAYMENT_REQUIRED:
             return paid
         # A seller that says nothing is taken to charge for what it delivered.

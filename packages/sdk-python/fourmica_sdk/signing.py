@@ -139,10 +139,14 @@ def _normalize_signature(signature: str | bytes) -> str:
         sig = "0x" + sig
     try:
         raw = bytes.fromhex(sig[2:])
-    except ValueError:
-        return sig
+    except ValueError as exc:
+        raise SigningError("the signer returned a signature that is not hex") from exc
+    # Core takes only the 65-byte r || s || v form.
     if len(raw) != SIGNATURE_LENGTH:
-        return sig
+        raise SigningError(
+            f"the signer returned a {len(raw)}-byte signature; "
+            f"expected {SIGNATURE_LENGTH}"
+        )
     r, s, v = raw[:32], int.from_bytes(raw[32:64], "big"), raw[64]
     if not 0 < int.from_bytes(r, "big") < _SECP256K1_ORDER:
         raise SigningError("the signer returned a signature with r out of range")

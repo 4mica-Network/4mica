@@ -87,9 +87,21 @@ def test_a_high_s_signature_is_rewritten_as_its_low_s_twin():
     assert recover(normal) == TEST_ADDRESS
 
 
-def test_what_is_not_a_65_byte_signature_is_left_for_the_server_to_refuse():
-    assert _normalize_signature("0xabcd") == "0xabcd"
-    assert _normalize_signature("not hex") == "0xnot hex"
+@pytest.mark.parametrize(
+    ("signature", "reason"),
+    [
+        ("not hex", "not hex"),
+        ("0x" + "zz" * 65, "not hex"),
+        ("0xabc", "not hex"),
+        ("0xabcd", "2-byte"),
+        ("", "0-byte"),
+        ("0x" + "11" * 64, "64-byte"),
+        (b"\x11" * 66, "66-byte"),
+    ],
+)
+def test_what_is_not_a_65_byte_hex_signature_is_a_signing_error(signature, reason):
+    with pytest.raises(SigningError, match=reason):
+        _normalize_signature(signature)
 
 
 @pytest.mark.parametrize(
@@ -121,6 +133,20 @@ async def test_a_malformed_remote_signature_fails_the_payment_as_a_signing_error
     signer = PayerSigner(BrokenSigner())
     with pytest.raises(SigningError, match="s out of range"):
         await signer._sign(lambda: DIGEST)
+
+
+@pytest.mark.parametrize("output", ["0xdeadbeef", "garbage", b"\x00" * 64])
+async def test_a_remote_signer_returning_no_signature_fails_as_a_signing_error(
+    output,
+):
+    class BrokenSigner:
+        address = TEST_ADDRESS
+
+        async def sign_hash(self, message_hash):
+            return output
+
+    with pytest.raises(SigningError, match="signer returned a"):
+        await PayerSigner(BrokenSigner())._sign(lambda: DIGEST)
 
 
 def test_requirements_echo_an_empty_extra_only_when_one_was_advertised():

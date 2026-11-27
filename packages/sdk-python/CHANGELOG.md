@@ -39,14 +39,16 @@
     raises `SpendLimitError` before anything is signed.
   - `SpendLimits.total` is one budget per entry for the whole session,
     shared by every network it pays on, and once set refuses an asset no
-    entry names. A payment sent to a seller stays counted whatever comes
-    back, a second 402 included.
+    entry names; an empty list permits nothing. A payment sent to a seller
+    stays counted whatever comes back, a second 402 included.
   - When the seller refuses a payment because core wants a checkpoint
     (`invalid_4mica_credit_checkpoint_required`), `fetch` signs the
     checkpoint for the cycle core names and pays once more, so a session
     paying per request keeps going past core's bound on uncheckpointed
-    guarantees instead of being refused until the cycle ends. Both
-    payments count towards `total`.
+    guarantees instead of being refused until the cycle ends. The second
+    payment carries the first one's request id, and core issues one
+    guarantee per request id, so the seller can redeem one of them and
+    `total` counts it once.
   - After a redirect, `fetch` pays the request that was answered 402, not
     the one it started with, and only on the origin it was asked for. The
     paid retry follows no redirect, so the payment is never forwarded.
@@ -67,6 +69,9 @@
   reads an x402 after-settle hook into what `report_payment` takes, and
   `payment_from_header()` reads an `X-PAYMENT` header. `AppListing` and
   `AppAgent` carry `assetDecimals` for pricing a route in base units.
+- `X402Flow.sign_payment()` and `sign_payment_v2()` take `req_id=`: signing
+  again for a refused payment under its request id leaves the seller able to
+  redeem only one of the two.
 - `to_caip2(network)` gives the CAIP-2 id from any form of a hosted
   network's name: `base-sepolia`, `BASE_SEPOLIA` or `eip155:84532`.
 - `fourmica_sdk.amounts`: `parse_amount`, `to_base_units`, `format_units` and
@@ -146,6 +151,8 @@
 - A 65-byte signature from a remote signer that cannot be one (`r` or `s`
   outside the curve order, or `v` other than 0, 1, 27 or 28) raises
   `SigningError`. An `s` above the order used to escape as `OverflowError`.
+  So does an answer that is not hex or not 65 bytes long, which used to be
+  sent as it was for the server to refuse.
 - A `wallet_private_key` and an `evm_signer` for two different accounts are
   refused at connect: payments were signed by one and transactions sent by
   the other.

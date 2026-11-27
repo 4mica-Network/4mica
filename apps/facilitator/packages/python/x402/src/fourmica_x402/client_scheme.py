@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import ssl
@@ -159,10 +160,15 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
         self._private_key = private_key
         self._core_urls = dict(core_urls or {})
         self._payers: Dict[str, _Payer] = {}
+        # Requirements -> the request id of the payment refused for them, for
+        # the retry x402 signs after a recovery.
+        self._retry_req_ids: Dict[str, int] = {}
+        self._retry_lock = threading.Lock()
         # When the facilitator refuses a payment for something the payer can
         # fix (a checkpoint core wants, a stale cycle or clock, a checkpoint
         # cutoff), fix it and have x402 retry the request once with a freshly
-        # signed payment. Sync, so both x402Client and x402ClientSync run it.
+        # signed payment under the refused one's request id. Sync, so both
+        # x402Client and x402ClientSync run it.
         self.scheme_hooks = {"on_payment_response": self._on_payment_response}
 
     def _config(self, rpc_url: str) -> Config:
@@ -215,7 +221,23 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
         except Exception:
             # The caller still gets the refusal, which names what to fix.
             return None
-        return RecoveredResponseResult() if recovered else None
+        if not recovered:
+            return None
+        req_id = _req_id_of(ctx.payment_payload.payload)
+        if req_id is None:
+            # Without it the retry could be redeemed alongside the refused one.
+            return None
+        with self._retry_lock:
+            self._retry_req_ids[_requirements_key(ctx.requirements)] = req_id
+        return RecoveredResponseResult()
+
+    def _take_retry_req_id(self, requirements: Any) -> Optional[int]:
+        """The refused payment's request id, once. A refused payment can still
+        be redeemed later, once checkpointed or once its timestamp has passed;
+        core issues one guarantee per request id, so the seller gets the
+        refused payment or its retry, never both."""
+        with self._retry_lock:
+            return self._retry_req_ids.pop(_requirements_key(requirements), None)
 
     def create_payment_payload(self, requirements: Any) -> dict[str, Any]:
         if hasattr(requirements, "max_amount_required"):
@@ -245,7 +267,11 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
             accepts=[accepted],
         )
 
-        signed = _run_async(flow.sign_payment_v2(payment_required, accepted))
+        signed = _run_async(
+            flow.sign_payment_v2(
+                payment_required, accepted, req_id=self._take_retry_req_id(requirements)
+            )
+        )
         return signed.payload.to_payload()
 
     def _create_payment_payload_v1(self, requirements: PaymentRequirementsV1) -> dict[str, Any]:
@@ -253,24 +279,40 @@ class FourMicaEvmScheme(SchemeNetworkClient, SchemeNetworkClientV1):
         req_v1 = SDKPaymentRequirementsV1.from_raw(
             requirements.model_dump(by_alias=True, exclude_none=True)
         )
-        signed = _run_async(flow.sign_payment(req_v1))
+        signed = _run_async(flow.sign_payment(req_v1, req_id=self._take_retry_req_id(requirements)))
         return signed.payload.to_payload()
 
     def _core_url(self, network: str) -> Optional[str]:
         return self._core_urls.get(network) or DEFAULT_RPC_URLS.get(network)
 
     def _rpc_url_for(self, requirements: Any) -> Optional[str]:
-        """The core that signs *requirements*: the one the seller names in
-        ``extra.rpcUrl``, then the payer's own override, then the hosted
-        deployment for the network."""
-        rpc_url = requirements.extra.get("rpcUrl") if requirements.extra else None
-        return rpc_url or self._core_url(str(requirements.network))
+        """The core that signs *requirements*: the payer's own ``core_urls``
+        entry, then the one the seller names in ``extra.rpcUrl`` (a seller on a
+        self-hosted core), then the hosted deployment for the network."""
+        network = str(requirements.network)
+        advertised = requirements.extra.get("rpcUrl") if requirements.extra else None
+        return self._core_urls.get(network) or advertised or DEFAULT_RPC_URLS.get(network)
 
     def _require_rpc_url(self, requirements: Any) -> str:
         rpc_url = self._rpc_url_for(requirements)
         if not rpc_url:
             raise ValueError(f"No RPC URL configured for network {requirements.network}")
         return rpc_url
+
+
+def _requirements_key(requirements: Any) -> str:
+    return json.dumps(
+        requirements.model_dump(by_alias=True, exclude_none=True),
+        sort_keys=True,
+        default=str,
+    )
+
+
+def _req_id_of(payload: Any) -> Optional[int]:
+    try:
+        return int(str(payload["payload"]["req_id"]), 0)
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def create_default_client_scheme(

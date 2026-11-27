@@ -497,7 +497,37 @@ async def test_checkpoints_the_cycle_core_names_and_pays_once_more():
     assert [is_paid(call) for call in seller.calls] == [False, True, True]
     assert client.sign_payment.await_count == 2
     assert len(records) == 1
-    # The refused payment stays counted: the seller still holds it.
+    # Core issues one guarantee per request id: the seller can redeem the
+    # refused payment, once checkpointed, or the retry, never both.
+    refused, retry = (call.args[0] for call in client.sign_payment.await_args_list)
+    assert refused.req_id == retry.req_id
+    # So the two count once; a new request is a new payment.
+    ctx.http = Seller(lambda: v2_challenge([entry(amount="600000")])).http
+    await paying_fetch(ctx, "GET", URL)
+    assert client.sign_payment.await_args.args[0].req_id != refused.req_id
+    with pytest.raises(SpendLimitError) as raised:
+        await paying_fetch(ctx, "GET", URL)
+    assert raised.value.limit == "total"
+
+
+async def test_a_retry_that_fails_to_sign_keeps_the_refused_payment_counted():
+    seller = refused_then(checkpoint_required(), httpx.Response(200))
+    client = FakeClient()
+    signed: list[object] = []
+
+    async def offline_on_the_retry(payload):
+        if signed:
+            raise RuntimeError("signer offline")
+        signed.append(payload)
+        return await client._sign_payment(payload)
+
+    client.sign_payment.side_effect = offline_on_the_retry
+    limiter = SpendLimiter(SpendLimits(total="1 USDC"))
+    ctx, _records, _ = context(seller.http, limiter=limiter, client=client)
+
+    with pytest.raises(X402Error):
+        await paying_fetch(ctx, "GET", URL)
+
     ctx.http = Seller(lambda: v2_challenge([entry(amount="600000")])).http
     with pytest.raises(SpendLimitError) as raised:
         await paying_fetch(ctx, "GET", URL)
@@ -705,7 +735,7 @@ async def test_one_total_is_one_budget_across_networks():
     assert [r.network for r in records] == [here.caip2, there.caip2]
 
 
-@pytest.mark.parametrize("total", ["5 USDC", "5 USCD", ["5 USDC", "5 USTD"]])
+@pytest.mark.parametrize("total", ["5 USDC", "5 USCD", ["5 USDC", "5 USTD"], []])
 async def test_a_total_refuses_an_asset_none_of_its_entries_names(total):
     seller = Seller(lambda: v2_challenge([entry(asset=USDT)]))
     limiter = SpendLimiter(SpendLimits(per_payment=["1 USDC", "1 USDT"], total=total))
