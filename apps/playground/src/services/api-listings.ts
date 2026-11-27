@@ -5,6 +5,7 @@ import type { PublicApiListing } from "@/schema/api-listing";
 import type { HttpMethod, PaymentNetwork } from "@/schema/params";
 import { cachedPublic, ownerTag } from "./cache";
 import { type Prisma, prisma } from "./db";
+import { PAYABLE_LISTING } from "./payable";
 
 export const API_LISTING_PUBLIC_SELECT = {
   id: true,
@@ -85,7 +86,7 @@ const queryApiListings = async (
     where: {
       ownerId,
       deletedAt: null,
-      ...(includeHidden ? {} : { visibility: "PUBLIC" }),
+      ...(includeHidden ? {} : { visibility: "PUBLIC", ...PAYABLE_LISTING }),
     },
     select: API_LISTING_PUBLIC_SELECT,
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
@@ -119,7 +120,10 @@ const queryApiListing = async (
       deletedAt: null,
       ...(includeHidden
         ? {}
-        : { visibility: { in: ["PUBLIC", "UNLISTED"] as const } }),
+        : {
+            visibility: { in: ["PUBLIC", "UNLISTED"] as const },
+            ...PAYABLE_LISTING,
+          }),
       OR: [{ slug: idOrSlug }, { id: idOrSlug }],
     },
     select: API_LISTING_PUBLIC_SELECT,

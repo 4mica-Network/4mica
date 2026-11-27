@@ -10,6 +10,7 @@ import {
 } from "@/schema/trust";
 import { resourceTag } from "@/services/cache";
 import { prisma } from "@/services/db";
+import { PAYABLE_AGENT, PAYABLE_LISTING } from "@/services/payable";
 import {
   hasSettledPayment,
   type ResourceKind,
@@ -54,7 +55,10 @@ const resolveTarget = async (
   } as const;
 
   if (resource.kind === "listing") {
-    const listing = await prisma.apiListing.findFirst({ where, select });
+    const listing = await prisma.apiListing.findFirst({
+      where: { ...where, ...(publicOnly ? PAYABLE_LISTING : {}) },
+      select,
+    });
 
     return listing
       ? {
@@ -66,7 +70,10 @@ const resolveTarget = async (
       : null;
   }
 
-  const agent = await prisma.agent.findFirst({ where, select });
+  const agent = await prisma.agent.findFirst({
+    where: { ...where, ...(publicOnly ? PAYABLE_AGENT : {}) },
+    select,
+  });
 
   if (!agent?.ownerId) {
     return null;

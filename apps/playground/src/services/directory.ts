@@ -9,6 +9,7 @@ import {
 import { AGENT_PUBLIC_SELECT, toPublicAgent } from "./agents";
 import { API_LISTING_PUBLIC_SELECT, toPublicApiListing } from "./api-listings";
 import { prisma } from "./db";
+import { PAYABLE_AGENT, PAYABLE_LISTING } from "./payable";
 import { PROFILE_SELECT } from "./profile";
 import { toPublicProfile } from "./profile-rules";
 
@@ -34,6 +35,7 @@ export const listDirectory = cache(async (): Promise<DirectoryEntry[]> => {
         deletedAt: null,
         visibility: "PUBLIC",
         owner: RENDERABLE_OWNER,
+        ...PAYABLE_LISTING,
       },
       select: {
         ...API_LISTING_PUBLIC_SELECT,
@@ -48,6 +50,7 @@ export const listDirectory = cache(async (): Promise<DirectoryEntry[]> => {
         deletedAt: null,
         visibility: "PUBLIC",
         owner: RENDERABLE_OWNER,
+        ...PAYABLE_AGENT,
       },
       select: {
         ...AGENT_PUBLIC_SELECT,
