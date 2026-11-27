@@ -37,10 +37,21 @@ export interface AuditLogItem {
   } | null;
 }
 
+export interface AuditFilters {
+  from: string;
+  to: string;
+  actorUserId: string;
+  actionPrefix: string;
+  projectId: string;
+  targetType: string;
+  targetId: string;
+  q: string;
+}
+
 export interface AuditLogState {
   items: AuditLogItem[];
   nextCursor: string | null;
-  action: string;
+  filters: AuditFilters;
   status: LoadStatus;
   isLoadingMore: boolean;
   error: string | null;

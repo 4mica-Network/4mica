@@ -1,18 +1,27 @@
-import { Avatar, Button, EmptyState } from "@4mica/ui";
+import { Avatar, Button, EmptyState, InputField } from "@4mica/ui";
+import { exportAuditLog } from "@api/exports";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { selectCan } from "@stores/organization/selector";
 import { PERMISSION } from "@stores/organization/type";
+import { selectProjects } from "@stores/project/selector";
 import {
   fetchAuditLog,
+  fetchMembers,
   selectAuditLog,
-  setAuditActionFilter,
+  selectMembers,
+  setAuditFilters,
 } from "@stores/team";
-import type { AuditLogItem } from "@stores/team/type";
+import { INITIAL_AUDIT_FILTERS } from "@stores/team/reducer";
+import { auditParams } from "@stores/team/saga";
+import type { AuditFilters, AuditLogItem } from "@stores/team/type";
 import { formatDateTime } from "@utils/format";
+import { useDebounceEffect } from "ahooks";
 import { Lock, ScrollText, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Select } from "@/components/form";
+import { ExportCsvButton } from "@/components/ExportCsv";
+import { TextInput } from "@/components/form";
+import { ListToolbar } from "@/components/ListToolbar";
 import { PageSpinner } from "@/components/PageSpinner";
 import { SettingsPage } from "@/components/SettingsPage";
 
@@ -59,51 +68,166 @@ function AuditRow({ item }: { item: AuditLogItem }) {
   );
 }
 
+function AuditFiltersBar() {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const { filters } = useAppSelector(selectAuditLog);
+  const members = useAppSelector(selectMembers);
+  const projects = useAppSelector(selectProjects);
+  const canExport = useAppSelector(selectCan(PERMISSION.REPORTS_EXPORT));
+
+  useEffect(() => {
+    dispatch(fetchMembers());
+  }, [dispatch]);
+
+  const apply = (next: Partial<AuditFilters>) => {
+    dispatch(setAuditFilters(next));
+    dispatch(fetchAuditLog());
+  };
+
+  return (
+    <div className="flex flex-col gap-3" data-testid="audit-filters">
+      <ListToolbar>
+        <ListToolbar.Search
+          value={filters.q}
+          placeholder={t("auditLog.filter.search")}
+          onSearch={(q) => apply({ q })}
+          data-testid="audit-search"
+        />
+        <ListToolbar.Filters>
+          <ListToolbar.Filter
+            label={t("auditLog.filter.actor")}
+            value={filters.actorUserId}
+            options={[
+              { value: "", title: t("auditLog.filter.anyone") },
+              ...members.map((member) => ({
+                value: member.userId,
+                title: member.name || member.email || member.userId,
+              })),
+            ]}
+            onChange={(actorUserId) => apply({ actorUserId })}
+            data-testid="audit-actor-filter"
+          />
+          <ListToolbar.Filter
+            label={t("auditLog.filter.project")}
+            value={filters.projectId}
+            options={[
+              { value: "", title: t("auditLog.filter.allProjects") },
+              ...projects.map((project) => ({
+                value: project.id,
+                title: project.name,
+              })),
+            ]}
+            onChange={(projectId) => apply({ projectId })}
+            data-testid="audit-project-filter"
+          />
+        </ListToolbar.Filters>
+      </ListToolbar>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
+        <DebouncedInput
+          label={t("auditLog.filter.actionPrefix")}
+          value={filters.actionPrefix}
+          placeholder="spending_policy."
+          onCommit={(actionPrefix) => apply({ actionPrefix })}
+          testId="audit-action-prefix"
+        />
+        <DebouncedInput
+          label={t("auditLog.filter.targetType")}
+          value={filters.targetType}
+          placeholder="api_key"
+          onCommit={(targetType) => apply({ targetType })}
+          testId="audit-target-type"
+        />
+        <DebouncedInput
+          label={t("auditLog.filter.targetId")}
+          value={filters.targetId}
+          onCommit={(targetId) => apply({ targetId })}
+          testId="audit-target-id"
+        />
+        <TextInput
+          type="date"
+          aria-label={t("auditLog.filter.from")}
+          value={filters.from}
+          onChange={(from) => apply({ from })}
+        />
+        <TextInput
+          type="date"
+          aria-label={t("auditLog.filter.to")}
+          value={filters.to}
+          onChange={(to) => apply({ to })}
+        />
+      </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          type="button"
+          intent="ghost"
+          size="sm"
+          onClick={() => apply(INITIAL_AUDIT_FILTERS)}
+          data-testid="audit-clear-filters"
+        >
+          {t("auditLog.filter.clear")}
+        </Button>
+        {canExport && (
+          <ExportCsvButton
+            onExport={() => exportAuditLog(auditParams(filters))}
+            data-testid="audit-export"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DebouncedInput({
+  label,
+  value,
+  placeholder,
+  onCommit,
+  testId,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onCommit: (value: string) => void;
+  testId: string;
+}) {
+  const [text, setText] = useState(value);
+  useEffect(() => {
+    setText(value);
+  }, [value]);
+  useDebounceEffect(
+    () => {
+      if (text !== value) {
+        onCommit(text);
+      }
+    },
+    [text],
+    { wait: 450 },
+  );
+  return (
+    <InputField
+      value={text}
+      aria-label={label}
+      placeholder={placeholder ?? label}
+      maxLength={200}
+      onChange={(event) => setText(event.target.value)}
+      data-testid={testId}
+    />
+  );
+}
+
 function AuditLog() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const audit = useAppSelector(selectAuditLog);
-  const [seenActions, setSeenActions] = useState<string[]>([]);
 
   useEffect(() => {
     dispatch(fetchAuditLog());
   }, [dispatch]);
 
-  useEffect(() => {
-    setSeenActions((current) => {
-      const next = new Set(current);
-      for (const item of audit.items) {
-        next.add(item.action);
-      }
-      return next.size === current.length ? current : [...next].sort();
-    });
-  }, [audit.items]);
-
-  const options = useMemo(
-    () => [
-      { value: "", title: t("auditLog.filter.all") },
-      ...seenActions.map((action) => ({ value: action, title: action })),
-    ],
-    [seenActions, t],
-  );
-
-  const chooseAction = (action: string) => {
-    dispatch(setAuditActionFilter(action));
-    dispatch(fetchAuditLog());
-  };
-
   return (
     <div className="flex flex-col gap-4">
-      <div className="w-60">
-        <Select
-          id="audit-action-filter"
-          aria-label={t("auditLog.filter.label")}
-          value={audit.action}
-          options={options}
-          hasSearch
-          onChange={chooseAction}
-        />
-      </div>
+      <AuditFiltersBar />
 
       {audit.status === "idle" || audit.status === "loading" ? (
         <PageSpinner />

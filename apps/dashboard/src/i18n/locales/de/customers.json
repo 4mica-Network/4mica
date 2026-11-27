@@ -263,5 +263,11 @@
   "customer.remove.confirmTitle": "Diesen Kunden entfernen?",
   "customer.remove.confirmDescription": "Sie werden zur Kundenliste zurückgeleitet.",
   "customer.remove.confirm": "Entfernen",
-  "customer.credit.promotionalNegative": "Aktionsguthaben darf nicht negativ sein. Verwenden Sie eine Korrektur, um Guthaben zurückzunehmen."
+  "customer.credit.promotionalNegative": "Aktionsguthaben darf nicht negativ sein. Verwenden Sie eine Korrektur, um Guthaben zurückzunehmen.",
+  "customer.limits.token": "Token",
+  "customer.limits.tokenHint": "Limits zählen nur Ausgaben in diesem Token.",
+  "customer.limits.chooseToken": "Token wählen",
+  "customer.limits.tokenRequired": "Wähle das Token, in dem diese Limits gelten.",
+  "customer.limits.allTokens": "Alle Tokens (alt)",
+  "customer.limits.allTokensHint": "Diese Limits summieren alle Tokens. Wähle ein Token, um sie genau zu machen."
 }

@@ -1,11 +1,14 @@
 import { Avatar, cn, Dropdown, Tooltip } from "@4mica/ui";
 import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
-import { useAppSelector } from "@stores/hooks";
+import { fetchFinanceBadges } from "@stores/financeBadge/actions";
+import { selectFinanceBadges } from "@stores/financeBadge/selector";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   allows,
   selectActiveOrganization,
 } from "@stores/organization/selector";
+import { PERMISSION } from "@stores/organization/type";
 import { selectUser } from "@stores/user/selector";
 import { m } from "framer-motion";
 import {
@@ -109,6 +112,64 @@ function AvatarCircle() {
   );
 }
 
+const BADGE_REFRESH_MS = 60_000;
+
+function useFinanceBadgeRefresh() {
+  const dispatch = useAppDispatch();
+  const organization = useAppSelector(selectActiveOrganization);
+  const enabled =
+    organization !== null && allows(organization, PERMISSION.FINANCE_READ);
+  const organizationId = organization?.id;
+
+  useEffect(() => {
+    if (!enabled || !organizationId) {
+      return;
+    }
+    dispatch(fetchFinanceBadges());
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") {
+        dispatch(fetchFinanceBadges());
+      }
+    }, BADGE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [dispatch, enabled, organizationId]);
+}
+
+function NavBadge({
+  kind,
+  collapsed,
+}: {
+  kind: NonNullable<NavItem["badge"]>;
+  collapsed: boolean;
+}) {
+  const { t } = useTranslation();
+  const badges = useAppSelector(selectFinanceBadges);
+  const count =
+    kind === "approvals"
+      ? badges.pendingApprovals
+      : badges.unacknowledgedAlerts;
+  const more =
+    kind === "approvals" ? badges.more.approvals : badges.more.alerts;
+  if (count === 0) {
+    return null;
+  }
+  const label = more ? `${count}+` : String(count);
+  return (
+    <span
+      className={cn(
+        "grid min-w-5 place-items-center rounded-full bg-brand px-1.5 font-semibold text-2xs text-surface-deep tabular-nums",
+        collapsed
+          ? "absolute top-0.5 left-6 h-3.5 min-w-3.5 px-1"
+          : "mr-2 ml-auto h-5",
+      )}
+      data-testid={`nav-badge-${kind}`}
+    >
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">{t(`nav.badge.${kind}`, { count })}</span>
+    </span>
+  );
+}
+
 function NavRow({
   item,
   collapsed,
@@ -128,12 +189,13 @@ function NavRow({
           end={end}
           onMouseEnter={() => preloadPage(item.to)}
           onFocus={() => preloadPage(item.to)}
-          className={({ isActive }) => rowClass(isActive)}
+          className={({ isActive }) => cn(rowClass(isActive), "relative")}
         >
           <RowIcon icon={item.icon} />
           <Label collapsed={collapsed} className="pr-2.5">
             {label}
           </Label>
+          {item.badge && <NavBadge kind={item.badge} collapsed={collapsed} />}
         </NavLink>
       </span>
     </Tooltip>
@@ -326,9 +388,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const [settled, setSettled] = useState(!collapsed);
   const organization = useAppSelector(selectActiveOrganization);
-  const settingsNav = SETTINGS_NAV.filter(
-    (item) => !item.permission || allows(organization, item.permission),
-  );
+  const permitted = (item: NavItem) =>
+    !item.permission || allows(organization, item.permission);
+  const settingsNav = SETTINGS_NAV.filter(permitted);
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter(permitted),
+  })).filter((section) => section.items.length > 0);
+  useFinanceBadgeRefresh();
 
   useEffect(() => {
     if (collapsed) {
@@ -375,7 +442,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           ? settingsNav.map((item) => (
               <NavRow key={item.to} item={item} collapsed={collapsed} />
             ))
-          : NAV_SECTIONS.map((section, i) => (
+          : sections.map((section, i) => (
               <div key={section.titleKey ?? `section-${i}`} className="mb-1">
                 {section.titleKey && (
                   <Label

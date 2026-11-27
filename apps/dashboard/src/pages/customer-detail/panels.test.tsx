@@ -38,7 +38,7 @@ vi.mock("react-router-dom", async (importOriginal) => ({
 
 const { AccessPanel } = await import("./AccessPanel");
 const { IdentitiesPanel } = await import("./IdentitiesPanel");
-const { LimitsPanel } = await import("./LimitsPanel");
+const { LimitsPanel, validateLimits } = await import("./LimitsPanel");
 const { PolicyPanel } = await import("./PolicyPanel");
 const { CreditPanel } = await import("./CreditPanel");
 const { CouponsPanel } = await import("./CouponsPanel");
@@ -317,6 +317,34 @@ describe("LimitsPanel", () => {
     expect(
       screen.getByTestId("customer-limits-empty-empty-state"),
     ).toBeInTheDocument();
+  });
+
+  it("marks limits without a token as the legacy all-tokens kind", () => {
+    renderPanel();
+    expect(screen.getByTestId("customer-limit-legacy-tag")).toBeInTheDocument();
+  });
+
+  it("names the token the limits are in", () => {
+    renderPanel({ limitNetwork: "BASE_SEPOLIA", limitAssetAddress: null });
+    expect(screen.getByTestId("customer-limit-token-tag")).toHaveTextContent(
+      "Base Sepolia",
+    );
+    expect(screen.queryByTestId("customer-limit-legacy-tag")).toBeNull();
+  });
+
+  it("requires a token before saving daily or monthly limits", () => {
+    expect(
+      validateLimits(
+        { dailyLimit: "5", monthlyLimit: "", token: "" },
+        (key) => key,
+      ),
+    ).toEqual({ token: "customer.limits.tokenRequired" });
+    expect(
+      validateLimits(
+        { dailyLimit: "5", monthlyLimit: "", token: "BASE_SEPOLIA:" },
+        (key) => key,
+      ),
+    ).toEqual({});
   });
 
   it("omits a limit card the customer does not have", () => {

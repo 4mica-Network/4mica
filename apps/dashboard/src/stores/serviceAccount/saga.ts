@@ -1,5 +1,6 @@
 import * as api from "@api/serviceAccount";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import type { RevealSecret } from "@stores/developer/type";
 import { errorCode } from "@stores/organization/saga";
 import type { PendingMeta } from "@stores/utils";
@@ -28,6 +29,11 @@ import type {
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (
+    yield* handledAsApproval(error, serviceAccountActionFailed("", {}, meta))
+  ) {
+    return;
+  }
   const message =
     errorCode(error) === "service_account_suspended"
       ? t(

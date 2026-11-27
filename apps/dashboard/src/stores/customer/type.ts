@@ -93,6 +93,8 @@ export interface Customer {
   dailyLimit: string | null;
   monthlyLimit: string | null;
   limitCurrency: string;
+  limitNetwork?: PaymentNetwork | null;
+  limitAssetAddress?: string | null;
   freeQuotaUnit: CustomerQuotaUnit | null;
   freeQuota: string | null;
   freeQuotaPeriod: CustomerQuotaPeriod | null;

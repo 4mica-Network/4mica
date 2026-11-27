@@ -1,7 +1,9 @@
 import { PERMISSION, type Permission } from "@stores/organization/type";
 import {
   BadgeCheck,
+  BarChart3,
   Bell,
+  BellRing,
   Blocks,
   Bot,
   Building2,
@@ -10,11 +12,15 @@ import {
   CreditCard,
   FolderKanban,
   House,
+  Inbox,
   KeySquare,
+  Landmark,
+  ListChecks,
   type LucideIcon,
   ScrollText,
   Settings,
   ShieldCheck,
+  ShieldHalf,
   SlidersHorizontal,
   Users,
   Wallet,
@@ -26,6 +32,7 @@ export interface NavItem {
   icon: LucideIcon;
   end?: boolean;
   permission?: Permission;
+  badge?: "approvals" | "alerts";
 }
 
 export interface NavSection {
@@ -50,6 +57,43 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: "/apis", labelKey: "nav.apis", icon: Blocks },
     ],
   },
+  {
+    titleKey: "nav.section.finance",
+    items: [
+      {
+        to: "/finance/policies",
+        labelKey: "nav.policies",
+        icon: Landmark,
+        permission: PERMISSION.FINANCE_READ,
+      },
+      {
+        to: "/finance/approvals",
+        labelKey: "nav.approvals",
+        icon: Inbox,
+        permission: PERMISSION.FINANCE_READ,
+        badge: "approvals",
+      },
+      {
+        to: "/finance/alerts",
+        labelKey: "nav.alerts",
+        icon: BellRing,
+        permission: PERMISSION.FINANCE_READ,
+        badge: "alerts",
+      },
+      {
+        to: "/finance/reports",
+        labelKey: "nav.reports",
+        icon: BarChart3,
+        permission: PERMISSION.FINANCE_READ,
+      },
+      {
+        to: "/finance/authorizations",
+        labelKey: "nav.authorizations",
+        icon: ListChecks,
+        permission: PERMISSION.FINANCE_READ,
+      },
+    ],
+  },
 ];
 
 export const FOOTER_ITEMS: NavItem[] = [
@@ -71,6 +115,12 @@ export const SETTINGS_NAV: NavItem[] = [
     to: "/settings/service-accounts",
     labelKey: "nav.serviceAccounts",
     icon: KeySquare,
+  },
+  {
+    to: "/settings/governance",
+    labelKey: "nav.governance",
+    icon: ShieldHalf,
+    permission: PERMISSION.FINANCE_READ,
   },
   {
     to: "/settings/audit-log",

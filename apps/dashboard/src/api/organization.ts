@@ -116,11 +116,9 @@ export const revokeInvitation = (id: string) =>
     method: HttpMethod.POST,
   });
 
-export const getAuditLogs = (params: {
-  limit?: number;
-  cursor?: string;
-  action?: string;
-}) =>
+export const getAuditLogs = (
+  params: Record<string, string | number | undefined>,
+) =>
   httpClient.request<{ items: AuditLogItem[]; nextCursor: string | null }>({
     url: "/me/organization/audit-logs",
     method: HttpMethod.GET,

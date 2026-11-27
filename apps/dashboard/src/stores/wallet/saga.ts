@@ -1,6 +1,7 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/wallet";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
 import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
@@ -61,6 +62,9 @@ const toMessage = (error: unknown, fallback: string): string => {
 };
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (yield* handledAsApproval(error, walletActionFailed("", {}, meta))) {
+    return;
+  }
   const message = toMessage(error, fallback);
   yield put(walletActionFailed(message, toIssueMap(error), meta));
 

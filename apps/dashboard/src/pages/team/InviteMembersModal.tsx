@@ -124,7 +124,11 @@ export function InviteMembersModal({
             onChange={setRaw}
           />
         </FieldRow>
-        <FieldRow title={t("team.invite.role")} htmlFor="invite-role">
+        <FieldRow
+          title={t("team.invite.role")}
+          description={t(`team.roleDescription.${role}`)}
+          htmlFor="invite-role"
+        >
           <Select
             id="invite-role"
             value={role}

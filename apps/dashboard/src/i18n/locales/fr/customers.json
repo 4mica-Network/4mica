@@ -271,5 +271,11 @@
   "customer.remove.confirmTitle": "Retirer ce client ?",
   "customer.remove.confirmDescription": "Vous serez redirigé vers la liste des clients.",
   "customer.remove.confirm": "Retirer",
-  "customer.credit.promotionalNegative": "Le crédit promotionnel ne peut pas être négatif. Utilisez un ajustement pour reprendre du crédit."
+  "customer.credit.promotionalNegative": "Le crédit promotionnel ne peut pas être négatif. Utilisez un ajustement pour reprendre du crédit.",
+  "customer.limits.token": "Jeton",
+  "customer.limits.tokenHint": "Les limites ne comptent que les dépenses dans ce jeton.",
+  "customer.limits.chooseToken": "Choisir un jeton",
+  "customer.limits.tokenRequired": "Choisissez le jeton de ces limites.",
+  "customer.limits.allTokens": "Tous les jetons (ancien)",
+  "customer.limits.allTokensHint": "Ces limites additionnent tous les jetons. Choisissez un jeton pour les rendre précises."
 }

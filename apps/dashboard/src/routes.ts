@@ -56,6 +56,26 @@ const DeveloperSettings = lazyPage("pages/developer", () =>
 const Disputes = lazyPage("pages/disputes", () =>
   import("@/pages/disputes").then((page) => page.Disputes),
 );
+const SpendingPolicies = lazyPage("pages/spending-policies", () =>
+  import("@/pages/spending-policies").then((page) => page.SpendingPolicies),
+);
+const Approvals = lazyPage("pages/approvals", () =>
+  import("@/pages/approvals").then((page) => page.Approvals),
+);
+const FinanceAlerts = lazyPage("pages/finance-alerts", () =>
+  import("@/pages/finance-alerts").then((page) => page.FinanceAlerts),
+);
+const FinanceReports = lazyPage("pages/finance-reports", () =>
+  import("@/pages/finance-reports").then((page) => page.FinanceReports),
+);
+const SpendAuthorizations = lazyPage("pages/spend-authorizations", () =>
+  import("@/pages/spend-authorizations").then(
+    (page) => page.SpendAuthorizations,
+  ),
+);
+const GovernanceSettings = lazyPage("pages/governance", () =>
+  import("@/pages/governance").then((page) => page.GovernanceSettings),
+);
 const Help = lazyPage("pages/help", () =>
   import("@/pages/help").then((page) => page.Help),
 );
@@ -117,6 +137,16 @@ export const APP_PAGES: RouteMeta[] = [
   { path: "agents/:id/advanced", component: AgentAdvanced },
   { path: "apis", component: Apis },
   { path: "apis/:id", component: ApiDetail },
+  {
+    path: "finance",
+    component: () =>
+      createElement(Navigate, { to: "/finance/policies", replace: true }),
+  },
+  { path: "finance/policies", component: SpendingPolicies },
+  { path: "finance/approvals", component: Approvals },
+  { path: "finance/alerts", component: FinanceAlerts },
+  { path: "finance/reports", component: FinanceReports },
+  { path: "finance/authorizations", component: SpendAuthorizations },
   { path: "help", component: Help },
   { path: "help/requests/:id", component: HelpRequestDetail },
 ];
@@ -142,6 +172,7 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "compliance", component: ComplianceSettings },
   { path: "developer", component: DeveloperSettings },
   { path: "service-accounts", component: ServiceAccountsSettings },
+  { path: "governance", component: GovernanceSettings },
   { path: "audit-log", component: AuditLogSettings },
 ];
 

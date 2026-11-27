@@ -1,6 +1,7 @@
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
+  AuditFilters,
   AuditLogItem,
   AuditLogState,
   Member,
@@ -8,10 +9,21 @@ import type {
   TeamState,
 } from "./type";
 
+export const INITIAL_AUDIT_FILTERS: AuditFilters = {
+  from: "",
+  to: "",
+  actorUserId: "",
+  actionPrefix: "",
+  projectId: "",
+  targetType: "",
+  targetId: "",
+  q: "",
+};
+
 const INITIAL_AUDIT: AuditLogState = {
   items: [],
   nextCursor: null,
-  action: "",
+  filters: INITIAL_AUDIT_FILTERS,
   status: "idle",
   isLoadingMore: false,
   error: null,
@@ -197,12 +209,15 @@ export default function teamReducer(
         },
       };
 
-    case actionTypes.SET_AUDIT_ACTION_FILTER:
+    case actionTypes.SET_AUDIT_FILTERS:
       return {
         ...state,
         audit: {
           ...state.audit,
-          action: (action.payload as { action: string }).action,
+          filters: {
+            ...state.audit.filters,
+            ...(action.payload as Partial<AuditFilters>),
+          },
           nextCursor: null,
         },
       };

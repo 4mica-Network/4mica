@@ -263,5 +263,11 @@
   "customer.remove.confirmTitle": "Remove this customer?",
   "customer.remove.confirmDescription": "You will be taken back to the customer list.",
   "customer.remove.confirm": "Remove",
-  "customer.credit.promotionalNegative": "Promotional credit cannot be negative. Use an adjustment to take credit back."
+  "customer.credit.promotionalNegative": "Promotional credit cannot be negative. Use an adjustment to take credit back.",
+  "customer.limits.token": "Token",
+  "customer.limits.tokenHint": "Limits count spend in this token only.",
+  "customer.limits.chooseToken": "Choose a token",
+  "customer.limits.tokenRequired": "Choose the token these limits are in.",
+  "customer.limits.allTokens": "All tokens (legacy)",
+  "customer.limits.allTokensHint": "These limits add up every token. Pick one token to make them precise."
 }

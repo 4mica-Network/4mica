@@ -10,6 +10,11 @@ export const PERMISSION = {
   RESOURCES_WRITE: "resources.write",
   RESOURCES_READ: "resources.read",
   PAYMENTS_READ: "payments.read",
+  FINANCE_READ: "finance.read",
+  FINANCE_MANAGE: "finance.manage",
+  APPROVALS_DECIDE: "approvals.decide",
+  GOVERNANCE_MANAGE: "governance.manage",
+  REPORTS_EXPORT: "reports.export",
 } as const;
 
 export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];
@@ -19,6 +24,7 @@ export const ORGANIZATION_ROLE = {
   ADMIN: "ADMIN",
   DEVELOPER: "DEVELOPER",
   VIEWER: "VIEWER",
+  FINANCE: "FINANCE",
 } as const;
 
 export type OrganizationRole =

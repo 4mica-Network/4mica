@@ -207,15 +207,47 @@ describe("team settings", () => {
   });
 });
 
+describe("finance role", () => {
+  it("offers Finance in the invite modal and explains what it can do", () => {
+    renderTeam(organization());
+    fireEvent.click(screen.getByTestId("team-invite"));
+
+    fireEvent.click(screen.getByTestId("invite-role-select-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Finance" }));
+
+    expect(
+      screen.getByText(/no engineering credentials such as API keys/),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^Email addresses/), {
+      target: { value: "cfo@example.com" },
+    });
+    fireEvent.click(screen.getByTestId("invite-members-submit"));
+
+    expect(dispatched).toContainEqual(
+      expect.objectContaining({
+        type: teamActionTypes.INVITE_MEMBERS_REQUESTED,
+        payload: { emails: ["cfo@example.com"], role: "FINANCE" },
+      }),
+    );
+  });
+});
+
 describe("role helpers", () => {
   it("lets only an owner hand out the owner role", () => {
     expect(assignableRoles("OWNER")).toEqual([
       "OWNER",
       "ADMIN",
       "DEVELOPER",
+      "FINANCE",
       "VIEWER",
     ]);
-    expect(assignableRoles("ADMIN")).toEqual(["ADMIN", "DEVELOPER", "VIEWER"]);
+    expect(assignableRoles("ADMIN")).toEqual([
+      "ADMIN",
+      "DEVELOPER",
+      "FINANCE",
+      "VIEWER",
+    ]);
   });
 
   it("splits, trims, lowercases and de-duplicates pasted addresses", () => {

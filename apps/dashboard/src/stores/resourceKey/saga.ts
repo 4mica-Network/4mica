@@ -1,5 +1,6 @@
 import * as api from "@api/resourceKey";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import {
   refreshAfterWrite,
   writeSucceededTypes,
@@ -32,6 +33,9 @@ const toMessage = (error: unknown, fallback: string): string =>
   });
 
 function* fail(error: unknown, fallback: string, meta: ResourceMeta) {
+  if (yield* handledAsApproval(error, resourceKeyActionFailed("", {}, meta))) {
+    return;
+  }
   const message = toMessage(error, fallback);
   yield put(resourceKeyActionFailed(message, toIssueMap(error), meta));
 

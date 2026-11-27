@@ -1,6 +1,7 @@
 import * as cliApi from "@api/cli";
 import * as api from "@api/developer";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import type { RootState } from "@stores/index";
 import {
   refreshAfterWrite,
@@ -48,6 +49,9 @@ import type {
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (yield* handledAsApproval(error, developerActionFailed("", {}, meta))) {
+    return;
+  }
   const message = toMessage(error, fallback);
   yield put(developerActionFailed(message, toIssueMap(error), meta));
   notifyError({

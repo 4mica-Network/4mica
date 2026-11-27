@@ -1,6 +1,7 @@
 import { HttpError } from "@4mica/http";
 import * as api from "@api/organization";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import { resetSession } from "@stores/session";
 import { fetchUser } from "@stores/user/actions";
 import type { PendingMeta } from "@stores/utils";
@@ -73,6 +74,9 @@ export const failureMessage = (error: unknown, fallback: string): string => {
 };
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (yield* handledAsApproval(error, organizationActionFailed("", {}, meta))) {
+    return;
+  }
   const code = errorCode(error);
   const issues = toIssueMap(error);
   if (code === "handle_taken") {

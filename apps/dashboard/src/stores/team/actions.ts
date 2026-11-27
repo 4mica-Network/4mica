@@ -1,7 +1,12 @@
 import type { OrganizationRole } from "@stores/organization/type";
 import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
-import type { AuditLogItem, Member, PendingInvitation } from "./type";
+import type {
+  AuditFilters,
+  AuditLogItem,
+  Member,
+  PendingInvitation,
+} from "./type";
 
 export const teamPendingKeys = {
   member: (userId: string) => `member:${userId}`,
@@ -144,9 +149,9 @@ export const fetchAuditLogFailed = (message: string) => ({
   payload: { message },
 });
 
-export const setAuditActionFilter = (action: string) => ({
-  type: actionTypes.SET_AUDIT_ACTION_FILTER,
-  payload: { action },
+export const setAuditFilters = (filters: Partial<AuditFilters>) => ({
+  type: actionTypes.SET_AUDIT_FILTERS,
+  payload: filters,
 });
 
 export const teamActionFailed = (

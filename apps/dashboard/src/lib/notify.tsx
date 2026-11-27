@@ -100,6 +100,9 @@ export const notifySuccess = (props: NotifyProps) =>
 export const notifyError = (props: NotifyProps) =>
   notify({ ...props, type: "error" });
 
+export const notifyInfo = (props: NotifyProps) =>
+  notify({ ...props, type: "info" });
+
 function Notification({ data }: ActionNotificationProps) {
   const { title, content, type } = data;
   const { Icon, tint } = TONES[type];

@@ -18,6 +18,9 @@ import configReducer from "./config/reducer";
 import configSaga from "./config/saga";
 import type customerReducer from "./customer/reducer";
 import type developerReducer from "./developer/reducer";
+import type financeReducer from "./finance/reducer";
+import financeBadgeReducer from "./financeBadge/reducer";
+import financeBadgeSaga from "./financeBadge/saga";
 import organizationReducer from "./organization/reducer";
 import organizationSaga from "./organization/saga";
 import type paymentReducer from "./payment/reducer";
@@ -42,6 +45,7 @@ const eagerReducers = {
   banner: bannerReducer,
   organization: organizationReducer,
   project: projectReducer,
+  financeBadge: financeBadgeReducer,
 };
 
 export interface LazyReducers {
@@ -58,6 +62,7 @@ export interface LazyReducers {
   support: typeof supportReducer;
   team: typeof teamReducer;
   serviceAccount: typeof serviceAccountReducer;
+  finance: typeof financeReducer;
 }
 
 type AllReducers = typeof eagerReducers & LazyReducers;
@@ -88,7 +93,12 @@ export const store = createStore(
   composeEnhancers(applyMiddleware(sagaMiddleware)),
 );
 
-sagaMiddleware.run(sessionScoped, [...userSaga, ...configSaga, ...bannerSaga]);
+sagaMiddleware.run(sessionScoped, [
+  ...userSaga,
+  ...configSaga,
+  ...bannerSaga,
+  ...financeBadgeSaga,
+]);
 sagaMiddleware.run(function* () {
   yield all([...organizationSaga, ...projectSaga]);
 });

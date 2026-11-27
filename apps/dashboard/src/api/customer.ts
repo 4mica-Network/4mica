@@ -119,6 +119,10 @@ export interface CustomerPolicyInput {
   discountFixed?: string | null;
   minPaymentAmount?: string | null;
   approvalThreshold?: string | null;
+  dailyLimit?: string | null;
+  monthlyLimit?: string | null;
+  limitNetwork?: PaymentNetwork | null;
+  limitAssetAddress?: string | null;
 }
 
 export const setCustomerPolicy = (id: string, data: CustomerPolicyInput) =>

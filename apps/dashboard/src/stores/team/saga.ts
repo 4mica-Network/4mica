@@ -1,5 +1,6 @@
 import * as api from "@api/organization";
 import i18n from "@i18n";
+import { handledAsApproval } from "@stores/approvalRequired";
 import { fetchOrganizations } from "@stores/organization/actions";
 import organizationActionTypes from "@stores/organization/actionTypes";
 import { failureMessage } from "@stores/organization/saga";
@@ -31,6 +32,7 @@ import {
 import actionTypes from "./actionTypes";
 import { selectAuditLog, selectTeamState } from "./selector";
 import type {
+  AuditFilters,
   AuditLogItem,
   AuditLogState,
   Member,
@@ -40,9 +42,22 @@ import type {
 
 export const AUDIT_PAGE_SIZE = 50;
 
+export const auditParams = (filters: AuditFilters) =>
+  definedParams({
+    ...filters,
+    from: filters.from ? `${filters.from}T00:00:00.000Z` : "",
+    to: filters.to ? `${filters.to}T23:59:59.999Z` : "",
+    q: filters.q.trim(),
+    actionPrefix: filters.actionPrefix.trim(),
+    targetId: filters.targetId.trim(),
+  });
+
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
 function* fail(error: unknown, fallback: string, meta: PendingMeta) {
+  if (yield* handledAsApproval(error, teamActionFailed("", {}, meta))) {
+    return;
+  }
   const message = failureMessage(error, fallback);
   const issues = toIssueMap(error);
   yield put(teamActionFailed(message, issues, meta));
@@ -212,10 +227,8 @@ export function* fetchAuditLog(action: {
     const result = (yield call(() =>
       api.getAuditLogs({
         limit: AUDIT_PAGE_SIZE,
-        ...definedParams({
-          action: audit.action,
-          cursor: append ? audit.nextCursor : null,
-        }),
+        ...auditParams(audit.filters),
+        ...definedParams({ cursor: append ? audit.nextCursor : null }),
       }),
     )) as { items: AuditLogItem[]; nextCursor: string | null };
     yield put(fetchAuditLogSucceeded({ ...result, append }));

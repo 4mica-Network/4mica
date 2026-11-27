@@ -1,5 +1,19 @@
-import { HttpClient, type HttpRequestConfig } from "@4mica/http";
+import {
+  HttpClient,
+  HttpMethod,
+  type HttpRequestConfig,
+  resolveRequestHeaders,
+} from "@4mica/http";
+import i18n from "@i18n";
 import { CANCEL } from "redux-saga";
+import {
+  ApprovalRequiredError,
+  captureRequest,
+  isApprovalRequiredBody,
+  rememberRequest,
+  type StoredRequest,
+} from "@/lib/approvalRequests";
+import { notifyInfo } from "@/lib/notify";
 import { LOCAL_API_URL, requireTrustedApiUrl } from "./apiUrl";
 
 export { setAuthTokenProvider, setUnauthorizedHandler } from "@4mica/http";
@@ -22,6 +36,27 @@ export const mapResponse = <T, U>(
   return cancel ? withCancel(mapped, cancel) : mapped;
 };
 
+export const settleGoverned = <T>(
+  captured: StoredRequest | null,
+  result: T,
+): T => {
+  if (!captured || !isApprovalRequiredBody(result)) {
+    return result;
+  }
+  const { approvalRequest } = result;
+  rememberRequest(approvalRequest.id, {
+    ...captured,
+    summary: approvalRequest.summary ?? "",
+  });
+  notifyInfo({
+    title: i18n.t("approval.sent.title"),
+    content: i18n.t("approval.sent.body", {
+      count: approvalRequest.requiredApprovals,
+    }),
+  });
+  throw new ApprovalRequiredError(result);
+};
+
 class SagaAwareHttpClient extends HttpClient {
   override request<TResponse, TData = unknown>(
     config: HttpRequestConfig<TData>,
@@ -36,8 +71,15 @@ class SagaAwareHttpClient extends HttpClient {
       });
     }
 
+    const captured =
+      config.method === HttpMethod.GET || config.skipAuth
+        ? null
+        : captureRequest(config, resolveRequestHeaders());
+
     return withCancel(
-      super.request<TResponse, TData>({ ...config, signal: controller.signal }),
+      super
+        .request<TResponse, TData>({ ...config, signal: controller.signal })
+        .then((result) => settleGoverned(captured, result)),
       () => controller.abort(),
     );
   }
