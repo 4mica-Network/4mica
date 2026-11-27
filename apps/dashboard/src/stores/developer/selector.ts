@@ -16,6 +16,12 @@ export const selectApiKeys = (state: RootState): ApiKey[] =>
 export const selectCliSessions = (state: RootState): CliSession[] =>
   state.developer.cliSessions;
 
+export const selectCliSessionsState = (state: RootState) => ({
+  isLoading: state.developer.cliSessionsLoading,
+  hasLoaded: state.developer.cliSessionsLoaded,
+  error: state.developer.cliSessionsError,
+});
+
 export const selectWebhooks = (state: RootState): Webhook[] =>
   state.developer.webhooks;
 

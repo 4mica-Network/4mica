@@ -1,5 +1,5 @@
 import { HttpMethod } from "@4mica/http";
-import type { CliSession } from "@stores/developer/type";
+import type { CliSession, NewCliToken } from "@stores/developer/type";
 import { httpClient } from "./client";
 
 export interface CliDeviceRequest {
@@ -42,7 +42,7 @@ export const getCliSessions = () =>
     method: HttpMethod.GET,
   });
 
-export const createCliToken = (data: { name: string }) =>
+export const createCliToken = (data: NewCliToken) =>
   httpClient.request<CreatedCliToken, typeof data>({
     url: "/me/cli/sessions",
     method: HttpMethod.POST,

@@ -3,6 +3,7 @@ import actionTypes from "./actionTypes";
 import type {
   ApiKey,
   CliSession,
+  NewCliToken,
   RevealSecret,
   Webhook,
   WebhookEvent,
@@ -27,7 +28,6 @@ export const fetchDeveloperSucceeded = (payload: {
   apiKeys: ApiKey[];
   webhooks: Webhook[];
   events: WebhookEvent[];
-  cliSessions: CliSession[];
 }) => ({
   type: actionTypes.FETCH_DEVELOPER_SUCCEEDED,
   payload,
@@ -167,8 +167,26 @@ export const deleteWebhookSucceeded = (id: string, meta: PendingMeta) => ({
   meta,
 });
 
+export const fetchCliSessions = () => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_REQUESTED,
+});
+
+export const fetchCliSessionsPending = () => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_PENDING,
+});
+
+export const fetchCliSessionsSucceeded = (sessions: CliSession[]) => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED,
+  payload: { sessions },
+});
+
+export const fetchCliSessionsFailed = (message: string) => ({
+  type: actionTypes.FETCH_CLI_SESSIONS_FAILED,
+  payload: { message },
+});
+
 export const createCliToken = (
-  payload: { name: string },
+  payload: NewCliToken,
   onReveal?: RevealSecret,
 ) => ({
   type: actionTypes.CREATE_CLI_TOKEN_REQUESTED,

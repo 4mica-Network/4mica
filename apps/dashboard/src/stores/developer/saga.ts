@@ -16,6 +16,9 @@ import {
   deleteApiKeySucceeded,
   deleteWebhookSucceeded,
   developerActionFailed,
+  fetchCliSessionsFailed,
+  fetchCliSessionsPending,
+  fetchCliSessionsSucceeded,
   fetchDeveloperFailed,
   fetchDeveloperPending,
   fetchDeveloperSucceeded,
@@ -26,7 +29,7 @@ import {
   updateWebhookSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import type { RevealSecret, WebhookStatus } from "./type";
+import type { NewCliToken, RevealSecret, WebhookStatus } from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
@@ -42,20 +45,16 @@ function* fail(error: unknown, fallback: string, meta: PendingMeta) {
 export function* fetchDeveloper(): Generator {
   try {
     yield put(fetchDeveloperPending());
-    const [apiKeys, webhooks, events, cliSessions] = (yield all([
+    const [apiKeys, webhooks, events] = (yield all([
       call(api.getApiKeys),
       call(api.getWebhooks),
       call(() => api.getWebhookEvents().catch(() => [])),
-      call(cliApi.getCliSessions),
     ])) as [
       Awaited<ReturnType<typeof api.getApiKeys>>,
       Awaited<ReturnType<typeof api.getWebhooks>>,
       Awaited<ReturnType<typeof api.getWebhookEvents>>,
-      Awaited<ReturnType<typeof cliApi.getCliSessions>>,
     ];
-    yield put(
-      fetchDeveloperSucceeded({ apiKeys, webhooks, events, cliSessions }),
-    );
+    yield put(fetchDeveloperSucceeded({ apiKeys, webhooks, events }));
   } catch (error) {
     yield put(
       fetchDeveloperFailed(
@@ -241,9 +240,28 @@ export function* deleteWebhook(action: {
   }
 }
 
+export function* fetchCliSessions(): Generator {
+  try {
+    yield put(fetchCliSessionsPending());
+    const sessions = (yield call(cliApi.getCliSessions)) as Awaited<
+      ReturnType<typeof cliApi.getCliSessions>
+    >;
+    yield put(fetchCliSessionsSucceeded(sessions));
+  } catch (error) {
+    yield put(
+      fetchCliSessionsFailed(
+        toMessage(
+          error,
+          t("store.developer.cliSessionsFailed", "Couldn't load CLI sessions."),
+        ),
+      ),
+    );
+  }
+}
+
 export function* createCliToken(action: {
   type: string;
-  payload: { name: string };
+  payload: NewCliToken;
   meta: PendingMeta;
   onReveal?: RevealSecret;
 }): Generator {
@@ -305,6 +323,7 @@ export default [
   takeEvery(actionTypes.UPDATE_WEBHOOK_REQUESTED, updateWebhook),
   takeEvery(actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED, rotateWebhookSecret),
   takeEvery(actionTypes.DELETE_WEBHOOK_REQUESTED, deleteWebhook),
+  takeLatest(actionTypes.FETCH_CLI_SESSIONS_REQUESTED, fetchCliSessions),
   takeEvery(actionTypes.CREATE_CLI_TOKEN_REQUESTED, createCliToken),
   takeEvery(actionTypes.REVOKE_CLI_SESSION_REQUESTED, revokeCliSession),
 ];

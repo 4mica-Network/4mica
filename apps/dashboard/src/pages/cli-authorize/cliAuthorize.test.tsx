@@ -1,6 +1,6 @@
 import { HttpError } from "@4mica/http";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { api } = vi.hoisted(() => ({
@@ -28,10 +28,19 @@ vi.mock("react-i18next", () => ({
 
 const { CliAuthorize } = await import("./index");
 
+function GoTo({ search }: { search: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(`/cli/authorize${search}`)}>
+      go
+    </button>
+  );
+}
+
 const REQUEST = {
   userCode: "BCDF-GHJK",
   clientName: "ada-laptop",
-  scopes: ["account:read", "wallets:read", "wallets:write"],
+  scopes: ["account:read", "wallets:read", "wallets:link"],
   requestIp: "203.0.113.7",
   createdAt: "2026-11-26T10:00:00.000Z",
   expiresAt: "2026-11-26T10:10:00.000Z",
@@ -71,7 +80,7 @@ describe("CliAuthorize", () => {
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(
       screen.getByText(
-        ["accountRead", "walletsRead", "walletsWrite"]
+        ["accountRead", "walletsRead", "walletsLink"]
           .map((scope) => `developer.cli.authorize.scope.${scope}`)
           .join(", "),
       ),
@@ -145,5 +154,35 @@ describe("CliAuthorize", () => {
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByTestId("cli-user-code")).toBeInTheDocument();
+  });
+
+  it("shows the code now in the address, never a slower answer for the one before", async () => {
+    let answerFirst: (value: unknown) => void = () => {};
+    api.getCliDeviceRequest.mockImplementation((userCode: string) =>
+      userCode === "BBBB-BBBB"
+        ? new Promise((resolve) => {
+            answerFirst = resolve;
+          })
+        : Promise.resolve({
+            ...REQUEST,
+            userCode,
+            clientName: "the-right-one",
+          }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/cli/authorize?code=BBBB-BBBB"]}>
+        <CliAuthorize />
+        <GoTo search="?code=CCCC-CCCC" />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText("go"));
+
+    expect(await screen.findByText("the-right-one")).toBeInTheDocument();
+    answerFirst({ ...REQUEST, userCode: "BBBB-BBBB", clientName: "stale" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByText("stale")).toBeNull();
+    expect(screen.getByTestId("cli-user-code")).toHaveTextContent("CCCC-CCCC");
   });
 });

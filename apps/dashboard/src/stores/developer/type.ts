@@ -20,6 +20,18 @@ export interface ApiKey {
 
 export type CliSessionKind = "DEVICE" | "TOKEN";
 
+export type CliScope =
+  | "account:read"
+  | "wallets:read"
+  | "wallets:link"
+  | "wallets:unlink";
+
+export interface NewCliToken {
+  name: string;
+  scopes: CliScope[];
+  expiresInDays: 30 | 90 | 365;
+}
+
 export interface CliSession {
   id: string;
   kind: CliSessionKind;
@@ -65,6 +77,9 @@ export type DeveloperState = {
   webhooks: Webhook[];
   events: WebhookEvent[];
   cliSessions: CliSession[];
+  cliSessionsLoading: boolean;
+  cliSessionsLoaded: boolean;
+  cliSessionsError: string | null;
   isLoading: boolean;
   hasLoaded: boolean;
   pending: Record<string, boolean>;

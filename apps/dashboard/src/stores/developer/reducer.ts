@@ -13,6 +13,9 @@ export const INITIAL_STATE: DeveloperState = {
   webhooks: [],
   events: [],
   cliSessions: [],
+  cliSessionsLoading: false,
+  cliSessionsLoaded: false,
+  cliSessionsError: null,
   isLoading: false,
   hasLoaded: false,
   pending: {},
@@ -42,14 +45,12 @@ export default function developerReducer(
         apiKeys: ApiKey[];
         webhooks: Webhook[];
         events: WebhookEvent[];
-        cliSessions: CliSession[];
       };
       return {
         ...state,
         apiKeys: payload.apiKeys,
         webhooks: payload.webhooks,
         events: payload.events,
-        cliSessions: payload.cliSessions,
         isLoading: false,
         hasLoaded: true,
         error: null,
@@ -141,6 +142,29 @@ export default function developerReducer(
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }
+
+    case actionTypes.FETCH_CLI_SESSIONS_PENDING:
+      return { ...state, cliSessionsLoading: true, cliSessionsError: null };
+
+    case actionTypes.FETCH_CLI_SESSIONS_SUCCEEDED: {
+      const { sessions } = action.payload as { sessions: CliSession[] };
+      return {
+        ...state,
+        cliSessions: sessions,
+        cliSessionsLoading: false,
+        cliSessionsLoaded: true,
+        cliSessionsError: null,
+      };
+    }
+
+    case actionTypes.FETCH_CLI_SESSIONS_FAILED:
+      return {
+        ...state,
+        cliSessionsLoading: false,
+        cliSessionsError:
+          (action.payload as { message?: string })?.message ??
+          "Failed to load CLI sessions.",
+      };
 
     case actionTypes.CREATE_CLI_TOKEN_SUCCEEDED: {
       const { session } = action.payload as { session: CliSession };

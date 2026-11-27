@@ -5,6 +5,9 @@ import {
   createCliTokenSucceeded,
   deleteApiKeySucceeded,
   developerActionFailed,
+  fetchCliSessionsFailed,
+  fetchCliSessionsPending,
+  fetchDeveloperSucceeded,
   revokeApiKey,
   revokeApiKeySucceeded,
   revokeCliSession,
@@ -179,5 +182,27 @@ describe("cli sessions", () => {
 
     expect(state.cliSessions.map((session) => session.id)).toEqual(["cli_2"]);
     expect(state.pending["cliSession:cli_1"]).toBeUndefined();
+  });
+
+  it("fails on its own, leaving keys and webhooks loaded", () => {
+    const loaded = reducer(
+      INITIAL_STATE,
+      fetchDeveloperSucceeded({
+        apiKeys: [key()],
+        webhooks: [hook()],
+        events: [],
+      }),
+    );
+    const state = reducer(
+      reducer(loaded, fetchCliSessionsPending()),
+      fetchCliSessionsFailed("CLI sessions are unavailable"),
+    );
+
+    expect(state.hasLoaded).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.apiKeys).toHaveLength(1);
+    expect(state.webhooks).toHaveLength(1);
+    expect(state.cliSessionsError).toBe("CLI sessions are unavailable");
+    expect(state.cliSessionsLoaded).toBe(false);
   });
 });

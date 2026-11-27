@@ -4,7 +4,7 @@ import { selectUser } from "@stores/user/selector";
 import { isNotFound, toMessage } from "@utils/http-errors";
 import { m } from "framer-motion";
 import { CircleCheck, CircleX } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -28,7 +28,8 @@ type Stage =
 const SCOPE_KEYS: Record<string, string> = {
   "account:read": "developer.cli.authorize.scope.accountRead",
   "wallets:read": "developer.cli.authorize.scope.walletsRead",
-  "wallets:write": "developer.cli.authorize.scope.walletsWrite",
+  "wallets:link": "developer.cli.authorize.scope.walletsLink",
+  "wallets:unlink": "developer.cli.authorize.scope.walletsUnlink",
 };
 
 function Brand() {
@@ -82,15 +83,19 @@ export function CliAuthorize() {
 
   usePageTitle(t("developer.cli.authorize.title"));
 
+  const generation = useRef(0);
+
   const lookUp = useCallback(async (userCode: string) => {
+    const mine = ++generation.current;
+    const current = () => generation.current === mine;
     setStage({ name: "loading" });
+    setDeciding(null);
     setError(null);
     try {
-      setStage({
-        name: "review",
-        request: await getCliDeviceRequest(userCode),
-      });
+      const request = await getCliDeviceRequest(userCode);
+      if (current()) setStage({ name: "review", request });
     } catch (cause) {
+      if (!current()) return;
       if (isNotFound(cause)) {
         setStage({ name: "unknown" });
         return;
@@ -104,29 +109,36 @@ export function CliAuthorize() {
     if (code) {
       void lookUp(code);
     } else {
+      generation.current += 1;
       setStage({ name: "enter" });
     }
   }, [code, lookUp]);
 
   const decide = async (decision: "approve" | "deny", userCode: string) => {
+    const mine = generation.current;
+    const current = () => generation.current === mine;
     setDeciding(decision);
     setError(null);
     try {
       if (decision === "approve") {
         await approveCliDeviceRequest(userCode);
-        setStage({ name: "approved" });
       } else {
         await denyCliDeviceRequest(userCode);
-        setStage({ name: "denied" });
+      }
+      if (current()) {
+        setStage(
+          decision === "approve" ? { name: "approved" } : { name: "denied" },
+        );
       }
     } catch (cause) {
+      if (!current()) return;
       if (isNotFound(cause)) {
         setStage({ name: "unknown" });
       } else {
         setError(toMessage(cause, ""));
       }
     } finally {
-      setDeciding(null);
+      if (current()) setDeciding(null);
     }
   };
 
