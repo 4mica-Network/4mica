@@ -368,3 +368,30 @@ describe("rate limiting", () => {
     expect(config.rateLimit.enabled).toBe(false);
   });
 });
+
+describe("the per-user budget key", () => {
+  it("is the account, whichever credential the request carries", async () => {
+    const { userKey } = await import("./rate-limit");
+    const account = { clerkUserId: "user_a" };
+    const byCli = (sessionId: string) =>
+      userKey({
+        auth: null,
+        user: account,
+        cliSession: { id: sessionId },
+        ip: "203.0.113.1",
+      } as never);
+
+    expect(byCli("cli_1")).toBe("user_a");
+    expect(byCli("cli_2")).toBe("user_a");
+    expect(
+      userKey({
+        auth: { clerkUserId: "user_a" },
+        user: account,
+        ip: "203.0.113.9",
+      } as never),
+    ).toBe("user_a");
+    expect(
+      userKey({ auth: null, user: null, ip: "203.0.113.1" } as never),
+    ).toBe("203.0.113.1");
+  });
+});

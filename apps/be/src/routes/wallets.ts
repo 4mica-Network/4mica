@@ -57,11 +57,15 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   const publicWrite = { ...strict, onResponse: revalidateOnWrite };
 
   const read = cliGuards(app, "wallets:read");
-  const write = cliGuards(app, "wallets:write");
-  const strictWrite = {
-    onRequest: write.onRequest,
-    preHandler: [...write.preHandler, sensitiveRateLimit(app)],
+  const strictFor = (scope: "wallets:link" | "wallets:unlink") => {
+    const guard = cliGuards(app, scope);
+    return {
+      onRequest: guard.onRequest,
+      preHandler: [...guard.preHandler, sensitiveRateLimit(app)],
+    };
   };
+  const link = strictFor("wallets:link");
+  const unlink = strictFor("wallets:unlink");
   const sessionSecurity: Record<string, string[]>[] = [
     { bearerAuth: [] },
     { cliTokenAuth: [] },
@@ -110,7 +114,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/wallets/siwe-nonce",
     {
-      ...strictWrite,
+      ...link,
       schema: {
         tags: ["wallets"],
         summary: "Start linking a wallet: get a message to sign",
@@ -131,7 +135,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.post(
     "/me/wallets",
     {
-      ...strictWrite,
+      ...link,
       schema: {
         tags: ["wallets"],
         summary: "Link a wallet by proving control of its address",
@@ -177,7 +181,7 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
   app.delete(
     "/me/wallets/:id",
     {
-      ...strictWrite,
+      ...unlink,
       onResponse: revalidateOnWrite,
       schema: {
         tags: ["wallets"],

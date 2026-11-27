@@ -6,6 +6,7 @@ import { hashSecret } from "@utils/secrets";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import { redeemDeviceRequest } from "./repository";
 import { DEVICE_GRANT_TYPE } from "./schema";
 
 type Row = Record<string, unknown>;
@@ -27,6 +28,9 @@ vi.mock("@clerk/backend", () => ({
 vi.mock("@4mica/db", () => {
   const matches = (row: Row, where: Row): boolean =>
     Object.entries(where).every(([key, expected]) => {
+      if (key === "OR") {
+        return (expected as Row[]).some((branch) => matches(row, branch));
+      }
       const actual = row[key];
       if (
         expected !== null &&
@@ -269,7 +273,7 @@ describe("cli sign-in", () => {
       expect(granted.statusCode).toBe(200);
       expect(granted.json()).toMatchObject({
         token_type: "Bearer",
-        scope: "account:read wallets:read wallets:write",
+        scope: "account:read wallets:read wallets:link",
       });
       const token = granted.json().access_token as string;
       expect(token).toMatch(/^4mica_cli_/);
@@ -322,6 +326,60 @@ describe("cli sign-in", () => {
       expect((await approve(login.user_code)).statusCode).toBe(404);
     });
 
+    it("asks for only the scopes the CLI names, always with account:read", async () => {
+      const login = (
+        await post("/v1/cli/device/code", {
+          client_name: "reader",
+          scope: "wallets:read",
+        })
+      ).json();
+      await approve(login.user_code);
+
+      const granted = await poll(login.device_code);
+      expect(granted.json().scope).toBe("account:read wallets:read");
+    });
+
+    it("refuses a scope it does not know", async () => {
+      const response = await post("/v1/cli/device/code", {
+        scope: "wallets:read payments:send",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("invalid_scope");
+      expect(db.requests).toHaveLength(0);
+    });
+
+    it("refuses to redeem a request that expired after it was checked", async () => {
+      const login = await startLogin();
+      await approve(login.user_code);
+      const request = db.requests[0];
+      vi.advanceTimersByTime(11 * 60 * 1000);
+
+      const redeemed = await redeemDeviceRequest({
+        id: request.id as string,
+        userId: USER_ID,
+        clientName: "ada-laptop",
+        scopes: ["account:read"],
+      });
+
+      expect(redeemed).toBeNull();
+      expect(request.consumedAt).toBeNull();
+      expect(db.sessions).toHaveLength(0);
+    });
+
+    it("lets only one of two simultaneous polls through the interval", async () => {
+      const login = await startLogin();
+      const [first, second] = await Promise.all([
+        poll(login.device_code),
+        poll(login.device_code),
+      ]);
+
+      expect([first.json().error, second.json().error].sort()).toEqual([
+        "authorization_pending",
+        "slow_down",
+      ]);
+    });
+
     it("rejects an unknown device code and any other grant type", async () => {
       expect((await poll("nope")).json().error).toBe("invalid_grant");
 
@@ -353,7 +411,7 @@ describe("cli sign-in", () => {
       expect(shown.json()).toMatchObject({
         userCode: login.user_code,
         clientName: "ada-laptop",
-        scopes: ["account:read", "wallets:read", "wallets:write"],
+        scopes: ["account:read", "wallets:read", "wallets:link"],
       });
       expect(shown.body).not.toContain(login.device_code);
 
@@ -500,6 +558,53 @@ describe("cli sign-in", () => {
       }
     });
 
+    it("cannot unlink a wallet unless the session was given wallets:unlink", async () => {
+      const token = await signIn();
+      authenticateRequest.mockResolvedValue(signedOut());
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/me/wallets/019fce62-0000-7000-8000-00000000beef",
+        headers: asCli(token),
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().error).toBe("insufficient_scope");
+    });
+
+    it("records use at most once every few minutes", async () => {
+      const token = await signIn();
+      const read = () =>
+        app.inject({
+          method: "GET",
+          url: "/v1/cli/session",
+          headers: asCli(token),
+        });
+
+      await read();
+      await vi.waitFor(() =>
+        expect(db.sessions[0].lastUsedAt).toBeInstanceOf(Date),
+      );
+      const first = db.sessions[0].lastUsedAt as Date;
+
+      vi.advanceTimersByTime(60_000);
+      await read();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(db.sessions[0].lastUsedAt).toBe(first);
+
+      vi.advanceTimersByTime(5 * 60_000);
+      await read();
+      await vi.waitFor(() => expect(db.sessions[0].lastUsedAt).not.toBe(first));
+    });
+
+    it("are never cached", async () => {
+      const login = await startLogin();
+      await approve(login.user_code);
+      const granted = await poll(login.device_code);
+
+      expect(granted.headers["cache-control"]).toBe("no-store");
+    });
+
     it("are held to their scopes", async () => {
       const token = await signIn();
       db.sessions[0].scopes = ["account:read"];
@@ -548,7 +653,7 @@ describe("cli sign-in", () => {
       expect(response.body).not.toContain("hashedToken");
     });
 
-    it("mints a token for CI and shows it once", async () => {
+    it("mints a read-only token for CI by default, for 90 days, and shows it once", async () => {
       const created = await post(
         "/me/cli/sessions",
         { name: "GitHub Actions" },
@@ -558,7 +663,21 @@ describe("cli sign-in", () => {
       expect(created.statusCode).toBe(201);
       const { plaintext, session } = created.json();
       expect(plaintext).toMatch(/^4mica_cli_/);
-      expect(session).toMatchObject({ kind: "TOKEN", name: "GitHub Actions" });
+      expect(session).toMatchObject({
+        kind: "TOKEN",
+        name: "GitHub Actions",
+        scopes: ["account:read", "wallets:read"],
+      });
+      const days =
+        (new Date(session.expiresAt).getTime() - Date.now()) / 86_400_000;
+      expect(Math.round(days)).toBe(90);
+
+      const unlink = await app.inject({
+        method: "DELETE",
+        url: "/me/wallets/019fce62-0000-7000-8000-00000000beef",
+        headers: asCli(plaintext),
+      });
+      expect(unlink.statusCode).toBe(403);
 
       const usable = await app.inject({
         method: "GET",
@@ -566,6 +685,40 @@ describe("cli sign-in", () => {
         headers: asCli(plaintext),
       });
       expect(usable.statusCode).toBe(200);
+    });
+
+    it("mints a token with the permissions and lifetime chosen", async () => {
+      const created = await post(
+        "/me/cli/sessions",
+        {
+          name: "deploy",
+          scopes: ["wallets:link", "wallets:unlink"],
+          expiresInDays: 30,
+        },
+        SESSION_AUTH,
+      );
+
+      const { session } = created.json();
+      expect(session.scopes).toEqual([
+        "account:read",
+        "wallets:link",
+        "wallets:unlink",
+      ]);
+      const days =
+        (new Date(session.expiresAt).getTime() - Date.now()) / 86_400_000;
+      expect(Math.round(days)).toBe(30);
+    });
+
+    it("refuses a lifetime or permission it does not offer", async () => {
+      for (const body of [
+        { name: "x", expiresInDays: 3650 },
+        { name: "x", scopes: ["payments:send"] },
+        { name: "x", scopes: [] },
+      ]) {
+        const response = await post("/me/cli/sessions", body, SESSION_AUTH);
+        expect(response.statusCode, JSON.stringify(body)).toBe(400);
+      }
+      expect(db.sessions).toHaveLength(0);
     });
 
     it("will not revoke another account's session", async () => {

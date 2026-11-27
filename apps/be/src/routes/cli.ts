@@ -60,7 +60,10 @@ export const cliRoutes: FastifyPluginCallback = (app, _opts, done) => {
           "RFC 8628 device authorization. Unauthenticated by design; the request grants nothing until a signed-in user approves its user code.",
         body: {
           type: "object",
-          properties: { client_name: { type: "string", maxLength: 120 } },
+          properties: {
+            client_name: { type: "string", maxLength: 120 },
+            scope: { type: "string", maxLength: 200 },
+          },
         },
         response: {
           ...limitedResponses,

@@ -7,10 +7,32 @@ import { findCliSessionByHash, touchCliSession } from "./repository";
 export const CLI_SCOPES = [
   "account:read",
   "wallets:read",
-  "wallets:write",
+  "wallets:link",
+  "wallets:unlink",
 ] as const;
 
 export type CliScope = (typeof CLI_SCOPES)[number];
+
+export const REQUIRED_SCOPE: CliScope = "account:read";
+
+export const DEFAULT_DEVICE_SCOPES: readonly CliScope[] = [
+  "account:read",
+  "wallets:read",
+  "wallets:link",
+];
+
+export const DEFAULT_TOKEN_SCOPES: readonly CliScope[] = [
+  "account:read",
+  "wallets:read",
+];
+
+export const isCliScope = (value: string): value is CliScope =>
+  (CLI_SCOPES as readonly string[]).includes(value);
+
+export const withRequiredScope = (scopes: readonly CliScope[]): CliScope[] =>
+  CLI_SCOPES.filter(
+    (scope) => scope === REQUIRED_SCOPE || scopes.includes(scope),
+  );
 
 export interface CliSessionContext {
   id: string;
@@ -113,5 +135,5 @@ export const authenticateCliToken =
       disabled: false,
     };
 
-    void touchCliSession(record.id).catch(() => {});
+    void touchCliSession(record.id, record.lastUsedAt).catch(() => {});
   };

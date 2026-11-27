@@ -1,5 +1,5 @@
 import { prisma } from "@4mica/db";
-import { CLI_SCOPES } from "@auth/cli-token";
+import type { CliScope } from "@auth/cli-token";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import {
   generateCliToken,
@@ -11,7 +11,7 @@ import {
 export const DEVICE_CODE_TTL_MS = 10 * 60 * 1000;
 export const DEVICE_POLL_INTERVAL_SECS = 5;
 export const DEVICE_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-export const TOKEN_SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STALE_REQUEST_MS = 24 * 60 * 60 * 1000;
 const USER_CODE_ATTEMPTS = 5;
@@ -40,6 +40,7 @@ const DEVICE_REQUEST_SELECT = {
 export const createDeviceRequest = async (input: {
   clientName: string;
   requestIp: string;
+  scopes: CliScope[];
 }) => {
   const deviceCode = generateDeviceCode();
   const now = Date.now();
@@ -55,7 +56,7 @@ export const createDeviceRequest = async (input: {
           deviceCodeHash: hashSecret(deviceCode),
           userCode: generateUserCode(),
           clientName: input.clientName,
-          scopes: [...CLI_SCOPES],
+          scopes: input.scopes,
           requestIp: input.requestIp,
           intervalSecs: DEVICE_POLL_INTERVAL_SECS,
           expiresAt: new Date(now + DEVICE_CODE_TTL_MS),
@@ -89,12 +90,24 @@ export const findDeviceRequestByCode = (deviceCode: string) =>
     },
   });
 
-export const recordDevicePoll = (id: string) =>
-  prisma.cliDeviceRequest.update({
-    where: { id },
-    data: { lastPolledAt: new Date() },
-    select: { id: true },
+export const claimDevicePoll = async (
+  id: string,
+  minGapMs: number,
+): Promise<boolean> => {
+  const now = Date.now();
+  const { count } = await prisma.cliDeviceRequest.updateMany({
+    where: {
+      id,
+      OR: [
+        { lastPolledAt: null },
+        { lastPolledAt: { lt: new Date(now - minGapMs) } },
+      ],
+    },
+    data: { lastPolledAt: new Date(now) },
   });
+
+  return count > 0;
+};
 
 export const redeemDeviceRequest = (request: {
   id: string;
@@ -104,7 +117,12 @@ export const redeemDeviceRequest = (request: {
 }) =>
   prisma.$transaction(async (tx) => {
     const { count } = await tx.cliDeviceRequest.updateMany({
-      where: { id: request.id, status: "APPROVED", consumedAt: null },
+      where: {
+        id: request.id,
+        status: "APPROVED",
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       data: { consumedAt: new Date() },
     });
 
@@ -156,19 +174,22 @@ export const listCliSessions = (userId: string) =>
     select: CLI_SESSION_SELECT,
   });
 
-export const createCliToken = async (userId: string, name: string) => {
+export const createCliToken = async (
+  userId: string,
+  input: { name: string; scopes: CliScope[]; expiresInDays: number },
+) => {
   const secret = generateCliToken();
 
   const session = await prisma.cliSession.create({
     data: {
       userId,
       kind: "TOKEN",
-      name,
+      name: input.name,
       prefix: secret.prefix,
       last4: secret.last4,
       hashedToken: secret.hash,
-      scopes: [...CLI_SCOPES],
-      expiresAt: new Date(Date.now() + TOKEN_SESSION_TTL_MS),
+      scopes: input.scopes,
+      expiresAt: new Date(Date.now() + input.expiresInDays * DAY_MS),
     },
     select: CLI_SESSION_SELECT,
   });

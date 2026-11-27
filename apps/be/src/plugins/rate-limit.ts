@@ -27,9 +27,8 @@ const TOO_MANY_REQUESTS = {
 const isExempt = (request: FastifyRequest): boolean =>
   request.method === "OPTIONS" || request.url.startsWith("/health");
 
-const userKey = (request: FastifyRequest): string =>
-  request.auth?.clerkUserId ??
-  (request.cliSession ? `cli:${request.cliSession.id}` : request.ip);
+export const userKey = (request: FastifyRequest): string =>
+  request.auth?.clerkUserId ?? request.user?.clerkUserId ?? request.ip;
 
 const ipKey = (request: FastifyRequest): string => request.ip;
 

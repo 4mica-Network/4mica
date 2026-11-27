@@ -1,4 +1,11 @@
 import {
+  type CliScope,
+  DEFAULT_DEVICE_SCOPES,
+  DEFAULT_TOKEN_SCOPES,
+  isCliScope,
+  withRequiredScope,
+} from "@auth/cli-token";
+import {
   invalidBody,
   notFound,
   parseBody,
@@ -9,6 +16,7 @@ import { formatUserCode, normalizeUserCode } from "@utils/secrets";
 import type { FastifyReply, RouteHandler } from "fastify";
 import { config } from "@/config/index";
 import {
+  claimDevicePoll,
   createCliToken,
   createDeviceRequest,
   DEVICE_SESSION_TTL_MS,
@@ -17,7 +25,6 @@ import {
   findDeviceRequestByCode,
   findPendingDeviceRequest,
   listCliSessions,
-  recordDevicePoll,
   redeemDeviceRequest,
   revokeCliSession,
 } from "./repository";
@@ -50,9 +57,22 @@ export const createDeviceCodeHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
+  const requested = parsed.data.scope?.split(/\s+/).filter(Boolean) ?? [];
+  const unknown = requested.filter((scope) => !isCliScope(scope));
+  if (unknown.length > 0) {
+    return grantError(
+      reply,
+      "invalid_scope",
+      `Unknown scope: ${unknown.join(", ")}.`,
+    );
+  }
+
   const created = await createDeviceRequest({
     clientName: parsed.data.client_name,
     requestIp: request.ip,
+    scopes: withRequiredScope(
+      requested.length > 0 ? (requested as CliScope[]) : DEFAULT_DEVICE_SCOPES,
+    ),
   });
   const userCode = formatUserCode(created.userCode);
   const uri = verificationUri();
@@ -111,12 +131,12 @@ export const deviceTokenHandler: RouteHandler = async (request, reply) => {
     );
   }
 
-  const sinceLastPoll = found.lastPolledAt
-    ? Date.now() - found.lastPolledAt.getTime()
-    : Number.POSITIVE_INFINITY;
-  await recordDevicePoll(found.id);
+  const onTime = await claimDevicePoll(
+    found.id,
+    found.intervalSecs * 1000 - POLL_TOLERANCE_MS,
+  );
 
-  if (sinceLastPoll < found.intervalSecs * 1000 - POLL_TOLERANCE_MS) {
+  if (!onTime) {
     return grantError(
       reply,
       "slow_down",
@@ -148,11 +168,17 @@ export const deviceTokenHandler: RouteHandler = async (request, reply) => {
   });
 
   if (!redeemed) {
-    return grantError(
-      reply,
-      "invalid_grant",
-      "That device code is unknown or has already been used.",
-    );
+    return found.expiresAt.getTime() <= Date.now()
+      ? grantError(
+          reply,
+          "expired_token",
+          "The sign-in request expired before it was approved.",
+        )
+      : grantError(
+          reply,
+          "invalid_grant",
+          "That device code is unknown or has already been used.",
+        );
   }
 
   appLogger.info("CLI session created", {
@@ -233,7 +259,11 @@ export const createCliTokenHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { session, plaintext } = await createCliToken(userId, parsed.data.name);
+  const { session, plaintext } = await createCliToken(userId, {
+    name: parsed.data.name,
+    scopes: withRequiredScope(parsed.data.scopes ?? DEFAULT_TOKEN_SCOPES),
+    expiresInDays: parsed.data.expiresInDays,
+  });
   appLogger.info("CLI session created", {
     userId,
     sessionId: session.id,

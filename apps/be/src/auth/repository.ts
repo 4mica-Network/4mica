@@ -103,10 +103,31 @@ export const findCliSessionByHash = (hashedToken: string) =>
       scopes: true,
       revokedAt: true,
       expiresAt: true,
+      lastUsedAt: true,
       createdAt: true,
       user: { select: USER_FIELDS },
     },
   });
 
-export const touchCliSession = (id: string) =>
-  prisma.cliSession.update({ where: { id }, data: { lastUsedAt: new Date() } });
+export const CLI_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+
+export const touchCliSession = async (
+  id: string,
+  lastUsedAt: Date | null,
+): Promise<void> => {
+  const now = Date.now();
+  if (lastUsedAt && now - lastUsedAt.getTime() < CLI_TOUCH_INTERVAL_MS) {
+    return;
+  }
+
+  await prisma.cliSession.updateMany({
+    where: {
+      id,
+      OR: [
+        { lastUsedAt: null },
+        { lastUsedAt: { lt: new Date(now - CLI_TOUCH_INTERVAL_MS) } },
+      ],
+    },
+    data: { lastUsedAt: new Date(now) },
+  });
+};
