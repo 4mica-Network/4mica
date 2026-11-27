@@ -456,6 +456,93 @@ def answering(answer: Callable[[], httpx.Response]) -> Seller:
     return Seller(lambda: v2_challenge([entry(amount="600000")]), answer=answer)
 
 
+CYCLE = "0x" + "22" * 32
+
+
+def checkpoint_required(details: dict | None = None, header="PAYMENT-RESPONSE"):
+    refusal = {
+        "success": False,
+        "errorReason": "invalid_4mica_credit_checkpoint_required",
+        "network": "eip155:84532",
+    }
+    if details is not None:
+        refusal["extra"] = {"retryable": False, "details": details}
+    return httpx.Response(402, headers={header: b64(refusal)}, json={})
+
+
+def refused_then(*answers: httpx.Response) -> Seller:
+    queue = list(answers)
+    return answering(lambda: queue.pop(0) if len(queue) > 1 else queue[0])
+
+
+async def test_checkpoints_the_cycle_core_names_and_pays_once_more():
+    details = {
+        "cycle_id": CYCLE,
+        "cycle_id_text": "7",
+        "asset_address": USDC,
+        "payer": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+        "uncheckpointed": 64,
+        "max_uncheckpointed": 64,
+    }
+    seller = refused_then(checkpoint_required(details), httpx.Response(200))
+    client = FakeClient()
+    limiter = SpendLimiter(SpendLimits(total="1.2 USDC"))
+    ctx, records, _ = context(seller.http, limiter=limiter, client=client)
+
+    response = await paying_fetch(ctx, "GET", URL)
+
+    assert response.status_code == 200
+    client.payment.checkpoint_cycle.assert_awaited_once_with(USDC, CYCLE)
+    client.payment.checkpoint_active_cycle.assert_not_awaited()
+    assert [is_paid(call) for call in seller.calls] == [False, True, True]
+    assert client.sign_payment.await_count == 2
+    assert len(records) == 1
+    # The refused payment stays counted: the seller still holds it.
+    ctx.http = Seller(lambda: v2_challenge([entry(amount="600000")])).http
+    with pytest.raises(SpendLimitError) as raised:
+        await paying_fetch(ctx, "GET", URL)
+    assert raised.value.limit == "total"
+
+
+@pytest.mark.parametrize(
+    "refused",
+    [
+        checkpoint_required(),
+        checkpoint_required({"cycle_id": CYCLE}),
+        checkpoint_required(header="X-PAYMENT-RESPONSE"),
+    ],
+)
+async def test_checkpoints_the_active_cycle_when_the_refusal_names_none(refused):
+    seller = refused_then(refused, httpx.Response(200))
+    client = FakeClient()
+    ctx, records, _ = context(seller.http, client=client)
+    assert (await paying_fetch(ctx, "GET", URL)).status_code == 200
+    client.payment.checkpoint_active_cycle.assert_awaited_once_with(USDC)
+    assert len(records) == 1
+
+
+async def test_checkpoints_once_and_returns_a_second_refusal():
+    seller = refused_then(checkpoint_required())
+    client = FakeClient()
+    ctx, records, _ = context(seller.http, client=client)
+    assert (await paying_fetch(ctx, "GET", URL)).status_code == 402
+    assert client.payment.checkpoint_active_cycle.await_count == 1
+    assert len(seller.calls) == 3
+    assert records == []
+
+
+async def test_a_refusal_a_checkpoint_does_not_fix_is_returned_as_is():
+    refusal = {"success": False, "errorReason": "insufficient_funds"}
+    seller = refused_then(
+        httpx.Response(402, headers={"PAYMENT-RESPONSE": b64(refusal)})
+    )
+    client = FakeClient()
+    ctx, _, _ = context(seller.http, client=client)
+    assert (await paying_fetch(ctx, "GET", URL)).status_code == 402
+    client.payment.checkpoint_active_cycle.assert_not_awaited()
+    assert len(seller.calls) == 2
+
+
 async def test_does_not_record_a_seller_error_and_keeps_the_amount_reserved():
     seller = answering(lambda: httpx.Response(500, text="boom"))
     limiter = SpendLimiter(SpendLimits(total="1 USDC"))
@@ -665,6 +752,9 @@ class OtherProtocol:
 
     def settled(self, response):
         return None
+
+    async def recover(self, refused, terms, client):
+        return False
 
 
 async def test_prefers_protocols_in_the_given_order():

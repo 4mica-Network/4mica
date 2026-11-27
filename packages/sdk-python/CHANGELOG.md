@@ -41,6 +41,12 @@
     shared by every network it pays on, and once set refuses an asset no
     entry names. A payment sent to a seller stays counted whatever comes
     back, a second 402 included.
+  - When the seller refuses a payment because core wants a checkpoint
+    (`invalid_4mica_credit_checkpoint_required`), `fetch` signs the
+    checkpoint for the cycle core names and pays once more, so a session
+    paying per request keeps going past core's bound on uncheckpointed
+    guarantees instead of being refused until the cycle ends. Both
+    payments count towards `total`.
   - After a redirect, `fetch` pays the request that was answered 402, not
     the one it started with, and only on the origin it was asked for. The
     paid retry follows no redirect, so the payment is never forwarded.

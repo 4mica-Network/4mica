@@ -182,14 +182,11 @@ async def paying_fetch(
         return response
 
     body = await challenged.aread()
-    refusals: list[SpendLimitError] = []
-    for protocol, terms, session in options:
-        try:
-            reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
-        except SpendLimitError as refusal:
-            refusals.append(refusal)
-            continue
 
+    async def pay_and_send(
+        protocol: PaymentProtocol, terms: PaymentTerms, session: NetworkSession
+    ) -> tuple[httpx.Response, Reservation]:
+        reservation = await ctx.limiter.reserve(session, terms, str(challenged.url))
         headers = challenged.headers.copy()
         headers.pop("transfer-encoding", None)
         try:
@@ -210,6 +207,20 @@ async def paying_fetch(
             ),
             **{**send_options, "follow_redirects": False},
         )
+        return paid, reservation
+
+    refusals: list[SpendLimitError] = []
+    for protocol, terms, session in options:
+        try:
+            paid, reservation = await pay_and_send(protocol, terms, session)
+        except SpendLimitError as refusal:
+            refusals.append(refusal)
+            continue
+        if paid.status_code == HTTPStatus.PAYMENT_REQUIRED and await protocol.recover(
+            paid, terms, session.client
+        ):
+            # Once: a seller refusing again is not something paying fixes.
+            paid, reservation = await pay_and_send(protocol, terms, session)
         if paid.status_code == HTTPStatus.PAYMENT_REQUIRED:
             return paid
         # A seller that says nothing is taken to charge for what it delivered.

@@ -111,6 +111,12 @@ holds a signed payment, and its answer does not prove it cannot redeem it. The
 count is kept in memory by this session: a new `connect` starts from zero, and
 across processes sharing a wallet the hard limit is the collateral deposited.
 
+**A refusal to checkpoint.** Core holds a payer to so many guarantees no
+checkpoint covers (see [Checkpoints](#checkpoints)). When the seller refuses
+the payment for that, `fetch` signs the checkpoint core asks for and pays once
+more. Both payments count towards `total`. A second refusal comes back as the
+response.
+
 **Redirects** are not followed unless you pass `follow_redirects=True` or an
 `http_client` that follows them. When they are, the request paid for is the
 one that was answered 402: the URL the redirect led to, and after a 303 a

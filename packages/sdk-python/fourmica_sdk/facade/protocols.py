@@ -9,6 +9,7 @@ import httpx
 
 from ..client import Client
 from ..errors import X402Error
+from ..models import CheckpointRequiredDetails, parse_refusal_details
 from ..networks import resolve_network
 from ..utils import parse_address, parse_u256
 from ..x402 import (
@@ -53,11 +54,34 @@ class PaymentProtocol(Protocol):
         """``None`` when the response does not say."""
         ...
 
+    async def recover(
+        self, refused: httpx.Response, terms: PaymentTerms, client: Client
+    ) -> bool:
+        """Fixes what the seller's refusal of a paid request says the payer can
+        fix. ``True`` when paying again can go through."""
+        ...
+
 
 def _decode_json_header(value: str) -> Any:
     text = value.strip()
     # Senders may drop the padding.
     return json.loads(base64.b64decode(text + "=" * (-len(text) % 4)))
+
+
+_CHECKPOINT_REQUIRED = "invalid_4mica_credit_checkpoint_required"
+
+
+def _payment_response(response: httpx.Response) -> dict[str, Any] | None:
+    header = response.headers.get("PAYMENT-RESPONSE") or response.headers.get(
+        "X-PAYMENT-RESPONSE"
+    )
+    if not header:
+        return None
+    try:
+        raw = _decode_json_header(header)
+    except ValueError:
+        return None
+    return raw if isinstance(raw, dict) else None
 
 
 def _read_required(response: httpx.Response) -> dict[str, Any] | None:
@@ -159,16 +183,27 @@ class X402Protocol:
         return {"X-PAYMENT": signed.header}
 
     def settled(self, response: httpx.Response) -> bool | None:
-        header = response.headers.get("PAYMENT-RESPONSE") or response.headers.get(
-            "X-PAYMENT-RESPONSE"
+        answer = _payment_response(response)
+        return None if answer is None else answer.get("success") is True
+
+    async def recover(
+        self, refused: httpx.Response, terms: PaymentTerms, client: Client
+    ) -> bool:
+        # Core caps the guarantees no checkpoint covers; past it, every payment
+        # in the cycle is refused until the payer signs one.
+        answer = _payment_response(refused)
+        if answer is None or answer.get("errorReason") != _CHECKPOINT_REQUIRED:
+            return False
+        extra = answer.get("extra")
+        required = parse_refusal_details(
+            CheckpointRequiredDetails,
+            extra.get("details") if isinstance(extra, dict) else None,
         )
-        if not header:
-            return None
-        try:
-            raw = _decode_json_header(header)
-        except ValueError:
-            return None
-        return raw.get("success") is True if isinstance(raw, dict) else None
+        if required is None:
+            await client.payment.checkpoint_active_cycle(terms.asset)
+        else:
+            await client.payment.checkpoint_cycle(terms.asset, required.cycle_id)
+        return True
 
 
 PROTOCOLS: dict[str, PaymentProtocol] = {"x402": X402Protocol()}

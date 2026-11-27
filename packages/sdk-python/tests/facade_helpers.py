@@ -98,6 +98,10 @@ class FakeClient:
         self.settlement = SimpleNamespace(
             positions=AsyncMock(return_value=[]), pay=MagicMock(), claim=MagicMock()
         )
+        self.payment = SimpleNamespace(
+            checkpoint_active_cycle=AsyncMock(return_value=None),
+            checkpoint_cycle=AsyncMock(return_value=None),
+        )
         self.new_payment = AsyncMock(side_effect=self._new_payment)
         self.sign_payment = AsyncMock(side_effect=self._sign_payment)
         self.aclose = AsyncMock(return_value=None)
