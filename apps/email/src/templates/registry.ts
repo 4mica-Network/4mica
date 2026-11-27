@@ -39,6 +39,7 @@ import AccountDeleted from "@emails/platform/AccountDeleted";
 import AgentCreated from "@emails/platform/AgentCreated";
 import CreditLimitChanged from "@emails/platform/CreditLimitChanged";
 import DisputeCreated from "@emails/platform/DisputeCreated";
+import FinancialAlert from "@emails/platform/FinancialAlert";
 import PaymentSucceeded from "@emails/platform/PaymentSucceeded";
 import PayoutPaid from "@emails/platform/PayoutPaid";
 import Receipt from "@emails/platform/Receipt";
@@ -336,6 +337,12 @@ export const registry = {
     summary: "Confirm that an agent was registered",
     subject: ({ agentName }) => `${agentName} is registered and ready`,
     component: AgentCreated,
+  }),
+
+  "financial-alert": define<"financial-alert">({
+    summary: "Alert finance recipients about spend, budgets or approvals",
+    subject: ({ workspaceName, title }) => `[${workspaceName}] ${title}`,
+    component: FinancialAlert,
   }),
 
   "account-deleted": define<"account-deleted">({

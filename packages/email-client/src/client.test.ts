@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EmailClient } from "./client";
 import { EmailClientError } from "./errors";
@@ -175,6 +176,28 @@ describe("EmailClient", () => {
 });
 
 describe("template contract", () => {
+  it("validates a financial alert and defaults its lines", async () => {
+    post.mockResolvedValue({ data: { id: "msg" } });
+    const payload = {
+      to: "ada@4mica.io",
+      workspaceName: "Northwind",
+      title: "Daily budget 80% used",
+      dashboardUrl: "https://app.4mica.io/finance/alerts",
+    };
+
+    const parsed = v.parse(templateSchemas["financial-alert"], payload);
+    expect(parsed.lines).toEqual([]);
+    expect(
+      v.safeParse(templateSchemas["financial-alert"], {
+        ...payload,
+        dashboardUrl: "not a url",
+      }).success,
+    ).toBe(false);
+
+    await new EmailClient("http://email:4100").sendFinancialAlert(payload);
+    expect(post).toHaveBeenCalledWith("/emails/financial-alert", payload);
+  });
+
   it("keeps templateIds in sync with templateSchemas", () => {
     expect(templateIds.sort()).toEqual(Object.keys(templateSchemas).sort());
   });

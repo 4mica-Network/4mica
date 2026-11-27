@@ -10,6 +10,7 @@ import type {
   AnnouncementPayload,
   CreditLimitChangedPayload,
   DisputeCreatedPayload,
+  FinancialAlertPayload,
   PaymentSucceededPayload,
   PayoutPaidPayload,
   ReceiptPayload,
@@ -225,6 +226,10 @@ export class EmailClient {
 
   sendAgentCreated(payload: AgentCreatedPayload) {
     return this.send("agent-created", payload);
+  }
+
+  sendFinancialAlert(payload: FinancialAlertPayload) {
+    return this.send("financial-alert", payload);
   }
 
   sendAccountDeleted(payload: AccountDeletedPayload) {
