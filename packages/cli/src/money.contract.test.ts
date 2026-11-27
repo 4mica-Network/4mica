@@ -105,6 +105,10 @@ beforeAll(async () => {
         return result("0x186a0");
       case "eth_blockNumber":
         return result("0x1");
+      case "eth_getBlockByNumber":
+        return result({ number: "0x1", baseFeePerGas: "0x3b9aca00" });
+      case "eth_maxPriorityFeePerGas":
+        return result("0x3b9aca00");
       case "eth_sendRawTransaction":
         if (onBroadcast === "accept") return result(HASH);
         if (onBroadcast === "refuse") {
