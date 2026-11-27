@@ -1,5 +1,6 @@
 import { hostname } from "node:os";
 import { Flags } from "@oclif/core";
+import { readContext, writeContext } from "../../core/config-file.js";
 import { askSecret } from "../../core/confirm.js";
 import {
   type SessionKind,
@@ -24,6 +25,11 @@ import {
 import { openBrowser } from "../../core/runner.js";
 import { canPrompt } from "../../core/runtime.js";
 import { readEnv } from "../../core/settings.js";
+import {
+  findOrganization,
+  listOrganizations,
+  type Organization,
+} from "../../core/workspace.js";
 import { cancelled, usageError } from "../../errors.js";
 import { PlatformCommand } from "../../platform-command.js";
 import { brand, spinner } from "../../ui/log.js";
@@ -50,7 +56,10 @@ export default class AuthLogin extends PlatformCommand {
     "one, and otherwise in a file only you can read.\n\n" +
     "Signing in gives the cli access to the account: who you are, and the " +
     "wallets linked to it. It does not touch a wallet key, and cannot move " +
-    "funds; commands that pay still sign with the wallet in `4mica whoami`.";
+    "funds; commands that pay still sign with the wallet in `4mica whoami`." +
+    "\n\nWith --org, the session is limited to that organization: the " +
+    "dashboard approves it for that organization only, and the cli acts in " +
+    "it from then on.";
   static flags = {
     "with-token": Flags.boolean({
       summary: "read a token from stdin instead, as CI does",
@@ -82,6 +91,7 @@ export default class AuthLogin extends PlatformCommand {
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --no-open",
+    "<%= config.bin %> <%= command.id %> --org acme",
     "<%= config.bin %> <%= command.id %> --scopes account:read,wallets:read,wallets:link,wallets:unlink",
     "cat token.txt | <%= config.bin %> <%= command.id %> --with-token",
   ];
@@ -137,6 +147,7 @@ export default class AuthLogin extends PlatformCommand {
       throw error;
     }
     const { me, kept } = signedIn;
+    const org = await this.actIn(platform, token, me, flags.org);
 
     this.note(`Signed in as ${brand(accountLabel(me.user))}`);
     this.note(`token kept in ${kept.where}`);
@@ -150,15 +161,43 @@ export default class AuthLogin extends PlatformCommand {
         ["account", accountLabel(me.user)],
         ["platform", platform.origin],
         ["session", me.session.name],
+        ["organization", org ? (org.handle ?? org.name) : undefined],
         ["expires", me.session.expiresAt],
       ]),
     );
     return {
       account: me.user,
       session: me.session,
+      organization: me.organization ?? null,
       apiUrl: platform.origin,
       storage: kept.storage,
     };
+  }
+
+  private async actIn(
+    platform: Platform,
+    token: string,
+    me: WhoAmI,
+    wanted: string | undefined,
+  ): Promise<Pick<Organization, "id" | "handle" | "name"> | undefined> {
+    const org =
+      me.organization ??
+      (wanted
+        ? findOrganization(
+            (await listOrganizations(platform, token)).items,
+            wanted,
+          )
+        : undefined);
+    if (!org) return undefined;
+
+    const dir = this.config.configDir;
+    const saved = await readContext(dir);
+    await writeContext(dir, {
+      ...saved,
+      org: { id: org.id, handle: org.handle, name: org.name },
+      project: saved.org?.id === org.id ? saved.project : undefined,
+    });
+    return org;
   }
 
   private async retire(
@@ -189,7 +228,13 @@ export default class AuthLogin extends PlatformCommand {
 
   private async interactive(
     platform: Platform,
-    flags: { web: boolean; open: boolean; name?: string; scopes?: string },
+    flags: {
+      web: boolean;
+      open: boolean;
+      name?: string;
+      scopes?: string;
+      org?: string;
+    },
     onMinted: () => void,
   ): Promise<string> {
     if (!flags.web && canPrompt()) {
@@ -218,7 +263,7 @@ export default class AuthLogin extends PlatformCommand {
 
   private async deviceFlow(
     platform: Platform,
-    flags: { open: boolean; name?: string; scopes?: string },
+    flags: { open: boolean; name?: string; scopes?: string; org?: string },
   ): Promise<string> {
     const scope = flags.scopes
       ?.split(/[\s,]+/)
@@ -229,6 +274,7 @@ export default class AuthLogin extends PlatformCommand {
       body: {
         client_name: (flags.name ?? hostname()).slice(0, 120),
         ...(scope ? { scope } : {}),
+        ...(flags.org ? { organization: flags.org } : {}),
       },
     });
     if (!isDeviceCode(device)) throw badResponse("a sign-in code");

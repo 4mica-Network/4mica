@@ -15,7 +15,37 @@ export interface MockPlatform extends MockServer {
   wallets: { id: string; label: string; address: string; network: string }[];
   challenge?: string;
   clientName?: string;
+  organization?: string;
+  boundOrg?: { id: string; name: string; handle: string | null };
+  orgs: {
+    id: string;
+    handle: string | null;
+    name: string;
+    personal: boolean;
+    role: string;
+  }[];
+  projects: Record<
+    string,
+    {
+      id: string;
+      slug: string;
+      name: string;
+      isDefault: boolean;
+      archived: boolean;
+      role: string;
+    }[]
+  >;
+  contexts: {
+    route: string;
+    org?: string;
+    project?: string;
+    environment?: string;
+  }[];
 }
+
+export const PERSONAL_ORG = "019fce62-0000-7000-8000-0000000000a1";
+export const ACME_ORG = "019fce62-0000-7000-8000-0000000000ac";
+export const ACME_CHECKOUT = "019fce62-0000-7000-8000-00000000c0c0";
 
 export const ACCOUNT = {
   id: "019fce62-0000-7000-8000-000000000000",
@@ -71,6 +101,53 @@ export async function mockPlatform(): Promise<MockPlatform> {
     ],
     bearers: [],
     wallets: [],
+    orgs: [
+      {
+        id: PERSONAL_ORG,
+        handle: "ada",
+        name: "Ada Lovelace",
+        personal: true,
+        role: "OWNER",
+      },
+      {
+        id: ACME_ORG,
+        handle: "acme",
+        name: "Acme",
+        personal: false,
+        role: "DEVELOPER",
+      },
+    ],
+    projects: {
+      [PERSONAL_ORG]: [
+        {
+          id: "019fce62-0000-7000-8000-00000000d0d0",
+          slug: "default",
+          name: "Default",
+          isDefault: true,
+          archived: false,
+          role: "ADMIN",
+        },
+      ],
+      [ACME_ORG]: [
+        {
+          id: "019fce62-0000-7000-8000-00000000a0a0",
+          slug: "default",
+          name: "Default",
+          isDefault: true,
+          archived: false,
+          role: "DEVELOPER",
+        },
+        {
+          id: ACME_CHECKOUT,
+          slug: "checkout",
+          name: "Checkout",
+          isDefault: false,
+          archived: false,
+          role: "ADMIN",
+        },
+      ],
+    },
+    contexts: [],
   } as unknown as MockPlatform;
   let issued = "";
 
@@ -90,6 +167,7 @@ export async function mockPlatform(): Promise<MockPlatform> {
     if (route === "POST /v1/cli/device/code") {
       state.clientName = body.client_name;
       state.scope = body.scope;
+      state.organization = body.organization;
       return send(res, 200, {
         device_code: "device-code-1",
         user_code: "BCDF-GHJK",
@@ -129,6 +207,14 @@ export async function mockPlatform(): Promise<MockPlatform> {
       }
       state.tokens.add(GRANTED);
       state.kinds.set(GRANTED, "DEVICE");
+      const asked = state.orgs.find((org) => org.handle === state.organization);
+      if (asked) {
+        state.boundOrg = {
+          id: asked.id,
+          name: asked.name,
+          handle: asked.handle,
+        };
+      }
       return send(res, 200, {
         access_token: GRANTED,
         token_type: "Bearer",
@@ -139,6 +225,48 @@ export async function mockPlatform(): Promise<MockPlatform> {
 
     if (!bearer || !state.tokens.has(bearer)) {
       return send(res, 401, { error: "unauthorized", message: "no" });
+    }
+
+    const header = (name: string) => {
+      const value = req.headers[name];
+      return typeof value === "string" ? value : undefined;
+    };
+    state.contexts.push({
+      route,
+      org: header("x-org-id"),
+      project: header("x-project-id"),
+      environment: header("x-environment"),
+    });
+    const orgId = state.boundOrg?.id ?? header("x-org-id") ?? PERSONAL_ORG;
+    if (
+      state.boundOrg &&
+      header("x-org-id") &&
+      header("x-org-id") !== state.boundOrg.id
+    ) {
+      return send(res, 404, {
+        error: "not_found",
+        message: "organization not found",
+      });
+    }
+
+    if (route === "GET /me/organizations") {
+      const items = state.orgs.filter(
+        (org) => !state.boundOrg || org.id === state.boundOrg.id,
+      );
+      return send(res, 200, {
+        items,
+        defaultId: state.boundOrg?.id ?? PERSONAL_ORG,
+      });
+    }
+    if (route === "GET /me/projects") {
+      const projects = state.projects[orgId];
+      if (!projects) {
+        return send(res, 404, {
+          error: "not_found",
+          message: "organization not found",
+        });
+      }
+      return send(res, 200, { items: projects });
     }
 
     if (route === "GET /v1/cli/session") {
@@ -155,6 +283,7 @@ export async function mockPlatform(): Promise<MockPlatform> {
           createdAt: "2026-01-01T00:00:00.000Z",
           expiresAt: "2026-04-01T00:00:00.000Z",
         },
+        organization: state.boundOrg ?? null,
       });
     }
     if (route === "DELETE /v1/cli/session") {

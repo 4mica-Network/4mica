@@ -8,6 +8,22 @@ exports[`account > shows the account and its linked wallets > json shape: accoun
     "name": "string",
     "username": "string",
   },
+  "context": {
+    "environment": {
+      "name": "string",
+      "source": "string",
+    },
+    "organization": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+    "project": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+  },
   "wallets": [
     {
       "address": "string",
@@ -33,6 +49,7 @@ exports[`auth login > shows a code, waits for approval, and keeps the token it i
     "username": "string",
   },
   "apiUrl": "string",
+  "organization": "null",
   "session": {
     "createdAt": "string",
     "expiresAt": "string",
@@ -64,6 +81,22 @@ exports[`auth status > names the account, and never the token > json shape: auth
     "username": "string",
   },
   "apiUrl": "string",
+  "context": {
+    "environment": {
+      "name": "string",
+      "source": "string",
+    },
+    "organization": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+    "project": {
+      "id": "null",
+      "name": "null",
+      "source": "string",
+    },
+  },
   "session": {
     "createdAt": "string",
     "expiresAt": "string",

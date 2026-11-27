@@ -4,7 +4,7 @@ import { CLI_DOCS_URL, DOCS_URL } from "./core/links.js";
 /** Root help lists commands by what the user is doing, not alphabetically. */
 const GROUPS: [string, string[]][] = [
   ["PROJECT", ["init", "dev", "dashboard"]],
-  ["ACCOUNT", ["auth", "account"]],
+  ["ACCOUNT", ["auth", "account", "orgs", "projects", "env"]],
   [
     "WALLET",
     ["wallets", "whoami", "balance", "deposit", "withdraw", "withdrawals"],

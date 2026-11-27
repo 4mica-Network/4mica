@@ -19,6 +19,7 @@ import {
   resolveSettings,
   type Settings,
 } from "./core/settings.js";
+import { resolveContext } from "./core/workspace.js";
 import { configError, EXIT } from "./errors.js";
 
 /** Read by the account commands from the environment only, never a file. */
@@ -103,7 +104,8 @@ export abstract class NetworkCommand extends BaseCommand {
         },
       );
     }
-    return requireSession(this.config.configDir);
+    const dir = this.config.configDir;
+    return (await resolveContext(await requireSession(dir), dir)).session;
   }
 
   protected async settings(flags: {

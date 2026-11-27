@@ -14,6 +14,7 @@ export const TOKEN_PREFIX = "4mica_cli_";
 export interface Platform {
   apiUrl: Resolved;
   origin: string;
+  headers?: Record<string, string>;
 }
 
 type Env = Record<string, string | undefined>;
@@ -157,6 +158,7 @@ export async function request(
   const response = await fetch(new URL(path, platform.origin), {
     method: options.method ?? "GET",
     headers: {
+      ...platform.headers,
       accept: "application/json",
       ...(options.body === undefined
         ? {}
@@ -262,9 +264,16 @@ export interface SessionInfo {
   expiresAt: string;
 }
 
+export interface BoundOrganization {
+  id: string;
+  name: string;
+  handle: string | null;
+}
+
 export interface WhoAmI {
   user: Account;
   session: SessionInfo;
+  organization?: BoundOrganization | null;
 }
 
 export const DEFAULT_SCOPES = [

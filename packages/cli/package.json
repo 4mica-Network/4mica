@@ -73,6 +73,9 @@
       },
       "auth": {
         "description": "sign the cli in to and out of your 4mica account"
+      },
+      "env": {
+        "description": "choose the environment the cli acts in"
       }
     },
     "plugins": [
