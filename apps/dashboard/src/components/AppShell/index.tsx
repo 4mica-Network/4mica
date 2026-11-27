@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation } from "react-router-dom";
 import { OnboardingGate } from "@/components/Onboarding";
+import { EnvironmentBar } from "@/components/Project/EnvironmentToggle";
 import { COLLAPSED_WIDTH, Sidebar } from "@/components/Sidebar";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
@@ -128,6 +129,7 @@ export function AppShell() {
         tabIndex={-1}
         className="min-w-0 flex-1 overflow-y-auto outline-none"
       >
+        <EnvironmentBar />
         <div className="relative mx-auto flex min-h-full w-full max-w-400 flex-col px-6 py-6">
           <Outlet />
         </div>

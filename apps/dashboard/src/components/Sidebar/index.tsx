@@ -23,6 +23,8 @@ import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
 import { OrganizationSwitcher } from "@/components/Organization/OrganizationSwitcher";
+import { EnvironmentToggle } from "@/components/Project/EnvironmentToggle";
+import { ProjectSwitcher } from "@/components/Project/ProjectSwitcher";
 import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
@@ -362,6 +364,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         ) : (
           <AvatarMenu collapsed={collapsed} />
         )}
+        <div className="mt-1 flex flex-col gap-1.5">
+          <ProjectSwitcher collapsed={collapsed} />
+          <EnvironmentToggle collapsed={collapsed} />
+        </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-3 pb-3">

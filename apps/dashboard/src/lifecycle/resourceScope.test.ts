@@ -1,3 +1,4 @@
+import type { ApiKey } from "@stores/developer/type";
 import {
   createResourceKeySucceeded,
   fetchResourceKeys,
@@ -22,11 +23,14 @@ import { describe, expect, it } from "vitest";
 const agentA: ResourceRef = { kind: "agent", id: "agt_a" };
 const agentB: ResourceRef = { kind: "agent", id: "agt_b" };
 
-const key = {
+const key: ApiKey = {
   id: "key_a",
   name: "A",
   prefix: "4mica_sk_ab12",
   last4: "wxyz",
+  environment: "SANDBOX",
+  scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+  serviceAccountId: null,
   lastUsedAt: null,
   expiresAt: null,
   revokedAt: null,

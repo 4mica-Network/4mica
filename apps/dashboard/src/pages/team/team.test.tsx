@@ -57,13 +57,13 @@ const member = (
 const MEMBERS = [
   member("me", "Ada", "ADMIN"),
   member("owner", "Grace", "OWNER"),
-  member("teammate", "Alan", "MEMBER"),
+  member("teammate", "Alan", "DEVELOPER"),
 ];
 
 const INVITATION: PendingInvitation = {
   id: "inv_1",
   email: "new@example.com",
-  role: "MEMBER",
+  role: "DEVELOPER",
   invitedBy: { id: "me", name: "Ada" },
   expiresAt: "2026-12-01T00:00:00.000Z",
   createdAt: "2026-11-20T00:00:00.000Z",
@@ -155,7 +155,7 @@ describe("team settings", () => {
   it("shows a read-only list to a plain member", () => {
     renderTeam(
       organization({
-        role: "MEMBER",
+        role: "DEVELOPER",
         permissions: ["resources.read", "resources.write", "payments.read"],
       }),
     );
@@ -200,7 +200,7 @@ describe("team settings", () => {
         type: teamActionTypes.INVITE_MEMBERS_REQUESTED,
         payload: {
           emails: ["one@example.com", "two@example.com"],
-          role: "MEMBER",
+          role: "DEVELOPER",
         },
       }),
     );
@@ -209,8 +209,13 @@ describe("team settings", () => {
 
 describe("role helpers", () => {
   it("lets only an owner hand out the owner role", () => {
-    expect(assignableRoles("OWNER")).toEqual(["OWNER", "ADMIN", "MEMBER"]);
-    expect(assignableRoles("ADMIN")).toEqual(["ADMIN", "MEMBER"]);
+    expect(assignableRoles("OWNER")).toEqual([
+      "OWNER",
+      "ADMIN",
+      "DEVELOPER",
+      "VIEWER",
+    ]);
+    expect(assignableRoles("ADMIN")).toEqual(["ADMIN", "DEVELOPER", "VIEWER"]);
   });
 
   it("splits, trims, lowercases and de-duplicates pasted addresses", () => {

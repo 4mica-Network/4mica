@@ -20,11 +20,14 @@ import type customerReducer from "./customer/reducer";
 import type developerReducer from "./developer/reducer";
 import organizationReducer from "./organization/reducer";
 import organizationSaga from "./organization/saga";
-import { organizationHeaders } from "./organization/selector";
 import type paymentReducer from "./payment/reducer";
+import projectReducer from "./project/reducer";
+import projectSaga from "./project/saga";
+import { projectHeaders } from "./project/selector";
 import { onStoreRegistered } from "./registry";
 import type resourceKeyReducer from "./resourceKey/reducer";
 import { sessionScoped } from "./rootSaga";
+import type serviceAccountReducer from "./serviceAccount/reducer";
 import { withSessionReset } from "./session";
 import type supportReducer from "./support/reducer";
 import type teamReducer from "./team/reducer";
@@ -38,6 +41,7 @@ const eagerReducers = {
   config: configReducer,
   banner: bannerReducer,
   organization: organizationReducer,
+  project: projectReducer,
 };
 
 export interface LazyReducers {
@@ -53,6 +57,7 @@ export interface LazyReducers {
   compliance: typeof complianceReducer;
   support: typeof supportReducer;
   team: typeof teamReducer;
+  serviceAccount: typeof serviceAccountReducer;
 }
 
 type AllReducers = typeof eagerReducers & LazyReducers;
@@ -85,10 +90,10 @@ export const store = createStore(
 
 sagaMiddleware.run(sessionScoped, [...userSaga, ...configSaga, ...bannerSaga]);
 sagaMiddleware.run(function* () {
-  yield all(organizationSaga);
+  yield all([...organizationSaga, ...projectSaga]);
 });
 
-setRequestHeadersProvider(() => organizationHeaders(store.getState()));
+setRequestHeadersProvider(() => projectHeaders(store.getState()));
 
 onStoreRegistered(({ name, reducer, watchers }) => {
   Object.assign(lazyReducers, { [name]: reducer });

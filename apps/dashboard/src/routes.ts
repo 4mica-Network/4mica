@@ -74,6 +74,14 @@ const Overview = lazyPage("pages/overview", () =>
 const Payments = lazyPage("pages/payments", () =>
   import("@/pages/payments").then((page) => page.Payments),
 );
+const ProjectsSettings = lazyPage("pages/projects", () =>
+  import("@/pages/projects").then((page) => page.ProjectsSettings),
+);
+const ServiceAccountsSettings = lazyPage("pages/service-accounts", () =>
+  import("@/pages/service-accounts").then(
+    (page) => page.ServiceAccountsSettings,
+  ),
+);
 const PlansSettings = lazyPage("pages/plans", () =>
   import("@/pages/plans").then((page) => page.PlansSettings),
 );
@@ -128,10 +136,12 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "general", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
+  { path: "projects", component: ProjectsSettings },
   { path: "notifications", component: NotificationSettings },
   { path: "plans", component: PlansSettings },
   { path: "compliance", component: ComplianceSettings },
   { path: "developer", component: DeveloperSettings },
+  { path: "service-accounts", component: ServiceAccountsSettings },
   { path: "audit-log", component: AuditLogSettings },
 ];
 

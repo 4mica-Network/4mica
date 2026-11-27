@@ -13,12 +13,19 @@ import type { PaymentNetwork, PublicVisibility } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";
-import { NETWORK_OPTIONS } from "@/lib/networks";
+import { useNetworkOptions } from "@/hooks/useNetworkOptions";
 import { VISIBILITY_OPTIONS } from "./constants";
 
-export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
+export function AgentToolbar({
+  onBatchDelete,
+  onMove,
+}: {
+  onBatchDelete: () => void;
+  onMove: () => void;
+}) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const networkOptions = useNetworkOptions();
 
   const filters = useAppSelector(selectAgentFilters);
   const selectedIds = useAppSelector(selectSelectedAgentIds);
@@ -42,6 +49,7 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
             : dispatch(setAgentSelection(agents.map((item) => item.id)))
         }
         onBatchDelete={onBatchDelete}
+        onMove={onMove}
       />
     ) : undefined;
 
@@ -74,7 +82,7 @@ export function AgentToolbar({ onBatchDelete }: { onBatchDelete: () => void }) {
           value={filters.network}
           options={[
             { value: "", title: t("agent.toolbar.allNetworks") },
-            ...NETWORK_OPTIONS,
+            ...networkOptions,
           ]}
           onChange={(network) => dispatch(setAgentFilters({ network }))}
           data-testid="agent-network-filter"

@@ -9,6 +9,8 @@ import {
 } from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { EyeOff, Globe, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -25,6 +27,9 @@ export function ApiListingRow({
 }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
 
   const isPending = useAppSelector(
     selectIsApiListingPending(apiListingPendingKeys.row(listing.id)),
@@ -46,14 +51,16 @@ export function ApiListingRow({
       )}
       data-testid={`api-listing-row-${listing.id}`}
     >
-      <Checkbox
-        aria-label={t("apiListing.row.select", { name: listing.name })}
-        variant="square"
-        className="relative z-10 mt-0.5 w-auto shrink-0"
-        checked={isSelected}
-        onChange={() => dispatch(toggleApiListingSelected(listing.id))}
-        data-testid={`api-listing-select-${listing.id}`}
-      />
+      {canWrite && (
+        <Checkbox
+          aria-label={t("apiListing.row.select", { name: listing.name })}
+          variant="square"
+          className="relative z-10 mt-0.5 w-auto shrink-0"
+          checked={isSelected}
+          onChange={() => dispatch(toggleApiListingSelected(listing.id))}
+          data-testid={`api-listing-select-${listing.id}`}
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
@@ -102,53 +109,57 @@ export function ApiListingRow({
       <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
-        <RowActionsMenu
-          label={t("apiListing.row.more", { name: listing.name })}
-          disabled={isPending}
-          data-testid={`api-listing-more-${listing.id}`}
-        >
-          <RowActionsMenu.RouteItem
-            icon={Pencil}
-            to={`/apis/${listing.id}`}
-            data-testid={`api-listing-edit-${listing.id}`}
+        {canWrite && (
+          <RowActionsMenu
+            label={t("apiListing.row.more", { name: listing.name })}
+            disabled={isPending}
+            data-testid={`api-listing-more-${listing.id}`}
           >
-            {t("apiListing.row.edit")}
-          </RowActionsMenu.RouteItem>
-
-          {listing.visibility === "PUBLIC" ? (
-            <RowActionsMenu.Item
-              icon={EyeOff}
-              onSelect={() =>
-                dispatch(publishApiListing({ id: listing.id, publish: false }))
-              }
-              data-testid={`api-listing-unpublish-${listing.id}`}
+            <RowActionsMenu.RouteItem
+              icon={Pencil}
+              to={`/apis/${listing.id}`}
+              data-testid={`api-listing-edit-${listing.id}`}
             >
-              {t("apiListing.row.unpublish")}
-            </RowActionsMenu.Item>
-          ) : (
-            <RowActionsMenu.Item
-              icon={Globe}
-              disabled={!isPayable}
-              onSelect={() =>
-                dispatch(publishApiListing({ id: listing.id, publish: true }))
-              }
-              data-testid={`api-listing-publish-${listing.id}`}
-            >
-              {isPayable
-                ? t("apiListing.row.publish")
-                : t("apiListing.row.publishBlocked")}
-            </RowActionsMenu.Item>
-          )}
+              {t("apiListing.row.edit")}
+            </RowActionsMenu.RouteItem>
 
-          <RowActionsMenu.Item
-            icon={Trash2}
-            tone="danger"
-            onSelect={() => onDelete(listing)}
-            data-testid={`api-listing-delete-${listing.id}`}
-          >
-            {t("apiListing.row.delete")}
-          </RowActionsMenu.Item>
-        </RowActionsMenu>
+            {listing.visibility === "PUBLIC" ? (
+              <RowActionsMenu.Item
+                icon={EyeOff}
+                onSelect={() =>
+                  dispatch(
+                    publishApiListing({ id: listing.id, publish: false }),
+                  )
+                }
+                data-testid={`api-listing-unpublish-${listing.id}`}
+              >
+                {t("apiListing.row.unpublish")}
+              </RowActionsMenu.Item>
+            ) : (
+              <RowActionsMenu.Item
+                icon={Globe}
+                disabled={!isPayable}
+                onSelect={() =>
+                  dispatch(publishApiListing({ id: listing.id, publish: true }))
+                }
+                data-testid={`api-listing-publish-${listing.id}`}
+              >
+                {isPayable
+                  ? t("apiListing.row.publish")
+                  : t("apiListing.row.publishBlocked")}
+              </RowActionsMenu.Item>
+            )}
+
+            <RowActionsMenu.Item
+              icon={Trash2}
+              tone="danger"
+              onSelect={() => onDelete(listing)}
+              data-testid={`api-listing-delete-${listing.id}`}
+            >
+              {t("apiListing.row.delete")}
+            </RowActionsMenu.Item>
+          </RowActionsMenu>
+        )}
       </div>
     </div>
   );

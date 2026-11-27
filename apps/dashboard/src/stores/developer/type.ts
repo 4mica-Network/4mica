@@ -1,3 +1,5 @@
+import type { EnvironmentKind } from "@4mica/rules";
+
 export const WEBHOOK_STATUS = {
   ENABLED: "ENABLED",
   DISABLED: "DISABLED",
@@ -6,11 +8,22 @@ export const WEBHOOK_STATUS = {
 export type WebhookStatus =
   (typeof WEBHOOK_STATUS)[keyof typeof WEBHOOK_STATUS];
 
+export const API_KEY_SCOPES = [
+  "PAYMENTS_WRITE",
+  "CUSTOMERS_READ",
+  "RESOURCE_READ",
+] as const;
+
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
 export interface ApiKey {
   id: string;
   name: string;
   prefix: string;
   last4: string;
+  environment: EnvironmentKind;
+  scopes: ApiKeyScope[];
+  serviceAccountId: string | null;
   lastUsedAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;
@@ -42,6 +55,7 @@ export interface CliSession {
   lastUsedAt: string | null;
   expiresAt: string;
   createdAt: string;
+  organization?: { id: string; name: string; handle: string | null } | null;
 }
 
 export interface Webhook {

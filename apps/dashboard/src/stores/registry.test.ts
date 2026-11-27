@@ -36,6 +36,7 @@ describe("lazy stores", () => {
       "banner",
       "config",
       "organization",
+      "project",
       "user",
     ]);
   });

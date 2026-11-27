@@ -9,12 +9,15 @@ import {
   selectHasLoadedCustomerDetail,
 } from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
 import { LoadFailure } from "@/components/LoadFailure";
 import { PageSpinner } from "@/components/PageSpinner";
+import { ProjectRestricted } from "@/components/Project/ProjectRestricted";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AccessPanel } from "./AccessPanel";
 import { ActivityPanel } from "./ActivityPanel";
@@ -30,6 +33,9 @@ import { RemovePanel } from "./RemovePanel";
 export function CustomerDetail() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
   const { id = "" } = useParams<{ id: string }>();
 
   const shown = useAppSelector(selectDetailCustomer);
@@ -95,23 +101,25 @@ export function CustomerDetail() {
           <OverviewTiles overview={overview} />
         </div>
 
-        <DetailsForm customer={customer} />
+        <ProjectRestricted>
+          <DetailsForm customer={customer} />
 
-        <AccessPanel customer={customer} />
+          <AccessPanel customer={customer} />
 
-        <IdentitiesPanel customer={customer} />
+          <IdentitiesPanel customer={customer} />
 
-        <PolicyPanel customer={customer} />
+          <PolicyPanel customer={customer} />
 
-        <LimitsPanel customer={customer} overview={overview} />
+          <LimitsPanel customer={customer} overview={overview} />
 
-        <CreditPanel customer={customer} />
+          <CreditPanel customer={customer} />
 
-        <CouponsPanel customer={customer} />
+          <CouponsPanel customer={customer} />
+        </ProjectRestricted>
 
         <ActivityPanel customerId={customer.id} />
 
-        <RemovePanel customer={customer} />
+        {canWrite && <RemovePanel customer={customer} />}
       </div>
     </div>
   );

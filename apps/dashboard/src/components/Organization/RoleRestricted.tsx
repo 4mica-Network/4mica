@@ -2,7 +2,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-export function RoleRestrictedNotice() {
+export function RoleRestrictedNotice({ message }: { message?: string }) {
   const { t } = useTranslation();
   return (
     <p
@@ -10,16 +10,18 @@ export function RoleRestrictedNotice() {
       data-testid="role-restricted"
     >
       <Lock aria-hidden="true" className="h-4 w-4 shrink-0" />
-      {t("organization.restricted")}
+      {message ?? t("organization.restricted")}
     </p>
   );
 }
 
 export function RoleRestricted({
   allowed,
+  message,
   children,
 }: {
   allowed: boolean;
+  message?: string;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -28,10 +30,10 @@ export function RoleRestricted({
   }
   return (
     <>
-      <RoleRestrictedNotice />
+      <RoleRestrictedNotice message={message} />
       <fieldset
         disabled
-        title={t("organization.restricted")}
+        title={message ?? t("organization.restricted")}
         className="m-0 flex min-w-0 flex-col gap-8 border-0 p-0"
       >
         {children}

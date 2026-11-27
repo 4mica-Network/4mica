@@ -34,7 +34,14 @@ vi.mock("@clerk/clerk-react", () => ({
 vi.mock("@stores/hooks", () => ({
   useAppDispatch: () => dispatch,
   useAppSelector: (selector: (state: unknown) => unknown) =>
-    selector({ organization: { status: "loaded", activeId: "org_1" } }),
+    selector({
+      organization: { status: "loaded", activeId: "org_1" },
+      project: {
+        status: "loaded",
+        activeId: "project_1",
+        environment: "sandbox",
+      },
+    }),
 }));
 vi.mock("@stores/user/actions", () => ({
   fetchUser: () => ({ type: "FETCH_USER_REQUESTED" }),

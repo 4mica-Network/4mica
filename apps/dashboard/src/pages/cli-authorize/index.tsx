@@ -1,5 +1,6 @@
-import { Button, Card, InputField } from "@4mica/ui";
+import { Button, Card, InputField, Select } from "@4mica/ui";
 import { useAppSelector } from "@stores/hooks";
+import type { OrganizationSummary } from "@stores/organization/type";
 import { selectUser } from "@stores/user/selector";
 import { isNotFound, toMessage } from "@utils/http-errors";
 import { m } from "framer-motion";
@@ -13,6 +14,7 @@ import {
   denyCliDeviceRequest,
   getCliDeviceRequest,
 } from "@/api/cli";
+import { getOrganizations } from "@/api/organization";
 import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
@@ -67,6 +69,11 @@ function Heading({ title, body }: { title: string; body?: string }) {
 
 const SOFT = "bg-overlay/5 font-normal hover:bg-overlay/10";
 
+const ANY_ORGANIZATION = "any";
+
+const organizationName = (org: { name: string; handle: string | null }) =>
+  org.name || org.handle || "";
+
 export function CliAuthorize() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
@@ -80,6 +87,21 @@ export function CliAuthorize() {
   const [typed, setTyped] = useState("");
   const [deciding, setDeciding] = useState<"approve" | "deny" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
+  const [organizationId, setOrganizationId] = useState(ANY_ORGANIZATION);
+
+  useEffect(() => {
+    let live = true;
+    getOrganizations().then(
+      (list) => {
+        if (live) setOrganizations(list.items);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   usePageTitle(t("developer.cli.authorize.title"));
 
@@ -91,6 +113,7 @@ export function CliAuthorize() {
     setStage({ name: "loading" });
     setDeciding(null);
     setError(null);
+    setOrganizationId(ANY_ORGANIZATION);
     try {
       const request = await getCliDeviceRequest(userCode);
       if (current()) setStage({ name: "review", request });
@@ -122,7 +145,11 @@ export function CliAuthorize() {
     setError(null);
     try {
       if (decision === "approve") {
-        await approveCliDeviceRequest(userCode);
+        if (organizationId === ANY_ORGANIZATION) {
+          await approveCliDeviceRequest(userCode);
+        } else {
+          await approveCliDeviceRequest(userCode, organizationId);
+        }
       } else {
         await denyCliDeviceRequest(userCode);
       }
@@ -251,7 +278,57 @@ export function CliAuthorize() {
                     .join(", ")}
                 </dd>
               </div>
+              {stage.request.organization && (
+                <div className="flex justify-between gap-4">
+                  <dt className="shrink-0 text-ink-muted">
+                    {t("developer.cli.authorize.organization")}
+                  </dt>
+                  <dd
+                    className="min-w-0 truncate text-ink-strong"
+                    data-testid="cli-organization"
+                  >
+                    {organizationName(stage.request.organization)}
+                  </dd>
+                </div>
+              )}
             </dl>
+
+            {!stage.request.organization && organizations.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <Select
+                  label={t("developer.cli.authorize.organization")}
+                  data-testid="cli-organization"
+                  value={organizationId}
+                  options={[
+                    {
+                      title: t("developer.cli.authorize.anyOrganization"),
+                      value: ANY_ORGANIZATION,
+                    },
+                    ...organizations.map((org) => ({
+                      title: organizationName(org),
+                      value: org.id,
+                    })),
+                  ]}
+                  disabled={deciding !== null}
+                  onChange={(option) =>
+                    setOrganizationId(
+                      option ? String(option.value) : ANY_ORGANIZATION,
+                    )
+                  }
+                />
+                <p className="text-ink-muted text-xs">
+                  {organizationId === ANY_ORGANIZATION
+                    ? t("developer.cli.authorize.anyOrganizationHint")
+                    : t("developer.cli.authorize.organizationHint")}
+                </p>
+              </div>
+            )}
+
+            {stage.request.organization && (
+              <p className="text-ink-muted text-xs">
+                {t("developer.cli.authorize.organizationHint")}
+              </p>
+            )}
 
             <p className="text-ink-muted text-xs">
               {t("developer.cli.authorize.noFunds")}

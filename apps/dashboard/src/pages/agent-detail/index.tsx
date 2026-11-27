@@ -19,6 +19,7 @@ import { BackBar } from "@/components/BackBar";
 import { LoadFailure } from "@/components/LoadFailure";
 import { SettingsSection } from "@/components/layout";
 import { PageSpinner } from "@/components/PageSpinner";
+import { ProjectRestricted } from "@/components/Project/ProjectRestricted";
 import { FaqEditor } from "@/components/Resource/FaqEditor";
 import { PolicyForm } from "@/components/Resource/PolicyForm";
 import { ReportsPanel } from "@/components/Resource/ReportsPanel";
@@ -94,33 +95,35 @@ export function AgentDetail() {
           {agent.name}
         </h1>
 
-        <ToggleSection
-          checked={policyEnabled}
-          description={t("appDetail.policyLead")}
-          id="agent-policy-enabled"
-          isSaving={isSavingPolicy}
-          onToggle={(checked) =>
-            dispatch(savePolicy(resource, { policyEnabled: checked }))
-          }
-          title={t("appDetail.tabs.policy")}
-        >
-          <PolicyForm resource={resource} />
-        </ToggleSection>
+        <ProjectRestricted>
+          <ToggleSection
+            checked={policyEnabled}
+            description={t("appDetail.policyLead")}
+            id="agent-policy-enabled"
+            isSaving={isSavingPolicy}
+            onToggle={(checked) =>
+              dispatch(savePolicy(resource, { policyEnabled: checked }))
+            }
+            title={t("appDetail.tabs.policy")}
+          >
+            <PolicyForm resource={resource} />
+          </ToggleSection>
 
-        <ToggleSection
-          checked={faqEnabled}
-          description={t("appDetail.faq.lead")}
-          id="agent-faq-enabled"
-          isSaving={isSavingPolicy}
-          onToggle={(checked) =>
-            dispatch(savePolicy(resource, { faqEnabled: checked }))
-          }
-          title={t("appDetail.faq.title")}
-        >
-          <FaqEditor resource={resource} />
-        </ToggleSection>
+          <ToggleSection
+            checked={faqEnabled}
+            description={t("appDetail.faq.lead")}
+            id="agent-faq-enabled"
+            isSaving={isSavingPolicy}
+            onToggle={(checked) =>
+              dispatch(savePolicy(resource, { faqEnabled: checked }))
+            }
+            title={t("appDetail.faq.title")}
+          >
+            <FaqEditor resource={resource} />
+          </ToggleSection>
 
-        <SecretKeysSection resource={resource} />
+          <SecretKeysSection resource={resource} />
+        </ProjectRestricted>
 
         <SettingsSection
           description={t("appDetail.reviewsLead")}

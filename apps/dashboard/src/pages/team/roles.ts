@@ -6,7 +6,8 @@ import {
 export const ROLES: OrganizationRole[] = [
   ORGANIZATION_ROLE.OWNER,
   ORGANIZATION_ROLE.ADMIN,
-  ORGANIZATION_ROLE.MEMBER,
+  ORGANIZATION_ROLE.DEVELOPER,
+  ORGANIZATION_ROLE.VIEWER,
 ];
 
 export const assignableRoles = (

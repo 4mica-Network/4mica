@@ -16,10 +16,13 @@ import {
 } from "@stores/apiListing";
 import type { ApiListing } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { ArrowUpRight, Blocks, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageSpinner } from "@/components/PageSpinner";
+import { MoveToProjectModal } from "@/components/Project/MoveToProjectModal";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { links } from "@/lib/links";
 import { ApiListingRow } from "./ApiListingRow";
@@ -46,6 +49,10 @@ export function Apis() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<ApiListing | null>(null);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isMoveOpen, setIsMoveOpen] = useState(false);
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
 
   useEffect(() => {
     dispatch(fetchApiListings());
@@ -81,24 +88,29 @@ export function Apis() {
           </p>
         </div>
 
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift shrink-0"
-          onClick={() => setIsCreateOpen(true)}
-          data-testid="api-listing-create-button"
-        >
-          <span className="flex items-center gap-1.5 text-sm">
-            <Plus className="h-4 w-4" />
-            {t("apiListing.create.cta")}
-          </span>
-        </Button>
+        {canWrite && (
+          <Button
+            type="button"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift shrink-0"
+            onClick={() => setIsCreateOpen(true)}
+            data-testid="api-listing-create-button"
+          >
+            <span className="flex items-center gap-1.5 text-sm">
+              <Plus className="h-4 w-4" />
+              {t("apiListing.create.cta")}
+            </span>
+          </Button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {hasLoaded && (listings.length > 0 || hasFilters) && (
-          <ApiListingToolbar onBatchDelete={() => setIsBatchDeleteOpen(true)} />
+          <ApiListingToolbar
+            onBatchDelete={() => setIsBatchDeleteOpen(true)}
+            onMove={() => setIsMoveOpen(true)}
+          />
         )}
 
         {showSpinner ? (
@@ -130,7 +142,7 @@ export function Apis() {
                 : t("apiListing.empty.description")
             }
             action={
-              hasFilters ? undefined : (
+              hasFilters || !canWrite ? undefined : (
                 <div className="flex flex-col items-center gap-3">
                   <Button
                     type="button"
@@ -188,6 +200,13 @@ export function Apis() {
           </div>
         )}
       </div>
+
+      <MoveToProjectModal
+        isOpen={isMoveOpen}
+        onClose={() => setIsMoveOpen(false)}
+        kind="api_listing"
+        ids={selectedIds}
+      />
 
       <CreateApiListingModal
         isOpen={isCreateOpen}

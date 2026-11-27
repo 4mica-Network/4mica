@@ -6,6 +6,8 @@ import {
 } from "@stores/customer";
 import type { Customer } from "@stores/customer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Masked } from "@/components/Masked";
@@ -18,6 +20,9 @@ import {
 export function CustomerRow({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
 
   const isSelected = useAppSelector(selectIsCustomerSelected(customer.id));
 
@@ -33,14 +38,16 @@ export function CustomerRow({ customer }: { customer: Customer }) {
       )}
       data-testid={`customer-row-${customer.id}`}
     >
-      <Checkbox
-        aria-label={t("customer.row.select", { name: customer.name })}
-        variant="square"
-        className="relative z-10 mt-0.5 w-auto shrink-0"
-        checked={isSelected}
-        onChange={() => dispatch(toggleCustomerSelected(customer.id))}
-        data-testid={`customer-select-${customer.id}`}
-      />
+      {canWrite && (
+        <Checkbox
+          aria-label={t("customer.row.select", { name: customer.name })}
+          variant="square"
+          className="relative z-10 mt-0.5 w-auto shrink-0"
+          checked={isSelected}
+          onChange={() => dispatch(toggleCustomerSelected(customer.id))}
+          data-testid={`customer-select-${customer.id}`}
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link

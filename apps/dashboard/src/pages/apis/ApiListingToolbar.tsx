@@ -13,15 +13,18 @@ import type { PaymentNetwork, PublicVisibility } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";
-import { NETWORK_OPTIONS } from "@/lib/networks";
+import { useNetworkOptions } from "@/hooks/useNetworkOptions";
 
 export function ApiListingToolbar({
   onBatchDelete,
+  onMove,
 }: {
   onBatchDelete: () => void;
+  onMove: () => void;
 }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const networkOptions = useNetworkOptions();
 
   const filters = useAppSelector(selectApiListingFilters);
   const selectedIds = useAppSelector(selectSelectedApiListingIds);
@@ -45,6 +48,7 @@ export function ApiListingToolbar({
             : dispatch(setApiListingSelection(listings.map((item) => item.id)))
         }
         onBatchDelete={onBatchDelete}
+        onMove={onMove}
       />
     ) : undefined;
 
@@ -78,7 +82,7 @@ export function ApiListingToolbar({
           value={filters.network}
           options={[
             { value: "", title: t("apiListing.toolbar.allNetworks") },
-            ...NETWORK_OPTIONS,
+            ...networkOptions,
           ]}
           onChange={(network) => dispatch(setApiListingFilters({ network }))}
           data-testid="api-listing-network-filter"

@@ -1,3 +1,4 @@
+import type { EnvironmentKind } from "@4mica/rules";
 import type { PaymentNetwork } from "@stores/shared/type";
 
 export type { BatchDeleteResult, PaymentNetwork } from "@stores/shared/type";
@@ -26,6 +27,7 @@ export interface Wallet {
   description: string | null;
   address: string;
   network: PaymentNetwork;
+  environment?: EnvironmentKind;
   role: WalletRole;
   status: WalletStatus;
   isDefault: boolean;

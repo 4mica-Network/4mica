@@ -6,6 +6,7 @@ export const PERMISSION = {
   AUDIT_READ: "audit.read",
   WALLETS_MANAGE: "wallets.manage",
   BUSINESS_MANAGE: "business.manage",
+  PROJECTS_CREATE: "projects.create",
   RESOURCES_WRITE: "resources.write",
   RESOURCES_READ: "resources.read",
   PAYMENTS_READ: "payments.read",
@@ -16,7 +17,8 @@ export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];
 export const ORGANIZATION_ROLE = {
   OWNER: "OWNER",
   ADMIN: "ADMIN",
-  MEMBER: "MEMBER",
+  DEVELOPER: "DEVELOPER",
+  VIEWER: "VIEWER",
 } as const;
 
 export type OrganizationRole =

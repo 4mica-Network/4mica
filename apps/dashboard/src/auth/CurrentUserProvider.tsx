@@ -7,6 +7,11 @@ import {
   selectActiveOrganizationId,
   selectHasResolvedOrganizations,
 } from "@stores/organization/selector";
+import {
+  selectActiveProjectId,
+  selectEnvironment,
+  selectHasResolvedProjects,
+} from "@stores/project/selector";
 import { resetSession } from "@stores/session";
 import { fetchUser } from "@stores/user/actions";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -20,6 +25,9 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const [tokenReady, setTokenReady] = useState(false);
   const organizationsResolved = useAppSelector(selectHasResolvedOrganizations);
   const activeOrganizationId = useAppSelector(selectActiveOrganizationId);
+  const projectsResolved = useAppSelector(selectHasResolvedProjects);
+  const activeProjectId = useAppSelector(selectActiveProjectId);
+  const environment = useAppSelector(selectEnvironment);
 
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
@@ -80,11 +88,19 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     };
   }, [dispatch, isSignedIn, tokenReady]);
 
-  if (!tokenReady || !organizationsResolved) {
+  if (
+    !tokenReady ||
+    !organizationsResolved ||
+    (activeOrganizationId && !projectsResolved)
+  ) {
     return <FullScreenLoader />;
   }
 
   return (
-    <Fragment key={activeOrganizationId ?? "default"}>{children}</Fragment>
+    <Fragment
+      key={`${activeOrganizationId ?? "default"}:${activeProjectId ?? "default"}:${environment}`}
+    >
+      {children}
+    </Fragment>
   );
 }

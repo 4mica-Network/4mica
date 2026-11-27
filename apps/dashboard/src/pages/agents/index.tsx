@@ -16,10 +16,13 @@ import {
 } from "@stores/agent";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { selectProjectCan } from "@stores/project/selector";
+import { PROJECT_PERMISSION } from "@stores/project/type";
 import { Bot, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PageSpinner } from "@/components/PageSpinner";
+import { MoveToProjectModal } from "@/components/Project/MoveToProjectModal";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AgentRow } from "./AgentRow";
 import { AgentToolbar } from "./AgentToolbar";
@@ -45,6 +48,10 @@ export function Agents() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isMoveOpen, setIsMoveOpen] = useState(false);
+  const canWrite = useAppSelector(
+    selectProjectCan(PROJECT_PERMISSION.RESOURCES_WRITE),
+  );
 
   useEffect(() => {
     dispatch(fetchAgents());
@@ -80,24 +87,29 @@ export function Agents() {
           </p>
         </div>
 
-        <Button
-          type="button"
-          intent="invert"
-          size="sm"
-          className="btn-no-lift shrink-0"
-          onClick={() => setIsCreateOpen(true)}
-          data-testid="agent-create-button"
-        >
-          <span className="flex items-center gap-1.5 text-sm">
-            <Plus className="h-4 w-4" />
-            {t("agent.create.cta")}
-          </span>
-        </Button>
+        {canWrite && (
+          <Button
+            type="button"
+            intent="invert"
+            size="sm"
+            className="btn-no-lift shrink-0"
+            onClick={() => setIsCreateOpen(true)}
+            data-testid="agent-create-button"
+          >
+            <span className="flex items-center gap-1.5 text-sm">
+              <Plus className="h-4 w-4" />
+              {t("agent.create.cta")}
+            </span>
+          </Button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {hasLoaded && (agents.length > 0 || hasFilters) && (
-          <AgentToolbar onBatchDelete={() => setIsBatchDeleteOpen(true)} />
+          <AgentToolbar
+            onBatchDelete={() => setIsBatchDeleteOpen(true)}
+            onMove={() => setIsMoveOpen(true)}
+          />
         )}
 
         {showSpinner ? (
@@ -129,7 +141,7 @@ export function Agents() {
                 : t("agent.empty.description")
             }
             action={
-              hasFilters ? undefined : (
+              hasFilters || !canWrite ? undefined : (
                 <Button
                   type="button"
                   intent="invert"
@@ -172,6 +184,13 @@ export function Agents() {
           </div>
         )}
       </div>
+
+      <MoveToProjectModal
+        isOpen={isMoveOpen}
+        onClose={() => setIsMoveOpen(false)}
+        kind="agent"
+        ids={selectedIds}
+      />
 
       <CreateAgentModal
         isOpen={isCreateOpen}

@@ -2,10 +2,17 @@ import { HttpMethod } from "@4mica/http";
 import type { CliSession, NewCliToken } from "@stores/developer/type";
 import { httpClient } from "./client";
 
+export interface CliOrganization {
+  id: string;
+  name: string;
+  handle: string | null;
+}
+
 export interface CliDeviceRequest {
   userCode: string;
   clientName: string;
   scopes: string[];
+  organization?: CliOrganization | null;
   requestIp: string | null;
   createdAt: string;
   expiresAt: string;
@@ -22,11 +29,14 @@ export const getCliDeviceRequest = (userCode: string) =>
     method: HttpMethod.GET,
   });
 
-export const approveCliDeviceRequest = (userCode: string) =>
-  httpClient.request<void, { userCode: string }>({
+export const approveCliDeviceRequest = (
+  userCode: string,
+  organizationId?: string,
+) =>
+  httpClient.request<void, { userCode: string; organizationId?: string }>({
     url: "/me/cli/device/approve",
     method: HttpMethod.POST,
-    data: { userCode },
+    data: organizationId ? { userCode, organizationId } : { userCode },
   });
 
 export const denyCliDeviceRequest = (userCode: string) =>

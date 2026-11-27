@@ -20,6 +20,7 @@ import { formatDate } from "@utils/format";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiKeyTags } from "@/components/ApiKey";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SettingsSection } from "@/components/layout";
 import { SecretRevealCard } from "@/components/RevealedSecret";
@@ -59,6 +60,7 @@ function SecretKeyRow({
         <p className="mt-0.5 font-mono text-ink-muted text-xs">
           {apiKey.prefix}…{apiKey.last4}
         </p>
+        <ApiKeyTags apiKey={apiKey} />
         <p className="mt-0.5 text-ink-subtle text-xs">
           {t("developer.keys.created")} {formatDate(apiKey.createdAt)} ·{" "}
           {t("developer.keys.lastUsed")} {formatDate(apiKey.lastUsedAt)}

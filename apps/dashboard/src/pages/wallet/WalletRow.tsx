@@ -1,4 +1,5 @@
 import {
+  environmentForNetwork,
   explorerAddressUrl,
   PAYMENT_NETWORKS,
   shortenAddress,
@@ -55,6 +56,9 @@ export function WalletRow({
   const { copied, copy } = useCopyToClipboard();
 
   const network = PAYMENT_NETWORKS[wallet.network];
+  const isProduction =
+    (wallet.environment ?? environmentForNetwork(wallet.network)) ===
+    "PRODUCTION";
 
   const handleCopy = () => copy(wallet.address);
 
@@ -117,6 +121,14 @@ export function WalletRow({
 
           <Tag size="sm" variant="neutral">
             {network.label}
+          </Tag>
+
+          <Tag
+            size="sm"
+            variant={isProduction ? "warning" : "neutral"}
+            data-testid={`wallet-environment-${wallet.id}`}
+          >
+            {t(isProduction ? "environment.production" : "environment.sandbox")}
           </Tag>
         </div>
       </div>

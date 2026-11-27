@@ -27,7 +27,7 @@ const organization = (
   name: "Acme",
   avatarUrl: null,
   personal: false,
-  role: "MEMBER",
+  role: "DEVELOPER",
   permissions: ["resources.read", "resources.write", "payments.read"],
   memberCount: 3,
   createdAt: "2026-11-01T00:00:00.000Z",

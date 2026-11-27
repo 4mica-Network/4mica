@@ -36,7 +36,9 @@ export function InviteMembersModal({
   const failed = Boolean(useAppSelector(selectTeamError));
 
   const [raw, setRaw] = useState("");
-  const [role, setRole] = useState<OrganizationRole>(ORGANIZATION_ROLE.MEMBER);
+  const [role, setRole] = useState<OrganizationRole>(
+    ORGANIZATION_ROLE.DEVELOPER,
+  );
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export function InviteMembersModal({
       return;
     }
     setRaw("");
-    setRole(ORGANIZATION_ROLE.MEMBER);
+    setRole(ORGANIZATION_ROLE.DEVELOPER);
     setSubmitted(false);
     dispatch(clearTeamIssues());
   }, [dispatch, isOpen]);

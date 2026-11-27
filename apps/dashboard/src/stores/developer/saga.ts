@@ -38,7 +38,12 @@ import {
   updateWebhookSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
-import type { NewCliToken, RevealSecret, WebhookStatus } from "./type";
+import type {
+  ApiKeyScope,
+  NewCliToken,
+  RevealSecret,
+  WebhookStatus,
+} from "./type";
 
 const t = (key: string, defaultValue: string) => i18n.t(key, { defaultValue });
 
@@ -78,7 +83,7 @@ export function* fetchDeveloper(): Generator {
 
 export function* createApiKey(action: {
   type: string;
-  payload: { name: string };
+  payload: { name: string; scopes?: ApiKeyScope[] };
   meta: PendingMeta;
   onReveal?: RevealSecret;
 }): Generator {

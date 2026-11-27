@@ -87,6 +87,17 @@ function CliSessionRow({ session }: { session: CliSession }) {
             )
             .join(", ")}
         </p>
+        <p
+          className="mt-0.5 text-ink-muted text-xs"
+          data-testid="cli-session-organization"
+        >
+          {t("developer.cli.organization")}:{" "}
+          {session.organization
+            ? session.organization.name ||
+              session.organization.handle ||
+              session.organization.id
+            : t("developer.cli.anyOrganization")}
+        </p>
         <p className="mt-0.5 text-ink-subtle text-xs">
           {t("developer.cli.created")} {formatDate(session.createdAt)} ·{" "}
           {t("developer.cli.lastUsed")} {formatDate(session.lastUsedAt)} ·{" "}

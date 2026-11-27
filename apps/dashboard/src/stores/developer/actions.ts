@@ -2,6 +2,7 @@ import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   ApiKey,
+  ApiKeyScope,
   CliSession,
   NewCliToken,
   RevealSecret,
@@ -39,7 +40,7 @@ export const fetchDeveloperFailed = (message: string) => ({
 });
 
 export const createApiKey = (
-  payload: { name: string },
+  payload: { name: string; scopes?: ApiKeyScope[] },
   onReveal?: RevealSecret,
 ) => ({
   type: actionTypes.CREATE_API_KEY_REQUESTED,

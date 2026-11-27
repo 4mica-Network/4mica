@@ -1,6 +1,7 @@
 import { HttpMethod } from "@4mica/http";
 import type {
   ApiKey,
+  ApiKeyScope,
   Webhook,
   WebhookEvent,
   WebhookStatus,
@@ -31,6 +32,7 @@ export const getApiKeys = () =>
 
 export const createApiKey = (data: {
   name: string;
+  scopes?: ApiKeyScope[];
   expiresAt?: string | null;
 }) =>
   httpClient.request<CreatedApiKey, typeof data>({

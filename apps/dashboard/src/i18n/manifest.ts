@@ -23,6 +23,8 @@ export const LAZY_TRANSLATIONS = {
   "pages/payments": ["payments", "wallet"],
   "pages/plans": ["settings"],
   "pages/profile": ["settings", "onboarding"],
+  "pages/projects": ["settings"],
+  "pages/service-accounts": ["developer"],
   "pages/team": ["settings"],
   "pages/wallet": ["wallet"],
   "components/Onboarding/Wizard": ["onboarding"],

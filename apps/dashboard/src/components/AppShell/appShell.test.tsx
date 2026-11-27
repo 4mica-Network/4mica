@@ -10,6 +10,9 @@ vi.mock("@/components/Sidebar", () => ({
   ),
 }));
 vi.mock("@/components/Onboarding", () => ({ OnboardingGate: () => null }));
+vi.mock("@/components/Project/EnvironmentToggle", () => ({
+  EnvironmentBar: () => null,
+}));
 
 const { AppShell } = await import("./index");
 

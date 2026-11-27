@@ -13,6 +13,14 @@ const { api } = vi.hoisted(() => ({
 
 vi.mock("@/api/cli", () => api);
 
+const ACME = "019fce62-0000-7000-8000-0000000000ac";
+
+const { organizations } = vi.hoisted(() => ({
+  organizations: { getOrganizations: vi.fn() },
+}));
+
+vi.mock("@/api/organization", () => organizations);
+
 vi.mock("@stores/hooks", () => ({
   useAppSelector: (selector: (s: unknown) => unknown) =>
     selector({ user: { user: { email: "ada@example.com", name: "Ada" } } }),
@@ -66,6 +74,71 @@ describe("CliAuthorize", () => {
     api.getCliDeviceRequest.mockResolvedValue(REQUEST);
     api.approveCliDeviceRequest.mockResolvedValue(undefined);
     api.denyCliDeviceRequest.mockResolvedValue(undefined);
+    organizations.getOrganizations.mockReset();
+    organizations.getOrganizations.mockResolvedValue({
+      items: [
+        { id: "personal", name: "Ada", handle: "ada" },
+        { id: ACME, name: "Acme", handle: "acme" },
+      ],
+      defaultId: "personal",
+    });
+  });
+
+  it("approves for any organization unless one is picked", async () => {
+    open("?code=BCDF-GHJK");
+
+    expect(
+      await screen.findByTestId("cli-organization-select-trigger"),
+    ).toHaveTextContent("developer.cli.authorize.anyOrganization");
+    expect(
+      screen.getByText("developer.cli.authorize.anyOrganizationHint"),
+    ).toBeInTheDocument();
+    fireEvent.click(button("developer.cli.authorize.approve"));
+
+    await screen.findByText("developer.cli.authorize.approvedTitle");
+    expect(api.approveCliDeviceRequest).toHaveBeenCalledWith("BCDF-GHJK");
+  });
+
+  it("limits the session to the organization picked", async () => {
+    open("?code=BCDF-GHJK");
+
+    fireEvent.click(
+      await screen.findByTestId("cli-organization-select-trigger"),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "Acme" }));
+    expect(
+      screen.getByText("developer.cli.authorize.organizationHint"),
+    ).toBeInTheDocument();
+    fireEvent.click(button("developer.cli.authorize.approve"));
+
+    await screen.findByText("developer.cli.authorize.approvedTitle");
+    expect(api.approveCliDeviceRequest).toHaveBeenCalledWith("BCDF-GHJK", ACME);
+  });
+
+  it("shows the organization the CLI asked for, with nothing to pick", async () => {
+    api.getCliDeviceRequest.mockResolvedValue({
+      ...REQUEST,
+      organization: { id: ACME, name: "Acme", handle: "acme" },
+    });
+    open("?code=BCDF-GHJK");
+
+    expect(await screen.findByTestId("cli-organization")).toHaveTextContent(
+      "Acme",
+    );
+    expect(screen.queryByTestId("cli-organization-select-trigger")).toBeNull();
+    fireEvent.click(button("developer.cli.authorize.approve"));
+
+    await screen.findByText("developer.cli.authorize.approvedTitle");
+    expect(api.approveCliDeviceRequest).toHaveBeenCalledWith("BCDF-GHJK");
+  });
+
+  it("offers no picker when the organizations cannot be loaded", async () => {
+    organizations.getOrganizations.mockRejectedValue(new Error("offline"));
+    open("?code=BCDF-GHJK");
+
+    expect(await screen.findByTestId("cli-user-code")).toBeInTheDocument();
+    expect(screen.queryByTestId("cli-organization-select-trigger")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows who is asking and what they would get before anything is granted", async () => {
