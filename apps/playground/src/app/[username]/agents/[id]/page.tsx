@@ -3,12 +3,15 @@ import { BookText, CalendarDays, Globe, UserRound, Wallet } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { CardShell } from "@/components/CardShell";
+import { CopyForAi } from "@/components/CopyForAi";
 import { CopyValue } from "@/components/CopyValue";
 import {
   buildAgentBuyerSteps,
   buildAgentRunSteps,
 } from "@/components/IntegrationSection/AgentIntegration";
+import { buildSellerSteps } from "@/components/IntegrationSection/SellerIntegration";
 import { JsonLd } from "@/components/JsonLd";
 import { PayWithFourMica } from "@/components/PayWithFourMica";
 import { PriceHeadline, pricingNote } from "@/components/PriceHeadline";
@@ -21,18 +24,23 @@ import {
   ResourceFacts,
 } from "@/components/ResourceFacts";
 import { RevealLink } from "@/components/RevealLink";
-import { type FlowStep, StepFlow } from "@/components/StepFlow";
+import { type FlowGroup, type FlowStep, StepFlow } from "@/components/StepFlow";
 import { SupportSection } from "@/components/SupportSection";
-import { TrustSection } from "@/components/TrustSection";
+import { TopBar } from "@/components/TopBar";
+import { TrustSection, TrustSectionSkeleton } from "@/components/TrustSection";
+import { parseView, ViewSwitch } from "@/components/ViewSwitch";
 import { VisibilityTag } from "@/components/VisibilityTag";
 import { messages } from "@/i18n";
+import { buildAgentHandoff, buildSellerHandoff } from "@/lib/ai-handoff";
 import { buildAgentDescriptor } from "@/lib/descriptor";
 import { isSellable } from "@/lib/snippets/agent";
+import { buildSellerSnippets } from "@/lib/snippets/seller";
 import { links } from "@/services/links";
-import { getPayerState } from "@/services/payer";
+import { getPayerState, preloadPayerState } from "@/services/payer";
 import { resolveAgent } from "@/services/resource";
 import { buildAgentMetadata, notFoundMetadata } from "@/services/seo";
-import type { ProfileChildPageProps } from "@/types";
+import type { ProfileChildPageProps, ResourcePageProps } from "@/types";
+import { sizedAvatarUrl } from "@/utils/avatarUrl";
 import { bareHost } from "@/utils/bareHost";
 import { formatDate } from "@/utils/formatDate";
 import { agentPath, profilePath } from "@/utils/profileUrl";
@@ -59,7 +67,11 @@ export async function generateMetadata({
     : notFoundMetadata();
 }
 
-export default async function AgentPage({ params }: ProfileChildPageProps) {
+export default async function AgentPage({
+  params,
+  searchParams,
+}: ResourcePageProps) {
+  preloadPayerState();
   const resolved = await resolveAgent(await params);
 
   if (!resolved) {
@@ -67,8 +79,34 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
   }
 
   const { agent, profile } = resolved;
+  const view = parseView(profile.isOwner, (await searchParams).view);
   const payerState = await getPayerState(agent.network);
   const descriptor = buildAgentDescriptor(agent, profile);
+
+  const pageUrl = `${links.website}${agentPath(profile.username, agent.ref)}`;
+  const dashboardUrl = `${links.app}/agents/${agent.id}`;
+  const sellerSnippets =
+    view === "seller" && isSellable(agent)
+      ? buildSellerSnippets({
+          kind: "agent",
+          method: "POST",
+          url: agent.endpointUrl,
+        })
+      : null;
+  const handoff =
+    view === "seller"
+      ? sellerSnippets &&
+        buildSellerHandoff(sellerSnippets, {
+          kind: "agent",
+          dashboardUrl,
+          docsUrl: links.docs,
+        })
+      : buildAgentHandoff(agent, {
+          username: profile.username,
+          pageUrl,
+          appUrl: links.app,
+          docsUrl: links.docs,
+        });
 
   const price = {
     amount: agent.priceAmount,
@@ -161,31 +199,65 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
       : []),
   ];
 
-  const setup: FlowStep[] = profile.isOwner
-    ? []
-    : [
-        {
-          id: "setup",
-          title: messages.flow.setup,
-          done: payerState.step === "ready",
-          content: (
-            <PayWithFourMica network={agent.network} state={payerState} />
-          ),
-        },
-      ];
+  const integrate: FlowGroup[] =
+    view === "seller"
+      ? [
+          {
+            id: "sell",
+            label: messages.integration.sellerHeading,
+            icon: "integrate",
+            numbered: true,
+            collapsible: true,
+            steps: buildSellerSteps(
+              sellerSnippets,
+              dashboardUrl,
+              messages.integration.agentNotSellableOwner,
+            ),
+          },
+          {
+            id: "run",
+            label: messages.integration.agentRunHeading,
+            icon: "run",
+            numbered: true,
+            collapsible: true,
+            steps: buildAgentRunSteps(agent),
+          },
+        ]
+      : [
+          {
+            id: "call",
+            label: messages.integration.agentBuyerHeading,
+            icon: "integrate",
+            numbered: true,
+            collapsible: true,
+            steps: [
+              {
+                id: "setup",
+                title: messages.flow.setup,
+                done: payerState.step === "ready",
+                content: (
+                  <PayWithFourMica network={agent.network} state={payerState} />
+                ),
+              },
+              ...buildAgentBuyerSteps(agent),
+            ],
+          },
+        ];
 
   const reviews: FlowStep = {
     id: "reviews",
     title: messages.flow.reviews,
     icon: "reviews",
     content: (
-      <TrustSection
-        id={agent.id}
-        kind="agent"
-        profile={profile}
-        publishedAt={agent.publishedAt}
-        resourceRef={agent.ref}
-      />
+      <Suspense fallback={<TrustSectionSkeleton />}>
+        <TrustSection
+          id={agent.id}
+          kind="agent"
+          profile={profile}
+          publishedAt={agent.publishedAt}
+          resourceRef={agent.ref}
+        />
+      </Suspense>
     ),
   };
 
@@ -200,43 +272,35 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
     <>
       <JsonLd descriptor={descriptor} />
 
-      <ProfileNav
-        className="absolute top-4 left-4 z-20 sm:top-6 sm:left-8"
-        displayName={profile.name || profile.username}
-        username={profile.username}
-      />
-
       <CardShell
-        actions={
-          <ProfileActions
-            label={messages.flow.actions}
-            title={agent.name}
-            url={`${links.website}${agentPath(profile.username, agent.ref)}`}
+        account={<TopBar />}
+        accountOnMobile={false}
+        nav={
+          <ProfileNav
+            displayName={profile.name || profile.username}
+            username={profile.username}
           />
+        }
+        title={agent.name}
+        actions={
+          <div className="flex items-stretch gap-2">
+            {profile.isOwner && <ViewSwitch view={view} />}
+            {handoff && (
+              <CopyForAi markdown={handoff.markdown} prompt={handoff.prompt} />
+            )}
+            <ProfileActions
+              label={messages.flow.actions}
+              title={agent.name}
+              url={pageUrl}
+            />
+          </div>
         }
       >
         <StepFlow
+          key={view}
           groups={[
             { id: "overview", steps: [overview] },
-            {
-              id: "call",
-              label: messages.integration.agentBuyerHeading,
-              icon: "integrate",
-              numbered: true,
-              collapsible: true,
-              steps: [
-                ...setup,
-                ...buildAgentBuyerSteps(agent, profile.isOwner),
-              ],
-            },
-            {
-              id: "run",
-              label: messages.integration.agentRunHeading,
-              icon: "run",
-              numbered: true,
-              collapsible: true,
-              steps: buildAgentRunSteps(agent, profile.isOwner),
-            },
+            ...integrate,
             { id: "more", steps: [...about, reviews, support] },
           ]}
           identity={
@@ -248,7 +312,8 @@ export default async function AgentPage({ params }: ProfileChildPageProps) {
                   fallback={agent.ref}
                   name={agent.name}
                   size="md"
-                  src={agent.avatarUrl}
+                  src={sizedAvatarUrl(agent.avatarUrl, 96)}
+                  priority={true}
                 />
                 <div className="flex min-w-0 flex-col gap-1">
                   <h1 className="font-semibold text-ink-strong text-lg leading-tight">

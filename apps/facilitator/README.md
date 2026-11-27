@@ -41,7 +41,6 @@ operator's signed guarantee receipt to the recipient.
   from fourmica_sdk import Client, ConfigBuilder, X402Flow, X402PaymentRequired
 
   payer_key = "0x..."    # wallet private key
-  user_address = "0x..." # address to embed in the claims
 
   async def main():
       cfg = (
@@ -57,7 +56,7 @@ operator's signed guarantee receipt to the recipient.
       challenge = X402PaymentRequired.from_raw(json.loads(base64.b64decode(header)))
       accepted = next(a for a in challenge.accepts if a.scheme == "4mica-credit")
 
-      payment = await flow.sign_payment_v2(challenge, accepted, user_address)
+      payment = await flow.sign_payment_v2(challenge, accepted)
       headers = {"PAYMENT-SIGNATURE": payment.header}  # retry header (decode to paymentPayload for /verify)
       await client.aclose()
 

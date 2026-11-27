@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { findUp } from "find-up";
+import { packageRoot } from "./package-root.js";
 
 export interface RunContext {
   /** True when running inside the 4Mica monorepo (dev), false when published. */
@@ -12,10 +12,8 @@ export interface RunContext {
   templatesDir: string;
 }
 
-/** dist/index.js → packages/cli → templates live one level up from dist/. */
 function bundledTemplatesDir(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return join(here, "..", "templates");
+  return join(packageRoot, "templates");
 }
 
 /**

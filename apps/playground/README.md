@@ -105,6 +105,17 @@ If the prefix is ever unset in a production build, **every page loads with no
 CSS or JS and nothing appears in the server logs.** Treat it as a required CI
 build arg.
 
+The Dockerfile sets `PLAYGROUND_STRICT_ENV=1`, which makes `src/env.ts` fail
+the build unless:
+
+- `NEXT_PUBLIC_BASE_URL` and `NEXT_PUBLIC_APP_URL` are `https:` URLs on
+  `4mica.io` or one of its subdomains, and
+- `NEXT_PUBLIC_ASSET_PREFIX` is exactly `/p`.
+
+`localhost`, `127.0.0.1` and `[::1]` are exempt, with no prefix required, so a
+local image still builds against a local base URL. Plain `pnpm build` outside
+Docker doesn't set the flag and behaves as before.
+
 ### `@4mica/db` throws at import
 
 `packages/db/src/index.ts` throws when `DATABASE_URL` is unset, and `next build`
@@ -158,6 +169,16 @@ Copy-link is a plain client button (no round-trip for a string concat). Profile
 editing belongs in `apps/dashboard` against the already-validated
 `PATCH /me/profile` — duplicating it here would create two write paths for the
 same fields.
+
+Every write action first calls `allowWrite()` (`src/services/writeLimit.ts`),
+which allows each Clerk user 10 writes per minute before any database query.
+The count lives in Valkey under `playground:write:<clerk-user-id>:<minute>`, so
+it holds across replicas and restarts. In production that is apps/be's Valkey,
+reached as `4mica-be-valkey` over `4mica-data`, which is `VALKEY_URL`'s compose
+default. With `VALKEY_URL` unset, or Valkey unreachable, it falls back to a
+per-process counter and logs `shared write limit unavailable`. A Valkey outage
+weakens the limit but never blocks writes. The edge nginx's per-IP limits stay
+in front of all of it.
 
 ### What is never exposed
 

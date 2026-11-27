@@ -1,5 +1,3 @@
-"""Tests for CdpAccountSigner — no cdp-sdk installation required (all CDP calls are mocked)."""
-
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,10 +14,7 @@ from fourmica_sdk.wallet.cdp import (
 ADDRESS = "0xAbCdEf0123456789AbCdEf0123456789AbCdEf01"
 
 
-# ---------------------------------------------------------------------------
-# Fake CDP exception used to simulate schema rejections from the CDP API.
-# ---------------------------------------------------------------------------
-class _FakeCdpApiException(Exception):
+class _FakeCdpApiError(Exception):
     pass
 
 
@@ -44,8 +39,7 @@ def signer(mock_cdp: MagicMock) -> CdpAccountSigner:
 
 @pytest.fixture
 def cdp_modules():
-    """Patch sys.modules so cdp imports inside CdpAccountSigner methods resolve without the real SDK."""
-    fake_domain_cls = MagicMock(side_effect=lambda **kw: MagicMock())
+    fake_domain_cls = MagicMock(side_effect=lambda **_: MagicMock())
     mocks = {
         "cdp": MagicMock(),
         "cdp.openapi_client": MagicMock(),
@@ -53,24 +47,14 @@ def cdp_modules():
         "cdp.openapi_client.models.eip712_domain": MagicMock(
             EIP712Domain=fake_domain_cls
         ),
-        "cdp.openapi_client.exceptions": MagicMock(ApiException=_FakeCdpApiException),
+        "cdp.openapi_client.exceptions": MagicMock(ApiException=_FakeCdpApiError),
     }
     with patch.dict(sys.modules, mocks):
         yield mocks
 
 
-# ---------------------------------------------------------------------------
-# address property
-# ---------------------------------------------------------------------------
-
-
 def test_address_returns_value(signer: CdpAccountSigner) -> None:
     assert signer.address == ADDRESS
-
-
-# ---------------------------------------------------------------------------
-# sign_message — bytes path
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -99,7 +83,6 @@ async def test_sign_message_bytes_passes_correct_eip191_hash(
 async def test_sign_message_bytes_hash_is_not_bare_keccak(
     signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
-    """Regression: old code did keccak(body) which omits the EIP-191 prefix."""
     msg = b"\xde\xad\xbe\xef" * 8
     broken_hash = "0x" + keccak(msg).hex()
 
@@ -118,11 +101,6 @@ async def test_sign_message_bytes_with_address(
     assert call_address == ADDRESS
 
 
-# ---------------------------------------------------------------------------
-# sign_message — str path
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_sign_message_str_delegates_to_cdp(
     signer: CdpAccountSigner, mock_cdp: MagicMock
@@ -133,10 +111,6 @@ async def test_sign_message_str_delegates_to_cdp(
     mock_cdp.evm.sign_hash.assert_not_awaited()
     assert result == "0xSIGMESSAGE"
 
-
-# ---------------------------------------------------------------------------
-# sign_typed_data — happy path
-# ---------------------------------------------------------------------------
 
 _TYPED_MSG = {
     "types": {
@@ -153,8 +127,9 @@ _TYPED_MSG = {
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_calls_cdp(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
     result = await signer.sign_typed_data(_TYPED_MSG)
     mock_cdp.evm.sign_typed_data.assert_awaited_once()
@@ -162,8 +137,9 @@ async def test_sign_typed_data_calls_cdp(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_strips_eip712domain_from_types(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
     captured: dict = {}
 
@@ -179,26 +155,21 @@ async def test_sign_typed_data_strips_eip712domain_from_types(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_passes_correct_address(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
     await signer.sign_typed_data(_TYPED_MSG)
     call_address = mock_cdp.evm.sign_typed_data.call_args[0][0]
     assert call_address == ADDRESS
 
 
-# ---------------------------------------------------------------------------
-# sign_typed_data — fallback path
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_fallback_on_cdp_api_exception(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
-    mock_cdp.evm.sign_typed_data = AsyncMock(
-        side_effect=_FakeCdpApiException("bad schema")
-    )
+    mock_cdp.evm.sign_typed_data = AsyncMock(side_effect=_FakeCdpApiError("bad schema"))
     mock_cdp.evm.sign_hash = AsyncMock(return_value="0xFALLBACK")
 
     result = await signer.sign_typed_data(_TYPED_MSG)
@@ -208,12 +179,11 @@ async def test_sign_typed_data_fallback_on_cdp_api_exception(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_fallback_passes_correct_eip712_hash(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
-    mock_cdp.evm.sign_typed_data = AsyncMock(
-        side_effect=_FakeCdpApiException("rejected")
-    )
+    mock_cdp.evm.sign_typed_data = AsyncMock(side_effect=_FakeCdpApiError("rejected"))
     mock_cdp.evm.sign_hash = AsyncMock(return_value="0xFALLBACK")
 
     encoded = encode_typed_data(full_message=_TYPED_MSG)
@@ -225,13 +195,11 @@ async def test_sign_typed_data_fallback_passes_correct_eip712_hash(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_fallback_hash_is_not_bare_body_keccak(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
-    """Regression: old code did keccak(body) which omits version+header bytes."""
-    mock_cdp.evm.sign_typed_data = AsyncMock(
-        side_effect=_FakeCdpApiException("rejected")
-    )
+    mock_cdp.evm.sign_typed_data = AsyncMock(side_effect=_FakeCdpApiError("rejected"))
     mock_cdp.evm.sign_hash = AsyncMock(return_value="0xFALLBACK")
 
     encoded = encode_typed_data(full_message=_TYPED_MSG)
@@ -244,8 +212,9 @@ async def test_sign_typed_data_fallback_hash_is_not_bare_body_keccak(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("cdp_modules")
 async def test_sign_typed_data_non_cdp_exception_propagates(
-    signer: CdpAccountSigner, mock_cdp: MagicMock, cdp_modules: dict
+    signer: CdpAccountSigner, mock_cdp: MagicMock
 ) -> None:
     mock_cdp.evm.sign_typed_data = AsyncMock(
         side_effect=ConnectionError("network down")
@@ -255,11 +224,6 @@ async def test_sign_typed_data_non_cdp_exception_propagates(
         await signer.sign_typed_data(_TYPED_MSG)
 
     mock_cdp.evm.sign_hash.assert_not_awaited()
-
-
-# ---------------------------------------------------------------------------
-# close / context manager
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -272,9 +236,9 @@ async def test_close_calls_cdp_close(
 
 @pytest.mark.asyncio
 async def test_close_skips_when_no_close_method() -> None:
-    cdp = MagicMock(spec=[])  # no .close attribute
+    cdp = MagicMock(spec=[])
     signer = CdpAccountSigner(address=ADDRESS, _cdp_client=cdp)
-    await signer.close()  # must not raise
+    await signer.close()
 
 
 @pytest.mark.asyncio
@@ -290,11 +254,6 @@ async def test_context_manager_returns_signer(mock_cdp: MagicMock) -> None:
     signer = CdpAccountSigner(address=ADDRESS, _cdp_client=mock_cdp)
     async with signer as s:
         assert s is signer
-
-
-# ---------------------------------------------------------------------------
-# create_cdp_account
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

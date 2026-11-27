@@ -36,18 +36,25 @@ class StubSigned:
         self.payload = StubRequest(wire)
 
 
+def _wire(req_id, version):
+    return {"payload": {"version": "v1", "req_id": hex(req_id)}, "signature": "0x", "v": version}
+
+
 class StubFlow:
     def __init__(self):
         self.last_payment_required = None
         self.last_accepted = None
+        self.req_ids = []
 
-    async def sign_payment_v2(self, payment_required, accepted):
+    async def sign_payment_v2(self, payment_required, accepted, *, req_id=None):
         self.last_payment_required = payment_required
         self.last_accepted = accepted
-        return StubSigned({"claims": {"version": "v1", "req_id": "0x1"}, "v": 2})
+        self.req_ids.append(req_id)
+        return StubSigned(_wire(req_id or 1, 2))
 
-    async def sign_payment(self, requirements):
-        return StubSigned({"claims": {"version": "v1", "req_id": "0x2"}, "v": 1})
+    async def sign_payment(self, requirements, *, req_id=None):
+        self.req_ids.append(req_id)
+        return StubSigned(_wire(req_id or 2, 1))
 
 
 class StubPayment:
@@ -103,7 +110,7 @@ def test_create_payment_payload_v2():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 2
-    assert payload["claims"]["req_id"] == "0x1"
+    assert payload["payload"]["req_id"] == "0x1"
     flow = scheme._payers["https://custom.rpc.example"].flow
     assert flow.last_payment_required.resource.url == "https://api.example.com/premium"
     assert flow.last_payment_required.resource.description == "Premium dataset"
@@ -128,10 +135,10 @@ def test_create_payment_payload_v1():
     )
     payload = scheme.create_payment_payload(req)
     assert payload["v"] == 1
-    assert payload["claims"]["req_id"] == "0x2"
+    assert payload["payload"]["req_id"] == "0x2"
 
 
-def test_pays_on_the_payers_core_override_unless_the_seller_names_one():
+def test_the_payers_own_core_wins_over_the_one_the_seller_names():
     scheme = StubScheme("0x" + "1" * 64, core_urls={"eip155:31337": "http://localhost:3000/"})
     req = PaymentRequirements(
         scheme="4mica-credit",
@@ -140,15 +147,31 @@ def test_pays_on_the_payers_core_override_unless_the_seller_names_one():
         amount="1",
         pay_to="0xdef",
         max_timeout_seconds=60,
-        extra={},
+        extra={"rpcUrl": "https://seller.core.example/"},
     )
 
     scheme.create_payment_payload(req)
-    scheme.create_payment_payload(
-        req.model_copy(update={"extra": {"rpcUrl": "https://seller.core.example/"}})
+    scheme.create_payment_payload(req.model_copy(update={"extra": {}}))
+
+    assert scheme.connected == ["http://localhost:3000/"]
+
+
+def test_the_core_the_seller_names_wins_over_the_hosted_one():
+    scheme = StubScheme("0x" + "1" * 64)
+    req = PaymentRequirements(
+        scheme="4mica-credit",
+        network="eip155:84532",
+        asset="0xabc",
+        amount="1",
+        pay_to="0xdef",
+        max_timeout_seconds=60,
+        extra={"rpcUrl": "https://seller.core.example/"},
     )
 
-    assert scheme.connected == ["http://localhost:3000/", "https://seller.core.example/"]
+    scheme.create_payment_payload(req)
+    scheme.create_payment_payload(req.model_copy(update={"extra": {}}))
+
+    assert scheme.connected == ["https://seller.core.example/", SEPOLIA_CORE]
 
 
 def test_create_payment_payload_v2_rejects_unknown_network_without_rpc():
@@ -169,9 +192,9 @@ def test_create_payment_payload_v2_rejects_unknown_network_without_rpc():
 
 def _paid(scheme, requirements):
     """Pays *requirements* once, so the scheme is connected to its core."""
-    scheme.create_payment_payload(requirements)
+    payload = scheme.create_payment_payload(requirements)
     return PaymentResponseContext(
-        payment_payload=PaymentPayload(x402_version=2, accepted=requirements, payload={}),
+        payment_payload=PaymentPayload(x402_version=2, accepted=requirements, payload=payload),
         requirements=requirements,
     )
 
@@ -205,6 +228,52 @@ def test_recovers_by_checkpointing_when_core_wants_one():
 
     assert isinstance(on_payment_response(ctx), RecoveredResponseResult)
     assert scheme.payment.calls == [("checkpoint_active_cycle", BASE_SEPOLIA.asset)]
+
+
+def _flow(scheme):
+    (payer,) = scheme._payers.values()
+    return payer.flow
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["invalid_4mica_credit_checkpoint_required", "invalid_4mica_credit_future_timestamp"],
+)
+def test_the_payment_signed_after_a_recovery_reuses_the_refused_ones_request_id(reason):
+    # Both refused payments become redeemable later, once checkpointed or once
+    # their timestamp passes; core issues one guarantee per request id.
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    refused = int(ctx.payment_payload.payload["payload"]["req_id"], 16)
+    ctx.settle_response = _refusal(reason)
+
+    assert isinstance(scheme.scheme_hooks["on_payment_response"](ctx), RecoveredResponseResult)
+    retry = scheme.create_payment_payload(BASE_SEPOLIA.model_copy())
+    scheme.create_payment_payload(BASE_SEPOLIA)
+
+    assert int(retry["payload"]["req_id"], 16) == refused
+    # Once: the next payment for the same terms is a new one.
+    assert _flow(scheme).req_ids == [None, refused, None]
+
+
+def test_a_retry_request_id_is_only_reused_for_the_same_requirements():
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    ctx.settle_response = _refusal("invalid_4mica_credit_checkpoint_required")
+    scheme.scheme_hooks["on_payment_response"](ctx)
+
+    scheme.create_payment_payload(BASE_SEPOLIA.model_copy(update={"amount": "2000"}))
+
+    assert _flow(scheme).req_ids == [None, None]
+
+
+def test_does_not_retry_a_refused_payment_whose_request_id_it_cannot_read():
+    scheme = StubScheme("0x" + "1" * 64)
+    ctx = _paid(scheme, BASE_SEPOLIA)
+    ctx.payment_payload = PaymentPayload(x402_version=2, accepted=BASE_SEPOLIA, payload={})
+    ctx.settle_response = _refusal("invalid_4mica_credit_checkpoint_required")
+
+    assert scheme.scheme_hooks["on_payment_response"](ctx) is None
 
 
 def test_leaves_success_and_unrecoverable_refusals_alone():
@@ -261,3 +330,114 @@ def test_default_scheme_fails_when_a_core_the_caller_named_is_down(monkeypatch):
         create_default_client_scheme(
             "0x" + "11" * 32, core_urls={"eip155:31337": "http://localhost:3000"}
         )
+
+
+KEY = "0x" + "11" * 32
+
+# What a FourMica session in the same process, on Base mainnet, is set up with.
+MAINNET_ENV = {
+    "FOURMICA_NETWORK": "base",
+    "FOURMICA_WALLET_PRIVATE_KEY": "0x" + "22" * 32,
+    "FOURMICA_BEARER_TOKEN": "mainnet-token",
+    "FOURMICA_CONTRACT_ADDRESS": "0x" + "c0" * 20,
+    "FOURMICA_ETHEREUM_HTTP_RPC_URL": "https://mainnet.rpc.example",
+    "FOURMICA_FACILITATOR_URL": "https://facilitator.example",
+    "FOURMICA_AUTH_URL": "https://auth.example",
+}
+
+
+def _environment(monkeypatch, values):
+    import os
+
+    for name in list(os.environ):
+        if name.startswith(("FOURMICA_", "4MICA_")):
+            monkeypatch.delenv(name)
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+
+def test_a_payer_takes_nothing_from_an_environment_that_describes_another_core(
+    monkeypatch,
+):
+    _environment(monkeypatch, MAINNET_ENV)
+    cfg = FourMicaEvmScheme(KEY)._config(SEPOLIA_CORE)
+
+    assert cfg.rpc_url == SEPOLIA_CORE
+    assert cfg.wallet_private_key == KEY
+    # Mainnet's contract, chain RPC and facilitator are not Sepolia's, and its
+    # bearer token is not sent to Sepolia's core, nor Sepolia's sign-in to
+    # mainnet's auth URL.
+    assert cfg.contract_address is None
+    assert cfg.ethereum_http_rpc_url is None
+    assert cfg.facilitator_url is None
+    assert cfg.bearer_token is None
+    assert cfg.auth.auth_url == SEPOLIA_CORE
+
+
+def test_the_payer_for_the_core_the_environment_describes_takes_its_settings(
+    monkeypatch,
+):
+    _environment(monkeypatch, MAINNET_ENV)
+    cfg = FourMicaEvmScheme(KEY)._config(MAINNET_CORE)
+
+    assert cfg.rpc_url == MAINNET_CORE
+    # The key the scheme was given still wins.
+    assert cfg.wallet_private_key == KEY
+    assert cfg.bearer_token == "mainnet-token"
+    assert cfg.contract_address.lower() == "0x" + "c0" * 20
+    assert cfg.ethereum_http_rpc_url == "https://mainnet.rpc.example"
+    assert cfg.facilitator_url == "https://facilitator.example"
+
+
+def test_an_environment_naming_no_core_describes_the_default_one(monkeypatch):
+    from fourmica_sdk import ConfigBuilder
+
+    _environment(monkeypatch, {"FOURMICA_BEARER_TOKEN": "token"})
+    default_core = ConfigBuilder().wallet_private_key(KEY).build().rpc_url
+    other_core = MAINNET_CORE if default_core.rstrip("/") == SEPOLIA_CORE else SEPOLIA_CORE
+    scheme = FourMicaEvmScheme(KEY)
+
+    assert scheme._config(default_core).bearer_token == "token"
+    assert scheme._config(other_core).bearer_token is None
+
+
+def test_a_self_hosted_core_takes_the_settings_of_the_rpc_url_that_names_it(
+    monkeypatch,
+):
+    local = "http://localhost:3000"
+    _environment(
+        monkeypatch,
+        {"FOURMICA_RPC_URL": local, "FOURMICA_CONTRACT_ADDRESS": "0x" + "c0" * 20},
+    )
+    scheme = FourMicaEvmScheme(KEY, core_urls={"eip155:31337": local})
+
+    assert scheme._config(local).contract_address.lower() == "0x" + "c0" * 20
+    # The same core, written with a trailing slash.
+    assert scheme._config(local + "/").contract_address is not None
+    assert scheme._config(SEPOLIA_CORE).contract_address is None
+
+
+def test_each_payer_connects_with_its_own_core_and_the_given_key(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+
+    from fourmica_x402 import client_scheme
+
+    configs = []
+
+    async def connect(cfg):
+        configs.append(cfg)
+        return SimpleNamespace(payment=StubPayment())
+
+    monkeypatch.setattr(client_scheme.FourMicaClient, "connect", connect)
+    monkeypatch.setattr(client_scheme.X402Flow, "from_client", lambda client: StubFlow())
+    _environment(monkeypatch, MAINNET_ENV)
+
+    scheme = FourMicaEvmScheme(KEY)
+    asyncio.run(scheme._connect(SEPOLIA_CORE))
+    asyncio.run(scheme._connect(MAINNET_CORE))
+
+    sepolia, mainnet = configs
+    assert (sepolia.rpc_url, mainnet.rpc_url) == (SEPOLIA_CORE, MAINNET_CORE)
+    assert sepolia.wallet_private_key == mainnet.wallet_private_key == KEY
+    assert (sepolia.bearer_token, mainnet.bearer_token) == (None, "mainnet-token")

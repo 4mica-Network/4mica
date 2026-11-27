@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sdk-4mica"
-version = "2.0.0"
+version = "2.1.0"
 description = "4Mica Python SDK — payment guarantees and settlement-cycle clearing for the agentic economy"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -22,17 +22,27 @@ classifiers = [
 ]
 dependencies = [
   "web3>=7.14.1",
+  "aiohttp>=3.10.0",
   "httpx>=0.28.0",
   "eth-abi>=5.2.0",
+  "eth-keys>=0.5.0",
   "eth-utils>=6.0.0",
   "eth-account>=0.13.0",
-  "typing-extensions>=4.15.0",
   "certifi>=2024.2.2",
 ]
 
 [project.optional-dependencies]
 cdp = ["cdp-sdk>=1.0.0"]
-dev = ["pytest>=8.4.0", "pytest-asyncio>=1.0.0", "ruff>=0.6.0"]
+dev = [
+  "pytest>=8.4.0",
+  "pytest-asyncio>=1.0.0",
+  "pytest-cov>=7.0.0",
+  "ruff>=0.16.0",
+  "mypy>=2.4.0",
+  "vulture>=2.16",
+  "deptry>=0.25.0",
+  "pip-audit>=2.10.0",
+]
 
 [project.urls]
 Homepage = "https://4mica.io"
@@ -54,5 +64,49 @@ line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
-ignore = ["E501"]
+select = [
+  "A", "ARG", "ASYNC", "B", "BLE", "C4", "DTZ", "E", "ERA", "F", "FBT", "FLY",
+  "FURB", "G", "I", "ISC", "LOG", "N", "PERF", "PIE", "PL", "PT", "PTH", "RET",
+  "RUF", "S", "SIM", "SLF", "T20", "TRY", "UP", "W",
+]
+ignore = ["E501", "PLR0913", "PLR0917", "TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "ARG001", "ARG002", "ARG005", "FBT", "PLR2004", "S101", "S105", "S106",
+  "SLF001",
+]
+"examples/**" = ["T201"]
+"fourmica_sdk/wallet/cdp.py" = ["PLC0415"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["fourmica_sdk", "examples"]
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["cdp", "cdp.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["eth_abi", "eth_keys", "eth_keys.*", "eth_utils"]
+implicit_reexport = true
+
+[tool.coverage.run]
+branch = true
+source = ["fourmica_sdk"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "^\\s*\\.\\.\\.$"]
+
+[tool.vulture]
+paths = ["fourmica_sdk", "tests", "examples"]
+min_confidence = 80
+ignore_names = ["DataclassInstance"]
+
+[tool.deptry]
+optional_dependencies_dev_groups = ["dev"]

@@ -1,16 +1,14 @@
 import {
   agentPendingKeys,
   clearAgentSelection,
-  setAgentFilters,
-  setAgentSelection,
-} from "@stores/agent/actions";
-import {
   selectAgentFilters,
   selectAgents,
   selectAreAllAgentsSelected,
   selectIsAgentPending,
   selectSelectedAgentIds,
-} from "@stores/agent/selector";
+  setAgentFilters,
+  setAgentSelection,
+} from "@stores/agent";
 import type { PaymentNetwork, PublicVisibility } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";

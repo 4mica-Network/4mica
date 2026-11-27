@@ -15,6 +15,124 @@ pip install "sdk-4mica[cdp]"   # with the Coinbase CDP wallet backend
 
 Requires Python 3.10+.
 
+## Quick start
+
+```python
+import asyncio
+from fourmica_sdk import FourMica
+
+
+async def main():
+    async with await FourMica.connect(
+        private_key="0x...", network="base-sepolia"
+    ) as client:
+        await client.deposit("5 USDC")  # gasless where it can
+        response = await client.fetch("https://api.example.com/data")
+        print(response.status_code, client.payment_for(response))
+
+
+asyncio.run(main())
+```
+
+`FourMica` is the short way in: connect once, then deposit, pay and withdraw
+with amounts written the way people write them. It matches `FourMica` in the
+TypeScript SDK.
+
+| Call | What it does |
+|---|---|
+| `await FourMica.connect(...)` | `private_key=` or `signer=`; `network=` defaults to `base-sepolia`, and `rpc_url=` names a self-hosted core. With no key or signer, the whole configuration is read from `FOURMICA_*`. |
+| `await client.deposit("5 USDC")` | Deposits collateral and waits until core counts it. `gas="self"` sends the wallet's own transaction; `wait="mined"` returns without waiting. |
+| `await client.balance("USDC")` | `total`, `locked` and `available` as decimal strings, with base units under `raw`. Without an asset: every asset held, keyed by symbol. |
+| `await client.fetch(url, method="GET", **kwargs)` | An `httpx` request that pays a 4Mica 402 within the spend limits and retries once. `client.payment_for(response)` says what was paid. |
+| `await client.withdraw("2 USDC")` | Requests a withdrawal. |
+| `await client.withdrawals()` | Pending requests, and when each can be finalized. |
+| `await client.finalize_withdrawal("USDC")` / `cancel_withdrawal("USDC")` | Pays out a request after the grace period, or cancels it. Takes the token address for an asset core no longer lists. |
+| `await client.positions()` | What the wallet still owes and is owed, one entry per asset and settlement cycle, soonest deadline first. |
+| `await client.settle(only=None)` | Pays every open debit and claims every open credit; `only="pay"` or `"claim"` does one side. Each result says `settled`, `skipped`, `failed` or `unknown`. |
+| `await client.low_level()` | The `Client` underneath, for anything else. |
+
+Every call that touches a network takes `network=` to use another one; the
+session connects to it on first use. `async with` (or `await client.aclose()`)
+closes them all.
+
+**The environment is read only when no key or signer is passed.**
+`FourMica.connect(private_key=...)` ignores `FOURMICA_NETWORK` and the other
+variables; pass `network=` yourself.
+
+**Amounts are decimal strings**, `"5 USDC"` or
+`{"amount": "5", "asset": "USDC"}`. Numbers are refused, because `5` could
+mean five tokens or five base units. An asset is a symbol, `"ETH"` for the
+native asset, or a token address, checked against the tokens core accepts.
+An amount with more decimal places than the token has is an error, never
+rounded.
+
+**`deposit` does not raise when core is slow.** Once the transaction is mined
+the money has moved, so running out of `timeout_secs` (default 60) returns
+`status="pending"`; `await result.spendable()` waits again.
+
+`"spendable"` is inferred from the balance. Core reports the collateral an
+account holds, not which deposit it has counted, so the deposit is taken as
+counted once the total has grown by its amount. Deposits of one asset through
+the same session run one after another, so each is measured from the one
+before. A deposit to the same account from somewhere else at the same time
+(another process, the dashboard) can be taken for this one.
+
+**`fetch` only pays within its limits.** By default that is at most 1 USDC per
+payment, and nothing in any other asset:
+
+```python
+from fourmica_sdk import FourMica, SpendLimits
+
+client = await FourMica.connect(
+    private_key="0x...",
+    spend=SpendLimits(
+        per_payment=["0.10 USDC", "0.10 USDT"],  # the assets it may pay in
+        total=["5 USDC", "5 USDT"],  # for this session, on all networks together
+        pay_to=["0xSeller..."],  # optional: the only payees
+    ),
+)
+```
+
+A payment over a limit raises `SpendLimitError` before anything is signed. A
+402 that is not a `4mica-credit` offer on a network the session has open comes
+back untouched. The request body is read into memory once, so the retry sends
+the same bytes even for a file or a generator.
+
+**Each `total` entry is one budget for the whole session.** `"5 USDC"` is
+5 USDC across every network the session pays on, not 5 on each. Once `total`
+is set, an asset none of its entries names is refused, even if `per_payment`
+allows it: a total that capped only some assets would leave the rest
+unlimited. A misspelled entry names nothing, so it refuses that asset too, and
+an empty list (`total=[]`) refuses every asset; only `None` means no total.
+
+`total` counts every payment the session sends to a seller. One that was
+never sent because signing failed is released again. One that was sent stays
+counted whatever the seller answers, an error or another 402 included: it
+holds a signed payment, and its answer does not prove it cannot redeem it. The
+count is kept in memory by this session: a new `connect` starts from zero, and
+across processes sharing a wallet the hard limit is the collateral deposited.
+
+**A refusal to checkpoint.** Core holds a payer to so many guarantees no
+checkpoint covers (see [Checkpoints](#checkpoints)). When the seller refuses
+the payment for that, `fetch` signs the checkpoint core asks for and pays once
+more, under the refused payment's request id. Core issues one guarantee per
+request id, so the seller can redeem one of the two however it plays them, and
+`total` counts one. A second refusal comes back as the response.
+
+**Redirects** are not followed unless you pass `follow_redirects=True` or an
+`http_client` that follows them. When they are, the request paid for is the
+one that was answered 402: the URL the redirect led to, and after a 303 a
+`GET` with no body, never the original `POST` again. A 402 from another origin
+than the URL you asked for is not paid and comes back untouched; fetch that
+URL directly to pay it. The same host moving from `http` to `https` is not
+another origin. The paid retry itself follows no redirect, so the payment is
+never forwarded: a redirect in answer to it comes back as the response.
+
+**A remote signer** (`signer=`, such as the CDP backend) signs payments and
+gasless deposits and withdrawals, but cannot send a transaction or read the
+wallet: the balance check before a deposit is skipped, and `withdrawals()`
+needs a local key.
+
 ## Connecting
 
 ```python
@@ -44,10 +162,16 @@ An Ethereum RPC endpoint is only needed for paths that read chain state or
 send transactions; signing-only clients never touch the chain.
 
 Configuration can also come from the environment via
-`ConfigBuilder().from_env()`: `4MICA_NETWORK` / `4MICA_RPC_URL`,
-`4MICA_WALLET_PRIVATE_KEY`, `4MICA_ETHEREUM_HTTP_RPC_URL`,
-`4MICA_CONTRACT_ADDRESS`, `4MICA_FACILITATOR_URL`, `4MICA_BEARER_TOKEN`,
-`4MICA_AUTH_URL`, `4MICA_AUTH_REFRESH_MARGIN_SECS`.
+`ConfigBuilder().from_env()`: `FOURMICA_NETWORK` / `FOURMICA_RPC_URL`,
+`FOURMICA_WALLET_PRIVATE_KEY`, `FOURMICA_ETHEREUM_HTTP_RPC_URL`,
+`FOURMICA_CONTRACT_ADDRESS`, `FOURMICA_FACILITATOR_URL`,
+`FOURMICA_BEARER_TOKEN`, `FOURMICA_AUTH_URL`,
+`FOURMICA_AUTH_REFRESH_MARGIN_SECS`. The older `4MICA_` prefix still works,
+but a shell cannot `export` a name that starts with a digit; setting both
+prefixes to different values is a `ConfigError`.
+
+`.network(...)` also selects that network's hosted facilitator where there is
+one, so gasless routes work without `.facilitator_url(...)`.
 
 SIWE auth is on by default (the SDK signs in with your wallet and refreshes
 tokens automatically); a `bearer_token` replaces it.
@@ -184,6 +308,11 @@ action = await client.settlement.pay(cycle_id).action()
 only; the 0x-prefixed on-chain id carried in payments and receipts is not
 accepted here.
 
+`await client.settlement.positions()` lists what is still open, with each
+cycle's text id, and `await client.payment.list_issued(cycle_id)` pages
+through the guarantees the signer issued in a cycle (this one takes the
+on-chain id, `cycle_id` on a position).
+
 ### Collateral
 
 ```python
@@ -202,8 +331,9 @@ balance = await client.account.asset_balance("0xToken...")
 
 ### Gasless routes
 
-With a facilitator configured (`.facilitator_url(...)` or
-`4MICA_FACILITATOR_URL`), token-moving operations can run without the signer
+With a facilitator configured (`.network(...)` on a network that hosts one,
+`.facilitator_url(...)` or `FOURMICA_FACILITATOR_URL`), token-moving
+operations can run without the signer
 paying gas: the payer signs an authorization and the facilitator submits it.
 Unpinned `send()` prefers gasless and falls back to self-funding when nothing
 will sponsor it; a pin makes the route explicit:
@@ -229,6 +359,33 @@ name the request itself (`invalid_signature`, `insufficient_funds`, …)
 are surfaced, not retried — your own transaction would fail the same way —
 and an `OutcomeUnknownError` means the facilitator may already have
 submitted: check the chain before resending.
+
+## Sellers: the app API
+
+`fourmica_sdk.app` talks to the 4Mica app API with a listing's or agent's API
+key: `resource()` describes it, `resolve_customer()` says whether a payer may
+pay and how much after coupons and credit, and `report_payment()` records a
+payment. In an x402 after-settle hook, `parse_settlement(context)` reads off
+what `report_payment()` needs:
+
+```python
+from fourmica_sdk.app import AppClient, parse_settlement
+
+async with AppClient(api_key) as app:
+    settled = parse_settlement(context)
+    await app.report_payment(
+        req_id=settled.req_id,
+        payer_address=settled.payer_address,
+        recipient_address=pay_to,
+        network="base-sepolia",
+        amount=settled.amount,  # base units
+        guarantee_claims=settled.guarantee_claims,
+        guarantee_signature=settled.guarantee_signature,
+    )
+```
+
+Networks take any form of the name: `base-sepolia`, `BASE_SEPOLIA` or
+`eip155:84532`. `to_caip2()` gives the CAIP-2 id x402 wants.
 
 ## x402
 
@@ -265,6 +422,12 @@ can branch on codes this SDK predates.
 Core's own coded refusals carry `code` and `details` on `RpcError`, and the
 payment ones arrive typed (see [Refusals](#refusals)).
 
+`OutcomeUnknownError` means something was sent and no answer came back, so it
+may have gone through: check before sending again. For a transaction the
+wallet sent itself it is a `TransactionOutcomeUnknownError`, whose `stage` is
+`"broadcast"` (no hash to look it up by) or `"receipt"` (look it up by
+`tx_hash`).
+
 ## Development
 
 This package lives in the 4mica monorepo at `packages/sdk-python` and has no
@@ -272,9 +435,16 @@ pnpm/turbo wiring — it is a plain Python project:
 
 ```bash
 cd packages/sdk-python
-pip install -e ".[dev,cdp]"
-ruff check . && pytest -q
+uv venv && uv pip install -e ".[dev,cdp]"
+bash scripts/check.sh
 ```
+
+`scripts/check.sh` runs every check: ruff format and lint (bandit's security
+rules included), `mypy --strict`, `vulture` for dead code, `deptry` for
+undeclared or unused dependencies, `pip-audit` for known vulnerabilities, and
+pytest, which fails under 100% branch coverage. The pre-commit hook runs it
+when a commit touches this package, and CI runs the same checks on every pull
+request here and weekly. `pytest -m integration` runs the live-stack tests.
 
 Contract ABIs under `fourmica_sdk/contract/abi/` are copies of the monorepo's
 `contracts/abi/*.json`, vendored from the `4mica-core` repo's forge artifacts

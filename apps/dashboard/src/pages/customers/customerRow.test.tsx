@@ -8,10 +8,14 @@ const { dispatch } = vi.hoisted(() => ({ dispatch: vi.fn() }));
 vi.mock("@stores/hooks", () => ({
   useAppDispatch: () => dispatch,
   useAppSelector: (selector: (s: unknown) => unknown) =>
-    selector({ customer: { pending: {}, selectedIds: [], items: [] } }),
+    selector({
+      user: { user: null },
+      customer: { pending: {}, selectedIds: [], items: [] },
+    }),
 }));
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 

@@ -1,11 +1,11 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import ThemeProvider from "@/context/ThemeProvider";
+import { MotionProvider } from "@/components/MotionProvider";
 import { publicEnv } from "@/env";
 import fontVariables from "@/fonts";
 import { themeInitScript } from "@/lib/theme";
 import { SITE_NAME } from "@/services/seo";
+import { getNonce } from "@/utils/nonce";
 import "@/style/globals.css";
 
 export const metadata: Metadata = {
@@ -29,32 +29,30 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   colorScheme: "dark light",
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
+  const nonce = await getNonce();
+
   return (
     <html className="dark" lang="en" suppressHydrationWarning={true}>
       <head>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input. */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <link rel="preconnect" href="https://img.clerk.com" />
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static, self-authored theme bootstrap with no user input.
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+          nonce={nonce}
+          suppressHydrationWarning={true}
+        />
       </head>
       <body
         suppressHydrationWarning={true}
-        className={`${fontVariables} min-h-screen bg-surface-deep text-ink-body antialiased`}
+        className={`${fontVariables} min-h-dvh bg-surface-deep pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-ink-body antialiased`}
       >
-        {/*
-          ClerkProvider is a client component, so wrapping <html> would put the
-          document — and the theme script in <head> — inside a client tree,
-          where React never executes a script tag. It only has to be above the
-          components that use Clerk, which all live in children.
-        */}
-        <ClerkProvider
-          publishableKey={publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        >
-          <ThemeProvider>{children}</ThemeProvider>
-        </ClerkProvider>
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

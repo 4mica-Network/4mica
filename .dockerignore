@@ -17,3 +17,9 @@ node_modules
 **/tsconfig.tsbuildinfo
 packages/db/src/generated
 .DS_Store
+**/logs
+**/test-results
+**/playwright-report
+**/playwright/.auth
+**/.playwright
+**/.playwright-cli

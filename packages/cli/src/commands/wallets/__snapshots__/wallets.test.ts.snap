@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`what the wallet commands print with --json > keeps its fields > json shape: wallets 1`] = `
+[
+  {
+    "active": "boolean",
+    "address": "string",
+    "name": "string",
+    "path": "string",
+  },
+]
+`;
+
+exports[`what the wallet commands print with --json > keeps its fields > json shape: wallets create 1`] = `
+{
+  "active": "boolean",
+  "address": "string",
+  "name": "string",
+  "nextSteps": [
+    {
+      "command": "string",
+      "done": "boolean",
+      "step": "string",
+    },
+  ],
+  "path": "string",
+}
+`;
+
+exports[`what the wallet commands print with --json > keeps its fields > json shape: wallets import 1`] = `
+{
+  "active": "boolean",
+  "address": "string",
+  "name": "string",
+  "path": "string",
+}
+`;
+
+exports[`what the wallet commands print with --json > keeps its fields > json shape: wallets remove 1`] = `
+{
+  "address": "string",
+  "name": "string",
+  "path": "string",
+  "removed": "boolean",
+  "wasActive": "boolean",
+}
+`;
+
+exports[`what the wallet commands print with --json > keeps its fields > json shape: wallets use 1`] = `
+{
+  "active": "boolean",
+  "address": "string",
+  "name": "string",
+  "path": "string",
+}
+`;

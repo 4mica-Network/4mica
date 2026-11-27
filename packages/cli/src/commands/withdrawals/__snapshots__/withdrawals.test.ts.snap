@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`withdrawals > finalizes and cancels by asset > json shape: withdrawals cancel 1`] = `
+{
+  "asset": {
+    "address": "string",
+    "decimals": "number",
+    "symbol": "string",
+  },
+  "explorerUrl": "string",
+  "network": "string",
+  "route": "string",
+  "txHash": "string",
+}
+`;
+
+exports[`withdrawals > finalizes and cancels by asset > json shape: withdrawals finalize 1`] = `
+{
+  "asset": {
+    "address": "string",
+    "decimals": "number",
+    "symbol": "string",
+  },
+  "explorerUrl": "string",
+  "network": "string",
+  "route": "string",
+  "txHash": "string",
+}
+`;
+
+exports[`withdrawals > lists what is pending > json shape: withdrawals 1`] = `
+[
+  {
+    "amount": "string",
+    "amountRaw": "string",
+    "asset": {
+      "address": "string",
+      "decimals": "number",
+      "symbol": "string",
+    },
+    "network": "string",
+    "ready": "boolean",
+    "readyAt": "string",
+    "requestedAt": "string",
+  },
+]
+`;
+
+exports[`withdrawals > requests the amount it was given > json shape: withdrawals request 1`] = `
+{
+  "asset": {
+    "address": "string",
+    "decimals": "number",
+    "symbol": "string",
+  },
+  "explorerUrl": "string",
+  "network": "string",
+  "route": "string",
+  "txHash": "string",
+}
+`;

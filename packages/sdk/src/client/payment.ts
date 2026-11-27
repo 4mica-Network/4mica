@@ -29,6 +29,7 @@ import {
   type CheckpointAcceptedResponse,
   type CheckpointBatchResponse,
   CheckpointPayload,
+  type PayerGuaranteesPage,
   type PaymentRequest,
   PaymentRequestPayload,
   parseCheckpointMismatchDetails,
@@ -207,6 +208,25 @@ export class PaymentClient {
   /** Payments guaranteed to the signer as a recipient. */
   async listReceived(): Promise<RecipientPaymentInfo[]> {
     return this.ctx.rpc.listRecipientPayments(this.ctx.signerAddress);
+  }
+
+  /**
+   * One page of the guarantees the signer issued, as a payer, in a cycle:
+   * whom each pays, for which request, how much, and where it stands.
+   *
+   * @param cycleId - The cycle's on-chain `bytes32` id, as `cycleId` on a
+   *   position or on {@link activeCycle}'s answer.
+   * @param page - Pass a page's `nextCursor` back as `after` for the next.
+   */
+  async listIssued(
+    cycleId: string,
+    page: { limit?: number; after?: string } = {},
+  ): Promise<PayerGuaranteesPage> {
+    return this.ctx.rpc.listPayerGuarantees(
+      this.ctx.signerAddress,
+      cycleId,
+      page,
+    );
   }
 
   // --- core's view -------------------------------------------------------

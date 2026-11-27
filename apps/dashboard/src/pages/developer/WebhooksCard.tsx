@@ -1,19 +1,17 @@
-import { Button, Card, EmptyState, Spinner, Switch, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, Switch, Tag } from "@4mica/ui";
 import {
   createWebhook,
   deleteWebhook,
   developerPendingKeys,
   rotateWebhookSecret,
-  updateWebhook,
-} from "@stores/developer/actions";
-import {
   selectDeveloperError,
   selectDeveloperIssues,
   selectIsDeveloperPending,
   selectWebhookEvents,
   selectWebhooks,
-} from "@stores/developer/selector";
-import type { Webhook } from "@stores/developer/type";
+  updateWebhook,
+} from "@stores/developer";
+import type { RevealSecret, Webhook } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -21,9 +19,16 @@ import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { ComboBox, FieldRow, TextInput } from "@/components/form";
 import { SettingsSection } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
-function WebhookRow({ webhook }: { webhook: Webhook }) {
+function WebhookRow({
+  webhook,
+  onReveal,
+}: {
+  webhook: Webhook;
+  onReveal: RevealSecret;
+}) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const events = useAppSelector(selectWebhookEvents);
@@ -133,7 +138,9 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
             title={t("developer.webhooks.rotateConfirm")}
             description={t("developer.webhooks.rotateConsequence")}
             confirmLabel={t("developer.webhooks.rotate")}
-            onConfirm={() => dispatch(rotateWebhookSecret({ id: webhook.id }))}
+            onConfirm={() =>
+              dispatch(rotateWebhookSecret({ id: webhook.id }, onReveal))
+            }
           >
             <Button type="button" size="sm" intent="soft" disabled={isPending}>
               {t("developer.webhooks.rotate")}
@@ -159,7 +166,7 @@ function WebhookRow({ webhook }: { webhook: Webhook }) {
   );
 }
 
-export function WebhooksCard() {
+export function WebhooksCard({ onReveal }: { onReveal: RevealSecret }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const webhooks = useAppSelector(selectWebhooks);
@@ -200,11 +207,14 @@ export function WebhooksCard() {
       return;
     }
     dispatch(
-      createWebhook({
-        url: trimmedUrl,
-        description: description.trim() || null,
-        events: selected.map(String),
-      }),
+      createWebhook(
+        {
+          url: trimmedUrl,
+          description: description.trim() || null,
+          events: selected.map(String),
+        },
+        onReveal,
+      ),
     );
   };
 
@@ -291,7 +301,7 @@ export function WebhooksCard() {
         />
       ) : (
         webhooks.map((webhook) => (
-          <WebhookRow key={webhook.id} webhook={webhook} />
+          <WebhookRow key={webhook.id} webhook={webhook} onReveal={onReveal} />
         ))
       )}
     </SettingsSection>

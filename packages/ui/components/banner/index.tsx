@@ -121,6 +121,7 @@ export const Banner = ({
             external
             icon={<ExternalLink size={12} />}
             onClick={() => onLearnMore?.(data)}
+            className="min-h-6"
             data-testid={`${prefix}-learn-more`}
           >
             {learnMoreLabel}
@@ -135,7 +136,7 @@ export const Banner = ({
             intent="ghost"
             size="sm"
             onClick={() => onDismiss(data)}
-            className="p-0 font-normal text-ink-muted text-xs leading-normal hover:bg-transparent hover:text-ink-strong hover:underline hover:underline-offset-2"
+            className="min-h-6 p-0 font-normal text-ink-muted text-xs leading-normal hover:bg-transparent hover:text-ink-strong hover:underline hover:underline-offset-2"
             data-testid={`${prefix}-dismiss-button`}
           >
             {dismissLabel}

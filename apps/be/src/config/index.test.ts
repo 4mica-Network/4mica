@@ -163,6 +163,8 @@ describe("parseEnv", () => {
           PUBLIC_API_URL: "https://api.app.4mica.io",
           CORE_URL: "https://base.api.4mica.io",
           CORE_SIGNER_KEY: `0x${"1".repeat(64)}`,
+          PLAYGROUND_URL: "http://4mica-playground:3100",
+          REVALIDATE_SECRET: "s".repeat(32),
         }),
       ),
     ).toEqual([]);

@@ -4,10 +4,6 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchPaymentSummary,
   fetchPayments,
-  setPaymentFilters,
-  setPaymentPage,
-} from "@stores/payment/actions";
-import {
   selectHasLoadedPayments,
   selectIsPaymentsLoading,
   selectPaymentError,
@@ -17,26 +13,29 @@ import {
   selectPaymentSummary,
   selectPayments,
   selectPaymentTotal,
-} from "@stores/payment/selector";
+  setPaymentFilters,
+  setPaymentPage,
+} from "@stores/payment";
 import type {
   PaymentDirection,
   PaymentNetwork,
   PaymentSort,
   PaymentStatus,
 } from "@stores/payment/type";
-import { fetchActiveWallets } from "@stores/wallet/actions";
-import { selectActiveWallets } from "@stores/wallet/selector";
+import { fetchActiveWallets, selectActiveWallets } from "@stores/wallet";
 import { ArrowRightLeft, TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ListToolbar } from "@/components/ListToolbar";
 import { PageSpinner } from "@/components/PageSpinner";
 import { PaymentRow } from "@/components/PaymentRow";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { NETWORK_OPTIONS } from "@/lib/networks";
 import { SummaryTiles } from "./SummaryTiles";
 
 export function Payments() {
   const { t } = useTranslation();
+  usePageTitle(t("page.payments.title"));
   const dispatch = useAppDispatch();
 
   const payments = useAppSelector(selectPayments);

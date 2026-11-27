@@ -6,17 +6,20 @@ export const en = {
     viewDocs: "View docs",
     openApi: "Open API",
     loading: "Loading…",
+    skipToContent: "Skip to content",
   },
 
   auth: {
     join: "Join",
     signIn: "Sign in",
-    signInTitle: "Welcome back",
+    signInTitle: "Sign in to 4Mica",
     signInSubtitle: "Sign in to your 4Mica account to continue.",
     signUpTitle: "Join 4Mica",
     signUpSubtitle:
       "Create an account to pay for this API with credit-backed guarantees.",
     google: "Continue with Google",
+    help: "Trouble signing in?",
+    contact: "Contact us",
     error: "We could not complete that. Try again.",
     haveAccount: "Already have an account?",
     needAccount: "New to 4Mica?",
@@ -28,6 +31,7 @@ export const en = {
     verifiedHint: "This account has been verified by 4Mica.",
     agentsHeading: "Agents",
     apisHeading: "APIs",
+    tabsLabel: "Listings",
     noAgentsTitle: "No agents yet",
     noApisTitle: "No APIs yet",
     noAgents: "No published agents yet.",
@@ -100,6 +104,7 @@ export const en = {
     ratingCountOther: "{{count}} ratings",
     verifiedCount: "{{count}} from verified buyers",
     verifiedPurchase: "Verified purchase",
+    anonymousReviewer: "A 4Mica user",
     hasVerifiedBuyers: "Paid buyers have rated this",
     listedSince: "Listed since {{date}}",
     noPolicy: "No published policy",
@@ -119,6 +124,9 @@ export const en = {
     signInToReport: "Sign in to report this.",
 
     rateN: "Rate {{count}} out of 5",
+    ratingLabel: "Your rating",
+    titleLabel: "Review title",
+    bodyLabel: "Review",
     titlePlaceholder: "Sum it up in a line (optional)",
     bodyPlaceholder: "Did it return what you paid for? How fast? (optional)",
     postReview: "Post rating",
@@ -128,6 +136,8 @@ export const en = {
 
     reportAction: "Report this listing",
     reportSubmit: "Send report",
+    reportReasonLabel: "Reason",
+    reportDetailLabel: "Details",
     reportPlaceholder: "What happened? Include a request id if you have one.",
     reportNote: "Goes to the owner and to 4Mica. Nothing is published.",
     reportThanks:
@@ -146,6 +156,8 @@ export const en = {
     errorNotFound: "That listing is no longer available.",
     errorNoRating: "Pick a star rating first.",
     errorGeneric: "That did not go through. Try again.",
+    errorRateLimited:
+      "You are doing that too often. Wait a minute and try again.",
     errorReportOwn: "You cannot report your own listing.",
     errorDescribeOther: "Tell us what is wrong so we can look into it.",
     errorDeleteMissing: "There is no review of yours to delete.",
@@ -163,6 +175,7 @@ export const en = {
     heading: "Integration",
     copy: "Copy",
     copied: "Copied",
+    languageTabs: "Code language",
     viewDocs: "Read the full integration guide",
 
     installTitle: "Install the SDK",
@@ -205,18 +218,52 @@ export const en = {
       "The agent's wallet address is only shown to you, the owner.",
     inactiveAgent:
       "This agent cannot sign payments until it is active. The setup below still applies.",
+
+    sellerHeading: "Server setup",
+    sellerOpenDashboard: "Open in the dashboard",
+    sellerInstallTitle: "Install the server SDK",
+    sellerInstallLead:
+      "Add the 4Mica SDK and payment middleware to the server that answers this endpoint.",
+    sellerKeyTitle: "Add your secret key",
+    sellerKeyLead:
+      "Create a secret key under Secret keys for this resource in the dashboard, and put it in your server's .env file.",
+    sellerConnectTitle: "Load your terms",
+    sellerConnectLead:
+      "Start server.ts by reading this resource from the dashboard. Price, network and receiving wallet all come from there.",
+    sellerRecordTitle: "Record payments",
+    sellerRecordLead:
+      "Point the resource server at the 4Mica facilitator, and report each settled payment so it shows under Payments.",
+    sellerProtectTitle: "Protect your route",
+    sellerProtectLead:
+      "Add the payment middleware. Unpaid requests get a 402 with your terms; paid ones are verified before your handler runs.",
+    sellerHandleTitle: "Serve paid requests",
+    sellerHandleLead:
+      "Check the payer against your customer rules, then do the work and start listening.",
+    sellerTestTitle: "Check the paywall",
+    sellerTestLead:
+      "Call the route without paying. A 402 with your network and receiving wallet means buyers can pay you.",
   },
 
   flow: {
     stepsLabel: "Steps",
     done: "Done",
     next: "Next: {{title}}",
+    nextShort: "Next",
+    openSteps: "All steps:",
+    stepCount: "Step {{current}} of {{total}}",
+    closeSteps: "Close steps",
     overview: "Overview",
     setup: "Set up payment",
     integrate: "Integrate",
     reviews: "Reviews",
     support: "Support",
     actions: "Page actions",
+  },
+
+  view: {
+    label: "View as",
+    seller: "Server guide",
+    buyer: "Customer view",
   },
 
   ai: {
@@ -292,9 +339,7 @@ export const en = {
 
   owner: {
     previewTitle: "Only you can see this",
-    previewLead:
-      "Your profile is private. Publish it to make this page visible to everyone.",
-    publishAction: "Profile settings",
+    publishAction: "Publish",
     refreshAction: "Refresh",
     refreshed: "Refreshed",
     refreshFailed: "Could not refresh",

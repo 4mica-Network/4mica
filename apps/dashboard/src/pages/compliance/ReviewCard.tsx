@@ -1,12 +1,10 @@
 import { Button, Card } from "@4mica/ui";
 import {
   compliancePendingKeys,
-  submitCompliance,
-} from "@stores/compliance/actions";
-import {
   selectCompliance,
   selectIsCompliancePending,
-} from "@stores/compliance/selector";
+  submitCompliance,
+} from "@stores/compliance";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";
 import { ArrowUpRight, Check, Circle } from "lucide-react";
@@ -34,7 +32,7 @@ function Requirement({ requirement }: { requirement: string }) {
     return (
       <Link
         to="/settings/business"
-        className="group inline-flex items-center gap-1.5 text-ink-body text-sm hover:text-ink-strong"
+        className="group inline-flex min-h-6 items-center gap-1.5 text-ink-body text-sm hover:text-ink-strong"
       >
         {label}
         <span className="text-ink-muted text-xs">
@@ -51,7 +49,7 @@ function Requirement({ requirement }: { requirement: string }) {
   return (
     <a
       href={`#${SECTION_FOR[requirement] ?? ""}`}
-      className="text-ink-body text-sm hover:text-ink-strong"
+      className="inline-flex min-h-6 items-center text-ink-body text-sm hover:text-ink-strong"
     >
       {label}
     </a>

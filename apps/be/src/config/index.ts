@@ -60,6 +60,14 @@ const EnvSchema = v.object({
     ),
   ]),
   UNSUBSCRIBE_SECRET: v.string(),
+  PLAYGROUND_URL: v.union([
+    v.literal(""),
+    v.pipe(
+      v.string(),
+      v.startsWith("http", "PLAYGROUND_URL must be an http(s) URL"),
+    ),
+  ]),
+  REVALIDATE_SECRET: v.string(),
   CORE_URL: v.union([
     v.literal(""),
     v.pipe(v.string(), v.startsWith("http", "CORE_URL must be an http(s) URL")),
@@ -118,6 +126,8 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
     PUBLIC_API_URL: source.PUBLIC_API_URL ?? "",
     VALKEY_URL: source.VALKEY_URL ?? "",
     UNSUBSCRIBE_SECRET: source.UNSUBSCRIBE_SECRET ?? "",
+    PLAYGROUND_URL: source.PLAYGROUND_URL ?? "",
+    REVALIDATE_SECRET: source.REVALIDATE_SECRET ?? "",
     CORE_URL: source.CORE_URL ?? "",
     CORE_SIGNER_KEY: source.CORE_SIGNER_KEY ?? "",
     ONBOARDING_TICK_MS: source.ONBOARDING_TICK_MS ?? "300000",
@@ -165,6 +175,16 @@ export const parseEnv = (source: NodeJS.ProcessEnv): Env => {
   }
 
   if (
+    result.output.PLAYGROUND_URL &&
+    result.output.REVALIDATE_SECRET.length > 0 &&
+    result.output.REVALIDATE_SECRET.length < 32
+  ) {
+    throw new Error(
+      "Invalid environment configuration:\n  - REVALIDATE_SECRET: must be at least 32 characters",
+    );
+  }
+
+  if (
     result.output.NODE_ENV === "production" &&
     result.output.CLERK_AUTHORIZED_PARTIES.trim() === ""
   ) {
@@ -199,6 +219,11 @@ export const productionWarnings = (env: Env): string[] => {
       "CORE_URL or CORE_SIGNER_KEY is unset; reported payments are not verified against 4mica core",
     );
   }
+  if (env.PLAYGROUND_URL === "" || env.REVALIDATE_SECRET === "") {
+    warnings.push(
+      "PLAYGROUND_URL or REVALIDATE_SECRET is unset; public profiles refresh on their 60s timer only",
+    );
+  }
   if (env.TRUST_PROXY_HOPS === 0) {
     warnings.push(
       "TRUST_PROXY_HOPS is 0; behind nginx every client shares one IP",
@@ -225,6 +250,13 @@ export const config = {
     .map((party) => party.trim())
     .filter(Boolean),
   emailServiceUrl: env.EMAIL_SERVICE_URL || undefined,
+  playground:
+    env.PLAYGROUND_URL && env.REVALIDATE_SECRET
+      ? {
+          url: env.PLAYGROUND_URL.replace(/\/+$/, ""),
+          secret: env.REVALIDATE_SECRET,
+        }
+      : undefined,
   publicApiUrl: env.PUBLIC_API_URL || `http://localhost:${env.PORT}`,
   appUrl: new LinkConfig(process.env).appBase,
   shutdown: {

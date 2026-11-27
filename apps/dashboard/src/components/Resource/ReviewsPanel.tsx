@@ -1,13 +1,14 @@
 import { Button, EmptyState, InputField, Stars, Tag } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { replyToReview, trustPendingKeys } from "@stores/trust/actions";
 import {
+  replyToReview,
   selectIsTrustPending,
   selectReviews,
   selectTrustError,
   selectTrustIssues,
   selectTrustSummary,
-} from "@stores/trust/selector";
+  trustPendingKeys,
+} from "@stores/trust";
 import type { Review } from "@stores/trust/type";
 import { formatDate } from "@utils/format";
 import { MessageSquare, Star } from "lucide-react";

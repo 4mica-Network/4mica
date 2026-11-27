@@ -1,8 +1,12 @@
 import type { AgentInput } from "@api/agent";
 import * as api from "@api/agent";
 import i18n from "@i18n";
-import { definedParams, type PendingMeta } from "@stores/utils";
-import { toMessage as messageOf, toIssueMap } from "@utils/http-errors";
+import { definedParams, type PendingMeta, pageBeyondEnd } from "@stores/utils";
+import {
+  isNotFound,
+  toMessage as messageOf,
+  toIssueMap,
+} from "@utils/http-errors";
 import { call, put, select, takeEvery, takeLatest } from "redux-saga/effects";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import {
@@ -10,11 +14,14 @@ import {
   batchDeleteAgentsSucceeded,
   createAgentSucceeded,
   deleteAgentSucceeded,
+  fetchAgentFailed,
+  fetchAgentSucceeded,
   fetchAgents as fetchAgentsAction,
   fetchAgentsFailed,
   fetchAgentsPending,
   fetchAgentsSucceeded,
   publishAgentSucceeded,
+  setAgentPage,
   updateAgentSucceeded,
 } from "./actions";
 import actionTypes from "./actionTypes";
@@ -60,6 +67,12 @@ export function* fetchAgents(): Generator {
         }),
       }),
     )) as Awaited<ReturnType<typeof api.getAgents>>;
+
+    const lastPage = pageBeyondEnd(result);
+    if (lastPage !== null) {
+      yield put(setAgentPage(lastPage));
+      return;
+    }
 
     yield put(fetchAgentsSucceeded(result));
   } catch (error) {
@@ -206,10 +219,38 @@ export function* batchDeleteAgents(action: {
   }
 }
 
+export function* fetchAgent(action: {
+  type: string;
+  payload: { id: string };
+}): Generator {
+  try {
+    const item = (yield call(() => api.getAgent(action.payload.id))) as Awaited<
+      ReturnType<typeof api.getAgent>
+    >;
+    yield put(fetchAgentSucceeded(item));
+  } catch (error) {
+    yield put(
+      fetchAgentFailed(
+        toMessage(
+          error,
+          t("store.agent.fetchOneFailed", "Couldn't load that agent."),
+        ),
+        isNotFound(error),
+      ),
+    );
+  }
+}
+
 export default [
-  takeLatest(actionTypes.FETCH_AGENTS_REQUESTED, fetchAgents),
-  takeLatest(actionTypes.SET_AGENT_FILTERS, fetchAgents),
-  takeLatest(actionTypes.SET_AGENT_PAGE, fetchAgents),
+  takeLatest(actionTypes.FETCH_AGENT_REQUESTED, fetchAgent),
+  takeLatest(
+    [
+      actionTypes.FETCH_AGENTS_REQUESTED,
+      actionTypes.SET_AGENT_FILTERS,
+      actionTypes.SET_AGENT_PAGE,
+    ],
+    fetchAgents,
+  ),
   takeEvery(actionTypes.CREATE_AGENT_REQUESTED, createAgent),
   takeEvery(actionTypes.UPDATE_AGENT_REQUESTED, updateAgent),
   takeEvery(actionTypes.PUBLISH_AGENT_REQUESTED, publishAgent),

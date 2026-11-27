@@ -1,6 +1,6 @@
 import { cn } from "@4mica/ui";
 import { ChevronLeft, ChevronRight, Monitor } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation } from "react-router-dom";
 import { OnboardingGate } from "@/components/Onboarding";
@@ -13,7 +13,7 @@ const DESKTOP_QUERY = "(min-width: 1024px)";
 function UnsupportedScreen() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-deep px-6 text-center text-ink-body">
+    <div className="flex min-h-dvh items-center justify-center bg-surface-deep px-6 text-center text-ink-body">
       <div className="flex max-w-sm flex-col items-center gap-4">
         <span className="grid h-12 w-12 place-items-center rounded-xl border border-overlay/10 bg-surface">
           <Monitor aria-hidden="true" className="h-5 w-5 text-ink-muted" />
@@ -30,6 +30,7 @@ function UnsupportedScreen() {
 }
 
 export function AppShell() {
+  const { t } = useTranslation();
   const isSupported = useMediaQuery(SUPPORTED_QUERY);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const { pathname } = useLocation();
@@ -38,6 +39,16 @@ export function AppShell() {
 
   const collapsed = isDesktop ? desktopCollapsed : !overlayOpen;
   const isOverlay = !isDesktop && overlayOpen;
+  const mainRef = useRef<HTMLElement>(null);
+  const lastPathname = useRef(pathname);
+
+  useEffect(() => {
+    if (lastPathname.current === pathname) {
+      return;
+    }
+    lastPathname.current = pathname;
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   useEffect(() => {
     setOverlayOpen(false);
@@ -64,14 +75,20 @@ export function AppShell() {
     isDesktop ? setDesktopCollapsed((v) => !v) : setOverlayOpen((v) => !v);
 
   return (
-    <div className="flex h-screen bg-surface-deep text-ink-body">
+    <div className="flex h-dvh bg-surface-deep text-ink-body">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:text-ink-strong focus:text-sm focus:shadow-lg"
+      >
+        {t("shell.skipToContent")}
+      </a>
       <div
         className="relative shrink-0"
         style={isDesktop ? undefined : { width: COLLAPSED_WIDTH }}
       >
         <div
           className={cn(
-            "relative h-screen",
+            "relative h-dvh",
             !isDesktop && "absolute inset-y-0 left-0 z-40",
             isOverlay && "shadow-2xl",
           )}
@@ -80,7 +97,9 @@ export function AppShell() {
           <button
             type="button"
             onClick={toggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={t(
+              collapsed ? "shell.expandSidebar" : "shell.collapseSidebar",
+            )}
             aria-expanded={!collapsed}
             className="absolute right-0 bottom-6 z-30 grid h-6 w-6 translate-x-1/2 place-items-center rounded-md border border-overlay/10 bg-surface text-ink-subtle shadow-sm transition-colors hover:text-ink-strong"
           >
@@ -96,15 +115,20 @@ export function AppShell() {
       {isOverlay && (
         <button
           type="button"
-          aria-label="Close sidebar"
+          aria-label={t("shell.closeSidebar")}
           tabIndex={-1}
           onClick={() => setOverlayOpen(false)}
           className="fixed inset-0 z-30 cursor-default bg-black/50"
         />
       )}
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="relative flex min-h-full w-full flex-col px-6 py-6">
+      <main
+        ref={mainRef}
+        id="main-content"
+        tabIndex={-1}
+        className="min-w-0 flex-1 overflow-y-auto outline-none"
+      >
+        <div className="relative mx-auto flex min-h-full w-full max-w-400 flex-col px-6 py-6">
           <Outlet />
         </div>
       </main>

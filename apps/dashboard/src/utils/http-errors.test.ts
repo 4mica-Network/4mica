@@ -1,5 +1,6 @@
 import { HttpError } from "@4mica/http";
 import { describe, expect, it } from "vitest";
+import "@/i18n";
 import { toIssueMap, toMessage } from "./http-errors";
 
 const httpError = (status: number, body: unknown) =>
@@ -58,6 +59,28 @@ describe("toMessage", () => {
         "fallback",
       ),
     ).toBe("A paused wallet cannot receive payments.");
+  });
+
+  it("tells a disabled account apart from an expired session", () => {
+    expect(
+      toMessage(
+        httpError(403, {
+          error: "account_disabled",
+          message: "This account cannot be modified.",
+        }),
+        "fallback",
+        { sessionExpired: "Sign in again" },
+      ),
+    ).toContain("account is disabled");
+  });
+
+  it("explains a rate limit, with the wait when the server gives one", () => {
+    expect(
+      toMessage(new HttpError(429, "Too Many Requests", {}, 3000), "fallback"),
+    ).toBe("You're doing that too often. Try again in 3 seconds.");
+    expect(toMessage(httpError(429, {}), "fallback")).toBe(
+      "You're doing that too often. Try again in a moment.",
+    );
   });
 
   it("uses the session message for auth failures when given one", () => {

@@ -208,6 +208,7 @@ export interface CustomerFilters {
 }
 
 export interface CustomerDetail {
+  id: string | null;
   customer: Customer | null;
   overview: CustomerOverview | null;
   credit: CustomerCreditBalance | null;
@@ -221,6 +222,8 @@ export interface CustomerDetail {
   };
   isLoading: boolean;
   hasLoaded: boolean;
+  loadError: string | null;
+  notFound: boolean;
 }
 
 export type CustomerState = {

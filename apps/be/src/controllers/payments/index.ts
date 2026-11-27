@@ -1,5 +1,6 @@
 import { PAYMENT_NETWORKS } from "@4mica/rules";
 import { GuaranteeReceipt } from "@4mica/sdk";
+import { toDisplayAmount } from "@4mica/sdk/app";
 import { requireApiKeyOwner } from "@auth/api-key";
 import { redeemPaymentBenefits } from "@controllers/customers/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
@@ -88,7 +89,7 @@ export const getPaymentHandler: RouteHandler = async (request, reply) => {
 const checkGuarantee = async (
   data: ReportPaymentInput,
 ): Promise<
-  | { kind: "ok" }
+  | { kind: "ok"; amount?: string }
   | { kind: "missing" | "mismatch"; path: keyof ReportPaymentInput }
 > => {
   const core = await getCoreClient();
@@ -121,7 +122,9 @@ const checkGuarantee = async (
     : PAYMENT_NETWORKS[data.network].currency.decimals;
 
   const mismatch = guaranteeMismatch(guarantee, data, decimals);
-  return mismatch ? { kind: "mismatch", path: mismatch } : { kind: "ok" };
+  return mismatch
+    ? { kind: "mismatch", path: mismatch }
+    : { kind: "ok", amount: toDisplayAmount(guarantee.amount, decimals) };
 };
 
 export const reportPaymentHandler: RouteHandler = async (request, reply) => {
@@ -196,6 +199,10 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
           { path: check.path, message: "does not match the core guarantee" },
         ],
       });
+    }
+
+    if (check.kind === "ok" && check.amount) {
+      data.amount = check.amount;
     }
   }
 

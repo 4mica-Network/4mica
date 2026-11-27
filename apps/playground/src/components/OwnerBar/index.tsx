@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Spinner } from "@4mica/ui";
-import { EyeOff, RefreshCw, Settings } from "lucide-react";
+import { Spinner } from "@4mica/ui";
+import { EyeOff, RefreshCw } from "lucide-react";
 import { useState, useTransition } from "react";
 import { revalidateProfile } from "@/actions/revalidate";
 import { messages } from "@/i18n";
@@ -24,49 +24,48 @@ export function OwnerBar({ username }: OwnerBarProps) {
     });
   };
 
+  const refreshLabel =
+    status === "done"
+      ? messages.owner.refreshed
+      : status === "failed"
+        ? messages.owner.refreshFailed
+        : messages.owner.refreshAction;
+
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
-      <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
-
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-ink-strong text-sm">
+    <div className="flex justify-center max-md:mx-4 max-md:mt-3 max-md:mb-1">
+      <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-overlay/10 py-1 pr-1 pl-3 text-xs">
+        <EyeOff
+          aria-hidden="true"
+          className="h-3.5 w-3.5 shrink-0 text-warning"
+        />
+        <span className="truncate text-ink-body">
           {messages.owner.previewTitle}
-        </p>
-        <p className="text-ink-muted text-sm">{messages.owner.previewLead}</p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
-        <Button
-          intent="ghost"
-          size="sm"
+        </span>
+        <span aria-hidden="true" className="h-3 w-px shrink-0 bg-overlay/15" />
+        <button
+          type="button"
           onClick={refresh}
           disabled={pending}
-          icon={
-            pending ? (
-              <Spinner size="sm" />
-            ) : (
-              <RefreshCw aria-hidden="true" className="h-4 w-4" />
-            )
-          }
+          aria-label={refreshLabel}
+          title={refreshLabel}
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-muted transition-colors hover:bg-overlay/10 hover:text-ink-strong disabled:cursor-wait"
         >
-          {status === "done"
-            ? messages.owner.refreshed
-            : status === "failed"
-              ? messages.owner.refreshFailed
-              : messages.owner.refreshAction}
-        </Button>
-
-        <Button
-          intent="outline"
-          size="sm"
-          asChild
-          icon={<Settings aria-hidden="true" className="h-4 w-4" />}
+          {pending ? (
+            <Spinner size="sm" />
+          ) : (
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+          )}
+        </button>
+        <a
+          href={`${links.app}/settings/profile`}
+          className="inline-flex h-6 shrink-0 items-center rounded-full px-2.5 font-medium text-ink-strong transition-colors hover:bg-overlay/10"
         >
-          <a href={`${links.app}/settings/profile`}>
-            {messages.owner.publishAction}
-          </a>
-        </Button>
+          {messages.owner.publishAction}
+        </a>
       </div>
+      <span className="sr-only" aria-live="polite">
+        {status === "idle" ? "" : refreshLabel}
+      </span>
     </div>
   );
 }

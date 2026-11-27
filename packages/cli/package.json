@@ -23,18 +23,58 @@
     "agents"
   ],
   "bin": {
-    "4mica": "./dist/index.js"
+    "4mica": "./bin/run.js"
   },
   "files": [
+    "bin",
     "dist",
     "templates",
-    "snapshot.json"
+    "snapshot.json",
+    "oclif.manifest.json"
   ],
   "engines": {
     "node": ">=22.0.0"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
+  },
+  "oclif": {
+    "bin": "4mica",
+    "dirname": "4mica",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "helpClass": "./dist/help.js",
+    "additionalHelpFlags": [
+      "-h"
+    ],
+    "additionalVersionFlags": [
+      "-v"
+    ],
+    "hooks": {
+      "command_not_found": "./dist/hooks/not-found.js"
+    },
+    "exitCodes": {
+      "default": 1,
+      "failedFlagParsing": 2,
+      "failedFlagValidation": 2,
+      "invalidArgsSpec": 2,
+      "nonExistentFlag": 2,
+      "requiredArgs": 2,
+      "unexpectedArgs": 2,
+      "violatedFlagConstraint": 2
+    },
+    "topics": {
+      "guarantees": {
+        "description": "check guarantee receipts"
+      },
+      "config": {
+        "description": "show and change the cli's settings"
+      }
+    },
+    "plugins": [
+      "@oclif/plugin-autocomplete"
+    ]
   },
   "scripts": {
     "prebuild": "node scripts/gen-snapshot.mjs",
@@ -43,23 +83,29 @@
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "check:exports": "publint --strict"
+    "test": "tsup --silent && vitest run",
+    "test:e2e": "tsup --silent && vitest run --config vitest.e2e.config.ts",
+    "prepack": "node scripts/gen-manifest.mjs",
+    "postpack": "node scripts/gen-manifest.mjs --clean",
+    "check:exports": "publint --strict",
+    "check:snapshot": "node scripts/gen-snapshot.mjs && git diff --exit-code -- snapshot.json"
   },
   "dependencies": {
+    "@4mica/sdk": "workspace:^",
     "@clack/prompts": "catalog:",
+    "@oclif/core": "catalog:",
+    "@oclif/plugin-autocomplete": "catalog:",
     "execa": "catalog:",
     "find-up": "catalog:",
     "ora": "catalog:",
     "picocolors": "catalog:",
-    "read-pkg": "catalog:",
-    "terminal-link": "catalog:",
-    "yargs": "catalog:"
+    "undici": "catalog:",
+    "viem": "catalog:"
   },
   "devDependencies": {
     "@4mica/tsconfig": "workspace:*",
+    "@4mica/url": "workspace:*",
     "@types/node": "catalog:node24",
-    "@types/yargs": "catalog:",
     "publint": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:typescript-latest",

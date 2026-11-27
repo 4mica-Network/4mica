@@ -1,32 +1,23 @@
-"""Sign a payment guarantee request as the payer.
-
-Env: 4MICA_NETWORK (or 4MICA_RPC_URL), 4MICA_WALLET_PRIVATE_KEY,
-RECIPIENT_ADDRESS, optional ERC20_TOKEN and AMOUNT.
-"""
+"""Env: FOURMICA_NETWORK (or FOURMICA_RPC_URL), FOURMICA_WALLET_PRIVATE_KEY,
+RECIPIENT_ADDRESS, optional ERC20_TOKEN and AMOUNT (base units)."""
 
 import asyncio
+import json
 import os
-import secrets
-import time
 
-from fourmica_sdk import Client, ConfigBuilder, PaymentGuaranteeRequestClaims
+from fourmica_sdk import Client, ConfigBuilder
 
 
 async def main() -> None:
     cfg = ConfigBuilder().from_env().build()
     async with await Client.connect(cfg) as client:
-        claims = PaymentGuaranteeRequestClaims.new(
-            user_address=client.signer_address,
-            recipient_address=os.environ["RECIPIENT_ADDRESS"],
-            req_id=int.from_bytes(secrets.token_bytes(32), "big"),
-            amount=int(os.environ.get("AMOUNT", "1000")),
-            timestamp=int(time.time()),
-            erc20_token=os.environ.get("ERC20_TOKEN"),
+        payload = await client.payment.new_payment(
+            os.environ["RECIPIENT_ADDRESS"],
+            int(os.environ.get("AMOUNT", "1000")),
+            os.environ.get("ERC20_TOKEN"),
         )
-        signature = await client.payment.sign_request(claims)
-        print("claims:", claims.to_payload())
-        print("signature:", signature.signature)
-        print("hand both to the recipient, who calls payment.issue_guarantee")
+        request = await client.payment.sign_request(payload)
+        print(json.dumps(request.to_payload()))
 
 
 if __name__ == "__main__":

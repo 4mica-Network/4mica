@@ -111,11 +111,13 @@ export function Select({ id, onChange, ...props }: SelectProps) {
   const controlId = id ?? field.id;
   return (
     <UiSelect
+      placeholder={t("form.selectPlaceholder")}
       searchPlaceholder={t("form.search")}
       noDataText={t("form.noResults")}
       noResultsText={t("form.noResults")}
       {...props}
       id={controlId}
+      aria-labelledby={props["aria-label"] ? undefined : field.labelId}
       aria-describedby={field.describedBy}
       data-testid={controlId}
       onChange={(option) => option && onChange(String(option.value))}
@@ -134,8 +136,12 @@ export function ComboBox({
   const field = useFieldA11y();
   return (
     <UiComboBox
+      placeholder={t("form.selectManyPlaceholder")}
       {...props}
       id={id ?? field.id}
+      aria-labelledby={
+        props["aria-label"] || props.label ? undefined : field.labelId
+      }
       aria-describedby={field.describedBy}
       searchPlaceholder={t("form.search")}
       noResultsText={t("form.noResults")}

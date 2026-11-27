@@ -3,7 +3,7 @@ import { useCopyToClipboard } from "@4mica/ui/hooks";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { useAppSelector } from "@stores/hooks";
 import { selectUser } from "@stores/user/selector";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   ArrowLeft,
   Check,
@@ -20,6 +20,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
+import { preloadPage } from "@/routes";
 
 const EXPANDED_WIDTH = 256;
 export const COLLAPSED_WIDTH = 60;
@@ -27,7 +28,7 @@ const WIDTH_TRANSITION = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const };
 
 const rowClass = (active: boolean) =>
   cn(
-    "flex h-9 w-full items-center overflow-hidden rounded-md font-medium text-sm transition-colors",
+    "flex h-9 w-full items-center overflow-hidden rounded-md font-medium text-sm",
     active
       ? "bg-overlay/10 text-ink-strong"
       : "text-ink-muted hover:bg-overlay/5 hover:text-ink-body",
@@ -85,10 +86,13 @@ function useDisplayName(): string {
 function AvatarCircle() {
   const { t } = useTranslation();
   const { user } = useUser();
+  const imageUrl = user?.imageUrl;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   return (
     <Avatar
-      src={user?.imageUrl}
+      src={imageUrl && imageUrl !== failedUrl ? imageUrl : null}
+      onError={() => setFailedUrl(imageUrl ?? null)}
       name={t("monogram")}
       alt=""
       size="xs"
@@ -114,6 +118,8 @@ function NavRow({
         <NavLink
           to={item.to}
           end={end}
+          onMouseEnter={() => preloadPage(item.to)}
+          onFocus={() => preloadPage(item.to)}
           className={({ isActive }) => rowClass(isActive)}
         >
           <RowIcon icon={item.icon} />
@@ -194,13 +200,13 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
           <span className="min-w-0 truncate font-medium text-ink-strong text-sm">
             {displayName}
           </span>
-          <motion.span
+          <m.span
             animate={{ rotate: open ? 180 : 0 }}
             transition={{ duration: 0.18 }}
             className="shrink-0 text-ink-subtle"
           >
             <ChevronDown aria-hidden="true" className="h-4 w-4" />
-          </motion.span>
+          </m.span>
         </span>
       </button>
 
@@ -218,7 +224,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
             to="/settings/profile"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
           >
             <UserCog aria-hidden="true" className="h-4 w-4" />
             {t("sidebar.preferences")}
@@ -230,7 +236,7 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
               setOpen(false);
               void signOut({ redirectUrl: "/sign-in" });
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />
             {t("sidebar.signOut")}
@@ -302,12 +308,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     : t("sidebar.copyPublicProfile");
 
   return (
-    <motion.aside
+    <m.aside
       initial={false}
       animate={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
       transition={WIDTH_TRANSITION}
       onAnimationComplete={() => setSettled(!collapsed)}
-      className="flex h-screen shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
+      className="flex h-dvh shrink-0 flex-col overflow-hidden border-overlay/10 border-r bg-surface-deep"
     >
       <div className="flex flex-col gap-0.5 p-3">
         {inSettings ? (
@@ -360,13 +366,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         {!inSettings && (
           <>
             {!collapsed && settled && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15 }}
               >
                 <SidebarBanners />
-              </motion.div>
+              </m.div>
             )}
             <div className="flex flex-col gap-0.5">
               <ActionRow
@@ -397,6 +403,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           </Label>
         </div>
       </div>
-    </motion.aside>
+    </m.aside>
   );
 }

@@ -22,12 +22,14 @@ vi.mock("@api/wallet", () => ({
 
 class NoWalletError extends Error {}
 class WalletRejectedError extends Error {}
+class WalletAccountChangedError extends Error {}
 
 vi.mock("@/lib/wallet-signer", () => ({
   signMessage,
   connectWallet: vi.fn(),
   hasInjectedWallet: () => true,
   NoWalletError,
+  WalletAccountChangedError,
   WalletRejectedError,
 }));
 
@@ -194,6 +196,24 @@ describe("createWallet saga", () => {
     expect(notifyError).toHaveBeenCalled();
   });
 
+  it("tells the user to switch back when the wallet changed account mid-link", async () => {
+    createWalletChallenge.mockResolvedValue(CHALLENGE);
+    signMessage.mockRejectedValue(new WalletAccountChangedError());
+
+    const dispatched = await record(createWallet, walletState(), {
+      type: actionTypes.CREATE_WALLET_REQUESTED,
+      payload,
+      meta: CREATE_META,
+    });
+
+    const failure = dispatched.find(
+      (a) => a.type === actionTypes.WALLET_ACTION_FAILED,
+    );
+    expect((failure?.payload as { message: string }).message).toContain(
+      "Switch back to the address you're linking",
+    );
+  });
+
   it("stays quiet when the user dismisses the signature prompt", async () => {
     createWalletChallenge.mockResolvedValue(CHALLENGE);
     signMessage.mockRejectedValue(new WalletRejectedError());
@@ -263,7 +283,7 @@ describe("auth failures", () => {
     expect(message).toContain("session has expired");
   });
 
-  it("uses the same wording for a 403", async () => {
+  it("says the account is disabled rather than asking for a new sign-in", async () => {
     createWalletChallenge.mockRejectedValue(
       new HttpError(403, "Forbidden", {
         error: "account_disabled",
@@ -281,7 +301,7 @@ describe("auth failures", () => {
       (a) => a.type === actionTypes.WALLET_ACTION_FAILED,
     );
     expect((failure?.payload as { message: string }).message).toContain(
-      "session has expired",
+      "account is disabled",
     );
   });
 

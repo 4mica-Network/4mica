@@ -1,7 +1,11 @@
+import "./env";
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { x402ResourceServer } from "@4mica/x402/server";
+import {
+  FourMicaFacilitatorClient,
+  x402ResourceServer,
+} from "@4mica/x402/server";
 import { paymentMiddleware } from "@4mica/x402/server/express";
 import type { FacilitatorClient } from "@x402/core/server";
 import express from "express";
@@ -9,12 +13,18 @@ import express from "express";
 const PORT_FILE = join(tmpdir(), "__TMPFILE__");
 
 const NETWORK = "eip155:84532";
-// Base Sepolia USDC, one of the stablecoins 4mica core accepts there.
-const ASSET = "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f";
-const PAY_TO = "0x1111111111111111111111111111111111111111";
+// Base Sepolia USDC, one of the stablecoins 4mica core accepts there. Set
+// ASSET to charge in another token; `4mica tokens` lists what a network takes.
+const ASSET =
+  process.env.ASSET ?? "0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f";
+// Live once PAY_TO names the wallet to be paid at: payments are then checked
+// by the 4mica facilitator and guaranteed by 4mica core. Without it this runs
+// in demo mode and any payment is accepted.
+const LIVE = Boolean(process.env.PAY_TO);
+const PAY_TO =
+  process.env.PAY_TO ?? "0x1111111111111111111111111111111111111111";
 
-// Demo mode: stands in for the 4mica facilitator and accepts any payment. To go
-// live, pass `new FourMicaFacilitatorClient()` from @4mica/x402/server instead.
+// Demo mode: stands in for the 4mica facilitator and accepts any payment.
 const demoFacilitator: FacilitatorClient = {
   async getSupported() {
     return {
@@ -55,7 +65,12 @@ app.use(
         description: "Premium market data feed",
       },
     },
-    new x402ResourceServer(demoFacilitator),
+    new x402ResourceServer(
+      LIVE
+        ? // The hosted Base Sepolia facilitator, unless FACILITATOR_URL names another.
+          new FourMicaFacilitatorClient({ url: process.env.FACILITATOR_URL })
+        : demoFacilitator,
+    ),
   ),
 );
 
@@ -69,6 +84,11 @@ function listen(port: number, attemptsLeft = 20) {
     const url = `http://localhost:${port}`;
     writeFileSync(PORT_FILE, url);
     console.log(`[seller-express] listening on ${url}`);
+    console.log(
+      LIVE
+        ? `  live: payments go to ${PAY_TO}`
+        : "  demo mode: any payment is accepted. Set PAY_TO in .env to go live.",
+    );
     console.log(`  GET /premium costs a payment — run the buyer to pay for it.`);
   });
   server.once("error", (err: NodeJS.ErrnoException) => {

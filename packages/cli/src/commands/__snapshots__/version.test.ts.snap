@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`version > names the version, Node and the platform > json shape: version 1`] = `
+{
+  "arch": "string",
+  "node": "string",
+  "platform": "string",
+  "version": "string",
+}
+`;

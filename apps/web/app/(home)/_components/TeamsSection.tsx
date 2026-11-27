@@ -63,7 +63,7 @@ export default function TeamsSection() {
 
         <div className="mt-14">
           <div className="flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
-            <div className="flex w-max shrink-0 animate-[marquee_48s_linear_infinite] items-center hover:[animation-play-state:paused] motion-reduce:[animation-play-state:paused]">
+            <div className="flex min-h-16 w-max shrink-0 animate-[marquee_48s_linear_infinite] items-center hover:[animation-play-state:paused] motion-reduce:[animation-play-state:paused]">
               {[0, 1].map((copy) =>
                 MARQUEE_ITEMS.map((partner, index) => (
                   <Link

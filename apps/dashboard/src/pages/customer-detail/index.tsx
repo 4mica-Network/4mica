@@ -1,18 +1,19 @@
-import { Button } from "@4mica/ui";
 import {
   fetchCustomerDetail,
   resetCustomerDetail,
-} from "@stores/customer/actions";
-import {
+  selectCustomerDetailId,
+  selectCustomerDetailLoadError,
+  selectCustomerDetailNotFound,
   selectCustomerOverview,
   selectDetailCustomer,
   selectHasLoadedCustomerDetail,
-} from "@stores/customer/selector";
+} from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { LoadFailure } from "@/components/LoadFailure";
 import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { AccessPanel } from "./AccessPanel";
@@ -31,9 +32,13 @@ export function CustomerDetail() {
   const dispatch = useAppDispatch();
   const { id = "" } = useParams<{ id: string }>();
 
-  const customer = useAppSelector(selectDetailCustomer);
+  const shown = useAppSelector(selectDetailCustomer);
+  const customer = shown?.id === id ? shown : null;
+  const shownId = useAppSelector(selectCustomerDetailId);
   const overview = useAppSelector(selectCustomerOverview);
   const hasLoaded = useAppSelector(selectHasLoadedCustomerDetail);
+  const loadError = useAppSelector(selectCustomerDetailLoadError);
+  const notFound = useAppSelector(selectCustomerDetailNotFound);
 
   usePageTitle(
     customer
@@ -53,20 +58,20 @@ export function CustomerDetail() {
     };
   }, [dispatch, id]);
 
-  if (!hasLoaded && !customer) {
+  if (!customer && (!hasLoaded || shownId !== id)) {
     return <PageSpinner />;
   }
 
   if (!customer) {
     return (
-      <div className="flex flex-col items-start gap-4 py-10">
-        <p className="text-ink-muted text-sm">
-          {t("customer.detail.notFound")}
-        </p>
-        <Button asChild intent="outline" size="sm">
-          <Link to="/customers">{t("customer.detail.back")}</Link>
-        </Button>
-      </div>
+      <LoadFailure
+        notFound={notFound || !loadError}
+        notFoundLabel={t("customer.detail.notFound")}
+        message={loadError}
+        onRetry={() => id && dispatch(fetchCustomerDetail(id))}
+        backTo="/customers"
+        backLabel={t("customer.detail.back")}
+      />
     );
   }
 

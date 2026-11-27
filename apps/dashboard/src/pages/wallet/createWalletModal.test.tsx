@@ -25,6 +25,7 @@ vi.mock("@stores/hooks", () => ({
 }));
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -106,6 +107,37 @@ describe("CreateWalletModal", () => {
       await screen.findByTestId("create-wallet-address"),
     ).toHaveTextContent("0x7A9f3C4B2e8d5a1f6C0b4e9d2a8C3F5B7e1d6A04");
     expect(connectWallet).not.toHaveBeenCalled();
+  });
+
+  it("ignores a wallet answer that arrives after the modal was reopened", async () => {
+    const stale = "0x7A9f3C4B2e8d5a1f6C0b4e9d2a8C3F5B7e1d6A04";
+    const fresh = "0x4f2C8b6D1e9A3f5c7B0d2E4a6C8f1B3d5E7a9C02";
+    let answerFirstOpen: (account: string) => void = () => {};
+    currentAccount
+      .mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            answerFirstOpen = resolve;
+          }),
+      )
+      .mockResolvedValue(fresh);
+
+    const { rerender } = render(
+      <CreateWalletModal isOpen onClose={() => {}} />,
+    );
+    rerender(<CreateWalletModal isOpen={false} onClose={() => {}} />);
+    rerender(<CreateWalletModal isOpen onClose={() => {}} />);
+
+    expect(
+      await screen.findByTestId("create-wallet-address"),
+    ).toHaveTextContent(fresh);
+
+    answerFirstOpen(stale);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByTestId("create-wallet-address")).toHaveTextContent(
+      fresh,
+    );
   });
 
   it("reopens the wallet's account picker instead of reconnecting", async () => {

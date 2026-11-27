@@ -3,16 +3,17 @@ import {
   PAYMENT_NETWORKS,
   shortenAddress,
 } from "@4mica/rules";
-import { Button, Modal, Spinner, Tag } from "@4mica/ui";
+import { Button, Modal, Tag } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { clearWalletIssues, createWallet } from "@stores/wallet/actions";
 import {
+  clearWalletIssues,
+  createWallet,
   selectIsWalletPending,
   selectWalletError,
   selectWalletIssues,
   selectWallets,
-} from "@stores/wallet/selector";
+} from "@stores/wallet";
 import type { PaymentNetwork } from "@stores/wallet/type";
 import { blankToNull } from "@utils/format";
 import {
@@ -22,7 +23,7 @@ import {
   ShieldCheck,
   Wallet as WalletIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import {
@@ -33,6 +34,7 @@ import {
   FormTextInput,
 } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { firstStepWith, useStepWithIssue } from "@/hooks/useStepWithIssue";
@@ -104,6 +106,8 @@ export function CreateWalletModal({
   });
   const formId = useId();
 
+  const session = useRef(0);
+
   const adopt = useCallback(
     (address: string, chainId: number | null) => {
       setValue("address", address, { shouldValidate: true, shouldDirty: true });
@@ -121,10 +125,13 @@ export function CreateWalletModal({
     if (!isOpen) {
       return;
     }
+    const opened = ++session.current;
     reset();
     setStep(0);
     setConnectError(null);
     setWalletChainId(null);
+    setIsConnecting(false);
+    setIsSwitching(false);
     dispatch(clearWalletIssues());
 
     void (async () => {
@@ -132,12 +139,19 @@ export function CreateWalletModal({
         currentAccount(),
         currentChainId(),
       ]);
+      if (session.current !== opened) {
+        return;
+      }
       if (account) {
         adopt(account, chainId);
       } else {
         setWalletChainId(chainId);
       }
     })();
+
+    return () => {
+      session.current++;
+    };
   }, [isOpen, reset, dispatch, adopt]);
 
   useServerIssues(issues, setError);
@@ -150,7 +164,12 @@ export function CreateWalletModal({
       onAccountsChanged: (accounts) => {
         const [next] = accounts ?? [];
         if (next) {
-          void currentChainId().then((chainId) => adopt(next, chainId));
+          const current = session.current;
+          void currentChainId().then((chainId) => {
+            if (session.current === current) {
+              adopt(next, chainId);
+            }
+          });
         } else {
           setValue("address", "", { shouldValidate: false });
           setWalletChainId(null);
@@ -169,12 +188,19 @@ export function CreateWalletModal({
   }, [isOpen, adopt, setValue]);
 
   const handleConnect = async () => {
+    const current = session.current;
     setConnectError(null);
     setIsConnecting(true);
     try {
       const address = await connectWallet();
-      adopt(address, await currentChainId());
+      const chainId = await currentChainId();
+      if (session.current === current) {
+        adopt(address, chainId);
+      }
     } catch (cause) {
+      if (session.current !== current) {
+        return;
+      }
       if (cause instanceof NoWalletError) {
         setConnectError(t("wallet.create.verify.noWallet"));
       } else if (cause instanceof WalletRejectedError) {
@@ -183,42 +209,61 @@ export function CreateWalletModal({
         setConnectError(t("wallet.create.verify.connectFailed"));
       }
     } finally {
-      setIsConnecting(false);
+      if (session.current === current) {
+        setIsConnecting(false);
+      }
     }
   };
 
   const handleSwitchAccount = async () => {
+    const current = session.current;
     setConnectError(null);
     setIsConnecting(true);
     try {
       const address = await requestAccountSwitch();
-      adopt(address, await currentChainId());
+      const chainId = await currentChainId();
+      if (session.current === current) {
+        adopt(address, chainId);
+      }
     } catch (cause) {
+      if (session.current !== current) {
+        return;
+      }
       if (cause instanceof WalletRejectedError) {
         setConnectError(t("wallet.create.verify.rejected"));
       } else {
         setConnectError(t("wallet.create.verify.connectFailed"));
       }
     } finally {
-      setIsConnecting(false);
+      if (session.current === current) {
+        setIsConnecting(false);
+      }
     }
   };
 
   const handleSwitchChain = async (network: PaymentNetwork) => {
+    const current = session.current;
     setConnectError(null);
     setIsSwitching(true);
     try {
       await switchChain(chainDefinition(network));
-      setWalletChainId(PAYMENT_NETWORKS[network].chainId);
-      setValue("network", network, { shouldValidate: true });
+      if (session.current === current) {
+        setWalletChainId(PAYMENT_NETWORKS[network].chainId);
+        setValue("network", network, { shouldValidate: true });
+      }
     } catch (cause) {
+      if (session.current !== current) {
+        return;
+      }
       setConnectError(
         cause instanceof WalletRejectedError
           ? t("wallet.create.verify.switchRejected")
           : t("wallet.create.verify.switchFailed"),
       );
     } finally {
-      setIsSwitching(false);
+      if (session.current === current) {
+        setIsSwitching(false);
+      }
     }
   };
 
@@ -278,6 +323,7 @@ export function CreateWalletModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("wallet.create.title")}
@@ -529,7 +575,7 @@ export function CreateWalletModal({
                   href={links.docsNoCustody}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-brand hover:underline"
+                  className="text-brand underline underline-offset-2"
                 >
                   {t("wallet.create.connect.safetyLink")}
                 </a>

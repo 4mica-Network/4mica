@@ -1,6 +1,5 @@
 import { useAppSelector } from "@stores/hooks";
-import { supportPendingKeys } from "@stores/support/actions";
-import { selectIsSupportPending } from "@stores/support/selector";
+import { selectIsSupportPending, supportPendingKeys } from "@stores/support";
 import type { SupportRequest } from "@stores/support/type";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 

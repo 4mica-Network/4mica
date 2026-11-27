@@ -1,7 +1,11 @@
 import { Button, EmptyState, Tag } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { trustPendingKeys, updateReport } from "@stores/trust/actions";
-import { selectIsTrustPending, selectReports } from "@stores/trust/selector";
+import {
+  selectIsTrustPending,
+  selectReports,
+  trustPendingKeys,
+  updateReport,
+} from "@stores/trust";
 import type { Report, ReportStatus } from "@stores/trust/type";
 import { formatDate } from "@utils/format";
 import { ShieldAlert } from "lucide-react";

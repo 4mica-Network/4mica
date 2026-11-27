@@ -12,12 +12,14 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/cn";
+import { focusableWithin } from "../../lib/focusable";
 import {
   clampToViewport,
   oppositeSide,
@@ -80,6 +82,9 @@ function useStableEvent<TArgs extends unknown[]>(
 function isNativeElement(el: ReactElement): boolean {
   return typeof el.type === "string";
 }
+
+const NATIVELY_FOCUSABLE =
+  "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])";
 
 const BUBBLE_OFFSET = 10;
 
@@ -241,6 +246,17 @@ export function Tooltip({
   const isControlled = typeof open === "boolean";
   const currentOpen = isControlled ? open : uncontrolledOpen;
 
+  const [needsTabStop, setNeedsTabStop] = useState(true);
+
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    setNeedsTabStop(
+      anchor instanceof HTMLElement &&
+        !anchor.matches(NATIVELY_FOCUSABLE) &&
+        focusableWithin(anchor).length === 0,
+    );
+  });
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emitOpenChange = useStableEvent(onOpenChange);
 
@@ -281,6 +297,7 @@ export function Tooltip({
   const composedChild = useMemo(() => {
     const wrap = (node: ReactNode) => {
       const isInteractive = trigger === "hover";
+      const tabStop = isInteractive && !disabled && needsTabStop;
       return (
         // biome-ignore lint/a11y/noStaticElementInteractions: <TODO: fix this>
         <span
@@ -289,9 +306,8 @@ export function Tooltip({
           onMouseLeave={isInteractive ? hide : undefined}
           onFocus={isInteractive ? show : undefined}
           onBlur={isInteractive ? hide : undefined}
-          tabIndex={isInteractive ? (disabled ? -1 : 0) : undefined}
+          tabIndex={tabStop ? 0 : undefined}
           aria-describedby={currentOpen ? tooltipId : undefined}
-          aria-disabled={disabled || undefined}
           className="inline-block align-middle"
         >
           {node}
@@ -330,6 +346,7 @@ export function Tooltip({
     } = child.props;
 
     const isInteractive = trigger === "hover";
+    const tabStop = isInteractive && !disabled && needsTabStop;
 
     return cloneElement(child, {
       ...rest,
@@ -358,17 +375,30 @@ export function Tooltip({
             hide();
           }
         : childOnBlur,
-      tabIndex: isInteractive
-        ? (rest.tabIndex ?? (disabled ? -1 : 0))
-        : rest.tabIndex,
+      tabIndex: tabStop ? (rest.tabIndex ?? 0) : rest.tabIndex,
       "aria-describedby": currentOpen ? tooltipId : undefined,
-      "aria-disabled": disabled || undefined,
     });
-  }, [children, disabled, hide, show, trigger, currentOpen, tooltipId]);
+  }, [
+    children,
+    disabled,
+    hide,
+    show,
+    trigger,
+    currentOpen,
+    tooltipId,
+    needsTabStop,
+  ]);
 
   useEffect(() => {
     if (disabled && currentOpen) setOpenSafe(false);
   }, [disabled, currentOpen, setOpenSafe]);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   const node = content ?? title;
 

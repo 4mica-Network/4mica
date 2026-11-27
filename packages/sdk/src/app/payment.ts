@@ -29,12 +29,10 @@ const asBigInt = (value: unknown): bigint | null => {
   return null;
 };
 
-export function paymentFromHeader(
-  header: string,
-  decimals = 18,
-): ParsedPayment {
-  const payment = (parsePaymentHeader(header).payload as { payload?: unknown })
-    .payload as Record<string, unknown> | undefined;
+const readPayment = (payload: unknown, decimals: number): ParsedPayment => {
+  const payment = (payload as { payload?: unknown } | undefined)?.payload as
+    | Record<string, unknown>
+    | undefined;
 
   const reqId = payment?.req_id ?? payment?.reqId;
   const payerAddress = payment?.user_address ?? payment?.userAddress;
@@ -46,7 +44,7 @@ export function paymentFromHeader(
     amountRaw === null
   ) {
     throw new InvalidParamsError(
-      "payment header is missing req_id, user_address or amount",
+      "payment is missing req_id, user_address or amount",
     );
   }
 
@@ -55,5 +53,48 @@ export function paymentFromHeader(
     payerAddress,
     amountRaw,
     amount: formatUnits(amountRaw, decimals),
+  };
+};
+
+export function paymentFromHeader(
+  header: string,
+  decimals = 18,
+): ParsedPayment {
+  return readPayment(parsePaymentHeader(header).payload, decimals);
+}
+
+export interface SettlementContext {
+  paymentPayload: { payload: unknown };
+  result: { extra?: Record<string, unknown> };
+}
+
+export interface SettledPayment {
+  reqId: string;
+  payerAddress: string;
+  amount: string;
+  guaranteeClaims: string | null;
+  guaranteeSignature: string | null;
+}
+
+export function parseSettlement({
+  paymentPayload,
+  result,
+}: SettlementContext): SettledPayment {
+  const { reqId, payerAddress, amountRaw } = readPayment(
+    paymentPayload.payload,
+    0,
+  );
+  const receipt = result.extra?.receipt as
+    | { receipt?: unknown; signature?: unknown }
+    | undefined;
+
+  return {
+    reqId,
+    payerAddress,
+    amount: amountRaw.toString(),
+    guaranteeClaims:
+      typeof receipt?.receipt === "string" ? receipt.receipt : null,
+    guaranteeSignature:
+      typeof receipt?.signature === "string" ? receipt.signature : null,
   };
 }

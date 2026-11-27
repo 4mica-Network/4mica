@@ -12,13 +12,33 @@ import {
   type TypedDataDefinition,
 } from "viem";
 import { toAccount } from "viem/accounts";
+import { ConfigError } from "@/errors";
 import type { CdpAccountConfig } from "@/wallet/models";
+
+/**
+ * Coinbase's SDK is an optional peer dependency: only this function uses it,
+ * and it is not installed with `@4mica/sdk`.
+ */
+async function loadCdp(): Promise<typeof import("@coinbase/cdp-sdk")> {
+  try {
+    return await import("@coinbase/cdp-sdk");
+  } catch (error) {
+    const { code } = error as NodeJS.ErrnoException;
+    if (code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") {
+      throw error;
+    }
+    throw new ConfigError(
+      "createCdpAccount needs @coinbase/cdp-sdk, which is not installed; " +
+        "add it to your project: npm install @coinbase/cdp-sdk",
+    );
+  }
+}
 
 /** Creates a viem Account backed by a Coinbase CDP MPC wallet (private key never leaves CDP). */
 export async function createCdpAccount(
   config: CdpAccountConfig,
 ): Promise<Account> {
-  const { CdpClient } = await import("@coinbase/cdp-sdk");
+  const { CdpClient } = await loadCdp();
 
   const cdp = new CdpClient({
     apiKeyId: config.apiKeyId,

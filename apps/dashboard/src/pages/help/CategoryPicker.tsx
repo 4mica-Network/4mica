@@ -1,4 +1,8 @@
-import { cn } from "@4mica/ui";
+import { Button, cn } from "@4mica/ui";
+import { fetchConfig } from "@stores/config/actions";
+import { selectConfigState } from "@stores/config/selector";
+import { useAppDispatch, useAppSelector } from "@stores/hooks";
+import { useId } from "react";
 import { useController } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useConfigList } from "@/hooks/useConfigOptions";
@@ -10,11 +14,41 @@ import {
 
 export function CategoryPicker() {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const categories = useConfigList("supportCategories");
+  const { isLoading } = useAppSelector(selectConfigState);
   const { field, fieldState } = useController({ name: "category" });
+  const errorId = useId();
+  const errorMessage = fieldState.error?.message;
+
+  if (categories.length === 0) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col items-start gap-3 rounded-lg border border-overlay/10 px-4 py-3"
+        data-testid="help-categories-unavailable"
+      >
+        <p className="text-ink-muted text-sm">
+          {t("help.create.categoriesUnavailable")}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          intent="outline"
+          loading={isLoading}
+          onClick={() => dispatch(fetchConfig())}
+        >
+          {t("help.create.categoriesRetry")}
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <fieldset className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0">
+    <fieldset
+      aria-describedby={errorMessage ? errorId : undefined}
+      className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0"
+    >
       <legend className="mb-3 text-ink-muted text-sm">
         {t("help.create.categoryPrompt")}
       </legend>
@@ -28,7 +62,7 @@ export function CategoryPicker() {
             <label
               key={category}
               className={cn(
-                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-overlay/40",
+                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-overlay/60",
                 isSelected
                   ? "border-overlay/40 bg-overlay/10"
                   : "border-overlay/10 hover:border-overlay/20 hover:bg-overlay/5",
@@ -65,9 +99,9 @@ export function CategoryPicker() {
         })}
       </div>
 
-      {fieldState.error?.message && (
-        <p aria-live="polite" className="text-danger text-xs">
-          {t(fieldState.error.message)}
+      {errorMessage && (
+        <p id={errorId} aria-live="polite" className="text-danger text-xs">
+          {t(errorMessage)}
         </p>
       )}
     </fieldset>

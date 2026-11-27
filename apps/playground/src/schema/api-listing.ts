@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import {
   HttpMethodSchema,
+  HttpsUrlOrNullSchema,
   PaymentNetworkSchema,
   VisibilitySchema,
 } from "./params";
@@ -13,7 +14,7 @@ const PublicApiListingSchema = v.object({
   description: v.nullable(v.string()),
   url: v.nullable(v.string()),
   method: HttpMethodSchema,
-  docsUrl: v.nullable(v.string()),
+  docsUrl: HttpsUrlOrNullSchema,
   category: v.nullable(v.string()),
   tags: v.array(v.string()),
   priceLabel: v.nullable(v.string()),

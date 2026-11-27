@@ -13,6 +13,7 @@ import {
   upsertPolicyHandler,
 } from "@controllers/trust/index";
 import type { ResourceKind } from "@controllers/trust/repository";
+import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
@@ -131,6 +132,8 @@ const SURFACES: Surface[] = [
 
 export const trustRoutes: FastifyPluginCallback = (app, _opts, done) => {
   const base = guards(app);
+
+  app.addHook("onResponse", revalidateOnWrite);
 
   const strict = {
     onRequest: base.onRequest,

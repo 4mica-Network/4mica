@@ -1,18 +1,6 @@
-"""How the payment client reacts to core's coded refusals, what it caches
-between payments, and which cycle it checkpoints. Port of
-``sdk-rust/tests/payment_errors.rs``.
-
-Offline against a mock core reached through the real ``RpcProxy`` over an
-``httpx.MockTransport``, so error bodies are decoded exactly as in production.
-The refusals are the payer's whole recovery story — each must arrive as a
-typed error carrying what the caller needs to act on, and several also settle
-what the client may keep reusing.
-"""
-
 import asyncio
 import json
 import time
-from typing import List, Optional
 
 import httpx
 import pytest
@@ -59,9 +47,7 @@ def unix_now() -> int:
     return int(time.time())
 
 
-def active_cycle(cycle_id: str, period_end: Optional[int] = None) -> dict:
-    """A cycle still open for the next day unless told otherwise, so only a
-    refusal can expire it."""
+def active_cycle(cycle_id: str, period_end: int | None = None) -> dict:
     return {
         "cycle_id": cycle_id,
         "cycle_id_text": "0x0:1700000000",
@@ -72,7 +58,6 @@ def active_cycle(cycle_id: str, period_end: Optional[int] = None) -> dict:
 
 
 def active_cycle_at(server_time: int, period_start: int) -> dict:
-    """The active cycle as a core whose clock reads *server_time* reports it."""
     return {
         **active_cycle(FIRST_CYCLE, server_time + 86_400),
         "period_start": period_start,
@@ -85,8 +70,6 @@ def refusing(body: dict, status: int = 409) -> Handler:
 
 
 def cycle_reads_alternating() -> Handler:
-    """The first read reports FIRST_CYCLE and every later one NEXT_CYCLE, so a
-    test can tell a cached answer from a fresh one."""
     reads = {"n": 0}
 
     def handler(request):
@@ -97,7 +80,6 @@ def cycle_reads_alternating() -> Handler:
 
 
 async def client_refusing_with(monkeypatch, refusal: dict, status: int = 409):
-    """A core that always serves a cycle and always refuses issuance."""
     core = MockCore(
         {
             ("GET", "/core/cycles/active"): cycle_reads_alternating(),
@@ -167,8 +149,6 @@ async def test_a_cutoff_refusal_names_the_cutoff(monkeypatch):
 
 
 async def test_the_payers_own_cutoff_holds_its_next_payment_past_it(monkeypatch):
-    """The cutoff comes back with the refusal, and the client keeps it so the
-    next payment is stamped past it rather than repeating the mistake."""
     cutoff = unix_now()
     client, _ = await client_refusing_with(
         monkeypatch,
@@ -195,8 +175,6 @@ async def test_the_payers_own_cutoff_holds_its_next_payment_past_it(monkeypatch)
 
 
 async def test_a_cycle_mismatch_is_what_expires_the_cached_cycle(monkeypatch):
-    """A cycle is held until core rejects a payment signed against it, so the
-    next payment is scoped to the cycle core will actually accept."""
     client, core = await client_refusing_with(
         monkeypatch,
         {
@@ -226,8 +204,6 @@ async def test_a_cycle_mismatch_is_what_expires_the_cached_cycle(monkeypatch):
 
 
 async def test_a_cycle_is_reread_once_its_period_ends(monkeypatch):
-    """Once a cycle's period ends core opens the next one, so the client stops
-    reusing it."""
     core = MockCore(
         {
             ("GET", "/core/cycles/active"): lambda r: ok(
@@ -260,9 +236,6 @@ async def test_cycles_are_cached_per_asset(monkeypatch):
 
 
 async def test_another_payers_cutoff_does_not_hold_this_client_back(monkeypatch):
-    """Issuance is the recipient's call, so a cutoff refusal usually names a
-    payer this client is not. Taking that cutoff as its own would hold back
-    its next payment for someone else's schedule."""
     far_future = unix_now() + 3_600
     client, _ = await client_refusing_with(
         monkeypatch,
@@ -288,8 +261,6 @@ async def test_another_payers_cutoff_does_not_hold_this_client_back(monkeypatch)
 
 
 async def test_an_uncoded_refusal_is_not_reinterpreted(monkeypatch):
-    """A refusal core does not code stays an RPC error rather than being
-    forced into a typed one."""
     client, _ = await client_refusing_with(
         monkeypatch, {"error": "another guarantee with req_id 7 already exists"}
     )
@@ -314,7 +285,6 @@ async def test_a_coded_refusal_with_unreadable_details_stays_an_rpc_error(
 
 
 async def test_typed_refusals_are_still_rpc_errors(monkeypatch):
-    """Code written against core's plain errors keeps catching them."""
     client, _ = await client_refusing_with(
         monkeypatch,
         {
@@ -352,8 +322,6 @@ async def test_issuance_posts_the_tagged_payload_and_its_signature(monkeypatch):
 
 
 async def test_each_checkpoint_names_the_cycle_it_covers(monkeypatch):
-    """Each checkpoint asks core for exactly the cycle it covers: the active
-    one, or the one named."""
     empty_batch = {
         "cycle_id": FIRST_CYCLE,
         "cycle_id_text": "0x0:1700000000",
@@ -383,7 +351,6 @@ async def test_each_checkpoint_names_the_cycle_it_covers(monkeypatch):
 
 
 def signed_payment(amount: int, timestamp: int) -> dict:
-    """A payment the payer signed in the first cycle, as core lists it."""
     payload = PaymentRequestPayload.new(
         user_address=PAYER.address,
         recipient_address=RECIPIENT,
@@ -401,12 +368,9 @@ def signed_payment(amount: int, timestamp: int) -> dict:
 
 
 def core_racing_a_payment(refusals: int) -> tuple:
-    """A core where a second payment lands right after the payer first reads
-    its batch, and which refuses the first *refusals* checkpoints as no
-    longer matching."""
     first = signed_payment(10, 1_700_000_100)
     late = signed_payment(7, 1_700_000_200)
-    submitted: List[SignedCheckpoint] = []
+    submitted: list[SignedCheckpoint] = []
     reads = {"n": 0}
 
     def batch(request):
@@ -464,8 +428,6 @@ def core_racing_a_payment(refusals: int) -> tuple:
 
 
 async def test_a_checkpoint_overtaken_by_a_payment_is_signed_again(monkeypatch):
-    """A payment landing mid-checkpoint makes the first one stale; the retry
-    re-reads the batch and covers the late payment too."""
     core, submitted, reads = core_racing_a_payment(refusals=1)
     client = await connect(monkeypatch, core)
 
@@ -483,8 +445,6 @@ async def test_a_checkpoint_overtaken_by_a_payment_is_signed_again(monkeypatch):
 
 
 async def test_a_checkpoint_refused_twice_reports_the_mismatch(monkeypatch):
-    """A payer paid faster than it can checkpoint gets the refusal back rather
-    than an endless retry."""
     core, submitted, _ = core_racing_a_payment(refusals=1_000)
     client = await connect(monkeypatch, core)
 
@@ -498,8 +458,6 @@ async def test_a_checkpoint_refused_twice_reports_the_mismatch(monkeypatch):
 async def test_an_accepted_checkpoint_holds_the_next_payment_past_its_cutoff(
     monkeypatch,
 ):
-    """A payment stamped at or before an accepted cutoff could never be
-    collected, so the next one waits until it can be stamped past it."""
     cutoff = unix_now()
     core = MockCore(
         {
@@ -536,9 +494,6 @@ async def test_an_accepted_checkpoint_holds_the_next_payment_past_its_cutoff(
 
 @pytest.mark.parametrize("skew", [3_600, -3_600])
 async def test_payments_are_stamped_by_cores_clock(monkeypatch, skew):
-    """Core refuses a payment stamped past its own clock, so a payer whose
-    clock runs ahead must stamp by core's, and one whose clock lags must not
-    fall behind the cycle it signs for."""
     core_time = unix_now() + skew
     core = MockCore(
         {
@@ -557,9 +512,6 @@ async def test_payments_are_stamped_by_cores_clock(monkeypatch, skew):
 async def test_a_payment_in_a_cycle_that_just_opened_is_stamped_inside_it(
     monkeypatch,
 ):
-    """Erring behind core's clock must not push a payment before the cycle it
-    is signed for. Core's clock as the client knows it is a truncated lower
-    bound, so it can read a moment before the cycle that is already open."""
     reported = unix_now()
     opened = reported + 2
     core = MockCore(

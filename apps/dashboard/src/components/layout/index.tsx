@@ -1,6 +1,7 @@
-import { Card, cn, Spinner } from "@4mica/ui";
+import { Card, cn } from "@4mica/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/Spinner";
 
 export function SavingIndicator() {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h3 className="font-semibold text-base text-ink-strong">{title}</h3>
+        <h2 className="font-semibold text-base text-ink-strong">{title}</h2>
         {description && (
           <p className="mt-1 text-ink-muted text-sm">{description}</p>
         )}
@@ -145,7 +146,7 @@ export function SectionRow({
     >
       {children}
       {actions && (
-        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-hover:opacity-100">
           {actions}
         </div>
       )}

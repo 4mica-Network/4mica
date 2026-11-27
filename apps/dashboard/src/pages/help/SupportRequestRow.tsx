@@ -1,14 +1,12 @@
-import { Checkbox, cn, Spinner } from "@4mica/ui";
+import { Checkbox, cn } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import {
-  supportPendingKeys,
-  toggleSupportRequestSelected,
-  updateSupportRequest,
-} from "@stores/support/actions";
 import {
   selectIsSupportPending,
   selectIsSupportRequestSelected,
-} from "@stores/support/selector";
+  supportPendingKeys,
+  toggleSupportRequestSelected,
+  updateSupportRequest,
+} from "@stores/support";
 import type { SupportRequest } from "@stores/support/type";
 import {
   CircleCheck,
@@ -20,6 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { Spinner } from "@/components/Spinner";
 import { isDone } from "./constants";
 
 export const supportRequestPath = (id: string) =>
@@ -65,7 +64,7 @@ export function SupportRequestRow({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <Link
           to={supportRequestPath(request.id)}
-          className="min-w-0 truncate font-semibold text-base text-ink-strong after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+          className="min-w-0 truncate font-semibold text-base text-ink-strong after:absolute after:inset-0 after:content-[''] focus-visible:underline focus-visible:outline-none focus-visible:after:rounded-sm focus-visible:after:ring-2 focus-visible:after:ring-overlay/60 focus-visible:after:ring-inset"
           data-testid={`support-link-${request.id}`}
         >
           {request.subject}
@@ -76,7 +75,7 @@ export function SupportRequestRow({
         </p>
       </div>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-has-[a:focus-visible]:opacity-100 lg:group-hover:opacity-100">
+      <div className="relative z-10 flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 lg:pointer-fine:opacity-0 lg:group-has-[a:focus-visible]:opacity-100 lg:group-hover:opacity-100">
         {isPending && <Spinner size="sm" className="mr-1 text-ink-subtle" />}
 
         <RowActionsMenu

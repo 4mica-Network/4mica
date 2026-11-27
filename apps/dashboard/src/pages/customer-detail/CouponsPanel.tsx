@@ -1,17 +1,15 @@
 import { isDecimalAmount, trimAmount } from "@4mica/rules";
-import { Button, EmptyState, Spinner, Tag } from "@4mica/ui";
+import { Button, EmptyState, Tag } from "@4mica/ui";
 import {
   createCustomerCoupon,
   customerPendingKeys,
   deleteCustomerCoupon,
-  updateCustomerCoupon,
-} from "@stores/customer/actions";
-import {
   selectCustomerCoupons,
   selectCustomerError,
   selectCustomerIssues,
   selectIsCustomerPending,
-} from "@stores/customer/selector";
+  updateCustomerCoupon,
+} from "@stores/customer";
 import type {
   Customer,
   CustomerCoupon,
@@ -30,6 +28,7 @@ import {
   SectionRow,
   SectionRows,
 } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useReturnFocus } from "@/hooks/useReturnFocus";
 import {

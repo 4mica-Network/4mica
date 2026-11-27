@@ -25,7 +25,6 @@ const developerActions = mirrorKeys([
   "DELETE_WEBHOOK_SUCCEEDED",
 
   "DEVELOPER_ACTION_FAILED",
-  "DISMISS_REVEALED_SECRET",
 ] as const);
 
 export default developerActions;

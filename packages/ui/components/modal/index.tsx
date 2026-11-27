@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { X } from "lucide-react";
 import { type ReactNode, useId, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -61,7 +61,7 @@ export const Modal = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-9990 flex items-center justify-center p-4">
-          <motion.div
+          <m.div
             key="overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -72,7 +72,7 @@ export const Modal = ({
             data-testid={`${prefix}-overlay`}
           />
 
-          <motion.div
+          <m.div
             key="panel"
             ref={panelRef}
             tabIndex={-1}
@@ -85,7 +85,7 @@ export const Modal = ({
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              "relative flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-overlay/10 bg-surface shadow-2xl outline-none",
+              "relative flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-xl border border-overlay/10 bg-surface shadow-2xl outline-none",
               SIZES[size],
               className,
             )}
@@ -117,7 +117,7 @@ export const Modal = ({
                     type="button"
                     onClick={onClose}
                     aria-label={closeLabel}
-                    className="-mt-1 -mr-1 shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/40"
+                    className="-mt-1 -mr-1 shrink-0 rounded-md p-1 text-ink-subtle transition-colors hover:text-ink-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60"
                     data-testid={`${prefix}-close`}
                   >
                     <X className="h-4 w-4" />
@@ -144,7 +144,7 @@ export const Modal = ({
                 {footer}
               </div>
             )}
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>,

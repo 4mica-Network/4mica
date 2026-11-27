@@ -104,6 +104,7 @@ export const isSellable = (
 
 export const buildAgentBuyerSnippets = (
   agent: PublicAgent,
+  { sellerText = true }: { sellerText?: boolean } = {},
 ): AgentBuyerSnippets | null => {
   if (!isSellable(agent)) {
     return null;
@@ -114,11 +115,11 @@ export const buildAgentBuyerSnippets = (
   const price = formatPrice(
     agent.priceAmount,
     agent.priceCurrency,
-    agent.priceLabel,
+    sellerText ? agent.priceLabel : null,
   );
 
   const descriptorParts = [
-    agent.name,
+    sellerText ? agent.name : null,
     price === null ? null : `${price} per call`,
   ];
   const paidToParts = [

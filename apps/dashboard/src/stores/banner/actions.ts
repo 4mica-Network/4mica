@@ -36,3 +36,8 @@ export const recordBannerInteraction = (
   type: actionTypes.RECORD_BANNER_INTERACTION_REQUESTED,
   payload: { id, interaction },
 });
+
+export const bannerViewRecorded = (id: string) => ({
+  type: actionTypes.BANNER_VIEW_RECORDED,
+  payload: { id },
+});

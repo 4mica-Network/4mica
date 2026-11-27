@@ -1,11 +1,3 @@
-"""Collateral lifecycle against a live core + anvil: deposits over both asset
-kinds, the account views that read them back, and the withdrawal request /
-cancel round-trip. Finalization is not exercised — the dev stack's grace
-period is minutes long by design.
-
-See live_stack.py for environment and the required WalletRole grant.
-"""
-
 import pytest
 from live_stack import (
     credited_balance,
@@ -27,8 +19,6 @@ async def _native_collateral(client) -> int:
 
 
 async def test_native_deposit_reaches_chain_and_api(payer):
-    # principalBalance is stablecoin-only (pool-share accounting) and reverts
-    # UnsupportedAsset for ETH — native collateral reads via getUserAllAssets.
     before = await _native_collateral(payer)
 
     receipt = await payer.deposit.of(None, NATIVE_DEPOSIT).send()
@@ -90,6 +80,4 @@ async def test_supported_tokens_expose_gasless_metadata(payer):
     tokens = await payer.tokens.supported()
     assert tokens.chain_id == payer.public_params.chain_id
     assert tokens.tokens
-    # The dev stack's mock stablecoins implement EIP-712, so core should relay
-    # a domain separator for at least one — the input gasless signing needs.
     assert any(t.domain_separator for t in tokens.tokens)

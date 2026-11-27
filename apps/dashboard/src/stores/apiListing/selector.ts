@@ -50,3 +50,12 @@ export const selectAreAllApiListingsSelected = (state: RootState): boolean =>
   state.apiListing.items.every((item) =>
     state.apiListing.selectedIds.includes(item.id),
   );
+
+export const selectCurrentApiListing = (state: RootState): ApiListing | null =>
+  state.apiListing.current;
+
+export const selectCurrentApiListingError = (state: RootState): string | null =>
+  state.apiListing.currentError;
+
+export const selectCurrentApiListingNotFound = (state: RootState): boolean =>
+  state.apiListing.currentNotFound;

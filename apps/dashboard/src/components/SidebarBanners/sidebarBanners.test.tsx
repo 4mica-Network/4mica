@@ -30,12 +30,16 @@ const banner = (over: Partial<Banner> = {}): Banner => ({
   ...over,
 });
 
-const makeStore = (banners: Banner[], user: unknown = { id: "usr_1" }) => {
+const makeStore = (
+  banners: Banner[],
+  user: unknown = { id: "usr_1" },
+  hasLoaded = true,
+) => {
   const dispatched: { type: string; payload?: unknown }[] = [];
   const state = {
     user: { ...USER_INITIAL_STATE, user },
     developer: {},
-    banner: { ...BANNER_INITIAL_STATE, banners, hasLoaded: true },
+    banner: { ...BANNER_INITIAL_STATE, banners, hasLoaded },
   };
   return {
     dispatched,
@@ -50,8 +54,12 @@ const makeStore = (banners: Banner[], user: unknown = { id: "usr_1" }) => {
   };
 };
 
-const renderDeck = (banners: Banner[], user: unknown = { id: "usr_1" }) => {
-  const { store, dispatched } = makeStore(banners, user);
+const renderDeck = (
+  banners: Banner[],
+  user: unknown = { id: "usr_1" },
+  hasLoaded = true,
+) => {
+  const { store, dispatched } = makeStore(banners, user, hasLoaded);
   const view = render(
     <Provider store={store as any}>
       <MemoryRouter>
@@ -77,10 +85,18 @@ describe("sidebar banners", () => {
   });
 
   it("fetches once the user is present", () => {
-    const { dispatched } = renderDeck([]);
+    const { dispatched } = renderDeck([], { id: "usr_1" }, false);
 
     expect(dispatched.some((a) => a.type === "FETCH_BANNERS_REQUESTED")).toBe(
       true,
+    );
+  });
+
+  it("does not fetch again when the sidebar remounts it", () => {
+    const { dispatched } = renderDeck([banner()]);
+
+    expect(dispatched.some((a) => a.type === "FETCH_BANNERS_REQUESTED")).toBe(
+      false,
     );
   });
 

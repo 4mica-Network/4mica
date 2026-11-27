@@ -1,14 +1,15 @@
-import { Button, Card, cn, Spinner } from "@4mica/ui";
+import { Button, Card, cn } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
+  selectIsSupportPending,
   supportPendingKeys,
   updateSupportRequest,
-} from "@stores/support/actions";
-import { selectIsSupportPending } from "@stores/support/selector";
+} from "@stores/support";
 import type { SupportRequestDetail, SupportStatus } from "@stores/support/type";
 import { formatDateTime } from "@utils/format";
 import { CircleCheck, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@/components/Spinner";
 import { isDone, STATUS_LABEL_KEYS } from "@/pages/help/constants";
 
 const TONE = {

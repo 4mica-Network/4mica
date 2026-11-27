@@ -90,6 +90,9 @@ export const Select = ({
   const generatedId = useId();
   const triggerId = id ?? `select-${generatedId}`;
   const listboxId = `${triggerId}-listbox`;
+  const labelId = `${triggerId}-label`;
+  const valueId = `${triggerId}-value`;
+  const nameId = ariaLabelledBy ?? (label || ariaLabel ? labelId : undefined);
   const errorId = error ? `${triggerId}-error` : undefined;
   const describedBy = joinIds(ariaDescribedBy, errorId);
 
@@ -135,6 +138,7 @@ export const Select = ({
     }
     onChange?.(option);
     setOpen(false);
+    anchorRef.current?.focus();
   };
 
   const displayLabel = selected?.title ?? placeholder;
@@ -150,6 +154,7 @@ export const Select = ({
     <div className="relative w-full" data-testid={prefix}>
       {label && (
         <label
+          id={labelId}
           htmlFor={triggerId}
           className="mb-2.5 flex select-none items-center gap-1 font-medium text-ink-muted text-sm"
           data-testid={`${prefix}-label`}
@@ -161,6 +166,12 @@ export const Select = ({
         </label>
       )}
 
+      {!label && ariaLabel && !ariaLabelledBy && (
+        <span id={labelId} hidden>
+          {ariaLabel}
+        </span>
+      )}
+
       {!isInputHidden && (
         <button
           ref={mergeRefs(anchorRef, ref)}
@@ -169,8 +180,7 @@ export const Select = ({
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-controls={isOpen ? listboxId : undefined}
-          aria-label={ariaLabel}
-          aria-labelledby={ariaLabelledBy}
+          aria-labelledby={nameId ? `${nameId} ${valueId}` : undefined}
           aria-describedby={describedBy}
           aria-invalid={error ? true : undefined}
           disabled={disabled}
@@ -180,7 +190,7 @@ export const Select = ({
             "flex w-full items-center justify-between rounded-lg border border-overlay/15 px-3 py-2.5 text-left text-ink-body text-sm outline-none transition",
             disabled
               ? "cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/40",
+              : "cursor-pointer hover:border-overlay/30 focus-visible:border-overlay/50 focus-visible:ring-1 focus-visible:ring-overlay/60",
             error && "border-danger",
             className,
           )}
@@ -188,6 +198,7 @@ export const Select = ({
         >
           <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
             <span
+              id={valueId}
               className={selected ? "text-ink-body" : "text-ink-subtle"}
               data-testid={`${prefix}-selected`}
             >
@@ -251,15 +262,15 @@ export const Select = ({
               <div
                 id={listboxId}
                 role="listbox"
-                aria-labelledby={label ? triggerId : undefined}
-                aria-label={label ? undefined : (ariaLabel ?? placeholder)}
+                aria-labelledby={nameId}
+                aria-label={nameId ? undefined : placeholder}
               >
                 {hasEmptyValue && selected && (
                   <button
                     type="button"
                     role="option"
                     aria-selected={false}
-                    className="block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none"
+                    className="block w-full cursor-pointer rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset"
                     onClick={() => handleChange(null)}
                     data-testid={`${prefix}-clear`}
                   >
@@ -283,7 +294,7 @@ export const Select = ({
                       aria-selected={opt.value === selected?.value}
                       title={opt.title}
                       className={cn(
-                        "block w-full cursor-pointer truncate rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none",
+                        "block w-full cursor-pointer truncate rounded-md px-4 py-2 text-left text-ink-body hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset",
                         opt.value === selected?.value && "bg-overlay/5",
                       )}
                       onClick={() => handleChange(opt)}

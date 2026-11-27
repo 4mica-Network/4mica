@@ -36,16 +36,30 @@ ARG NEXT_PUBLIC_BASE_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_ASSET_PREFIX
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG SENTRY_RELEASE
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+ARG SENTRY_REPOSITORY
 
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_ASSET_PREFIX=$NEXT_PUBLIC_ASSET_PREFIX \
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT=$NEXT_PUBLIC_SENTRY_ENVIRONMENT \
+    SENTRY_RELEASE=$SENTRY_RELEASE \
+    SENTRY_ORG=$SENTRY_ORG \
+    SENTRY_PROJECT=$SENTRY_PROJECT \
+    SENTRY_REPOSITORY=$SENTRY_REPOSITORY
 
 # @4mica/db throws at import when DATABASE_URL is unset, and `next build`
 # imports every route module to collect metadata. This sentinel is never
 # connected to — same trick as packages/db/prisma.config.ts.
 ENV DATABASE_URL=postgresql://unset:unset@127.0.0.1:1/unset
+
+ENV PLAYGROUND_STRICT_ENV=1
 
 # src/env.ts rejects a CLERK_SECRET_KEY that is not sk_-prefixed, and the same
 # metadata collection evaluates it. Deliberately a build-only sentinel rather
@@ -56,7 +70,8 @@ ENV CLERK_SECRET_KEY=sk_build_time_placeholder
 
 # turbo (not `next build` directly) so the @4mica/db#build edge runs
 # `prisma generate` first and @4mica/ui's dist is fresh.
-RUN turbo build --filter=@4mica/playground
+RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
+    turbo build --filter=@4mica/playground
 
 FROM node:24-alpine AS runner
 WORKDIR /app

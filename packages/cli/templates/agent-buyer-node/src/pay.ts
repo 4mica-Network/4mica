@@ -50,7 +50,47 @@ export type PaidResult<T> = {
   paid: number;
 };
 
+// Live once the wallet key is set: payments are then signed for real through
+// @4mica/sdk. Without it the payment is a hand-built stand-in that only a
+// demo seller accepts.
+const LIVE = Boolean(process.env.FOURMICA_WALLET_PRIVATE_KEY);
+
+type Session = Awaited<
+  ReturnType<typeof import("@4mica/sdk").FourMica.connect>
+>;
+let session: Promise<Session> | undefined;
+
+/** One connection for the whole run: connecting logs in to 4mica core. */
+function connected(): Promise<Session> {
+  session ??= import("@4mica/sdk").then(({ FourMica }) => FourMica.connect());
+  return session;
+}
+
+/**
+ * Call once at the end of a run. A connection that failed has nothing to
+ * close, and its error was already thrown to whoever asked for it.
+ */
+export async function closePayments(): Promise<void> {
+  const client = await session?.catch(() => undefined);
+  await client?.close();
+}
+
+/**
+ * `client.fetch` answers a 402 by signing a payment within the spend limit
+ * (1 USDC a payment unless `spend` says otherwise) and repeating the request.
+ */
+async function payLive<T>(url: string): Promise<PaidResult<T>> {
+  const client = await connected();
+  const paid = await client.fetch(url);
+  return {
+    status: paid.status,
+    body: paid.ok ? ((await paid.json()) as T) : null,
+    paid: Number(client.paymentFor(paid)?.amountRaw ?? 0),
+  };
+}
+
 export async function payAndFetch<T>(url: string): Promise<PaidResult<T>> {
+  if (LIVE) return payLive<T>(url);
   const first = await fetch(url);
   if (first.status !== 402) {
     return { status: first.status, body: (await first.json()) as T, paid: 0 };

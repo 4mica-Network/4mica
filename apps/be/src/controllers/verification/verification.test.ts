@@ -312,7 +312,7 @@ describe("verification routes", () => {
 
       expect(res.statusCode).toBe(303);
       expect(res.headers.location).toBe(
-        "http://app.test/settings/profile?verifyToken=4mica_ev_good",
+        "http://app.test/settings/profile#verifyToken=4mica_ev_good",
       );
       // A mail scanner prefetching the link must not be able to verify it.
       expect(tokenFindUnique).not.toHaveBeenCalled();

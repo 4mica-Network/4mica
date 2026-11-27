@@ -10,10 +10,7 @@ import {
 import type { PublicAgent } from "@/types";
 import { StepLead } from "./StepLead";
 
-export function buildAgentBuyerSteps(
-  agent: PublicAgent,
-  isOwner: boolean,
-): FlowStep[] {
+export function buildAgentBuyerSteps(agent: PublicAgent): FlowStep[] {
   const buyer = buildAgentBuyerSnippets(agent);
   const inactive = agent.status !== "ACTIVE" && (
     <Tag className="self-start" size="sm" variant="warning">
@@ -29,11 +26,7 @@ export function buildAgentBuyerSteps(
         content: (
           <>
             {inactive}
-            <StepLead>
-              {isOwner
-                ? messages.integration.agentNotSellableOwner
-                : messages.integration.agentNotSellable}
-            </StepLead>
+            <StepLead>{messages.integration.agentNotSellable}</StepLead>
           </>
         ),
       },
@@ -113,10 +106,7 @@ export function buildAgentBuyerSteps(
   ];
 }
 
-export function buildAgentRunSteps(
-  agent: PublicAgent,
-  isOwner: boolean,
-): FlowStep[] {
+export function buildAgentRunSteps(agent: PublicAgent): FlowStep[] {
   const runner = buildAgentSnippets(agent);
 
   return [
@@ -142,11 +132,9 @@ export function buildAgentRunSteps(
             lang="typescript"
             showLineNumbers
           />
-          {isOwner && (
-            <p className="text-ink-muted text-xs">
-              {messages.integration.walletOwnerOnly}
-            </p>
-          )}
+          <p className="text-ink-muted text-xs">
+            {messages.integration.walletOwnerOnly}
+          </p>
         </>
       ),
     },

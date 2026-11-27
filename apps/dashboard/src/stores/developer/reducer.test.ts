@@ -4,7 +4,6 @@ import {
   createApiKeySucceeded,
   deleteApiKeySucceeded,
   developerActionFailed,
-  dismissRevealedSecret,
   revokeApiKey,
   revokeApiKeySucceeded,
   updateWebhook,
@@ -65,36 +64,16 @@ describe("developer reducer", () => {
     });
   });
 
-  it("prepends a created key and holds its plaintext for display", () => {
+  it("prepends a created key without keeping any plaintext", () => {
     const created = key({ id: "key_2", name: "New" });
     const state = reducer(
       seeded,
-      createApiKeySucceeded(
-        created,
-        { kind: "apiKey", id: "key_2", plaintext: "4mica_sk_secret" },
-        { pendingKey: "createApiKey" },
-      ),
+      createApiKeySucceeded(created, { pendingKey: "createApiKey" }),
     );
 
     expect(state.apiKeys[0].id).toBe("key_2");
-    expect(state.revealed?.plaintext).toBe("4mica_sk_secret");
+    expect(state).not.toHaveProperty("revealed");
     expect(state.pending).toEqual({});
-  });
-
-  it("drops the plaintext once dismissed", () => {
-    let state = reducer(
-      seeded,
-      createApiKeySucceeded(
-        key({ id: "key_2" }),
-        { kind: "apiKey", id: "key_2", plaintext: "secret" },
-        { pendingKey: "createApiKey" },
-      ),
-    );
-    state = reducer(state, dismissRevealedSecret());
-
-    expect(state.revealed).toBeNull();
-    // The key itself survives; only the secret is forgotten.
-    expect(state.apiKeys).toHaveLength(2);
   });
 
   it("replaces a revoked key in place rather than appending", () => {

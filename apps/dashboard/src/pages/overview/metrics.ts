@@ -6,12 +6,13 @@ import type {
   RankedEntry,
 } from "@stores/payment/type";
 import { formatUnits } from "viem";
+import { currentLocale } from "@/i18n/locale";
 
 export const sumVolume = (volume: PaymentVolume[]): string =>
   volume.reduce((total, entry) => total + Number(entry.amount), 0).toString();
 
 export const formatAmount = (value: number): string =>
-  value.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  value.toLocaleString(currentLocale(), { maximumFractionDigits: 6 });
 
 export const formatBalance = (value: string | bigint, decimals: number) =>
   trimAmount(formatUnits(BigInt(value), decimals));
@@ -20,7 +21,7 @@ export const monthLabel = (month: string): string => {
   const [year, index] = month.split("-");
   const date = new Date(Date.UTC(Number(year), Number(index) - 1, 1));
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(currentLocale(), {
     month: "short",
     timeZone: "UTC",
   });

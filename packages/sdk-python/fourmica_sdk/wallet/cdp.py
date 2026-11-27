@@ -1,25 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, cast
+
+from eth_account.messages import encode_defunct, encode_typed_data
+from eth_utils import keccak
 
 
 @dataclass
 class CdpAccountConfig:
-    """Configuration for a CDP MPC wallet account."""
-
     api_key_id: str
-    """CDP API key ID from the Coinbase Developer Platform dashboard."""
     api_key_secret: str
-    """CDP API key secret from the Coinbase Developer Platform dashboard."""
     wallet_secret: str
-    """Wallet secret — required for account creation and all signing operations (POST endpoints)."""
+    """Required for account creation and every signing operation."""
     name: str
-    """Idempotency name — get_or_create_account always returns the same wallet for a given name."""
+    """Idempotency key: the same name always yields the same wallet."""
 
 
 class CdpAccountSigner:
-    """Implements EvmSigner backed by a Coinbase CDP MPC wallet (private key never leaves CDP)."""
+    """The private key never leaves CDP."""
 
     def __init__(self, address: str, _cdp_client: Any) -> None:
         self._address = address
@@ -29,37 +28,32 @@ class CdpAccountSigner:
     def address(self) -> str:
         return self._address
 
-    async def sign_message(self, message: Union[str, bytes]) -> str:
+    async def sign_message(self, message: str | bytes) -> str:
         if isinstance(message, bytes):
-            from eth_account.messages import encode_defunct
-            from eth_utils import keccak
-
             prefixed = encode_defunct(primitive=message)
             msg_hash = (
                 "0x" + keccak(prefixed.version + prefixed.header + prefixed.body).hex()
             )
-            return await self._cdp.evm.sign_hash(self._address, msg_hash)
+            return cast(str, await self._cdp.evm.sign_hash(self._address, msg_hash))
 
-        # Plain string — CDP applies the EIP-191 prefix internally.
-        return await self._cdp.evm.sign_message(self._address, message)
+        # Plain string: CDP applies the EIP-191 prefix internally.
+        return cast(str, await self._cdp.evm.sign_message(self._address, message))
 
     async def sign_hash(self, message_hash: bytes) -> str:
-        digest = (
-            message_hash
-            if isinstance(message_hash, str)
-            else "0x" + bytes(message_hash).hex()
-        )
-        return await self._cdp.evm.sign_hash(self._address, digest)
+        raw: object = message_hash
+        digest = raw if isinstance(raw, str) else "0x" + bytes(message_hash).hex()
+        return cast(str, await self._cdp.evm.sign_hash(self._address, digest))
 
-    async def sign_typed_data(self, full_message: dict) -> str:
+    async def sign_typed_data(self, full_message: dict[str, Any]) -> str:
+        from cdp.openapi_client.exceptions import ApiException
         from cdp.openapi_client.models.eip712_domain import EIP712Domain
 
-        domain_dict: dict = full_message.get("domain", {})
-        types: dict = full_message.get("types", {})
+        domain_dict: dict[str, Any] = full_message.get("domain", {})
+        types: dict[str, Any] = full_message.get("types", {})
         primary_type: str = full_message.get("primaryType", "")
-        message: dict = full_message.get("message", {})
+        message: dict[str, Any] = full_message.get("message", {})
 
-        # Strip EIP712Domain entry — CDP takes domain as a separate object.
+        # CDP takes the domain as a separate object.
         filtered_types = {k: v for k, v in types.items() if k != "EIP712Domain"}
 
         domain = EIP712Domain(
@@ -71,36 +65,24 @@ class CdpAccountSigner:
         )
 
         try:
-            return await self._cdp.evm.sign_typed_data(
-                self._address, domain, filtered_types, primary_type, message
+            return cast(
+                str,
+                await self._cdp.evm.sign_typed_data(
+                    self._address, domain, filtered_types, primary_type, message
+                ),
             )
-        except Exception as exc:
-            # Only fall back to hash-then-sign for CDP schema/API rejections.
-            # Re-raise anything else (network errors, auth failures, etc.).
-            try:
-                from cdp.openapi_client.exceptions import (
-                    ApiException as _CdpApiException,
-                )
-
-                if not isinstance(exc, _CdpApiException):
-                    raise
-            except ImportError:
-                pass
-
-            from eth_account.messages import encode_typed_data
-            from eth_utils import keccak
-
+        except ApiException:
             encoded = encode_typed_data(full_message=full_message)
             msg_hash = (
                 "0x" + keccak(encoded.version + encoded.header + encoded.body).hex()
             )
-            return await self._cdp.evm.sign_hash(self._address, msg_hash)
+            return cast(str, await self._cdp.evm.sign_hash(self._address, msg_hash))
 
     async def close(self) -> None:
         if hasattr(self._cdp, "close"):
             await self._cdp.close()
 
-    async def __aenter__(self) -> "CdpAccountSigner":
+    async def __aenter__(self) -> CdpAccountSigner:
         return self
 
     async def __aexit__(self, *_: object) -> None:
@@ -108,7 +90,6 @@ class CdpAccountSigner:
 
 
 async def create_cdp_account(config: CdpAccountConfig) -> CdpAccountSigner:
-    """Creates a CdpAccountSigner backed by a Coinbase CDP MPC wallet."""
     from cdp import CdpClient
 
     cdp = CdpClient(

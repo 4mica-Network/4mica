@@ -41,12 +41,14 @@ jobs:
           service_dir: apps/playground
           health_container: 4mica-playground
           pre_up: |
+            sh ../../infra/firewall/check-bind.sh '${{ vars.PLAYGROUND_BIND || '127.0.0.1' }}' || exit 1
             docker network create 4mica-data 2>/dev/null || true
             # Same attach as deploy-be.yml — either stack may come up first.
             pg='${{ vars.POSTGRES_HOST }}'
             if [ -n "$pg" ] && [ "$pg" != host.docker.internal ]; then
               docker network connect 4mica-data "$pg" 2>/dev/null || true
             fi
+            printf 'SENTRY_RELEASE=%s\n' "$(git rev-parse HEAD)" >> .env
           env_contents: |
             NODE_ENV=production
             PLAYGROUND_PORT=${{ vars.PLAYGROUND_PORT || '8081' }}
@@ -73,3 +75,17 @@ jobs:
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
 
             REVALIDATE_SECRET=${{ secrets.REVALIDATE_SECRET }}
+
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ inputs.environment }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+            SENTRY_REPOSITORY=${{ github.repository }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+
+      - name: Confirm the playground port is closed to the internet
+        shell: bash
+        env:
+          SERVER_HOST: ${{ secrets.BE_SERVER_HOST }}
+          PORT: ${{ vars.PLAYGROUND_PORT || '8081' }}
+        run: bash infra/firewall/probe-closed.sh "$SERVER_HOST" "$PORT"

@@ -25,6 +25,7 @@ export function DeleteConfirmDialog({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={

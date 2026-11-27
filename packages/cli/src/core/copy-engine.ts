@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { rewritePackageJson } from "./rewrite-deps.js";
 import { substitute, type Tokens } from "./substitute.js";
 
@@ -62,7 +62,8 @@ async function walk(dir: string, opts: CopyOptions): Promise<void> {
 
 async function copyFile(srcPath: string, opts: CopyOptions): Promise<void> {
   const rel = relative(opts.templateDir, srcPath);
-  const parts = rel.split("/");
+  // `relative` speaks the platform's separator: a backslash on Windows.
+  const parts = rel.split(sep);
   parts[parts.length - 1] = targetName(parts[parts.length - 1]);
   const destPath = join(opts.targetDir, ...parts);
   await mkdir(join(destPath, ".."), { recursive: true });

@@ -4,13 +4,11 @@ import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   clearSupportIssues,
   createSupportRequest,
-  supportPendingKeys,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
   selectSupportIssues,
-} from "@stores/support/selector";
+  supportPendingKeys,
+} from "@stores/support";
 import type { SupportCategory } from "@stores/support/type";
 import { blankToNull } from "@utils/format";
 import { ArrowUpRight, BookOpen } from "lucide-react";
@@ -142,6 +140,7 @@ export function CreateSupportRequestModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("help.create.title")}

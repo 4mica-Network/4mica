@@ -7,6 +7,7 @@ import {
   updateProfileHandler,
   upsertBusinessHandler,
 } from "@controllers/me/index";
+import { revalidateOnWrite } from "@plugins/playground-revalidate";
 import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
@@ -81,13 +82,20 @@ export const meRoutes: FastifyPluginCallback = (app, _opts, done) => {
 
   app.patch(
     "/me/profile",
-    patchOptions(app, "Update public profile"),
+    {
+      ...patchOptions(app, "Update public profile"),
+      onResponse: revalidateOnWrite,
+    },
     updateProfileHandler,
   );
 
   app.patch(
     "/me/account",
-    patchOptions(app, "Update account settings"),
+    {
+      ...patchOptions(app, "Update account settings"),
+      preHandler: [...guards(app).preHandler, sensitiveRateLimit(app)],
+      onResponse: revalidateOnWrite,
+    },
     updateAccountHandler,
   );
 

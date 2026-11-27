@@ -1,18 +1,17 @@
-import { Button } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   fetchSupportRequest,
   resetSupportRequest,
-} from "@stores/support/actions";
-import {
   selectCurrentSupportRequest,
   selectCurrentSupportRequestError,
+  selectCurrentSupportRequestNotFound,
   selectIsLoadingCurrentSupportRequest,
-} from "@stores/support/selector";
+} from "@stores/support";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { BackBar } from "@/components/BackBar";
+import { LoadFailure } from "@/components/LoadFailure";
 import { PageSpinner } from "@/components/PageSpinner";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { RemovePanel } from "./RemovePanel";
@@ -27,6 +26,7 @@ export function HelpRequestDetail() {
   const request = useAppSelector(selectCurrentSupportRequest);
   const isLoading = useAppSelector(selectIsLoadingCurrentSupportRequest);
   const loadError = useAppSelector(selectCurrentSupportRequestError);
+  const notFound = useAppSelector(selectCurrentSupportRequestNotFound);
 
   usePageTitle(
     request
@@ -50,12 +50,14 @@ export function HelpRequestDetail() {
 
   if (!request) {
     return (
-      <div className="flex flex-col items-start gap-4 py-10">
-        <p className="text-ink-muted text-sm">{t("help.detail.notFound")}</p>
-        <Button asChild intent="outline" size="sm">
-          <Link to="/help">{t("help.detail.back")}</Link>
-        </Button>
-      </div>
+      <LoadFailure
+        notFound={notFound || !loadError}
+        notFoundLabel={t("help.detail.notFound")}
+        message={loadError}
+        onRetry={() => dispatch(fetchSupportRequest(id))}
+        backTo="/help"
+        backLabel={t("help.detail.back")}
+      />
     );
   }
 

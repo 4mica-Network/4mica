@@ -1,17 +1,15 @@
-import { Button, Card, EmptyState, InputField, Spinner, Tag } from "@4mica/ui";
+import { Button, Card, EmptyState, InputField, Tag } from "@4mica/ui";
 import {
   createApiKey,
   deleteApiKey,
   developerPendingKeys,
   revokeApiKey,
-} from "@stores/developer/actions";
-import {
   selectApiKeys,
   selectDeveloperError,
   selectDeveloperIssues,
   selectIsDeveloperPending,
-} from "@stores/developer/selector";
-import type { ApiKey } from "@stores/developer/type";
+} from "@stores/developer";
+import type { ApiKey, RevealSecret } from "@stores/developer/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { formatDate } from "@utils/format";
 import { KeyRound, Trash2 } from "lucide-react";
@@ -19,6 +17,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SettingsSection } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
@@ -84,7 +83,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKey }) {
   );
 }
 
-export function ApiKeysCard() {
+export function ApiKeysCard({ onReveal }: { onReveal: RevealSecret }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const apiKeys = useAppSelector(selectApiKeys);
@@ -100,7 +99,7 @@ export function ApiKeysCard() {
     if (!trimmed || isCreating) {
       return;
     }
-    dispatch(createApiKey({ name: trimmed }));
+    dispatch(createApiKey({ name: trimmed }, onReveal));
   };
 
   return (

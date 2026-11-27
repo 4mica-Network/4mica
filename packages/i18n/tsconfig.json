@@ -1,0 +1,11 @@
+{
+  "extends": "@4mica/tsconfig/react-library.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["src", "vitest.config.ts"],
+  "exclude": ["node_modules"]
+}

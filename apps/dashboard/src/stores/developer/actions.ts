@@ -2,7 +2,7 @@ import type { PendingMeta } from "@stores/utils";
 import actionTypes from "./actionTypes";
 import type {
   ApiKey,
-  RevealedSecret,
+  RevealSecret,
   Webhook,
   WebhookEvent,
   WebhookStatus,
@@ -35,19 +35,19 @@ export const fetchDeveloperFailed = (message: string) => ({
   payload: { message },
 });
 
-export const createApiKey = (payload: { name: string }) => ({
+export const createApiKey = (
+  payload: { name: string },
+  onReveal?: RevealSecret,
+) => ({
   type: actionTypes.CREATE_API_KEY_REQUESTED,
   payload,
   meta: { pendingKey: "createApiKey" },
+  onReveal,
 });
 
-export const createApiKeySucceeded = (
-  apiKey: ApiKey,
-  revealed: RevealedSecret,
-  meta: PendingMeta,
-) => ({
+export const createApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
   type: actionTypes.CREATE_API_KEY_SUCCEEDED,
-  payload: { apiKey, revealed },
+  payload: { apiKey },
   meta,
 });
 
@@ -87,23 +87,26 @@ export const deleteApiKeySucceeded = (id: string, meta: PendingMeta) => ({
   meta,
 });
 
-export const createWebhook = (payload: {
-  url: string;
-  description?: string | null;
-  events: string[];
-}) => ({
+export const createWebhook = (
+  payload: {
+    url: string;
+    description?: string | null;
+    events: string[];
+  },
+  onReveal?: RevealSecret,
+) => ({
   type: actionTypes.CREATE_WEBHOOK_REQUESTED,
   payload,
   meta: { pendingKey: "createWebhook" },
+  onReveal,
 });
 
 export const createWebhookSucceeded = (
   webhook: Webhook,
-  revealed: RevealedSecret,
   meta: PendingMeta,
 ) => ({
   type: actionTypes.CREATE_WEBHOOK_SUCCEEDED,
-  payload: { webhook, revealed },
+  payload: { webhook },
   meta,
 });
 
@@ -130,19 +133,22 @@ export const updateWebhookSucceeded = (
   meta,
 });
 
-export const rotateWebhookSecret = (payload: { id: string }) => ({
+export const rotateWebhookSecret = (
+  payload: { id: string },
+  onReveal?: RevealSecret,
+) => ({
   type: actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED,
   payload,
   meta: { pendingKey: developerPendingKeys.webhook(payload.id) },
+  onReveal,
 });
 
 export const rotateWebhookSecretSucceeded = (
   webhook: Webhook,
-  revealed: RevealedSecret,
   meta: PendingMeta,
 ) => ({
   type: actionTypes.ROTATE_WEBHOOK_SECRET_SUCCEEDED,
-  payload: { webhook, revealed },
+  payload: { webhook },
   meta,
 });
 
@@ -166,8 +172,4 @@ export const developerActionFailed = (
   type: actionTypes.DEVELOPER_ACTION_FAILED,
   payload: { message, issues },
   meta,
-});
-
-export const dismissRevealedSecret = () => ({
-  type: actionTypes.DISMISS_REVEALED_SECRET,
 });

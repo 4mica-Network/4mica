@@ -2,6 +2,7 @@ import { trimAmount } from "@4mica/rules";
 import { Card, Tooltip } from "@4mica/ui";
 import type { PaymentSummary, PaymentTotals } from "@stores/payment/type";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
 
 function Volume({ totals }: { totals: PaymentTotals }) {
   const { t } = useTranslation();
@@ -21,7 +22,7 @@ function Volume({ totals }: { totals: PaymentTotals }) {
           key={`${entry.network}:${entry.assetAddress ?? "native"}`}
           className="font-mono font-semibold text-ink-strong text-lg tabular-nums"
         >
-          {trimAmount(entry.amount)}{" "}
+          <Masked>{trimAmount(entry.amount)}</Masked>{" "}
           <span className="font-normal text-ink-subtle text-xs">
             {entry.assetAddress
               ? t("payment.row.erc20")

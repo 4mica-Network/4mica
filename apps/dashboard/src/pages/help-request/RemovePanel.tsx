@@ -1,13 +1,11 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import {
   deleteSupportRequest,
-  supportPendingKeys,
-} from "@stores/support/actions";
-import {
   selectIsSupportPending,
   selectSupportError,
-} from "@stores/support/selector";
+  supportPendingKeys,
+} from "@stores/support";
 import type { SupportRequestDetail } from "@stores/support/type";
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -15,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { SectionCard } from "@/components/layout";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
 export function RemovePanel({ request }: { request: SupportRequestDetail }) {
@@ -31,7 +30,7 @@ export function RemovePanel({ request }: { request: SupportRequestDetail }) {
   const requestedDelete = useRef(false);
   useOnSuccess(isDeleting, Boolean(error), () => {
     if (requestedDelete.current) {
-      navigate("/help");
+      navigate("/help", { replace: true });
     }
   });
   useEffect(() => {

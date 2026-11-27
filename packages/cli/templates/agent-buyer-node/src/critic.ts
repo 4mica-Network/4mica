@@ -1,8 +1,9 @@
+import "./env";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { brainMode, judgeSetup, rateJoke } from "./brain";
-import { payAndFetch } from "./pay";
+import { closePayments, payAndFetch } from "./pay";
 
 function comedianBase(): string {
   if (process.env.COMEDIAN_URL) return process.env.COMEDIAN_URL;
@@ -189,7 +190,9 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error("[critic] failed:", err);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error("[critic] failed:", err);
+    process.exitCode = 1;
+  })
+  .finally(closePayments);

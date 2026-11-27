@@ -4,6 +4,7 @@ import {
   notFoundResponse,
 } from "@/services/descriptor-response";
 import { resolveApiListing } from "@/services/resource";
+import { isIndexable } from "@/services/seo";
 import type { ProfileChildPageProps } from "@/types";
 
 export async function GET(
@@ -18,6 +19,9 @@ export async function GET(
 
   return descriptorResponse(
     buildApiListingDescriptor(resolved.listing, resolved.profile),
-    resolved.listing.visibility === "PUBLIC",
+    {
+      visible: resolved.listing.visibility === "PUBLIC",
+      indexable: isIndexable(resolved.profile, resolved.listing.visibility),
+    },
   );
 }

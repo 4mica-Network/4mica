@@ -3,6 +3,8 @@ import type { PaymentStats } from "@stores/payment/type";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import {
   bandPath,
   formatAmount,
@@ -39,7 +41,7 @@ function Total({
         {label}
       </span>
       <span className="font-mono font-semibold text-ink-strong text-xl tabular-nums">
-        {value}
+        <Masked>{value}</Masked>
       </span>
     </div>
   );
@@ -54,6 +56,7 @@ export function CashFlowChart({
   range: Range;
   onRangeChange: (range: Range) => void;
 }) {
+  const { mask } = usePrivacy();
   const { t } = useTranslation();
   const gradientId = useId();
   const [hovered, setHovered] = useState<number | null>(null);
@@ -269,14 +272,14 @@ export function CashFlowChart({
                       {t("overview.flow.earned")}
                     </dt>
                     <dd className="text-right font-mono text-ink-strong tabular-nums">
-                      {formatAmount(earned[active])}
+                      <Masked>{formatAmount(earned[active])}</Masked>
                     </dd>
                     <dt className="inline-flex items-center gap-1.5 text-ink-subtle">
                       <span className="h-1.5 w-1.5 rounded-full bg-ink-strong" />
                       {t("overview.flow.spent")}
                     </dt>
                     <dd className="text-right font-mono text-ink-strong tabular-nums">
-                      {formatAmount(spent[active])}
+                      <Masked>{formatAmount(spent[active])}</Masked>
                     </dd>
                     <dt className="text-ink-subtle">
                       {t("overview.flow.payments")}
@@ -295,7 +298,7 @@ export function CashFlowChart({
                 <button
                   key={month}
                   type="button"
-                  className="absolute inset-y-0 focus-visible:bg-overlay/5 focus-visible:outline-none"
+                  className="absolute inset-y-0 focus-visible:bg-overlay/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-overlay/60 focus-visible:ring-inset"
                   style={zoneOf(index)}
                   onMouseEnter={() => setHovered(index)}
                   onMouseLeave={() => setHovered(null)}
@@ -303,8 +306,8 @@ export function CashFlowChart({
                   onBlur={() => setHovered(null)}
                   aria-label={t("overview.flow.point", {
                     month: monthLabel(month),
-                    earned: formatAmount(earned[index]),
-                    spent: formatAmount(spent[index]),
+                    earned: mask(formatAmount(earned[index])),
+                    spent: mask(formatAmount(spent[index])),
                   })}
                 />
               ))}

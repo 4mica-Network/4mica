@@ -1,8 +1,4 @@
-"""Reading the signer's own balances and positions."""
-
 from __future__ import annotations
-
-from typing import List, Optional, Union
 
 from ..models import AssetBalanceInfo
 from .ctx import ClientCtx
@@ -13,30 +9,25 @@ class AccountClient:
     def __init__(self, ctx: ClientCtx) -> None:
         self._ctx = ctx
 
-    async def assets(self) -> List[AssetPosition]:
-        """The signer's position in every asset the contract knows them by."""
+    async def assets(self) -> list[AssetPosition]:
         gateway = await self._ctx.gateway()
         raw = await gateway.get_user_assets(self._ctx.signer_address)
         return [AssetPosition.from_gateway(item) for item in raw]
 
-    async def principal_balance(self, asset: Union[Asset, str, None] = None) -> int:
+    async def principal_balance(self, asset: Asset | str | None = None) -> int:
         """Collateral deposited in *asset*, before any yield."""
         gateway = await self._ctx.gateway()
         return await gateway.principal_balance(
             self._ctx.signer_address, Asset.coerce(asset).address
         )
 
-    async def withdrawable_balance(self, asset: Union[Asset, str, None] = None) -> int:
-        """What the signer could withdraw from *asset* right now."""
+    async def withdrawable_balance(self, asset: Asset | str | None = None) -> int:
         gateway = await self._ctx.gateway()
         return await gateway.withdrawable_balance(
             self._ctx.signer_address, Asset.coerce(asset).address
         )
 
     async def stablecoin_position(self, token: str) -> StablecoinPosition:
-        """The signer's full position in a yield-bearing stablecoin: principal,
-        yield and how it is split, plus the pool-level totals the split is
-        derived from."""
         gateway = await self._ctx.gateway()
         user = self._ctx.signer_address
         token_address = Asset.erc20(token).address
@@ -62,12 +53,10 @@ class AccountClient:
         )
 
     async def asset_balance(
-        self, asset: Union[Asset, str, None] = None
-    ) -> Optional[AssetBalanceInfo]:
-        """The signer's balance in *asset* as guarantees are accounted against
-        it, including how much is currently locked. ``None`` when the signer
-        holds nothing in that asset. Lags the chain: a fresh deposit appears
-        once it has been observed and confirmed."""
+        self, asset: Asset | str | None = None
+    ) -> AssetBalanceInfo | None:
+        """``None`` when the signer holds nothing in *asset*. Lags the chain: a
+        fresh deposit appears once core has observed and confirmed it."""
         return await self._ctx.rpc.get_user_asset_balance(
             self._ctx.signer_address, Asset.coerce(asset).address
         )

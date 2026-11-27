@@ -1,16 +1,14 @@
 import {
   apiListingPendingKeys,
   clearApiListingSelection,
-  setApiListingFilters,
-  setApiListingSelection,
-} from "@stores/apiListing/actions";
-import {
   selectApiListingFilters,
   selectApiListings,
   selectAreAllApiListingsSelected,
   selectIsApiListingPending,
   selectSelectedApiListingIds,
-} from "@stores/apiListing/selector";
+  setApiListingFilters,
+  setApiListingSelection,
+} from "@stores/apiListing";
 import type { PaymentNetwork, PublicVisibility } from "@stores/apiListing/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { useTranslation } from "react-i18next";

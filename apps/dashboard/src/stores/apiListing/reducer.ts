@@ -3,6 +3,9 @@ import actionTypes from "./actionTypes";
 import type { ApiListing, ApiListingFilters, ApiListingState } from "./type";
 
 export const INITIAL_STATE: ApiListingState = {
+  current: null,
+  currentError: null,
+  currentNotFound: false,
   items: [],
   total: 0,
   page: 1,
@@ -72,9 +75,32 @@ export default function apiListingReducer(
         validationIssues: {},
       };
 
-    case actionTypes.CREATE_API_LISTING_SUCCEEDED:
+    case actionTypes.FETCH_API_LISTING_REQUESTED:
+      return { ...state, currentError: null, currentNotFound: false };
+
+    case actionTypes.FETCH_API_LISTING_SUCCEEDED:
+      return { ...state, current: action.payload as ApiListing };
+
+    case actionTypes.FETCH_API_LISTING_FAILED: {
+      const payload = action.payload as { message: string; notFound: boolean };
+      return {
+        ...state,
+        currentError: payload.message,
+        currentNotFound: payload.notFound,
+      };
+    }
+
     case actionTypes.UPDATE_API_LISTING_SUCCEEDED:
-    case actionTypes.PUBLISH_API_LISTING_SUCCEEDED:
+    case actionTypes.PUBLISH_API_LISTING_SUCCEEDED: {
+      const updated = action.payload as ApiListing;
+      return {
+        ...state,
+        current: state.current?.id === updated.id ? updated : state.current,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.CREATE_API_LISTING_SUCCEEDED:
     case actionTypes.DELETE_API_LISTING_SUCCEEDED:
       return {
         ...state,

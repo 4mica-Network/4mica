@@ -7,6 +7,47 @@ body {
   color: rgb(var(--ink-body));
 }
 
+html:root {
+  --toastify-font-family: inherit;
+  --toastify-toast-width: 360px;
+  --toastify-toast-min-height: 0px;
+  --toastify-toast-padding: 12px;
+  --toastify-toast-bd-radius: 0.5rem;
+  --toastify-toast-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.45);
+  --toastify-color-light: rgb(var(--surface));
+  --toastify-text-color-light: rgb(var(--ink-body));
+}
+
+.Toastify .Toastify__toast {
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid rgb(var(--overlay) / 0.1);
+}
+
+.Toastify .Toastify__close-button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  color: rgb(var(--ink-subtle));
+  opacity: 1;
+  transition:
+    color 150ms,
+    background-color 150ms;
+}
+
+.Toastify .Toastify__close-button:hover,
+.Toastify .Toastify__close-button:focus-visible {
+  color: rgb(var(--ink-strong));
+  background: rgb(var(--overlay) / 0.08);
+}
+
+.Toastify .Toastify__close-button > svg {
+  width: 12px;
+  height: 12px;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -23,7 +64,20 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in {
-    animation: none;
+  *:not(.animate-spin),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
+
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
   }
 }

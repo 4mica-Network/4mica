@@ -3,9 +3,6 @@ import {
   batchDeleteAgents,
   deleteAgent,
   fetchAgents,
-  setAgentPage,
-} from "@stores/agent/actions";
-import {
   selectAgentError,
   selectAgentFilters,
   selectAgentLimit,
@@ -15,7 +12,8 @@ import {
   selectHasLoadedAgents,
   selectIsAgentsLoading,
   selectSelectedAgentIds,
-} from "@stores/agent/selector";
+  setAgentPage,
+} from "@stores/agent";
 import type { Agent } from "@stores/agent/type";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Bot, Plus, TriangleAlert } from "lucide-react";

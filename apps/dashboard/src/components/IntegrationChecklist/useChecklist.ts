@@ -1,11 +1,11 @@
 import { isProfileRenderable } from "@4mica/rules";
-import { selectAgents } from "@stores/agent/selector";
-import { selectApiListings } from "@stores/apiListing/selector";
-import { selectApiKeys, selectWebhooks } from "@stores/developer/selector";
+import { selectAgents } from "@stores/agent";
+import { selectApiListings } from "@stores/apiListing";
+import { selectApiKeys, selectWebhooks } from "@stores/developer";
 import { useAppSelector } from "@stores/hooks";
-import { selectPaymentSummary } from "@stores/payment/selector";
+import { selectPaymentSummary } from "@stores/payment";
 import { selectBusiness, selectUser } from "@stores/user/selector";
-import { selectWallets } from "@stores/wallet/selector";
+import { selectWallets } from "@stores/wallet";
 import { useTranslation } from "react-i18next";
 
 export interface ChecklistItem {

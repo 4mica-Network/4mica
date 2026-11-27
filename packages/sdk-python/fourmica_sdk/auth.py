@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from http import HTTPStatus
+from typing import Any
 
 import httpx
 
@@ -26,7 +27,7 @@ class AuthTokens:
     expires_in: int
 
     @classmethod
-    def from_payload(cls, payload: Dict[str, Any]) -> "AuthTokens":
+    def from_payload(cls, payload: dict[str, Any]) -> AuthTokens:
         def require(key: str) -> Any:
             if key not in payload or payload[key] is None:
                 raise AuthDecodeError(f"missing auth token field: {key}")
@@ -54,7 +55,7 @@ class SiweTemplate:
     issued_at: str
 
     @classmethod
-    def from_payload(cls, payload: Dict[str, Any]) -> "SiweTemplate":
+    def from_payload(cls, payload: dict[str, Any]) -> SiweTemplate:
         def pick(*keys: str) -> Any:
             for key in keys:
                 if key in payload and payload[key] is not None:
@@ -88,7 +89,7 @@ class AuthNonceResponse:
     siwe: SiweTemplate
 
     @classmethod
-    def from_payload(cls, payload: Dict[str, Any]) -> "AuthNonceResponse":
+    def from_payload(cls, payload: dict[str, Any]) -> AuthNonceResponse:
         if not isinstance(payload, dict):
             raise AuthDecodeError("invalid nonce response payload")
         if "siwe" not in payload or payload["siwe"] is None:
@@ -117,9 +118,7 @@ def build_siwe_message(template: SiweTemplate, address: str, nonce: str) -> str:
 
 
 class AuthClient:
-    def __init__(
-        self, auth_url: str, client: Optional[httpx.AsyncClient] = None
-    ) -> None:
+    def __init__(self, auth_url: str, client: httpx.AsyncClient | None = None) -> None:
         try:
             auth_url = validate_url(auth_url)
         except ValidationError as exc:
@@ -187,8 +186,8 @@ class AuthSession:
     def __init__(
         self,
         client: AuthClient,
-        wallet_private_key: Optional[str] = None,
-        evm_signer: Optional[EvmSigner] = None,
+        wallet_private_key: str | None = None,
+        evm_signer: EvmSigner | None = None,
         refresh_margin_secs: int = 60,
     ) -> None:
         if refresh_margin_secs < 0:
@@ -205,8 +204,8 @@ class AuthSession:
         self._signer = evm_signer
         self._address = evm_signer.address
         self._refresh_margin_secs = refresh_margin_secs
-        self._tokens: Optional[AuthTokens] = None
-        self._expires_at: Optional[float] = None
+        self._tokens: AuthTokens | None = None
+        self._expires_at: float | None = None
         self._lock = asyncio.Lock()
 
     async def aclose(self) -> None:
@@ -216,10 +215,12 @@ class AuthSession:
         self._tokens = tokens
         self._expires_at = time.time() + max(tokens.expires_in, 0)
 
-    def _token_valid(self) -> bool:
-        if not self._tokens or self._expires_at is None:
-            return False
-        return time.time() < (self._expires_at - self._refresh_margin_secs)
+    def _valid_tokens(self) -> AuthTokens | None:
+        if self._tokens is None or self._expires_at is None:
+            return None
+        if time.time() >= self._expires_at - self._refresh_margin_secs:
+            return None
+        return self._tokens
 
     async def login(self) -> AuthTokens:
         async with self._lock:
@@ -236,13 +237,11 @@ class AuthSession:
         self._cache_tokens(tokens)
         return tokens
 
-    async def _refresh(self) -> AuthTokens:
-        if not self._tokens:
-            return await self._login_locked()
+    async def _refresh(self, current: AuthTokens) -> AuthTokens:
         try:
-            tokens = await self._client.refresh(self._tokens.refresh_token)
+            tokens = await self._client.refresh(current.refresh_token)
         except AuthStatusError as exc:
-            if exc.status_code == 401:
+            if exc.status_code == HTTPStatus.UNAUTHORIZED:
                 return await self._login_locked()
             raise
         self._cache_tokens(tokens)
@@ -250,21 +249,24 @@ class AuthSession:
 
     async def logout(self) -> None:
         async with self._lock:
-            if self._tokens:
-                try:
-                    await self._client.logout(self._tokens.refresh_token)
-                finally:
-                    self._tokens = None
-                    self._expires_at = None
+            if not self._tokens:
+                return
+            try:
+                await self._client.logout(self._tokens.refresh_token)
+            finally:
+                self._tokens = None
+                self._expires_at = None
 
     async def access_token(self) -> str:
-        if self._token_valid():
-            return self._tokens.access_token  # type: ignore[union-attr]
+        valid = self._valid_tokens()
+        if valid is not None:
+            return valid.access_token
         async with self._lock:
-            if self._token_valid():
-                return self._tokens.access_token  # type: ignore[union-attr]
-            if self._tokens:
-                tokens = await self._refresh()
-            else:
+            valid = self._valid_tokens()
+            if valid is not None:
+                return valid.access_token
+            if self._tokens is None:
                 tokens = await self._login_locked()
+            else:
+                tokens = await self._refresh(self._tokens)
             return tokens.access_token

@@ -1,7 +1,7 @@
 import { initials } from "@4mica/ui";
 import { ImageResponse } from "next/og";
 import { parseUsername } from "@/schema/params";
-import { getPublicProfile } from "@/services/profile";
+import { getAnonymousProfile } from "@/services/profile";
 import { SITE_NAME } from "@/services/seo";
 
 export const revalidate = 3600;
@@ -29,21 +29,19 @@ interface RouteContext {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const username = parseUsername((await params).username);
-  const result = username ? await getPublicProfile(username) : null;
+  const result = username ? await getAnonymousProfile(username) : null;
 
-  const isPublic = result?.profile.isPublished ?? false;
-  const profile = isPublic ? result?.profile : undefined;
+  const profile = result?.profile.isPublished ? result.profile : null;
 
-  const displayName = profile
-    ? truncate(profile.name || profile.username, NAME_LIMIT)
-    : SITE_NAME;
-  const handle = profile ? `@${profile.username}` : "4mica.io";
-  const blurb = profile
-    ? truncate(
-        profile.bio || "Agents and APIs on the 4Mica credit layer.",
-        BIO_LIMIT,
-      )
-    : "Credit-layer infrastructure for the agentic economy.";
+  if (!profile) {
+    return new Response(null, { status: 404 });
+  }
+
+  const displayName = truncate(profile.name || profile.username, NAME_LIMIT);
+  const blurb = truncate(
+    profile.bio || "Agents and APIs on the 4Mica credit layer.",
+    BIO_LIMIT,
+  );
 
   return new ImageResponse(
     <div
@@ -74,9 +72,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
             fontWeight: 600,
           }}
         >
-          {profile
-            ? initials(profile.name, profile.username)
-            : String.fromCodePoint(0x34)}
+          {initials(profile.name, profile.username)}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -90,7 +86,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
           >
             {displayName}
           </div>
-          <div style={{ color: COLORS.brand, fontSize: "32px" }}>{handle}</div>
+          <div style={{ color: COLORS.brand, fontSize: "32px" }}>
+            @{profile.username}
+          </div>
         </div>
       </div>
 
@@ -128,6 +126,12 @@ export async function GET(_request: Request, { params }: RouteContext) {
         {SITE_NAME}
       </div>
     </div>,
-    OG_SIZE,
+    {
+      ...OG_SIZE,
+      headers: {
+        "cache-control":
+          "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    },
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@4mica/ui";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { Flag } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { fileReport } from "@/actions/trust";
 import { messages } from "@/i18n";
 import { REPORT_REASONS, type ReportReason } from "@/schema/trust";
@@ -34,6 +34,7 @@ const ERRORS: Record<string, string> = {
   invalid_report: messages.trust.errorInvalidReport,
   not_found: messages.trust.errorNotFound,
   own_resource: messages.trust.errorReportOwn,
+  rate_limited: messages.trust.errorRateLimited,
 };
 
 export function ReportDialog({
@@ -48,6 +49,14 @@ export function ReportDialog({
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
   const reduceMotion = useReducedMotion();
+  const panelId = useId();
+  const thanks = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (done) {
+      thanks.current?.focus();
+    }
+  }, [done]);
 
   const send = () => {
     setError(null);
@@ -73,13 +82,21 @@ export function ReportDialog({
 
   if (done) {
     return (
-      <p className="text-ink-muted text-sm">{messages.trust.reportThanks}</p>
+      <p
+        className="text-ink-muted text-sm"
+        ref={thanks}
+        role="status"
+        tabIndex={-1}
+      >
+        {messages.trust.reportThanks}
+      </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
       <button
+        aria-controls={panelId}
         aria-expanded={open}
         className="inline-flex items-center gap-1.5 self-start text-ink-subtle text-sm transition-colors hover:text-ink-body"
         onClick={() => setOpen((value) => !value)}
@@ -91,9 +108,10 @@ export function ReportDialog({
 
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <m.div
             animate={{ height: "auto", opacity: 1 }}
-            className="overflow-hidden"
+            className="-mx-1 overflow-hidden px-1"
+            id={panelId}
             exit={{ height: 0, opacity: 0 }}
             initial={{ height: 0, opacity: 0 }}
             transition={
@@ -106,10 +124,14 @@ export function ReportDialog({
             }
           >
             {canReport ? (
-              <div className="flex flex-col gap-3 pt-1">
-                <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-col gap-3 pt-1 pb-1">
+                <fieldset
+                  aria-label={messages.trust.reportReasonLabel}
+                  className="m-0 flex min-w-0 flex-wrap gap-1.5"
+                >
                   {REPORT_REASONS.map((value) => (
                     <button
+                      aria-pressed={value === reason}
                       className={
                         value === reason
                           ? "rounded-full border border-overlay/30 bg-overlay/10 px-3 py-1 text-ink-strong text-xs"
@@ -122,10 +144,11 @@ export function ReportDialog({
                       {REASON_LABEL[value]}
                     </button>
                   ))}
-                </div>
+                </fieldset>
 
                 <textarea
-                  className="w-full rounded-md border border-overlay/15 bg-transparent px-3 py-2 text-ink-body text-sm outline-none placeholder:text-ink-subtle focus:border-overlay/30"
+                  aria-label={messages.trust.reportDetailLabel}
+                  className="w-full rounded-md border border-overlay/15 bg-transparent px-3 py-2 text-ink-body text-sm placeholder:text-ink-subtle"
                   maxLength={2000}
                   onChange={(event) => setDetail(event.target.value)}
                   placeholder={messages.trust.reportPlaceholder}
@@ -148,7 +171,11 @@ export function ReportDialog({
                   </span>
                 </div>
 
-                {error && <p className="text-danger text-sm">{error}</p>}
+                {error && (
+                  <p className="text-danger text-sm" role="alert">
+                    {error}
+                  </p>
+                )}
               </div>
             ) : (
               <p className="pt-1 text-ink-muted text-sm">
@@ -161,7 +188,7 @@ export function ReportDialog({
                 </a>
               </p>
             )}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

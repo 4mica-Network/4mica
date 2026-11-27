@@ -2,9 +2,6 @@ import { Button, EmptyState, Pagination } from "@4mica/ui";
 import {
   batchDeleteCustomers,
   fetchCustomers,
-  setCustomerPage,
-} from "@stores/customer/actions";
-import {
   selectCustomerError,
   selectCustomerFilters,
   selectCustomerLimit,
@@ -14,7 +11,8 @@ import {
   selectHasLoadedCustomers,
   selectIsCustomersLoading,
   selectSelectedCustomerIds,
-} from "@stores/customer/selector";
+  setCustomerPage,
+} from "@stores/customer";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
 import { Plus, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -13,7 +13,7 @@ import {
   NAME_MIN_LENGTH,
 } from "@utils/user-rules";
 import { hasErrors } from "@utils/validation";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { EditableCard } from "@/components/EditableCard";
@@ -23,6 +23,7 @@ import { SettingsPage } from "@/components/SettingsPage";
 import { useDraft } from "@/hooks/useDraft";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { clearVerifyToken, readVerifyToken } from "@/lib/verifyToken";
 import { CredentialsSection } from "./CredentialsSection";
 
 const TEXT_MAX_LENGTH = 2000;
@@ -46,6 +47,7 @@ function useVerificationOutcome() {
       content: t(`page.settings.profile.verify.${outcome}.body`, {
         defaultValue: "",
       }),
+      options: { toastId: `verify-outcome-${outcome}` },
     });
 
     setParams({}, { replace: true });
@@ -53,21 +55,12 @@ function useVerificationOutcome() {
 }
 
 function useVerificationToken() {
-  const [params, setParams] = useSearchParams();
-  const token = params.get("verifyToken");
+  const [token, setToken] = useState(readVerifyToken);
 
-  const clear = useCallback(
-    () =>
-      setParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("verifyToken");
-          return next;
-        },
-        { replace: true },
-      ),
-    [setParams],
-  );
+  const clear = useCallback(() => {
+    clearVerifyToken();
+    setToken(null);
+  }, []);
 
   return { token, clear };
 }

@@ -1,20 +1,21 @@
 import { slugify } from "@4mica/rules";
 import { Button, Modal } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createApiListing } from "@stores/apiListing/actions";
 import {
+  clearApiListingIssues,
+  createApiListing,
   selectApiListingError,
   selectApiListingIssues,
   selectIsApiListingPending,
-} from "@stores/apiListing/selector";
+} from "@stores/apiListing";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import { fetchActiveWallets } from "@stores/wallet/actions";
-import { selectSellerWallets } from "@stores/wallet/selector";
+import { fetchActiveWallets, selectSellerWallets } from "@stores/wallet";
 import { blankToNull } from "@utils/format";
 import { ArrowUpRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { shallowEqual } from "react-redux";
 import { Form } from "@/components/form";
 import { StepIndicator } from "@/components/Onboarding/StepIndicator";
 import { fromAssetFormValue, NATIVE_ASSET } from "@/components/PriceField";
@@ -45,7 +46,7 @@ export function CreateApiListingModal({
   const isSaving = useAppSelector(selectIsApiListingPending(PENDING_KEY));
   const error = useAppSelector(selectApiListingError);
   const issues = useAppSelector(selectApiListingIssues);
-  const wallets = useAppSelector(selectSellerWallets);
+  const wallets = useAppSelector(selectSellerWallets, shallowEqual);
 
   const [step, setStep] = useState(0);
   useStepWithIssue(issues, CREATE_STEP_FIELDS, setStep);
@@ -96,6 +97,7 @@ export function CreateApiListingModal({
     }
     reset();
     setStep(0);
+    dispatch(clearApiListingIssues());
     dispatch(fetchActiveWallets());
   }, [isOpen, reset, dispatch]);
 
@@ -162,6 +164,7 @@ export function CreateApiListingModal({
 
   return (
     <Modal
+      closeLabel={t("modal.close")}
       isOpen={isOpen}
       onClose={onClose}
       title={t("apiListing.create.title")}

@@ -3,6 +3,7 @@ import { cn, Segmented, Tooltip } from "@4mica/ui";
 import type { WalletBalance } from "@stores/balance/type";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
 import { ROLE_LABEL_KEYS } from "@/pages/wallet/constants";
 import { type AssetTotal, collateralRows, formatBalance } from "./metrics";
 import { Panel } from "./Panel";
@@ -119,7 +120,9 @@ export function CollateralTable({
                 <td className="px-3 py-3 text-right font-mono text-ink-strong tabular-nums">
                   {asset && row.total > 0n ? (
                     <>
-                      {formatBalance(row.available, asset.decimals)}{" "}
+                      <Masked>
+                        {formatBalance(row.available, asset.decimals)}
+                      </Masked>{" "}
                       <span className="text-ink-subtle text-xs">
                         {asset.symbol}
                       </span>
@@ -133,7 +136,9 @@ export function CollateralTable({
                 <td className="px-3 py-3 text-right font-mono tabular-nums">
                   {asset && row.locked > 0n ? (
                     <span className="text-ink-body">
-                      {formatBalance(row.locked, asset.decimals)}
+                      <Masked>
+                        {formatBalance(row.locked, asset.decimals)}
+                      </Masked>
                     </span>
                   ) : (
                     <span className="text-ink-subtle">—</span>

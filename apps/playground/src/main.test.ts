@@ -1,13 +1,16 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isReservedSegment, reservedSegments } from "@4mica/url";
-import { describe, expect, it } from "vitest";
-import { parseEnv, parsePublicEnv } from "@/env";
+import { describe, expect, it, vi } from "vitest";
+import { parsePublicEnv } from "@/env";
+import { parseEnv } from "@/env.server";
 import { parseIdOrSlug, parseUsername } from "@/schema/params";
 // The pure rules module, not @/services/profile — that one imports server-only,
 // Prisma and Clerk, none of which belong in a unit test.
 import { isProfileRenderable, toPublicProfile } from "@/services/profile-rules";
 import { safeBrandColor } from "@/utils/brandColor";
+
+vi.mock("server-only", () => ({}));
 
 const VALID_ENV = {
   DATABASE_URL: "postgresql://u:p@127.0.0.1:5433/db?schema=public",
@@ -23,6 +26,16 @@ describe("env contract", () => {
     expect(() =>
       parseEnv({ ...VALID_ENV, DATABASE_URL: "mysql://u:p@host/db" }),
     ).toThrow(/postgres/);
+  });
+
+  it("accepts an unset VALKEY_URL and rejects a non-redis one", () => {
+    expect(parseEnv(VALID_ENV).VALKEY_URL).toBe("");
+    expect(
+      parseEnv({ ...VALID_ENV, VALKEY_URL: "rediss://valkey:6380" }).VALKEY_URL,
+    ).toBe("rediss://valkey:6380");
+    expect(() =>
+      parseEnv({ ...VALID_ENV, VALKEY_URL: "valkey://valkey:6379" }),
+    ).toThrow(/redis:\/\//);
   });
 
   it("rejects a Clerk secret that is not sk_-prefixed", () => {
@@ -42,6 +55,46 @@ describe("env contract", () => {
     expect(() =>
       parsePublicEnv({ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "sk_test_leak" }),
     ).toThrow(/must start with pk_/);
+  });
+
+  describe("in a deployed build", () => {
+    const PROD = {
+      NEXT_PUBLIC_BASE_URL: "https://4mica.io",
+      NEXT_PUBLIC_APP_URL: "https://app.4mica.io",
+      NEXT_PUBLIC_ASSET_PREFIX: "/p",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_abc",
+    };
+    const parse = (overrides: Partial<typeof PROD>) =>
+      parsePublicEnv({ ...PROD, ...overrides }, { strict: true });
+
+    it("accepts the deployed configuration", () => {
+      expect(parse({}).NEXT_PUBLIC_ASSET_PREFIX).toBe("/p");
+      expect(
+        parse({ NEXT_PUBLIC_BASE_URL: "https://dev.4mica.io" }),
+      ).toBeTruthy();
+    });
+
+    it.each([
+      ["NEXT_PUBLIC_BASE_URL", "http://4mica.io", /must use https:/],
+      ["NEXT_PUBLIC_APP_URL", "ftp://app.4mica.io", /must use https:/],
+      ["NEXT_PUBLIC_APP_URL", "javascript:alert(1)", /must use https:/],
+      ["NEXT_PUBLIC_BASE_URL", "https://4mica.io.evil.test", /not 4mica\.io/],
+      ["NEXT_PUBLIC_APP_URL", "https://evil4mica.io", /not 4mica\.io/],
+      ["NEXT_PUBLIC_ASSET_PREFIX", "", /must be \/p/],
+      ["NEXT_PUBLIC_ASSET_PREFIX", "/q", /must be \/p/],
+    ])("rejects %s=%s", (key, value, message) => {
+      expect(() => parse({ [key]: value })).toThrow(message);
+    });
+
+    it("allows a strict build against localhost without the prefix", () => {
+      expect(
+        parse({
+          NEXT_PUBLIC_BASE_URL: "http://localhost:3100",
+          NEXT_PUBLIC_APP_URL: "http://localhost:4173",
+          NEXT_PUBLIC_ASSET_PREFIX: "",
+        }).NEXT_PUBLIC_BASE_URL,
+      ).toBe("http://localhost:3100");
+    });
   });
 
   it("defaults the app URL to the base URL", () => {
@@ -395,6 +448,28 @@ describe("reserved segments vs nginx", () => {
     expect(profileRule).toBeLessThan(catchAll);
     expect(nginxConf).toMatch(
       /location ~ \^\/\[\^\/\]\+\/llms\\\.txt\$\s+{[^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
+  it("rate-limits the handle namespace, with a tighter budget for writes", () => {
+    expect(nginxConf).toMatch(
+      /limit_req_zone \$mica_write_key\s+zone=mica_write:/,
+    );
+    expect(nginxConf).toMatch(
+      /map \$request_method \$mica_write_key {[^}]*POST\s+\$binary_remote_addr;/,
+    );
+    expect(nginxConf).toMatch(
+      /location \/ {[^}]*limit_req zone=mica_pages [^}]*limit_req zone=mica_write [^}]*proxy_pass [^;]*mica_playground;/,
+    );
+    expect(nginxConf).toMatch(
+      /location \^~ \/api\/ {[^}]*limit_req zone=mica_pages [^}]*proxy_pass [^;]*mica_playground;/,
+    );
+  });
+
+  it("hides /api/health from public clients at the edge", () => {
+    expect(nginxConf).toMatch(/geo \$mica_internal {[^}]*default\s+0;/);
+    expect(nginxConf).toMatch(
+      /location = \/api\/health {\s*if \(\$mica_internal = 0\) {\s*return 404;\s*}[^}]*proxy_pass [^;]*mica_playground;/,
     );
   });
 

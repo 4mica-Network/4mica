@@ -1,15 +1,13 @@
-import { Button, Spinner } from "@4mica/ui";
+import { Button } from "@4mica/ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "@stores/hooks";
-import {
-  supportPendingKeys,
-  updateSupportRequest,
-} from "@stores/support/actions";
 import {
   selectIsSupportPending,
   selectSupportError,
   selectSupportIssues,
-} from "@stores/support/selector";
+  supportPendingKeys,
+  updateSupportRequest,
+} from "@stores/support";
 import type {
   SupportCategory,
   SupportRequestDetail,
@@ -20,6 +18,7 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { Form } from "@/components/form";
+import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 import { useServerIssues } from "@/hooks/useServerIssues";
 import { categoryLabelKey, PRIORITY_LABEL_KEYS } from "@/pages/help/constants";

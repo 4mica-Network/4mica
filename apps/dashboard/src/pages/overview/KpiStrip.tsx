@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Masked } from "@/components/Masked";
 import {
   type AssetTotal,
   formatAmount,
@@ -57,7 +58,7 @@ function Kpi({
 function Figure({ value, unit }: { value: string; unit?: string }) {
   return (
     <span className="block truncate font-mono font-semibold text-2xl text-ink-strong tabular-nums tracking-tight">
-      {value}
+      <Masked>{value}</Masked>
       {unit && (
         <span className="ml-1.5 font-normal font-sans text-ink-subtle text-xs">
           {unit}

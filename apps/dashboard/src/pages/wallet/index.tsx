@@ -4,9 +4,6 @@ import {
   batchDeleteWallets,
   deleteWallet,
   fetchWallets,
-  setWalletPage,
-} from "@stores/wallet/actions";
-import {
   selectHasLoadedWallets,
   selectIsWalletsLoading,
   selectSelectedWalletIds,
@@ -16,7 +13,8 @@ import {
   selectWalletPage,
   selectWallets,
   selectWalletTotal,
-} from "@stores/wallet/selector";
+  setWalletPage,
+} from "@stores/wallet";
 import type { Wallet as WalletType } from "@stores/wallet/type";
 import { ArrowUpRight, Plus, TriangleAlert, WalletMinimal } from "lucide-react";
 import { useEffect, useState } from "react";

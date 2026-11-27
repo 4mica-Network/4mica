@@ -114,3 +114,13 @@ export const selectIsCustomerDetailLoading = (state: RootState): boolean =>
 
 export const selectHasLoadedCustomerDetail = (state: RootState): boolean =>
   state.customer.detail.hasLoaded;
+
+export const selectCustomerDetailLoadError = (
+  state: RootState,
+): string | null => state.customer.detail.loadError;
+
+export const selectCustomerDetailNotFound = (state: RootState): boolean =>
+  state.customer.detail.notFound;
+
+export const selectCustomerDetailId = (state: RootState): string | null =>
+  state.customer.detail.id;
