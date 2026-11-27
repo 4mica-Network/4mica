@@ -4,6 +4,12 @@ import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 import {
+  APPROVAL_HEADERS,
+  approvedFor,
+  governOff,
+  governOn,
+} from "@/test-support/governance";
+import {
   actAs,
   ORG_ID,
   OTHER_ORG_ID,
@@ -24,7 +30,16 @@ const {
   resourcePolicy,
   faqItem,
   tenancy,
+  governance,
 } = vi.hoisted(() => ({
+  governance: {
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -55,6 +70,7 @@ vi.mock("@clerk/backend", () => ({
 vi.mock("@4mica/db", () => ({
   prisma: {
     ...tenancy,
+    ...governance,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     apiKey,
@@ -226,6 +242,7 @@ describe("resource key routes", () => {
     }
     clearUserCache();
     actAs(tenancy);
+    governOff(governance);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -771,6 +788,62 @@ describe("resource key routes", () => {
         deletedAt: null,
       });
       await instance.close();
+    });
+  });
+
+  describe("governed production keys", () => {
+    const create = async (headers: Record<string, string> = {}) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "POST",
+        url: `/me/api-listings/${LISTING_ID}/keys`,
+        headers: { ...AUTH, "x-environment": "production", ...headers },
+        payload: { name: "Production", scopes: ["RESOURCE_READ"] },
+      });
+      await instance.close();
+      return res;
+    };
+    const payload = {
+      projectId: PROJECT_ID,
+      kind: "listing",
+      resourceId: LISTING_ID,
+      name: "Production",
+      scopes: ["RESOURCE_READ"],
+    };
+
+    beforeEach(() => {
+      governOn(governance, "api_key.create_production");
+    });
+
+    it("asks for approval before minting a production resource key", async () => {
+      const res = await create();
+
+      expect(res.statusCode).toBe(202);
+      expect(
+        governance.approvalRequest.create.mock.calls[0][0].data.payload,
+      ).toEqual(payload);
+      expect(apiKey.create).not.toHaveBeenCalled();
+    });
+
+    it("mints the key with a matching approval", async () => {
+      approvedFor(governance, "api_key.create_production", payload);
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(201);
+      expect(apiKey.create).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an approval for another resource", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        ...payload,
+        resourceId: AGENT_ID,
+      });
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(409);
+      expect(apiKey.create).not.toHaveBeenCalled();
     });
   });
 });

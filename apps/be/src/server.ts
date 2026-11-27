@@ -6,6 +6,10 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { loadUser } from "./auth/user-store";
 import { config, productionWarnings } from "./config/index";
 import {
+  startAuditRetention,
+  stopAuditRetention,
+} from "./jobs/audit-retention/index";
+import {
   startOnboardingDrip,
   stopOnboardingDrip,
 } from "./jobs/onboarding/index";
@@ -82,6 +86,8 @@ export const initApp = async (
   registerPlaygroundRevalidation(app);
 
   app.addHook("onClose", stopOnboardingDrip);
+
+  app.addHook("onClose", stopAuditRetention);
 
   app.addHook("onClose", closeCoreClient);
 
@@ -259,6 +265,7 @@ export const runServer = async (): Promise<FastifyInstance> => {
   }
 
   await startOnboardingDrip(app);
+  await startAuditRetention();
 
   return app;
 };

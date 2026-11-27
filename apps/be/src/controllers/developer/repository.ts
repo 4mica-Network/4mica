@@ -2,9 +2,9 @@ import { type ApiKeyScope, type Prisma, prisma } from "@4mica/db";
 import { type ResourceScope, scopeData, scopeWhere } from "@utils/scope";
 import { generateApiKey, generateWebhookSecret } from "@utils/secrets";
 import {
-  API_KEY_SCOPES,
   type CreateApiKeyInput,
   type CreateWebhookInput,
+  DEFAULT_API_KEY_SCOPES,
   type UpdateApiKeyInput,
   type UpdateWebhookInput,
 } from "./schema";
@@ -44,7 +44,7 @@ export const findApiKey = async (id: string): Promise<ApiKeyRow | null> => {
 };
 
 export const scopesOrAll = (scopes: ApiKeyScope[] | undefined) =>
-  scopes ?? [...API_KEY_SCOPES];
+  scopes ?? [...DEFAULT_API_KEY_SCOPES];
 
 export const WEBHOOK_SELECT = {
   id: true,

@@ -170,6 +170,7 @@ export const auditProject = (
     },
     {
       ...entry,
+      projectId: scope.projectId,
       metadata: {
         projectId: scope.projectId,
         environment: scope.environment,

@@ -226,6 +226,12 @@ const findMember = (tx: Tx, orgId: string, userId: string) =>
     select: MEMBER_SELECT,
   });
 
+export const findMemberRole = (orgId: string, userId: string) =>
+  prisma.membership.findUnique({
+    where: { organizationId_userId: { organizationId: orgId, userId } },
+    select: { role: true, user: { select: { name: true } } },
+  });
+
 export type MembershipChange =
   | { ok: true; member: Member | null }
   | { ok: false; reason: "not_found" | "last_owner" | "owner_only" };

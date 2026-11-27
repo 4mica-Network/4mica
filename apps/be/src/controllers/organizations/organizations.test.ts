@@ -1,9 +1,15 @@
-import type { OrgRole } from "@4mica/db";
+import { type OrgRole, Prisma } from "@4mica/db";
 import { clearUserCache } from "@auth/user-store";
 import { organizationRoutes } from "@routes/organizations";
 import { hashSecret } from "@utils/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
+import {
+  APPROVAL_HEADERS,
+  APPROVAL_ID,
+  approvedFor,
+  governOn,
+} from "@/test-support/governance";
 import {
   actAs,
   membershipRow,
@@ -44,6 +50,12 @@ const { authenticateRequest, getUser, db } = vi.hoisted(() => {
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
     $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   };
@@ -54,7 +66,14 @@ vi.mock("@clerk/backend", () => ({
   createClerkClient: vi.fn(() => ({ authenticateRequest, users: { getUser } })),
 }));
 
-vi.mock("@4mica/db", () => ({ prisma: db, disconnect: vi.fn(async () => {}) }));
+vi.mock("@4mica/db", async () => {
+  const { sqltag, join, empty } = await import("@prisma/client/runtime/client");
+  return {
+    Prisma: { sql: sqltag, join, empty },
+    prisma: db,
+    disconnect: vi.fn(async () => {}),
+  };
+});
 
 const USER_ID = "019fce62-0000-7000-8000-000000000000";
 const OTHER_USER_ID = "019fce62-0000-7000-8000-000000000001";
@@ -204,11 +223,12 @@ describe("organization routes", () => {
           "resources.write",
           "resources.read",
           "payments.read",
+          "finance.read",
         ],
       });
       expect(body.items[2]).toMatchObject({
         role: "VIEWER",
-        permissions: ["resources.read", "payments.read"],
+        permissions: ["resources.read", "payments.read", "finance.read"],
       });
       expect(db.membership.findMany.mock.calls[0][0].where).toMatchObject({
         userId: USER_ID,
@@ -629,6 +649,7 @@ describe("organization routes", () => {
       [undefined, "DEVELOPER"],
       ["DEVELOPER", "DEVELOPER"],
       ["VIEWER", "VIEWER"],
+      ["FINANCE", "FINANCE"],
     ] as const)("invites with role %s as %s", async (requested, stored) => {
       actInTeam("ADMIN");
       db.membership.findMany.mockResolvedValue([]);
@@ -882,6 +903,297 @@ describe("organization routes", () => {
     });
   });
 
+  describe("the finance role", () => {
+    it("gives finance read access, approvals and finance management but no keys or members", async () => {
+      db.membership.findMany.mockResolvedValue([
+        { role: "FINANCE", organization: orgRow() },
+      ]);
+      db.user.findUnique.mockResolvedValue({ defaultOrganizationId: null });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: "/me/organizations",
+        headers: AUTH,
+      });
+
+      expect(res.json().items[0]).toMatchObject({
+        role: "FINANCE",
+        permissions: [
+          "resources.read",
+          "payments.read",
+          "finance.read",
+          "finance.manage",
+          "approvals.decide",
+          "reports.export",
+        ],
+      });
+
+      await instance.close();
+    });
+
+    it("lets an admin make someone finance", async () => {
+      actInTeam("ADMIN");
+      db.$queryRaw.mockResolvedValue([{ id: "m1" }]);
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
+      );
+      db.membership.update.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "FINANCE"),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/organization/members/${OTHER_USER_ID}`,
+        headers: TEAM,
+        payload: { role: "FINANCE" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().role).toBe("FINANCE");
+      expect(db.membership.update.mock.calls[0][0].data).toEqual({
+        role: "FINANCE",
+      });
+
+      await instance.close();
+    });
+  });
+
+  describe("governed role grants", () => {
+    const patchRole = async (
+      role: string,
+      headers: Record<string, string> = {},
+    ) => {
+      const instance = await app();
+      const res = await instance.inject({
+        method: "PATCH",
+        url: `/me/organization/members/${OTHER_USER_ID}`,
+        headers: { ...TEAM, ...headers },
+        payload: { role },
+      });
+      await instance.close();
+      return res;
+    };
+
+    beforeEach(() => {
+      actInTeam("OWNER");
+      governOn(db, "member.role_grant");
+      db.$queryRaw.mockResolvedValue([{ id: "m1" }]);
+      db.membership.findUnique.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "DEVELOPER"),
+      );
+      db.membership.update.mockResolvedValue(memberRow(OTHER_USER_ID, "ADMIN"));
+    });
+
+    it.each([
+      "ADMIN",
+      "FINANCE",
+      "OWNER",
+    ])("asks for approval before granting %s", async (role) => {
+      const res = await patchRole(role);
+
+      expect(res.statusCode).toBe(202);
+      expect(res.json().approvalRequest.id).toBe(APPROVAL_ID);
+      expect(db.approvalRequest.create.mock.calls[0][0].data).toMatchObject({
+        organizationId: ORG_ID,
+        action: "member.role_grant",
+        requestedById: USER_ID,
+        payload: { kind: "role_change", userId: OTHER_USER_ID, role },
+      });
+      expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("does not govern lowering someone to developer or viewer", async () => {
+      db.membership.update.mockResolvedValue(
+        memberRow(OTHER_USER_ID, "VIEWER"),
+      );
+
+      const res = await patchRole("VIEWER");
+
+      expect(res.statusCode).toBe(200);
+      expect(db.governanceSettings.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("404s before asking for approval for someone who is not a member", async () => {
+      db.membership.findUnique.mockResolvedValue(null);
+
+      const res = await patchRole("ADMIN");
+
+      expect(res.statusCode).toBe(404);
+      expect(db.approvalRequest.create).not.toHaveBeenCalled();
+    });
+
+    it("grants the role with a matching approval", async () => {
+      approvedFor(db, "member.role_grant", {
+        kind: "role_change",
+        userId: OTHER_USER_ID,
+        role: "ADMIN",
+      });
+
+      const res = await patchRole("ADMIN", APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(200);
+      expect(db.membership.update).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an approval granted for a different role", async () => {
+      approvedFor(db, "member.role_grant", {
+        kind: "role_change",
+        userId: OTHER_USER_ID,
+        role: "FINANCE",
+      });
+
+      const res = await patchRole("ADMIN", APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("approval_invalid");
+      expect(db.membership.update).not.toHaveBeenCalled();
+    });
+
+    it("asks for approval before inviting an admin, and invites with one", async () => {
+      actInTeam("ADMIN");
+      governOn(db, "member.role_grant");
+      db.membership.findMany.mockResolvedValue([]);
+      db.membership.findFirst.mockImplementation(async () => ({
+        ...membershipRow("ADMIN", ORG_ID, false),
+        organization: { ...orgRow() },
+      }));
+      db.invitation.create.mockImplementation(
+        async ({ data }: { data: { email: string; role: string } }) => ({
+          id: INVITATION_ID,
+          email: data.email,
+          role: data.role,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          createdAt: new Date(),
+          invitedBy: { id: USER_ID, name: "Ada Lovelace" },
+        }),
+      );
+      const instance = await app();
+      const invite = (headers: Record<string, string> = {}) =>
+        instance.inject({
+          method: "POST",
+          url: "/me/organization/invitations",
+          headers: { ...TEAM, ...headers },
+          payload: {
+            emails: ["grace@example.com", "alan@example.com"],
+            role: "ADMIN",
+          },
+        });
+
+      const asked = await invite();
+      expect(asked.statusCode).toBe(202);
+      expect(db.approvalRequest.create.mock.calls[0][0].data.payload).toEqual({
+        kind: "invitation",
+        emails: ["alan@example.com", "grace@example.com"],
+        role: "ADMIN",
+      });
+      expect(db.invitation.create).not.toHaveBeenCalled();
+
+      approvedFor(db, "member.role_grant", {
+        kind: "invitation",
+        emails: ["alan@example.com", "grace@example.com"],
+        role: "ADMIN",
+      });
+      const done = await invite(APPROVAL_HEADERS);
+      expect(done.statusCode).toBe(201);
+      expect(db.invitation.create).toHaveBeenCalledTimes(2);
+
+      await instance.close();
+    });
+
+    it("does not govern inviting a developer", async () => {
+      db.membership.findMany.mockResolvedValue([]);
+      db.membership.findFirst.mockImplementation(async () => ({
+        ...membershipRow("OWNER", ORG_ID, false),
+        organization: { ...orgRow() },
+      }));
+      db.invitation.create.mockImplementation(
+        async ({ data }: { data: { email: string; role: string } }) => ({
+          id: INVITATION_ID,
+          email: data.email,
+          role: data.role,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          createdAt: new Date(),
+          invitedBy: { id: USER_ID, name: "Ada Lovelace" },
+        }),
+      );
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/invitations",
+        headers: TEAM,
+        payload: { emails: ["grace@example.com"], role: "DEVELOPER" },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(db.approvalRequest.create).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("asks for approval before transferring ownership", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/transfer",
+        headers: TEAM,
+        payload: { userId: OTHER_USER_ID },
+      });
+
+      expect(res.statusCode).toBe(202);
+      expect(db.approvalRequest.create.mock.calls[0][0].data.payload).toEqual({
+        kind: "transfer",
+        userId: OTHER_USER_ID,
+      });
+      expect(db.membership.update).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("transfers ownership with a matching approval", async () => {
+      approvedFor(db, "member.role_grant", {
+        kind: "transfer",
+        userId: OTHER_USER_ID,
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/transfer",
+        headers: { ...TEAM, ...APPROVAL_HEADERS },
+        payload: { userId: OTHER_USER_ID },
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(db.membership.update).toHaveBeenCalledTimes(2);
+
+      await instance.close();
+    });
+
+    it("refuses a transfer approval granted for someone else", async () => {
+      approvedFor(db, "member.role_grant", {
+        kind: "transfer",
+        userId: "019fce62-0000-7000-8000-000000000009",
+      });
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/me/organization/transfer",
+        headers: { ...TEAM, ...APPROVAL_HEADERS },
+        payload: { userId: OTHER_USER_ID },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(db.membership.update).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+  });
+
   describe("audit log", () => {
     it.each([
       "DEVELOPER",
@@ -903,13 +1215,38 @@ describe("organization routes", () => {
       await instance.close();
     });
 
+    const LOG_A = "019fce62-0000-7000-8000-00000000a003";
+    const LOG_B = "019fce62-0000-7000-8000-00000000a002";
+    const LOG_C = "019fce62-0000-7000-8000-00000000a001";
+
+    const logRow = (id: string) => ({
+      id,
+      action: "org.updated",
+      createdAt: new Date(),
+      actor: null,
+    });
+
+    const rawSql = (call = 0) => {
+      const [strings, ...values] = db.$queryRaw.mock.calls[call] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      return Prisma.sql(strings, ...values);
+    };
+
+    beforeEach(() => {
+      db.$queryRaw.mockReset();
+      db.auditLog.findMany.mockReset();
+    });
+
     it("pages an admin through the organization's entries only", async () => {
       actInTeam("ADMIN");
-      db.auditLog.findMany.mockResolvedValue([
-        { id: "3", action: "org.updated", createdAt: new Date(), actor: null },
-        { id: "2", action: "org.updated", createdAt: new Date(), actor: null },
-        { id: "1", action: "org.updated", createdAt: new Date(), actor: null },
+      db.$queryRaw.mockResolvedValue([
+        { id: LOG_A },
+        { id: LOG_B },
+        { id: LOG_C },
       ]);
+      db.auditLog.findMany.mockResolvedValue([logRow(LOG_A), logRow(LOG_B)]);
       const instance = await app();
 
       const res = await instance.inject({
@@ -919,14 +1256,223 @@ describe("organization routes", () => {
       });
 
       expect(res.statusCode).toBe(200);
-      expect(res.json()).toMatchObject({ nextCursor: "2" });
+      expect(res.json()).toMatchObject({ nextCursor: LOG_B });
       expect(res.json().items).toHaveLength(2);
+      expect(rawSql().sql).toContain("l.organization_id = ?");
+      expect(rawSql().values).toEqual([ORG_ID, 3]);
       expect(db.auditLog.findMany.mock.calls[0][0]).toMatchObject({
-        where: { organizationId: ORG_ID },
-        take: 3,
+        where: { organizationId: ORG_ID, id: { in: [LOG_A, LOG_B] } },
       });
 
       await instance.close();
+    });
+
+    it("continues after the cursor", async () => {
+      actInTeam("ADMIN");
+      db.$queryRaw.mockResolvedValue([]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/organization/audit-logs?cursor=${LOG_B}`,
+        headers: TEAM,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ items: [], nextCursor: null });
+      expect(rawSql().sql).toContain("l.id <");
+      expect(rawSql().values).toContain(LOG_B);
+      expect(db.auditLog.findMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it.each([
+      ["from=2026-11-01", "l.created_at >=", new Date("2026-11-01T00:00:00Z")],
+      ["to=2026-11-01", "l.created_at <", new Date("2026-11-02T00:00:00Z")],
+      [
+        "to=2026-11-01T12:00:00Z",
+        "l.created_at <",
+        new Date("2026-11-01T12:00:00Z"),
+      ],
+      ["action=wallet.removed", "l.action =", "wallet.removed"],
+      ["actionPrefix=wallet.", "l.action LIKE", "wallet.%"],
+      ["actionPrefix=a_b%25", "l.action LIKE", "a\\_b\\%%"],
+      [`actorUserId=${OTHER_USER_ID}`, "l.actor_user_id =", OTHER_USER_ID],
+      [`actorApiKeyId=${LOG_C}`, "l.actor_api_key_id =", LOG_C],
+      ["targetType=wallet", "l.target_type =", "wallet"],
+      ["targetId=abc", "l.target_id =", "abc"],
+      [`projectId=${LOG_A}`, "l.project_id =", LOG_A],
+      ["q=0xABC", "l.metadata::text ILIKE", "%0xABC%"],
+    ] as const)("filters on %s", async (query, clause, value) => {
+      actInTeam("ADMIN");
+      db.$queryRaw.mockResolvedValue([]);
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/organization/audit-logs?${query}`,
+        headers: TEAM,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(rawSql().sql).toContain(clause);
+      expect(rawSql().values).toContainEqual(value);
+      expect(rawSql().values[0]).toBe(ORG_ID);
+
+      await instance.close();
+    });
+
+    it("searches the action, the target and the metadata", async () => {
+      actInTeam("ADMIN");
+      db.$queryRaw.mockResolvedValue([]);
+      const instance = await app();
+
+      await instance.inject({
+        method: "GET",
+        url: "/me/organization/audit-logs?q=stripe",
+        headers: TEAM,
+      });
+
+      expect(rawSql().sql).toMatch(
+        /l\.action ILIKE \?\s+OR l\.target_id ILIKE \?\s+OR l\.metadata::text ILIKE/,
+      );
+
+      await instance.close();
+    });
+
+    it.each([
+      "from=yesterday",
+      "from=2026-02-30",
+      "actorUserId=not-a-uuid",
+      "projectId=1",
+      "from=2026-11-02&to=2026-11-01",
+    ])("refuses %s", async (query) => {
+      actInTeam("ADMIN");
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "GET",
+        url: `/me/organization/audit-logs?${query}`,
+        headers: TEAM,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(db.$queryRaw).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    describe("export", () => {
+      const exportRow = (over: Record<string, unknown> = {}) => ({
+        id: LOG_A,
+        created_at: new Date("2026-11-20T10:00:00Z"),
+        action: "wallet.removed",
+        actor_user_id: USER_ID,
+        actor_name: '=HYPERLINK("http://evil")',
+        actor_api_key_id: null,
+        project_id: null,
+        target_type: "wallet",
+        target_id: "w1",
+        ip: "127.0.0.1",
+        metadata: { note: "a,b" },
+        ...over,
+      });
+
+      it("exports the filtered log as an audited CSV attachment", async () => {
+        actInTeam("ADMIN");
+        db.$queryRaw.mockResolvedValue([exportRow()]);
+        const instance = await app();
+
+        const res = await instance.inject({
+          method: "GET",
+          url: "/me/organization/audit-logs/export.csv?actionPrefix=wallet.&from=2026-11-01",
+          headers: TEAM,
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["content-type"]).toContain("text/csv");
+        expect(res.headers["content-disposition"]).toMatch(
+          /^attachment; filename="audit-log-\d{4}-\d{2}-\d{2}\.csv"$/,
+        );
+        expect(res.headers["x-truncated"]).toBe("false");
+
+        const lines = res.body.split("\r\n");
+        expect(lines[0]).toBe(
+          "id,created_at,action,actor_user_id,actor_name,actor_api_key_id,project_id,target_type,target_id,ip,metadata",
+        );
+        expect(lines[1]).toBe(
+          `${LOG_A},2026-11-20T10:00:00.000Z,wallet.removed,${USER_ID},"'=HYPERLINK(""http://evil"")",,,wallet,w1,127.0.0.1,"{""note"":""a,b""}"`,
+        );
+        expect(rawSql().values).toContain("wallet.%");
+
+        const exported = db.auditLog.create.mock.calls
+          .map((call) => call[0].data)
+          .find((data) => data.action === "report.exported");
+        expect(exported).toMatchObject({
+          organizationId: ORG_ID,
+          actorUserId: USER_ID,
+          targetId: "audit_logs",
+          metadata: {
+            report: "audit_logs",
+            filters: {
+              actionPrefix: "wallet.",
+              from: "2026-11-01T00:00:00.000Z",
+              to: null,
+            },
+            rows: 1,
+            truncated: false,
+          },
+        });
+
+        await instance.close();
+      });
+
+      it("says when the export was cut short", async () => {
+        actInTeam("OWNER");
+        db.$queryRaw.mockImplementation(
+          async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+            const take = values.at(-1) as number;
+            return Array.from({ length: take }, (_, index) =>
+              exportRow({ id: `${index}`.padStart(8, "0") }),
+            );
+          },
+        );
+        const instance = await app();
+
+        const res = await instance.inject({
+          method: "GET",
+          url: "/me/organization/audit-logs/export.csv",
+          headers: TEAM,
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["x-truncated"]).toBe("true");
+        expect(res.body.split("\r\n").filter(Boolean)).toHaveLength(50_001);
+
+        await instance.close();
+      });
+
+      it.each([
+        "FINANCE",
+        "DEVELOPER",
+        "VIEWER",
+      ] as const)("is refused to a %s", async (role) => {
+        actInTeam(role);
+        const instance = await app();
+
+        const res = await instance.inject({
+          method: "GET",
+          url: "/me/organization/audit-logs/export.csv",
+          headers: TEAM,
+        });
+
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toMatchObject({ permission: "audit.read" });
+        expect(db.$queryRaw).not.toHaveBeenCalled();
+
+        await instance.close();
+      });
     });
   });
 });

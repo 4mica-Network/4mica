@@ -3,6 +3,13 @@ import { developerRoutes } from "@routes/developer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 import {
+  APPROVAL_HEADERS,
+  APPROVAL_ID,
+  approvedFor,
+  governOff,
+  governOn,
+} from "@/test-support/governance";
+import {
   actAs,
   ORG_ID,
   OTHER_ORG_ID,
@@ -20,7 +27,16 @@ const {
   apiKey,
   webhook,
   tenancy,
+  governance,
 } = vi.hoisted(() => ({
+  governance: {
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -53,6 +69,7 @@ vi.mock("@clerk/backend", () => ({
 vi.mock("@4mica/db", () => ({
   prisma: {
     ...tenancy,
+    ...governance,
     agent: { count: vi.fn() },
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
@@ -137,6 +154,7 @@ describe("developer routes", () => {
     }
     clearUserCache();
     actAs(tenancy);
+    governOff(governance);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -630,6 +648,89 @@ describe("developer routes", () => {
       expect(apiKey.create).not.toHaveBeenCalled();
       expect(webhook.create).not.toHaveBeenCalled();
       await app.close();
+    });
+  });
+
+  describe("governed production keys", () => {
+    const create = (headers: Record<string, string> = {}) =>
+      initApp([{ plugin: developerRoutes }]).then(async (app) => {
+        const res = await app.inject({
+          method: "POST",
+          url: "/me/api-keys",
+          headers: { ...AUTH, "x-environment": "production", ...headers },
+          payload: { name: "CI", scopes: ["PAYMENTS_WRITE"] },
+        });
+        await app.close();
+        return res;
+      });
+
+    beforeEach(() => {
+      governOn(governance, "api_key.create_production");
+    });
+
+    it("asks for approval before minting a production key", async () => {
+      const res = await create();
+
+      expect(res.statusCode).toBe(202);
+      expect(res.json().approvalRequest.id).toBe(APPROVAL_ID);
+      expect(
+        governance.approvalRequest.create.mock.calls[0][0].data,
+      ).toMatchObject({
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        action: "api_key.create_production",
+        requestedById: USER_ID,
+        payload: {
+          projectId: PROJECT_ID,
+          kind: "account",
+          name: "CI",
+          scopes: ["PAYMENTS_WRITE"],
+        },
+      });
+      expect(apiKey.create).not.toHaveBeenCalled();
+    });
+
+    it("mints sandbox keys without asking", async () => {
+      const app = await initApp([{ plugin: developerRoutes }]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/me/api-keys",
+        headers: AUTH,
+        payload: { name: "CI" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(201);
+      expect(governance.governanceSettings.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("mints the key with a matching approval", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        projectId: PROJECT_ID,
+        kind: "account",
+        name: "CI",
+        scopes: ["PAYMENTS_WRITE"],
+      });
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(201);
+      expect(apiKey.create).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an approval for a different key", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        projectId: PROJECT_ID,
+        kind: "account",
+        name: "CI",
+        scopes: ["PAYMENTS_WRITE", "CUSTOMERS_READ"],
+      });
+
+      const res = await create(APPROVAL_HEADERS);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("approval_invalid");
+      expect(apiKey.create).not.toHaveBeenCalled();
     });
   });
 });

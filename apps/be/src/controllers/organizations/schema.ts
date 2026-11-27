@@ -3,10 +3,22 @@ import {
   USERNAME_MESSAGE,
   usernameUnavailableReason,
 } from "@4mica/url";
+import { isoInstant } from "@controllers/finance/schema";
 import { email, singleLine } from "@controllers/schema-primitives";
 import * as v from "valibot";
 
-export const ORG_ROLES = ["OWNER", "ADMIN", "DEVELOPER", "VIEWER"] as const;
+export const ORG_ROLES = [
+  "OWNER",
+  "ADMIN",
+  "DEVELOPER",
+  "VIEWER",
+  "FINANCE",
+] as const;
+export const GOVERNED_ROLES: readonly OrgRoleInput[] = [
+  "OWNER",
+  "ADMIN",
+  "FINANCE",
+];
 export const MAX_INVITES_PER_REQUEST = 20;
 export const INVITATION_TTL_DAYS = 7;
 export const AUDIT_PAGE_MAX = 100;
@@ -59,6 +71,26 @@ export const InviteMembersSchema = v.object({
   role: v.optional(RoleSchema, "DEVELOPER"),
 });
 
+const auditText = (max: number) =>
+  v.optional(v.pipe(v.string(), v.trim(), v.maxLength(max)));
+
+const auditId = v.optional(
+  v.pipe(v.string(), v.trim(), v.toLowerCase(), v.uuid()),
+);
+
+const AuditLogFilterEntries = {
+  from: v.optional(isoInstant),
+  to: v.optional(isoInstant),
+  action: auditText(64),
+  actionPrefix: auditText(64),
+  actorUserId: auditId,
+  actorApiKeyId: auditId,
+  targetType: auditText(64),
+  targetId: auditText(64),
+  projectId: auditId,
+  q: auditText(100),
+};
+
 export const ListAuditLogsQuerySchema = v.object({
   limit: v.optional(
     v.pipe(
@@ -71,7 +103,13 @@ export const ListAuditLogsQuerySchema = v.object({
     AUDIT_PAGE_DEFAULT,
   ),
   cursor: v.optional(v.pipe(v.string(), v.uuid())),
-  action: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(64))),
+  ...AuditLogFilterEntries,
 });
+
+export const ExportAuditLogsQuerySchema = v.object(AuditLogFilterEntries);
+
+export type AuditLogFilterQuery = v.InferOutput<
+  typeof ExportAuditLogsQuerySchema
+>;
 
 export type OrgRoleInput = v.InferOutput<typeof RoleSchema>;

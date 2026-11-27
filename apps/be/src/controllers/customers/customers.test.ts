@@ -18,6 +18,7 @@ const {
   findUnique,
   upsert,
   apiKey,
+  approvalRequest,
   customer,
   customerCoupon,
   customerCreditEntry,
@@ -66,6 +67,7 @@ const {
   },
   wallet: { findMany: vi.fn() },
   apiKey: { findUnique: vi.fn(), update: vi.fn() },
+  approvalRequest: { findFirst: vi.fn(), updateMany: vi.fn() },
   queryRaw: vi.fn(),
   FakeDecimal: class {
     private readonly raw: string;
@@ -117,6 +119,7 @@ vi.mock("@4mica/db", () => ({
   prisma: {
     ...tenancy,
     apiKey,
+    approvalRequest,
     customer,
     customerCoupon,
     customerCreditEntry,
@@ -145,6 +148,7 @@ const IDENTITY_ID = "019fce62-6666-7000-8000-000000000000";
 const CREDIT_ID = "019fce62-aaaa-7000-8000-000000000000";
 const COUPON_ID = "019fce62-bbbb-7000-8000-000000000000";
 const PAYER = "0x8a1c3f5b7d092e4a6c8b0d2f4e6a8c1b3d5f7e90";
+const APPROVAL_ID = "019fce62-9999-7000-8000-000000000000";
 
 const AUTH_USER = {
   id: USER_ID,
@@ -245,6 +249,8 @@ const storedCustomer = (over: Record<string, unknown> = {}) => ({
   dailyLimit: null,
   monthlyLimit: decimal("5000"),
   limitCurrency: "USD",
+  limitNetwork: null,
+  limitAssetAddress: null,
   freeQuotaUnit: null,
   freeQuota: null,
   freeQuotaPeriod: null,
@@ -334,6 +340,7 @@ describe("customer routes", () => {
     }
     for (const group of [
       apiKey,
+      approvalRequest,
       customer,
       customerCoupon,
       customerCreditEntry,
@@ -2326,6 +2333,109 @@ describe("customer routes", () => {
       await instance.close();
     });
 
+    it("clears the approval flag with a matching approved seller request and marks it used", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "150",
+        },
+      });
+      approvalRequest.updateMany.mockResolvedValue({ count: 1 });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150.00", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json()).toMatchObject({
+        allowed: true,
+        needsApproval: false,
+      });
+      expect(approvalRequest.findFirst.mock.calls[0][0].where).toMatchObject({
+        id: APPROVAL_ID,
+        organizationId: ORG_ID,
+        kind: "SELLER_PAYMENT",
+        status: "APPROVED",
+        executedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      });
+      expect(approvalRequest.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: APPROVAL_ID, status: "APPROVED", executedAt: null },
+      });
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the approved request is for a different amount", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "120",
+        },
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the approved request is for a different token", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue({
+        id: APPROVAL_ID,
+        payload: {
+          payerAddress: PAYER,
+          network: "BASE_SEPOLIA",
+          amount: "150",
+          assetAddress: "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+        },
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+      expect(approvalRequest.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("keeps the approval flag when the request was already used", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        claims({ approvalThreshold: decimal("100") }),
+      );
+      approvalRequest.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      const response = await instance.inject(
+        resolve({ amount: "150", approvalRequestId: APPROVAL_ID }),
+      );
+
+      expect(response.json().needsApproval).toBe(true);
+
+      await instance.close();
+    });
+
     it("spends nothing: no write touches the ledger or the quota", async () => {
       customerPaymentIdentity.findFirst.mockResolvedValue(claims());
       customerCoupon.findFirst.mockResolvedValue(storedCoupon());
@@ -2762,6 +2872,288 @@ describe("customer routes", () => {
         });
         expect(response.statusCode, panel).toBe(404);
       }
+
+      await instance.close();
+    });
+  });
+
+  describe("per-asset spend limits", () => {
+    const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+    const usdc = USDC.toLowerCase();
+
+    const setPolicy = (payload: Record<string, unknown>) => ({
+      method: "PATCH" as const,
+      url: `/me/customers/${CUSTOMER_ID}/policy`,
+      headers: AUTH,
+      payload,
+    });
+
+    const resolve = (payload: Record<string, unknown>) => ({
+      method: "POST" as const,
+      url: "/v1/customers/resolve",
+      headers: KEY_AUTH,
+      payload: {
+        payerAddress: PAYER,
+        network: "BASE_SEPOLIA",
+        amount: "10",
+        ...payload,
+      },
+    });
+
+    const limited = (over: Record<string, unknown> = {}) => ({
+      blockedAt: null,
+      customer: storedCustomer({
+        monthlyLimit: decimal("100"),
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+        ...over,
+      }),
+    });
+
+    const nestedText = (node: unknown): string =>
+      node !== null && typeof node === "object" && "values" in node
+        ? [
+            ...((node as { strings?: string[] }).strings ?? []),
+            ...(node as { values: unknown[] }).values.map(nestedText),
+          ].join(" ")
+        : "";
+
+    const fullText = (call: unknown[]): string =>
+      [sqlText(call), ...call.slice(1).map(nestedText)].join(" ");
+
+    const spentNearlyAll = () =>
+      queryRaw.mockImplementation((...call: unknown[]) =>
+        Promise.resolve(
+          sqlText(call).includes("monthly_spent")
+            ? [{ daily_spent: decimal("0"), monthly_spent: decimal("95") }]
+            : [],
+        ),
+      );
+
+    it("stores the limit asset with the limits", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({
+          dailyLimit: "10",
+          monthlyLimit: "100",
+          limitNetwork: "BASE_SEPOLIA",
+          limitAssetAddress: USDC,
+        }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        dailyLimit: "10",
+        monthlyLimit: "100",
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+      });
+
+      await instance.close();
+    });
+
+    it("accepts the native asset as a null address", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitNetwork: "BASE_SEPOLIA", limitAssetAddress: null }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: null,
+      });
+
+      await instance.close();
+    });
+
+    it("refuses an asset without a network", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitAssetAddress: USDC }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitAssetAddress");
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("refuses a network without an asset", async () => {
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ limitNetwork: "BASE_SEPOLIA" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitNetwork");
+
+      await instance.close();
+    });
+
+    it("refuses a limit on a customer with no limit asset", async () => {
+      customer.findFirst.mockResolvedValue({ limitNetwork: null });
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues[0].path).toBe("limitNetwork");
+      expect(customer.updateMany).not.toHaveBeenCalled();
+
+      await instance.close();
+    });
+
+    it("changes a limit on a customer that already names its asset", async () => {
+      customer.findFirst.mockResolvedValueOnce({
+        limitNetwork: "BASE_SEPOLIA",
+      });
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        monthlyLimit: "100",
+      });
+
+      await instance.close();
+    });
+
+    it("404s a limit change for a customer that is not the caller's", async () => {
+      customer.findFirst.mockResolvedValue(null);
+
+      const instance = await app();
+      const response = await instance.inject(
+        setPolicy({ monthlyLimit: "100" }),
+      );
+
+      expect(response.statusCode).toBe(404);
+
+      await instance.close();
+    });
+
+    it("clears the asset with the network", async () => {
+      const instance = await app();
+      await instance.inject(
+        setPolicy({ limitNetwork: null, limitAssetAddress: null }),
+      );
+
+      expect(customer.updateMany.mock.calls[0][0].data).toEqual({
+        limitNetwork: null,
+        limitAssetAddress: null,
+      });
+
+      await instance.close();
+    });
+
+    it("returns the limit asset on the customer", async () => {
+      customer.findFirst.mockResolvedValue(
+        storedCustomer({
+          limitNetwork: "BASE_SEPOLIA",
+          limitAssetAddress: usdc,
+        }),
+      );
+
+      const instance = await app();
+      const response = await instance.inject({
+        method: "GET",
+        url: `/me/customers/${CUSTOMER_ID}`,
+        headers: AUTH,
+      });
+
+      expect(response.json()).toMatchObject({
+        limitNetwork: "BASE_SEPOLIA",
+        limitAssetAddress: usdc,
+      });
+
+      await instance.close();
+    });
+
+    it("counts only the limit asset toward the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      const call = rawCall("monthly_spent") as unknown[];
+      expect(fullText(call)).toContain("IS NOT DISTINCT FROM");
+      expect(sqlValues(call)).toEqual(
+        expect.arrayContaining(["BASE_SEPOLIA", usdc]),
+      );
+
+      await instance.close();
+    });
+
+    it("checks a payment that does not name its asset against the limit network", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({}));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+
+      await instance.close();
+    });
+
+    it("does not hold a payment in another asset to the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(limited());
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: null }));
+
+      expect(response.json()).toMatchObject({ allowed: true });
+      expect(rawCall("monthly_spent")).toBeUndefined();
+
+      await instance.close();
+    });
+
+    it("does not hold a payment on another network to the limit", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        limited({ limitNetwork: "ETHEREUM_SEPOLIA" }),
+      );
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({ allowed: true });
+      expect(rawCall("monthly_spent")).toBeUndefined();
+
+      await instance.close();
+    });
+
+    it("keeps counting every asset for a customer without a limit asset", async () => {
+      customerPaymentIdentity.findFirst.mockResolvedValue(
+        limited({ limitNetwork: null, limitAssetAddress: null }),
+      );
+      spentNearlyAll();
+
+      const instance = await app();
+      const response = await instance.inject(resolve({ assetAddress: USDC }));
+
+      expect(response.json()).toMatchObject({
+        allowed: false,
+        deniedReason: "monthly_limit_exceeded",
+      });
+      expect(fullText(rawCall("monthly_spent") as unknown[])).not.toContain(
+        "IS NOT DISTINCT FROM",
+      );
 
       await instance.close();
     });

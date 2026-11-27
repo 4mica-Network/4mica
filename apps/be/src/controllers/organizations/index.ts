@@ -1,8 +1,16 @@
+import type { OrgRole } from "@4mica/db";
 import { permissionsFor } from "@auth/permissions";
 import type { Tenant } from "@auth/tenant";
 import { config } from "@config/index";
-import { listAuditLogs } from "@controllers/audit/repository";
+import { requireApproval } from "@controllers/approvals/gate";
 import {
+  AUDIT_EXPORT_HEADER,
+  exportAuditLogs,
+  listAuditLogs,
+} from "@controllers/audit/repository";
+import { rangeEnd, rangeStart } from "@controllers/finance/schema";
+import {
+  audit,
   invalidBody,
   notFound,
   parseBody,
@@ -11,6 +19,7 @@ import {
 } from "@controllers/shared";
 import { appLogger } from "@logger/index";
 import { clerk } from "@services/clerk";
+import { CSV_ROW_LIMIT, sendCsv } from "@utils/csv";
 import { isUniqueViolation } from "@utils/prisma-errors";
 import { generateInvitationToken, hashSecret } from "@utils/secrets";
 import type { FastifyReply, FastifyRequest, RouteHandler } from "fastify";
@@ -22,6 +31,7 @@ import {
   declineInvitation,
   existingMemberEmails,
   findInvitationByTokenHash,
+  findMemberRole,
   findOpenInvitation,
   getOrganization,
   handleTaken,
@@ -41,6 +51,8 @@ import {
 } from "./repository";
 import {
   CreateOrganizationSchema,
+  ExportAuditLogsQuerySchema,
+  GOVERNED_ROLES,
   INVITATION_TTL_DAYS,
   InviteMembersSchema,
   ListAuditLogsQuerySchema,
@@ -50,6 +62,11 @@ import {
 } from "./schema";
 
 const DAY_MS = 86_400_000;
+const SUMMARY_MAX = 280;
+
+const isGovernedRole = (role: OrgRole) => GOVERNED_ROLES.includes(role);
+
+const roleName = (role: OrgRole) => role.toLowerCase();
 
 const summary = (org: OrganizationRow) => ({
   ...org,
@@ -328,6 +345,26 @@ export const transferOwnershipHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
+  const target =
+    parsed.data.userId === tenant.userId
+      ? null
+      : await findMemberRole(tenant.orgId, parsed.data.userId);
+  if (!target) {
+    return notFound(reply, "member");
+  }
+
+  const gate = await requireApproval(
+    request,
+    reply,
+    tenant,
+    "member.role_grant",
+    { kind: "transfer", userId: parsed.data.userId },
+    `Transfer ownership to ${target.user.name}`.slice(0, SUMMARY_MAX),
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const result = await transferOwnership(
     tenant.orgId,
     tenant.userId,
@@ -358,11 +395,39 @@ export const updateMemberHandler: RouteHandler = async (request, reply) => {
   }
 
   const { userId } = request.params as { userId: string };
+  const { role } = parsed.data;
+
+  if (isGovernedRole(role)) {
+    const current = await findMemberRole(tenant.orgId, userId);
+    if (!current) {
+      return notFound(reply, "member");
+    }
+    if (
+      (role === "OWNER" || current.role === "OWNER") &&
+      tenant.role !== "OWNER"
+    ) {
+      return membershipError(reply, { ok: false, reason: "owner_only" });
+    }
+    if (current.role !== role) {
+      const gate = await requireApproval(
+        request,
+        reply,
+        tenant,
+        "member.role_grant",
+        { kind: "role_change", userId, role },
+        `Make ${current.user.name} ${roleName(role)}`.slice(0, SUMMARY_MAX),
+      );
+      if (!gate.proceed) {
+        return reply;
+      }
+    }
+  }
+
   const result = await changeMemberRole(
     tenant.orgId,
     tenant.role,
     userId,
-    parsed.data.role,
+    role,
     actor(request, tenant.userId),
   );
   return result.ok ? reply.send(result.member) : membershipError(reply, result);
@@ -427,6 +492,24 @@ export const createInvitationsHandler: RouteHandler = async (
         message: `${email} is already a member`,
       })),
     );
+  }
+
+  if (isGovernedRole(role)) {
+    const invitees = [...emails].sort();
+    const gate = await requireApproval(
+      request,
+      reply,
+      tenant,
+      "member.role_grant",
+      { kind: "invitation", emails: invitees, role },
+      (invitees.length === 1
+        ? `Invite ${invitees[0]} as ${roleName(role)}`
+        : `Invite ${invitees.length} people as ${roleName(role)}`
+      ).slice(0, SUMMARY_MAX),
+    );
+    if (!gate.proceed) {
+      return reply;
+    }
   }
 
   const org = await activeOrganization(reply, tenant);
@@ -631,5 +714,71 @@ export const listAuditLogsHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  return reply.send(await listAuditLogs(tenant.orgId, parsed.data));
+  const { from, to, ...rest } = parsed.data;
+  const window = auditWindow(from, to);
+  if (!window) {
+    return invalidBody(reply, [{ path: "from", message: "must be before to" }]);
+  }
+
+  return reply.send(await listAuditLogs(tenant.orgId, { ...rest, ...window }));
+};
+
+const auditWindow = (
+  from: string | undefined,
+  to: string | undefined,
+): { from?: Date; to?: Date } | null => {
+  const window = {
+    ...(from ? { from: rangeStart(from) } : {}),
+    ...(to ? { to: rangeEnd(to) } : {}),
+  };
+  return window.from && window.to && window.from >= window.to ? null : window;
+};
+
+export const exportAuditLogsHandler: RouteHandler = async (request, reply) => {
+  const tenant = await requireTenant(request, reply, "audit.read");
+  if (!tenant || !(await requireTenant(request, reply, "reports.export"))) {
+    return reply;
+  }
+
+  const parsed = parseBody(ExportAuditLogsQuerySchema, request.query);
+  if (!parsed.success) {
+    return invalidBody(reply, parsed.issues);
+  }
+
+  const { from, to, ...rest } = parsed.data;
+  const window = auditWindow(from, to);
+  if (!window) {
+    return invalidBody(reply, [{ path: "from", message: "must be before to" }]);
+  }
+
+  const filters = { ...rest, ...window };
+  const { rows, truncated } = await exportAuditLogs(
+    tenant.orgId,
+    filters,
+    CSV_ROW_LIMIT,
+  );
+
+  await audit(request, tenant, {
+    action: "report.exported",
+    targetType: "report",
+    targetId: "audit_logs",
+    metadata: {
+      report: "audit_logs",
+      filters: {
+        ...rest,
+        from: window.from?.toISOString() ?? null,
+        to: window.to?.toISOString() ?? null,
+      },
+      rows: rows.length,
+      truncated,
+    },
+  });
+
+  return sendCsv(
+    reply,
+    `audit-log-${new Date().toISOString().slice(0, 10)}.csv`,
+    AUDIT_EXPORT_HEADER,
+    rows,
+    truncated,
+  );
 };

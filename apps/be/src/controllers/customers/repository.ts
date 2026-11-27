@@ -61,6 +61,8 @@ export const CUSTOMER_SELECT = {
   dailyLimit: true,
   monthlyLimit: true,
   limitCurrency: true,
+  limitNetwork: true,
+  limitAssetAddress: true,
   createdAt: true,
   updatedAt: true,
   identities: {
@@ -695,6 +697,10 @@ export const setCustomerPolicy = async (
 ): Promise<CustomerRow | null> => {
   const data: Prisma.CustomerUpdateManyMutationInput = { ...input };
 
+  if (input.limitNetwork === null) {
+    data.limitAssetAddress = null;
+  }
+
   if (input.freeQuotaUnit !== undefined) {
     data.quotaResetAt = input.freeQuotaUnit === null ? null : new Date();
   }
@@ -706,6 +712,15 @@ export const setCustomerPolicy = async (
 
   return count > 0 ? getCustomer(scope, id) : null;
 };
+
+export const customerLimitNetwork = async (
+  scope: CustomerScope,
+  id: string,
+): Promise<{ limitNetwork: string | null } | null> =>
+  prisma.customer.findFirst({
+    where: { id, ...customerWhere(scope) },
+    select: { limitNetwork: true },
+  });
 
 export const resetCustomerUsage = async (
   scope: CustomerScope,
@@ -1183,23 +1198,47 @@ export const findCouponByCode = async (
 };
 
 export interface SpendLimitUsage {
+  applies: boolean;
   dailySpent: string | null;
   monthlySpent: string | null;
 }
 
+export interface LimitedPayment {
+  network: string;
+  assetAddress?: string | null;
+}
+
+export const limitAppliesTo = (
+  customer: Pick<RawCustomer, "limitNetwork" | "limitAssetAddress">,
+  payment?: LimitedPayment,
+): boolean =>
+  customer.limitNetwork === null ||
+  payment === undefined ||
+  (payment.network === customer.limitNetwork &&
+    (payment.assetAddress === undefined ||
+      (payment.assetAddress ?? null) === customer.limitAssetAddress));
+
 export const spendLimitUsageFor = async (
   orgId: string,
-  customer: Pick<RawCustomer, "dailyLimit" | "monthlyLimit"> & { id: string },
+  customer: Pick<
+    RawCustomer,
+    "dailyLimit" | "monthlyLimit" | "limitNetwork" | "limitAssetAddress"
+  > & { id: string },
+  payment?: LimitedPayment,
   now = new Date(),
 ): Promise<SpendLimitUsage> => {
   if (!customer.dailyLimit && !customer.monthlyLimit) {
-    return { dailySpent: null, monthlySpent: null };
+    return { applies: false, dailySpent: null, monthlySpent: null };
+  }
+
+  if (!limitAppliesTo(customer, payment)) {
+    return { applies: false, dailySpent: null, monthlySpent: null };
   }
 
   const addresses = await walletAddressesFor(orgId);
 
   if (addresses.length === 0) {
-    return { dailySpent: "0", monthlySpent: "0" };
+    return { applies: true, dailySpent: "0", monthlySpent: "0" };
   }
 
   const dayStart = quotaWindowStart("DAY", null, now) as Date;
@@ -1209,6 +1248,11 @@ export const spendLimitUsageFor = async (
     Prisma.join(addresses),
     Prisma.join([customer.id]),
   );
+  const asset =
+    customer.limitNetwork === null
+      ? Prisma.empty
+      : Prisma.sql`AND m.network = ${customer.limitNetwork}
+         AND m.asset_address IS NOT DISTINCT FROM ${customer.limitAssetAddress}`;
 
   const rows = await prisma.$queryRaw<
     {
@@ -1220,10 +1264,11 @@ export const spendLimitUsageFor = async (
     SELECT COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${dayStart}), 0) AS daily_spent,
            COALESCE(SUM(m.amount) FILTER (WHERE m.created_at >= ${monthStart}), 0) AS monthly_spent
       FROM matched m
-     WHERE m.status <> 'FAILED'
+     WHERE m.status <> 'FAILED' ${asset}
   `;
 
   return {
+    applies: true,
     dailySpent: amountText(rows[0]?.daily_spent ?? 0),
     monthlySpent: amountText(rows[0]?.monthly_spent ?? 0),
   };

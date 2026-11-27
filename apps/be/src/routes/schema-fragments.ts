@@ -138,7 +138,13 @@ export const apiKeyResponseSchema = {
       type: "array",
       items: {
         type: "string",
-        enum: ["PAYMENTS_WRITE", "CUSTOMERS_READ", "RESOURCE_READ"],
+        enum: [
+          "PAYMENTS_WRITE",
+          "CUSTOMERS_READ",
+          "RESOURCE_READ",
+          "SPEND_AUTHORIZE",
+          "APPROVALS_WRITE",
+        ],
       },
     },
     serviceAccountId: nullStr,
@@ -579,6 +585,8 @@ export const customerResponseSchema = {
     dailyLimit: nullStr,
     monthlyLimit: nullStr,
     limitCurrency: str,
+    limitNetwork: nullStr,
+    limitAssetAddress: nullStr,
     freeQuotaUnit: {
       type: "string",
       nullable: true,
@@ -1339,6 +1347,28 @@ export const cliCurrentSessionResponseSchema = {
         kind: { type: "string", enum: ["DEVICE", "TOKEN"] },
         name: str,
         scopes: cliScopes,
+        expiresAt: date,
+        createdAt: date,
+      },
+    },
+  },
+} as const;
+
+export const approvalRequiredResponseSchema = {
+  type: "object",
+  required: ["status", "message", "approvalRequest"],
+  properties: {
+    status: { type: "string", enum: ["approval_required"] },
+    message: str,
+    approvalRequest: {
+      type: "object",
+      properties: {
+        id: str,
+        kind: str,
+        action: str,
+        summary: str,
+        status: str,
+        requiredApprovals: int,
         expiresAt: date,
         createdAt: date,
       },

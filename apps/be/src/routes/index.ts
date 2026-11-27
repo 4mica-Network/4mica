@@ -1,6 +1,7 @@
 import type { FastifyPluginCallback } from "fastify";
 import { agentRoutes } from "./agents";
 import { apiListingRoutes } from "./api-listings";
+import { approvalRoutes } from "./approvals";
 import { balanceRoutes } from "./balances";
 import { bannerRoutes } from "./banners";
 import { cliRoutes } from "./cli";
@@ -8,6 +9,8 @@ import { complianceRoutes } from "./compliance";
 import { configRoutes } from "./config";
 import { customerRoutes } from "./customers";
 import { developerRoutes } from "./developer";
+import { financeRoutes } from "./finance";
+import { financeAlertRoutes } from "./finance-alerts";
 import { healthRoutes } from "./health";
 import { meRoutes } from "./me";
 import { organizationRoutes } from "./organizations";
@@ -15,6 +18,8 @@ import { paymentRoutes } from "./payments";
 import { projectRoutes } from "./projects";
 import { resourceKeyRoutes } from "./resource-keys";
 import { serviceAccountRoutes } from "./service-accounts";
+import { spendRoutes } from "./spend";
+import { spendingPolicyRoutes } from "./spending-policies";
 import { supportRoutes } from "./support";
 import { trustRoutes } from "./trust";
 import { unsubscribeRoutes } from "./unsubscribe";
@@ -41,6 +46,10 @@ export const routes: RouteRegistration[] = [
   { plugin: paymentRoutes },
   { plugin: balanceRoutes },
   { plugin: customerRoutes },
+  { plugin: financeRoutes },
+  { plugin: financeAlertRoutes },
+  { plugin: spendingPolicyRoutes },
+  { plugin: spendRoutes },
   { plugin: trustRoutes },
   { plugin: resourceKeyRoutes },
   { plugin: serviceAccountRoutes },
@@ -48,17 +57,21 @@ export const routes: RouteRegistration[] = [
   { plugin: configRoutes },
   { plugin: supportRoutes },
   { plugin: cliRoutes },
+  { plugin: approvalRoutes },
 ];
 
 export {
   agentRoutes,
   apiListingRoutes,
+  approvalRoutes,
   balanceRoutes,
   bannerRoutes,
   cliRoutes,
   complianceRoutes,
   customerRoutes,
   developerRoutes,
+  financeAlertRoutes,
+  financeRoutes,
   healthRoutes,
   meRoutes,
   organizationRoutes,
@@ -66,6 +79,8 @@ export {
   projectRoutes,
   resourceKeyRoutes,
   serviceAccountRoutes,
+  spendingPolicyRoutes,
+  spendRoutes,
   supportRoutes,
   trustRoutes,
   unsubscribeRoutes,

@@ -16,6 +16,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
+  approvalRequiredResponseSchema,
   createdApiKeyResponseSchema,
   createdWebhookResponseSchema,
   errorResponseSchema,
@@ -86,6 +87,8 @@ export const developerRoutes: FastifyPluginCallback = (app, _opts, done) => {
         response: {
           ...limitedResponses,
           201: createdApiKeyResponseSchema,
+          202: approvalRequiredResponseSchema,
+          409: errorResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
         },

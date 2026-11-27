@@ -32,6 +32,7 @@ const {
   apiListing,
   agent,
   redeemPaymentBenefits,
+  reconcileReportedPayment,
   getCoreClient,
   verifyGuarantee,
   getSupportedTokens,
@@ -44,6 +45,7 @@ const {
   },
   getSupportedTokens: vi.fn(),
   redeemPaymentBenefits: vi.fn(),
+  reconcileReportedPayment: vi.fn(),
   getCoreClient: vi.fn(),
   verifyGuarantee: vi.fn(),
   authenticateRequest: vi.fn(),
@@ -69,6 +71,8 @@ vi.mock("@controllers/customers/repository", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   redeemPaymentBenefits,
 }));
+
+vi.mock("@controllers/spend/decide", () => ({ reconcileReportedPayment }));
 
 vi.mock("@services/core", () => ({
   getCoreClient,
@@ -255,6 +259,8 @@ describe("payment routes", () => {
 
     redeemPaymentBenefits.mockReset();
     redeemPaymentBenefits.mockResolvedValue(null);
+    reconcileReportedPayment.mockReset();
+    reconcileReportedPayment.mockResolvedValue(undefined);
 
     getCoreClient.mockReset();
     getCoreClient.mockResolvedValue(null);
@@ -818,6 +824,42 @@ describe("payment routes", () => {
       expect(payment.create.mock.calls[0][0].data.organizationId).toBe(
         OWNER_ID,
       );
+
+      await instance.close();
+    });
+
+    it("records the reporting key and reconciles the payer's authorization", async () => {
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(payment.create.mock.calls[0][0].data.apiKeyId).toBe("key_1");
+      expect(reconcileReportedPayment.mock.calls[0][0]).toMatchObject({
+        id: PAYMENT_ID,
+        network: "BASE_SEPOLIA",
+      });
+
+      await instance.close();
+    });
+
+    it("still answers when reconciliation fails", async () => {
+      reconcileReportedPayment.mockRejectedValue(new Error("db down"));
+      const instance = await app();
+
+      const res = await instance.inject({
+        method: "POST",
+        url: "/v1/payments",
+        headers: KEY_AUTH,
+        payload: validReport(),
+      });
+
+      expect(res.statusCode).toBe(201);
 
       await instance.close();
     });

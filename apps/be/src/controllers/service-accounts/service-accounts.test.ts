@@ -5,6 +5,12 @@ import { hashSecret } from "@utils/secrets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initApp } from "@/server";
 import {
+  APPROVAL_HEADERS,
+  approvedFor,
+  governOff,
+  governOn,
+} from "@/test-support/governance";
+import {
   actAs,
   ORG_ID,
   OTHER_PROJECT_ID,
@@ -23,7 +29,16 @@ const {
   apiListing,
   $transaction,
   tenancy,
+  governance,
 } = vi.hoisted(() => ({
+  governance: {
+    governanceSettings: { findUnique: vi.fn() },
+    approvalRequest: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
   tenancy: {
     membership: { findFirst: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -59,6 +74,7 @@ vi.mock("@clerk/backend", () => ({
 vi.mock("@4mica/db", () => ({
   prisma: {
     ...tenancy,
+    ...governance,
     user: { findUnique, upsert, update: vi.fn() },
     business: { findUnique: vi.fn(), upsert: vi.fn() },
     serviceAccount,
@@ -186,6 +202,7 @@ describe("service account routes", () => {
     }
     clearUserCache();
     actAs(tenancy);
+    governOff(governance);
 
     authenticateRequest.mockResolvedValue(signedIn());
     upsert.mockResolvedValue(AUTH_USER);
@@ -662,6 +679,89 @@ describe("service account routes", () => {
         authRecord({ expiresAt: new Date(Date.now() - 1) }),
       );
       expect((await presentKey()).statusCode).toBe(401);
+    });
+  });
+
+  describe("governed production keys", () => {
+    const PRODUCTION = { "x-environment": "production" };
+
+    beforeEach(() => {
+      governOn(governance, "api_key.create_production");
+    });
+
+    it("asks for approval before giving a service account a production key", async () => {
+      const res = await call(
+        "POST",
+        `${BASE}/${ACCOUNT_ID}/keys`,
+        { name: "Deploys", scopes: ["PAYMENTS_WRITE"] },
+        PRODUCTION,
+      );
+
+      expect(res.statusCode).toBe(202);
+      expect(
+        governance.approvalRequest.create.mock.calls[0][0].data.payload,
+      ).toEqual({
+        projectId: PROJECT_ID,
+        kind: "service_account",
+        serviceAccountId: ACCOUNT_ID,
+        name: "Deploys",
+        scopes: ["PAYMENTS_WRITE"],
+      });
+      expect(apiKey.create).not.toHaveBeenCalled();
+    });
+
+    it("asks for approval before rotating a production key", async () => {
+      const res = await call(
+        "POST",
+        `${BASE}/${ACCOUNT_ID}/keys/${KEY_ID}/rotate`,
+        {},
+        PRODUCTION,
+      );
+
+      expect(res.statusCode).toBe(202);
+      expect(apiKey.updateMany).not.toHaveBeenCalled();
+      expect(apiKey.create).not.toHaveBeenCalled();
+    });
+
+    it("rotates with a matching approval", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        projectId: PROJECT_ID,
+        kind: "rotation",
+        serviceAccountId: ACCOUNT_ID,
+        keyId: KEY_ID,
+        expireOldInHours: 0,
+      });
+
+      const res = await call(
+        "POST",
+        `${BASE}/${ACCOUNT_ID}/keys/${KEY_ID}/rotate`,
+        {},
+        { ...PRODUCTION, ...APPROVAL_HEADERS },
+      );
+
+      expect(res.statusCode).toBe(201);
+      expect(apiKey.create).toHaveBeenCalledOnce();
+    });
+
+    it("refuses an approval for a different rotation", async () => {
+      approvedFor(governance, "api_key.create_production", {
+        projectId: PROJECT_ID,
+        kind: "rotation",
+        serviceAccountId: ACCOUNT_ID,
+        keyId: KEY_ID,
+        expireOldInHours: 24,
+      });
+
+      const res = await call(
+        "POST",
+        `${BASE}/${ACCOUNT_ID}/keys/${KEY_ID}/rotate`,
+        {},
+        { ...PRODUCTION, ...APPROVAL_HEADERS },
+      );
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe("approval_invalid");
+      expect(apiKey.create).not.toHaveBeenCalled();
     });
   });
 });

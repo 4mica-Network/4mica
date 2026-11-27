@@ -1,4 +1,5 @@
 import { requireApiKeyScope } from "@auth/api-key";
+import { consumeSellerApproval } from "@controllers/approvals/repository";
 import { MAX_OFFSET } from "@controllers/schema-primitives";
 import {
   auditProject,
@@ -23,6 +24,7 @@ import {
   creditBalance,
   customerActivity,
   customerBreakdown,
+  customerLimitNetwork,
   customerOverview,
   deleteCoupon,
   findCouponByCode,
@@ -222,6 +224,27 @@ export const setCustomerPolicyHandler: RouteHandler = async (
   }
 
   const { id } = request.params as { id: string };
+  const { dailyLimit, monthlyLimit, limitNetwork } = parsed.data;
+
+  if (
+    limitNetwork === undefined &&
+    (dailyLimit != null || monthlyLimit != null)
+  ) {
+    const current = await customerLimitNetwork(scope, id);
+    if (!current) {
+      return notFound(reply, "customer");
+    }
+    if (current.limitNetwork === null) {
+      return invalidBody(reply, [
+        {
+          path: "limitNetwork",
+          message:
+            "is required with limitAssetAddress when setting a spend limit",
+        },
+      ]);
+    }
+  }
+
   const updated = await setCustomerPolicy(scope, id, parsed.data);
 
   if (!updated) {
@@ -704,7 +727,14 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
-  const { payerAddress, network, amount, couponCode } = parsed.data;
+  const {
+    payerAddress,
+    network,
+    amount,
+    assetAddress,
+    couponCode,
+    approvalRequestId,
+  } = parsed.data;
   const resolved = await resolveCustomerForPayer(
     { orgId, projectId: key.projectId },
     network,
@@ -735,7 +765,7 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     couponCode
       ? findCouponByCode(orgId, customer.id, couponCode)
       : Promise.resolve(null),
-    spendLimitUsageFor(orgId, customer),
+    spendLimitUsageFor(orgId, customer, { network, assetAddress }),
   ]);
 
   const result = priceFor({
@@ -759,13 +789,29 @@ export const resolveCustomerHandler: RouteHandler = async (request, reply) => {
     discountFixed: optionalAmountText(customer.discountFixed),
     creditBalance: credit.total,
     approvalThreshold: optionalAmountText(customer.approvalThreshold),
-    dailyLimit: optionalAmountText(customer.dailyLimit),
+    dailyLimit: spent.applies ? optionalAmountText(customer.dailyLimit) : null,
     dailySpent: spent.dailySpent,
-    monthlyLimit: optionalAmountText(customer.monthlyLimit),
+    monthlyLimit: spent.applies
+      ? optionalAmountText(customer.monthlyLimit)
+      : null,
     monthlySpent: spent.monthlySpent,
   });
 
-  return reply.send({ customerId: customer.id, ...result });
+  const approved =
+    result.needsApproval &&
+    approvalRequestId != null &&
+    (await consumeSellerApproval(orgId, approvalRequestId, {
+      payerAddress,
+      network,
+      amount,
+      assetAddress: assetAddress ?? null,
+    }));
+
+  return reply.send({
+    customerId: customer.id,
+    ...result,
+    ...(approved ? { needsApproval: false } : {}),
+  });
 };
 
 export const customerOverviewHandler: RouteHandler = async (request, reply) => {

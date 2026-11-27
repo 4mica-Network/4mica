@@ -1,3 +1,4 @@
+import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import {
   auditProject,
   invalidBody,
@@ -212,6 +213,17 @@ export const createServiceAccountKeyHandler: RouteHandler = async (
     return suspended(reply);
   }
 
+  const gate = await requireProductionKeyApproval(
+    request,
+    reply,
+    scope,
+    { kind: "service_account", serviceAccountId: id, ...parsed.data },
+    `Create key "${parsed.data.name}" for service account ${account.name}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const key = await createServiceAccountKey(scope, scope.userId, id, {
     name: parsed.data.name,
     scopes: parsed.data.scopes,
@@ -221,7 +233,11 @@ export const createServiceAccountKeyHandler: RouteHandler = async (
     action: "api_key.created",
     targetType: "api_key",
     targetId: key.id,
-    metadata: { serviceAccountId: id, scopes: key.scopes },
+    metadata: {
+      serviceAccountId: id,
+      scopes: key.scopes,
+      ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+    },
   });
   appLogger.info("API key created", {
     userId: scope.userId,
@@ -288,6 +304,22 @@ export const rotateServiceAccountKeyHandler: RouteHandler = async (
     return suspended(reply);
   }
 
+  const gate = await requireProductionKeyApproval(
+    request,
+    reply,
+    scope,
+    {
+      kind: "rotation",
+      serviceAccountId: id,
+      keyId,
+      expireOldInHours: parsed.data.expireOldInHours,
+    },
+    `Rotate a key of service account ${account.name}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const key = await rotateServiceAccountKey(
     scope,
     scope.userId,
@@ -307,6 +339,7 @@ export const rotateServiceAccountKeyHandler: RouteHandler = async (
       serviceAccountId: id,
       replacedBy: key.id,
       expireOldInHours: parsed.data.expireOldInHours,
+      ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
     },
   });
   appLogger.info("API key rotated", {

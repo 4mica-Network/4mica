@@ -1,3 +1,4 @@
+import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import {
   auditProject,
   invalidBody,
@@ -57,6 +58,17 @@ export const createApiKeyHandler: RouteHandler = async (request, reply) => {
     return invalidBody(reply, parsed.issues);
   }
 
+  const gate = await requireProductionKeyApproval(
+    request,
+    reply,
+    scope,
+    { kind: "account", ...parsed.data },
+    `Create API key "${parsed.data.name}"`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const { apiKey, plaintext } = await createApiKey(
     scope,
     scope.userId,
@@ -66,6 +78,7 @@ export const createApiKeyHandler: RouteHandler = async (request, reply) => {
     action: "api_key.created",
     targetType: "api_key",
     targetId: apiKey.id,
+    ...(gate.approvalId ? { metadata: { approvalId: gate.approvalId } } : {}),
   });
   appLogger.info("API key created", {
     userId: scope.userId,

@@ -28,10 +28,16 @@ const eventList = v.pipe(
 
 const webhookUrl = publicHttpsUrl(2048);
 
-export const API_KEY_SCOPES = [
+export const DEFAULT_API_KEY_SCOPES = [
   "PAYMENTS_WRITE",
   "CUSTOMERS_READ",
   "RESOURCE_READ",
+] as const satisfies readonly ApiKeyScope[];
+
+export const API_KEY_SCOPES = [
+  ...DEFAULT_API_KEY_SCOPES,
+  "SPEND_AUTHORIZE",
+  "APPROVALS_WRITE",
 ] as const satisfies readonly ApiKeyScope[];
 
 export const apiKeyScopes = v.pipe(

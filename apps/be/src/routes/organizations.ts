@@ -6,6 +6,7 @@ import {
   createOrganizationHandler,
   declineInvitationHandler,
   deleteOrganizationHandler,
+  exportAuditLogsHandler,
   getOrganizationHandler,
   leaveOrganizationHandler,
   listAuditLogsHandler,
@@ -25,6 +26,7 @@ import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { cliGuards, guards } from "./guards";
 import {
+  approvalRequiredResponseSchema,
   errorResponseSchema,
   idParam,
   limitedResponses,
@@ -107,6 +109,19 @@ const invitationPreviewSchema = {
   },
 } as const;
 
+const auditLogFilters = {
+  from: { type: "string", maxLength: 40 },
+  to: { type: "string", maxLength: 40 },
+  action: { type: "string", maxLength: 64 },
+  actionPrefix: { type: "string", maxLength: 64 },
+  actorUserId: { type: "string", maxLength: 64 },
+  actorApiKeyId: { type: "string", maxLength: 64 },
+  targetType: { type: "string", maxLength: 64 },
+  targetId: { type: "string", maxLength: 64 },
+  projectId: { type: "string", maxLength: 64 },
+  q: { type: "string", maxLength: 100 },
+} as const;
+
 const auditLogListSchema = {
   type: "object",
   properties: {
@@ -117,6 +132,7 @@ const auditLogListSchema = {
         properties: {
           id: str,
           action: str,
+          projectId: nullableStr,
           targetType: nullableStr,
           targetId: nullableStr,
           metadata: {},
@@ -257,7 +273,10 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     "/me/organization/transfer",
     {
       ...strict,
-      schema: doc("Transfer ownership of the active organization", empty),
+      schema: doc("Transfer ownership of the active organization", {
+        ...empty,
+        202: approvalRequiredResponseSchema,
+      }),
     },
     transferOwnershipHandler,
   );
@@ -278,7 +297,10 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     {
       ...strict,
       schema: {
-        ...doc("Change a member's role", { 200: memberSchema }),
+        ...doc("Change a member's role", {
+          200: memberSchema,
+          202: approvalRequiredResponseSchema,
+        }),
         params: userIdParams,
       },
     },
@@ -309,7 +331,10 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
     "/me/organization/invitations",
     {
       ...strict,
-      schema: doc("Invite people by email", { 201: listOf(invitationSchema) }),
+      schema: doc("Invite people by email", {
+        201: listOf(invitationSchema),
+        202: approvalRequiredResponseSchema,
+      }),
     },
     createInvitationsHandler,
   );
@@ -350,12 +375,26 @@ export const organizationRoutes: FastifyPluginCallback = (app, _opts, done) => {
           properties: {
             limit: { type: "integer", minimum: 1, maximum: 100 },
             cursor: str,
-            action: { type: "string", maxLength: 64 },
+            ...auditLogFilters,
           },
         },
       },
     },
     listAuditLogsHandler,
+  );
+
+  app.get(
+    "/me/organization/audit-logs/export.csv",
+    {
+      ...base,
+      schema: {
+        ...doc("Export the active organization's audit log as CSV", {}),
+        description:
+          "Needs both `audit.read` and `reports.export`. Takes the same filters as the list. Returns `text/csv` as an attachment, newest first: RFC 4180 quoting, a header row, and any cell that starts with `=`, `+`, `-` or `@` prefixed with a single quote. At most 50,000 rows; `X-Truncated: true` says the export was cut short. The export itself is recorded as `report.exported`.",
+        querystring: { type: "object", properties: auditLogFilters },
+      },
+    },
+    exportAuditLogsHandler,
   );
 
   app.get(

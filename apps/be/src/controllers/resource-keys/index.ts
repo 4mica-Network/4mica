@@ -3,6 +3,7 @@ import type { ProjectPermission } from "@auth/permissions";
 import type { ProjectScope } from "@auth/project";
 import { getAgent } from "@controllers/agents/repository";
 import { getApiListing } from "@controllers/api-listings/repository";
+import { requireProductionKeyApproval } from "@controllers/approvals/key-gate";
 import {
   auditProject,
   invalidBody,
@@ -75,6 +76,17 @@ export const createResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
       return invalidBody(reply, parsed.issues);
     }
 
+    const gate = await requireProductionKeyApproval(
+      request,
+      reply,
+      scope,
+      { kind, resourceId: id, ...parsed.data },
+      `Create ${what(kind)} key "${parsed.data.name}"`,
+    );
+    if (!gate.proceed) {
+      return reply;
+    }
+
     const { apiKey, plaintext } = await createResourceKey(
       scope,
       scope.userId,
@@ -86,7 +98,10 @@ export const createResourceKeyHandler = (kind: ResourceKind): RouteHandler =>
       action: "api_key.created",
       targetType: "api_key",
       targetId: apiKey.id,
-      metadata: resourceRef(kind, id),
+      metadata: {
+        ...resourceRef(kind, id),
+        ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+      },
     });
     appLogger.info("API key created", {
       userId: scope.userId,

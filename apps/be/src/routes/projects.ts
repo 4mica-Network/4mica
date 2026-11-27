@@ -76,7 +76,7 @@ const projectMemberSchema = {
     avatarUrl: nullableStr,
     orgRole: {
       type: "string",
-      enum: ["OWNER", "ADMIN", "DEVELOPER", "VIEWER"],
+      enum: ["OWNER", "ADMIN", "DEVELOPER", "VIEWER", "FINANCE"],
     },
     projectRole: { type: ["string", "null"], enum: [...PROJECT_ROLES, null] },
     effectiveRole: {

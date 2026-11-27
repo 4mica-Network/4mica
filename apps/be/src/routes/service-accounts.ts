@@ -15,6 +15,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
+  approvalRequiredResponseSchema,
   errorResponseSchema,
   idParam,
   limitedResponses,
@@ -222,7 +223,11 @@ export const serviceAccountRoutes: FastifyPluginCallback = (
           "Create a key for a service account. The secret is returned only here.",
         security,
         params: idParamSchema,
-        response: { ...errors, 201: createdKeyResponseSchema },
+        response: {
+          ...errors,
+          201: createdKeyResponseSchema,
+          202: approvalRequiredResponseSchema,
+        },
       },
     },
     createServiceAccountKeyHandler,
@@ -253,7 +258,11 @@ export const serviceAccountRoutes: FastifyPluginCallback = (
           "Replace a key, optionally keeping the old one alive for a grace period",
         security,
         params: keyParamSchema,
-        response: { ...errors, 201: createdKeyResponseSchema },
+        response: {
+          ...errors,
+          201: createdKeyResponseSchema,
+          202: approvalRequiredResponseSchema,
+        },
       },
     },
     rotateServiceAccountKeyHandler,

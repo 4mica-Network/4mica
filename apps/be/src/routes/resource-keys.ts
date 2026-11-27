@@ -12,6 +12,7 @@ import type { FastifyPluginCallback } from "fastify";
 import { guards } from "./guards";
 import {
   apiKeyResponseSchema,
+  approvalRequiredResponseSchema,
   createdApiKeyResponseSchema,
   errorResponseSchema,
   idParam,
@@ -98,9 +99,11 @@ export const resourceKeyRoutes: FastifyPluginCallback = (app, _opts, done) => {
           response: {
             ...limitedResponses,
             201: createdApiKeyResponseSchema,
+            202: approvalRequiredResponseSchema,
             400: errorResponseSchema,
             401: errorResponseSchema,
             404: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },

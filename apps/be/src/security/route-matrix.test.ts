@@ -81,6 +81,12 @@ const API_KEY_ROUTES = new Set([
   "POST /v1/payments",
   "POST /v1/customers/resolve",
   "GET /v1/resource",
+  "POST /v1/approvals",
+  "GET /v1/approvals/:id",
+  "POST /v1/spend/authorize",
+  "GET /v1/spend/authorizations/:id",
+  "POST /v1/spend/authorizations/:id/consume",
+  "POST /v1/spend/authorizations/:id/release",
 ]);
 
 const CLI_TOKEN_ROUTES = new Set([
@@ -317,6 +323,12 @@ describe("authentication matrix", () => {
       "report",
       "auditLog",
       "organization",
+      "approvalRequest",
+      "spendingPolicy",
+      "spendAuthorization",
+      "financialAlert",
+      "approvalDecision",
+      "governanceSettings",
       "$queryRaw",
     ];
     const failures: string[] = [];

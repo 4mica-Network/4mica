@@ -1,4 +1,5 @@
 import { requestedEnvironment } from "@auth/project";
+import { requireApproval } from "@controllers/approvals/gate";
 import {
   audit,
   invalidBody,
@@ -283,6 +284,23 @@ export const deleteWalletHandler: RouteHandler = async (request, reply) => {
   }
 
   const { id } = request.params as { id: string };
+  const wallet = await getWallet(tenant.orgId, id);
+  if (!wallet) {
+    return notFound(reply, "wallet");
+  }
+
+  const gate = await requireApproval(
+    request,
+    reply,
+    tenant,
+    "wallet.remove",
+    { walletIds: [id] },
+    `Remove wallet ${wallet.address} on ${wallet.network}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const deleted = await deleteWallet(tenant.orgId, id);
 
   if (deleted) {
@@ -290,6 +308,7 @@ export const deleteWalletHandler: RouteHandler = async (request, reply) => {
       action: "wallet.removed",
       targetType: "wallet",
       targetId: id,
+      ...(gate.approvalId ? { metadata: { approvalId: gate.approvalId } } : {}),
     });
     appLogger.info("Wallet removed", { userId: tenant.userId, walletId: id });
     return reply.code(204).send();
@@ -312,12 +331,28 @@ export const batchDeleteWalletsHandler: RouteHandler = async (
     return invalidBody(reply, parsed.issues);
   }
 
+  const walletIds = [...parsed.data.ids].sort();
+  const gate = await requireApproval(
+    request,
+    reply,
+    tenant,
+    "wallet.remove",
+    { walletIds },
+    `Remove ${walletIds.length} wallet${walletIds.length === 1 ? "" : "s"}`,
+  );
+  if (!gate.proceed) {
+    return reply;
+  }
+
   const result = await batchDeleteWallets(tenant.orgId, parsed.data.ids);
   if (result.deleted.length > 0) {
     await audit(request, tenant, {
       action: "wallet.removed",
       targetType: "wallet",
-      metadata: { ids: result.deleted },
+      metadata: {
+        ids: result.deleted,
+        ...(gate.approvalId ? { approvalId: gate.approvalId } : {}),
+      },
     });
   }
   appLogger.info("Wallets removed", {

@@ -12,6 +12,7 @@ import { sensitiveRateLimit } from "@plugins/rate-limit";
 import type { FastifyPluginCallback } from "fastify";
 import { cliGuards, guards } from "./guards";
 import {
+  approvalRequiredResponseSchema,
   batchDeleteResponseSchema,
   errorResponseSchema,
   idParam,
@@ -190,9 +191,11 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
         params: idParamSchema,
         response: {
           ...limitedResponses,
+          202: approvalRequiredResponseSchema,
           204: { type: "null" },
           401: errorResponseSchema,
           404: errorResponseSchema,
+          409: errorResponseSchema,
         },
       },
     },
@@ -210,8 +213,10 @@ export const walletRoutes: FastifyPluginCallback = (app, _opts, done) => {
         response: {
           ...limitedResponses,
           200: batchDeleteResponseSchema,
+          202: approvalRequiredResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
+          409: errorResponseSchema,
         },
       },
     },

@@ -261,7 +261,7 @@ export const customerRoutes: FastifyPluginCallback = (app, _opts, done) => {
         tags: ["customers"],
         summary: "Set what this customer is charged",
         description:
-          "A free allowance is a unit, an amount and a period together, or nothing. Writing one starts its window now, so the allowance is never already spent by earlier payments.",
+          "A free allowance is a unit, an amount and a period together, or nothing. Writing one starts its window now, so the allowance is never already spent by earlier payments. Daily and monthly limits name one asset with `limitNetwork` and `limitAssetAddress` (null for the native asset), sent together; once set, only payments in that asset count toward the limits and only payments in that asset are checked against them. A customer without one keeps counting every asset.",
         security: [{ bearerAuth: [] }],
         params: idParamSchema,
         response: {

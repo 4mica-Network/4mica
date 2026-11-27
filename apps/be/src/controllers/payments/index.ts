@@ -13,6 +13,7 @@ import {
   parseBody,
   requireTenant,
 } from "@controllers/shared";
+import { reconcileReportedPayment } from "@controllers/spend/decide";
 import { appLogger } from "@logger/index";
 import { getCoreClient } from "@services/core";
 import { guaranteeMismatch } from "@utils/guarantee";
@@ -298,7 +299,13 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
     targets.agentId = key.agentId;
   }
 
-  const outcome = await reportPayment(orgId, key.projectId, data, targets);
+  const outcome = await reportPayment(
+    orgId,
+    key.projectId,
+    data,
+    targets,
+    key.id,
+  );
 
   if (outcome.kind === "conflict") {
     appLogger.warn("Payment report conflicts with an earlier one", {
@@ -335,6 +342,16 @@ export const reportPaymentHandler: RouteHandler = async (request, reply) => {
         error,
       });
     }
+  }
+
+  try {
+    await reconcileReportedPayment(row, request.server.email);
+  } catch (error) {
+    appLogger.error("Reported payment could not be reconciled", {
+      orgId,
+      paymentId: row.id,
+      error,
+    });
   }
 
   return reply.code(kind === "created" ? 201 : 200).send(row);

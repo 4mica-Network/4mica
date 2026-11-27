@@ -12,11 +12,27 @@ export const PERMISSIONS = [
   "resources.write",
   "resources.read",
   "payments.read",
+  "finance.read",
+  "finance.manage",
+  "approvals.decide",
+  "governance.manage",
+  "reports.export",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-const VIEWER: readonly Permission[] = ["resources.read", "payments.read"];
+const VIEWER: readonly Permission[] = [
+  "resources.read",
+  "payments.read",
+  "finance.read",
+];
+
+const FINANCE: readonly Permission[] = [
+  ...VIEWER,
+  "finance.manage",
+  "approvals.decide",
+  "reports.export",
+];
 
 const DEVELOPER: readonly Permission[] = [
   ...VIEWER,
@@ -31,9 +47,17 @@ const ADMIN: readonly Permission[] = [
   "audit.read",
   "wallets.manage",
   "business.manage",
+  "finance.manage",
+  "approvals.decide",
+  "reports.export",
 ];
 
-const OWNER: readonly Permission[] = [...ADMIN, "org.delete", "org.transfer"];
+const OWNER: readonly Permission[] = [
+  ...ADMIN,
+  "org.delete",
+  "org.transfer",
+  "governance.manage",
+];
 
 export const ROLE_PERMISSIONS: Readonly<
   Record<OrgRole, ReadonlySet<Permission>>
@@ -42,6 +66,7 @@ export const ROLE_PERMISSIONS: Readonly<
   ADMIN: new Set(ADMIN),
   DEVELOPER: new Set(DEVELOPER),
   VIEWER: new Set(VIEWER),
+  FINANCE: new Set(FINANCE),
 };
 
 export const can = (role: OrgRole, permission: Permission): boolean =>
@@ -124,7 +149,7 @@ export const effectiveProjectRole = ({
   if (restricted) {
     return null;
   }
-  return orgRole === "VIEWER" ? "VIEWER" : "DEVELOPER";
+  return orgRole === "DEVELOPER" ? "DEVELOPER" : "VIEWER";
 };
 
 export interface ProjectPermissionContext {
@@ -159,5 +184,6 @@ export const ROLE_RANK: Readonly<Record<OrgRole, number>> = {
   OWNER: 4,
   ADMIN: 3,
   DEVELOPER: 2,
+  FINANCE: 2,
   VIEWER: 1,
 };

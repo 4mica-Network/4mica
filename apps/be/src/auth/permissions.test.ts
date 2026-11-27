@@ -26,7 +26,30 @@ describe("organization permissions", () => {
     expect(permissionsFor("VIEWER")).toEqual([
       "resources.read",
       "payments.read",
+      "finance.read",
     ]);
+  });
+
+  it("lets finance govern money without engineering or admin rights", () => {
+    expect(permissionsFor("FINANCE")).toEqual([
+      "resources.read",
+      "payments.read",
+      "finance.read",
+      "finance.manage",
+      "approvals.decide",
+      "reports.export",
+    ]);
+    expect(can("FINANCE", "resources.write")).toBe(false);
+    expect(can("FINANCE", "wallets.manage")).toBe(false);
+    expect(can("FINANCE", "audit.read")).toBe(false);
+    expect(can("FINANCE", "governance.manage")).toBe(false);
+  });
+
+  it("leaves the approval rules to owners", () => {
+    expect(can("OWNER", "governance.manage")).toBe(true);
+    expect(can("ADMIN", "governance.manage")).toBe(false);
+    expect(can("ADMIN", "approvals.decide")).toBe(true);
+    expect(can("DEVELOPER", "approvals.decide")).toBe(false);
   });
 
   it("lets a developer write resources and create projects but not manage the organization", () => {
@@ -35,8 +58,10 @@ describe("organization permissions", () => {
       "resources.write",
       "resources.read",
       "payments.read",
+      "finance.read",
     ]);
     expect(can("DEVELOPER", "business.manage")).toBe(false);
+    expect(can("DEVELOPER", "finance.manage")).toBe(false);
     expect(can("DEVELOPER", "members.manage")).toBe(false);
   });
 
@@ -108,9 +133,20 @@ describe("effectiveProjectRole", () => {
     ).toBe("VIEWER");
   });
 
+  it("gives finance read-only access to unrestricted projects", () => {
+    expect(
+      effectiveProjectRole({
+        orgRole: "FINANCE",
+        projectRole: null,
+        restricted: false,
+      }),
+    ).toBe("VIEWER");
+  });
+
   it.each([
     "DEVELOPER",
     "VIEWER",
+    "FINANCE",
   ] as const)("hides a restricted project from an org %s without a membership", (orgRole) => {
     expect(
       effectiveProjectRole({ orgRole, projectRole: null, restricted: true }),

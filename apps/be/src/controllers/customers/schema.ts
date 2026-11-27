@@ -207,7 +207,29 @@ export const SetCustomerPolicySchema = v.pipe(
       discountFixed: v.nullable(decimalAmount),
       minPaymentAmount: v.nullable(decimalAmount),
       approvalThreshold: v.nullable(decimalAmount),
+      dailyLimit: v.nullable(decimalAmount),
+      monthlyLimit: v.nullable(decimalAmount),
+      limitNetwork: v.nullable(PaymentNetworkSchema),
+      limitAssetAddress: v.nullable(address),
     }),
+  ),
+  v.forward(
+    v.check(
+      (input) =>
+        input.limitAssetAddress === undefined ||
+        (input.limitNetwork !== undefined &&
+          (input.limitNetwork !== null || input.limitAssetAddress === null)),
+      "needs limitNetwork alongside it",
+    ),
+    ["limitAssetAddress"],
+  ),
+  v.forward(
+    v.check(
+      (input) =>
+        input.limitNetwork == null || input.limitAssetAddress !== undefined,
+      "needs limitAssetAddress alongside it (null for the native asset)",
+    ),
+    ["limitNetwork"],
   ),
   v.forward(
     v.check((input) => {
@@ -297,7 +319,9 @@ export const ResolveCustomerSchema = v.object({
   payerAddress: address,
   network: PaymentNetworkSchema,
   amount: positiveDecimalAmount,
+  assetAddress: v.optional(v.nullable(address)),
   couponCode: v.optional(v.nullable(couponCode)),
+  approvalRequestId: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export const BatchDeleteCustomersSchema = batchDeleteSchema("a customer id");

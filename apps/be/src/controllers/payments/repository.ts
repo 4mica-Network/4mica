@@ -470,6 +470,7 @@ export const reportPayment = async (
   projectId: string,
   data: ReportPaymentInput,
   targets: ReportResolution,
+  apiKeyId: string | null = null,
 ): Promise<ReportOutcome> => {
   const identity = {
     payerAddress: data.payerAddress,
@@ -509,6 +510,7 @@ export const reportPayment = async (
           data: {
             organizationId: orgId,
             projectId,
+            apiKeyId,
             reqId: data.reqId,
             ...identity,
             ...detail,
