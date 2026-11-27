@@ -92,7 +92,9 @@ export function RevealedSecretBanner({
       title={
         secret.kind === "apiKey"
           ? t("developer.reveal.keyTitle")
-          : t("developer.reveal.secretTitle")
+          : secret.kind === "cliToken"
+            ? t("developer.reveal.cliTokenTitle")
+            : t("developer.reveal.secretTitle")
       }
       plaintext={secret.plaintext}
       onDismiss={onDismiss}

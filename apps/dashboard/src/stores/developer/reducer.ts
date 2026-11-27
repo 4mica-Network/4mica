@@ -1,11 +1,18 @@
 import { setPending } from "@stores/utils";
 import actionTypes from "./actionTypes";
-import type { ApiKey, DeveloperState, Webhook, WebhookEvent } from "./type";
+import type {
+  ApiKey,
+  CliSession,
+  DeveloperState,
+  Webhook,
+  WebhookEvent,
+} from "./type";
 
 export const INITIAL_STATE: DeveloperState = {
   apiKeys: [],
   webhooks: [],
   events: [],
+  cliSessions: [],
   isLoading: false,
   hasLoaded: false,
   pending: {},
@@ -35,12 +42,14 @@ export default function developerReducer(
         apiKeys: ApiKey[];
         webhooks: Webhook[];
         events: WebhookEvent[];
+        cliSessions: CliSession[];
       };
       return {
         ...state,
         apiKeys: payload.apiKeys,
         webhooks: payload.webhooks,
         events: payload.events,
+        cliSessions: payload.cliSessions,
         isLoading: false,
         hasLoaded: true,
         error: null,
@@ -64,6 +73,8 @@ export default function developerReducer(
     case actionTypes.UPDATE_WEBHOOK_REQUESTED:
     case actionTypes.ROTATE_WEBHOOK_SECRET_REQUESTED:
     case actionTypes.DELETE_WEBHOOK_REQUESTED:
+    case actionTypes.CREATE_CLI_TOKEN_REQUESTED:
+    case actionTypes.REVOKE_CLI_SESSION_REQUESTED:
       return {
         ...state,
         pending: setPending(state.pending, action.meta?.pendingKey, true),
@@ -127,6 +138,24 @@ export default function developerReducer(
       return {
         ...state,
         webhooks: state.webhooks.filter((hook) => hook.id !== id),
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.CREATE_CLI_TOKEN_SUCCEEDED: {
+      const { session } = action.payload as { session: CliSession };
+      return {
+        ...state,
+        cliSessions: [session, ...state.cliSessions],
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+    }
+
+    case actionTypes.REVOKE_CLI_SESSION_SUCCEEDED: {
+      const { id } = action.payload as { id: string };
+      return {
+        ...state,
+        cliSessions: state.cliSessions.filter((session) => session.id !== id),
         pending: setPending(state.pending, action.meta?.pendingKey, false),
       };
     }

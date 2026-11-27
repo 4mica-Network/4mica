@@ -8,6 +8,7 @@ export const LAZY_TRANSLATIONS = {
   "pages/api-detail": ["apis", "resource", "developer", "wallet"],
   "pages/apis": ["apis", "wallet"],
   "pages/business": ["settings"],
+  "pages/cli-authorize": ["developer"],
   "pages/compliance": ["compliance", "settings"],
   "pages/customer-detail": ["customers", "payments"],
   "pages/customers": ["customers"],

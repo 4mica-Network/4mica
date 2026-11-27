@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   createApiKey,
   createApiKeySucceeded,
+  createCliTokenSucceeded,
   deleteApiKeySucceeded,
   developerActionFailed,
   revokeApiKey,
   revokeApiKeySucceeded,
+  revokeCliSession,
+  revokeCliSessionSucceeded,
   updateWebhook,
   updateWebhookSucceeded,
 } from "./actions";
 import reducer, { INITIAL_STATE } from "./reducer";
-import type { ApiKey, DeveloperState, Webhook } from "./type";
+import type { ApiKey, CliSession, DeveloperState, Webhook } from "./type";
 
 const key = (over: Partial<ApiKey> = {}): ApiKey => ({
   id: "key_1",
@@ -127,5 +130,54 @@ describe("developer reducer", () => {
     expect(state.pending).toEqual({});
     expect(state.error).toBe("bad url");
     expect(state.validationIssues).toEqual({ url: "must be https" });
+  });
+});
+
+const cliSession = (over: Partial<CliSession> = {}): CliSession => ({
+  id: "cli_1",
+  kind: "DEVICE",
+  name: "ada-laptop",
+  prefix: "4mica_cli_ab12",
+  last4: "wxyz",
+  scopes: ["account:read"],
+  lastUsedAt: null,
+  expiresAt: "2026-11-05T00:00:00.000Z",
+  createdAt: "2026-08-05T00:00:00.000Z",
+  ...over,
+});
+
+describe("cli sessions", () => {
+  it("puts a new token first in the list", () => {
+    const state = reducer(
+      { ...INITIAL_STATE, cliSessions: [cliSession()] },
+      createCliTokenSucceeded(cliSession({ id: "cli_2", kind: "TOKEN" }), {
+        pendingKey: "createCliToken",
+      }),
+    );
+
+    expect(state.cliSessions.map((session) => session.id)).toEqual([
+      "cli_2",
+      "cli_1",
+    ]);
+  });
+
+  it("drops a revoked session, and only that one", () => {
+    const requested = revokeCliSession({ id: "cli_1" });
+    const pending = reducer(
+      {
+        ...INITIAL_STATE,
+        cliSessions: [cliSession(), cliSession({ id: "cli_2" })],
+      },
+      requested,
+    );
+    expect(pending.pending["cliSession:cli_1"]).toBe(true);
+
+    const state = reducer(
+      pending,
+      revokeCliSessionSucceeded("cli_1", requested.meta),
+    );
+
+    expect(state.cliSessions.map((session) => session.id)).toEqual(["cli_2"]);
+    expect(state.pending["cliSession:cli_1"]).toBeUndefined();
   });
 });

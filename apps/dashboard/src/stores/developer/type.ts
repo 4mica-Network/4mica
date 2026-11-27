@@ -18,6 +18,20 @@ export interface ApiKey {
   updatedAt: string;
 }
 
+export type CliSessionKind = "DEVICE" | "TOKEN";
+
+export interface CliSession {
+  id: string;
+  kind: CliSessionKind;
+  name: string;
+  prefix: string;
+  last4: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface Webhook {
   id: string;
   url: string;
@@ -39,7 +53,7 @@ export interface WebhookEvent {
 }
 
 export interface RevealedSecret {
-  kind: "apiKey" | "webhookSecret";
+  kind: "apiKey" | "webhookSecret" | "cliToken";
   id: string;
   plaintext: string;
 }
@@ -50,6 +64,7 @@ export type DeveloperState = {
   apiKeys: ApiKey[];
   webhooks: Webhook[];
   events: WebhookEvent[];
+  cliSessions: CliSession[];
   isLoading: boolean;
   hasLoaded: boolean;
   pending: Record<string, boolean>;
