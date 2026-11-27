@@ -10,6 +10,7 @@ import {
   api,
   apiError,
   request,
+  requireScopes,
   requireSession,
   whoAmI,
 } from "../../core/platform.js";
@@ -61,6 +62,7 @@ export default class WalletsLink extends NetworkCommand {
         : "CLI wallet");
 
     const me = await whoAmI(platform, token);
+    requireScopes(me.session, ["wallets:link"]);
     const challenge = await api<Challenge>(platform, "/me/wallets/siwe-nonce", {
       method: "POST",
       token,

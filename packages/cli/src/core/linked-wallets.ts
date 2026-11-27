@@ -69,6 +69,7 @@ export const WALLET_LINK_STATEMENT =
   "Link this wallet to your 4Mica account. This does not authorize any transfer of funds.";
 
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MAX_CHALLENGE_LIFETIME_MS = 10 * 60 * 1000;
 const HEADER = /^(\S+) wants you to sign in with your Ethereum account:$/;
 const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/;
 
@@ -134,6 +135,8 @@ export function assertLinkChallenge(
     uri !== undefined &&
     URL.canParse(uri) &&
     new URL(uri).host === challenge.domain &&
+    (new URL(uri).protocol === "https:" ||
+      (new URL(uri).protocol === "http:" && LOOPBACK.test(challenge.domain))) &&
     challenge.address.toLowerCase() === expected.address.toLowerCase() &&
     challenge.statement === WALLET_LINK_STATEMENT &&
     challenge.fields.get("Version") === "1" &&
@@ -141,6 +144,7 @@ export function assertLinkChallenge(
     challenge.fields.get("Nonce") === expected.nonce &&
     issuedAt <= now + CLOCK_SKEW_MS &&
     expiresAt > now &&
+    expiresAt - issuedAt <= MAX_CHALLENGE_LIFETIME_MS &&
     challenge.resources.length === 2 &&
     challenge.resources.includes("urn:4mica:purpose:wallet-link") &&
     challenge.resources.includes(`urn:4mica:user:${expected.userId}`);

@@ -7,6 +7,7 @@ export interface MockPlatform extends MockServer {
   polls: string[];
   tokens: Set<string>;
   kinds: Map<string, "DEVICE" | "TOKEN">;
+  sessionScopes: string[];
   scope?: string;
   bearers: string[];
   wallets: { id: string; label: string; address: string; network: string }[];
@@ -60,6 +61,12 @@ export async function mockPlatform(): Promise<MockPlatform> {
     polls: [],
     tokens: new Set<string>(),
     kinds: new Map(),
+    sessionScopes: [
+      "account:read",
+      "wallets:read",
+      "wallets:link",
+      "wallets:unlink",
+    ],
     bearers: [],
     wallets: [],
   } as unknown as MockPlatform;
@@ -93,6 +100,9 @@ export async function mockPlatform(): Promise<MockPlatform> {
     }
     if (route === "POST /v1/cli/device/token") {
       const next = state.polls.shift() ?? "granted";
+      if (next === "hang") {
+        return;
+      }
       if (next === "drop") {
         req.socket.destroy();
         return;
@@ -136,7 +146,7 @@ export async function mockPlatform(): Promise<MockPlatform> {
           id: "session-1",
           kind: state.kinds.get(bearer) ?? "TOKEN",
           name: state.clientName ?? "ci",
-          scopes: ["account:read", "wallets:read", "wallets:link"],
+          scopes: state.sessionScopes,
           createdAt: "2026-01-01T00:00:00.000Z",
           expiresAt: "2026-04-01T00:00:00.000Z",
         },

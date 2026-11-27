@@ -314,6 +314,8 @@ file, one per platform API, readable by your user only.
 `auth login --insecure-storage` or `FOURMICA_CREDENTIAL_STORE=file` chooses
 the file; `FOURMICA_CREDENTIAL_STORE=keychain` refuses it, so signing in
 fails rather than write the token to disk. `auth status` says which is in use.
+A keychain that is locked or will not answer is reported as such
+(`CREDENTIAL_STORE_UNAVAILABLE`), never as being signed out.
 
 ### In CI
 

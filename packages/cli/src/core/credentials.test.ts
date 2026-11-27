@@ -1,5 +1,12 @@
-import { mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import {
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -18,6 +25,11 @@ const A = "https://api.app.4mica.io";
 const B = "http://localhost:4000";
 
 let dir: string;
+
+const tokenAt = async (origin: string) => {
+  const result = await loadToken(dir, origin, env);
+  return result.status === "found" ? result.credential.token : undefined;
+};
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "4mica-cli-"));
 });
@@ -31,9 +43,8 @@ describe("the token store", () => {
 
     expect(kept).toEqual({ storage: "file", where: credentialsFile(dir, A) });
     expect(await loadToken(dir, A, env)).toEqual({
-      token: "4mica_cli_one",
-      storage: "file",
-      kind: "DEVICE",
+      status: "found",
+      credential: { token: "4mica_cli_one", storage: "file", kind: "DEVICE" },
     });
     if (process.platform !== "win32") {
       expect((await stat(credentialsFile(dir, A))).mode & 0o777).toBe(0o600);
@@ -44,13 +55,13 @@ describe("the token store", () => {
     await saveToken(dir, A, "4mica_cli_one", { env });
     await saveToken(dir, B, "4mica_cli_two", { env });
 
-    expect((await loadToken(dir, A, env))?.token).toBe("4mica_cli_one");
-    expect((await loadToken(dir, B, env))?.token).toBe("4mica_cli_two");
+    expect(await tokenAt(A)).toBe("4mica_cli_one");
+    expect(await tokenAt(B)).toBe("4mica_cli_two");
     expect((await storedOrigins(dir)).sort()).toEqual([A, B].sort());
 
     expect(await removeToken(dir, A, env)).toBe(true);
-    expect(await loadToken(dir, A, env)).toBeUndefined();
-    expect((await loadToken(dir, B, env))?.token).toBe("4mica_cli_two");
+    expect(await loadToken(dir, A, env)).toEqual({ status: "missing" });
+    expect(await tokenAt(B)).toBe("4mica_cli_two");
   });
 
   it("loses neither of two sign-ins to different platforms at once", async () => {
@@ -63,8 +74,8 @@ describe("the token store", () => {
       ),
     ]);
 
-    expect((await loadToken(dir, A, env))?.token).toBe("4mica_cli_one");
-    expect((await loadToken(dir, B, env))?.token).toBe("4mica_cli_two");
+    expect(await tokenAt(A)).toBe("4mica_cli_one");
+    expect(await tokenAt(B)).toBe("4mica_cli_two");
   });
 
   it("lets one change to a platform's sign-in run at a time", async () => {
@@ -89,7 +100,10 @@ describe("the token store", () => {
   it("takes over a lock left behind by a process that died", async () => {
     await withCredentialLock(dir, A, async () => {});
     const lock = `${credentialsFile(dir, A)}.lock`;
-    await writeFile(lock, "");
+    await writeFile(
+      lock,
+      JSON.stringify({ id: "old", pid: process.pid, host: hostname() }),
+    );
     const { utimes } = await import("node:fs/promises");
     const old = new Date(Date.now() - 60_000);
     await utimes(lock, old, old);
@@ -106,17 +120,69 @@ describe("the token store", () => {
         env: { FOURMICA_CREDENTIAL_STORE: "keychain" },
       }),
     ).rejects.toMatchObject({ code: "KEYCHAIN_UNAVAILABLE" });
-    expect(await loadToken(dir, A, env)).toBeUndefined();
+    expect(await loadToken(dir, A, env)).toEqual({ status: "missing" });
   });
 
-  it("moves a token kept by an earlier version into its own file", async () => {
+  it("reports a keychain it cannot reach, not a missing sign-in", async () => {
+    await withCredentialLock(dir, A, async () => {});
     await writeFile(
-      join(dir, "credentials.json"),
-      JSON.stringify({ [B]: { storage: "file", token: "4mica_cli_old" } }),
+      credentialsFile(dir, A),
+      JSON.stringify({ origin: A, storage: "keychain", kind: "DEVICE" }),
     );
 
-    expect((await loadToken(dir, B, env))?.token).toBe("4mica_cli_old");
-    await expect(readFile(join(dir, "credentials.json"))).rejects.toThrow();
+    expect(await loadToken(dir, A, env)).toMatchObject({
+      status: "unavailable",
+    });
+  });
+
+  it("takes over at once a lock whose owner has exited", async () => {
+    await withCredentialLock(dir, A, async () => {});
+    const lock = `${credentialsFile(dir, A)}.lock`;
+    await writeFile(
+      lock,
+      JSON.stringify({ id: "gone", pid: 2 ** 22 + 7, host: hostname() }),
+    );
+
+    const started = Date.now();
+    await expect(withCredentialLock(dir, A, async () => "ran")).resolves.toBe(
+      "ran",
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("waits for a lock whose owner is alive and recent", async () => {
+    await withCredentialLock(dir, A, async () => {});
+    const lock = `${credentialsFile(dir, A)}.lock`;
+    await writeFile(
+      lock,
+      JSON.stringify({ id: "busy", pid: process.pid, host: hostname() }),
+    );
+    let ran = false;
+    const waiting = withCredentialLock(dir, A, async () => {
+      ran = true;
+    });
+
+    await sleep(300);
+    expect(ran).toBe(false);
+    await rm(lock);
+    await waiting;
+    expect(ran).toBe(true);
+  });
+
+  it("never removes a lock another process now holds", async () => {
+    const lock = `${credentialsFile(dir, A)}.lock`;
+    await withCredentialLock(dir, A, async () => {
+      await writeFile(
+        lock,
+        JSON.stringify({
+          id: "someone-else",
+          pid: process.pid,
+          host: hostname(),
+        }),
+      );
+    });
+
+    expect(JSON.parse(await readFile(lock, "utf8")).id).toBe("someone-else");
   });
 
   it("leaves nothing behind once the token is gone", async () => {
@@ -128,7 +194,7 @@ describe("the token store", () => {
   });
 
   it("has nothing for a platform it never signed in to", async () => {
-    expect(await loadToken(dir, A, env)).toBeUndefined();
+    expect(await loadToken(dir, A, env)).toEqual({ status: "missing" });
   });
 
   it("says which file is broken when it cannot be read", async () => {

@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { failure } from "../errors.js";
-import { apiError, type Platform, request } from "./platform.js";
+import { apiError, badResponse, type Platform, request } from "./platform.js";
 
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 
@@ -32,12 +32,24 @@ const lostResponse = () =>
     },
   );
 
+export function isDeviceCode(value: unknown): value is DeviceCode {
+  const code = (value ?? {}) as Partial<DeviceCode>;
+  return (
+    typeof code.device_code === "string" &&
+    typeof code.user_code === "string" &&
+    typeof code.verification_uri_complete === "string" &&
+    /^https?:\/\//.test(code.verification_uri_complete) &&
+    Number.isFinite(code.expires_in) &&
+    Number.isFinite(code.interval)
+  );
+}
+
 export async function pollForToken(
   platform: Platform,
-  device: Pick<DeviceCode, "device_code" | "expires_in" | "interval">,
+  device: Pick<DeviceCode, "device_code" | "interval">,
+  deadline: number,
   say: (message: string) => void,
 ): Promise<string> {
-  const deadline = Date.now() + device.expires_in * 1000;
   let intervalMs = Math.max(device.interval, 1) * 1000;
   let waitMs = intervalMs;
   let failures = 0;
@@ -59,6 +71,7 @@ export async function pollForToken(
       response = await request(platform, "/v1/cli/device/token", {
         method: "POST",
         body: { grant_type: DEVICE_GRANT, device_code: device.device_code },
+        signal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1)),
       });
     } catch {
       transient(`no answer from ${platform.origin}`, undefined, true);
@@ -82,7 +95,10 @@ export async function pollForToken(
       const { access_token } = (response.body ?? {}) as {
         access_token?: unknown;
       };
-      if (typeof access_token === "string") return access_token;
+      if (typeof access_token === "string" && access_token !== "") {
+        return access_token;
+      }
+      throw badResponse("a token");
     }
 
     const code = (response.body as { error?: unknown } | undefined)?.error;

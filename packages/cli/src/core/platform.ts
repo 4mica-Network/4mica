@@ -35,24 +35,51 @@ export interface Session {
   where?: string;
 }
 
+export type StoredSession =
+  | { status: "found"; session: Session }
+  | { status: "missing" }
+  | { status: "unavailable"; reason: string };
+
+export async function readStoredSession(
+  configDir: string,
+  env: Env = process.env,
+): Promise<StoredSession> {
+  const platform = resolvePlatform(env);
+  const result = await loadToken(configDir, platform.origin, env);
+  if (result.status !== "found") return result;
+  const { credential } = result;
+  return {
+    status: "found",
+    session: {
+      platform,
+      token: credential.token,
+      source: credential.storage,
+      kind: credential.kind,
+      where:
+        credential.storage === "file"
+          ? credentialsFile(configDir, platform.origin)
+          : undefined,
+    },
+  };
+}
+
+export const storeUnavailable = (reason: string) =>
+  configError(`the saved sign-in could not be read: ${reason}`, {
+    code: "CREDENTIAL_STORE_UNAVAILABLE",
+    retryable: true,
+    suggestions: [
+      "unlock the keychain, or approve the cli's access to it, and try again",
+      "or set FOURMICA_TOKEN for this command",
+    ],
+  });
+
 export async function loadStoredSession(
   configDir: string,
   env: Env = process.env,
 ): Promise<Session | undefined> {
-  const platform = resolvePlatform(env);
-  const stored = await loadToken(configDir, platform.origin, env);
-  return (
-    stored && {
-      platform,
-      token: stored.token,
-      source: stored.storage,
-      kind: stored.kind,
-      where:
-        stored.storage === "file"
-          ? credentialsFile(configDir, platform.origin)
-          : undefined,
-    }
-  );
+  const result = await readStoredSession(configDir, env);
+  if (result.status === "unavailable") throw storeUnavailable(result.reason);
+  return result.status === "found" ? result.session : undefined;
 }
 
 export async function loadSession(
@@ -111,6 +138,7 @@ interface RequestOptions {
   method?: string;
   token?: string;
   body?: unknown;
+  signal?: AbortSignal;
 }
 
 export async function request(
@@ -129,6 +157,7 @@ export async function request(
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     redirect: "error",
+    signal: options.signal,
   });
   const text = await response.text();
   let body: unknown;
@@ -177,15 +206,7 @@ export function apiError(platform: Platform, response: ApiResponse) {
   }
   if (status === 403 && code === "insufficient_scope") {
     const needed = said?.match(/needs ([a-z]+:[a-z]+)/)?.[1];
-    return failure(said ?? "this session is not allowed to do that", {
-      code: "INSUFFICIENT_SCOPE",
-      suggestions: [
-        needed
-          ? `sign in again allowing it: \`4mica auth login --scopes ${needed}\``
-          : "sign in again with `4mica auth login`",
-        "a token from the dashboard has the permissions chosen when it was made",
-      ],
-    });
+    return missingScopes(needed ? [needed] : [], said);
   }
   if (status === 429) {
     return failure("the platform is refusing requests for now: too many", {
@@ -238,8 +259,80 @@ export interface WhoAmI {
   session: SessionInfo;
 }
 
-export const whoAmI = (platform: Platform, token: string) =>
-  api<WhoAmI>(platform, "/v1/cli/session", { token });
+export const DEFAULT_SCOPES = [
+  "account:read",
+  "wallets:read",
+  "wallets:link",
+] as const;
+
+const SCOPE_NEEDS: Record<string, string[]> = {
+  "wallets:unlink": ["wallets:read"],
+};
+
+const ALL_SCOPES = [
+  "account:read",
+  "wallets:read",
+  "wallets:link",
+  "wallets:unlink",
+];
+
+export function loginCommandFor(needed: string[]): string {
+  const wanted = new Set<string>(DEFAULT_SCOPES);
+  for (const scope of needed) {
+    wanted.add(scope);
+    for (const dependency of SCOPE_NEEDS[scope] ?? []) wanted.add(dependency);
+  }
+  const scopes = ALL_SCOPES.filter((scope) => wanted.has(scope));
+  return `4mica auth login --web --scopes ${scopes.join(",")}`;
+}
+
+function missingScopes(missing: string[], said?: string) {
+  return failure(
+    said ??
+      `this session is not allowed to do that (needs ${missing.join(", ")})`,
+    {
+      code: "INSUFFICIENT_SCOPE",
+      suggestions: [
+        missing.length > 0
+          ? `sign in again allowing it: \`${loginCommandFor(missing)}\``
+          : "sign in again with `4mica auth login`",
+        "a token from the dashboard has the permissions chosen when it was made",
+      ],
+    },
+  );
+}
+
+export function requireScopes(session: SessionInfo, needed: string[]): void {
+  const missing = needed.filter((scope) => !session.scopes.includes(scope));
+  if (missing.length > 0) throw missingScopes(missing);
+}
+
+export const badResponse = (what: string) =>
+  failure(`the platform sent ${what} the cli does not understand`, {
+    code: "BAD_RESPONSE",
+    suggestions: ["check that FOURMICA_API_URL points at a 4mica platform API"],
+  });
+
+const isText = (value: unknown): value is string =>
+  typeof value === "string" && value !== "";
+
+export function isWhoAmI(value: unknown): value is WhoAmI {
+  const { user, session } = (value ?? {}) as Partial<WhoAmI>;
+  return (
+    isText(user?.id) &&
+    isText(session?.id) &&
+    (session?.kind === "DEVICE" || session?.kind === "TOKEN") &&
+    Array.isArray(session?.scopes) &&
+    session.scopes.every(isText) &&
+    isText(session?.expiresAt)
+  );
+}
+
+export async function whoAmI(platform: Platform, token: string) {
+  const me = await api<unknown>(platform, "/v1/cli/session", { token });
+  if (!isWhoAmI(me)) throw badResponse("an account");
+  return me;
+}
 
 export const accountLabel = (user: Account): string =>
   user.email ?? user.username ?? user.name ?? user.id;

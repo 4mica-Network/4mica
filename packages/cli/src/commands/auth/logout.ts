@@ -39,15 +39,22 @@ export default class AuthLogout extends PlatformCommand {
     const dir = this.config.configDir;
     const fromEnv = Boolean(readEnv(process.env, "TOKEN"));
 
-    const stored = await withCredentialLock(dir, platform.origin, async () => {
-      const found = await loadStoredSession(dir);
-      if (found) await removeToken(dir, platform.origin);
-      return found;
-    });
-
-    const outcome: Outcome = stored
-      ? await this.retire(platform, stored.token, stored.kind, flags.revoke)
-      : "none";
+    const outcome = await withCredentialLock(
+      dir,
+      platform.origin,
+      async (): Promise<Outcome> => {
+        const found = await loadStoredSession(dir);
+        if (!found) return "none";
+        const result = await this.retire(
+          platform,
+          found.token,
+          found.kind,
+          flags.revoke,
+        );
+        await removeToken(dir, platform.origin);
+        return result;
+      },
+    );
 
     if (outcome === "none") {
       this.note("not signed in; nothing to do");
@@ -55,7 +62,10 @@ export default class AuthLogout extends PlatformCommand {
       this.note("signed out; the token was revoked");
     } else if (outcome === "kept") {
       this.note(
-        "signed out here; the token came from the dashboard and is still valid, as it may be in use elsewhere. Pass --revoke to revoke it too",
+        "signed out here. The token came from the dashboard and stays valid, " +
+          "since it may be in use elsewhere, such as in CI; revoke it under " +
+          "Settings → Developer → CLI sessions. To revoke such a token as you " +
+          "sign out, use `4mica auth logout --revoke`",
       );
     } else {
       this.warning(
@@ -69,7 +79,7 @@ export default class AuthLogout extends PlatformCommand {
       );
     }
     return {
-      loggedOut: Boolean(stored),
+      loggedOut: outcome !== "none",
       revoked: outcome === "revoked",
       apiUrl: platform.origin,
     };

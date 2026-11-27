@@ -4,7 +4,12 @@ import {
   listLinkedWallets,
   platformNetwork,
 } from "../../core/linked-wallets.js";
-import { api, requireSession } from "../../core/platform.js";
+import {
+  api,
+  requireScopes,
+  requireSession,
+  whoAmI,
+} from "../../core/platform.js";
 import { canPrompt } from "../../core/runtime.js";
 import { walletAddress } from "../../core/session.js";
 import { cancelled, failure, usageError } from "../../errors.js";
@@ -43,6 +48,9 @@ export default class WalletsUnlink extends NetworkCommand {
     const address = args.address
       ? requireAddress(args.address, "the address")
       : await walletAddress(settings);
+
+    const me = await whoAmI(platform, token);
+    requireScopes(me.session, ["wallets:read", "wallets:unlink"]);
 
     const found = (
       await listLinkedWallets(platform, token, {

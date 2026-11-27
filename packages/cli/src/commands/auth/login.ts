@@ -6,13 +6,14 @@ import {
   saveToken,
   withCredentialLock,
 } from "../../core/credentials.js";
-import { type DeviceCode, pollForToken } from "../../core/device-flow.js";
+import { isDeviceCode, pollForToken } from "../../core/device-flow.js";
 import { readInput } from "../../core/input.js";
 import {
   accountLabel,
   api,
-  loadStoredSession,
+  badResponse,
   type Platform,
+  readStoredSession,
   request,
   TOKEN_PREFIX,
   whoAmI,
@@ -20,7 +21,7 @@ import {
 import { openBrowser } from "../../core/runner.js";
 import { canPrompt } from "../../core/runtime.js";
 import { readEnv } from "../../core/settings.js";
-import { cancelled, failure, usageError } from "../../errors.js";
+import { cancelled, usageError } from "../../errors.js";
 import { PlatformCommand } from "../../platform-command.js";
 import { brand, spinner } from "../../ui/log.js";
 import { fields } from "../../ui/output.js";
@@ -87,26 +88,39 @@ export default class AuthLogin extends PlatformCommand {
     const platform = await this.platform(flags);
     const dir = this.config.configDir;
 
+    let minted = false;
     const token = flags["with-token"]
       ? requireToken(await readInput("-"))
-      : await this.interactive(platform, flags);
+      : await this.interactive(platform, flags, () => {
+          minted = true;
+        });
 
-    const me = await whoAmI(platform, token);
-    const { kept, previous } = await withCredentialLock(
+    const { me, kept } = await withCredentialLock(
       dir,
       platform.origin,
       async () => {
-        const before = await loadStoredSession(dir);
-        const saved = await saveToken(dir, platform.origin, token, {
-          kind: me.session.kind,
-          fileOnly: flags["insecure-storage"],
-        });
-        return { kept: saved, previous: before };
+        const me = await whoAmI(platform, token);
+        const before = await readStoredSession(dir);
+        let saved: Awaited<ReturnType<typeof saveToken>>;
+        try {
+          saved = await saveToken(dir, platform.origin, token, {
+            kind: me.session.kind,
+            fileOnly: flags["insecure-storage"],
+          });
+        } catch (error) {
+          if (minted) await revokeToken(platform, token);
+          throw error;
+        }
+        if (before.status === "found" && before.session.token !== token) {
+          await this.retire(
+            platform,
+            before.session.token,
+            before.session.kind,
+          );
+        }
+        return { me, kept: saved };
       },
     );
-    if (previous && previous.token !== token) {
-      await this.retire(platform, previous.token, previous.kind);
-    }
 
     this.note(`Signed in as ${brand(accountLabel(me.user))}`);
     this.note(`token kept in ${kept.where}`);
@@ -143,10 +157,7 @@ export default class AuthLogin extends PlatformCommand {
         () => undefined,
       ));
     if (kind === "DEVICE") {
-      await request(platform, "/v1/cli/session", {
-        method: "DELETE",
-        token,
-      }).catch(() => undefined);
+      await revokeToken(platform, token);
       return;
     }
     if (kind === "TOKEN") {
@@ -159,6 +170,7 @@ export default class AuthLogin extends PlatformCommand {
   private async interactive(
     platform: Platform,
     flags: { web: boolean; open: boolean; name?: string; scopes?: string },
+    onMinted: () => void,
   ): Promise<string> {
     if (!flags.web && canPrompt()) {
       const { isCancel, select } = await import("@clack/prompts");
@@ -179,7 +191,9 @@ export default class AuthLogin extends PlatformCommand {
         );
       }
     }
-    return this.deviceFlow(platform, flags);
+    const token = await this.deviceFlow(platform, flags);
+    onMinted();
+    return token;
   }
 
   private async deviceFlow(
@@ -190,19 +204,16 @@ export default class AuthLogin extends PlatformCommand {
       ?.split(/[\s,]+/)
       .filter(Boolean)
       .join(" ");
-    const device = await api<DeviceCode>(platform, "/v1/cli/device/code", {
+    const device = await api<unknown>(platform, "/v1/cli/device/code", {
       method: "POST",
       body: {
         client_name: (flags.name ?? hostname()).slice(0, 120),
         ...(scope ? { scope } : {}),
       },
     });
+    if (!isDeviceCode(device)) throw badResponse("a sign-in code");
+    const deadline = Date.now() + device.expires_in * 1000;
     const page = device.verification_uri_complete;
-    if (!/^https?:\/\//.test(page)) {
-      throw failure("the platform gave an approval address that is not a URL", {
-        code: "BAD_VERIFICATION_URI",
-      });
-    }
 
     process.stderr.write(
       `Your one-time code: ${brand(device.user_code)}\n` +
@@ -216,7 +227,7 @@ export default class AuthLogin extends PlatformCommand {
 
     const waiting = spinner("Waiting for approval in the browser");
     try {
-      return await pollForToken(platform, device, (message) =>
+      return await pollForToken(platform, device, deadline, (message) =>
         this.note(message),
       );
     } finally {
@@ -224,3 +235,9 @@ export default class AuthLogin extends PlatformCommand {
     }
   }
 }
+
+const revokeToken = (platform: Platform, token: string) =>
+  request(platform, "/v1/cli/session", { method: "DELETE", token }).then(
+    () => undefined,
+    () => undefined,
+  );

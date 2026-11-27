@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { credentialsFile } from "../../core/credentials.js";
+import { credentialsFile, withCredentialLock } from "../../core/credentials.js";
 import {
   ACCOUNT,
   GRANTED,
@@ -166,6 +166,39 @@ describe("auth login", () => {
     expect(platform.tokens.has(GRANTED)).toBe(true);
   });
 
+  it("does not check, replace or revoke while another command holds the sign-in", async () => {
+    platform.tokens.add("4mica_cli_shared");
+    readInput.mockResolvedValue("4mica_cli_shared");
+    let release: () => void = () => {};
+    const held = withCredentialLock(
+      configDir(),
+      new URL(platform.url).origin,
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const login = run(AuthLogin, ["--with-token"]);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(platform.requests).toEqual([]);
+
+    release();
+    await held;
+    expect((await login).error).toBeUndefined();
+    expect(platform.requests.map((r) => r.url)).toEqual(["/v1/cli/session"]);
+  });
+
+  it("revokes a browser session it could not keep", async () => {
+    const { error } = await run(AuthLogin, ["--insecure-storage"], {
+      FOURMICA_CREDENTIAL_STORE: "keychain",
+    });
+
+    expect(error).toMatchObject({ code: "KEYCHAIN_UNAVAILABLE" });
+    expect(platform.tokens.has(GRANTED)).toBe(false);
+  });
+
   it("rides out a dropped connection", async () => {
     platform.polls.push("drop");
     const { error } = await signIn();
@@ -273,6 +306,27 @@ describe("auth logout", () => {
     const revoked = await run(AuthLogout, ["--revoke", "--json"]);
     expect(revoked.json).toMatchObject({ loggedOut: true, revoked: true });
     expect(platform.tokens.has("4mica_cli_shared")).toBe(false);
+  });
+
+  it("says the keychain is unavailable rather than that nobody is signed in", async () => {
+    await withCredentialLock(
+      configDir(),
+      new URL(platform.url).origin,
+      async () => {},
+    );
+    await writeFile(
+      tokenFile(),
+      JSON.stringify({
+        origin: new URL(platform.url).origin,
+        storage: "keychain",
+        kind: "DEVICE",
+      }),
+    );
+    const { error, stderr } = await run(AuthLogout);
+
+    expect(error).toMatchObject({ code: "CREDENTIAL_STORE_UNAVAILABLE" });
+    expect(stderr).not.toContain("nothing to do");
+    expect(await readFile(tokenFile(), "utf8")).toContain("keychain");
   });
 
   it("forgets the token even when the platform cannot be reached", async () => {
@@ -425,6 +479,22 @@ describe("wallets unlink", () => {
     expect(json).toMatchObject({ unlinked: true });
     expect(platform.wallets).toEqual([]);
     pinJson("wallets unlink", json);
+  });
+
+  it("names every permission unlinking needs, before asking for anything", async () => {
+    await signIn();
+    platform.sessionScopes = ["account:read", "wallets:link"];
+    platform.requests.length = 0;
+    const { error } = await run(WalletsUnlink, [
+      "0x000000000000000000000000000000000000dEaD",
+      "--yes",
+    ]);
+
+    expect(error).toMatchObject({ code: "INSUFFICIENT_SCOPE" });
+    expect(error?.suggestions?.[0]).toContain(
+      "--scopes account:read,wallets:read,wallets:link,wallets:unlink",
+    );
+    expect(platform.requests.map((r) => r.url)).toEqual(["/v1/cli/session"]);
   });
 
   it("says so when the wallet is not linked", async () => {

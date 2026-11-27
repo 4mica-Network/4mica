@@ -1,5 +1,5 @@
 import { listLinkedWallets } from "../core/linked-wallets.js";
-import { accountLabel, whoAmI } from "../core/platform.js";
+import { accountLabel, requireScopes, whoAmI } from "../core/platform.js";
 import { PlatformCommand } from "../platform-command.js";
 import { fields, table } from "../ui/output.js";
 
@@ -16,10 +16,9 @@ export default class Account extends PlatformCommand {
   async run() {
     const { flags } = await this.parse(Account);
     const { platform, token } = await this.session(flags);
-    const [me, wallets] = await Promise.all([
-      whoAmI(platform, token),
-      listLinkedWallets(platform, token),
-    ]);
+    const me = await whoAmI(platform, token);
+    requireScopes(me.session, ["wallets:read"]);
+    const wallets = await listLinkedWallets(platform, token);
 
     this.log(
       fields([
