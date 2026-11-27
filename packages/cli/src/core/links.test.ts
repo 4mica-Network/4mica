@@ -4,6 +4,7 @@ import { parseEnv } from "node:util";
 import { LinkConfig, links } from "@4mica/url";
 import { describe, expect, it } from "vitest";
 import {
+  API_URL,
   CLI_DOCS_URL,
   DASHBOARD_URL,
   DOCS_URL,
@@ -15,6 +16,16 @@ describe("the cli's copy of the site's addresses", () => {
   it("has the docs where @4mica/url has them", () => {
     expect(DOCS_URL).toBe(links.docs);
     expect(FUNDING_DOCS.startsWith(`${links.docs}/`)).toBe(true);
+  });
+
+  // The platform API is not in `@4mica/url`: the deployment reference is
+  // where its production address is written down.
+  it("has the platform API where the deployment reference puts it", async () => {
+    const deployment = await readFile(
+      join(packageRoot, "../../.github/DEPLOYMENT.md"),
+      "utf8",
+    );
+    expect(deployment).toContain(`| \`VITE_API_URL\` | \`${API_URL}\` |`);
   });
 
   it("links to a docs page that exists", async () => {

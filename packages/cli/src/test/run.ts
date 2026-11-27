@@ -31,6 +31,8 @@ export async function runCommand(
   argv: string[],
   /** A config directory to reuse, when one command should see another's work. */
   home?: string,
+  /** Variables the command should see, such as `FOURMICA_API_URL`. */
+  env: Record<string, string> = {},
 ): Promise<Outcome> {
   const dir = home ?? (await mkdtemp(join(tmpdir(), "4mica-cli-")));
   vi.stubEnv("XDG_CONFIG_HOME", dir);
@@ -39,6 +41,8 @@ export async function runCommand(
   for (const key of Object.keys(process.env)) {
     if (/^(FOURMICA|4MICA)_/.test(key)) vi.stubEnv(key, undefined);
   }
+  // Never the developer's own keychain.
+  vi.stubEnv("FOURMICA_CREDENTIAL_STORE", "file");
   for (const key of [
     "DEBUG",
     "HTTP_PROXY",
@@ -48,6 +52,7 @@ export async function runCommand(
   ]) {
     vi.stubEnv(key, undefined);
   }
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   resetOutcome();
   setRuntimeFlags({});
   const fetchBefore = globalThis.fetch;

@@ -1,0 +1,118 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`account > shows the account and its linked wallets > json shape: account 1`] = `
+{
+  "account": {
+    "email": "string",
+    "id": "string",
+    "name": "string",
+    "username": "string",
+  },
+  "wallets": [
+    {
+      "address": "string",
+      "createdAt": "string",
+      "id": "string",
+      "isDefault": "boolean",
+      "label": "string",
+      "network": "string",
+      "role": "string",
+      "status": "string",
+      "verifiedAt": "string",
+    },
+  ],
+}
+`;
+
+exports[`auth login > shows a code, waits for approval, and keeps the token it is given > json shape: auth login 1`] = `
+{
+  "account": {
+    "email": "string",
+    "id": "string",
+    "name": "string",
+    "username": "string",
+  },
+  "apiUrl": "string",
+  "session": {
+    "createdAt": "string",
+    "expiresAt": "string",
+    "id": "string",
+    "kind": "string",
+    "name": "string",
+    "scopes": [
+      "string",
+    ],
+  },
+  "storage": "string",
+}
+`;
+
+exports[`auth logout > revokes the token on the platform and forgets it here > json shape: auth logout 1`] = `
+{
+  "apiUrl": "string",
+  "loggedOut": "boolean",
+  "revoked": "boolean",
+}
+`;
+
+exports[`auth status > names the account, and never the token > json shape: auth status 1`] = `
+{
+  "account": {
+    "email": "string",
+    "id": "string",
+    "name": "string",
+    "username": "string",
+  },
+  "apiUrl": "string",
+  "session": {
+    "createdAt": "string",
+    "expiresAt": "string",
+    "id": "string",
+    "kind": "string",
+    "name": "string",
+    "scopes": [
+      "string",
+    ],
+  },
+  "tokenSource": "string",
+}
+`;
+
+exports[`wallets link > proves the wallet to the platform by signing its challenge > json shape: wallets link 1`] = `
+{
+  "account": {
+    "email": "string",
+    "id": "string",
+    "name": "string",
+    "username": "string",
+  },
+  "wallet": {
+    "address": "string",
+    "createdAt": "string",
+    "id": "string",
+    "isDefault": "boolean",
+    "label": "string",
+    "network": "string",
+    "role": "string",
+    "status": "string",
+    "verifiedAt": "string",
+  },
+}
+`;
+
+exports[`wallets unlink > asks before removing, and removes with --yes > json shape: wallets unlink 1`] = `
+{
+  "unlinked": "boolean",
+  "wallet": {
+    "address": "string",
+    "createdAt": "string",
+    "id": "string",
+    "isDefault": "boolean",
+    "label": "string",
+    "network": "string",
+    "role": "string",
+    "status": "string",
+    "verifiedAt": "string",
+  },
+}
+`;

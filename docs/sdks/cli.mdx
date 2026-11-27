@@ -51,7 +51,10 @@ The CLI uses the Base Sepolia testnet unless told otherwise. Real funds move onl
 | Command | What it does |
 | --- | --- |
 | `init [dir]` | Scaffold a project. Ends with a checklist of what a real payment still needs. |
+| `auth login`, `auth status`, `auth logout` | Sign the CLI in to your 4Mica account through the browser, check the session, and sign out. |
+| `account` | Show the account and the wallets linked to it. |
 | `wallets`, `wallets create`, `wallets import`, `wallets use`, `wallets remove` | List, create, import, switch and delete wallets. |
+| `wallets link`, `wallets unlink` | Link the wallet in use to your account by signing a one-time message, or remove it. |
 | `whoami` | Show the wallet and network in use, and where each comes from. |
 | `balance [asset]` | Collateral: total, locked and available. |
 | `deposit <amount>` | Deposit collateral. |
@@ -65,6 +68,22 @@ The CLI uses the Base Sepolia testnet unless told otherwise. Real funds move onl
 | `version` | The CLI's version, Node and platform, for a bug report. |
 
 `4mica help <command>` shows a command's examples and flags.
+
+## Your account
+
+A wallet key is enough to deposit, pay and withdraw. Signing in is separate: it connects the CLI to your 4Mica account, so wallets you hold can be linked to it and shown in the dashboard.
+
+```bash
+4mica auth login       # shows a one-time code and opens the dashboard to approve it
+4mica wallets link     # proves you hold the wallet in use, by signing a message
+4mica account          # the account and its linked wallets
+```
+
+`auth login` never asks for a password in the terminal. You approve the code at `app.4mica.io/cli/authorize` while signed in, and the CLI receives a token of its own, kept in the system keychain where there is one. Over SSH, `--no-open` prints the address to open on another device. Every signed-in terminal is listed under Settings → Developer, where it can be revoked.
+
+A token cannot move funds. It reads the account and links or removes wallets; payments are still signed by the wallet key, which never leaves your machine.
+
+In CI, create a token under Settings → Developer → CLI sessions and set it as `FOURMICA_TOKEN`.
 
 ## The wallet key
 
@@ -123,10 +142,11 @@ Each setting comes from the first of: a flag, an environment variable, the proje
 4mica config set asset USDC      # then `4mica deposit 5` needs no --asset
 ```
 
-The environment variables are `FOURMICA_NETWORK`, `FOURMICA_RPC_URL`, `FOURMICA_FACILITATOR_URL`, `FOURMICA_ASSET`, `FOURMICA_WALLET_PRIVATE_KEY`, `FOURMICA_REQUEST_TIMEOUT` and `FOURMICA_DEBUG`. `--rpc-url` is a 4Mica core's address, not an Ethereum RPC endpoint, and must be `https` unless it is on this machine. Requests honour `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`.
+The environment variables are `FOURMICA_NETWORK`, `FOURMICA_RPC_URL`, `FOURMICA_FACILITATOR_URL`, `FOURMICA_ASSET`, `FOURMICA_WALLET_PRIVATE_KEY`, `FOURMICA_TOKEN`, `FOURMICA_REQUEST_TIMEOUT` and `FOURMICA_DEBUG`. `--rpc-url` is a 4Mica core's address, not an Ethereum RPC endpoint, and must be `https` unless it is on this machine. Requests honour `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`.
 
 ## Limits
 
 - Wallet keys are plain files readable by your user only. They are not encrypted, and there is no keychain or hardware wallet support yet.
+- The account token is kept in the system keychain on macOS and on Linux with `secret-tool`; elsewhere it is a file readable by your user only.
 - One pending withdrawal per asset.
 - The CLI sends no telemetry and checks for no updates.

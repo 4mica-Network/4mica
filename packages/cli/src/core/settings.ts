@@ -226,6 +226,16 @@ export const requireFacilitatorUrl = (resolved: Resolved): void =>
     },
   });
 
+export const requireApiUrl = (resolved: Resolved): void =>
+  requireServiceUrl(resolved, {
+    name: "platform",
+    code: "BAD_API_URL",
+    hints: {
+      http: "use https: the account token is sent over this connection",
+      scheme: "give the platform API's https:// address",
+    },
+  });
+
 /**
  * Whether money sent here is known not to be real: a hosted testnet, or a
  * core on this machine. Anything else gets the mainnet treatment, since

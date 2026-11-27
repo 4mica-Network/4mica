@@ -16,6 +16,9 @@ function requireKey(settings: Settings): string {
   return key;
 }
 
+/** The wallet key, for signing something other than a payment. */
+export const walletKey = (settings: Settings): string => requireKey(settings);
+
 /** No network call. */
 export async function walletAddress(settings: Settings): Promise<string> {
   return addressFromKey(requireKey(settings), settings.key?.file ?? KEY);
