@@ -34,6 +34,7 @@ from ..models import (
     CheckpointRequiredDetails,
     CycleMismatchDetails,
     FutureTimestampDetails,
+    PayerGuaranteesPage,
     PaymentRequest,
     PaymentRequestPayload,
     RecipientPaymentInfo,
@@ -171,6 +172,21 @@ class PaymentClient:
     async def list_received(self) -> List[RecipientPaymentInfo]:
         """Payments guaranteed to the signer as a recipient."""
         return await self._ctx.rpc.list_recipient_payments(self._ctx.signer_address)
+
+    async def list_issued(
+        self,
+        cycle_id: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> PayerGuaranteesPage:
+        """One page of the guarantees the signer issued, as a payer, in a
+        cycle: whom each pays, for which request, how much, and where it
+        stands. *cycle_id* is the cycle's on-chain bytes32 id, as ``cycle_id``
+        on a position or on :meth:`active_cycle`'s answer. Pass a page's
+        ``next_cursor`` back as *after* for the next."""
+        return await self._ctx.rpc.list_payer_guarantees(
+            self._ctx.signer_address, cycle_id, limit=limit, after=after
+        )
 
     # --- core's view -----------------------------------------------------
 

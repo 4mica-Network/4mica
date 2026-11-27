@@ -814,6 +814,172 @@ class AssetBalanceInfo:
 
 
 @dataclass
+class ClearingPosition:
+    """A net position its participant can still settle with the ClearingHouse:
+    a debit to pay, or a credit to claim."""
+
+    cycle_id: str
+    """On-chain bytes32 cycle identifier."""
+    cycle_id_text: str
+    """Core's cycle identifier (``{asset}:{period_start}``), the one
+    ``settlement.pay(...)`` and ``settlement.claim(...)`` take."""
+    asset_address: str
+    role: ClearingParticipantRole
+    amount: int
+    """What a net debtor owes, or a net creditor is owed."""
+    gross_outgoing: int
+    """Sum of the guarantees the participant issued in the cycle, before netting."""
+    gross_incoming: int
+    """Sum of the guarantees issued to the participant in the cycle, before netting."""
+    payment_submission_deadline: int
+    """Unix seconds on the chain's clock. The ClearingHouse refuses a net
+    debtor's payment after it."""
+    payment_finality_deadline: int
+    """Unix seconds on the chain's clock. Once past it, an unpaid net debit is
+    taken from the debtor's collateral. A net credit can be claimed as soon as
+    every debtor in the cycle has paid, and otherwise once that collateral has
+    been taken."""
+    commit_confirmed: bool
+    """Whether core has seen the cycle's commit finalized on-chain. Until then
+    a payment can revert, and both deadlines are core's own estimate."""
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "ClearingPosition":
+        # Every field decides what is paid or claimed, and by when: one that
+        # is missing is refused, not filled in.
+        def required(*keys: str) -> Any:
+            value = _get_any(raw, *keys)
+            if value is None:
+                raise InvalidParamsError(
+                    f"invalid clearing position: missing {keys[0]}"
+                )
+            return value
+
+        def unix_seconds(*keys: str) -> int:
+            value = required(*keys)
+            if isinstance(value, bool) or not isinstance(value, (int, str)):
+                raise InvalidParamsError(
+                    f"invalid clearing position: {keys[0]} is not a time"
+                )
+            try:
+                seconds = int(value)
+            except ValueError:
+                seconds = 0
+            if seconds <= 0:
+                raise InvalidParamsError(
+                    f"invalid clearing position: {keys[0]} is not a time"
+                )
+            return seconds
+
+        role = str(required("role"))
+        if role not in ClearingParticipantRole.__members__:
+            raise InvalidParamsError(f"invalid clearing position: unknown role {role}")
+        commit_confirmed = required("commit_confirmed", "commitConfirmed")
+        if not isinstance(commit_confirmed, bool):
+            raise InvalidParamsError(
+                "invalid clearing position: commit_confirmed is not a boolean"
+            )
+        try:
+            return cls(
+                cycle_id=normalize_bytes32_hex(str(required("cycle_id", "cycleId"))),
+                cycle_id_text=str(required("cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(required("asset_address", "assetAddress"))
+                ),
+                role=ClearingParticipantRole(role),
+                amount=parse_u256(required("amount")),
+                gross_outgoing=parse_u256(required("gross_outgoing", "grossOutgoing")),
+                gross_incoming=parse_u256(required("gross_incoming", "grossIncoming")),
+                payment_submission_deadline=unix_seconds(
+                    "payment_submission_deadline", "paymentSubmissionDeadline"
+                ),
+                payment_finality_deadline=unix_seconds(
+                    "payment_finality_deadline", "paymentFinalityDeadline"
+                ),
+                commit_confirmed=commit_confirmed,
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid clearing position: {exc}") from exc
+
+
+#: Where a guarantee stands in its cycle's settlement. A status this SDK
+#: predates is passed through as core sent it.
+GUARANTEE_STATUSES = (
+    "ISSUED",
+    "PENDING_VALIDATION",
+    "FINALIZED_PAYABLE",
+    "DISPUTED",
+    "CANCELLED",
+    "NETTED",
+    "SETTLED",
+    "DEFAULT_REMUNERATED",
+)
+
+
+@dataclass
+class PayerGuaranteeInfo:
+    """One guarantee a payer issued."""
+
+    guarantee_id: str
+    recipient: str
+    req_id: int
+    amount: int
+    timestamp: int
+    """The timestamp the payer signed the request with, unix seconds."""
+    status: str
+    """One of :data:`GUARANTEE_STATUSES`, or a newer one as core sent it."""
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "PayerGuaranteeInfo":
+        return cls(
+            guarantee_id=str(_get_any(raw, "guarantee_id", "guaranteeId") or ""),
+            recipient=normalize_address(str(_get_any(raw, "recipient"))),
+            req_id=parse_u256(_get_any(raw, "req_id", "reqId") or 0),
+            amount=parse_u256(_get_any(raw, "amount") or 0),
+            timestamp=int(_get_any(raw, "timestamp") or 0),
+            status=str(_get_any(raw, "status")),
+        )
+
+
+@dataclass
+class PayerGuaranteesPage:
+    """One page of the guarantees a payer issued in a cycle, in the order core
+    stored them."""
+
+    cycle_id: str
+    """On-chain bytes32 cycle identifier."""
+    cycle_id_text: str
+    asset_address: str
+    payer: str
+    guarantees: List[PayerGuaranteeInfo]
+    next_cursor: Optional[str] = None
+    """Pass back as ``after`` for the next page. ``None`` on the last one."""
+
+    @classmethod
+    def from_rpc(cls, raw: Dict[str, Any]) -> "PayerGuaranteesPage":
+        try:
+            items = _get_any(raw, "guarantees")
+            cursor = _get_any(raw, "next_cursor", "nextCursor")
+            return cls(
+                cycle_id=normalize_bytes32_hex(
+                    str(_get_any(raw, "cycle_id", "cycleId"))
+                ),
+                cycle_id_text=str(_get_any(raw, "cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(_get_any(raw, "asset_address", "assetAddress"))
+                ),
+                payer=normalize_address(str(_get_any(raw, "payer"))),
+                guarantees=[
+                    PayerGuaranteeInfo.from_rpc(item)
+                    for item in (items if isinstance(items, list) else [])
+                ],
+                next_cursor=cursor if isinstance(cursor, str) and cursor else None,
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid guarantee list: {exc}") from exc
+
+
+@dataclass
 class RecipientPaymentInfo:
     user_address: str
     recipient_address: str

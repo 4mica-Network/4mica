@@ -268,6 +268,21 @@ async def test_deposits_on_another_network_through_that_networks_client(core):
     core.clients[0].deposit.of.assert_not_called()
 
 
+async def test_lists_and_settles_positions_on_the_network_asked_for(core):
+    async with await FourMica.connect(private_key=KEY) as client:
+        assert await client.positions() == []
+        assert await client.settle(only="pay") == []
+        assert await client.positions(network="base") == []
+    assert core.clients[0].settlement.positions.await_count == 2
+    assert core.clients[1].settlement.positions.await_count == 1
+
+
+async def test_settle_refuses_a_side_that_is_not_pay_or_claim(core):
+    async with await FourMica.connect(private_key=KEY) as client:
+        with pytest.raises(InvalidParamsError, match="only must be"):
+            await client.settle(only="both")
+
+
 # --- balance --------------------------------------------------------------------
 
 

@@ -62,6 +62,7 @@ from ..errors import (
     PoolInsolventError,
     RevertedOnChainError,
     StablecoinDepositsDisabledError,
+    TransactionOutcomeUnknownError,
     TransferFailedError,
     UnsupportedAssetError,
     ValueMismatchError,
@@ -74,6 +75,31 @@ from ..utils import load_abi, normalize_address, parse_u256
 DEFAULT_RECEIPT_TIMEOUT_SECS = 60
 DEFAULT_RECEIPT_POLL_LATENCY_SECS = 2
 _DEFAULT_WAIT = TxReceiptWaitOptions()
+
+_JSON_RPC_INTERNAL_ERROR = -32603
+
+
+def _lost_broadcast(exc: BaseException) -> bool:
+    """Whether a failed ``eth_sendRawTransaction`` may have reached the chain:
+    the request got no answer (a timeout, a dropped connection), one that was
+    not the node's (a gateway's 5xx, a 408), or a JSON-RPC internal error or
+    timeout. A refusal is not: any other JSON-RPC error, or an HTTP 4xx, is
+    the node (or its gatekeeper) saying no."""
+    import aiohttp
+    from web3.exceptions import RequestTimedOut, Web3RPCError
+
+    if isinstance(exc, aiohttp.ClientResponseError):
+        return exc.status >= 500 or exc.status == 408
+    if isinstance(exc, (aiohttp.ClientError, asyncio.TimeoutError, TimeoutError)):
+        return True
+    if isinstance(exc, RequestTimedOut):
+        return True
+    if isinstance(exc, Web3RPCError):
+        response = exc.rpc_response or {}
+        error = response.get("error") if isinstance(response, dict) else None
+        return isinstance(error, dict) and error.get("code") == _JSON_RPC_INTERNAL_ERROR
+    return False
+
 
 # Decoded custom errors that map to a dedicated exception; everything else
 # surfaces as ContractError carrying the decoded name (see error.rs's
@@ -201,34 +227,53 @@ class ContractGateway:
         txn: Dict[str, Any],
         wait_options: Optional[TxReceiptWaitOptions] = None,
     ) -> Dict[str, Any]:
-        """Sign, broadcast, and wait for the receipt."""
+        """Sign, broadcast, and wait for the receipt. A broadcast that got no
+        usable answer, or a receipt that did not come, is not a failure: it
+        raises :class:`TransactionOutcomeUnknownError`, since the transaction
+        may still go through."""
         opts = wait_options or _DEFAULT_WAIT
         try:
             signed = self.account.sign_transaction(txn)
-            raw_tx = getattr(signed, "raw_transaction", None)
-            if raw_tx is None:
-                raw_tx = getattr(signed, "rawTransaction", None)
-            if raw_tx is None:
-                raise ContractError("SignedTransaction missing raw_transaction")
+        except Exception as exc:
+            raise ContractError(str(exc)) from exc
+        raw_tx = getattr(signed, "raw_transaction", None)
+        if raw_tx is None:
+            raw_tx = getattr(signed, "rawTransaction", None)
+        if raw_tx is None:
+            raise ContractError("SignedTransaction missing raw_transaction")
+
+        try:
             tx_hash = await self.w3.eth.send_raw_transaction(raw_tx)
+        except Exception as exc:
+            if _lost_broadcast(exc):
+                raise TransactionOutcomeUnknownError(
+                    "the transaction was sent and no usable answer came back "
+                    f"({exc}); it may or may not have been accepted",
+                    stage="broadcast",
+                ) from exc
+            raise self._decode_contract_error(exc) from exc
+        tx_hash_hex = "0x" + (
+            tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
+        ).removeprefix("0x")
+
+        try:
             receipt = await self.w3.eth.wait_for_transaction_receipt(
                 tx_hash,
                 timeout=opts.timeout_secs,
                 poll_latency=opts.poll_latency_secs,
             )
-            receipt_dict = dict(receipt)
-            status = receipt_dict.get("status")
-            tx_hash_hex = "0x" + (
-                tx_hash.hex() if hasattr(tx_hash, "hex") else str(tx_hash)
-            ).removeprefix("0x")
-            if status in (0, "0x0", False):
-                raise RevertedOnChainError(tx_hash_hex)
-            receipt_dict["transactionHash"] = tx_hash_hex
-            return receipt_dict
-        except ContractError:
-            raise
         except Exception as exc:
-            raise ContractError(str(exc)) from exc
+            raise TransactionOutcomeUnknownError(
+                f"transaction {tx_hash_hex} was sent, but its receipt was not "
+                f"seen ({exc}); it may still be mined",
+                stage="receipt",
+                tx_hash=tx_hash_hex,
+            ) from exc
+        receipt_dict = dict(receipt)
+        if receipt_dict.get("status") in (0, "0x0", False):
+            raise RevertedOnChainError(tx_hash_hex)
+        receipt_dict["transactionHash"] = tx_hash_hex
+        return receipt_dict
 
     async def _prepare_tx(self, func, value: int = 0) -> Dict[str, Any]:
         call_params: Dict[str, Any] = {"from": self.account.address}
@@ -348,6 +393,10 @@ class ContractGateway:
 
         try:
             receipt = await send_approve(target)
+        except TransactionOutcomeUnknownError:
+            # The approval may be out: a reset and another approval on top of
+            # it would be two or three transactions where one was meant.
+            raise
         except Exception:
             if target == 0:
                 raise

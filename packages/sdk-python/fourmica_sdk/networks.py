@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from .errors import InvalidParamsError
+
 
 @dataclass(frozen=True)
 class NetworkInfo:
@@ -86,3 +88,13 @@ def resolve_network_rpc_url(network: str) -> Optional[str]:
     """Return the core API URL for *network* (shorthand or CAIP-2), or ``None``."""
     resolved = resolve_network(network)
     return resolved[1].rpc_url if resolved else None
+
+
+def to_caip2(network: str) -> str:
+    """The CAIP-2 id x402 wants (``eip155:8453``), from any form of a hosted
+    network's name: shorthand (``base-sepolia``), the app API's
+    (``BASE_SEPOLIA``) or CAIP-2 itself."""
+    resolved = resolve_network(network.replace("_", "-"))
+    if resolved is None:
+        raise InvalidParamsError(f"unknown network: {network}")
+    return resolved[1].caip2

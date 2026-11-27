@@ -47,6 +47,8 @@ TypeScript SDK.
 | `await client.withdraw("2 USDC")` | Requests a withdrawal. |
 | `await client.withdrawals()` | Pending requests, and when each can be finalized. |
 | `await client.finalize_withdrawal("USDC")` / `cancel_withdrawal("USDC")` | Pays out a request after the grace period, or cancels it. Takes the token address for an asset core no longer lists. |
+| `await client.positions()` | What the wallet still owes and is owed, one entry per asset and settlement cycle, soonest deadline first. |
+| `await client.settle(only=None)` | Pays every open debit and claims every open credit; `only="pay"` or `"claim"` does one side. Each result says `settled`, `skipped`, `failed` or `unknown`. |
 | `await client.low_level()` | The `Client` underneath, for anything else. |
 
 Every call that touches a network takes `network=` to use another one; the
@@ -298,6 +300,11 @@ action = await client.settlement.pay(cycle_id).action()
 only; the 0x-prefixed on-chain id carried in payments and receipts is not
 accepted here.
 
+`await client.settlement.positions()` lists what is still open, with each
+cycle's text id, and `await client.payment.list_issued(cycle_id)` pages
+through the guarantees the signer issued in a cycle (this one takes the
+on-chain id, `cycle_id` on a position).
+
 ### Collateral
 
 ```python
@@ -345,6 +352,33 @@ are surfaced, not retried — your own transaction would fail the same way —
 and an `OutcomeUnknownError` means the facilitator may already have
 submitted: check the chain before resending.
 
+## Sellers: the app API
+
+`fourmica_sdk.app` talks to the 4Mica app API with a listing's or agent's API
+key: `resource()` describes it, `resolve_customer()` says whether a payer may
+pay and how much after coupons and credit, and `report_payment()` records a
+payment. In an x402 after-settle hook, `parse_settlement(context)` reads off
+what `report_payment()` needs:
+
+```python
+from fourmica_sdk.app import AppClient, parse_settlement
+
+async with AppClient(api_key) as app:
+    settled = parse_settlement(context)
+    await app.report_payment(
+        req_id=settled.req_id,
+        payer_address=settled.payer_address,
+        recipient_address=pay_to,
+        network="base-sepolia",
+        amount=settled.amount,  # base units
+        guarantee_claims=settled.guarantee_claims,
+        guarantee_signature=settled.guarantee_signature,
+    )
+```
+
+Networks take any form of the name: `base-sepolia`, `BASE_SEPOLIA` or
+`eip155:84532`. `to_caip2()` gives the CAIP-2 id x402 wants.
+
 ## x402
 
 The SDK implements the `4mica-credit` x402 scheme, versions 1 and 2. A
@@ -379,6 +413,12 @@ spent; facilitator rejections carry their reason (such as
 can branch on codes this SDK predates.
 Core's own coded refusals carry `code` and `details` on `RpcError`, and the
 payment ones arrive typed (see [Refusals](#refusals)).
+
+`OutcomeUnknownError` means something was sent and no answer came back, so it
+may have gone through: check before sending again. For a transaction the
+wallet sent itself it is a `TransactionOutcomeUnknownError`, whose `stage` is
+`"broadcast"` (no hash to look it up by) or `"receipt"` (look it up by
+`tx_hash`).
 
 ## Development
 

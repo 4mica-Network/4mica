@@ -42,6 +42,25 @@
   - After a redirect, `fetch` pays the request that was answered 402, not
     the one it started with, and only on the origin it was asked for. The
     paid retry follows no redirect, so the payment is never forwarded.
+  - `positions()` lists what the wallet still owes and is owed, one entry
+    per asset and settlement cycle, soonest deadline first. `settle(only=)`
+    pays every open debit and claims every open credit, gaslessly where it
+    can; with no facilitator a token debit is approved for the exact amount
+    and paid by the wallet. One that fails does not stop the others: each
+    `SettleResult` says `settled`, `skipped`, `failed` or `unknown`.
+- `client.settlement.positions()` and `client.payment.list_issued(cycle_id,
+  limit=, after=)`, over core's `/core/participants/{addr}/positions` and
+  `/core/payers/{addr}/guarantees`, with `ClearingPosition`,
+  `PayerGuaranteeInfo` and `PayerGuaranteesPage`. A position missing a
+  field, or with an unknown role or a deadline that is not a time, raises
+  `InvalidParamsError` rather than being filled in.
+- `fourmica_sdk.app`, for sellers: `AppClient(api_key)` with `resource()`,
+  `resolve_customer()` and `report_payment()`; `parse_settlement(context)`
+  reads an x402 after-settle hook into what `report_payment` takes, and
+  `payment_from_header()` reads an `X-PAYMENT` header. `AppListing` and
+  `AppAgent` carry `assetDecimals` for pricing a route in base units.
+- `to_caip2(network)` gives the CAIP-2 id from any form of a hosted
+  network's name: `base-sepolia`, `BASE_SEPOLIA` or `eip155:84532`.
 - `fourmica_sdk.amounts`: `parse_amount`, `to_base_units`, `format_units` and
   `resolve_token`, pinned to the same `amounts.vectors.json` as the
   TypeScript SDK.
@@ -102,6 +121,15 @@
   refused at connect: payments were signed by one and transactions sent by
   the other.
 - `repr(Config)` no longer shows the private key or bearer token.
+- **A transaction the wallet sent itself whose fate is unknown is no longer
+  reported as failed.** A broadcast that got no usable answer (a timeout, a
+  dropped connection, a 5xx or 408, a JSON-RPC internal error), or a receipt
+  that did not come in time, raises `TransactionOutcomeUnknownError` with
+  its `stage` and, once the node accepted it, its `tx_hash`. It used to be a
+  `ContractError`, which invited a retry that could send it twice. It
+  extends `OutcomeUnknownError`, so one `except` covers sponsored and
+  self-sent transactions alike. An approval whose outcome is unknown is no
+  longer reset to zero and sent again.
 
 ## 2.0.0a1 - Unreleased
 

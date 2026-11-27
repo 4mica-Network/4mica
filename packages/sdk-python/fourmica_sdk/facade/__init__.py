@@ -18,7 +18,7 @@ import httpx
 from ..amounts import AmountInput, format_units
 from ..client import Client
 from ..config import Config, ConfigBuilder, read_env
-from ..errors import ClientError, ConfigError
+from ..errors import ClientError, ConfigError, InvalidParamsError
 from ..networks import DEFAULT_NETWORK, NETWORKS, resolve_network
 from ..signing import EvmSigner
 from .deposit import deposit as _deposit
@@ -32,13 +32,17 @@ from .models import (
     Gas,
     PaymentRecord,
     PendingWithdrawal,
+    Position,
     RawBalance,
+    SettleAction,
+    SettleResult,
     SpendLimits,
     Wait,
     WithdrawResult,
 )
 from .protocols import PROTOCOLS, PaymentProtocol, PaymentTerms
 from .session import NetworkSession, asset_ref
+from .settle import open_positions, settle_all
 from .withdraw import (
     cancel_withdrawal,
     finalize_withdrawal,
@@ -56,7 +60,9 @@ __all__ = [
     "PaymentRecord",
     "PaymentTerms",
     "PendingWithdrawal",
+    "Position",
     "RawBalance",
+    "SettleResult",
     "SpendLimits",
     "WithdrawResult",
 ]
@@ -321,6 +327,33 @@ class FourMica:
     ) -> List[PendingWithdrawal]:
         """Pending withdrawal requests, and when each can be finalized."""
         return await pending_withdrawals(await self._session(network))
+
+    async def positions(self, *, network: Optional[str] = None) -> List[Position]:
+        """What the wallet still owes and is still owed: one entry per asset
+        and settlement cycle, soonest deadline first. Paid, claimed and
+        defaulted positions are not listed."""
+        return await open_positions(await self._session(network))
+
+    async def settle(
+        self,
+        *,
+        only: Optional[SettleAction] = None,
+        network: Optional[str] = None,
+    ) -> List[SettleResult]:
+        """Pays every open debit and claims every open credit, gaslessly
+        where possible; ``only="pay"`` or ``only="claim"`` does one side. One
+        that fails does not stop the others: read each result's ``status``.
+        A debit left unpaid past its deadline is taken from the wallet's
+        collateral, so this is the call to run after a cycle closes.
+
+        A credit is claimable only once its cycle is funded; until then its
+        claim comes back ``"failed"``, before anything is sent. With no
+        facilitator configured the wallet sends the transactions itself and
+        pays their gas: for a token debit that is an approval of the exact
+        amount, when the ClearingHouse lacks one, and then the payment."""
+        if only not in (None, "pay", "claim"):
+            raise InvalidParamsError(f'only must be "pay" or "claim", not {only!r}')
+        return await settle_all(await self._session(network), only)
 
     async def fetch(
         self, url: Union[str, httpx.URL], *, method: str = "GET", **kwargs: Any

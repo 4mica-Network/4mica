@@ -21,9 +21,11 @@ from .models import (
     CheckpointAcceptedResponse,
     CheckpointBatchResponse,
     ClearingParticipantProof,
+    ClearingPosition,
     ClearingSettlementAction,
     ClearingSettlementActionResponse,
     CorePublicParameters,
+    PayerGuaranteesPage,
     PaymentRequest,
     RecipientPaymentInfo,
     SignedCheckpoint,
@@ -240,6 +242,40 @@ class RpcProxy:
         return await self.get_clearing_settlement_action(
             cycle_id, creditor, ClearingSettlementAction.CLAIM_NET_CREDIT
         )
+
+    async def list_participant_positions(
+        self, participant: str
+    ) -> List[ClearingPosition]:
+        """The positions *participant* can still settle, across every cycle
+        and asset, soonest payment deadline first: net debits that are unpaid
+        and still payable, and net credits that are unclaimed. Paid, claimed,
+        defaulted and flat positions are not listed."""
+        raw = await self._get(f"/core/participants/{participant}/positions")
+        positions = raw.get("positions") if isinstance(raw, dict) else None
+        return [
+            ClearingPosition.from_rpc(item)
+            for item in (positions if isinstance(positions, list) else [])
+        ]
+
+    async def list_payer_guarantees(
+        self,
+        payer: str,
+        cycle_id: str,
+        limit: Optional[int] = None,
+        after: Optional[str] = None,
+    ) -> PayerGuaranteesPage:
+        """One page of the guarantees *payer* issued in a cycle, whatever
+        their settlement status, in the order core stored them. *cycle_id* is
+        the cycle's on-chain bytes32 id (``cycle_id`` on a position or an
+        active cycle), not its text id. *limit* defaults to 100 and is capped
+        at 500 by core; *after* is the ``next_cursor`` of the page before."""
+        params: Dict[str, Any] = {"cycle_id": normalize_bytes32_hex(cycle_id)}
+        if limit is not None:
+            params["limit"] = limit
+        if after is not None:
+            params["after"] = after
+        raw = await self._get(f"/core/payers/{payer}/guarantees", params=params)
+        return PayerGuaranteesPage.from_rpc(raw)
 
     async def list_recipient_payments(
         self, recipient_address: str

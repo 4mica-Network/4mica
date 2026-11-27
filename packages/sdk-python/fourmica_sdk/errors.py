@@ -405,9 +405,33 @@ class SponsorshipTransportError(SponsorshipError):
 
 
 class OutcomeUnknownError(SponsorshipError):
-    """The request reached the facilitator but no usable answer came back, so
-    whether it submitted a transaction is unknown. Do not blindly retry: the
-    first attempt may already have settled."""
+    """Something was sent and no usable answer came back, so whether a
+    transaction went through is unknown. Do not blindly retry: the first
+    attempt may already have settled.
+
+    Raised as this class for a sponsored action the facilitator never
+    answered, and as :class:`TransactionOutcomeUnknownError` for a
+    transaction the wallet sent itself. Catching this one covers both."""
+
+
+class TransactionOutcomeUnknownError(OutcomeUnknownError):
+    """A transaction the wallet signed and sent itself, whose fate is unknown.
+
+    - ``stage="broadcast"``: it was handed to the chain's node and no usable
+      answer came back (a timeout, a dropped connection, a gateway error, a
+      JSON-RPC internal error). The node may have taken it, and there is no
+      hash to look it up by.
+    - ``stage="receipt"``: the node accepted it, as ``tx_hash``, and its
+      receipt was not seen in time. It may still be mined.
+
+    Either way a second attempt can send it twice. Check first: by
+    ``tx_hash`` when there is one, otherwise by the state it would have
+    changed."""
+
+    def __init__(self, message: str, stage: str, tx_hash: Optional[str] = None) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.tx_hash = tx_hash
 
 
 class Permit2AllowanceRequiredError(SponsorshipError):
@@ -560,6 +584,7 @@ __all__: List[str] = [
     "StaleTimestampError",
     "TimestampNotPastCutoffError",
     "TokenNotSupportedError",
+    "TransactionOutcomeUnknownError",
     "TransferFailedError",
     "UnknownRevertError",
     "UnreadableReceiptSignatureError",

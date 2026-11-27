@@ -27,6 +27,7 @@ from ..errors import (
 )
 from ..models import (
     ZERO_ADDRESS,
+    ClearingPosition,
     ClearingSettlementActionResponse,
     TxReceiptWaitOptions,
 )
@@ -51,6 +52,12 @@ class SettlementClient:
     def is_gasless_available(self) -> bool:
         """Whether the gasless route is available at all."""
         return self._ctx.facilitator.is_configured()
+
+    async def positions(self) -> List[ClearingPosition]:
+        """The signer's open positions, across every cycle and asset, soonest
+        payment deadline first: what :meth:`pay` and :meth:`claim` still have
+        to do. Pass a position's ``cycle_id_text`` to either."""
+        return await self._ctx.rpc.list_participant_positions(self._ctx.signer_address)
 
     def pay(self, cycle_id: str) -> "PayBuilder":
         """Starts a net-debit payment for *cycle_id* (the cycle's text id, as
