@@ -5,15 +5,15 @@ import {
   withCredentialLock,
 } from "../../core/credentials.js";
 import {
-  loadStoredSession,
   type Platform,
+  readStoredSession,
   request,
   whoAmI,
 } from "../../core/platform.js";
 import { readEnv } from "../../core/settings.js";
 import { PlatformCommand } from "../../platform-command.js";
 
-type Outcome = "revoked" | "kept" | "unreachable" | "none";
+type Outcome = "revoked" | "kept" | "unreachable" | "unreadable" | "none";
 
 export default class AuthLogout extends PlatformCommand {
   static summary = "sign the cli out of your 4mica account";
@@ -43,14 +43,19 @@ export default class AuthLogout extends PlatformCommand {
       dir,
       platform.origin,
       async (assertHeld): Promise<Outcome> => {
-        const found = await loadStoredSession(dir);
-        if (!found) return "none";
-        const result = await this.retire(
-          platform,
-          found.token,
-          found.kind,
-          flags.revoke,
-        );
+        const found = await readStoredSession(dir);
+        if (found.status === "missing") return "none";
+        // A token that cannot be read cannot be revoked, but signing out
+        // here must still work: forget it, and say what is left to do.
+        const result =
+          found.status === "unavailable"
+            ? "unreadable"
+            : await this.retire(
+                platform,
+                found.session.token,
+                found.session.kind,
+                flags.revoke,
+              );
         await assertHeld();
         await removeToken(dir, platform.origin);
         return result;
@@ -67,6 +72,12 @@ export default class AuthLogout extends PlatformCommand {
           "since it may be in use elsewhere, such as in CI; revoke it under " +
           "Settings → Developer → CLI sessions. To revoke such a token as you " +
           "sign out, use `4mica auth logout --revoke`",
+      );
+    } else if (outcome === "unreadable") {
+      this.warning(
+        "signed out here, but the saved token could not be read, so it was " +
+          "not revoked; revoke it in the dashboard under Settings → Developer " +
+          "→ CLI sessions",
       );
     } else {
       this.warning(

@@ -330,7 +330,7 @@ describe("auth logout", () => {
     expect(platform.tokens.has("4mica_cli_shared")).toBe(false);
   });
 
-  it("says the keychain is unavailable rather than that nobody is signed in", async () => {
+  it("forgets a token it cannot read, and says it was not revoked", async () => {
     await withCredentialLock(
       configDir(),
       new URL(platform.url).origin,
@@ -344,11 +344,14 @@ describe("auth logout", () => {
         kind: "DEVICE",
       }),
     );
-    const { error, stderr } = await run(AuthLogout);
+    const { error, json, stderr } = await run(AuthLogout, ["--json"]);
 
-    expect(error).toMatchObject({ code: "CREDENTIAL_STORE_UNAVAILABLE" });
+    expect(error).toBeUndefined();
+    expect(json).toMatchObject({ loggedOut: true, revoked: false });
     expect(stderr).not.toContain("nothing to do");
-    expect(await readFile(tokenFile(), "utf8")).toContain("keychain");
+    expect(stderr).toContain("could not be read");
+    expect(stderr).toContain("revoke it in the dashboard");
+    await expect(readFile(tokenFile())).rejects.toThrow();
   });
 
   it("forgets the token even when the platform cannot be reached", async () => {

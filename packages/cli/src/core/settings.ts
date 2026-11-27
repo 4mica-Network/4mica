@@ -226,7 +226,7 @@ export const requireFacilitatorUrl = (resolved: Resolved): void =>
     },
   });
 
-export const requireApiUrl = (resolved: Resolved): void =>
+export function requireApiUrl(resolved: Resolved): void {
   requireServiceUrl(resolved, {
     name: "platform",
     code: "BAD_API_URL",
@@ -235,6 +235,20 @@ export const requireApiUrl = (resolved: Resolved): void =>
       scheme: "give the platform API's https:// address",
     },
   });
+  // Requests and saved sign-ins both go by origin, so a path would be
+  // silently dropped: refuse it instead of sending requests elsewhere.
+  const { origin, pathname, search, hash } = new URL(resolved.value);
+  if (pathname === "/" && !search && !hash) return;
+  const make = resolved.source === "flag" ? usageError : configError;
+  throw make(
+    `the platform URL "${resolved.value}" (${resolved.source}) has a path, ` +
+      "which the cli does not use",
+    {
+      code: "BAD_API_URL",
+      suggestions: [`give only the origin: ${origin}`],
+    },
+  );
+}
 
 /**
  * Whether money sent here is known not to be real: a hosted testnet, or a
