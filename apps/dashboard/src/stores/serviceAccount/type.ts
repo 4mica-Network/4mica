@@ -15,6 +15,7 @@ export interface NewServiceAccountKey {
   name: string;
   scopes: ApiKeyScope[];
   expiresAt?: string;
+  ipAllowlist?: string[];
 }
 
 export type CreatedServiceAccountKey = ApiKey & { secret: string };

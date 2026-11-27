@@ -18,6 +18,17 @@ export function ApiKeyTags({ apiKey }: { apiKey: ApiKey }) {
       >
         {t(production ? "environment.production" : "environment.sandbox")}
       </Tag>
+      {(apiKey.ipAllowlist?.length ?? 0) > 0 && (
+        <Tag
+          size="sm"
+          variant="default"
+          data-testid={`api-key-ip-${apiKey.id}`}
+        >
+          {t("ipAllowlist.restricted", {
+            count: apiKey.ipAllowlist?.length ?? 0,
+          })}
+        </Tag>
+      )}
       {(apiKey.scopes ?? []).map((scope) => (
         <Tag key={scope} size="sm" variant="neutral">
           {t(`apiKey.scope.${scope}`)}

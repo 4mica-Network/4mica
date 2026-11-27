@@ -87,7 +87,7 @@ export function* fetchDeveloper(): Generator {
 
 export function* createApiKey(action: {
   type: string;
-  payload: { name: string; scopes?: ApiKeyScope[] };
+  payload: { name: string; scopes?: ApiKeyScope[]; ipAllowlist?: string[] };
   meta: PendingMeta;
   onReveal?: RevealSecret;
 }): Generator {
@@ -116,13 +116,14 @@ export function* createApiKey(action: {
 
 export function* renameApiKey(action: {
   type: string;
-  payload: { id: string; name: string };
+  payload: { id: string; name?: string; ipAllowlist?: string[] };
   meta: PendingMeta;
 }): Generator {
   try {
-    const key = (yield call(() =>
-      api.renameApiKey(action.payload.id, action.payload.name),
-    )) as Awaited<ReturnType<typeof api.renameApiKey>>;
+    const { id, ...data } = action.payload;
+    const key = (yield call(() => api.updateApiKey(id, data))) as Awaited<
+      ReturnType<typeof api.updateApiKey>
+    >;
     yield put(renameApiKeySucceeded(key, action.meta));
   } catch (error) {
     yield* fail(error, "Couldn't rename the API key.", action.meta);

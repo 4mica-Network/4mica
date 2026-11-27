@@ -15,6 +15,9 @@ export const PERMISSION = {
   APPROVALS_DECIDE: "approvals.decide",
   GOVERNANCE_MANAGE: "governance.manage",
   REPORTS_EXPORT: "reports.export",
+  SECURITY_MANAGE: "security.manage",
+  ROLES_MANAGE: "roles.manage",
+  COMPLIANCE_READ: "compliance.read",
 } as const;
 
 export type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];

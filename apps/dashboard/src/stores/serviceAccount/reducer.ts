@@ -60,6 +60,7 @@ export default function serviceAccountReducer(
     case actionTypes.DELETE_SERVICE_ACCOUNT_REQUESTED:
     case actionTypes.CREATE_SERVICE_ACCOUNT_KEY_REQUESTED:
     case actionTypes.REVOKE_SERVICE_ACCOUNT_KEY_REQUESTED:
+    case actionTypes.UPDATE_SERVICE_ACCOUNT_KEY_REQUESTED:
     case actionTypes.ROTATE_SERVICE_ACCOUNT_KEY_REQUESTED:
       return {
         ...state,
@@ -90,6 +91,7 @@ export default function serviceAccountReducer(
 
     case actionTypes.CREATE_SERVICE_ACCOUNT_KEY_SUCCEEDED:
     case actionTypes.REVOKE_SERVICE_ACCOUNT_KEY_SUCCEEDED:
+    case actionTypes.UPDATE_SERVICE_ACCOUNT_KEY_SUCCEEDED:
     case actionTypes.ROTATE_SERVICE_ACCOUNT_KEY_SUCCEEDED:
       return { ...state, pending: done() };
 

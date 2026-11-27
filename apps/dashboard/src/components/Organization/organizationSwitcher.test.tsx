@@ -138,23 +138,23 @@ describe("organization switcher", () => {
     );
   });
 
-  it("opens the create dialog", () => {
+  it("opens the create dialog", async () => {
     renderSidebar();
     openMenu();
 
     fireEvent.click(screen.getByTestId("organization-create"));
 
     expect(
-      screen.getByRole("dialog", { name: "Create organization" }),
+      await screen.findByRole("dialog", { name: "Create organization" }),
     ).toBeInTheDocument();
   });
 
-  it("suggests a handle from the name and rejects a reserved one", () => {
+  it("suggests a handle from the name and rejects a reserved one", async () => {
     renderSidebar();
     openMenu();
     fireEvent.click(screen.getByTestId("organization-create"));
 
-    fireEvent.change(screen.getByLabelText(/^Name/), {
+    fireEvent.change(await screen.findByLabelText(/^Name/), {
       target: { value: "Acme Labs" },
     });
     const handle = screen.getByLabelText(/^Handle/) as HTMLInputElement;
@@ -171,12 +171,12 @@ describe("organization switcher", () => {
     );
   });
 
-  it("creates an organization with a valid name and handle", () => {
+  it("creates an organization with a valid name and handle", async () => {
     renderSidebar();
     openMenu();
     fireEvent.click(screen.getByTestId("organization-create"));
 
-    fireEvent.change(screen.getByLabelText(/^Name/), {
+    fireEvent.change(await screen.findByLabelText(/^Name/), {
       target: { value: "Acme Labs" },
     });
     fireEvent.click(screen.getByTestId("create-organization-submit"));

@@ -18,13 +18,17 @@ import {
   selectServiceAccountKeys,
   selectServiceAccountKeysStatus,
   serviceAccountPendingKeys,
+  updateServiceAccountKey,
 } from "@stores/serviceAccount";
 import { formatDate } from "@utils/format";
+import { invalidAllowlistEntries, parseAllowlist } from "@utils/ipAllowlist";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiKeyTags, ScopePicker } from "@/components/ApiKey";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { FieldRow, Select, TextInput } from "@/components/form";
+import { IpAllowlistField } from "@/components/IpAllowlistField";
+import { IpAllowlistEditor } from "@/components/IpAllowlistField/IpAllowlistEditor";
 import { Spinner } from "@/components/Spinner";
 import { useOnSuccess } from "@/hooks/useOnSuccess";
 
@@ -79,6 +83,21 @@ function KeyRow({
       {canManage && !isRevoked && (
         <div className="flex shrink-0 items-center gap-2">
           {isPending && <Spinner size="sm" className="text-ink-subtle" />}
+          <IpAllowlistEditor
+            id={`key-ip-${apiKey.id}`}
+            keyName={apiKey.name}
+            value={apiKey.ipAllowlist}
+            disabled={isPending}
+            onSave={(ipAllowlist) =>
+              dispatch(
+                updateServiceAccountKey({
+                  id: accountId,
+                  keyId: apiKey.id,
+                  ipAllowlist,
+                }),
+              )
+            }
+          />
           <div className="w-32">
             <Select
               id={`rotate-grace-${apiKey.id}`}
@@ -165,15 +184,21 @@ function NewKeyForm({
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ApiKeyScope[]>([...API_KEY_SCOPES]);
   const [expiresOn, setExpiresOn] = useState("");
+  const [ipAllowlist, setIpAllowlist] = useState("");
 
   useOnSuccess(isCreating, failed, () => {
     setName("");
     setScopes([...API_KEY_SCOPES]);
     setExpiresOn("");
+    setIpAllowlist("");
   });
 
   const trimmed = name.trim();
-  const ready = trimmed.length > 0 && scopes.length > 0;
+  const allowlist = parseAllowlist(ipAllowlist);
+  const ready =
+    trimmed.length > 0 &&
+    scopes.length > 0 &&
+    invalidAllowlistEntries(allowlist).length === 0;
 
   return (
     <Card>
@@ -191,6 +216,7 @@ function NewKeyForm({
                 key: {
                   name: trimmed,
                   scopes,
+                  ...(allowlist.length > 0 ? { ipAllowlist: allowlist } : {}),
                   ...(expiresOn
                     ? { expiresAt: new Date(expiresOn).toISOString() }
                     : {}),
@@ -227,6 +253,11 @@ function NewKeyForm({
             onChange={setExpiresOn}
           />
         </FieldRow>
+        <IpAllowlistField
+          id={`new-key-ip-${accountId}`}
+          value={ipAllowlist}
+          onChange={setIpAllowlist}
+        />
         <div className="py-3">
           <ScopePicker
             idPrefix={`new-key-scope-${accountId}`}

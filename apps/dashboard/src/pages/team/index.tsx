@@ -5,6 +5,7 @@ import {
   selectCan,
 } from "@stores/organization/selector";
 import { PERMISSION } from "@stores/organization/type";
+import { fetchSecurity, selectSecurityCollection } from "@stores/security";
 import {
   fetchInvitations,
   fetchMembers,
@@ -15,7 +16,7 @@ import {
 } from "@stores/team";
 import { selectUser } from "@stores/user/selector";
 import { TriangleAlert, UserPlus, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "@/components/layout";
 import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
@@ -59,14 +60,28 @@ function Members() {
   const status = useAppSelector(selectMembersStatus);
   const error = useAppSelector(selectMembersError);
   const invitations = useAppSelector(selectInvitations);
+  const roles = useAppSelector(selectSecurityCollection("roles"));
+  const domains = useAppSelector(selectSecurityCollection("domains"));
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchMembers());
     if (canManage) {
       dispatch(fetchInvitations());
+      dispatch(fetchSecurity("roles"));
+      dispatch(fetchSecurity("domains"));
     }
   }, [dispatch, canManage]);
+
+  const verifiedDomains = useMemo(
+    () =>
+      domains.status === "loaded"
+        ? domains.items
+            .filter((domain) => domain.verified)
+            .map((domain) => domain.domain)
+        : null,
+    [domains],
+  );
 
   return (
     <>
@@ -118,6 +133,8 @@ function Members() {
                 isSelf={member.userId === user?.id}
                 viewerRole={organization?.role}
                 canManage={canManage}
+                customRoles={roles.items}
+                verifiedDomains={verifiedDomains}
               />
             ))}
           </div>

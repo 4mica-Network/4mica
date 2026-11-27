@@ -99,6 +99,8 @@ export default function teamReducer(
       };
 
     case actionTypes.UPDATE_MEMBER_ROLE_REQUESTED:
+    case actionTypes.SUSPEND_MEMBER_REQUESTED:
+    case actionTypes.REVOKE_MEMBER_SESSIONS_REQUESTED:
     case actionTypes.REMOVE_MEMBER_REQUESTED:
     case actionTypes.INVITE_MEMBERS_REQUESTED:
     case actionTypes.RESEND_INVITATION_REQUESTED:
@@ -110,7 +112,14 @@ export default function teamReducer(
         issues: {},
       };
 
-    case actionTypes.UPDATE_MEMBER_ROLE_SUCCEEDED: {
+    case actionTypes.REVOKE_MEMBER_SESSIONS_SUCCEEDED:
+      return {
+        ...state,
+        pending: setPending(state.pending, action.meta?.pendingKey, false),
+      };
+
+    case actionTypes.UPDATE_MEMBER_ROLE_SUCCEEDED:
+    case actionTypes.SUSPEND_MEMBER_SUCCEEDED: {
       const member = action.payload as Member;
       return {
         ...state,

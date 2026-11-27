@@ -111,6 +111,23 @@ const ProfileSettings = lazyPage("pages/profile", () =>
 const TeamSettings = lazyPage("pages/team", () =>
   import("@/pages/team").then((page) => page.TeamSettings),
 );
+const RolesSettings = lazyPage("pages/roles", () =>
+  import("@/pages/roles").then((page) => page.RolesSettings),
+);
+const SecuritySettingsPage = lazyPage("pages/security", () =>
+  import("@/pages/security").then((page) => page.SecuritySettingsPage),
+);
+const ScimSettings = lazyPage("pages/scim", () =>
+  import("@/pages/scim").then((page) => page.ScimSettings),
+);
+const AuditStreamsSettings = lazyPage("pages/audit-streams", () =>
+  import("@/pages/audit-streams").then((page) => page.AuditStreamsSettings),
+);
+const ComplianceReportSettings = lazyPage("pages/compliance-report", () =>
+  import("@/pages/compliance-report").then(
+    (page) => page.ComplianceReportSettings,
+  ),
+);
 const Wallet = lazyPage("pages/wallet", () =>
   import("@/pages/wallet").then((page) => page.Wallet),
 );
@@ -166,6 +183,7 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "general", component: AccountSettings },
   { path: "business", component: BusinessSettings },
   { path: "team", component: TeamSettings },
+  { path: "roles", component: RolesSettings },
   { path: "projects", component: ProjectsSettings },
   { path: "notifications", component: NotificationSettings },
   { path: "plans", component: PlansSettings },
@@ -174,6 +192,10 @@ export const SETTINGS_PAGES: SettingsRouteMeta[] = [
   { path: "service-accounts", component: ServiceAccountsSettings },
   { path: "governance", component: GovernanceSettings },
   { path: "audit-log", component: AuditLogSettings },
+  { path: "audit-streams", component: AuditStreamsSettings },
+  { path: "security", component: SecuritySettingsPage },
+  { path: "scim", component: ScimSettings },
+  { path: "compliance-report", component: ComplianceReportSettings },
 ];
 
 export const pageAt = (to: string): ComponentType | undefined => {

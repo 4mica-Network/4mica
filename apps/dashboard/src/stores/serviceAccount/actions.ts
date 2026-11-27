@@ -110,6 +110,16 @@ export const revokeServiceAccountKey = (payload: {
   meta: { pendingKey: serviceAccountPendingKeys.key(payload.keyId) },
 });
 
+export const updateServiceAccountKey = (payload: {
+  id: string;
+  keyId: string;
+  ipAllowlist: string[];
+}) => ({
+  type: actionTypes.UPDATE_SERVICE_ACCOUNT_KEY_REQUESTED,
+  payload,
+  meta: { pendingKey: serviceAccountPendingKeys.key(payload.keyId) },
+});
+
 export const rotateServiceAccountKey = (
   payload: { id: string; keyId: string; expireOldInHours: number },
   onReveal?: RevealSecret,

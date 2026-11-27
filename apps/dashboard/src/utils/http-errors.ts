@@ -1,5 +1,7 @@
 import { HttpError, HttpTimeoutError } from "@4mica/http";
 import i18n from "@i18n";
+import { accessErrorOf } from "@/lib/accessErrors";
+import { ReauthCancelledError, ReauthUnavailableError } from "@/lib/reauth";
 
 interface ApiIssue {
   path?: unknown;
@@ -54,6 +56,12 @@ export const toMessage = (
   fallback: string,
   { sessionExpired }: { sessionExpired?: string } = {},
 ): string => {
+  if (error instanceof ReauthCancelledError) {
+    return i18n.t("http.reauthCancelled");
+  }
+  if (error instanceof ReauthUnavailableError) {
+    return i18n.t("http.reauthUnavailable");
+  }
   if (!(error instanceof HttpError)) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       return i18n.t("http.offline");
@@ -68,6 +76,13 @@ export const toMessage = (
 
   if (error.status === 403 && code === "account_disabled") {
     return i18n.t("http.accountDisabled");
+  }
+
+  const access = accessErrorOf(error);
+  if (access) {
+    return i18n.t(`access.${access.code}.body`, {
+      domain: access.domain ?? "",
+    });
   }
 
   if (error.status === 429) {

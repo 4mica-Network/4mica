@@ -6,6 +6,7 @@ import {
 } from "@4mica/http";
 import i18n from "@i18n";
 import { CANCEL } from "redux-saga";
+import { accessErrorOf, reportAccessError } from "@/lib/accessErrors";
 import {
   ApprovalRequiredError,
   captureRequest,
@@ -14,11 +15,12 @@ import {
   type StoredRequest,
 } from "@/lib/approvalRequests";
 import { notifyInfo } from "@/lib/notify";
+import { withReauth } from "@/lib/reauth";
 import { LOCAL_API_URL, requireTrustedApiUrl } from "./apiUrl";
 
 export { setAuthTokenProvider, setUnauthorizedHandler } from "@4mica/http";
 
-const API_URL = import.meta.env.PROD
+export const API_URL = import.meta.env.PROD
   ? requireTrustedApiUrl(import.meta.env.VITE_API_URL)
   : import.meta.env.VITE_API_URL?.trim() || LOCAL_API_URL;
 
@@ -76,10 +78,16 @@ class SagaAwareHttpClient extends HttpClient {
         ? null
         : captureRequest(config, resolveRequestHeaders());
 
+    const send = () =>
+      super.request<TResponse, TData>({ ...config, signal: controller.signal });
+
     return withCancel(
-      super
-        .request<TResponse, TData>({ ...config, signal: controller.signal })
-        .then((result) => settleGoverned(captured, result)),
+      withReauth(send)
+        .then((result) => settleGoverned(captured, result))
+        .catch((error: unknown) => {
+          reportAccessError(accessErrorOf(error));
+          throw error;
+        }),
       () => controller.abort(),
     );
   }

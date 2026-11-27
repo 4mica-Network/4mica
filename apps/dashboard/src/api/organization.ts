@@ -9,6 +9,7 @@ import type {
   AuditLogItem,
   Member,
   PendingInvitation,
+  RoleAssignment,
 } from "@stores/team/type";
 import { httpClient } from "./client";
 
@@ -75,11 +76,23 @@ export const getMembers = () =>
     method: HttpMethod.GET,
   });
 
-export const updateMemberRole = (userId: string, role: OrganizationRole) =>
-  httpClient.request<Member, { role: OrganizationRole }>({
+export const updateMemberRole = (userId: string, data: RoleAssignment) =>
+  httpClient.request<Member, RoleAssignment>({
     url: `/me/organization/members/${encodeURIComponent(userId)}`,
     method: HttpMethod.PATCH,
-    data: { role },
+    data,
+  });
+
+export const suspendMember = (userId: string, suspended: boolean) =>
+  httpClient.request<Member>({
+    url: `/me/organization/members/${encodeURIComponent(userId)}/${suspended ? "suspend" : "reactivate"}`,
+    method: HttpMethod.POST,
+  });
+
+export const revokeMemberSessions = (userId: string) =>
+  httpClient.request<{ revoked: number }>({
+    url: `/me/organization/members/${encodeURIComponent(userId)}/sessions/revoke`,
+    method: HttpMethod.POST,
   });
 
 export const removeMember = (userId: string) =>

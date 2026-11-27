@@ -21,10 +21,17 @@ import {
   type LucideIcon,
   UserCog,
 } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { CreateOrganizationModal } from "@/components/Organization/CreateOrganizationModal";
 import { OrganizationSwitcher } from "@/components/Organization/OrganizationSwitcher";
 import { EnvironmentToggle } from "@/components/Project/EnvironmentToggle";
 import { ProjectSwitcher } from "@/components/Project/ProjectSwitcher";
@@ -32,6 +39,14 @@ import { SidebarBanners } from "@/components/SidebarBanners";
 import { links } from "@/lib/links";
 import { FOOTER_ITEMS, NAV_SECTIONS, type NavItem, SETTINGS_NAV } from "@/nav";
 import { preloadPage } from "@/routes";
+
+const CreateOrganizationModal = lazy(() =>
+  import("@/components/Organization/CreateOrganizationModal").then(
+    (module) => ({
+      default: module.CreateOrganizationModal,
+    }),
+  ),
+);
 
 const EXPANDED_WIDTH = 256;
 export const COLLAPSED_WIDTH = 60;
@@ -330,10 +345,11 @@ function AvatarMenu({ collapsed }: { collapsed: boolean }) {
         </div>
       </Dropdown>
 
-      <CreateOrganizationModal
-        isOpen={creating}
-        onClose={() => setCreating(false)}
-      />
+      {creating && (
+        <Suspense fallback={null}>
+          <CreateOrganizationModal isOpen onClose={() => setCreating(false)} />
+        </Suspense>
+      )}
     </>
   );
 }

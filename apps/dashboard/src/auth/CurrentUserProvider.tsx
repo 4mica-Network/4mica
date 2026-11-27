@@ -15,7 +15,10 @@ import {
 import { resetSession } from "@stores/session";
 import { fetchUser } from "@stores/user/actions";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { signInPath } from "@/auth/accessHandling";
 import { FullScreenLoader } from "@/auth/FullScreenLoader";
+import { useSecurityBridges } from "@/auth/useSecurityBridges";
+import { accessErrorFromBody } from "@/lib/accessErrors";
 import { clearVerifyToken } from "@/lib/verifyToken";
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
@@ -35,29 +38,33 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const signOutRef = useRef(signOut);
   signOutRef.current = signOut;
 
+  const signingOut = useRef(false);
+  const signOutTo = useRef((redirectUrl: string) => {
+    if (signingOut.current) {
+      return;
+    }
+    signingOut.current = true;
+    void signOutRef.current({ redirectUrl });
+  }).current;
+
+  useSecurityBridges(signOutTo);
+
   useEffect(() => {
-    let signingOut = false;
     setAuthTokenProvider((options) =>
       getTokenRef.current(
         options?.forceRefresh ? { skipCache: true } : undefined,
       ),
     );
-    setUnauthorizedHandler(() => {
-      if (signingOut) {
-        return;
-      }
-      signingOut = true;
-      const { pathname, search } = window.location;
-      void signOutRef.current({
-        redirectUrl: `/sign-in?redirect_url=${encodeURIComponent(`${pathname}${search}`)}`,
-      });
+    setUnauthorizedHandler((body) => {
+      const tooOld = accessErrorFromBody(body)?.code === "session_too_old";
+      signOutTo(signInPath({ reason: tooOld ? "session_too_old" : null }));
     });
     setTokenReady(true);
     return () => {
       setAuthTokenProvider(null);
       setUnauthorizedHandler(null);
     };
-  }, []);
+  }, [signOutTo]);
 
   useEffect(() => {
     if (!tokenReady || !isSignedIn || !userId) {

@@ -24,6 +24,7 @@ export interface ApiKey {
   environment: EnvironmentKind;
   scopes: ApiKeyScope[];
   serviceAccountId: string | null;
+  ipAllowlist?: string[];
   lastUsedAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;

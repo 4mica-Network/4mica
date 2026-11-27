@@ -66,6 +66,17 @@ export const revokeServiceAccountKey = (id: string, keyId: string) =>
     method: HttpMethod.POST,
   });
 
+export const updateServiceAccountKey = (
+  id: string,
+  keyId: string,
+  data: { ipAllowlist: string[] },
+) =>
+  httpClient.request<ApiKey, { ipAllowlist: string[] }>({
+    url: `${base(id)}/keys/${encodeURIComponent(keyId)}`,
+    method: HttpMethod.PATCH,
+    data,
+  });
+
 export const rotateServiceAccountKey = (
   id: string,
   keyId: string,

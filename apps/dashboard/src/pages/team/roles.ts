@@ -28,3 +28,29 @@ export const parseEmails = (raw: string): string[] => [
       .filter(Boolean),
   ),
 ];
+
+export const CUSTOM_ROLE_PREFIX = "custom:";
+
+export const roleValue = (member: {
+  role: OrganizationRole;
+  customRole?: { id: string } | null;
+}): string =>
+  member.customRole
+    ? `${CUSTOM_ROLE_PREFIX}${member.customRole.id}`
+    : member.role;
+
+export const emailDomain = (email: string | null): string | null => {
+  const at = email?.lastIndexOf("@") ?? -1;
+  return email && at > 0 ? email.slice(at + 1).toLowerCase() : null;
+};
+
+export const isManagedIdentity = (
+  email: string | null,
+  verifiedDomains: string[] | null,
+): boolean => {
+  if (verifiedDomains === null) {
+    return true;
+  }
+  const domain = emailDomain(email);
+  return domain !== null && verifiedDomains.includes(domain);
+};

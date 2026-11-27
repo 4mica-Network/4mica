@@ -30,6 +30,7 @@ import { projectHeaders } from "./project/selector";
 import { onStoreRegistered } from "./registry";
 import type resourceKeyReducer from "./resourceKey/reducer";
 import { sessionScoped } from "./rootSaga";
+import type securityReducer from "./security/reducer";
 import type serviceAccountReducer from "./serviceAccount/reducer";
 import { withSessionReset } from "./session";
 import type supportReducer from "./support/reducer";
@@ -63,6 +64,7 @@ export interface LazyReducers {
   team: typeof teamReducer;
   serviceAccount: typeof serviceAccountReducer;
   finance: typeof financeReducer;
+  security: typeof securityReducer;
 }
 
 type AllReducers = typeof eagerReducers & LazyReducers;

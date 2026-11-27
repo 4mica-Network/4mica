@@ -40,7 +40,7 @@ export const fetchDeveloperFailed = (message: string) => ({
 });
 
 export const createApiKey = (
-  payload: { name: string; scopes?: ApiKeyScope[] },
+  payload: { name: string; scopes?: ApiKeyScope[]; ipAllowlist?: string[] },
   onReveal?: RevealSecret,
 ) => ({
   type: actionTypes.CREATE_API_KEY_REQUESTED,
@@ -55,7 +55,11 @@ export const createApiKeySucceeded = (apiKey: ApiKey, meta: PendingMeta) => ({
   meta,
 });
 
-export const renameApiKey = (payload: { id: string; name: string }) => ({
+export const renameApiKey = (payload: {
+  id: string;
+  name?: string;
+  ipAllowlist?: string[];
+}) => ({
   type: actionTypes.RENAME_API_KEY_REQUESTED,
   payload,
   meta: { pendingKey: developerPendingKeys.apiKey(payload.id) },

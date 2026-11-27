@@ -5,10 +5,15 @@ import { PERMISSION } from "@stores/organization/type";
 import { switchProject } from "@stores/project/actions";
 import { selectActiveProject, selectProjects } from "@stores/project/selector";
 import { Check, ChevronsUpDown, FolderKanban, Plus } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { lazy, Suspense, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CreateProjectModal } from "./CreateProjectModal";
 import { useLeaveDetail } from "./useLeaveDetail";
+
+const CreateProjectModal = lazy(() =>
+  import("./CreateProjectModal").then((module) => ({
+    default: module.CreateProjectModal,
+  })),
+);
 
 const ITEM_CLASS =
   "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-ink-body text-sm outline-none hover:bg-overlay/10 focus-visible:bg-overlay/10 focus-visible:ring-1 focus-visible:ring-overlay/60 focus-visible:ring-inset";
@@ -158,10 +163,11 @@ export function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
         </div>
       </Dropdown>
 
-      <CreateProjectModal
-        isOpen={creating}
-        onClose={() => setCreating(false)}
-      />
+      {creating && (
+        <Suspense fallback={null}>
+          <CreateProjectModal isOpen onClose={() => setCreating(false)} />
+        </Suspense>
+      )}
     </>
   );
 }

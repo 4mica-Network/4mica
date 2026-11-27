@@ -216,6 +216,26 @@ export function* revokeServiceAccountKey(action: {
   }
 }
 
+export function* updateServiceAccountKey(action: {
+  type: string;
+  payload: { id: string; keyId: string; ipAllowlist: string[] };
+  meta: PendingMeta;
+}): Generator {
+  const { id, keyId, ipAllowlist } = action.payload;
+  try {
+    yield call(() => api.updateServiceAccountKey(id, keyId, { ipAllowlist }));
+    yield put(
+      serviceAccountKeySucceeded(
+        actionTypes.UPDATE_SERVICE_ACCOUNT_KEY_SUCCEEDED,
+        action.meta,
+      ),
+    );
+    yield* afterKeyChange(id);
+  } catch (error) {
+    yield* fail(error, "Couldn't update the API key.", action.meta);
+  }
+}
+
 export function* rotateServiceAccountKey(action: {
   type: string;
   payload: { id: string; keyId: string; expireOldInHours: number };
@@ -259,6 +279,10 @@ export default [
   takeEvery(
     actionTypes.CREATE_SERVICE_ACCOUNT_KEY_REQUESTED,
     createServiceAccountKey,
+  ),
+  takeEvery(
+    actionTypes.UPDATE_SERVICE_ACCOUNT_KEY_REQUESTED,
+    updateServiceAccountKey,
   ),
   takeEvery(
     actionTypes.REVOKE_SERVICE_ACCOUNT_KEY_REQUESTED,

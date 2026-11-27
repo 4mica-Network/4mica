@@ -8,7 +8,16 @@ export interface Member {
   avatarUrl: string | null;
   role: OrganizationRole;
   joinedAt: string;
+  customRole?: { id: string; name: string } | null;
+  source?: MemberSource | null;
+  suspendedAt?: string | null;
 }
+
+export type MemberSource = "SCIM" | "DOMAIN" | "INVITATION" | "OWNER" | string;
+
+export type RoleAssignment =
+  | { role: OrganizationRole }
+  | { customRoleId: string };
 
 export interface PendingInvitation {
   id: string;

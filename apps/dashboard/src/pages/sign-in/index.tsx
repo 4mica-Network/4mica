@@ -52,8 +52,15 @@ export function SignInPage() {
   }, [isLoaded]);
 
   const redirectUrlComplete = safeRedirectPath(params.get("redirect_url"));
+  const reason = params.get("reason");
+  const ssoDomain = reason === "sso_required" ? params.get("domain") : null;
+  const [email, setEmail] = useState("");
 
-  const signInWithGoogle = async () => {
+  const signInWith = async (
+    options:
+      | { strategy: "oauth_google" }
+      | { strategy: "enterprise_sso"; identifier: string },
+  ) => {
     if (!isLoaded || redirecting) {
       return;
     }
@@ -63,7 +70,7 @@ export function SignInPage() {
 
     try {
       await signIn.authenticateWithRedirect({
-        strategy: "oauth_google",
+        ...options,
         redirectUrl: "/sso-callback",
         redirectUrlComplete,
       });
@@ -95,13 +102,63 @@ export function SignInPage() {
           </h1>
 
           <div className="mt-10 flex w-91.25 max-w-full flex-col items-center">
+            {reason === "session_too_old" && (
+              <p
+                role="status"
+                className="mb-6 text-center text-ink-muted text-sm"
+                data-testid="sign-in-reason"
+              >
+                {t("auth.signIn.sessionTooOld")}
+              </p>
+            )}
+
+            {ssoDomain && (
+              <form
+                className="mb-6 flex w-full flex-col gap-3"
+                data-testid="sign-in-sso"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (email.trim()) {
+                    void signInWith({
+                      strategy: "enterprise_sso",
+                      identifier: email.trim(),
+                    });
+                  }
+                }}
+              >
+                <p className="text-center text-ink-muted text-sm">
+                  {t("auth.signIn.ssoRequired", { domain: ssoDomain })}
+                </p>
+                <input
+                  id="sign-in-sso-email"
+                  type="email"
+                  autoComplete="email"
+                  aria-label={t("auth.signIn.ssoEmail")}
+                  placeholder={`name@${ssoDomain}`}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="h-12 w-full rounded-md border border-overlay/15 bg-overlay/5 px-3 text-ink-strong text-sm outline-none focus-visible:ring-1 focus-visible:ring-overlay/60"
+                />
+                <Button
+                  type="submit"
+                  intent="invert"
+                  block
+                  disabled={!isLoaded || !email.trim()}
+                  loading={redirecting}
+                  className="h-12 text-sm"
+                >
+                  {t("auth.signIn.ssoContinue")}
+                </Button>
+              </form>
+            )}
+
             <Button
               type="button"
               intent="soft"
               block
               disabled={!isLoaded}
               loading={redirecting}
-              onClick={() => void signInWithGoogle()}
+              onClick={() => void signInWith({ strategy: "oauth_google" })}
               icon={<GoogleIcon />}
               className="h-12 gap-2 rounded-md bg-overlay/5 font-normal text-sm hover:bg-overlay/10"
             >

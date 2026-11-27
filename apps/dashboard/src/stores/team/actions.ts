@@ -6,6 +6,7 @@ import type {
   AuditLogItem,
   Member,
   PendingInvitation,
+  RoleAssignment,
 } from "./type";
 
 export const teamPendingKeys = {
@@ -32,10 +33,9 @@ export const fetchMembersFailed = (message: string) => ({
   payload: { message },
 });
 
-export const updateMemberRole = (payload: {
-  userId: string;
-  role: OrganizationRole;
-}) => ({
+export const updateMemberRole = (
+  payload: { userId: string } & RoleAssignment,
+) => ({
   type: actionTypes.UPDATE_MEMBER_ROLE_REQUESTED,
   payload,
   meta: { pendingKey: teamPendingKeys.member(payload.userId) },
@@ -58,6 +58,36 @@ export const removeMember = (payload: { userId: string }) => ({
 
 export const removeMemberSucceeded = (userId: string, meta: PendingMeta) => ({
   type: actionTypes.REMOVE_MEMBER_SUCCEEDED,
+  payload: { userId },
+  meta,
+});
+
+export const suspendMember = (payload: {
+  userId: string;
+  suspended: boolean;
+}) => ({
+  type: actionTypes.SUSPEND_MEMBER_REQUESTED,
+  payload,
+  meta: { pendingKey: teamPendingKeys.member(payload.userId) },
+});
+
+export const suspendMemberSucceeded = (member: Member, meta: PendingMeta) => ({
+  type: actionTypes.SUSPEND_MEMBER_SUCCEEDED,
+  payload: member,
+  meta,
+});
+
+export const revokeMemberSessions = (payload: { userId: string }) => ({
+  type: actionTypes.REVOKE_MEMBER_SESSIONS_REQUESTED,
+  payload,
+  meta: { pendingKey: teamPendingKeys.member(payload.userId) },
+});
+
+export const revokeMemberSessionsSucceeded = (
+  userId: string,
+  meta: PendingMeta,
+) => ({
+  type: actionTypes.REVOKE_MEMBER_SESSIONS_SUCCEEDED,
   payload: { userId },
   meta,
 });

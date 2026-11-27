@@ -17,10 +17,16 @@ type PlacementPrisma =
 
 export type NotificationPlacement = PlacementCamel | PlacementPrisma;
 
+export interface NotificationAction {
+  label: string;
+  onClick: () => void;
+}
+
 type NotificationData = {
   title: string;
   content: string;
   type: NotificationType;
+  action?: NotificationAction;
 };
 
 type ActionNotificationProps = ToastContentProps<NotificationData>;
@@ -61,12 +67,14 @@ function notify({
   content,
   type = "success",
   placement,
+  action,
   options = {},
 }: {
   title: string;
   content: string;
   type?: NotificationType;
   placement?: NotificationPlacement;
+  action?: NotificationAction;
   options?: ToastOptions;
 }) {
   const { position: positionOverride, ...restOptions } = options;
@@ -76,7 +84,7 @@ function notify({
 
   toast(
     (toastProps) => (
-      <Notification {...toastProps} data={{ title, content, type }} />
+      <Notification {...toastProps} data={{ title, content, type, action }} />
     ),
     {
       ...(position ? { position } : {}),
@@ -91,6 +99,7 @@ type NotifyProps = {
   title: string;
   content: string;
   placement?: NotificationPlacement;
+  action?: NotificationAction;
   options?: ToastOptions;
 };
 
@@ -103,8 +112,8 @@ export const notifyError = (props: NotifyProps) =>
 export const notifyInfo = (props: NotifyProps) =>
   notify({ ...props, type: "info" });
 
-function Notification({ data }: ActionNotificationProps) {
-  const { title, content, type } = data;
+function Notification({ data, closeToast }: ActionNotificationProps) {
+  const { title, content, type, action } = data;
   const { Icon, tint } = TONES[type];
 
   return (
@@ -117,6 +126,18 @@ function Notification({ data }: ActionNotificationProps) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-1">
         <span className="font-medium text-ink-strong text-sm">{title}</span>
         {content && <p className="text-ink-muted text-sm">{content}</p>}
+        {action && (
+          <button
+            type="button"
+            className="mt-1 self-start font-medium text-brand text-sm underline underline-offset-2"
+            onClick={() => {
+              action.onClick();
+              closeToast();
+            }}
+          >
+            {action.label}
+          </button>
+        )}
       </div>
     </div>
   );

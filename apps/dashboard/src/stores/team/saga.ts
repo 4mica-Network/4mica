@@ -3,7 +3,7 @@ import i18n from "@i18n";
 import { handledAsApproval } from "@stores/approvalRequired";
 import { fetchOrganizations } from "@stores/organization/actions";
 import organizationActionTypes from "@stores/organization/actionTypes";
-import { failureMessage } from "@stores/organization/saga";
+import { errorCode, failureMessage } from "@stores/organization/saga";
 import type { OrganizationRole } from "@stores/organization/type";
 import { selectUser } from "@stores/user/selector";
 import type { User } from "@stores/user/type";
@@ -26,6 +26,8 @@ import {
   removeMemberSucceeded,
   resendInvitationSucceeded,
   revokeInvitationSucceeded,
+  revokeMemberSessionsSucceeded,
+  suspendMemberSucceeded,
   teamActionFailed,
   updateMemberRoleSucceeded,
 } from "./actions";
@@ -37,6 +39,7 @@ import type {
   AuditLogState,
   Member,
   PendingInvitation,
+  RoleAssignment,
   TeamState,
 } from "./type";
 
@@ -58,7 +61,13 @@ function* fail(error: unknown, fallback: string, meta: PendingMeta) {
   if (yield* handledAsApproval(error, teamActionFailed("", {}, meta))) {
     return;
   }
-  const message = failureMessage(error, fallback);
+  const message =
+    errorCode(error) === "identity_not_managed"
+      ? t(
+          "store.team.identityNotManaged",
+          "Only members whose email is on one of your verified domains can be signed out everywhere. Ask this member to sign out themselves, or remove them.",
+        )
+      : failureMessage(error, fallback);
   const issues = toIssueMap(error);
   yield put(teamActionFailed(message, issues, meta));
   notifyError({
@@ -105,12 +114,13 @@ export function* fetchInvitations(): Generator {
 
 export function* updateMemberRole(action: {
   type: string;
-  payload: { userId: string; role: OrganizationRole };
+  payload: { userId: string } & RoleAssignment;
   meta: PendingMeta;
 }): Generator {
   try {
+    const { userId, ...assignment } = action.payload;
     const member = (yield call(() =>
-      api.updateMemberRole(action.payload.userId, action.payload.role),
+      api.updateMemberRole(userId, assignment as RoleAssignment),
     )) as Member;
     yield put(updateMemberRoleSucceeded(member, action.meta));
     const user = (yield select(selectUser)) as User | null;
@@ -121,6 +131,67 @@ export function* updateMemberRole(action: {
     yield* fail(
       error,
       t("store.team.roleFailed", "Couldn't change the role."),
+      action.meta,
+    );
+  }
+}
+
+export function* suspendMember(action: {
+  type: string;
+  payload: { userId: string; suspended: boolean };
+  meta: PendingMeta;
+}): Generator {
+  const { userId, suspended } = action.payload;
+  try {
+    const member = (yield call(() =>
+      api.suspendMember(userId, suspended),
+    )) as Member;
+    yield put(suspendMemberSucceeded(member, action.meta));
+    notifySuccess({
+      title: suspended
+        ? t("store.team.suspendedTitle", "Member suspended")
+        : t("store.team.reactivatedTitle", "Member reactivated"),
+      content: suspended
+        ? t(
+            "store.team.suspendedBody",
+            "They can no longer use this organization, and their CLI sessions here were revoked.",
+          )
+        : t("store.team.reactivatedBody", "Their access is restored."),
+    });
+  } catch (error) {
+    yield* fail(
+      error,
+      suspended
+        ? t("store.team.suspendFailed", "Couldn't suspend the member.")
+        : t("store.team.reactivateFailed", "Couldn't reactivate the member."),
+      action.meta,
+    );
+  }
+}
+
+export function* revokeMemberSessions(action: {
+  type: string;
+  payload: { userId: string };
+  meta: PendingMeta;
+}): Generator {
+  try {
+    const { revoked } = (yield call(() =>
+      api.revokeMemberSessions(action.payload.userId),
+    )) as { revoked: number };
+    yield put(
+      revokeMemberSessionsSucceeded(action.payload.userId, action.meta),
+    );
+    notifySuccess({
+      title: t("store.team.sessionsRevokedTitle", "Signed out everywhere"),
+      content: i18n.t("store.team.sessionsRevokedBody", {
+        count: revoked,
+        defaultValue: "{{count}} sessions were ended.",
+      }),
+    });
+  } catch (error) {
+    yield* fail(
+      error,
+      t("store.team.sessionsRevokeFailed", "Couldn't sign the member out."),
       action.meta,
     );
   }
@@ -255,6 +326,8 @@ export default [
   takeLatest(actionTypes.FETCH_MEMBERS_REQUESTED, fetchMembers),
   takeLatest(actionTypes.FETCH_INVITATIONS_REQUESTED, fetchInvitations),
   takeEvery(actionTypes.UPDATE_MEMBER_ROLE_REQUESTED, updateMemberRole),
+  takeEvery(actionTypes.SUSPEND_MEMBER_REQUESTED, suspendMember),
+  takeEvery(actionTypes.REVOKE_MEMBER_SESSIONS_REQUESTED, revokeMemberSessions),
   takeEvery(actionTypes.REMOVE_MEMBER_REQUESTED, removeMember),
   takeEvery(actionTypes.INVITE_MEMBERS_REQUESTED, inviteMembers),
   takeEvery(actionTypes.RESEND_INVITATION_REQUESTED, resendInvitation),
