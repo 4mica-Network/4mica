@@ -100,6 +100,7 @@ export function CliAuthorize() {
         setStage({ name: "unknown" });
         return;
       }
+      setTyped(userCode);
       setStage({ name: "enter" });
       setError(toMessage(cause, ""));
     }
@@ -164,8 +165,12 @@ export function CliAuthorize() {
             className="flex flex-col gap-5"
             onSubmit={(event) => {
               event.preventDefault();
-              if (typed.trim()) {
-                setParams({ code: typed.trim() }, { replace: true });
+              const next = typed.trim();
+              if (!next) return;
+              if (next === code) {
+                void lookUp(next);
+              } else {
+                setParams({ code: next }, { replace: true });
               }
             }}
           >

@@ -125,6 +125,23 @@ describe("CliAuthorize", () => {
     expect(await screen.findByTestId("cli-user-code")).toBeInTheDocument();
   });
 
+  it("retries the same code after a failed look-up, with the code still filled in", async () => {
+    api.getCliDeviceRequest.mockRejectedValueOnce(new Error("offline"));
+    open("?code=BCDF-GHJK");
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    const field = document.getElementById("cli-user-code") as HTMLInputElement;
+    expect(field.value).toBe("BCDF-GHJK");
+
+    fireEvent.click(button("developer.cli.authorize.continue"));
+
+    expect(await screen.findByTestId("cli-user-code")).toHaveTextContent(
+      "BCDF-GHJK",
+    );
+    expect(api.getCliDeviceRequest).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says so for a code that is unknown or expired, and offers another try", async () => {
     api.getCliDeviceRequest.mockRejectedValue(notFound());
     open("?code=BBBB-BBBB");
