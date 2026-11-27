@@ -41,6 +41,7 @@ dev = [
   "mypy>=2.4.0",
   "vulture>=2.16",
   "deptry>=0.25.0",
+  "pip-audit>=2.10.0",
 ]
 
 [project.urls]

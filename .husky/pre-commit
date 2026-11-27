@@ -1,2 +1,5 @@
 pnpm run lint
 pnpm run test
+if git diff --cached --name-only | grep -q '^packages/sdk-python/'; then
+  bash packages/sdk-python/scripts/check.sh
+fi

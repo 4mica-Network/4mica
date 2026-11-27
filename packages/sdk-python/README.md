@@ -427,14 +427,16 @@ pnpm/turbo wiring — it is a plain Python project:
 
 ```bash
 cd packages/sdk-python
-pip install -e ".[dev,cdp]"
-ruff format --check . && ruff check .  # lint and format
-mypy                                    # strict typing
-vulture && deptry .                     # dead code, undeclared or unused deps
-pytest -q --cov                         # tests; fails under 100% branch coverage
+uv venv && uv pip install -e ".[dev,cdp]"
+bash scripts/check.sh
 ```
 
-CI runs the same checks on every pull request that touches this package.
+`scripts/check.sh` runs every check: ruff format and lint (bandit's security
+rules included), `mypy --strict`, `vulture` for dead code, `deptry` for
+undeclared or unused dependencies, `pip-audit` for known vulnerabilities, and
+pytest, which fails under 100% branch coverage. The pre-commit hook runs it
+when a commit touches this package, and CI runs the same checks on every pull
+request here and weekly. `pytest -m integration` runs the live-stack tests.
 
 Contract ABIs under `fourmica_sdk/contract/abi/` are copies of the monorepo's
 `contracts/abi/*.json`, vendored from the `4mica-core` repo's forge artifacts

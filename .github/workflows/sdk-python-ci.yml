@@ -6,6 +6,8 @@ on:
       - "packages/sdk-python/**"
       - "contracts/abi/**"
       - ".github/workflows/sdk-python-ci.yml"
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 defaults:
@@ -42,8 +44,11 @@ jobs:
       - name: Dead code
         run: uv run --no-sync vulture
 
-      - name: Dependencies
+      - name: Undeclared or unused dependencies
         run: uv run --no-sync deptry .
+
+      - name: Dependency vulnerabilities
+        run: uv run --no-sync pip-audit --skip-editable --progress-spinner off
 
       # The package's ABIs are copies of the monorepo source of truth written
       # by scripts/refresh-abis.sh; a hand edit on either side fails here.
