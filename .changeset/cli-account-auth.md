@@ -21,5 +21,9 @@ system keychain on macOS and on Linux with `secret-tool`, and otherwise in a
 file readable by your user only. In CI, set `FOURMICA_TOKEN` to a token made
 in the dashboard under Settings → Developer.
 
+A session may do only what it was given: reading the account, listing,
+linking and, if asked for, removing wallets. Tokens made in the dashboard are
+read-only by default and expire after 30 days, 90 days or a year.
+
 An account session is separate from a wallet. It cannot move funds, and every
 command that worked without an account still does.

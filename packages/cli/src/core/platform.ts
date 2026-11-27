@@ -1,5 +1,11 @@
 import { configError, failure } from "../errors.js";
-import { loadToken, type Storage, storedOrigins } from "./credentials.js";
+import {
+  credentialsFile,
+  loadToken,
+  type SessionKind,
+  type Storage,
+  storedOrigins,
+} from "./credentials.js";
 import { API_URL } from "./links.js";
 import { type Resolved, readEnv, requireApiUrl } from "./settings.js";
 
@@ -25,6 +31,8 @@ export interface Session {
   platform: Platform;
   token: string;
   source: "env" | Storage;
+  kind?: SessionKind;
+  where?: string;
 }
 
 export async function loadStoredSession(
@@ -33,7 +41,18 @@ export async function loadStoredSession(
 ): Promise<Session | undefined> {
   const platform = resolvePlatform(env);
   const stored = await loadToken(configDir, platform.origin, env);
-  return stored && { platform, token: stored.token, source: stored.storage };
+  return (
+    stored && {
+      platform,
+      token: stored.token,
+      source: stored.storage,
+      kind: stored.kind,
+      where:
+        stored.storage === "file"
+          ? credentialsFile(configDir, platform.origin)
+          : undefined,
+    }
+  );
 }
 
 export async function loadSession(
@@ -77,6 +96,15 @@ export async function requireSession(configDir: string): Promise<Session> {
 export interface ApiResponse {
   status: number;
   body: unknown;
+  retryAfterMs?: number;
+}
+
+function retryAfter(header: string | null): number | undefined {
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
 }
 
 interface RequestOptions {
@@ -109,7 +137,11 @@ export async function request(
   } catch {
     body = undefined;
   }
-  return { status: response.status, body };
+  return {
+    status: response.status,
+    body,
+    retryAfterMs: retryAfter(response.headers.get("retry-after")),
+  };
 }
 
 interface ErrorBody {
@@ -144,9 +176,15 @@ export function apiError(platform: Platform, response: ApiResponse) {
     });
   }
   if (status === 403 && code === "insufficient_scope") {
+    const needed = said?.match(/needs ([a-z]+:[a-z]+)/)?.[1];
     return failure(said ?? "this session is not allowed to do that", {
       code: "INSUFFICIENT_SCOPE",
-      suggestions: ["sign in again with `4mica auth login`"],
+      suggestions: [
+        needed
+          ? `sign in again allowing it: \`4mica auth login --scopes ${needed}\``
+          : "sign in again with `4mica auth login`",
+        "a token from the dashboard has the permissions chosen when it was made",
+      ],
     });
   }
   if (status === 429) {

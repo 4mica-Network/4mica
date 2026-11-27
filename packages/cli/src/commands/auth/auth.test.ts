@@ -2,7 +2,7 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { credentialsPath } from "../../core/credentials.js";
+import { credentialsFile } from "../../core/credentials.js";
 import {
   ACCOUNT,
   GRANTED,
@@ -53,6 +53,9 @@ const run = (
 
 const configDir = () => join(home, "4mica");
 
+const tokenFile = () =>
+  credentialsFile(configDir(), new URL(platform.url).origin);
+
 const signIn = () => run(AuthLogin, ["--json", "--name", "ada-laptop"]);
 
 describe("auth login", () => {
@@ -70,7 +73,7 @@ describe("auth login", () => {
     expect(json).toMatchObject({ account: ACCOUNT, storage: "file" });
     pinJson("auth login", json);
 
-    const file = credentialsPath(configDir());
+    const file = tokenFile();
     expect(await readFile(file, "utf8")).toContain(GRANTED);
     if (process.platform !== "win32") {
       expect((await stat(file)).mode & 0o777).toBe(0o600);
@@ -90,7 +93,7 @@ describe("auth login", () => {
     const { error } = await run(AuthLogin);
 
     expect(error).toMatchObject({ code: "ACCESS_DENIED" });
-    await expect(readFile(credentialsPath(configDir()))).rejects.toThrow();
+    await expect(readFile(tokenFile())).rejects.toThrow();
   });
 
   it("says so when the code expires unapproved", async () => {
@@ -112,7 +115,7 @@ describe("auth login", () => {
     readInput.mockResolvedValue("4mica_cli_revoked-long-ago");
     const refused = await run(AuthLogin, ["--with-token"]);
     expect(refused.error).toMatchObject({ code: "SESSION_INVALID" });
-    expect(await readFile(credentialsPath(configDir()), "utf8")).toContain(
+    expect(await readFile(tokenFile(), "utf8")).toContain(
       "made-in-the-dashboard",
     );
   });
@@ -125,8 +128,9 @@ describe("auth login", () => {
     expect(platform.requests).toEqual([]);
   });
 
-  it("revokes the session it replaces", async () => {
+  it("revokes a browser session it replaces", async () => {
     platform.tokens.add("4mica_cli_older");
+    platform.kinds.set("4mica_cli_older", "DEVICE");
     readInput.mockResolvedValue("4mica_cli_older");
     await run(AuthLogin, ["--with-token"]);
 
@@ -134,6 +138,47 @@ describe("auth login", () => {
 
     expect(platform.tokens.has("4mica_cli_older")).toBe(false);
     expect(platform.tokens.has(GRANTED)).toBe(true);
+  });
+
+  it("leaves a dashboard token it replaces valid, since CI may share it", async () => {
+    platform.tokens.add("4mica_cli_shared");
+    readInput.mockResolvedValue("4mica_cli_shared");
+    await run(AuthLogin, ["--with-token"]);
+
+    const { stderr } = await signIn();
+
+    expect(platform.tokens.has("4mica_cli_shared")).toBe(true);
+    expect(stderr).toContain("still valid");
+  });
+
+  it("asks only for the permissions named", async () => {
+    await run(AuthLogin, ["--scopes", "account:read,wallets:unlink"]);
+
+    expect(platform.scope).toBe("account:read wallets:unlink");
+  });
+
+  it("rides out a platform that is briefly down or busy", async () => {
+    platform.polls.push("503", "429");
+    const { error, stderr } = await signIn();
+
+    expect(error).toBeUndefined();
+    expect(stderr).toContain("retrying");
+    expect(platform.tokens.has(GRANTED)).toBe(true);
+  });
+
+  it("rides out a dropped connection", async () => {
+    platform.polls.push("drop");
+    const { error } = await signIn();
+
+    expect(error).toBeUndefined();
+  });
+
+  it("says so when the token was issued but its answer was lost", async () => {
+    platform.polls.push("grant-then-drop");
+    const { error } = await run(AuthLogin);
+
+    expect(error).toMatchObject({ code: "LOGIN_RESPONSE_LOST" });
+    expect(error?.suggestions?.[0]).toContain("CLI sessions");
   });
 
   it("will not send a token to a platform over plain http", async () => {
@@ -210,8 +255,24 @@ describe("auth logout", () => {
 
     expect(json).toMatchObject({ loggedOut: true, revoked: true });
     expect(platform.tokens.has(GRANTED)).toBe(false);
-    await expect(readFile(credentialsPath(configDir()))).rejects.toThrow();
+    await expect(readFile(tokenFile())).rejects.toThrow();
     pinJson("auth logout", json);
+  });
+
+  it("leaves a dashboard token valid unless told to revoke it", async () => {
+    platform.tokens.add("4mica_cli_shared");
+    readInput.mockResolvedValue("4mica_cli_shared");
+    await run(AuthLogin, ["--with-token"]);
+
+    const kept = await run(AuthLogout, ["--json"]);
+    expect(kept.json).toMatchObject({ loggedOut: true, revoked: false });
+    expect(kept.stderr).toContain("--revoke");
+    expect(platform.tokens.has("4mica_cli_shared")).toBe(true);
+
+    await run(AuthLogin, ["--with-token"]);
+    const revoked = await run(AuthLogout, ["--revoke", "--json"]);
+    expect(revoked.json).toMatchObject({ loggedOut: true, revoked: true });
+    expect(platform.tokens.has("4mica_cli_shared")).toBe(false);
   });
 
   it("forgets the token even when the platform cannot be reached", async () => {
@@ -221,7 +282,7 @@ describe("auth logout", () => {
 
     expect(json).toMatchObject({ loggedOut: true, revoked: false });
     expect(stderr).toContain("revoke it in the dashboard");
-    await expect(readFile(credentialsPath(configDir()))).rejects.toThrow();
+    await expect(readFile(tokenFile())).rejects.toThrow();
   });
 
   it("leaves FOURMICA_TOKEN alone, and says it is still in effect", async () => {
@@ -254,6 +315,23 @@ describe("account", () => {
       wallets: [{ label: "buyer-1", network: "BASE_SEPOLIA" }],
     });
     pinJson("account", json);
+  });
+
+  it("lists every linked wallet, past the first page", async () => {
+    await signIn();
+    for (let i = 0; i < 150; i += 1) {
+      platform.wallets.push({
+        id: `wallet-${i}`,
+        label: `w${i}`,
+        address: `0x${i.toString(16).padStart(40, "0")}`,
+        network: "BASE_SEPOLIA",
+        status: "ACTIVE",
+      } as (typeof platform.wallets)[number]);
+    }
+    const { json, error } = await run(Account, ["--json"]);
+
+    expect(error).toBeUndefined();
+    expect((json as { wallets: unknown[] }).wallets).toHaveLength(150);
   });
 });
 
@@ -306,7 +384,7 @@ describe("wallets link", () => {
   it("refuses a challenge for another chain", async () => {
     await signIn();
     const { address } = await create("buyer-1");
-    platform.challenge = linkMessage(address, 1);
+    platform.challenge = linkMessage(address, { chainId: 1 });
     const { error } = await run(WalletsLink);
 
     expect(error).toMatchObject({ code: "UNEXPECTED_CHALLENGE" });

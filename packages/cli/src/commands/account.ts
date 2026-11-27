@@ -32,7 +32,7 @@ export default class Account extends PlatformCommand {
     this.log("");
     this.log(
       table(
-        ["LINKED WALLET", "NETWORK", "LABEL", "STATUS"],
+        [`LINKED WALLETS (${wallets.length})`, "NETWORK", "LABEL", "STATUS"],
         wallets.map((w) => [
           w.address,
           w.network.toLowerCase().replaceAll("_", "-"),

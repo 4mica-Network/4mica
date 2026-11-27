@@ -70,6 +70,7 @@ export default class WalletsLink extends NetworkCommand {
       address,
       chainId: network.chainId,
       nonce: challenge.nonce,
+      userId: me.user.id,
     });
 
     const key = walletKey(settings);

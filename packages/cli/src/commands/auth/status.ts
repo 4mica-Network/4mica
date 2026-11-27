@@ -1,4 +1,3 @@
-import { credentialsPath } from "../../core/credentials.js";
 import {
   accountLabel,
   loadSession,
@@ -29,7 +28,7 @@ export default class AuthStatus extends PlatformCommand {
         ? "FOURMICA_TOKEN"
         : session.source === "keychain"
           ? "the system keychain"
-          : credentialsPath(this.config.configDir);
+          : (session.where ?? "a file");
     this.log(
       fields([
         ["account", accountLabel(me.user)],

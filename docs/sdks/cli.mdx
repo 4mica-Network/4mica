@@ -81,7 +81,7 @@ A wallet key is enough to deposit, pay and withdraw. Signing in is separate: it 
 
 `auth login` never asks for a password in the terminal. You approve the code at `app.4mica.io/cli/authorize` while signed in, and the CLI receives a token of its own, kept in the system keychain where there is one. Over SSH, `--no-open` prints the address to open on another device. Every signed-in terminal is listed under Settings → Developer, where it can be revoked.
 
-A token cannot move funds. It reads the account and links or removes wallets; payments are still signed by the wallet key, which never leaves your machine.
+A token cannot move funds. It reads the account and links wallets; removing wallets has to be asked for with `--scopes`. Payments are still signed by the wallet key, which never leaves your machine. `auth logout` revokes a browser session, and leaves a dashboard token valid unless you pass `--revoke`.
 
 In CI, create a token under Settings → Developer → CLI sessions and set it as `FOURMICA_TOKEN`.
 

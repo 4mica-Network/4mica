@@ -1,13 +1,16 @@
 import { hostname } from "node:os";
-import { setTimeout as sleep } from "node:timers/promises";
 import { Flags } from "@oclif/core";
 import { askSecret } from "../../core/confirm.js";
-import { saveToken } from "../../core/credentials.js";
+import {
+  type SessionKind,
+  saveToken,
+  withCredentialLock,
+} from "../../core/credentials.js";
+import { type DeviceCode, pollForToken } from "../../core/device-flow.js";
 import { readInput } from "../../core/input.js";
 import {
   accountLabel,
   api,
-  apiError,
   loadStoredSession,
   type Platform,
   request,
@@ -21,17 +24,6 @@ import { cancelled, failure, usageError } from "../../errors.js";
 import { PlatformCommand } from "../../platform-command.js";
 import { brand, spinner } from "../../ui/log.js";
 import { fields } from "../../ui/output.js";
-
-const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
-
-interface DeviceCode {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  verification_uri_complete: string;
-  expires_in: number;
-  interval: number;
-}
 
 function requireToken(value: string): string {
   const token = value.trim();
@@ -76,10 +68,17 @@ export default class AuthLogin extends PlatformCommand {
     "insecure-storage": Flags.boolean({
       summary: "keep the token in a file, not in the system keychain",
     }),
+    scopes: Flags.string({
+      exclusive: ["with-token"],
+      helpValue: "<scope,...>",
+      summary:
+        "what the session may do; account:read, wallets:read and wallets:link by default, add wallets:unlink to remove wallets",
+    }),
   };
   static examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --no-open",
+    "<%= config.bin %> <%= command.id %> --scopes account:read,wallets:read,wallets:link,wallets:unlink",
     "cat token.txt | <%= config.bin %> <%= command.id %> --with-token",
   ];
 
@@ -93,15 +92,20 @@ export default class AuthLogin extends PlatformCommand {
       : await this.interactive(platform, flags);
 
     const me = await whoAmI(platform, token);
-    const previous = await loadStoredSession(dir);
-    const kept = await saveToken(dir, platform.origin, token, {
-      fileOnly: flags["insecure-storage"],
-    });
+    const { kept, previous } = await withCredentialLock(
+      dir,
+      platform.origin,
+      async () => {
+        const before = await loadStoredSession(dir);
+        const saved = await saveToken(dir, platform.origin, token, {
+          kind: me.session.kind,
+          fileOnly: flags["insecure-storage"],
+        });
+        return { kept: saved, previous: before };
+      },
+    );
     if (previous && previous.token !== token) {
-      await request(platform, "/v1/cli/session", {
-        method: "DELETE",
-        token: previous.token,
-      }).catch(() => undefined);
+      await this.retire(platform, previous.token, previous.kind);
     }
 
     this.note(`Signed in as ${brand(accountLabel(me.user))}`);
@@ -127,9 +131,34 @@ export default class AuthLogin extends PlatformCommand {
     };
   }
 
+  private async retire(
+    platform: Platform,
+    token: string,
+    known: SessionKind | undefined,
+  ): Promise<void> {
+    const kind =
+      known ??
+      (await whoAmI(platform, token).then(
+        (me) => me.session.kind,
+        () => undefined,
+      ));
+    if (kind === "DEVICE") {
+      await request(platform, "/v1/cli/session", {
+        method: "DELETE",
+        token,
+      }).catch(() => undefined);
+      return;
+    }
+    if (kind === "TOKEN") {
+      this.note(
+        "the token used before is still valid, as it may be in use elsewhere; revoke it under Settings → Developer if it is not",
+      );
+    }
+  }
+
   private async interactive(
     platform: Platform,
-    flags: { web: boolean; open: boolean; name?: string },
+    flags: { web: boolean; open: boolean; name?: string; scopes?: string },
   ): Promise<string> {
     if (!flags.web && canPrompt()) {
       const { isCancel, select } = await import("@clack/prompts");
@@ -155,11 +184,18 @@ export default class AuthLogin extends PlatformCommand {
 
   private async deviceFlow(
     platform: Platform,
-    flags: { open: boolean; name?: string },
+    flags: { open: boolean; name?: string; scopes?: string },
   ): Promise<string> {
+    const scope = flags.scopes
+      ?.split(/[\s,]+/)
+      .filter(Boolean)
+      .join(" ");
     const device = await api<DeviceCode>(platform, "/v1/cli/device/code", {
       method: "POST",
-      body: { client_name: (flags.name ?? hostname()).slice(0, 120) },
+      body: {
+        client_name: (flags.name ?? hostname()).slice(0, 120),
+        ...(scope ? { scope } : {}),
+      },
     });
     const page = device.verification_uri_complete;
     if (!/^https?:\/\//.test(page)) {
@@ -179,40 +215,12 @@ export default class AuthLogin extends PlatformCommand {
     }
 
     const waiting = spinner("Waiting for approval in the browser");
-    const deadline = Date.now() + device.expires_in * 1000;
-    let interval = Math.max(device.interval, 1);
     try {
-      while (Date.now() < deadline) {
-        await sleep(interval * 1000);
-        const response = await request(platform, "/v1/cli/device/token", {
-          method: "POST",
-          body: { grant_type: DEVICE_GRANT, device_code: device.device_code },
-        });
-        if (response.status === 200) {
-          const { access_token } = response.body as { access_token?: unknown };
-          if (typeof access_token === "string") return access_token;
-        }
-        const code = (response.body as { error?: unknown } | undefined)?.error;
-        if (code === "authorization_pending") continue;
-        if (code === "slow_down") {
-          interval += 5;
-          continue;
-        }
-        if (code === "access_denied") {
-          throw failure("the sign-in was denied in the dashboard", {
-            code: "ACCESS_DENIED",
-          });
-        }
-        if (code === "expired_token") break;
-        throw apiError(platform, response);
-      }
+      return await pollForToken(platform, device, (message) =>
+        this.note(message),
+      );
     } finally {
       waiting.clear();
     }
-    throw failure("the code expired before it was approved", {
-      code: "LOGIN_EXPIRED",
-      retryable: true,
-      suggestions: ["run `4mica auth login` again for a new code"],
-    });
   }
 }
