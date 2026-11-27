@@ -181,6 +181,26 @@ enum OrgRole {
   FINANCE
 }
 
+enum MembershipSource {
+  INVITATION
+  CREATOR
+  SCIM
+  DOMAIN
+}
+
+enum SsoProvider {
+  OKTA
+  MICROSOFT_ENTRA
+  GOOGLE_WORKSPACE
+  CUSTOM
+}
+
+enum AuditStreamStatus {
+  ACTIVE
+  PAUSED
+  FAILING
+}
+
 enum SpendingPolicyScope {
   ORGANIZATION
   PROJECT
@@ -282,6 +302,13 @@ model Organization {
   approvalRequests      ApprovalRequest[]
   governanceSettings    GovernanceSettings?
   financialAlerts       FinancialAlert[]
+  domains               OrganizationDomain[]
+  ssoConnections        SsoConnection[]
+  securitySettings      SecuritySettings?
+  customRoles           CustomRole[]
+  scimTokens            ScimToken[]
+  scimGroups            ScimGroup[]
+  auditStreams          AuditStream[]
   cliSessions           CliSession[]
 
   @@map("organizations")
@@ -532,19 +559,187 @@ model FinancialAlert {
   @@map("financial_alerts")
 }
 
-model Membership {
+model OrganizationDomain {
+  id                String    @id @default(uuid(7))
+  organizationId    String    @map("organization_id")
+  domain            String    @db.VarChar(253)
+  verificationToken String    @map("verification_token") @db.VarChar(64)
+  verifiedAt        DateTime? @map("verified_at")
+  lastCheckedAt     DateTime? @map("last_checked_at")
+  autoJoin          Boolean   @default(false) @map("auto_join")
+  autoJoinRole      OrgRole   @default(VIEWER) @map("auto_join_role")
+  createdById       String?   @map("created_by_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?           @relation("OrganizationDomainCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  ssoConnections SsoConnection[]
+
+  @@unique([organizationId, domain])
+  @@index([domain])
+  @@map("organization_domains")
+}
+
+model SsoConnection {
+  id                String      @id @default(uuid(7))
+  organizationId    String      @map("organization_id")
+  domainId          String      @map("domain_id")
+  provider          SsoProvider
+  name              String      @db.VarChar(120)
+  clerkConnectionId String?     @unique @map("clerk_connection_id")
+  idpEntityId       String?     @map("idp_entity_id") @db.VarChar(2048)
+  idpSsoUrl         String?     @map("idp_sso_url") @db.VarChar(2048)
+  idpMetadataUrl    String?     @map("idp_metadata_url") @db.VarChar(2048)
+  active            Boolean     @default(false)
+  enforced          Boolean     @default(false)
+  jitProvisioning   Boolean     @default(true) @map("jit_provisioning")
+  defaultRole       OrgRole     @default(VIEWER) @map("default_role")
+  createdById       String?     @map("created_by_id")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domain       OrganizationDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdBy    User?              @relation("SsoConnectionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("sso_connections")
+}
+
+model SecuritySettings {
+  organizationId               String   @id @map("organization_id")
+  requireMfa                   Boolean  @default(false) @map("require_mfa")
+  sessionMaxAgeHours           Int?     @map("session_max_age_hours")
+  reauthWindowMinutes          Int      @default(15) @map("reauth_window_minutes")
+  ipAllowlist                  String[] @default([]) @map("ip_allowlist")
+  enforceIpAllowlistForApiKeys Boolean  @default(false) @map("enforce_ip_allowlist_for_api_keys")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("security_settings")
+}
+
+model CustomRole {
+  id             String      @id @default(uuid(7))
+  organizationId String      @map("organization_id")
+  name           String      @db.VarChar(64)
+  description    String?     @db.VarChar(280)
+  permissions    String[]
+  projectRole    ProjectRole @default(VIEWER) @map("project_role")
+  createdById    String?     @map("created_by_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("CustomRoleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  memberships  Membership[]
+  scimGroups   ScimGroup[]
+
+  @@unique([organizationId, name])
+  @@map("custom_roles")
+}
+
+model ScimToken {
+  id             String    @id @default(uuid(7))
+  organizationId String    @map("organization_id")
+  name           String    @db.VarChar(120)
+  prefix         String    @db.VarChar(32)
+  last4          String    @db.VarChar(4)
+  hashedToken    String    @unique @map("hashed_token")
+  lastUsedAt     DateTime? @map("last_used_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ScimTokenCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("scim_tokens")
+}
+
+model ScimGroup {
   id             String   @id @default(uuid(7))
   organizationId String   @map("organization_id")
-  userId         String   @map("user_id")
-  role           OrgRole  @default(DEVELOPER)
+  externalId     String?  @map("external_id") @db.VarChar(255)
+  displayName    String   @map("display_name") @db.VarChar(255)
+  role           OrgRole?
+  customRoleId   String?  @map("custom_role_id")
+  priority       Int      @default(0)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?       @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  members      ScimGroupMember[]
+
+  @@unique([organizationId, displayName])
+  @@index([organizationId, externalId])
+  @@map("scim_groups")
+}
+
+model ScimGroupMember {
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group ScimGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("scim_group_members")
+}
+
+model AuditStream {
+  id                  String            @id @default(uuid(7))
+  organizationId      String            @map("organization_id")
+  name                String            @db.VarChar(120)
+  url                 String            @db.VarChar(2048)
+  status              AuditStreamStatus @default(ACTIVE)
+  secretVersion       Int               @default(1) @map("secret_version")
+  actionPrefixes      String[]          @default([]) @map("action_prefixes")
+  cursorId            String?           @map("cursor_id")
+  lastDeliveryAt      DateTime?         @map("last_delivery_at")
+  lastStatusCode      Int?              @map("last_status_code")
+  lastError           String?           @map("last_error") @db.VarChar(500)
+  consecutiveFailures Int               @default(0) @map("consecutive_failures")
+  nextAttemptAt       DateTime?         @map("next_attempt_at")
+  createdById         String?           @map("created_by_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  deletedAt           DateTime?         @map("deleted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("AuditStreamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status, nextAttemptAt])
+  @@map("audit_streams")
+}
+
+model Membership {
+  id             String           @id @default(uuid(7))
+  organizationId String           @map("organization_id")
+  userId         String           @map("user_id")
+  role           OrgRole          @default(DEVELOPER)
+  customRoleId   String?          @map("custom_role_id")
+  source         MembershipSource @default(INVITATION)
+  scimExternalId String?          @map("scim_external_id") @db.VarChar(255)
+  suspendedAt    DateTime?        @map("suspended_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([organizationId, scimExternalId])
   @@map("memberships")
 }
 
@@ -658,6 +853,12 @@ model User {
   createdSpendingPolicies        SpendingPolicy[]         @relation("SpendingPolicyCreator")
   requestedApprovals             ApprovalRequest[]        @relation("ApprovalRequester")
   approvalDecisions              ApprovalDecision[]
+  createdDomains                 OrganizationDomain[]     @relation("OrganizationDomainCreator")
+  createdSsoConnections          SsoConnection[]          @relation("SsoConnectionCreator")
+  createdCustomRoles             CustomRole[]             @relation("CustomRoleCreator")
+  createdScimTokens              ScimToken[]              @relation("ScimTokenCreator")
+  createdAuditStreams            AuditStream[]            @relation("AuditStreamCreator")
+  scimGroupMemberships           ScimGroupMember[]
   reviews                        Review[]
   reports                        Report[]
   bannerInteractions             BannerInteraction[]
@@ -744,6 +945,7 @@ model ApiKey {
   projectId        String        @map("project_id")
   environmentId    String        @map("environment_id")
   serviceAccountId String?       @map("service_account_id")
+  ipAllowlist      String[]      @default([]) @map("ip_allowlist")
   scopes           ApiKeyScope[] @default([])
   organizationId   String        @map("organization_id")
   createdById      String?       @map("created_by_id")
