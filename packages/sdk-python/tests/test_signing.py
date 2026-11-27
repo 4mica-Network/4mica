@@ -1,18 +1,8 @@
-"""The payer-signing path, pinned against the vectors the ClearingHouse
-verifies in its own cross-boundary suite.
-
-``checkpoint_vectors.json`` is core's fixture
-(``contracts/test/fixtures/checkpoint_vectors.json`` in 4mica-core), consumed
-by ``CheckpointCrossBoundary.t.sol``. A drift in the layout, the domain or the
-encoding breaks these, and with them every payment on-chain default would
-have to verify. Refresh by rerunning core's ``checkpoint_golden_vectors`` test
-with ``REGEN_CHECKPOINT_VECTORS=1`` and copying the file here.
-"""
-
 import json
 from pathlib import Path
 
 import pytest
+from eth_abi import encode
 from eth_account import Account
 from eth_utils import keccak
 
@@ -40,7 +30,6 @@ from fourmica_sdk.signing import PayerSigner
 FIXTURES = Path(__file__).parent / "fixtures"
 VECTORS = json.loads((FIXTURES / "checkpoint_vectors.json").read_text())
 
-# The deterministic key behind every pinned signature in the fixture.
 PAYER_KEY = "0x" + "42" * 32
 PAYER = Account.from_key(PAYER_KEY).address
 RECIPIENT = "0x00000000000000000000000000000000000000Be"
@@ -63,12 +52,12 @@ def payment() -> PaymentRequestPayload:
 
 
 def validation(**overrides) -> ValidationRequirement:
-    values = dict(
-        validator="eip155:31337:0x1111111111111111111111111111111111111111",
-        subject="0x" + "44" * 32,
-        deadline=1_700_003_600,
-        params="0x010203",
-    )
+    values = {
+        "validator": "eip155:31337:0x1111111111111111111111111111111111111111",
+        "subject": "0x" + "44" * 32,
+        "deadline": 1_700_003_600,
+        "params": "0x010203",
+    }
     values.update(overrides)
     return ValidationRequirement(**values)
 
@@ -96,17 +85,15 @@ def checkpoint() -> CheckpointPayload:
 
 
 def test_the_fixture_signer_is_the_payer_key():
-    assert PAYER == VECTORS["signer"]
+    assert VECTORS["signer"] == PAYER
 
 
 def test_domain_is_the_clearing_houses():
-    assert CLEARING_HOUSE_EIP712_NAME == VECTORS["domain"]["name"]
-    assert CLEARING_HOUSE_EIP712_VERSION == VECTORS["domain"]["version"]
+    assert VECTORS["domain"]["name"] == CLEARING_HOUSE_EIP712_NAME
+    assert VECTORS["domain"]["version"] == CLEARING_HOUSE_EIP712_VERSION
 
 
 def test_eip712_type_strings_match_the_contract():
-    """The ClearingHouse hard-codes these; drift here silently breaks every
-    on-chain verification."""
     assert PAYMENT_AUTHORIZATION_TYPE == (
         "PaymentAuthorization(address payer,bytes32 cycleId,address asset,"
         "uint256 amount,uint256 reqId,uint64 timestamp,bytes32 recipientCommitment)"
@@ -165,8 +152,6 @@ async def test_a_signature_recovers_to_the_payer():
 
 
 def test_validation_is_covered_by_the_payment_signature():
-    """A validation requirement is inside the commitment the payer signs, so
-    attaching one after the fact cannot reuse the plain signature."""
     plain = payment().signing_digest(DOMAIN)
     validated = (
         payment()
@@ -177,7 +162,7 @@ def test_validation_is_covered_by_the_payment_signature():
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    ("field", "value"),
     [
         ("validator", "eip155:31337:0x1111111111111111111111111111111111111112"),
         ("subject", "0x" + "45" * 32),
@@ -226,9 +211,6 @@ def test_a_checkpoints_digest_depends_on_its_total():
 
 
 def test_the_domain_separator_is_the_standard_eip712_one():
-    """Built the way the contract's OpenZeppelin EIP712 builds it."""
-    from eth_abi import encode
-
     expected = keccak(
         keccak(
             text="EIP712Domain(string name,string version,uint256 chainId,"
@@ -241,7 +223,7 @@ def test_the_domain_separator_is_the_standard_eip712_one():
             [CHAIN_ID, VECTORS["domain"]["verifyingContract"]],
         )
     )
-    assert DOMAIN == expected
+    assert expected == DOMAIN
 
 
 async def test_signing_for_another_payer_is_refused():

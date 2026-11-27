@@ -59,7 +59,6 @@ async def test_pay_passes_native_payable_value():
 
     call = next(c for c in gateway.calls if c[0] == "pay_net_debit")
     assert call[5] == 10
-    # A native debit never consults the token allowance.
     assert all(c[0] != "erc20_allowance" for c in gateway.calls)
 
 

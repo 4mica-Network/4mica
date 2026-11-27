@@ -1,21 +1,15 @@
-"""Wire types mirroring the core service's ``rpc-4mica`` crate.
-
-Core serializes snake_case JSON (``SiweTemplate`` in :mod:`.auth` is the one
-camelCase exception); ``from_rpc`` parsers accept both spellings defensively.
-U256 amounts serialize as 0x-prefixed hex, matching the Rust types.
-"""
-
 from __future__ import annotations
 
 import dataclasses
 import secrets
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .errors import InvalidParamsError
 from .guarantee import checkpoint_signing_digest, payment_signing_digest
 from .utils import (
+    BYTES32_LENGTH,
     ValidationError,
     normalize_address,
     normalize_bytes32_hex,
@@ -24,20 +18,19 @@ from .utils import (
     serialize_u256,
 )
 
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
-#: Current payment payload version. Clients always sign at this version; core
-#: accepts every version it advertises so older clients keep working.
 PAYMENT_PAYLOAD_VERSION = 1
 
-#: Payment payload versions this SDK can read, keyed by their wire tag.
-_PAYLOAD_VERSION_TAGS: Dict[str, int] = {"v1": PAYMENT_PAYLOAD_VERSION}
+_PAYLOAD_VERSION_TAGS: dict[str, int] = {"v1": PAYMENT_PAYLOAD_VERSION}
 
 _U64_MAX = 2**64 - 1
 
 
-def _get_any(raw: Dict[str, Any], *keys: str) -> Any:
-    """Return the first present key (even if falsy) to handle snake/camel responses."""
+def _get_any(raw: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         if key in raw:
             return raw[key]
@@ -45,24 +38,26 @@ def _get_any(raw: Dict[str, Any], *keys: str) -> Any:
 
 
 def _normalize_hex_bytes(raw: str) -> str:
-    """Normalize 0x-prefixed hex of arbitrary length (validator params blobs)."""
     value = str(raw).strip()
     if value.startswith(("0x", "0X")):
         value = value[2:]
     if len(value) % 2 != 0:
         raise ValidationError(f"invalid hex bytes: {raw}")
-    bytes.fromhex(value or "")
+    try:
+        bytes.fromhex(value)
+    except ValueError:
+        raise ValidationError(f"invalid hex bytes: {raw}") from None
     return "0x" + value.lower()
 
 
 @dataclass
 class ValidationRequirement:
-    """An agreement, signed by the payer, that a guarantee only becomes payable
-    once an external validator approves it."""
+    """Signed by the payer: the guarantee only becomes payable once an
+    external validator approves it."""
 
     validator: str
     subject: str
-    deadline: Optional[int] = None
+    deadline: int | None = None
     params: str = "0x"
 
     def __post_init__(self) -> None:
@@ -71,8 +66,8 @@ class ValidationRequirement:
         self.deadline = int(self.deadline) if self.deadline is not None else None
         self.params = _normalize_hex_bytes(self.params or "0x")
 
-    def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "validator": self.validator,
             "subject": self.subject,
         }
@@ -83,7 +78,7 @@ class ValidationRequirement:
         return payload
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "ValidationRequirement":
+    def from_rpc(cls, raw: dict[str, Any]) -> ValidationRequirement:
         return cls(
             validator=str(_get_any(raw, "validator")),
             subject=str(_get_any(raw, "subject")),
@@ -93,17 +88,14 @@ class ValidationRequirement:
 
 
 def _payload_address(field_name: str, raw: Any) -> str:
-    """Validates an address a signed payload carries, keeping its spelling:
-    the payload is what the payer signed over, and a resource server may
-    compare the recipient as a string."""
     value = str(raw).strip()
     parse_address(value, field_name)
     return value
 
 
-def _bytes32(raw: Union[str, bytes]) -> str:
+def _bytes32(raw: str | bytes) -> str:
     if isinstance(raw, (bytes, bytearray)):
-        if len(raw) != 32:
+        if len(raw) != BYTES32_LENGTH:
             raise ValidationError(f"expected 32 bytes, got {len(raw)}")
         return "0x" + bytes(raw).hex()
     return normalize_bytes32_hex(raw)
@@ -116,7 +108,7 @@ def _u64(raw: Any) -> int:
     return value
 
 
-def _require(raw: Dict[str, Any], what: str, *keys: str) -> Any:
+def _require(raw: dict[str, Any], what: str, *keys: str) -> Any:
     value = _get_any(raw, *keys)
     if value is None:
         raise InvalidParamsError(f"{what} is missing {keys[0]}")
@@ -125,29 +117,19 @@ def _require(raw: Dict[str, Any], what: str, *keys: str) -> Any:
 
 @dataclass
 class PaymentRequestPayload:
-    """V1 payment request payload.
-
-    What the payer's wallet signs is the ``PaymentAuthorization`` derived from
-    these: the collateral-relevant fields plus a commitment to the recipient.
-    The recipient, the ``salt`` that blinds it and any validation requirement
-    travel alongside as the commitment's opening, so core can check them while
-    the on-chain default path never sees them.
-    """
-
     user_address: str
     recipient_address: str
     cycle_id: str
-    """On-chain bytes32 settlement cycle id the authorization is scoped to."""
+    """On-chain bytes32 cycle id."""
     req_id: int
     amount: int
     asset_address: str
     timestamp: int
     salt: str
-    """Random bytes32 blinding the recipient commitment. Must be
-    unpredictable, or the recipient can be recovered by trying candidates."""
-    validation: Optional[ValidationRequirement] = None
-    """Present ⇒ the guarantee is validation-gated. Absent ⇒ payable at
-    issuance."""
+    """Random bytes32. Must be unpredictable, or the recipient can be
+    recovered by trying candidates."""
+    validation: ValidationRequirement | None = None
+    """Present: validation-gated. Absent: payable at issuance."""
 
     def __post_init__(self) -> None:
         self.user_address = _payload_address("user", self.user_address)
@@ -164,24 +146,24 @@ class PaymentRequestPayload:
         cls,
         user_address: str,
         recipient_address: str,
-        cycle_id: Union[str, bytes],
+        cycle_id: str | bytes,
         req_id: int,
         amount: int,
         timestamp: int,
-        erc20_token: Optional[str] = None,
-        salt: Union[str, bytes, None] = None,
-    ) -> "PaymentRequestPayload":
-        """A payload at the current version. *salt* defaults to fresh random
-        bytes, which is what it must be outside of test vectors."""
+        erc20_token: str | None = None,
+        salt: str | bytes | None = None,
+    ) -> PaymentRequestPayload:
+        """*salt* defaults to fresh random bytes, which it must be outside of
+        test vectors."""
         return cls(
             user_address=user_address,
             recipient_address=recipient_address,
-            cycle_id=cycle_id,
+            cycle_id=_bytes32(cycle_id),
             req_id=req_id,
             amount=amount,
             asset_address=erc20_token or ZERO_ADDRESS,
             timestamp=timestamp,
-            salt=salt if salt is not None else secrets.token_bytes(32),
+            salt=_bytes32(salt if salt is not None else secrets.token_bytes(32)),
         )
 
     @property
@@ -190,16 +172,14 @@ class PaymentRequestPayload:
 
     def with_validation(
         self, validation: ValidationRequirement
-    ) -> "PaymentRequestPayload":
+    ) -> PaymentRequestPayload:
         return dataclasses.replace(self, validation=validation)
 
-    def signing_digest(self, domain_separator: Union[str, bytes]) -> bytes:
-        """The digest the payer's wallet signs, under the ClearingHouse
-        domain separator."""
+    def signing_digest(self, domain_separator: str | bytes) -> bytes:
         return payment_signing_digest(self, domain_separator)
 
-    def to_payload(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "version": "v1",
             "user_address": self.user_address,
             "recipient_address": self.recipient_address,
@@ -215,10 +195,8 @@ class PaymentRequestPayload:
         return payload
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "PaymentRequestPayload":
-        """Parses a tagged payload. The version tag is what selects a layout,
-        so a payload without one, or with one this SDK does not know, is
-        refused rather than defaulted."""
+    def from_rpc(cls, raw: dict[str, Any]) -> PaymentRequestPayload:
+        """A missing or unknown version tag is refused, not defaulted."""
         if not isinstance(raw, dict):
             raise InvalidParamsError("payment payload must be an object")
         tag = raw.get("version")
@@ -248,18 +226,15 @@ class PaymentRequestPayload:
 
 @dataclass
 class PaymentRequest:
-    """A payer-signed payment request: EIP-712 over the payload's
-    ``PaymentAuthorization``, under the ClearingHouse domain."""
-
     payload: PaymentRequestPayload
     signature: str
     """65-byte signature as 0x-prefixed hex."""
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {"payload": self.payload.to_payload(), "signature": self.signature}
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "PaymentRequest":
+    def from_rpc(cls, raw: dict[str, Any]) -> PaymentRequest:
         return cls(
             payload=PaymentRequestPayload.from_rpc(
                 _require(raw, "payment request", "payload")
@@ -270,13 +245,12 @@ class PaymentRequest:
 
 @dataclass
 class CheckpointPayload:
-    """A payer's cumulative authorization for one cycle and asset, as signed
-    by the payer. Covers every one of the payer's authorizations in the cycle
-    stamped at or below ``timestamp_cutoff``."""
+    """Covers every one of the payer's authorizations in the cycle stamped at
+    or below ``timestamp_cutoff``."""
 
     payer: str
     cycle_id: str
-    """On-chain bytes32 settlement cycle id."""
+    """On-chain bytes32 cycle id."""
     asset_address: str
     cumulative_gross: int
     timestamp_cutoff: int
@@ -288,12 +262,10 @@ class CheckpointPayload:
         self.cumulative_gross = parse_u256(self.cumulative_gross)
         self.timestamp_cutoff = _u64(self.timestamp_cutoff)
 
-    def signing_digest(self, domain_separator: Union[str, bytes]) -> bytes:
-        """The digest the payer's wallet signs, under the ClearingHouse
-        domain separator."""
+    def signing_digest(self, domain_separator: str | bytes) -> bytes:
         return checkpoint_signing_digest(self, domain_separator)
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {
             "payer": self.payer,
             "cycle_id": self.cycle_id,
@@ -303,7 +275,7 @@ class CheckpointPayload:
         }
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "CheckpointPayload":
+    def from_rpc(cls, raw: dict[str, Any]) -> CheckpointPayload:
         what = "checkpoint"
         try:
             return cls(
@@ -319,18 +291,15 @@ class CheckpointPayload:
 
 @dataclass
 class SignedCheckpoint:
-    """A checkpoint with the payer's EIP-712 signature over it, under the
-    ClearingHouse domain."""
-
     payload: CheckpointPayload
     signature: str
     """65-byte signature as 0x-prefixed hex."""
 
-    def to_payload(self) -> Dict[str, Any]:
+    def to_payload(self) -> dict[str, Any]:
         return {"payload": self.payload.to_payload(), "signature": self.signature}
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "SignedCheckpoint":
+    def from_rpc(cls, raw: dict[str, Any]) -> SignedCheckpoint:
         return cls(
             payload=CheckpointPayload.from_rpc(
                 _require(raw, "signed checkpoint", "payload")
@@ -341,26 +310,22 @@ class SignedCheckpoint:
 
 @dataclass
 class ActiveCycleResponse:
-    """``GET /core/cycles/active?asset=``: the cycle a payment for *asset*
-    must be signed for right now."""
-
     cycle_id: str
-    """On-chain bytes32 cycle id, the value a payment request is signed with."""
+    """On-chain bytes32 cycle id."""
     cycle_id_text: str
     asset_address: str
     period_start: int
     """Unix seconds; a payment stamped earlier is refused as stale."""
     period_end: int
-    """Unix seconds; core opens the next cycle from this moment on."""
+    """Unix seconds."""
     server_time: int = 0
     """Core's clock, unix seconds. Zero from a core that predates it."""
     max_uncheckpointed: int = 0
-    """How many guarantees a payer may hold past its latest checkpoint before
-    core refuses the next with ``CHECKPOINT_REQUIRED``. Zero from a core that
-    predates it."""
+    """Guarantees allowed past the latest checkpoint before
+    ``CHECKPOINT_REQUIRED``. Zero from a core that predates it."""
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "ActiveCycleResponse":
+    def from_rpc(cls, raw: dict[str, Any]) -> ActiveCycleResponse:
         what = "active cycle"
         try:
             return cls(
@@ -378,23 +343,19 @@ class ActiveCycleResponse:
 
 @dataclass
 class CheckpointBatchResponse:
-    """``GET /core/payers/{payer}/checkpoint-batch``: what a payer needs to
-    sign its next checkpoint. Untrusted until checked — see
-    :meth:`~fourmica_sdk.client.payment.PaymentClient.checkpoint_cycle`."""
+    """Untrusted until checked."""
 
     cycle_id: str
     cycle_id_text: str
     asset_address: str
     payer: str
-    previous: Optional[SignedCheckpoint]
-    """The latest accepted checkpoint, which the next one extends. ``None``
-    for a cycle's first checkpoint."""
-    authorizations: List[PaymentRequest]
-    """Every accepted authorization newer than ``previous``."""
+    previous: SignedCheckpoint | None
+    """``None`` for a cycle's first checkpoint."""
+    authorizations: list[PaymentRequest]
     max_uncheckpointed: int = 0
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "CheckpointBatchResponse":
+    def from_rpc(cls, raw: dict[str, Any]) -> CheckpointBatchResponse:
         what = "checkpoint batch"
         previous = _get_any(raw, "previous")
         try:
@@ -418,8 +379,6 @@ class CheckpointBatchResponse:
 
 @dataclass
 class CheckpointAcceptedResponse:
-    """``POST /core/checkpoints``: the checkpoint core now holds."""
-
     cycle_id: str
     cycle_id_text: str
     asset_address: str
@@ -427,11 +386,10 @@ class CheckpointAcceptedResponse:
     cumulative_gross: int
     timestamp_cutoff: int
     covered: int
-    """Authorizations this checkpoint newly covers. Zero when it repeats the
-    latest accepted one, which core accepts rather than refuses."""
+    """Zero when it repeats the latest accepted checkpoint."""
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "CheckpointAcceptedResponse":
+    def from_rpc(cls, raw: dict[str, Any]) -> CheckpointAcceptedResponse:
         what = "accepted checkpoint"
         try:
             return cls(
@@ -447,20 +405,14 @@ class CheckpointAcceptedResponse:
             raise InvalidParamsError(f"invalid accepted checkpoint: {exc}") from exc
 
 
-# --- details core attaches to its coded refusals -------------------------
-#
-# Shapes from ``crates/rpc/src/core.rs``. Ids stay as core spelled them.
-
-_Details = TypeVar("_Details")
+_Details = TypeVar("_Details", bound="DataclassInstance")
 
 
-def parse_refusal_details(cls: Type[_Details], raw: Any) -> Optional[_Details]:
-    """*raw* decoded as *cls*, or ``None`` when it is absent or malformed —
-    a refusal whose details cannot be read stays a plain RPC error."""
+def parse_refusal_details(cls: type[_Details], raw: Any) -> _Details | None:
     if not isinstance(raw, dict):
         return None
-    values: Dict[str, Any] = {}
-    for f in dataclasses.fields(cls):  # type: ignore[arg-type]
+    values: dict[str, Any] = {}
+    for f in dataclasses.fields(cls):
         if f.name not in raw or raw[f.name] is None:
             if f.default is dataclasses.MISSING:
                 return None
@@ -475,8 +427,6 @@ def parse_refusal_details(cls: Type[_Details], raw: Any) -> Optional[_Details]:
 
 @dataclass
 class CheckpointRequiredDetails:
-    """``CHECKPOINT_REQUIRED``: the payer hit the uncheckpointed bound."""
-
     cycle_id: str
     cycle_id_text: str
     asset_address: str
@@ -487,9 +437,6 @@ class CheckpointRequiredDetails:
 
 @dataclass
 class TimestampNotPastCutoffDetails:
-    """``TIMESTAMP_NOT_PAST_CUTOFF``: stamped at or before the payer's latest
-    checkpoint cutoff, where nothing could ever cover it."""
-
     cycle_id: str
     cycle_id_text: str
     asset_address: str
@@ -503,8 +450,6 @@ class TimestampNotPastCutoffDetails:
 
 @dataclass
 class CycleMismatchDetails:
-    """``CYCLE_MISMATCH``: signed for a cycle other than the active one."""
-
     signed_cycle_id: str
     active_cycle_id: str
     active_cycle_id_text: str
@@ -514,17 +459,12 @@ class CycleMismatchDetails:
 
 @dataclass
 class FutureTimestampDetails:
-    """``FUTURE_TIMESTAMP``: stamped later than core's clock."""
-
     timestamp: int
     server_time: int
 
 
 @dataclass
 class StaleTimestampDetails:
-    """``STALE_TIMESTAMP``: names the active cycle but stamped before it
-    opened, usually because the payer's clock is behind."""
-
     cycle_id: str
     cycle_id_text: str
     timestamp: int
@@ -535,9 +475,6 @@ class StaleTimestampDetails:
 
 @dataclass
 class CheckpointMismatchDetails:
-    """``CHECKPOINT_MISMATCH``: the checkpoint no longer matches what core
-    holds, typically because a guarantee landed after the batch was read."""
-
     cycle_id: str
     cycle_id_text: str
     asset_address: str
@@ -546,32 +483,22 @@ class CheckpointMismatchDetails:
 
 @dataclass
 class CorePublicParameters:
-    """Static parameters exposed by the core service (``GET /core/public-params``)."""
-
     contract_address: str
-    """The on-chain Treasury (collateral vault) contract."""
+    """The Treasury (collateral vault) contract."""
     eip712_name: str
-    """EIP-712 domain name for payer-signed payloads; always
-    ``4micaClearingHouse``."""
     eip712_version: str
     chain_id: int
     guarantee_signer: str = ""
-    """The address whose signature attests the operator's guarantee receipts,
-    as registered on-chain for the layout core signs."""
+    """The address whose signature attests the operator's guarantee receipts."""
     guarantee_registry_address: str = ""
-    """Verifying contract of the domain guarantee receipts are signed under."""
     clearing_house_address: str = ""
-    """Verifying contract of the domain every payer-signed payload (payment
-    request, checkpoint) is signed under."""
     ethereum_http_rpc_url: str = ""
-    supported_payment_payload_versions: List[int] = field(
+    supported_payment_payload_versions: list[int] = field(
         default_factory=lambda: [PAYMENT_PAYLOAD_VERSION]
     )
     core_domain_separator: str = ""
-    """The Treasury's own EIP-712 ``DOMAIN_SEPARATOR()``, read on-chain by core."""
-    validators: List[str] = field(default_factory=list)
-    """Validators this operator whitelisted; a validation requirement may only
-    name one of these."""
+    validators: list[str] = field(default_factory=list)
+    """A validation requirement may only name one of these."""
 
     def __post_init__(self) -> None:
         self.chain_id = int(self.chain_id)
@@ -580,7 +507,7 @@ class CorePublicParameters:
         ]
 
     @classmethod
-    def from_rpc(cls, payload: Dict[str, Any]) -> "CorePublicParameters":
+    def from_rpc(cls, payload: dict[str, Any]) -> CorePublicParameters:
         def require(*keys: str) -> Any:
             value = _get_any(payload, *keys)
             if value is None:
@@ -590,8 +517,7 @@ class CorePublicParameters:
         def optional(*keys: str) -> str:
             return str(_get_any(payload, *keys) or "")
 
-        # Absent means a core that predates the field, which accepts what this
-        # SDK signs; present-but-empty means a core that accepts nothing.
+        # Absent: an older core accepting what this SDK signs. Empty: accepts none.
         versions_raw = _get_any(
             payload,
             "supported_payment_payload_versions",
@@ -632,32 +558,52 @@ class CorePublicParameters:
 class SupportedTokenInfo:
     symbol: str
     address: str
-    decimals: Optional[int] = None
-    domain_separator: Optional[str] = None
-    """The token's own EIP-712 ``DOMAIN_SEPARATOR()``, relayed by core so
-    clients can build gasless-deposit signatures without an Ethereum RPC.
-    ``None`` for tokens that do not expose one."""
+    decimals: int
+    domain_separator: str | None = None
+    """The token's own ``DOMAIN_SEPARATOR()``, relayed by core. ``None`` for
+    tokens that do not expose one."""
 
 
 @dataclass
 class SupportedTokensResponse:
     chain_id: int
-    tokens: List[SupportedTokenInfo]
+    tokens: list[SupportedTokenInfo]
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "SupportedTokensResponse":
-        tokens = [
-            SupportedTokenInfo(
-                symbol=str(t.get("symbol", "")),
-                address=str(t.get("address", "")),
-                decimals=int(t["decimals"]) if t.get("decimals") is not None else None,
-                domain_separator=_get_any(t, "domain_separator", "domainSeparator"),
+    def from_rpc(cls, raw: dict[str, Any]) -> SupportedTokensResponse:
+        tokens = []
+        for t in raw.get("tokens", []):
+            address = str(t.get("address", ""))
+            symbol = t.get("symbol")
+            if not isinstance(symbol, str) or not symbol:
+                raise InvalidParamsError(
+                    f"core's token list has no symbol for {address}"
+                )
+            try:
+                decimals = _token_decimals(t.get("decimals"))
+            except ValueError:
+                raise InvalidParamsError(
+                    f"core's token list has no valid decimals for {address}"
+                ) from None
+            tokens.append(
+                SupportedTokenInfo(
+                    symbol=symbol,
+                    address=address,
+                    decimals=decimals,
+                    domain_separator=_get_any(t, "domain_separator", "domainSeparator"),
+                )
             )
-            for t in raw.get("tokens", [])
-        ]
         return cls(
             chain_id=int(_get_any(raw, "chain_id", "chainId") or 0), tokens=tokens
         )
+
+
+def _token_decimals(raw: Any) -> int:
+    if isinstance(raw, str) and raw.strip().isdigit():
+        raw = int(raw)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise ValueError("not a non-negative integer")
+    return raw
 
 
 class ClearingParticipantRole(str, Enum):
@@ -672,25 +618,22 @@ class ClearingSettlementAction(str, Enum):
 
 @dataclass
 class ClearingParticipantProof:
-    """A participant's committed Merkle leaf and proof for one clearing cycle."""
-
     cycle_id: str
-    """On-chain bytes32 cycle identifier."""
+    """On-chain bytes32 cycle id."""
     cycle_id_text: str
-    """Core database cycle identifier (``{asset}:{period_start}``)."""
+    """Core's text id (``{asset}:{period_start}``)."""
     asset_address: str
     participant: str
     role: ClearingParticipantRole
     amount: int
-    """Amount used with the participant's role-specific ClearingHouse call."""
     net_debit: int
     net_credit: int
     leaf: str
     merkle_root: str
-    proof: List[str]
+    proof: list[str]
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "ClearingParticipantProof":
+    def from_rpc(cls, raw: dict[str, Any]) -> ClearingParticipantProof:
         try:
             return cls(
                 cycle_id=normalize_bytes32_hex(
@@ -720,26 +663,21 @@ class ClearingParticipantProof:
 
 @dataclass
 class ClearingSettlementActionResponse:
-    """A ClearingHouse call prepared by core from a participant's committed leaf."""
-
     contract_address: str
-    """ClearingHouse contract address."""
     function_name: str
-    """Contract function name to call (``payNetDebit`` / ``claimNetCreditFor``)."""
     action: ClearingSettlementAction
     cycle_id: str
-    """On-chain bytes32 cycle identifier."""
+    """On-chain bytes32 cycle id."""
     cycle_id_text: str
     asset_address: str
     participant: str
-    """Participant whose committed Merkle leaf is proven."""
     amount: int
     payable_value: int
     """Native value to attach; non-zero only for native-asset debtor payments."""
-    proof: List[str]
+    proof: list[str]
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "ClearingSettlementActionResponse":
+    def from_rpc(cls, raw: dict[str, Any]) -> ClearingSettlementActionResponse:
         try:
             return cls(
                 contract_address=normalize_address(
@@ -778,7 +716,7 @@ class AssetBalanceInfo:
     updated_at: int
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "AssetBalanceInfo":
+    def from_rpc(cls, raw: dict[str, Any]) -> AssetBalanceInfo:
         return cls(
             user_address=_get_any(raw, "user_address", "userAddress"),
             asset_address=_get_any(raw, "asset_address", "assetAddress"),
@@ -787,6 +725,156 @@ class AssetBalanceInfo:
             version=int(_get_any(raw, "version")),
             updated_at=int(_get_any(raw, "updated_at", "updatedAt")),
         )
+
+
+@dataclass
+class ClearingPosition:
+    cycle_id: str
+    """On-chain bytes32 cycle id."""
+    cycle_id_text: str
+    """Core's text id (``{asset}:{period_start}``), as ``settlement.pay(...)``
+    and ``settlement.claim(...)`` take it."""
+    asset_address: str
+    role: ClearingParticipantRole
+    amount: int
+    gross_outgoing: int
+    gross_incoming: int
+    payment_submission_deadline: int
+    """Unix seconds on the chain's clock. A debtor's payment is refused after
+    it."""
+    payment_finality_deadline: int
+    """Unix seconds on the chain's clock. After it, an unpaid debit is taken
+    from the debtor's collateral."""
+    commit_confirmed: bool
+    """Until it is, a payment can revert, and both deadlines are core's
+    estimate."""
+
+    @classmethod
+    def from_rpc(cls, raw: dict[str, Any]) -> ClearingPosition:
+        # Every field moves money or a deadline: missing is refused, not defaulted.
+        def required(*keys: str) -> Any:
+            value = _get_any(raw, *keys)
+            if value is None:
+                raise InvalidParamsError(
+                    f"invalid clearing position: missing {keys[0]}"
+                )
+            return value
+
+        def unix_seconds(*keys: str) -> int:
+            value = required(*keys)
+            if isinstance(value, bool) or not isinstance(value, (int, str)):
+                raise InvalidParamsError(
+                    f"invalid clearing position: {keys[0]} is not a time"
+                )
+            try:
+                seconds = int(value)
+            except ValueError:
+                seconds = 0
+            if seconds <= 0:
+                raise InvalidParamsError(
+                    f"invalid clearing position: {keys[0]} is not a time"
+                )
+            return seconds
+
+        role = str(required("role"))
+        if role not in ClearingParticipantRole.__members__:
+            raise InvalidParamsError(f"invalid clearing position: unknown role {role}")
+        commit_confirmed = required("commit_confirmed", "commitConfirmed")
+        if not isinstance(commit_confirmed, bool):
+            raise InvalidParamsError(
+                "invalid clearing position: commit_confirmed is not a boolean"
+            )
+        try:
+            return cls(
+                cycle_id=normalize_bytes32_hex(str(required("cycle_id", "cycleId"))),
+                cycle_id_text=str(required("cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(required("asset_address", "assetAddress"))
+                ),
+                role=ClearingParticipantRole(role),
+                amount=parse_u256(required("amount")),
+                gross_outgoing=parse_u256(required("gross_outgoing", "grossOutgoing")),
+                gross_incoming=parse_u256(required("gross_incoming", "grossIncoming")),
+                payment_submission_deadline=unix_seconds(
+                    "payment_submission_deadline", "paymentSubmissionDeadline"
+                ),
+                payment_finality_deadline=unix_seconds(
+                    "payment_finality_deadline", "paymentFinalityDeadline"
+                ),
+                commit_confirmed=commit_confirmed,
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid clearing position: {exc}") from exc
+
+
+GUARANTEE_STATUSES = (
+    "ISSUED",
+    "PENDING_VALIDATION",
+    "FINALIZED_PAYABLE",
+    "DISPUTED",
+    "CANCELLED",
+    "NETTED",
+    "SETTLED",
+    "DEFAULT_REMUNERATED",
+)
+
+
+@dataclass
+class PayerGuaranteeInfo:
+    guarantee_id: str
+    recipient: str
+    req_id: int
+    amount: int
+    timestamp: int
+    """Unix seconds."""
+    status: str
+    """One of :data:`GUARANTEE_STATUSES`, or a newer one as core sent it."""
+
+    @classmethod
+    def from_rpc(cls, raw: dict[str, Any]) -> PayerGuaranteeInfo:
+        return cls(
+            guarantee_id=str(_get_any(raw, "guarantee_id", "guaranteeId") or ""),
+            recipient=normalize_address(str(_get_any(raw, "recipient"))),
+            req_id=parse_u256(_get_any(raw, "req_id", "reqId") or 0),
+            amount=parse_u256(_get_any(raw, "amount") or 0),
+            timestamp=int(_get_any(raw, "timestamp") or 0),
+            status=str(_get_any(raw, "status")),
+        )
+
+
+@dataclass
+class PayerGuaranteesPage:
+    cycle_id: str
+    """On-chain bytes32 cycle id."""
+    cycle_id_text: str
+    asset_address: str
+    payer: str
+    guarantees: list[PayerGuaranteeInfo]
+    next_cursor: str | None = None
+    """Pass back as ``after`` for the next page. ``None`` on the last one."""
+
+    @classmethod
+    def from_rpc(cls, raw: dict[str, Any]) -> PayerGuaranteesPage:
+        try:
+            items = _get_any(raw, "guarantees")
+            cursor = _get_any(raw, "next_cursor", "nextCursor")
+            return cls(
+                cycle_id=normalize_bytes32_hex(
+                    str(_get_any(raw, "cycle_id", "cycleId"))
+                ),
+                cycle_id_text=str(_get_any(raw, "cycle_id_text", "cycleIdText")),
+                asset_address=normalize_address(
+                    str(_get_any(raw, "asset_address", "assetAddress"))
+                ),
+                payer=normalize_address(str(_get_any(raw, "payer"))),
+                guarantees=[
+                    PayerGuaranteeInfo.from_rpc(item)
+                    for item in (items if isinstance(items, list) else [])
+                ],
+                next_cursor=cursor if isinstance(cursor, str) and cursor else None,
+            )
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise InvalidParamsError(f"invalid guarantee list: {exc}") from exc
 
 
 @dataclass
@@ -801,7 +889,7 @@ class RecipientPaymentInfo:
     created_at: int
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "RecipientPaymentInfo":
+    def from_rpc(cls, raw: dict[str, Any]) -> RecipientPaymentInfo:
         return cls(
             user_address=_get_any(raw, "user_address", "userAddress"),
             recipient_address=_get_any(raw, "recipient_address", "recipientAddress"),
@@ -821,7 +909,7 @@ class UserSuspensionStatus:
     updated_at: int
 
     @classmethod
-    def from_rpc(cls, raw: Dict[str, Any]) -> "UserSuspensionStatus":
+    def from_rpc(cls, raw: dict[str, Any]) -> UserSuspensionStatus:
         return cls(
             user_address=_get_any(raw, "user_address", "userAddress"),
             suspended=bool(_get_any(raw, "suspended")),
@@ -835,7 +923,9 @@ class TxReceiptWaitOptions:
     poll_latency_secs: int = 2
 
 
-__all__: List[str] = [
+__all__: list[str] = [
+    "PAYMENT_PAYLOAD_VERSION",
+    "ZERO_ADDRESS",
     "ActiveCycleResponse",
     "AssetBalanceInfo",
     "CheckpointAcceptedResponse",
@@ -850,7 +940,6 @@ __all__: List[str] = [
     "CorePublicParameters",
     "CycleMismatchDetails",
     "FutureTimestampDetails",
-    "PAYMENT_PAYLOAD_VERSION",
     "PaymentRequest",
     "PaymentRequestPayload",
     "RecipientPaymentInfo",
@@ -862,5 +951,4 @@ __all__: List[str] = [
     "TxReceiptWaitOptions",
     "UserSuspensionStatus",
     "ValidationRequirement",
-    "ZERO_ADDRESS",
 ]

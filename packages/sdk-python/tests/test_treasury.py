@@ -1,6 +1,3 @@
-"""The Treasury as the SDK sees it: the vendored ABI, the reverts it maps to
-typed errors, and the pool-share position it reads."""
-
 import re
 from pathlib import Path
 
@@ -36,8 +33,6 @@ def names(abi, kind):
 
 
 def test_every_function_the_gateway_calls_is_in_a_vendored_abi():
-    """A function dropped from the contract fails here rather than at the
-    first call against a live deployment."""
     called = set(re.findall(r"functions\.([A-Za-z0-9_]+)\(", GATEWAY_SOURCE))
     called |= set(re.findall(r'_fn\(\s*"([A-Za-z0-9_]+)\(', GATEWAY_SOURCE))
     available = (
@@ -60,7 +55,6 @@ def test_the_pool_share_views_are_in_the_treasury_abi():
         "strategy",
     ):
         assert view in functions
-    # The Aave-era views are gone with the contract that had them.
     assert "totalUserScaledBalance" not in functions
     assert "getGuaranteeVersionConfig" not in functions
 
@@ -82,7 +76,6 @@ def selector(name: str) -> str:
 
 @pytest.fixture
 def gateway() -> ContractGateway:
-    # Construction makes no network calls; only the error decoder is used.
     return ContractGateway(
         eth_rpc_url="http://localhost:8545/",
         private_key=TEST_PRIVATE_KEY,
@@ -92,7 +85,7 @@ def gateway() -> ContractGateway:
 
 
 @pytest.mark.parametrize(
-    "name,expected",
+    ("name", "expected"),
     [
         ("InsufficientLiquidity", InsufficientLiquidityError),
         ("PoolInsolvent", PoolInsolventError),
@@ -114,8 +107,6 @@ def test_an_unmapped_treasury_revert_is_named(gateway):
 
 
 class PositionGateway:
-    """Answers each view with a distinct value so a crossed wire shows."""
-
     async def principal_balance(self, user, asset):
         return 1
 

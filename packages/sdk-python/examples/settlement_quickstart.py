@@ -1,13 +1,18 @@
-"""Settle a committed clearing cycle from either side.
+"""Env: FOURMICA_NETWORK (or FOURMICA_RPC_URL), FOURMICA_WALLET_PRIVATE_KEY,
+CYCLE_ID (text id or 0x on-chain id), ROLE=pay|claim."""
 
-Env: 4MICA_NETWORK (or 4MICA_RPC_URL), 4MICA_WALLET_PRIVATE_KEY, CYCLE_ID
-(text id or 0x-prefixed on-chain id), and ROLE=pay|claim.
-"""
+from __future__ import annotations
 
 import asyncio
 import os
 
-from fourmica_sdk import Client, ConfigBuilder, Erc20AllowanceRequiredError
+from fourmica_sdk import (
+    ClaimReceipt,
+    Client,
+    ConfigBuilder,
+    Erc20AllowanceRequiredError,
+    PayReceipt,
+)
 
 
 async def main() -> None:
@@ -16,6 +21,7 @@ async def main() -> None:
     role = os.environ.get("ROLE", "claim")
 
     async with await Client.connect(cfg) as client:
+        receipt: PayReceipt | ClaimReceipt
         if role == "pay":
             action = await client.settlement.pay(cycle_id).action()
             print("core prepared", action.function_name, "for", action.amount)

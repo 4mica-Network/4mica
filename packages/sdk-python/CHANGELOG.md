@@ -1,5 +1,172 @@
 # Changelog
 
+## 2.1.0 - Unreleased
+
+### Added
+
+- The package ships `py.typed`, so type checkers read its annotations; it
+  passes `mypy --strict`.
+- **`FourMica`**: a short way in, matching `FourMica` in the TypeScript SDK.
+  Connect once, then deposit, pay and withdraw with amounts written the way
+  people write them.
+
+  ```python
+  async with await FourMica.connect(private_key="0x...") as client:
+      await client.deposit("5 USDC")
+      response = await client.fetch("https://api.example.com/data")
+  ```
+
+  - `FourMica.connect(private_key= | signer= | env=, network=, rpc_url=,
+    facilitator_url=, spend=, protocols=, http_client=)`. Each network the
+    session touches gets its own `Client`, connected on first use;
+    `aclose()` (or `async with`) closes them all, and `await
+    client.low_level(network)` hands over the `Client`.
+  - `deposit("5 USDC")` resolves the asset against core's token list, checks
+    the wallet before anything is signed, goes gasless where it can, and
+    returns once core counts the deposit. Running out of time returns
+    `status="pending"` instead of raising. "Counted" is read off the
+    account's collateral total, so deposits of one asset through a session
+    run one after another: started together, two would both be confirmed by
+    core counting either.
+  - `balance()`, `withdraw()`, `withdrawals()`, `finalize_withdrawal()` and
+    `cancel_withdrawal()`. The last two take a token address for an asset
+    core no longer lists, so every request `withdrawals()` reports can be
+    finalized or cancelled.
+  - `fetch(url, method=, **kwargs)` sends an `httpx` request, pays a
+    `4mica-credit` x402 challenge within the session's `SpendLimits`
+    (default: at most 1 USDC per payment) and retries once.
+    `payment_for(response)` reports what was paid. A payment over a limit
+    raises `SpendLimitError` before anything is signed.
+  - `SpendLimits.total` is one budget per entry for the whole session,
+    shared by every network it pays on, and once set refuses an asset no
+    entry names; an empty list permits nothing. A payment sent to a seller
+    stays counted whatever comes back, a second 402 included.
+  - When the seller refuses a payment because core wants a checkpoint
+    (`invalid_4mica_credit_checkpoint_required`), `fetch` signs the
+    checkpoint for the cycle core names and pays once more, so a session
+    paying per request keeps going past core's bound on uncheckpointed
+    guarantees instead of being refused until the cycle ends. The second
+    payment carries the first one's request id, and core issues one
+    guarantee per request id, so the seller can redeem one of them and
+    `total` counts it once.
+  - After a redirect, `fetch` pays the request that was answered 402, not
+    the one it started with, and only on the origin it was asked for. The
+    paid retry follows no redirect, so the payment is never forwarded.
+  - `positions()` lists what the wallet still owes and is owed, one entry
+    per asset and settlement cycle, soonest deadline first. `settle(only=)`
+    pays every open debit and claims every open credit, gaslessly where it
+    can; with no facilitator a token debit is approved for the exact amount
+    and paid by the wallet. One that fails does not stop the others: each
+    `SettleResult` says `settled`, `skipped`, `failed` or `unknown`.
+- `client.settlement.positions()` and `client.payment.list_issued(cycle_id,
+  limit=, after=)`, over core's `/core/participants/{addr}/positions` and
+  `/core/payers/{addr}/guarantees`, with `ClearingPosition`,
+  `PayerGuaranteeInfo` and `PayerGuaranteesPage`. A position missing a
+  field, or with an unknown role or a deadline that is not a time, raises
+  `InvalidParamsError` rather than being filled in.
+- `fourmica_sdk.app`, for sellers: `AppClient(api_key)` with `resource()`,
+  `resolve_customer()` and `report_payment()`; `parse_settlement(context)`
+  reads an x402 after-settle hook into what `report_payment` takes, and
+  `payment_from_header()` reads an `X-PAYMENT` header. `AppListing` and
+  `AppAgent` carry `assetDecimals` for pricing a route in base units.
+- `X402Flow.sign_payment()` and `sign_payment_v2()` take `req_id=`: signing
+  again for a refused payment under its request id leaves the seller able to
+  redeem only one of the two.
+- `to_caip2(network)` gives the CAIP-2 id from any form of a hosted
+  network's name: `base-sepolia`, `BASE_SEPOLIA` or `eip155:84532`.
+- `fourmica_sdk.amounts`: `parse_amount`, `to_base_units`, `format_units` and
+  `resolve_token`, pinned to the same `amounts.vectors.json` as the
+  TypeScript SDK.
+- `ConfigBuilder.from_env()` reads `FOURMICA_*` variables, and takes a
+  mapping to read instead of `os.environ`. The `4MICA_` prefix still works;
+  both prefixes set to different values is a `ConfigError`.
+- `NetworkInfo` carries the chain id, label, hosted facilitator, explorer and
+  native symbol. `DEFAULT_NETWORK` and `resolve_network()` are exported.
+- Errors: `TokenNotSupportedError`, `AmbiguousTokenError`,
+  `AmountPrecisionError`, `InsufficientBalanceError`, `GasRequiredError` and
+  `SpendLimitError`. `AmountZeroError`, `NoWithdrawalRequestedError` and
+  `GracePeriodNotElapsedError` are now exported from the package root.
+
+### Changed
+
+- The SDK no longer sets `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` in the
+  process environment. The chain provider gets certifi's bundle directly.
+- `FacilitatorRejectedError(code, message, *, retryable=, transaction=,
+  details=)` and `RpcProxy.update_user_suspension(user, *, suspended=)` take
+  their flags by keyword.
+- `FourMica.settle()` reports SDK errors per position as before, and the
+  deposit wait keeps polling through them; any other exception now
+  propagates instead of being recorded as a failure or retried until the
+  timeout.
+- `aiohttp` and `eth-keys`, imported directly, are declared dependencies;
+  `typing-extensions`, unused, is not.
+- **`ConfigBuilder.network()` also selects the network's hosted
+  facilitator**, where one exists. A `Client` built with
+  `.network("base-sepolia")` and no `.facilitator_url(...)` used to
+  self-fund every operation; its unpinned `send()` now takes the gasless
+  route first. `.facilitator_url(...)` still wins, and `.rpc_url(...)`
+  clears the default.
+- **Core's token list is read strictly.** `SupportedTokenInfo.decimals` is
+  an `int`, no longer `Optional`, and a token missing `symbol` or `decimals`
+  raises `InvalidParamsError` instead of defaulting. Core always sends both.
+- An environment variable set to the empty string now counts as unset.
+- `Client.ctx` and `Client.rpc` are public, as in the TypeScript SDK.
+- `X402Flow`'s own HTTP client allows 30 seconds, and `FourMica.fetch`'s
+  allows five minutes for the answer, in place of httpx's 5-second default.
+
+### Fixed
+
+- Integers above `2**256 - 1`, negative ones and `True`/`False` are refused
+  wherever a u256 is read, including deposit and withdrawal amounts, where
+  a negative amount is now an `InvalidParamsError` rather than
+  `AmountZeroError`.
+- Validation params that are not hex raise `ValidationError`, so an x402
+  offer carrying them is refused as an `X402Error` instead of escaping as a
+  bare `ValueError`.
+- `examples/payer_quickstart.py` and `examples/recipient_quickstart.py` used
+  the 1.x API and failed on import; they use `new_payment`, `sign_request`
+  and `issue_guarantee`.
+- **An x402 v2 payment echoes `extra` as the seller advertised it.** An
+  advertised `extra: {}` was dropped from `accepted`, which the upstream
+  TypeScript seller middleware refuses as "No matching payment
+  requirements". `PaymentRequirementsV2.to_payload()` now keeps it.
+- **Payer signatures are sent in the form core and the facilitator
+  accept**: `v` of 27 or 28 and a low `s`. A remote signer answering with
+  `v` of 0 or 1 had every payment refused.
+- **A sponsored request the facilitator already broadcast is never resent
+  self-funded.** `settlement_pending`, `invalid_transaction_state` and
+  `duplicate_in_flight` used to trigger the self-funded fallback on
+  withdrawals, claims and payments. `FacilitatorRejectedError` now carries
+  the facilitator's `transaction` and `details`.
+- A connect timeout to the facilitator is "never sent", not "outcome
+  unknown", so the self-funded fallback applies.
+- A facilitator that sponsors no gas is reported in its own words instead of
+  "no facilitator configured".
+- `rpc.health()` returns an unhealthy core's report instead of retrying and
+  raising on its 503.
+- Self-funded transactions are sent one at a time, so two started together
+  no longer share a nonce.
+- `deposit.of()` and `withdraw.request()` refuse a float amount instead of
+  truncating it, and a bool instead of reading `True` as one base unit.
+- A 65-byte signature from a remote signer that cannot be one (`r` or `s`
+  outside the curve order, or `v` other than 0, 1, 27 or 28) raises
+  `SigningError`. An `s` above the order used to escape as `OverflowError`.
+  So does an answer that is not hex or not 65 bytes long, which used to be
+  sent as it was for the server to refuse.
+- A `wallet_private_key` and an `evm_signer` for two different accounts are
+  refused at connect: payments were signed by one and transactions sent by
+  the other.
+- `repr(Config)` no longer shows the private key or bearer token.
+- **A transaction the wallet sent itself whose fate is unknown is no longer
+  reported as failed.** A broadcast that got no usable answer (a timeout, a
+  dropped connection, a 5xx or 408, a JSON-RPC internal error), or a receipt
+  that did not come in time, raises `TransactionOutcomeUnknownError` with
+  its `stage` and, once the node accepted it, its `tx_hash`. It used to be a
+  `ContractError`, which invited a retry that could send it twice. It
+  extends `OutcomeUnknownError`, so one `except` covers sponsored and
+  self-sent transactions alike. An approval whose outcome is unknown is no
+  longer reset to zero and sent again.
+
 ## 2.0.0a1 - Unreleased
 
 Ground-up rewrite for the settlement-cycle protocol, mirroring the Rust SDK

@@ -1,34 +1,25 @@
-"""Exception taxonomy for the 4Mica Python SDK.
-
-Mirrors the Rust SDK's per-area error enums (``sdk-rust/src/error.rs``) as an
-exception hierarchy rooted at :class:`FourMicaError`. Facilitator error codes
-are carried verbatim on :class:`FacilitatorRejectedError` so callers can branch
-on codes this SDK predates.
-"""
-
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from collections.abc import Sequence
+from typing import Any
 
 
 class FourMicaError(Exception):
-    """Base error for the 4Mica Python SDK."""
+    pass
 
 
 class ConfigError(FourMicaError):
-    """Raised when configuration values are missing or invalid."""
+    pass
 
 
 class RpcError(FourMicaError):
-    """Raised when an API call to the core service fails. ``code`` and
-    ``details`` are what core attached to a coded refusal — stable across
-    message wording changes, so branch on ``code`` rather than the text."""
+    """Branch on ``code``, not the message text."""
 
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        code: Optional[str] = None,
+        status_code: int | None = None,
+        code: str | None = None,
         details: Any = None,
     ) -> None:
         super().__init__(message)
@@ -38,67 +29,57 @@ class RpcError(FourMicaError):
 
 
 class InvalidParamsError(FourMicaError):
-    """Raised when a server response or caller input fails validation."""
-
-
-# --- auth ---------------------------------------------------------------
+    """A server response or caller input failed validation."""
 
 
 class AuthError(FourMicaError):
-    """Raised when authentication flows fail."""
+    pass
 
 
 class AuthConfigError(AuthError):
-    """Raised when auth configuration is missing or invalid."""
+    pass
 
 
 class AuthUrlError(AuthError):
-    """Raised when an auth URL is invalid."""
+    pass
 
 
 class AuthTransportError(AuthError):
-    """Raised when auth requests fail to reach the server."""
+    pass
 
 
 class AuthDecodeError(AuthError):
-    """Raised when auth responses cannot be decoded."""
+    pass
 
 
 class AuthStatusError(AuthError):
-    """Raised when auth endpoints return a non-success status."""
-
-    def __init__(self, message: str, status_code: Optional[int] = None) -> None:
+    def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
 
 
-# --- client / connection ------------------------------------------------
-
-
 class ClientError(FourMicaError):
-    """Raised for client-side connection and initialization failures."""
+    pass
 
 
 class ClientInitializationError(ClientError):
-    """Raised when the client cannot be initialized (chain mismatch, bad keys, etc.)."""
+    pass
 
 
 class ChainRpcUnavailableError(ClientError):
-    """No Ethereum RPC endpoint is available, so nothing that reads chain state
-    or sends a transaction can run. Set ``4MICA_ETHEREUM_HTTP_RPC_URL`` or
+    """Set ``FOURMICA_ETHEREUM_HTTP_RPC_URL`` or
     ``ConfigBuilder.ethereum_http_rpc_url``."""
 
     def __init__(self) -> None:
         super().__init__(
-            "no Ethereum RPC endpoint is available; set 4MICA_ETHEREUM_HTTP_RPC_URL "
-            "or ConfigBuilder.ethereum_http_rpc_url"
+            "no Ethereum RPC endpoint is available; set "
+            "FOURMICA_ETHEREUM_HTTP_RPC_URL or ConfigBuilder.ethereum_http_rpc_url"
         )
 
 
 class MissingTokenDomainSeparatorError(ClientError):
-    """Core publishes no EIP-712 domain separator for this token, so no
-    EIP-3009 or EIP-2612 digest can be built for it. Scheme-scoped, not fatal:
-    Permit2 and self-funded routes need no token domain."""
+    """Only EIP-3009 and EIP-2612 digests need it; Permit2 and self-funded
+    routes still work."""
 
     def __init__(self, token: str) -> None:
         super().__init__(
@@ -108,20 +89,15 @@ class MissingTokenDomainSeparatorError(ClientError):
         self.token = token
 
 
-# --- payment guarantees -------------------------------------------------
-
-
 class PaymentError(FourMicaError):
-    """Raised by the payment-guarantee flow: signing, issuing, or verifying."""
+    pass
 
 
 class SigningError(PaymentError):
-    """Raised when payment signing fails."""
+    pass
 
 
 class InvalidPayerAddressError(PaymentError):
-    """The payload's payer is not a valid address."""
-
     def __init__(self) -> None:
         super().__init__("payer address is not a valid address")
 
@@ -136,17 +112,14 @@ class AddressMismatchError(PaymentError):
 
 
 class MalformedReceiptError(PaymentError):
-    """A guarantee receipt that does not decode: not hex, too short, an
-    unknown layout, or a payload that is not its layout."""
+    pass
 
 
 class UnreadableReceiptSignatureError(PaymentError):
-    """A guarantee receipt whose signature is not a readable ECDSA signature."""
+    pass
 
 
 class ReceiptSignerMismatchError(PaymentError):
-    """A guarantee receipt signed by someone other than the operator."""
-
     def __init__(self, expected: str, recovered: str) -> None:
         super().__init__(
             f"guarantee receipt was signed by {recovered}, not by the operator "
@@ -157,9 +130,7 @@ class ReceiptSignerMismatchError(PaymentError):
 
 
 class UntrustedCheckpointBatchError(PaymentError):
-    """Core's checkpoint batch failed a check, so it was not signed: an
-    operator that slipped in a payment the payer never made would inflate what
-    the payer can be charged on default."""
+    """Core's checkpoint batch failed a check, so nothing was signed."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(f"refusing to sign a checkpoint over core's batch: {reason}")
@@ -167,16 +138,14 @@ class UntrustedCheckpointBatchError(PaymentError):
 
 
 class CoreRefusalError(PaymentError, RpcError):
-    """A coded refusal from core, carrying the decoded ``details`` the caller
-    needs to act on. Still an :class:`RpcError`, so handlers written against
-    core's plain errors keep catching it."""
+    """A coded refusal with decoded ``details``; still an :class:`RpcError`."""
 
     def __init__(
         self,
         message: str,
         details: Any,
-        status_code: Optional[int] = None,
-        code: Optional[str] = None,
+        status_code: int | None = None,
+        code: str | None = None,
     ) -> None:
         RpcError.__init__(
             self, message, status_code=status_code, code=code, details=details
@@ -184,8 +153,7 @@ class CoreRefusalError(PaymentError, RpcError):
 
 
 class CheckpointRequiredError(CoreRefusalError):
-    """``CHECKPOINT_REQUIRED``: the payer holds too many guarantees past its
-    latest checkpoint. Submit one and retry."""
+    """Submit a checkpoint and retry."""
 
     def __init__(self, details: Any, **kwargs: Any) -> None:
         super().__init__(
@@ -198,8 +166,7 @@ class CheckpointRequiredError(CoreRefusalError):
 
 
 class CheckpointMismatchError(CoreRefusalError):
-    """``CHECKPOINT_MISMATCH``: the checkpoint no longer matches what core
-    holds. Re-read the batch and sign again."""
+    """Re-read the batch and sign again."""
 
     def __init__(self, details: Any, reason: str, **kwargs: Any) -> None:
         super().__init__(
@@ -212,8 +179,6 @@ class CheckpointMismatchError(CoreRefusalError):
 
 
 class CycleMismatchError(CoreRefusalError):
-    """``CYCLE_MISMATCH``: signed for a cycle other than the active one."""
-
     def __init__(self, details: Any, **kwargs: Any) -> None:
         super().__init__(
             f"payment was signed for cycle {details.signed_cycle_id} but the "
@@ -224,8 +189,6 @@ class CycleMismatchError(CoreRefusalError):
 
 
 class FutureTimestampError(CoreRefusalError):
-    """``FUTURE_TIMESTAMP``: stamped later than core's clock."""
-
     def __init__(self, details: Any, **kwargs: Any) -> None:
         super().__init__(
             f"payment timestamp {details.timestamp} is later than core's clock "
@@ -236,7 +199,7 @@ class FutureTimestampError(CoreRefusalError):
 
 
 class StaleTimestampError(CoreRefusalError):
-    """``STALE_TIMESTAMP``: stamped before the active cycle opened."""
+    """Stamped before the active cycle opened."""
 
     def __init__(self, details: Any, **kwargs: Any) -> None:
         super().__init__(
@@ -248,8 +211,7 @@ class StaleTimestampError(CoreRefusalError):
 
 
 class TimestampNotPastCutoffError(CoreRefusalError):
-    """``TIMESTAMP_NOT_PAST_CUTOFF``: stamped at or before the payer's latest
-    checkpoint cutoff."""
+    """Stamped at or before the payer's latest checkpoint cutoff."""
 
     def __init__(self, details: Any, **kwargs: Any) -> None:
         super().__init__(
@@ -260,25 +222,19 @@ class TimestampNotPastCutoffError(CoreRefusalError):
         )
 
 
-# --- on-chain -----------------------------------------------------------
-
-
 class ContractError(FourMicaError):
-    """Raised when an on-chain call or transaction fails."""
+    pass
 
 
 class UnknownRevertError(ContractError):
-    """A revert whose selector matches no known custom error."""
-
-    def __init__(self, selector: str, data: Optional[str] = None) -> None:
+    def __init__(self, selector: str, data: str | None = None) -> None:
         super().__init__(f"unknown revert (selector 0x{selector})")
         self.selector = selector
         self.data = data
 
 
 class RevertedOnChainError(ContractError):
-    """Mined and reverted, so gas *was* spent — as opposed to a refusal before
-    broadcasting."""
+    """Mined and reverted, so gas was spent."""
 
     def __init__(self, tx_hash: str) -> None:
         super().__init__(f"transaction {tx_hash} reverted on-chain")
@@ -286,53 +242,50 @@ class RevertedOnChainError(ContractError):
 
 
 class AmountZeroError(ContractError):
-    """The contract rejected a zero amount."""
+    pass
 
 
 class InsufficientAvailableError(ContractError):
-    """The contract has less available than the operation needs."""
+    pass
 
 
 class NoWithdrawalRequestedError(ContractError):
-    """No withdrawal request is outstanding to cancel or finalize."""
+    pass
 
 
 class GracePeriodNotElapsedError(ContractError):
-    """The withdrawal grace period has not elapsed yet."""
+    pass
 
 
 class TransferFailedError(ContractError):
-    """The asset transfer inside the contract failed."""
+    pass
 
 
 class UnsupportedAssetError(ContractError):
-    """The contract does not support this asset."""
-
     def __init__(self, asset: str) -> None:
         super().__init__(f"unsupported asset: {asset}")
         self.asset = asset
 
 
 class InsufficientLiquidityError(ContractError):
-    """The pool cannot pay this much out right now; its strategy holds the
-    rest. Retry later, or withdraw less."""
+    """The strategy holds the rest. Retry later, or withdraw less."""
 
 
 class PoolInsolventError(ContractError):
-    """The pool has shares outstanding but nothing backing them, so no
-    deposit can be priced."""
+    """Shares outstanding with nothing backing them; no deposit can be
+    priced."""
 
 
 class DepositsDisabledError(ContractError):
-    """The Treasury is not accepting deposits."""
+    pass
 
 
 class StablecoinDepositsDisabledError(ContractError):
-    """The Treasury is not accepting deposits of this stablecoin."""
+    pass
 
 
 class PausedError(ContractError):
-    """The Treasury is paused."""
+    pass
 
 
 class ValueMismatchError(ContractError):
@@ -344,8 +297,7 @@ class ZeroCollateralCreditError(ContractError):
 
 
 class Erc20AllowanceRequiredError(FourMicaError):
-    """A self-funded token pull needs an ERC-20 allowance that is not in place.
-    Grant it with the matching ``approve()`` terminal and retry."""
+    """Grant it with the matching ``approve()`` terminal and retry."""
 
     def __init__(self, token: str, spender: str, allowance: int, needed: int) -> None:
         super().__init__(
@@ -358,63 +310,159 @@ class Erc20AllowanceRequiredError(FourMicaError):
         self.needed = needed
 
 
-# --- facilitator sponsorship (used from Cycle 2 onward) ------------------
-
-
 class SponsorshipError(FourMicaError):
-    """A sponsored action the facilitator declined, or could not be asked to
-    perform at all."""
+    pass
 
 
 class FacilitatorNotConfiguredError(SponsorshipError):
-    """No facilitator URL was configured, so there is nobody to pay the gas."""
+    """No facilitator URL was configured, or the configured one sponsors
+    nothing."""
 
-    def __init__(self) -> None:
+    def __init__(self, message: str | None = None) -> None:
         super().__init__(
-            "no facilitator configured; set 4MICA_FACILITATOR_URL or "
+            f"the facilitator sponsors no gas: {message}"
+            if message
+            else "no facilitator configured; set FOURMICA_FACILITATOR_URL or "
             "ConfigBuilder.facilitator_url"
         )
 
 
 class FacilitatorRejectedError(SponsorshipError):
-    """The facilitator refused. ``code`` is carried verbatim so a caller can
-    branch on a code this SDK predates."""
+    """``code`` is verbatim. ``transaction`` is set when the refusal came
+    after broadcasting: check it on-chain before doing anything else."""
 
-    def __init__(self, code: str, message: str, retryable: bool = False) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        retryable: bool = False,
+        transaction: str | None = None,
+        details: Any = None,
+    ) -> None:
         super().__init__(f"facilitator rejected the request ({code}): {message}")
         self.code = code
         self.retryable = retryable
+        self.transaction = transaction
+        self.details = details
 
 
 class SponsorshipTransportError(SponsorshipError):
-    """The facilitator never received the request, so it cannot have acted on it."""
+    """The facilitator never received the request, so it cannot have acted
+    on it."""
 
 
 class OutcomeUnknownError(SponsorshipError):
-    """The request reached the facilitator but no usable answer came back, so
-    whether it submitted a transaction is unknown. Do not blindly retry: the
-    first attempt may already have settled."""
+    """Sent, with no usable answer: it may have gone through, so check before
+    retrying. Also covers :class:`TransactionOutcomeUnknownError`."""
+
+
+class TransactionOutcomeUnknownError(OutcomeUnknownError):
+    """``stage="broadcast"``: the node may have taken it, and there is no hash.
+    ``stage="receipt"``: accepted as ``tx_hash``; it may still be mined.
+    Either way a retry can send it twice: check first."""
+
+    def __init__(self, message: str, stage: str, tx_hash: str | None = None) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.tx_hash = tx_hash
 
 
 class Permit2AllowanceRequiredError(SponsorshipError):
-    """Permit2 needs a one-time on-chain ``approve(PERMIT2, ...)`` the signer
-    has not made. When ``eip2612_nonce`` is present the approval can be signed
-    (EIP-2612) rather than transacted."""
+    """With ``eip2612_nonce`` set, the approval can be signed (EIP-2612)
+    rather than transacted."""
 
-    def __init__(self, message: str, eip2612_nonce: Optional[int] = None) -> None:
+    def __init__(self, message: str, eip2612_nonce: int | None = None) -> None:
         super().__init__(f"permit2 requires a prior approve(PERMIT2, ...): {message}")
         self.eip2612_nonce = eip2612_nonce
 
 
-# --- x402 ---------------------------------------------------------------
-
-
 class X402Error(FourMicaError):
-    """Raised for x402 flow issues (invalid scheme, settlement errors, etc.)."""
+    pass
 
 
-__all__: List[str] = [
+def _list_tokens(tokens: Sequence[Any]) -> str:
+    if not tokens:
+        return "none"
+    return ", ".join(f"{t.symbol} ({t.address})" for t in tokens)
+
+
+class TokenNotSupportedError(InvalidParamsError):
+    """``supported`` is core's token list, each entry with ``symbol`` and
+    ``address``."""
+
+    def __init__(
+        self, asset: str, supported: Sequence[Any], network: str | None = None
+    ) -> None:
+        where = f" on {network}" if network else ""
+        super().__init__(
+            f"{asset} is not accepted{where}; accepted: "
+            f"{_list_tokens(supported)}, or the native asset"
+        )
+        self.asset = asset
+        self.network = network
+        self.supported = list(supported)
+
+
+class AmbiguousTokenError(InvalidParamsError):
+    """Two accepted tokens report this symbol; name the one meant by address."""
+
+    def __init__(self, symbol: str, matches: Sequence[Any]) -> None:
+        super().__init__(
+            f"{symbol} matches more than one accepted token: "
+            f"{_list_tokens(matches)}; pass the token address instead"
+        )
+        self.symbol = symbol
+        self.matches = list(matches)
+
+
+class AmountPrecisionError(InvalidParamsError):
+    """More decimal places than the token has. Never rounded."""
+
+    def __init__(self, amount: str, decimals: int) -> None:
+        super().__init__(
+            f"{amount} has more decimal places than the token's {decimals}; "
+            "round it yourself, the SDK never rounds an amount"
+        )
+        self.amount = amount
+        self.decimals = decimals
+
+
+class InsufficientBalanceError(FourMicaError):
+    """``needed`` and ``available`` are decimal strings in the asset's own
+    units."""
+
+    def __init__(self, asset: str, needed: str, available: str) -> None:
+        super().__init__(
+            f"the wallet holds {available} {asset} but this needs {needed}; "
+            "fund the wallet first"
+        )
+        self.asset = asset
+        self.needed = needed
+        self.available = available
+
+
+class GasRequiredError(FourMicaError):
+    pass
+
+
+class SpendLimitError(PaymentError):
+    """Nothing was signed. ``limit`` is ``"per_payment"``, ``"total"``,
+    ``"assets"`` or ``"pay_to"``."""
+
+    def __init__(self, limit: str, url: str, detail: str) -> None:
+        super().__init__(
+            f"payment for {url} refused by the session's spend limits ({limit}): "
+            f"{detail}; raise the limit in FourMica.connect(spend=...) to allow it"
+        )
+        self.limit = limit
+        self.url = url
+
+
+__all__: list[str] = [
     "AddressMismatchError",
+    "AmbiguousTokenError",
+    "AmountPrecisionError",
     "AmountZeroError",
     "AuthConfigError",
     "AuthDecodeError",
@@ -437,8 +485,10 @@ __all__: List[str] = [
     "FacilitatorRejectedError",
     "FourMicaError",
     "FutureTimestampError",
+    "GasRequiredError",
     "GracePeriodNotElapsedError",
     "InsufficientAvailableError",
+    "InsufficientBalanceError",
     "InsufficientLiquidityError",
     "InvalidParamsError",
     "InvalidPayerAddressError",
@@ -454,11 +504,14 @@ __all__: List[str] = [
     "RevertedOnChainError",
     "RpcError",
     "SigningError",
+    "SpendLimitError",
     "SponsorshipError",
     "SponsorshipTransportError",
     "StablecoinDepositsDisabledError",
     "StaleTimestampError",
     "TimestampNotPastCutoffError",
+    "TokenNotSupportedError",
+    "TransactionOutcomeUnknownError",
     "TransferFailedError",
     "UnknownRevertError",
     "UnreadableReceiptSignatureError",

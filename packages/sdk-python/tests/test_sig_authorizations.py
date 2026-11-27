@@ -1,6 +1,3 @@
-"""Authorization builders: what they bind, and that every signature recovers
-to the client's signer over the exact digest a redeemer would rebuild."""
-
 import pytest
 from eth_account import Account
 from stubs import (

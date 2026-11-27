@@ -1,19 +1,3 @@
-"""Full settlement-cycle clearing against a live stack, riding the real
-scheduler: issue a guarantee, wait for its cycle to close, net, and commit
-on-chain, then settle both sides through the SDK — the debtor pays the net
-debit, the creditor claims the net credit.
-
-Slow by construction (a full cycle window plus netting and commit — roughly
-SETTLEMENT_CYCLE_SECS + resolution cutoff + commit delay), so it is gated
-behind E2E_CLEARING=1 on top of the usual SDK_LOCAL_E2E=1. Run the stack with
-short windows (e.g. SETTLEMENT_CYCLE_SECS=600) and give pytest no global
-timeout. Unlike 4mica-core's own integration tests, no backdated cycle is
-injected into the DB — what settles here is exactly what the scheduler
-committed.
-
-See live_stack.py for environment and the required WalletRole grant.
-"""
-
 import os
 
 import pytest
@@ -70,9 +54,6 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     )
     cycle_id, pay_action = prepared
 
-    # Core prepared the debit for this debtor, in the cycle the receipt
-    # named, covering at least the guarantee issued above (earlier guarantees
-    # in the same window aggregate into the same net position).
     assert pay_action.function_name == "payNetDebit"
     assert pay_action.action == ClearingSettlementAction.PAY_NET_DEBIT
     assert pay_action.participant.lower() == payer.signer_address.lower()
@@ -80,9 +61,6 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     assert pay_action.amount >= verified.amount
     assert pay_action.proof, "committed cycle carries no Merkle proof"
 
-    # The action can be served before commitCycle lands on-chain; pay only
-    # once the ClearingHouse knows the cycle, or the preflight reverts
-    # CycleNotFound.
     onchain_cycle = await wait_for_onchain_cycle(payer, pay_action, timeout=timeout)
     assert onchain_cycle is not None, (
         "the scheduler never committed the cycle on the ClearingHouse"
@@ -103,7 +81,6 @@ async def test_cycle_settles_through_pay_and_claim(payer, recipient):
     assert claim_receipt.account == recipient.signer_address
     assert claim_receipt.tx_hash.startswith("0x")
 
-    # Reconciliation read: the recipient can fetch its own committed proof.
     proof = await recipient._ctx.rpc.get_clearing_participant_proof(
         cycle_id, recipient.signer_address
     )

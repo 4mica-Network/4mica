@@ -1,16 +1,14 @@
-"""Drift check: ``fourmica_sdk.networks.NETWORKS`` against the monorepo's list.
-
-``packages/sdk/networks.json`` is the single source of truth for 4Mica's
-hosted networks. The Python SDK keeps its own copy so it has no build-time
-dependency on the monorepo; this test fails when the two disagree.
-"""
-
 import json
 from pathlib import Path
 
 import pytest
 
-from fourmica_sdk.networks import NETWORKS
+from fourmica_sdk.networks import (
+    DEFAULT_NETWORK,
+    NETWORKS,
+    resolve_network,
+    resolve_network_rpc_url,
+)
 
 NETWORKS_JSON = Path(__file__).resolve().parents[2] / "sdk" / "networks.json"
 SOURCE = "packages/sdk/networks.json"
@@ -35,10 +33,31 @@ def test_network_matches_source_of_truth(canonical: dict, shorthand: str) -> Non
     if shorthand not in canonical:
         pytest.fail(f"{shorthand!r} is in NETWORKS but missing from {SOURCE}")
     info = NETWORKS[shorthand]
-    entry = canonical[shorthand]
-    assert info.caip2 == entry["caip2"], (
-        f"{shorthand}: caip2 {info.caip2!r} != {SOURCE} {entry['caip2']!r}"
+    ours = {
+        "caip2": info.caip2,
+        "chainId": info.chain_id,
+        "label": info.label,
+        "rpcUrl": info.rpc_url,
+        "facilitatorUrl": info.facilitator_url,
+        "explorerUrl": info.explorer_url,
+        "nativeSymbol": info.native_symbol,
+        "testnet": info.testnet,
+    }
+    assert ours == canonical[shorthand], (
+        f"{shorthand}: fourmica_sdk/networks.py drifted from {SOURCE}"
     )
-    assert info.rpc_url == entry["rpcUrl"], (
-        f"{shorthand}: rpc_url {info.rpc_url!r} != {SOURCE} rpcUrl {entry['rpcUrl']!r}"
-    )
+
+
+def test_default_network_is_hosted() -> None:
+    assert DEFAULT_NETWORK in NETWORKS
+
+
+def test_resolve_network_by_shorthand_or_caip2() -> None:
+    base = NETWORKS["base"]
+    assert resolve_network("base") == ("base", base)
+    assert resolve_network(" Base ") == ("base", base)
+    assert resolve_network("eip155:8453") == ("base", base)
+    assert resolve_network("EIP155:8453") == ("base", base)
+    assert resolve_network("solana") is None
+    assert resolve_network_rpc_url("eip155:8453") == base.rpc_url
+    assert resolve_network_rpc_url("solana") is None

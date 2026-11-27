@@ -1,6 +1,3 @@
-"""Gasless deposit flows against a mocked facilitator, mirroring
-``sdk-rust/tests/gasless_deposit.rs``."""
-
 import json
 
 import httpx
@@ -124,7 +121,6 @@ async def test_sponsored_permit2_signs_the_missing_approval():
     permit = bodies[-1]["eip2612Permit"]
     assert permit["value"] == str(2**256 - 1)
     assert set(permit) == {"value", "deadline", "v", "r", "s"}
-    # The retry reuses the same Permit2 authorization it already signed.
     assert bodies[0]["permit2Authorization"] == bodies[-1]["permit2Authorization"]
 
 

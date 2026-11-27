@@ -1,7 +1,3 @@
-"""Sponsored clearing settlement against a mocked facilitator, mirroring
-``sdk-rust/tests/sponsored_settlement.rs``: cycle-bound nonces, the sponsored
-approval retry, and the fallback matrix."""
-
 import json
 
 import httpx
@@ -110,9 +106,6 @@ async def test_sponsored_permit2_pay_pins_uint256_cycle_nonce():
 
 
 async def test_auto_pay_falls_back_to_self_funded_when_unsponsorable():
-    """EIP-3009 refused as a failed simulation, Permit2 refused with no
-    sponsorable approval — the auto route pays self-funded, allowance
-    pre-checked."""
     gateway = FakeGateway(allowance=5000)
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -130,8 +123,6 @@ async def test_auto_pay_falls_back_to_self_funded_when_unsponsorable():
 
 
 async def test_auto_pay_does_not_retry_an_insufficient_balance():
-    """INSUFFICIENT_BALANCE names the payment: the self-funded route pulls
-    from the same wallet and fails the same way, after paying gas."""
     gateway = FakeGateway(allowance=5000)
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -152,8 +143,6 @@ async def test_native_debits_cannot_go_gasless():
 
 
 async def test_gasless_claim_names_the_claim_only():
-    """Nothing is signed: the facilitator resolves the claim's terms from
-    core, so the request can only name which claim to submit."""
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:

@@ -15,6 +15,7 @@ from fourmica_sdk.guarantee import (
     clearing_house_domain_separator,
     guarantee_registry_domain_separator,
 )
+from fourmica_sdk.models import CorePublicParameters
 
 PARAMS = {
     "guarantee_signer": OPERATOR_ADDRESS,
@@ -43,8 +44,6 @@ class FakeProxy:
         return self
 
     async def get_public_params(self):
-        from fourmica_sdk.models import CorePublicParameters
-
         self.calls.append("get_public_params")
         if isinstance(self.params_raw, Exception):
             raise self.params_raw
@@ -84,8 +83,6 @@ async def test_connect_resolves_the_signing_domains_from_core(monkeypatch):
 
 
 async def test_connect_needs_no_ethereum_endpoint(monkeypatch):
-    """Everything resolved at connect comes from core, so constructing a
-    client costs no chain access at all."""
     use_params(monkeypatch, PARAMS)
     ctx = await ClientCtx.create(config())
     assert ctx.ethereum_http_rpc_url is None
@@ -112,7 +109,7 @@ async def test_a_core_that_predates_payload_versions_is_accepted(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "field,label",
+    ("field", "label"),
     [
         ("clearing_house_address", "clearing house address"),
         ("guarantee_registry_address", "guarantee registry address"),
@@ -120,8 +117,6 @@ async def test_a_core_that_predates_payload_versions_is_accepted(monkeypatch):
     ],
 )
 async def test_a_core_missing_a_signing_address_is_refused(monkeypatch, field, label):
-    """Every payment is signed or verified against these, so a core that
-    omits one is refused at connect rather than at the first payment."""
     params = dict(PARAMS)
     del params[field]
     proxy = use_params(monkeypatch, params)

@@ -1,44 +1,21 @@
-"""Issue and verify a payment guarantee as the recipient.
-
-Expects the payer's claims payload fields and signature (see
-payer_quickstart.py). Env: 4MICA_NETWORK (or 4MICA_RPC_URL),
-4MICA_WALLET_PRIVATE_KEY, PAYER_ADDRESS, REQ_ID, AMOUNT, TIMESTAMP,
-PAYER_SIGNATURE, optional ERC20_TOKEN.
-"""
+"""Env: FOURMICA_NETWORK (or FOURMICA_RPC_URL), FOURMICA_WALLET_PRIVATE_KEY,
+PAYMENT_REQUEST (the JSON payer_quickstart.py prints)."""
 
 import asyncio
+import json
 import os
 
-from fourmica_sdk import (
-    Client,
-    ConfigBuilder,
-    PaymentGuaranteeRequestClaims,
-    PaymentSignature,
-    SigningScheme,
-)
+from fourmica_sdk import Client, ConfigBuilder, PaymentRequest
 
 
 async def main() -> None:
     cfg = ConfigBuilder().from_env().build()
     async with await Client.connect(cfg) as client:
-        claims = PaymentGuaranteeRequestClaims.new(
-            user_address=os.environ["PAYER_ADDRESS"],
-            recipient_address=client.signer_address,
-            req_id=int(os.environ["REQ_ID"], 0),
-            amount=int(os.environ["AMOUNT"], 0),
-            timestamp=int(os.environ["TIMESTAMP"]),
-            erc20_token=os.environ.get("ERC20_TOKEN"),
-        )
-        signature = PaymentSignature(
-            signature=os.environ["PAYER_SIGNATURE"], scheme=SigningScheme.EIP712
-        )
-
-        cert = await client.payment.issue_guarantee(claims, signature)
-        verified = client.payment.verify_guarantee(cert)
-        print("guaranteed", verified.amount, "in cycle", hex(verified.cycle_id))
-
-        received = await client.payment.list_received()
-        print("payments received:", len(received))
+        request = PaymentRequest.from_rpc(json.loads(os.environ["PAYMENT_REQUEST"]))
+        receipt = await client.payment.issue_guarantee(request)
+        guarantee = client.payment.verify_guarantee(receipt)
+        print("guaranteed", guarantee.amount, "in cycle", hex(guarantee.cycle_id))
+        print("payments received:", len(await client.payment.list_received()))
 
 
 if __name__ == "__main__":

@@ -1,8 +1,3 @@
-"""Authorization digest parity. The type strings are pinned exactly as in
-``sdk-rust/src/digest.rs``, and the two domain-separator reconstructions are
-pinned against values read from the deployed contracts (Base Sepolia USDC and
-the canonical Permit2) — the same expectations the Rust suite carries."""
-
 from eth_account import Account
 
 from fourmica_sdk.digest import (
@@ -52,9 +47,6 @@ def test_type_strings_are_pinned():
 
 
 def test_reconstructed_domain_separator_matches_real_usdc():
-    """Pinned against Base Sepolia USDC's own DOMAIN_SEPARATOR(). The whole
-    risk of reconstruction is metadata disagreeing with the token, so the
-    expectation comes from the token, not from re-running the formula."""
     separator = eip712_domain_separator("USDC", "2", 84532, USDC)
     assert separator.hex() == (
         "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
@@ -62,8 +54,6 @@ def test_reconstructed_domain_separator_matches_real_usdc():
 
 
 def test_reconstructed_domain_separator_is_sensitive_to_the_name():
-    # Base *mainnet* USDC calls itself "USD Coin"; using the wrong one is a
-    # silent failure — a well-formed separator nothing verifies against.
     assert eip712_domain_separator("USDC", "2", 84532, USDC) != (
         eip712_domain_separator("USD Coin", "2", 84532, USDC)
     )
@@ -82,8 +72,6 @@ def test_core_domain_separator_is_deployment_specific():
         "Core4Mica", "1", 84532, contract
     )
     assert core_domain_separator(84532, contract) != core_domain_separator(1, contract)
-    # Core signs requests under its own operator domain; reusing that name
-    # would produce a well-formed separator Core4Mica rejects.
     assert core_domain_separator(84532, contract) != eip712_domain_separator(
         "4mica", "1", 84532, contract
     )
@@ -117,9 +105,6 @@ def test_permit2_transfer_signature_recovers_to_signer():
 
 
 def test_request_and_cancel_digests_differ_for_the_same_inputs():
-    """The two withdrawal actions share a nonce namespace on-chain, so their
-    digests must differ even when every shared field agrees — otherwise one
-    signature would authorize both."""
     request = digest_for_request_withdrawal(
         DOMAIN, ACCOUNT.address, USDC, 0, 0, 2_000_000_000, NONCE
     )

@@ -1,7 +1,3 @@
-"""Gasless withdrawal flows against a mocked facilitator, mirroring
-``sdk-rust/tests/gasless_withdraw.rs``: the action-tagged wire shape and the
-fallback matrix."""
-
 import json
 
 import httpx
@@ -107,9 +103,6 @@ async def test_throttling_falls_back_to_self_funding():
 
 
 async def test_a_rejection_naming_the_request_does_not_fall_back():
-    """The user's own transaction would revert for the same reason, so falling
-    back would cost them gas to learn what the facilitator already told them
-    for free."""
     gateway = FakeGateway()
     client = withdraw_client(lambda request: rejection("invalid_signature"), gateway)
 
@@ -119,8 +112,6 @@ async def test_a_rejection_naming_the_request_does_not_fall_back():
 
 
 async def test_an_unknown_outcome_does_not_fall_back():
-    """A second requestWithdrawal would overwrite the first and restart the
-    grace period without anyone noticing."""
     gateway = FakeGateway()
     client = withdraw_client(lambda request: httpx.Response(500, text="boom"), gateway)
 
@@ -130,9 +121,6 @@ async def test_an_unknown_outcome_does_not_fall_back():
 
 
 async def test_cancel_falls_back_on_unknown_codes():
-    """A code this SDK predates is treated as "the facilitator would not pay",
-    which costs one transaction at worst and keeps a new rejection from
-    stranding the user."""
     gateway = FakeGateway()
 
     receipt = (
