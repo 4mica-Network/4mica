@@ -44,6 +44,8 @@ enum HttpMethod {
 
 model Agent {
   id             String           @id @default(uuid(7))
+  projectId      String?          @map("project_id")
+  environmentId  String?          @map("environment_id")
   organizationId String?          @map("organization_id")
   createdById    String?          @map("created_by_id")
   slug           String?          @db.VarChar(64)
@@ -76,6 +78,8 @@ model Agent {
   deletedAt   DateTime? @map("deleted_at")
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment  Environment?  @relation(fields: [environmentId], references: [id], onDelete: Restrict)
 
   createdBy   User?           @relation("AgentCreator", fields: [createdById], references: [id], onDelete: SetNull)
   payerWallet Wallet?         @relation("AgentPayerWallet", fields: [payerWalletId], references: [id], onDelete: SetNull)
@@ -91,6 +95,7 @@ model Agent {
   @@unique([organizationId, slug])
   @@index([status])
   @@index([organizationId, visibility])
+  @@index([projectId, environmentId])
   @@map("agents")
 }
 
@@ -169,15 +174,27 @@ enum WalletVerificationMethod {
 enum OrgRole {
   OWNER
   ADMIN
-  MEMBER
+  DEVELOPER
+  VIEWER
 }
 
-/**
- * The tenant and ownership boundary. Every business resource belongs to an
- * organization, never to the person who created it. A personal organization
- * is the single-member workspace each user gets; its handle is the user's
- * username, so `handle` is the one public namespace for both.
- */
+enum ProjectRole {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+enum EnvironmentKind {
+  SANDBOX
+  PRODUCTION
+}
+
+enum ApiKeyScope {
+  PAYMENTS_WRITE
+  CUSTOMERS_READ
+  RESOURCE_READ
+}
+
 model Organization {
   id        String    @id @default(uuid(7))
   handle    String?   @unique @db.VarChar(64)
@@ -206,15 +223,103 @@ model Organization {
   beneficialOwners      BeneficialOwner[]
   wallets               Wallet[]
   supportRequests       SupportRequest[]
+  projects              Project[]
+  serviceAccounts       ServiceAccount[]
+  cliSessions           CliSession[]
 
   @@map("organizations")
+}
+
+model Project {
+  id                 String    @id @default(uuid(7))
+  organizationId     String    @map("organization_id")
+  slug               String    @db.VarChar(64)
+  name               String    @db.VarChar(120)
+  description        String?   @db.VarChar(280)
+  isDefault          Boolean   @default(false) @map("is_default")
+  restricted         Boolean   @default(false)
+  restrictProduction Boolean   @default(false) @map("restrict_production")
+  archivedAt         DateTime? @map("archived_at")
+  deletedAt          DateTime? @map("deleted_at")
+  createdById        String?   @map("created_by_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy       User?               @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  environments    Environment[]
+  members         ProjectMembership[]
+  serviceAccounts ServiceAccount[]
+  agents          Agent[]
+  apiListings     ApiListing[]
+  apiKeys         ApiKey[]
+  webhooks        Webhook[]
+  customers       Customer[]
+  payments        Payment[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model Environment {
+  id        String          @id @default(uuid(7))
+  projectId String          @map("project_id")
+  kind      EnvironmentKind
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agents      Agent[]
+  apiListings ApiListing[]
+  apiKeys     ApiKey[]
+  webhooks    Webhook[]
+
+  @@unique([projectId, kind])
+  @@map("environments")
+}
+
+model ProjectMembership {
+  id        String      @id @default(uuid(7))
+  projectId String      @map("project_id")
+  userId    String      @map("user_id")
+  role      ProjectRole @default(DEVELOPER)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_memberships")
+}
+
+model ServiceAccount {
+  id             String    @id @default(uuid(7))
+  organizationId String    @map("organization_id")
+  projectId      String    @map("project_id")
+  name           String    @db.VarChar(120)
+  description    String?   @db.VarChar(280)
+  suspendedAt    DateTime? @map("suspended_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdById    String?   @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ServiceAccountCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  apiKeys      ApiKey[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("service_accounts")
 }
 
 model Membership {
   id             String   @id @default(uuid(7))
   organizationId String   @map("organization_id")
   userId         String   @map("user_id")
-  role           OrgRole  @default(MEMBER)
+  role           OrgRole  @default(DEVELOPER)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -230,7 +335,7 @@ model Invitation {
   id             String    @id @default(uuid(7))
   organizationId String    @map("organization_id")
   email          String    @db.VarChar(255)
-  role           OrgRole   @default(MEMBER)
+  role           OrgRole   @default(DEVELOPER)
   tokenHash      String    @unique @map("token_hash")
   invitedById    String?   @map("invited_by_id")
   expiresAt      DateTime  @map("expires_at")
@@ -248,10 +353,6 @@ model Invitation {
   @@map("invitations")
 }
 
-/**
- * Append-only. A database trigger rejects UPDATE and DELETE, so a row
- * cannot be rewritten even by code that reaches the table directly.
- */
 model AuditLog {
   id             String   @id @default(uuid(7))
   organizationId String   @map("organization_id")
@@ -332,6 +433,9 @@ model User {
   createdWallets                 Wallet[]                 @relation("WalletCreator")
   createdCustomers               Customer[]               @relation("CustomerCreator")
   createdSupportRequests         SupportRequest[]         @relation("SupportRequestCreator")
+  createdProjects                Project[]                @relation("ProjectCreator")
+  createdServiceAccounts         ServiceAccount[]         @relation("ServiceAccountCreator")
+  projectMemberships             ProjectMembership[]
   reviews                        Review[]
   reports                        Report[]
   bannerInteractions             BannerInteraction[]
@@ -414,22 +518,29 @@ model OnboardingEmailSend {
 }
 
 model ApiKey {
-  id             String    @id @default(uuid(7))
-  organizationId String    @map("organization_id")
-  createdById    String?   @map("created_by_id")
-  listingId      String?   @map("listing_id")
-  agentId        String?   @map("agent_id")
-  name           String    @db.VarChar(120)
-  prefix         String    @db.VarChar(32)
-  last4          String    @db.VarChar(4)
-  hashedKey      String    @unique @map("hashed_key")
-  lastUsedAt     DateTime? @map("last_used_at")
-  expiresAt      DateTime? @map("expires_at")
-  revokedAt      DateTime? @map("revoked_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id               String        @id @default(uuid(7))
+  projectId        String        @map("project_id")
+  environmentId    String        @map("environment_id")
+  serviceAccountId String?       @map("service_account_id")
+  scopes           ApiKeyScope[] @default([])
+  organizationId   String        @map("organization_id")
+  createdById      String?       @map("created_by_id")
+  listingId        String?       @map("listing_id")
+  agentId          String?       @map("agent_id")
+  name             String        @db.VarChar(120)
+  prefix           String        @db.VarChar(32)
+  last4            String        @db.VarChar(4)
+  hashedKey        String        @unique @map("hashed_key")
+  lastUsedAt       DateTime?     @map("last_used_at")
+  expiresAt        DateTime?     @map("expires_at")
+  revokedAt        DateTime?     @map("revoked_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment    Environment     @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+  serviceAccount ServiceAccount? @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
 
   createdBy User?       @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
   listing   ApiListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -438,11 +549,15 @@ model ApiKey {
   @@index([organizationId])
   @@index([listingId])
   @@index([agentId])
+  @@index([projectId, environmentId])
+  @@index([serviceAccountId])
   @@map("api_keys")
 }
 
 model ApiListing {
   id             String           @id @default(uuid(7))
+  projectId      String           @map("project_id")
+  environmentId  String           @map("environment_id")
   organizationId String           @map("organization_id")
   createdById    String?          @map("created_by_id")
   slug           String           @db.VarChar(64)
@@ -480,6 +595,8 @@ model ApiListing {
   deletedAt DateTime? @map("deleted_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment  Environment  @relation(fields: [environmentId], references: [id], onDelete: Restrict)
 
   createdBy User?           @relation("ApiListingCreator", fields: [createdById], references: [id], onDelete: SetNull)
   wallet    Wallet?         @relation(fields: [walletId], references: [id], onDelete: SetNull)
@@ -492,6 +609,7 @@ model ApiListing {
 
   @@unique([organizationId, slug])
   @@index([organizationId, visibility])
+  @@index([projectId, environmentId])
   @@map("api_listings")
 }
 
@@ -518,8 +636,9 @@ enum PaymentStatus {
  * row serves the buyer and the seller without being stored twice.
  */
 model Payment {
-  id             String @id @default(uuid(7))
-  organizationId String @map("organization_id")
+  id             String  @id @default(uuid(7))
+  projectId      String? @map("project_id")
+  organizationId String  @map("organization_id")
 
   listingId String? @map("listing_id")
   agentId   String? @map("agent_id")
@@ -554,6 +673,7 @@ model Payment {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   listing      ApiListing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
   agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
@@ -561,6 +681,7 @@ model Payment {
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([payerAddress, createdAt(sort: Desc)])
   @@index([recipientAddress, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
   @@map("payments")
 }
 
@@ -615,6 +736,7 @@ enum CustomerIdentitySource {
 
 model Customer {
   id             String         @id @default(uuid(7))
+  projectId      String         @map("project_id")
   organizationId String         @map("organization_id")
   createdById    String?        @map("created_by_id")
   name           String         @db.VarChar(120)
@@ -644,6 +766,7 @@ model Customer {
   updatedAt     DateTime                  @updatedAt @map("updated_at")
   deletedAt     DateTime?                 @map("deleted_at")
   organization  Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project       Project                   @relation(fields: [projectId], references: [id], onDelete: Restrict)
   createdBy     User?                     @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
   identities    CustomerPaymentIdentity[]
   coupons       CustomerCoupon[]
@@ -651,6 +774,7 @@ model Customer {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, status])
+  @@index([projectId, createdAt(sort: Desc)])
   @@map("customers")
 }
 
@@ -728,6 +852,8 @@ model CustomerPaymentIdentity {
 
 model Webhook {
   id                 String        @id @default(uuid(7))
+  projectId          String        @map("project_id")
+  environmentId      String        @map("environment_id")
   organizationId     String        @map("organization_id")
   createdById        String?       @map("created_by_id")
   url                String        @db.VarChar(2048)
@@ -742,9 +868,12 @@ model Webhook {
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
   organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  environment        Environment   @relation(fields: [environmentId], references: [id], onDelete: Restrict)
   createdBy          User?         @relation("WebhookCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
+  @@index([projectId, environmentId])
   @@map("webhooks")
 }
 
@@ -943,23 +1072,26 @@ enum CliSessionKind {
 }
 
 model CliSession {
-  id          String         @id @default(uuid(7))
-  userId      String         @map("user_id")
-  kind        CliSessionKind
-  name        String         @db.VarChar(120)
-  prefix      String         @db.VarChar(32)
-  last4       String         @db.VarChar(4)
-  hashedToken String         @unique @map("hashed_token")
-  scopes      String[]
-  lastUsedAt  DateTime?      @map("last_used_at")
-  expiresAt   DateTime       @map("expires_at")
-  revokedAt   DateTime?      @map("revoked_at")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id             String         @id @default(uuid(7))
+  userId         String         @map("user_id")
+  kind           CliSessionKind
+  organizationId String?        @map("organization_id")
+  name           String         @db.VarChar(120)
+  prefix         String         @db.VarChar(32)
+  last4          String         @db.VarChar(4)
+  hashedToken    String         @unique @map("hashed_token")
+  scopes         String[]
+  lastUsedAt     DateTime?      @map("last_used_at")
+  expiresAt      DateTime       @map("expires_at")
+  revokedAt      DateTime?      @map("revoked_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([organizationId])
   @@map("cli_sessions")
 }
 
@@ -975,6 +1107,7 @@ model CliDeviceRequest {
   userCode       String                 @unique @map("user_code") @db.VarChar(16)
   clientName     String                 @map("client_name") @db.VarChar(120)
   scopes         String[]
+  organizationId String?                @map("organization_id")
   status         CliDeviceRequestStatus @default(PENDING)
   userId         String?                @map("user_id")
   requestIp      String?                @map("request_ip") @db.VarChar(64)
