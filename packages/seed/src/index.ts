@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import type { Prisma } from "@4mica/db";
 import { config as loadEnv } from "dotenv";
 
 loadEnv({
@@ -434,6 +435,64 @@ const TEAM_LISTINGS = [
   },
 ] as const;
 
+const FINANCE_MEMBER = {
+  clerkUserId: "user_seed_finance_fran",
+  username: "fran-finance",
+  name: "Fran Ilunga",
+  email: "fran@example.com",
+} as const;
+
+const TEAM_GOVERNANCE = {
+  approvalsRequired: 1,
+  governedActions: ["spending_policy.change", "api_key.create_production"],
+} as const;
+
+const TEAM_APPROVAL = {
+  id: "019a0000-5eed-7000-8000-00000000a001",
+  action: "spending_policy.change",
+  summary:
+    'Create spending policy "Labs monthly cap": 200 USDC a month on Base Sepolia',
+  payload: {
+    op: "create",
+    name: "Labs monthly cap",
+    scope: "ORGANIZATION",
+    mode: "ENFORCE",
+    network: "BASE_SEPOLIA",
+    assetAddress: USDC_BASE_SEPOLIA,
+    monthlyLimit: "200",
+  },
+  ttlHours: 72,
+} as const;
+
+const GUARDRAIL_POLICY = {
+  name: "Workspace guardrail",
+  scope: "ORGANIZATION",
+  mode: "ENFORCE",
+  network: "BASE_SEPOLIA",
+  assetAddress: USDC_BASE_SEPOLIA,
+  perPaymentLimit: "5",
+  dailyLimit: "50",
+  approvalThreshold: "20",
+} as const;
+
+const BUDGET_POLICY = {
+  name: "Monthly budget",
+  scope: "ORGANIZATION",
+  mode: "MONITOR",
+  network: "BASE_SEPOLIA",
+  assetAddress: USDC_BASE_SEPOLIA,
+  monthlyLimit: "500",
+  alertThresholds: [50, 80, 100],
+} as const;
+
+const SPEND_AUTHORIZATION_IDS = {
+  consumed: "019a0000-5eed-7000-8000-00000000b001",
+  reserved: "019a0000-5eed-7000-8000-00000000b002",
+  denied: "019a0000-5eed-7000-8000-00000000b003",
+} as const;
+
+const BLOCKED_SELLER = "0x2c4e6a8c0f2b4d6e8a1c3f5b7d9e0a2c4e6f8b31";
+
 const DEV_INVITATION = {
   email: "invitee@example.com",
   role: "DEVELOPER",
@@ -534,6 +593,26 @@ const ensureDefaultProject = async (organizationId: string) => {
 
 const sha256Hex = (value: string): string =>
   createHash("sha256").update(value).digest("hex");
+
+const canonical = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(canonical);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, entry]) => [key, canonical(entry)]),
+    );
+  }
+  return value;
+};
+
+const payloadHash = (action: string, payload: unknown): string =>
+  sha256Hex(JSON.stringify(canonical({ action, payload })));
+
+const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 const inSevenDays = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -1267,6 +1346,254 @@ const seed = async (): Promise<void> => {
     },
   });
 
+  const financeFields = {
+    username: FINANCE_MEMBER.username,
+    name: FINANCE_MEMBER.name,
+    email: FINANCE_MEMBER.email,
+    emailVerified: true,
+    private: false,
+    completeOnboarding: true,
+    isSeeded: true,
+  };
+
+  const financeMember = await prisma.user.upsert({
+    where: { clerkUserId: FINANCE_MEMBER.clerkUserId },
+    update: financeFields,
+    create: { clerkUserId: FINANCE_MEMBER.clerkUserId, ...financeFields },
+    select: { id: true },
+  });
+
+  await ensurePersonalOrganization({
+    id: financeMember.id,
+    username: FINANCE_MEMBER.username,
+    name: FINANCE_MEMBER.name,
+    avatarUrl: null,
+  });
+
+  await prisma.membership.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: team.id,
+        userId: financeMember.id,
+      },
+    },
+    update: { role: "FINANCE" },
+    create: {
+      organizationId: team.id,
+      userId: financeMember.id,
+      role: "FINANCE",
+    },
+  });
+
+  const governanceFields = {
+    approvalsRequired: TEAM_GOVERNANCE.approvalsRequired,
+    governedActions: [...TEAM_GOVERNANCE.governedActions],
+  };
+
+  await prisma.governanceSettings.upsert({
+    where: { organizationId: team.id },
+    update: governanceFields,
+    create: { organizationId: team.id, ...governanceFields },
+  });
+
+  const approvalFields = {
+    organizationId: team.id,
+    projectId: null,
+    kind: "GOVERNANCE" as const,
+    action: TEAM_APPROVAL.action,
+    summary: TEAM_APPROVAL.summary,
+    payload: TEAM_APPROVAL.payload,
+    payloadHash: payloadHash(TEAM_APPROVAL.action, TEAM_APPROVAL.payload),
+    requestedById: owner.id,
+    requestedByApiKeyId: null,
+    requiredApprovals: TEAM_GOVERNANCE.approvalsRequired,
+    status: "PENDING" as const,
+    expiresAt: new Date(Date.now() + TEAM_APPROVAL.ttlHours * 60 * 60 * 1000),
+    decidedAt: null,
+    executedAt: null,
+  };
+
+  await prisma.approvalRequest.upsert({
+    where: { id: TEAM_APPROVAL.id },
+    update: approvalFields,
+    create: { id: TEAM_APPROVAL.id, ...approvalFields },
+  });
+
+  await prisma.approvalDecision.deleteMany({
+    where: { approvalRequestId: TEAM_APPROVAL.id },
+  });
+
+  const ensurePolicy = async (
+    name: string,
+    fields: Omit<
+      Prisma.SpendingPolicyUncheckedCreateInput,
+      "organizationId" | "name"
+    >,
+  ) => {
+    const existing = await prisma.spendingPolicy.findFirst({
+      where: { organizationId: org.id, name },
+      select: { id: true },
+    });
+    const data = { ...fields, enabled: true, frozenAt: null, deletedAt: null };
+    return existing
+      ? prisma.spendingPolicy.update({
+          where: { id: existing.id },
+          data,
+          select: { id: true },
+        })
+      : prisma.spendingPolicy.create({
+          data: {
+            organizationId: org.id,
+            name,
+            createdById: owner.id,
+            ...data,
+          },
+          select: { id: true },
+        });
+  };
+
+  const guardrail = await ensurePolicy(GUARDRAIL_POLICY.name, {
+    scope: GUARDRAIL_POLICY.scope,
+    mode: GUARDRAIL_POLICY.mode,
+    network: GUARDRAIL_POLICY.network,
+    assetAddress: GUARDRAIL_POLICY.assetAddress,
+    perPaymentLimit: GUARDRAIL_POLICY.perPaymentLimit,
+    dailyLimit: GUARDRAIL_POLICY.dailyLimit,
+    monthlyLimit: null,
+    approvalThreshold: GUARDRAIL_POLICY.approvalThreshold,
+    approvalsRequired: 1,
+    allowedRecipients: [],
+    alertThresholds: [80, 100],
+  });
+
+  const budget = await ensurePolicy(BUDGET_POLICY.name, {
+    scope: BUDGET_POLICY.scope,
+    mode: BUDGET_POLICY.mode,
+    network: BUDGET_POLICY.network,
+    assetAddress: BUDGET_POLICY.assetAddress,
+    perPaymentLimit: null,
+    dailyLimit: null,
+    monthlyLimit: BUDGET_POLICY.monthlyLimit,
+    approvalThreshold: null,
+    approvalsRequired: 1,
+    allowedRecipients: [],
+    alertThresholds: [...BUDGET_POLICY.alertThresholds],
+  });
+
+  const sentThisMonth = PAYMENTS.findLastIndex(
+    (entry) => entry.direction === "out" && entry.monthsAgo === 0,
+  );
+  const sentReqId = `0xseed${sentThisMonth.toString(16).padStart(4, "0")}`;
+  const sentPayment = await prisma.payment.findFirst({
+    where: { organizationId: org.id, reqId: sentReqId },
+    select: { id: true, amount: true, createdAt: true },
+  });
+
+  const spendScope = {
+    organizationId: org.id,
+    projectId: agentRow?.projectId ?? org.project.id,
+    environment: "SANDBOX" as const,
+    apiKeyId: null,
+    agentId: agentRow?.id ?? null,
+    network: "BASE_SEPOLIA" as const,
+    assetAddress: USDC_BASE_SEPOLIA,
+    payerAddress: ATLAS_PAYER,
+    approvalRequestId: null,
+  };
+  const consumedAt = sentPayment?.createdAt ?? now;
+  const deniedAt = new Date(now.getTime() - 26 * 60 * 60 * 1000);
+
+  const spendAuthorizations: (Prisma.SpendAuthorizationUncheckedCreateInput & {
+    id: string;
+  })[] = [
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.consumed,
+      recipientAddress: CUSTOMER_ADDRESS,
+      amount: sentPayment?.amount ?? "0.002",
+      reqId: sentPayment ? sentReqId : null,
+      status: "CONSUMED",
+      deniedReason: null,
+      policyId: null,
+      paymentId: sentPayment?.id ?? null,
+      expiresAt: new Date(consumedAt.getTime() + TEN_MINUTES_MS),
+      consumedAt,
+      createdAt: consumedAt,
+    },
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.reserved,
+      recipientAddress: TEAM_WALLET.address,
+      amount: TEAM_LISTINGS[0].priceAmount,
+      reqId: null,
+      status: "RESERVED",
+      deniedReason: null,
+      policyId: null,
+      paymentId: null,
+      expiresAt: new Date(now.getTime() + TEN_MINUTES_MS),
+      consumedAt: null,
+      createdAt: now,
+    },
+    {
+      ...spendScope,
+      id: SPEND_AUTHORIZATION_IDS.denied,
+      recipientAddress: BLOCKED_SELLER,
+      amount: "7.5",
+      reqId: null,
+      status: "DENIED",
+      deniedReason: "per_payment_limit",
+      policyId: guardrail.id,
+      paymentId: null,
+      expiresAt: new Date(deniedAt.getTime() + TEN_MINUTES_MS),
+      consumedAt: null,
+      createdAt: deniedAt,
+    },
+  ];
+
+  for (const { id, ...fields } of spendAuthorizations) {
+    await prisma.spendAuthorization.upsert({
+      where: { id },
+      update: fields,
+      create: { id, ...fields },
+    });
+  }
+
+  const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const budgetPercent = BUDGET_POLICY.alertThresholds[0];
+  const budgetAlertKey = `budget:${budget.id}:monthly:${period}:${budgetPercent}`;
+  const budgetAlertFields = {
+    projectId: null,
+    kind: "BUDGET_THRESHOLD" as const,
+    policyId: budget.id,
+    title: `${BUDGET_POLICY.name} reached ${budgetPercent}% this month`,
+    detail: {
+      window: "monthly",
+      period,
+      percent: budgetPercent,
+      limit: BUDGET_POLICY.monthlyLimit,
+      spent: "250",
+      network: BUDGET_POLICY.network,
+      assetAddress: BUDGET_POLICY.assetAddress,
+    },
+    acknowledgedAt: null,
+    acknowledgedById: null,
+  };
+
+  await prisma.financialAlert.upsert({
+    where: {
+      organizationId_dedupeKey: {
+        organizationId: org.id,
+        dedupeKey: budgetAlertKey,
+      },
+    },
+    update: budgetAlertFields,
+    create: {
+      organizationId: org.id,
+      dedupeKey: budgetAlertKey,
+      ...budgetAlertFields,
+    },
+  });
+
   const [agents, wallets, listings, banners, payments, customers] =
     await Promise.all([
       prisma.agent.count(),
@@ -1281,7 +1608,7 @@ const seed = async (): Promise<void> => {
     `${count} ${noun}${count === 1 ? "" : "s"}`;
 
   console.info(
-    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}", restricted project "${RESEARCH_PROJECT.slug}"), service account "${SERVICE_ACCOUNT.name}" (sandbox key "${SERVICE_ACCOUNT_SECRET}"), ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
+    `[@4mica/seed] upserted profile @${PROFILE.username}, team @${TEAM.handle} (${plural(TEAM_LISTINGS.length, "api listing")}, invitation token "${DEV_INVITATION.token}", restricted project "${RESEARCH_PROJECT.slug}"), service account "${SERVICE_ACCOUNT.name}" (sandbox key "${SERVICE_ACCOUNT_SECRET}"), finance member @${FINANCE_MEMBER.username} in @${TEAM.handle} (governance on ${TEAM_GOVERNANCE.governedActions.join(", ")}; pending approval ${TEAM_APPROVAL.id}), spending policies "${GUARDRAIL_POLICY.name}" (enforce) and "${BUDGET_POLICY.name}" (monitor) with ${plural(spendAuthorizations.length, "spend authorization")} and a budget alert, ${plural(AGENTS.length, "agent")}, ${plural(WALLETS.length, "wallet")}, ${plural(API_LISTINGS.length, "api listing")} ${plural(BANNERS.length, "banner")}, ${plural(PAYMENTS.length, "payment")} and ${plural(CUSTOMERS.length, "customer")} (${agents} agent rows, ${wallets} wallet rows, ${listings} listing rows, ${banners} banner rows, ${payments} payment rows, ${customers} customer rows total).`,
   );
 };
 
